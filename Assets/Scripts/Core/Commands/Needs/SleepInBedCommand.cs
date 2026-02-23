@@ -5,14 +5,14 @@ namespace Arcontio.Core
 {
     /// <summary>
     /// SleepInBedCommand (Day9):
-    /// L’NPC usa un letto (WorldObjectInstance) tramite ObjectUseState.
+    /// Lâ€™NPC usa un letto (WorldObjectInstance) tramite ObjectUseState.
     ///
     /// Effetto:
     /// - setta UseState: IsInUse=true, UsingNpcId=npcId
     /// - riduce Fatigue01 usando NeedsConfig.sleepRestGainPerTick
     ///
     /// Nota:
-    /// - reasonTag è SOLO per log (non influenza la logica).
+    /// - reasonTag Ã¨ SOLO per log (non influenza la logica).
     ///   Serve a tenere leggibile il test: "Community" vs "Trespass".
     /// </summary>
     public sealed class SleepInBedCommand : ICommand
@@ -52,10 +52,15 @@ namespace Arcontio.Core
             if (!world.Objects.TryGetValue(_bedObjId, out var obj) || obj == null)
                 return;
 
-            // 1) Se già in uso, non facciamo nulla (v0)
+            // 1) Se giÃ  in uso, non facciamo nulla (v0)
             var use = world.GetUseStateOrDefault(_bedObjId);
             if (use.IsInUse)
                 return;
+
+            // ACTION TRACE (debug/overlay): l'NPC sta iniziando a dormire in un letto.
+            // reasonTag Ã¨ solo diagnostico (Community/Trespass).
+            string sleepLabel = string.IsNullOrEmpty(_reasonTag) ? "SleepInBed" : ("SleepInBed:" + _reasonTag);
+            world.SetNpcAction(_npcId, NpcActionState.Sleep(sleepLabel, _bedObjId));
 
             // 2) Occupiamo letto
             use.IsInUse = true;

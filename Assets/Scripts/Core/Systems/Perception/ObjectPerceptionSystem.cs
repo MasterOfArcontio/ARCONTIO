@@ -54,6 +54,38 @@ namespace Arcontio.Core
                 if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                     facing = CardinalDirection.North;
 
+                // ============================================================
+                // DEBUG FOV (heatmap per finestra N tick)
+                // ============================================================
+                // Questo NON influenza la percezione canonica degli oggetti.
+                // Serve solo a visualizzare in grid view quali celle l'NPC "ha osservato"
+                // (in senso geometrico: Range ? Cone ? (opzionale) LOS).
+                //
+                // Motivazione:
+                // - La view poll-a a frame.
+                // - Se il tick-rate supera il frame-rate, vedere i coni in sequenza
+                //   richiede un buffer.
+                // - Qui registriamo la telemetria nel write buffer del World.
+                // ============================================================
+                if (world.DebugFovTelemetry != null)
+                {
+                    bool debugUseLos = world.Config?.Sim?.debug_fov != null
+                        ? world.Config.Sim.debug_fov.use_los
+                        : true;
+
+                    RecordDebugFovCellsForNpc(
+                        world: world,
+                        npcId: npcId,
+                        originX: np.X,
+                        originY: np.Y,
+                        facing: facing,
+                        visionRange: visionRange,
+                        useCone: useCone,
+                        coneSlope: coneSlope,
+                        useLos: debugUseLos
+                    );
+                }
+
                 for (int o = 0; o < _objIds.Count; o++)
                 {
                     int objId = _objIds[o];
@@ -104,6 +136,77 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("ObjectPerception.SpottedEvents", spotted);
+        }
+
+        /// <summary>
+        /// Registra nel DebugFovTelemetry tutte le celle "candidate" viste dall'NPC.
+        ///
+        /// Pipeline coerente con ARCONTIO Core Standard:
+        /// - Range gate
+        /// - Cone gate (90° su 4 orientamenti)
+        /// - LOS via OcclusionMap (World.HasLineOfSight)
+        ///
+        /// Nota:
+        /// - Per performance (debug), facciamo uno scan brute-force nel bounding box.
+        /// - È accettabile perché:
+        ///   - mappe piccole
+        ///   - feature disattivabile
+        ///   - finestra N tick (non per forza ogni frame)
+        /// </summary>
+        private static void RecordDebugFovCellsForNpc(
+            World world,
+            int npcId,
+            int originX,
+            int originY,
+            CardinalDirection facing,
+            int visionRange,
+            bool useCone,
+            float coneSlope,
+            bool useLos)
+        {
+            // Fail-safe
+            if (world == null || world.DebugFovTelemetry == null) return;
+            if (visionRange <= 0) return;
+
+            int minX = originX - visionRange;
+            int maxX = originX + visionRange;
+            int minY = originY - visionRange;
+            int maxY = originY + visionRange;
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (!world.InBounds(x, y))
+                        continue;
+
+                    int dist = Manhattan(originX, originY, x, y);
+                    if (dist > visionRange)
+                        continue;
+
+                    // Cone check (opzionale)
+                    if (useCone)
+                    {
+                        if (!IsInCone(originX, originY, facing, x, y, coneSlope))
+                            continue;
+                    }
+                    else
+                    {
+                        // modalità legacy: "davanti"
+                        if (!IsInFront(originX, originY, facing, x, y))
+                            continue;
+                    }
+
+                    // LOS (opzionale via debug flag)
+                    if (useLos)
+                    {
+                        if (!world.HasLineOfSight(originX, originY, x, y))
+                            continue;
+                    }
+
+                    world.DebugFovTelemetry.RecordCell(npcId, x, y);
+                }
+            }
         }
 
         private static int Manhattan(int ax, int ay, int bx, int by)

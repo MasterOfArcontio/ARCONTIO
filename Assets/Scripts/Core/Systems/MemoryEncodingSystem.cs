@@ -7,7 +7,7 @@ namespace Arcontio.Core
     /// <summary>
     /// MemoryEncodingSystem:
     /// - prende gli eventi del tick (buffer)
-    /// - decide per quali NPC l'evento � percepito (testimoni)  <-- QUI applichiamo CONO+LOS
+    /// - decide per quali NPC l'evento è percepito (testimoni)  <-- QUI applichiamo CONO+LOS
     /// - per ciascun testimone applica IMemoryRule e aggiunge trace nel MemoryStore
     ///
     /// Nota architetturale:
@@ -62,14 +62,14 @@ namespace Arcontio.Core
 
             // Cono:
             // Nel tuo progetto hai sia NpcVisionUseCone/NpcVisionConeSlope
-            // sia NpcVisionConeHalfWidthPerStep. Per evitare ambiguit�,
+            // sia NpcVisionConeHalfWidthPerStep. Per evitare ambiguità,
             // usiamo: (A) UseCone toggle + (B) ConeSlope come ampiezza.
             bool useCone = world.Global.NpcVisionUseCone;
             float coneHalfWidthPerStep = world.Global.NpcVisionConeSlope;
             if (coneHalfWidthPerStep < 0f) coneHalfWidthPerStep = 0f;
 
             // LOS:
-            // Riutilizzo il toggle gi� esistente (EnableTokenLOS) per non introdurre un nuovo flag.
+            // Riutilizzo il toggle già esistente (EnableTokenLOS) per non introdurre un nuovo flag.
             // Se vuoi separare le due cose: aggiungi GlobalState.NpcVisionUseLOS.
             bool useLos = world.Global.EnableTokenLOS;
 
@@ -102,6 +102,7 @@ namespace Arcontio.Core
                             continue;
 
                         int dist = Manhattan(p.X, p.Y, evX, evY);
+
                         if (dist > visionRange)
                             continue;
 
@@ -118,11 +119,56 @@ namespace Arcontio.Core
                         // ? LOS per tutti gli eventi con cella
                         // Nota: se vuoi un toggle globale, puoi usare world.Global.EnableTokenLOS oppure creare EnableNpcVisionLOS.
                         // Qui assumo: BlocksVision + VisionCost>=1 => blocca.
-                        if (HasBlockingLOS(world, p.X, p.Y, evX, evY))
-                            continue;
+                        if (useLos)
+                        {
+                            if (HasBlockingLOS(world, p.X, p.Y, evX, evY))
+                                continue;
+                        }
 
                         float quality = 1f - (dist / (float)visionRange);
                         if (quality < 0.05f) quality = 0.05f;
+
+                        // ============================================================
+                        // NPC BALLOON SIGNALS (view)
+                        // ============================================================
+                        // UX requirement:
+                        // - If an NPC witnesses a theft or suffers it (and perceives it), the view should be
+                        //   able to show a dedicated balloon above the NPC.
+                        //
+                        // Architectural reason:
+                        // - Only here we know the real witnesses (range + cone + LOS).
+                        // - So this is the correct point to emit the signal.
+                        //
+                        // NOTE:
+                        // - This does NOT change the simulation state; it only writes an observability store
+                        //   (World.NpcBalloonSignals).
+                        if (e is FoodStolenEvent fe)
+                        {
+                            if (npcId == fe.VictimNpcId)
+                            {
+                                // Victim that *sees* the theft (otherwise it would not pass perception filters above).
+                                world.EmitNpcBalloon(npcId, NpcBalloonKind.TheftSuffered, subjectId: fe.ThiefNpcId, secondarySubjectId: fe.VictimNpcId);
+                            }
+                            else
+                            {
+                                // Third-party witness.
+                                world.EmitNpcBalloon(npcId, NpcBalloonKind.TheftWitnessed, subjectId: fe.ThiefNpcId, secondarySubjectId: fe.VictimNpcId);
+                            }
+                        }
+
+                        // ============================================================
+                        // DAY10: Object-memory store (NpcObjectMemoryStore)
+                        // ============================================================
+                        // Nota (molto verbosa ma importante):
+                        // Questo blocco NON sostituisce le MemoryTrace narrative.
+                        // Serve a mantenere una lista compatta di oggetti conosciuti (cibo/letto/etc.)
+                        // per evitare sia:
+                        // - telepatia (scansione globale di world.Objects)
+                        // - polling costoso (ricerche ripetute ogni tick)
+                        //
+                        // Lo aggiorniamo SOLO se questo npcId è un testimone valido dellevento
+                        // (range + cono + LOS già verificati sopra).
+                        TryUpsertObjectMemoryFromSpotted(world, npcId, e, quality, tick);
 
                         telemetry.Counter("MemoryEncodingSystem.TracesEncodedAttempts", 1);
 
@@ -165,16 +211,108 @@ namespace Arcontio.Core
             return dx + dy;
         }
 
+        // ============================================================
+        // DAY10: Object-memory store helpers
+        // ============================================================
+
+        /// <summary>
+        /// Se levento è ObjectSpottedEvent, aggiorna lo store ad-hoc NpcObjectMemoryStore del testimone.
+        /// Questo è il punto di integrazione perception ? eventi ? conoscenza.
+        /// </summary>
+        private static void TryUpsertObjectMemoryFromSpotted(World world, int witnessNpcId, ISimEvent e, float reliability01, Tick tick)
+        {
+            if (e is not ObjectSpottedEvent ev)
+                return;
+
+            // Safety: NPC esiste?
+            if (!world.ExistsNpc(witnessNpcId))
+                return;
+
+            // Safety: store esiste? (difensivo: anche se CreateNpc lo dovrebbe creare)
+            if (!world.NpcObjectMemory.TryGetValue(witnessNpcId, out var store) || store == null)
+            {
+                int cap = world.Global.NpcObjectMemorySlots;
+                if (cap <= 0) cap = 24;
+                store = new NpcObjectMemoryStore(cap);
+                world.NpcObjectMemory[witnessNpcId] = store;
+            }
+
+            // Owner info: non è nellevento (perché levento è cosa è stato visto),
+            // quindi lo recuperiamo dalla fonte di verità world.Objects.
+            OwnerKind ownerKind = OwnerKind.None;
+            int ownerId = -1;
+
+            if (world.Objects.TryGetValue(ev.ObjectId, out var obj) && obj != null)
+            {
+                ownerKind = obj.OwnerKind;
+                ownerId = obj.OwnerId;
+            }
+
+            // Utility: euristica minima per Day10.
+            // In futuro questa dovrebbe dipendere da Needs/Goal dellNPC e non essere hardcoded.
+            float utility01 = EstimateUtility01(ev.DefId);
+
+            // Tick: tick.Index è long. In Day10 per semplicità castiamo a int.
+            // (Nel lungo periodo, se la simulazione dura mesi di tick, conviene passare a long.)
+            int nowTick = (int)tick.Index;
+
+            // pinIfOwnedByNpc:
+            // - se loggetto è owned-by-npc e ownerId == witnessNpcId, lo pinniamo (non viene evicted facilmente).
+            // - questo evita di dimenticare il proprio letto / le proprie risorse principali.
+            bool pinIfOwnedByNpc = true;
+
+            // Upsert = Update+Insert:
+            // - se già presente: refresh lastSeen/pos/reliability
+            // - se non presente: inserisci o rimpiazza entry peggiore
+            store.Upsert(
+                nowTick,
+                ev.DefId,
+                ev.ObjectId,
+                ev.CellX, ev.CellY,
+                ownerKind,
+                ownerId,
+                reliability01,
+                utility01,
+                pinIfOwnedByNpc,
+                witnessNpcId
+            );
+        }
+
+        /// <summary>
+        /// Euristica minimale di quanto è utile un oggetto per la decisione.
+        /// Per Day10 basta distinguere cibo/letto; tutto il resto è medio-basso.
+        /// </summary>
+        private static float EstimateUtility01(string defId)
+        {
+            if (string.IsNullOrEmpty(defId))
+                return 0.25f;
+
+            // Nota: per v0.01 usiamo contains su DefId.
+            // In futuro: object def tags (Food/Bed/Workstation/...), non string matching.
+            string s = defId.ToLowerInvariant();
+
+            if (s.Contains("food"))
+                return 1.00f;
+
+            if (s.Contains("bed"))
+                return 0.90f;
+
+            if (s.Contains("door"))
+                return 0.60f;
+
+            return 0.35f;
+        }
+
         /// <summary>
         /// IsInCone:
         /// Cono in griglia deterministico, basato su:
-        /// - forward: quanto � davanti (deve essere > 0)
-        /// - side: quanto � laterale (|side| <= forward * coneHalfWidthPerStep)
+        /// - forward: quanto è davanti (deve essere > 0)
+        /// - side: quanto è laterale (|side| <= forward * coneHalfWidthPerStep)
         ///
         /// coneHalfWidthPerStep:
         /// - 0.0  => solo linea frontale
         /// - 0.5  => cono stretto
-        /// - 1.0  => cono ampio (?45� su griglia)
+        /// - 1.0  => cono ampio (?45° su griglia)
         /// </summary>
         private static bool IsInCone(int sx, int sy, CardinalDirection facing, int tx, int ty, float coneHalfWidthPerStep)
         {
@@ -192,12 +330,12 @@ namespace Arcontio.Core
 
                 case CardinalDirection.South:
                     forward = -dy;
-                    side = -dx;
+                    side = dx;
                     break;
 
                 case CardinalDirection.East:
                     forward = dx;
-                    side = -dy;
+                    side = dy;
                     break;
 
                 case CardinalDirection.West:
@@ -206,42 +344,28 @@ namespace Arcontio.Core
                     break;
 
                 default:
-                    return false;
+                    forward = dy;
+                    side = dx;
+                    break;
             }
 
-            if (forward <= 0)
-                return false;
+            // Deve essere davanti
+            if (forward <= 0) return false;
 
-            int absSide = side < 0 ? -side : side;
+            // side <= forward * slope
+            float limit = forward * coneHalfWidthPerStep;
+            if (side < 0) side = -side;
 
-            // absSide <= forward * slope
-            // Usiamo floor per mantenere determinismo su grid.
-            int allowed = (int)Math.Floor(forward * coneHalfWidthPerStep + 0.0001f);
-            return absSide <= allowed;
+            return side <= limit + 0.0001f;
         }
 
-        // =========================
-        // LOS (blocca)
-        // =========================
+        /// <summary>
+        /// LOS blocking:
+        /// true se una cella tra start e target blocca la visione.
+        /// </summary>
         private static bool HasBlockingLOS(World world, int x0, int y0, int x1, int y1)
         {
-            foreach (var cell in BresenhamCellsBetween(x0, y0, x1, y1))
-            {
-                if (!world.TryGetOccluder(cell.x, cell.y, out bool blocksVision, out bool blocksMovement, out float visionCost))
-                    continue;
-
-                if (!blocksVision)
-                    continue;
-
-                // muro pieno -> blocca
-                if (visionCost >= 1f)
-                    return true;
-            }
-            return false;
-        }
-
-        private static IEnumerable<(int x, int y)> BresenhamCellsBetween(int x0, int y0, int x1, int y1)
-        {
+            // Bresenham grid LOS
             int dx = Math.Abs(x1 - x0);
             int dy = Math.Abs(y1 - y0);
 
@@ -249,53 +373,56 @@ namespace Arcontio.Core
             int sy = y0 < y1 ? 1 : -1;
 
             int err = dx - dy;
+
             int x = x0;
             int y = y0;
 
-            while (!(x == x1 && y == y1))
+            while (true)
             {
-                int e2 = 2 * err;
+                // Non bloccare la cella di partenza, ma blocca celle intermedie.
+                if (!(x == x0 && y == y0))
+                {
+                    if (world.BlocksVisionAt(x, y))
+                        return true;
+                }
 
+                if (x == x1 && y == y1)
+                    return false;
+
+                int e2 = 2 * err;
                 if (e2 > -dy) { err -= dy; x += sx; }
                 if (e2 < dx) { err += dx; y += sy; }
-
-                // escludiamo start e end
-                if (x == x1 && y == y1) yield break;
-                if (x == x0 && y == y0) continue;
-
-                yield return (x, y);
             }
         }
 
         private static bool TryGetEventCell(ISimEvent e, out int x, out int y)
         {
-            // Pattern match: qui teniamo la "mappa" di cosa ha una cella.
+            x = 0; y = 0;
+
             switch (e)
             {
-                case AttackEvent a:
-                    x = a.CellX; y = a.CellY; return true;
+                case PredatorSpottedEvent pe:
+                    x = pe.CellX; y = pe.CellY;
+                    return true;
 
-                case DeathEvent d:
-                    x = d.CellX; y = d.CellY; return true;
+                case AttackEvent ae:
+                    x = ae.CellX; y = ae.CellY;
+                    return true;
 
-                case PredatorSpottedEvent p:
-                    x = p.CellX; y = p.CellY; return true;
+                case DeathEvent de:
+                    x = de.CellX; y = de.CellY;
+                    return true;
 
-                case ObjectSpottedEvent o:
-                    x = o.CellX; y = o.CellY; return true;
+                case ObjectSpottedEvent oe:
+                    x = oe.CellX; y = oe.CellY;
+                    return true;
 
-                // Day9: furto cibo (FACT con cella)
-                case FoodStolenEvent fs:
-                    x = fs.CellX; y = fs.CellY; return true;
-
-                // Day9: sospetto di mancanza (evento �interno�, ma con cella dove �se ne accorge�)
-                case FoodMissingSuspectedEvent ms:
-                    x = ms.CellX; y = ms.CellY; return true;
-
-                default:
-                    x = y = 0;
-                    return false;
+                case FoodStolenEvent fe:
+                    x = fe.CellX; y = fe.CellY;
+                    return true;
             }
+
+            return false;
         }
     }
 }

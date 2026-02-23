@@ -5,14 +5,14 @@ namespace Arcontio.Core
 {
     /// <summary>
     /// EatPrivateFoodCommand (Day9):
-    /// L’NPC consuma 1 unità dal proprio cibo privato (World.NpcPrivateFood[npcId]).
+    /// Lâ€™NPC consuma 1 unitÃ  dal proprio cibo privato (World.NpcPrivateFood[npcId]).
     ///
     /// Effetto:
     /// - decrementa il contatore privato
     /// - riduce Hunger01 usando NeedsConfig.eatSatietyGain
     ///
     /// Nota:
-    /// - Non genera di per sé "furto" o "sospetto": è consumo legittimo.
+    /// - Non genera di per sÃ© "furto" o "sospetto": Ã¨ consumo legittimo.
     /// </summary>
     public sealed class EatPrivateFoodCommand : ICommand
     {
@@ -30,6 +30,12 @@ namespace Arcontio.Core
 
             if (!world.NpcPrivateFood.TryGetValue(_npcId, out int priv) || priv <= 0)
                 return;
+
+            // ACTION TRACE (debug/overlay): consumo cibo privato (inventario v0).
+            world.SetNpcAction(_npcId, NpcActionState.Eat("EatPrivateFood"));
+
+            // BALLOON SIGNAL (view): fumetto "Eat" (cibo privato)
+            world.EmitNpcBalloon(_npcId, NpcBalloonKind.Eat);
 
             // 1) Mutazione inventario privato
             world.NpcPrivateFood[_npcId] = priv - 1;

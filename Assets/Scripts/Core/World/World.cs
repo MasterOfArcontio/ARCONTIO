@@ -1,7 +1,9 @@
+using Arcontio.Core.Logging;
 using System;
 using System.Collections.Generic;
 using Unity.VisualScripting.FullSerializer;
 using UnityEngine;
+using UnityEngine.LightTransport;
 using static UnityEditor.PlayerSettings;
 
 namespace Arcontio.Core
@@ -11,7 +13,7 @@ namespace Arcontio.Core
     /// Contiene stato globale + component store.
     ///
     /// Day10 (patch):
-    /// - Gli "occluder" NON sono pi˘ una struttura separata: sono oggetti del mondo (WorldObjectInstance)
+    /// - Gli "occluder" NON sono pi√π una struttura separata: sono oggetti del mondo (WorldObjectInstance)
     /// - Manteniamo una OcclusionMap interna (griglia) come CACHE derivata da World.Objects
     ///   per query veloci: BlocksVision/BlocksMovement.
     ///
@@ -30,6 +32,24 @@ namespace Arcontio.Core
         // Dimensione griglia simulatore (spostabile in game_params.json)
         public int MapWidth { get; private set; }
         public int MapHeight { get; private set; }
+
+        // ============================================================
+        // DEBUG / TELEMETRY (view-only diagnostics)
+        // ============================================================
+
+        /// <summary>
+        /// Telemetria FOV (debug): heatmap per NPC accumulata in finestre di N tick.
+        ///
+        /// Per design:
+        /// - se null: feature disabilitata da game_params.json.
+        /// - se presente: viene aggiornata dai system che calcolano percezione
+        ///   e avanzata 1 volta per tick dal SimulationHost.
+        ///
+        /// IMPORTANTISSIMO:
+        /// - Questa NON √® logica di simulazione.
+        /// - √à solo un canale di osservabilit√† per la view/debug.
+        /// </summary>
+        public DebugFovTelemetry DebugFovTelemetry { get; private set; }
 
         private OcclusionCell[] _occlusion; // size = MapWidth*MapHeight
         private struct OcclusionCell
@@ -54,11 +74,23 @@ namespace Arcontio.Core
 
             MapWidth = width;
             MapHeight = height;
-            _occlusion = new OcclusionCell[MapWidth * MapHeight];
 
-            // Puliamo la cache
-            for (int i = 0; i < _occlusion.Length; i++)
+            int size = MapWidth * MapHeight;
+
+            _occlusion = new OcclusionCell[size];
+            _objIdByCell = new int[size];
+            _blocksVision = new bool[size];
+            _blocksMovement = new bool[size];
+
+            // Pulizia cache: default √® ok per OcclusionCell/bool,
+            // ma _objIdByCell deve essere inizializzato a -1 (empty).
+            for (int i = 0; i < size; i++)
+            {
                 _occlusion[i] = default;
+                _blocksVision[i] = false;
+                _blocksMovement[i] = false;
+                _objIdByCell[i] = -1;
+            }
         }
 
         // ============================================================
@@ -77,11 +109,41 @@ namespace Arcontio.Core
         public readonly Dictionary<int, Social> Social = new();
         public readonly Dictionary<int, GridPosition> GridPos = new();
         public readonly Dictionary<int, CardinalDirection> NpcFacing = new();
-        
+
+// ============================================================
+// ACTIVITY / ACTION (NPC)
+// ============================================================
+
+/// <summary>
+/// Stato di azione "corrente" per NPC (view/debug friendliness).
+/// 
+/// NOTE ARCHITETTURALI (ARCONTIO):
+/// - Non √® una "AI brain" separata: √® un piccolo stato descrittivo che rende osservabile
+///   cosa l'NPC sta facendo in questo momento.
+/// - Viene aggiornato dai Command (intenti) e/o dai System (esecuzione fisica).
+/// - La View pu√≤ leggerlo senza dover inferire azioni da segnali indiretti (movimento, fame, ecc.).
+/// </summary>
+public readonly Dictionary<int, NpcActionState> NpcAction = new();
+
+        /// <summary>
+        /// NpcBalloonSignals:
+        /// Ultimo segnale "visuale" (balloon) per ciascun NPC.
+        ///
+        /// Nota:
+        /// - √à uno store di osservabilit√†, come NpcAction.
+        /// - Viene scritto dal core quando accadono fatti rilevanti.
+        /// - La view lo legge e decide come renderizzare (sprite, durata, layering).
+        /// </summary>
+        public readonly Dictionary<int, NpcBalloonSignal> NpcBalloonSignals = new();
+
+        // Movimento come "intento" eseguito da un System.
+        // Le Rule scrivono qui; il MovementSystem consuma e prova ad avanzare.
+        //        public readonly Dictionary<int, MoveIntent> MoveIntents = new();
+
         // Memoria (per-NPC)
         public readonly Dictionary<int, MemoryStore> Memory = new();
         public readonly Dictionary<int, PersonalityMemoryParams> MemoryParams = new();
-        
+
         // 1 store per NPC
         public readonly Dictionary<int, NpcObjectMemoryStore> NpcObjectMemory =
             new Dictionary<int, NpcObjectMemoryStore>(2048);
@@ -96,7 +158,7 @@ namespace Arcontio.Core
         // Use state (letto occupato, ecc.)
         public readonly Dictionary<int, ObjectUseState> ObjectUse = new();
 
-        // Food stock ìin-worldî (pile/stockpile)
+        // Food stock ?in-world? (pile/stockpile)
         public readonly Dictionary<int, FoodStockComponent> FoodStocks = new();
 
         // Cibo privato per NPC (inventario v0)
@@ -106,9 +168,28 @@ namespace Arcontio.Core
         // npcId -> ultimo tick in cui ha consumato cibo privato
         public readonly Dictionary<int, long> NpcLastPrivateFoodConsumeTick = new();
 
-        // (Day10) Occluder component store per oggetti ìmuro/portaî
-        // Nota: un muro Ë un oggetto, e qui mettiamo i suoi flags runtime (vision/movement + cost).
+        // (Day10) Occluder component store per oggetti ?muro/porta?
+        // Nota: un muro √® un oggetto, e qui mettiamo i suoi flags runtime (vision/movement + cost).
         public readonly Dictionary<int, Occluder> ObjectOccluders = new();
+
+        // ============================================================
+        // MOVEMENT / SCAN (intent + execution state)
+        // ============================================================
+
+        /// <summary>
+        /// Intento di movimento per NPC.
+        /// - Scritto dalla decision pipeline (Rules/Decision).
+        /// - Consumato dal MovementSystem (fisico).
+        /// </summary>
+        public readonly Dictionary<int, MoveIntent> NpcMoveIntents = new();
+
+        /// <summary>
+        /// Stato di scan direzionale per NPC.
+        /// - "Nessuna visione a 360¬∞ gratuita": scan = 4 turn consecutivi.
+        /// - Consumato da IdleScanSystem.
+        /// </summary>
+        public readonly Dictionary<int, ScanState> NpcScanStates = new();
+
 
         // ============================================================
         // INTERNAL GRID INDEXES / CACHES
@@ -137,9 +218,24 @@ namespace Arcontio.Core
             Config = config;
             InitMap(Config.Sim.worldWidth, Config.Sim.worldHeight);
 
-            // default global params
-            Global.FoodStock = 0;
-            Global.MaterialsStock = 0;
+            // ============================================================
+            // DEBUG FOV TELEMETRY (config-driven)
+            // ============================================================
+            // Nota:
+            // - questa √® una feature SOLO debug.
+            // - la view la usa per disegnare overlay "heat" delle celle viste.
+            // - viene attivata da game_params.json: debug_fov.enabled.
+            //
+            // Implementazione:
+            // - accumulo per finestra di N tick
+            // - double buffer read/write
+            if (Config?.Sim != null && Config.Sim.debug_fov != null && Config.Sim.debug_fov.enabled)
+            {
+                int window = Config.Sim.debug_fov.window_ticks;
+                if (window <= 0) window = 1;
+
+                DebugFovTelemetry = new DebugFovTelemetry(MapWidth, MapHeight, window);
+            }
 
             Global.EnableMemorySpatialFusion = false;
             Global.MemoryRegionSizeCells = 4;
@@ -153,12 +249,37 @@ namespace Arcontio.Core
             Global.TokenReliabilityFalloffPerCell = 0.06f;
             Global.TokenIntensityFalloffPerCell = 0.04f;
 
-            Global.NpcVisionRangeCells = 6;
+            // ============================================================
+            // Perception params (data-driven via game_params.json)
+            // ============================================================
+            // Prima erano hardcoded. Ora li leggiamo da SimulationParams.
+            // Se valori non sono presenti o sono invalidi, facciamo fallback safe.
+            int vr = Config?.Sim != null ? Config.Sim.npcVisionRangeCells : 6;
+            if (vr <= 0) vr = 6;
+            Global.NpcVisionRangeCells = vr;
 
-            // Day8/9 cone params
-            Global.NpcVisionConeHalfWidthPerStep = 1.0f;
-            Global.NpcVisionUseCone = true;
-            Global.NpcVisionConeSlope = 1.0f;
+            bool useCone = Config?.Sim != null ? Config.Sim.npcVisionUseCone : true;
+            Global.NpcVisionUseCone = useCone;
+
+            // Cone slope:
+            // - se npcVisionConeSlope > 0 => usalo.
+            // - altrimenti, se npcVisionFovDegrees > 0 => calcola slope = tan(fov/2).
+            float slope = Config?.Sim != null ? Config.Sim.npcVisionConeSlope : 1.0f;
+            int fovDeg = Config?.Sim != null ? Config.Sim.npcVisionFovDegrees : 90;
+
+            if (slope <= 0f && fovDeg > 0)
+            {
+                // half-angle in radianti
+                // Esempio: FOV=90¬∞ => half=45¬∞ => tan(45)=1.
+                float halfRad = (fovDeg * 0.5f) * Mathf.Deg2Rad;
+                slope = Mathf.Tan(halfRad);
+            }
+
+            if (slope <= 0f) slope = 1.0f;
+
+            // Legacy/back-compat: manteniamo anche HalfWidthPerStep per codice vecchio.
+            Global.NpcVisionConeSlope = slope;
+            Global.NpcVisionConeHalfWidthPerStep = slope;
 
             Global.Needs = NeedsConfig.Default();
         }
@@ -188,7 +309,7 @@ namespace Arcontio.Core
         public bool AreBonded(int aNpcId, int bNpcId)
         {
             // STUB (roadmap): quando introdurrai bond graph,
-            // questa funzione consulter‡ quel grafo.
+            // questa funzione consulter√† quel grafo.
             return false;
         }
 
@@ -210,9 +331,9 @@ namespace Arcontio.Core
             // Imposti MaxTraces dopo la creazione.
             var store = new MemoryStore();
 
-            // Priorit‡: se hai un config globale, usalo; altrimenti fallback su PersonalityMemoryParams.
+            // Priorit√†: se hai un config globale, usalo; altrimenti fallback su PersonalityMemoryParams.
             int maxTraces = MemoryParams[id].MaxTraces;
-            if (Global.NpcObjectMemorySlots > 0) { /* non Ë maxTraces: Ë slots oggetti (altro). */ }
+            if (Global.NpcObjectMemorySlots > 0) { /* non √® maxTraces: √® slots oggetti (altro). */ }
 
             store.MaxTraces = maxTraces;
             Memory[id] = store;
@@ -225,6 +346,25 @@ namespace Arcontio.Core
             if (!NpcLastPrivateFoodConsumeTick.ContainsKey(id))
                 NpcLastPrivateFoodConsumeTick[id] = -999999;
 
+            // Movement intent init (se non presente)
+            if (!NpcMoveIntents.ContainsKey(id))
+                NpcMoveIntents[id] = default;
+
+            // Scan state init (se non presente)
+            if (!NpcScanStates.ContainsKey(id))
+                NpcScanStates[id] = default;
+
+
+// Action state init (se non presente)
+if (!NpcAction.ContainsKey(id))
+    NpcAction[id] = NpcActionState.Idle();
+
+            // Balloon signal init (se non presente)
+            // Nota:
+            // - Default = struct default => Kind=None, Tick=0.
+            // - La view user√† il tick per capire se ha gi√† mostrato il balloon.
+            if (!NpcBalloonSignals.ContainsKey(id))
+                NpcBalloonSignals[id] = default;
             return id;
         }
 
@@ -233,6 +373,216 @@ namespace Arcontio.Core
             if (!ExistsNpc(npcId)) return;
             NpcFacing[npcId] = dir;
         }
+
+        // ============================================================
+        // Facing / Position / Movement helper API
+        // ============================================================
+
+        /// <summary>
+        /// GetFacing:
+        /// - Non esisteva come helper; √® utile per sistemi (scan, movement) e debug.
+        /// - Se manca entry, default = North (deterministico).
+        /// </summary>
+        public CardinalDirection GetFacing(int npcId)
+        {
+            if (!ExistsNpc(npcId)) return CardinalDirection.North;
+            if (NpcFacing.TryGetValue(npcId, out var dir)) return dir;
+            return CardinalDirection.North;
+        }
+
+        /// <summary>
+        /// TryGetNpcPos:
+        /// - Fonte di verit√† runtime per la posizione NPC √® GridPos.
+        /// </summary>
+        public bool TryGetNpcPos(int npcId, out int x, out int y)
+        {
+            x = 0; y = 0;
+            if (!GridPos.TryGetValue(npcId, out var gp)) return false;
+            x = gp.X; y = gp.Y;
+            return true;
+        }
+
+        /// <summary>
+        /// SetNpcPos:
+        /// - Aggiorna GridPos.
+        /// - In futuro questo √® il punto perfetto per pubblicare NpcMovedEvent / PerceptionDirty.
+        /// </summary>
+        public void SetNpcPos(int npcId, int x, int y)
+        {
+            if (!ExistsNpc(npcId)) return;
+            GridPos[npcId] = new GridPosition(x, y);
+        }
+
+        public bool TryGetObjectCell(int objectId, out int x, out int y)
+        {
+            x = 0; y = 0;
+            if (!Objects.TryGetValue(objectId, out var obj) || obj == null) return false;
+            x = obj.CellX; y = obj.CellY;
+            return true;
+        }
+
+        public bool BlocksMovementAt(int x, int y)
+        {
+            if (!TryGetOccluder(x, y, out _, out bool bm, out _)) return false;
+            return bm;
+        }
+
+        /// <summary>
+        /// O(N) per DAY10 (pochi NPC). In futuro cache.
+        /// </summary>
+        public bool TryGetNpcAt(int x, int y, out int npcId)
+        {
+            npcId = 0;
+            foreach (var kv in GridPos)
+            {
+                if (kv.Value.X == x && kv.Value.Y == y)
+                {
+                    npcId = kv.Key;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public void SetMoveIntent(int npcId, MoveIntent intent)
+        {
+            if (!ExistsNpc(npcId)) return;
+
+            NpcMoveIntents[npcId] = intent;
+        }
+
+        public void ClearMoveIntent(int npcId)
+        {
+            if (!ExistsNpc(npcId)) return;
+            NpcMoveIntents[npcId] = default;
+        }
+        
+
+        // ============================================================
+        // NPC ACTION STATE (API)
+        // ============================================================
+
+        /// <summary>
+        /// Imposta lo stato di azione dell'NPC.
+        /// 
+        /// Nota:
+        /// - Non validiamo "consistenza semantica" qui (es: puoi dire Eat anche se non c'√® cibo).
+        /// - Questo √® volutamente un canale descrittivo/diagnostico.
+        /// - Le guardie sono solo su ExistsNpc.
+        /// </summary>
+        public void SetNpcAction(int npcId, NpcActionState state)
+        {
+            if (!ExistsNpc(npcId)) return;
+            NpcAction[npcId] = state;
+        }
+
+        /// <summary>
+        /// Utility: imposta l'NPC in stato Idle (azione "nessuna"/default).
+        /// </summary>
+        public void SetNpcIdle(int npcId)
+        {
+            if (!ExistsNpc(npcId)) return;
+            NpcAction[npcId] = NpcActionState.Idle();
+        }
+
+        /// <summary>
+        /// Prova a leggere lo stato di azione corrente.
+        /// </summary>
+        public bool TryGetNpcAction(int npcId, out NpcActionState state)
+        {
+            if (!ExistsNpc(npcId))
+            {
+                state = default;
+                return false;
+            }
+            return NpcAction.TryGetValue(npcId, out state);
+        }
+
+
+        // ============================================================
+        // NPC BALLOON SIGNAL (API)
+        // ============================================================
+
+        /// <summary>
+        /// Imposta l'ultimo balloon signal per un NPC.
+        ///
+        /// Nota:
+        /// - √à un segnale transiente: la view lo consumer√† mostrando un balloon per X secondi.
+        /// - NON √® un bus di eventi.
+        /// - Non validiamo semantica qui: √® solo osservabilit√†.
+        /// </summary>
+        public void SetNpcBalloonSignal(int npcId, NpcBalloonSignal signal)
+        {
+            if (!ExistsNpc(npcId)) return;
+            NpcBalloonSignals[npcId] = signal;
+        }
+
+        /// <summary>
+        /// Convenience: emette un balloon con tick corrente (TickContext).
+        /// </summary>
+        public void EmitNpcBalloon(int npcId, NpcBalloonKind kind, int subjectId = 0, int secondarySubjectId = 0)
+        {
+            if (!ExistsNpc(npcId)) return;
+
+            int tick = (int)TickContext.CurrentTickIndex;
+            NpcBalloonSignals[npcId] = new NpcBalloonSignal
+            {
+                Kind = kind,
+                Tick = tick,
+                SubjectId = subjectId,
+                SecondarySubjectId = secondarySubjectId
+            };
+        }
+
+        public bool TryGetNpcBalloonSignal(int npcId, out NpcBalloonSignal signal)
+        {
+            if (!ExistsNpc(npcId))
+            {
+                signal = default;
+                return false;
+            }
+            return NpcBalloonSignals.TryGetValue(npcId, out signal);
+        }
+
+
+        /// <summary>
+        /// Utility: consideriamo "idle" se non ha MoveIntent attivo e non sta facendo scan.
+        /// Questo √® volutamente minimale: in futuro ActivityStateComponent pu√≤ sostituire.
+        /// </summary>
+        public bool IsNpcIdleForScan(int npcId)
+        {
+            if (!ExistsNpc(npcId)) return false;
+
+            if (NpcMoveIntents.TryGetValue(npcId, out var mi) && mi.Active)
+                return false;
+
+            if (NpcScanStates.TryGetValue(npcId, out var ss) && ss.Active)
+                return false;
+
+            return true;
+        }
+
+        public void StartScan(int npcId, int currentTick, int turns = 4)
+        {
+            if (!ExistsNpc(npcId)) return;
+
+            // Importante:
+            // - lo scan √® "costoso": √® una sequenza di turn su tick successivi.
+            // - non facciamo 4 turn nello stesso tick.
+            NpcScanStates[npcId] = new ScanState
+            {
+                Active = true,
+                RemainingTurns = turns,
+                LastTurnTick = currentTick - 999999
+            };
+        }
+
+        public void StopScan(int npcId)
+        {
+            if (!ExistsNpc(npcId)) return;
+            NpcScanStates[npcId] = default;
+        }
+
 
         // ============================================================
         // OBJECT API (Create / Destroy)
@@ -276,7 +626,7 @@ namespace Arcontio.Core
 
             Objects[id] = inst;
 
-            // Se Ë un occluder oppure blocca la visione o il movimento, aggiorna la occlusion map.
+            // Se √® un occluder oppure blocca la visione o il movimento, aggiorna la occlusion map.
             if (TryGetObjectDef(defId, out var def) && def != null &&
                                (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
             {
@@ -291,18 +641,45 @@ namespace Arcontio.Core
             if (!Objects.TryGetValue(objectId, out var obj) || obj == null)
                 return;
 
-            // Se Ë occluder, pulisci la cache prima di rimuoverlo.
+            int x = obj.CellX;
+            int y = obj.CellY;
+
+            // 1) Se √® occluder, pulisci la cache occlusione prima di rimuovere dai dizionari.
+            //    (Questo evita che restino celle "bloccate" anche dopo la rimozione dell'oggetto.)
             if (TryGetObjectDef(obj.DefId, out var def) && def != null && def.IsOccluder)
             {
-                ClearOccluderFromCache(objectId, obj.CellX, obj.CellY);
+                ClearOccluderFromCache(objectId, x, y);
+
+                // Difensivo: nel tuo file coesistono due cache (OcclusionCell[] e bool[]).
+                // HasLineOfSight usa _occlusion, ma alcune API (IsVisionBlocked/IsMovementBlocked) usano bool[].
+                // Quindi, se questi array esistono, azzeriamo anche loro.
+                if (_blocksVision != null && _blocksVision.Length == MapWidth * MapHeight && InBounds(x, y))
+                    _blocksVision[CellIndex(x, y)] = false;
+
+                if (_blocksMovement != null && _blocksMovement.Length == MapWidth * MapHeight && InBounds(x, y))
+                    _blocksMovement[CellIndex(x, y)] = false;
             }
 
-            // component cleanup (use state, stocks)
+            // 2) Libera la cella nella griglia "1 object per cell".
+            //    Nel tuo World l'empty value √® -1 (come da commento su _objIdByCell).
+            if (_objIdByCell != null && _objIdByCell.Length == MapWidth * MapHeight && InBounds(x, y))
+            {
+                int idx = CellIndex(x, y);
+
+                // Difensivo: liberiamo solo se la cella punta davvero a quell'objectId.
+                if (_objIdByCell[idx] == objectId)
+                    _objIdByCell[idx] = -1;
+            }
+
+            // 3) component cleanup (use state, stocks, runtime occluders)
             ObjectUse.Remove(objectId);
             FoodStocks.Remove(objectId);
+            ObjectOccluders.Remove(objectId);
 
+            // 4) rimuovi dal registry oggetti
             Objects.Remove(objectId);
         }
+
         private void PlaceOccluderInCache(int objectId, int x, int y, ObjectDef def)
         {
             if (_occlusion == null || _occlusion.Length == 0) return;
@@ -310,12 +687,33 @@ namespace Arcontio.Core
 
             int idx = Idx(x, y);
 
-            // Se gi‡ presente qualcosa, lo consideriamo errore di coerenza (1 occluder per cell).
+            // Se gi√† presente qualcosa, lo consideriamo errore di coerenza (1 occluder per cell).
             if (_occlusion[idx].OccluderObjectId != 0 && _occlusion[idx].OccluderObjectId != objectId)
             {
                 Debug.LogWarning($"[World] OcclusionMap overwrite at ({x},{y}). old={_occlusion[idx].OccluderObjectId} new={objectId}");
             }
 
+		            // ------------------------------------------------------------
+            // IMPORTANTISSIMO (bugfix):
+            // In questo World coesistono due cache:
+            // - _occlusion[] (OcclusionCell) usata da HasLineOfSight / TryGetOccluder
+            // - _blocksVision[] / _blocksMovement[] usate da IsVisionBlocked / IsMovementBlocked
+            //
+            // CreateObject() aggiorna l'occlusione via PlaceOccluderInCache.
+            // Se qui non aggiorniamo anche i bool[], IsMovementBlocked pu√≤ restare "false"
+            // su celle muro => un NPC pu√≤ finire dentro una cella wall.
+            // ------------------------------------------------------------
+
+            bool blocksVision = def.BlocksVision;
+            bool blocksMove = def.BlocksMovement;
+
+            // Se √® marcato come occluder ma non ha flags, default "blocca tutto".
+            if (def.IsOccluder && !blocksVision && !blocksMove)
+            {
+                blocksVision = true;
+                blocksMove = true;
+            }
+			
             _occlusion[idx] = new OcclusionCell
             {
                 OccluderObjectId = objectId,
@@ -323,6 +721,21 @@ namespace Arcontio.Core
                 BlocksMovement = def.BlocksMovement,
                 VisionCost = def.VisionCost <= 0f ? 1f : def.VisionCost
             };
+			
+			// Allinea le cache bool[] se esistono (difensivo).
+            if (_blocksVision != null && _blocksVision.Length == MapWidth * MapHeight)
+                _blocksVision[CellIndex(x, y)] = blocksVision;
+
+            if (_blocksMovement != null && _blocksMovement.Length == MapWidth * MapHeight)
+                _blocksMovement[CellIndex(x, y)] = blocksMove;
+
+            // Manteniamo anche il componente runtime per query dettagliate (TryGetOccluder ecc.).
+            ObjectOccluders[objectId] = new Occluder
+            {
+                BlocksVision = blocksVision,
+                BlocksMovement = blocksMove,
+                VisionCost = def.VisionCost <= 0f ? 1f : def.VisionCost
+            };	
         }
 
         private void ClearOccluderFromCache(int objectId, int x, int y)
@@ -333,12 +746,22 @@ namespace Arcontio.Core
             int idx = Idx(x, y);
             if (_occlusion[idx].OccluderObjectId == objectId)
                 _occlusion[idx] = default;
+
+            // Allinea le cache bool[] (difensivo).
+            if (_blocksVision != null && _blocksVision.Length == MapWidth * MapHeight)
+                _blocksVision[CellIndex(x, y)] = false;
+
+            if (_blocksMovement != null && _blocksMovement.Length == MapWidth * MapHeight)
+                _blocksMovement[CellIndex(x, y)] = false;
+
+            // Il registry ObjectOccluders √® per objectId.
+            ObjectOccluders.Remove(objectId);
         }
 
         /// <summary>
         /// Regola ARCONTIO Core Standard v1.0: 1 object per cell.
         /// Qui facciamo enforcement minimo:
-        /// - se esiste gi‡ un oggetto in (x,y) => fail.
+        /// - se esiste gi√† un oggetto in (x,y) => fail.
         /// </summary>
         public bool HasAnyObjectAt(int x, int y)
         {
@@ -382,7 +805,7 @@ namespace Arcontio.Core
 
         public bool IsVisionBlocked(int x, int y)
         {
-            if (!InBounds(x, y)) return true; // fuori mappa: trattalo come ìchiusoî
+            if (!InBounds(x, y)) return true; // fuori mappa: trattalo come ?chiuso?
             return _blocksVision[CellIndex(x, y)];
         }
 
@@ -394,7 +817,7 @@ namespace Arcontio.Core
 
         /// <summary>
         /// TryGetOccluder:
-        /// - restituisce true se nella cella c'Ë un oggetto che blocca visione e/o movimento.
+        /// - restituisce true se nella cella c'√® un oggetto che blocca visione e/o movimento.
         /// - i dettagli stanno in ObjectOccluders (se presenti) altrimenti in def flags.
         /// </summary>
         public bool TryGetOccluder(int x, int y, out bool blocksVision, out bool blocksMovement, out float visionCost)
@@ -423,7 +846,7 @@ namespace Arcontio.Core
         /// <summary>
         /// Wrapper legacy: SetOccluder(x,y,Occluder).
         ///
-        /// Per non rompere i test/seed gi‡ scritti, questo:
+        /// Per non rompere i test/seed gi√† scritti, questo:
         /// - crea (o aggiorna) un oggetto in quella cella con defId="_runtime_occluder"
         /// - lo mette in ObjectOccluders e aggiorna la cache.
         ///
@@ -455,9 +878,9 @@ namespace Arcontio.Core
             if (existing >= 0)
             {
                 objId = existing;
-                // se cíË un oggetto ìnormaleî gi‡ piazzato, qui sei in conflitto con 1 object/cell.
-                // Per il debug: logghiamo e sovrascriviamo SOLO líocclusione cache, senza cambiare líoggetto.
-                // Se vuoi muro ìveroî, devi piazzare líoggetto muro e non un letto nella stessa cella.
+                // se c?√® un oggetto ?normale? gi√† piazzato, qui sei in conflitto con 1 object/cell.
+                // Per il debug: logghiamo e sovrascriviamo SOLO l?occlusione cache, senza cambiare l?oggetto.
+                // Se vuoi muro ?vero?, devi piazzare l?oggetto muro e non un letto nella stessa cella.
                 Debug.LogWarning($"[World] SetOccluder: cell ({x},{y}) already has obj={existing}. " +
                                  $"Keeping object, overriding occlusion cache only.");
             }
@@ -474,6 +897,31 @@ namespace Arcontio.Core
             int idx = CellIndex(x, y);
             _blocksVision[idx] = occ.BlocksVision;
             _blocksMovement[idx] = occ.BlocksMovement;
+        }
+
+        private void RebuildOcclusionCell(int x, int y)
+        {
+            if (!InBounds(x, y)) return;
+
+            int objId = GetObjectAt(x, y);
+            if (objId == 0 || !Objects.TryGetValue(objId, out var obj) || obj == null)
+            {
+                _occlusion[Idx(x, y)] = default;
+                return;
+            }
+
+            if (!TryGetObjectDef(obj.DefId, out var def) || def == null)
+            {
+                _occlusion[Idx(x, y)] = default;
+                return;
+            }
+
+            _occlusion[Idx(x, y)] = new OcclusionCell
+            {
+                BlocksVision = def.BlocksVision,
+                BlocksMovement = def.BlocksMovement,
+                VisionCost = def.VisionCost
+            };
         }
 
         // ============================================================
@@ -506,7 +954,7 @@ namespace Arcontio.Core
             int err = dx - dy;
 
             // percorriamo la linea; saltiamo la prima cella (sorgente),
-            // e consideriamo blocking sulle celle intermedie e target (in genere anche il target puÚ essere muro).
+            // e consideriamo blocking sulle celle intermedie e target (in genere anche il target pu√≤ essere muro).
             bool first = true;
 
             while (true)
@@ -543,7 +991,7 @@ namespace Arcontio.Core
             bool blocksVision = def.BlocksVision;
             bool blocksMove = def.BlocksMovement;
 
-            // Se Ë marcato come occluder, ma non ha flags specifiche, default ìblocca tuttoî
+            // Se √® marcato come occluder, ma non ha flags specifiche, default ?blocca tutto?
             if (def.IsOccluder)
             {
                 if (!blocksVision && !blocksMove)
@@ -557,7 +1005,7 @@ namespace Arcontio.Core
             _blocksVision[idx] = blocksVision;
             _blocksMovement[idx] = blocksMove;
 
-            // Se Ë un occluder ìveroî, registriamo anche il componente runtime per query dettagliate.
+            // Se √® un occluder ?vero?, registriamo anche il componente runtime per query dettagliate.
             if (def.IsOccluder || blocksVision || blocksMove)
             {
                 ObjectOccluders[objId] = new Occluder
@@ -575,11 +1023,6 @@ namespace Arcontio.Core
     /// </summary>
     public struct GlobalState
     {
-        public int FoodStock;
-        public int MaterialsStock;
-
-        public int AcceptedLeaderId;
-
         // --- Memory Spatial Fusion ---
         public bool EnableMemorySpatialFusion;
         public int MemoryRegionSizeCells;

@@ -10,11 +10,11 @@ namespace Arcontio.Core
     /// Pubblica FoodStolenEvent come FACT del mondo (furto avvenuto).
     /// IMPORTANTE:
     /// - Questo evento NON rende automaticamente la vittima consapevole.
-    /// - La consapevolezza/memoria verrà gestita dal MemoryEncodingSystem:
+    /// - La consapevolezza/memoria verrÃ  gestita dal MemoryEncodingSystem:
     ///   testimoni (range + cono + LOS) => TheftWitnessed / FoodStolenFromMe
     ///
-    /// cellX/cellY dell’evento:
-    /// - posizione del ladro al momento dell’azione (se nota),
+    /// cellX/cellY dellâ€™evento:
+    /// - posizione del ladro al momento dellâ€™azione (se nota),
     /// - fallback (0,0) se mancante.
     /// </summary>
     public sealed class StealPrivateFoodCommand : ICommand
@@ -25,7 +25,7 @@ namespace Arcontio.Core
 
         /// <summary>
         /// Overload comodo: units default = 1.
-        /// Così NeedsDecisionRule può chiamare new StealPrivateFoodCommand(thief, victim)
+        /// CosÃ¬ NeedsDecisionRule puÃ² chiamare new StealPrivateFoodCommand(thief, victim)
         /// senza errori di compilazione.
         /// </summary>
         public StealPrivateFoodCommand(int thiefNpcId, int victimNpcId)
@@ -48,6 +48,12 @@ namespace Arcontio.Core
             if (!world.NpcPrivateFood.TryGetValue(_victimNpcId, out int victimFood) || victimFood <= 0)
                 return;
 
+            // ACTION TRACE (debug/overlay): furto di cibo privato.
+            world.SetNpcAction(_thiefNpcId, NpcActionState.Steal("StealPrivateFood", targetObjectId: 0));
+
+            // BALLOON SIGNAL (view): fumetto "Steal" per il ladro.
+            world.EmitNpcBalloon(_thiefNpcId, NpcBalloonKind.Steal, subjectId: _victimNpcId);
+
             int stolen = _units;
             if (stolen > victimFood) stolen = victimFood;
 
@@ -62,7 +68,7 @@ namespace Arcontio.Core
                 ey = p.Y;
             }
 
-            // 3) Pubblica FACT del mondo: il furto è successo
+            // 3) Pubblica FACT del mondo: il furto Ã¨ successo
             bus.Publish(new FoodStolenEvent(
                 victimNpcId: _victimNpcId,
                 thiefNpcId: _thiefNpcId,

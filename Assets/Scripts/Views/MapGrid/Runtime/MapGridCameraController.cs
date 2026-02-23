@@ -1,5 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.EventSystems;
+using UnityEngine.U2D;
+using System.Reflection;
 
 namespace Arcontio.View.MapGrid
 {
@@ -23,6 +26,41 @@ namespace Arcontio.View.MapGrid
         private MapGridData _map;
         private MapGridConfig _cfg;
 
+        private PixelPerfectCamera _ppc;
+
+        // -------------------------
+        // Pixel Perfect Zoom (PPC)
+        // -------------------------
+        // IMPORTANT:
+        // Se PixelPerfectCamera è attiva, essa ricalcola e re-imposta la Camera.orthographicSize
+        // per garantire il rendering pixel-perfect. Questo significa che uno zoom "classico"
+        // basato su orthographicSize verrà immediatamente sovrascritto (come hai osservato:
+        // size cambia per un attimo e poi torna al valore precedente).
+        //
+        // La soluzione corretta, mantenendo PixelPerfectCamera, è applicare lo zoom *sui parametri
+        // della PixelPerfectCamera*, tipicamente assetsPPU. Questo zoom è necessariamente a step
+        // discreti (interi) se vuoi evitare artefatti.
+        //
+        // NOTA DI COMPATIBILITÀ:
+        // Non assumiamo che il tuo MapGridConfig abbia già campi dedicati al pixel-perfect zoom.
+        // Per evitare di rompere la compilazione se quei campi non esistono ancora, leggiamo
+        // eventuali parametri da cfg.camera via reflection (opzionali):
+        //   camera.pixelPerfectZoom.enabled
+        //   camera.pixelPerfectZoom.minAssetsPpu
+        //   camera.pixelPerfectZoom.maxAssetsPpu
+        //   camera.pixelPerfectZoom.stepAssetsPpu
+        // oppure in forma piatta:
+        //   camera.pixelPerfectZoomEnabled
+        //   camera.pixelPerfectZoomMinAssetsPpu
+        //   camera.pixelPerfectZoomMaxAssetsPpu
+        //   camera.pixelPerfectZoomStepAssetsPpu
+        //
+        // Se questi campi non ci sono, usiamo default ragionevoli.
+        private bool _ppZoomEnabled;
+        private int _ppMinAssetsPpu;
+        private int _ppMaxAssetsPpu;
+        private int _ppStepAssetsPpu;
+
         private float _tileWorld;
 
         // Target position (pan con inerzia verso questo punto)
@@ -40,6 +78,19 @@ namespace Arcontio.View.MapGrid
             _map = map;
             _cfg = cfg;
             _tileWorld = cfg.tileSizeWorld;
+            _ppc = _camera.GetComponent<PixelPerfectCamera>();
+
+            // Pixel-perfect zoom defaults (usati solo se _ppc != null).
+            // - Enabled di default se PPC è presente.
+            // - Step di default 2 (abbastanza fine per non dare sensazione di "salti" troppo grossi).
+            // - Range default 16..128 (range ampio, poi lo restringi da config in base al tuo PPU reale).
+            _ppZoomEnabled = (_ppc != null);
+            _ppMinAssetsPpu = 16;
+            _ppMaxAssetsPpu = 128;
+            _ppStepAssetsPpu = 2;
+
+            // Proviamo ad applicare override da config (se presenti).
+            ApplyPixelPerfectZoomOverridesFromConfig();
 
             _camera.orthographic = true;
             _camera.orthographicSize = cfg.camera.startZoom;
@@ -54,9 +105,9 @@ namespace Arcontio.View.MapGrid
 
             HandleZoomToCursor();
             HandleRmbDragPanTarget();
-            HandleEdgePanTarget(); // edge-pan viene ignorato mentre trascini RMB
+            //HandleEdgePanTarget(); // edge-pan viene ignorato mentre trascini RMB
 
-            // Clamp target prima di applicare inerzia (cos� non inseguiamo target fuori mappa)
+            // Clamp target prima di applicare inerzia (così non inseguiamo target fuori mappa)
             _targetPos = ClampToMapBounds(_targetPos);
 
             // Applica inerzia verso target
@@ -82,26 +133,89 @@ namespace Arcontio.View.MapGrid
             Vector3 before = GetMouseWorldOnZ0();
 
             // 2) Applica zoom
+            // Se PixelPerfectCamera è presente e lo zoom PPC è abilitato,
+            // dobbiamo zoomare via assetsPPU (non via orthographicSize).
+            if (_ppc != null && _ppZoomEnabled)
+            {
+                ApplyPixelPerfectZoom(scrollY);
+
+                // 3) World point sotto mouse dopo lo zoom
+                Vector3 afterPpc = GetMouseWorldOnZ0();
+
+                // 4) Compensazione "zoom to cursor"
+                Vector3 offsetPpc = before - afterPpc;
+                _targetPos += offsetPpc;
+                return;
+            }
+
+            // Modalità classica: orthographicSize (valida solo se NON stai usando PPC).
             float sign = Mathf.Sign(scrollY);
             float delta = -sign * _cfg.camera.zoomSpeed;
 
-            float newSize = Mathf.Clamp(
+            /*           float newSize = Mathf.Clamp(
+                           _camera.orthographicSize + delta,
+                           _cfg.camera.minZoom,
+                           _cfg.camera.maxZoom);
+
+                       // Se non cambia, stop
+                       if (Mathf.Approximately(newSize, _camera.orthographicSize))
+                           return;
+
+                       _camera.orthographicSize = newSize;*/
+            float desired = Mathf.Clamp(
                 _camera.orthographicSize + delta,
                 _cfg.camera.minZoom,
                 _cfg.camera.maxZoom);
 
-            // Se non cambia, stop
-            if (Mathf.Approximately(newSize, _camera.orthographicSize))
+            // Snapping volutamente grossolano (feature di debug / look & feel "a scatti").
+            // NOTA: se vuoi tornare a zoom continuo, usa il blocco commentato sopra (newSize) e rimuovi
+            // la quantizzazione qui sotto.
+            float ppu = 32f;
+            float k = 4f;                 // 4 pixel per step
+            float step = k / ppu;         // = 0.125
+            step *= 16f;
+            float snapped = Mathf.Round(desired / step) * step;
+
+            if (Mathf.Approximately(snapped, _camera.orthographicSize))
                 return;
 
-            _camera.orthographicSize = newSize;
-
+            _camera.orthographicSize = snapped;
             // 3) World point sotto mouse dopo lo zoom
             Vector3 after = GetMouseWorldOnZ0();
 
             // 4) Compensazione: sposta target in modo che "before" resti sotto il mouse
             Vector3 offset = before - after;
             _targetPos += offset;
+        }
+
+        /// <summary>
+        /// Applica zoom pixel-perfect agendo su PixelPerfectCamera.assetsPPU.
+        ///
+        /// Regole:
+        /// - Lo step è un intero: più alto = zoom più "veloce" (salti più grossi).
+        /// - Clamp in un range (min/max) per evitare valori ridicoli.
+        /// - Aumentare assetsPPU = sprite più grandi a schermo = "zoom in".
+        ///   Quindi scroll su (di solito scrollY > 0) deve produrre zoom-in.
+        ///   Il segno dell'Input System può variare per device, ma nella tua scena hai visto:
+        ///   scrollY = +1 / -1; qui usiamo il suo segno direttamente.
+        /// </summary>
+        private void ApplyPixelPerfectZoom(float scrollY)
+        {
+            // Failsafe: se step è 0 o negativo, forziamo a 1.
+            int step = Mathf.Max(1, _ppStepAssetsPpu);
+
+            // Convenzione: scrollY > 0 = zoom in.
+            int dir = scrollY > 0 ? +1 : -1;
+
+            int current = _ppc.assetsPPU;
+            int desired = current + (dir * step);
+            desired = Mathf.Clamp(desired, _ppMinAssetsPpu, _ppMaxAssetsPpu);
+
+            // Se non cambia, non facciamo nulla.
+            if (desired == current)
+                return;
+
+            _ppc.assetsPPU = desired;
         }
 
         /// <summary>
@@ -121,6 +235,9 @@ namespace Arcontio.View.MapGrid
 
             var mouse = Mouse.current;
             if (mouse == null) return;
+
+            if (IsPointerOverUI())
+                return;
 
             if (mouse.rightButton.wasPressedThisFrame)
             {
@@ -158,8 +275,94 @@ namespace Arcontio.View.MapGrid
             _targetPos += deltaWorld;
         }
 
+        private static bool IsPointerOverUI()
+        {
+            return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        }
+
         /// <summary>
-        /// Edge-pan: muove il target se il mouse � vicino ai bordi.
+        /// Prova a leggere override di configurazione per lo zoom pixel-perfect.
+        ///
+        /// Questo metodo è volutamente "tollerante":
+        /// - se i campi non esistono nel tuo MapGridConfig, non fa nulla.
+        /// - se esistono ma hanno valori strani, applichiamo comunque clamp minimo.
+        ///
+        /// In pratica: puoi aggiungere i campi al JSON oggi e completare in seguito
+        /// l'aggiunta dei campi nella classe di config, senza rischiare crash o compilazioni rotte.
+        /// </summary>
+        private void ApplyPixelPerfectZoomOverridesFromConfig()
+        {
+            if (_cfg == null) return;
+            if (_cfg.camera == null) return;
+
+            object camCfg = _cfg.camera;
+
+            // 1) Forma annidata: camera.pixelPerfectZoom.{enabled,minAssetsPpu,maxAssetsPpu,stepAssetsPpu}
+            object ppBlock = TryGetMemberValue(camCfg, "pixelPerfectZoom");
+            if (ppBlock != null)
+            {
+                if (TryGetBool(ppBlock, "enabled", out var b)) _ppZoomEnabled = b;
+                if (TryGetInt(ppBlock, "minAssetsPpu", out var iMin)) _ppMinAssetsPpu = iMin;
+                if (TryGetInt(ppBlock, "maxAssetsPpu", out var iMax)) _ppMaxAssetsPpu = iMax;
+                if (TryGetInt(ppBlock, "stepAssetsPpu", out var iStep)) _ppStepAssetsPpu = iStep;
+            }
+
+            // 2) Forma piatta (fallback)
+            if (TryGetBool(camCfg, "pixelPerfectZoomEnabled", out var enabled2)) _ppZoomEnabled = enabled2;
+            if (TryGetInt(camCfg, "pixelPerfectZoomMinAssetsPpu", out var min2)) _ppMinAssetsPpu = min2;
+            if (TryGetInt(camCfg, "pixelPerfectZoomMaxAssetsPpu", out var max2)) _ppMaxAssetsPpu = max2;
+            if (TryGetInt(camCfg, "pixelPerfectZoomStepAssetsPpu", out var step2)) _ppStepAssetsPpu = step2;
+
+            // Clamp di sicurezza lato controller.
+            _ppMinAssetsPpu = Mathf.Max(1, _ppMinAssetsPpu);
+            _ppMaxAssetsPpu = Mathf.Max(_ppMinAssetsPpu, _ppMaxAssetsPpu);
+            _ppStepAssetsPpu = Mathf.Max(1, _ppStepAssetsPpu);
+        }
+
+        /// <summary>
+        /// Reflection helper: prova a leggere un member (field o property) senza dipendenze compile-time.
+        /// </summary>
+        private static object TryGetMemberValue(object obj, string name)
+        {
+            if (obj == null) return null;
+            var t = obj.GetType();
+
+            // Field
+            var f = t.GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (f != null) return f.GetValue(obj);
+
+            // Property
+            var p = t.GetProperty(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (p != null && p.GetIndexParameters().Length == 0) return p.GetValue(obj);
+
+            return null;
+        }
+
+        private static bool TryGetInt(object obj, string name, out int value)
+        {
+            value = default;
+            object raw = TryGetMemberValue(obj, name);
+            if (raw == null) return false;
+
+            if (raw is int i) { value = i; return true; }
+            if (raw is float f) { value = Mathf.RoundToInt(f); return true; }
+            if (raw is double d) { value = (int)System.Math.Round(d); return true; }
+            if (raw is long l) { value = (int)l; return true; }
+            return false;
+        }
+
+        private static bool TryGetBool(object obj, string name, out bool value)
+        {
+            value = default;
+            object raw = TryGetMemberValue(obj, name);
+            if (raw == null) return false;
+
+            if (raw is bool b) { value = b; return true; }
+            return false;
+        }
+
+        /// <summary>
+        /// Edge-pan: muove il target se il mouse è vicino ai bordi.
         /// Importante: se stai trascinando RMB, NON applichiamo edge-pan.
         /// </summary>
         private void HandleEdgePanTarget()
@@ -208,7 +411,7 @@ namespace Arcontio.View.MapGrid
 
         /// <summary>
         /// Restituisce il world-point sotto il mouse sul piano Z=0.
-        /// Usato SOLO per lo zoom-to-cursor (qui � stabile e non genera jitter).
+        /// Usato SOLO per lo zoom-to-cursor (qui è stabile e non genera jitter).
         /// </summary>
         private Vector3 GetMouseWorldOnZ0()
         {

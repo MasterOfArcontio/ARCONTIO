@@ -6,7 +6,7 @@ using Arcontio.Core.Diagnostics;
 namespace Arcontio.Core
 {
     /// <summary>
-    /// TokenEmissionPipeline (Giorno 5):
+    /// TokenEmissionPipeline:
     /// Trasforma MemoryTrace -> TokenEnvelope quando due NPC sono in contatto.
     ///
     /// Perché non è un ISystem:

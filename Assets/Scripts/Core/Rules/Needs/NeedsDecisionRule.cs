@@ -57,7 +57,7 @@ namespace Arcontio.Core
 
             var cfg = world.Global.Needs;
 
-            int ate = 0, slept = 0, antisocial = 0;
+            int ate = 0, slept = 0, antisocial = 0, moved = 0;
 
             foreach (var npcId in world.NpcCore.Keys)
             {
@@ -66,11 +66,20 @@ namespace Arcontio.Core
                 // --- MANGIA ---
                 if (needs.Hunger01 >= cfg.hungryThreshold)
                 {
-                    if (TryPlanEat(world, npcId, needs, out var cmd, out bool didSteal))
+                    if (TryPlanEatOrMove(world, npcId, in needs, (int)pulse.TickIndex, out var cmd, out bool didSteal, out bool didMove))
                     {
                         outCommands.Add(cmd);
-                        ate++;
+                        if (didMove) moved++; else ate++;
                         if (didSteal) antisocial++;
+
+                        ArcontioLogger.Info(
+                            new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "NeedsDecisionRule"),
+                            new LogBlock(LogLevel.Info, "log.needsconfig.Handle")
+                                         .AddField("tick", pulse.TickIndex)
+                                         .AddField("npcId", npcId)
+                                         .AddField("Command", cmd.Name));
+
+
                         continue; // una sola azione per tick
                     }
                 }
@@ -83,6 +92,14 @@ namespace Arcontio.Core
                         outCommands.Add(cmd);
                         slept++;
                         if (didTrespass) antisocial++;
+
+                        ArcontioLogger.Info(
+                            new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "NeedsDecisionRule"),
+                            new LogBlock(LogLevel.Info, "log.needsconfig.Handle")
+                                         .AddField("tick", pulse.TickIndex)
+                                         .AddField("npcId", npcId)
+                                         .AddField("Command", cmd.Name));
+
                         continue; // una sola azione per tick
                     }
                 }
@@ -95,6 +112,7 @@ namespace Arcontio.Core
                 new LogBlock(LogLevel.Info, "log.needsconfig.Handle")
                     .AddField("tick=", pulse.TickIndex)
                     .AddField("ate==", ate)
+                    .AddField("moved==", moved)
                     .AddField("antisocial==", antisocial));
             }
         }
@@ -103,10 +121,33 @@ namespace Arcontio.Core
         // EAT DECISION
         // ============================================================
 
-        private bool TryPlanEat(World world, int npcId, Needs needs, out ICommand cmd, out bool didSteal)
+        /// <summary>
+        /// Day10: Eat OR Move OR Steal.
+        ///
+        /// Ordine decisionale (coerente con la policy di progetto):
+        /// 1) cibo privato addosso
+        /// 2) cibo community visibile: se sei sulla cella -> mangia, altrimenti -> muoviti
+        /// 3) se NON esiste cibo legale e "okToSteal":
+        ///    3a) stock privato a terra (OwnerKind=Npc, OwnerId!=me) visibile: se sei sulla cella -> ruba unità, altrimenti -> muoviti
+        ///    3b) altrimenti prova furto "addosso" (NpcPrivateFood) come fallback
+        ///
+        /// Nota:
+        /// - Questo metodo evita sia "mangiare a distanza" sia "rubare a distanza".
+        /// - Il movimento viene espresso tramite SetMoveIntentCommand.
+        ///   (Se nel tuo branch non esiste ancora MoveIntent, questo è il punto dove dovrai allineare i tipi.)
+        /// </summary>
+        private bool TryPlanEatOrMove(
+            World world,
+            int npcId,
+            in Needs needs,
+            int nowTick,
+            out ICommand cmd,
+            out bool didSteal,
+            out bool didMove)
         {
             cmd = null;
             didSteal = false;
+            didMove = false;
 
             // 1) privato
             if (world.NpcPrivateFood.TryGetValue(npcId, out int priv) && priv > 0)
@@ -116,13 +157,34 @@ namespace Arcontio.Core
             }
 
             // 2) stock community (VISIBILE)
-            // Nota: qui sta il bug storico.
-            // Prima bastava "Units>0". Questo permette telepatia (mangio cibo dietro un muro).
-            // Ora filtriamo con range + LOS usando coordinate *corrette* dal World.
+            // Nota: qui stava il bug storico.
+            // Prima bastava "Units>0" => telepatia (mangio dietro un muro).
+            // Ora: range + LOS + (Day10) "se non sei sulla cella -> muoviti".
             int foodObj = FindVisibleCommunityFoodStock(world, npcId, _maxSeekRangeCells);
             if (foodObj != 0)
             {
-                cmd = new EatFromStockCommand(npcId, foodObj);
+                if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+                    return false;
+
+                if (!TryGetObjectCell(world, foodObj, out int fx, out int fy))
+                    return false;
+
+                if (nx == fx && ny == fy)
+                {
+                    // IMPORTANTISSIMO: mangio solo se sono sullo stock.
+                    cmd = new EatFromStockCommand(npcId, foodObj);
+                    return true;
+                }
+
+                didMove = true;
+                cmd = new SetMoveIntentCommand(npcId, new MoveIntent
+                {
+                    Active = true,
+                    TargetX = fx,
+                    TargetY = fy,
+                    Reason = MoveIntentReason.SeekFood,
+                    TargetObjectId = foodObj
+                });
                 return true;
             }
 
@@ -134,6 +196,40 @@ namespace Arcontio.Core
             if (!okToSteal)
                 return false;
 
+            // 3a) Day10: furto da stock privato a terra (non addosso)
+            // Questo è il caso che vuoi testare: FoodStockComponent con OwnerKind=Npc, OwnerId=victim.
+            int stolenStockObj = FindVisibleOtherNpcFoodStock(world, npcId, _maxSeekRangeCells);
+            if (stolenStockObj != 0)
+            {
+                if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+                    return false;
+
+                if (!TryGetObjectCell(world, stolenStockObj, out int sx, out int sy))
+                    return false;
+
+                if (nx == sx && ny == sy)
+                {
+                    // Ruba davvero solo se sei sullo stock.
+                    didSteal = true;
+                    cmd = new StealFromStockCommand(npcId, stolenStockObj);
+                    return true;
+                }
+
+                // Altrimenti ti avvicini prima: niente furto "a distanza".
+                didMove = true;
+                didSteal = true; // stai pianificando un'azione antisociale
+                cmd = new SetMoveIntentCommand(npcId, new MoveIntent
+                {
+                    Active = true,
+                    TargetX = sx,
+                    TargetY = sy,
+                    Reason = MoveIntentReason.SeekFood,
+                    TargetObjectId = stolenStockObj
+                });
+                return true;
+            }
+
+            // 3b) fallback: furto di cibo "addosso" (NpcPrivateFood)
             int victim = FindNpcWithPrivateFood(world, npcId);
             if (victim != 0)
             {
@@ -197,6 +293,48 @@ namespace Arcontio.Core
                 if (kv.Key == exceptNpcId) continue;
                 if (kv.Value > 0) return kv.Key;
             }
+            return 0;
+        }
+
+        /// <summary>
+        /// Day10: trova uno stock di cibo privato (OwnerKind=Npc) appartenente ad un altro NPC,
+        /// che sia visibile (range + LOS) e con Units > 0.
+        ///
+        /// Nota strategica:
+        /// - In futuro questo non dovrebbe essere "scan globale world.FoodStocks",
+        ///   ma una query su NpcObjectMemoryStore (conoscenza soggettiva).
+        /// - Per il test Day10 (seed) va benissimo: vogliamo validare meccanica furto + witness.
+        /// </summary>
+        private static int FindVisibleOtherNpcFoodStock(World world, int npcId, int maxRangeCells)
+        {
+            if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+                return 0;
+
+            foreach (var kv in world.FoodStocks)
+            {
+                int objId = kv.Key;
+                var st = kv.Value;
+
+                if (st.Units <= 0) continue;
+
+                // Deve essere privato di un altro NPC.
+                if (st.OwnerKind != OwnerKind.Npc) continue;
+                if (st.OwnerId <= 0) continue;
+                if (st.OwnerId == npcId) continue;
+
+                if (!TryGetObjectCell(world, objId, out int ox, out int oy))
+                    continue;
+
+                int manhattan = Mathf.Abs(ox - nx) + Mathf.Abs(oy - ny);
+                if (manhattan > maxRangeCells)
+                    continue;
+
+                if (!world.HasLineOfSight(nx, ny, ox, oy))
+                    continue;
+
+                return objId;
+            }
+
             return 0;
         }
 

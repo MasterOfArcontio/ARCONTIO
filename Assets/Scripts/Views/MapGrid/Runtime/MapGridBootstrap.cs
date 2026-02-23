@@ -1,4 +1,6 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
+
 
 namespace Arcontio.View.MapGrid
 {
@@ -31,6 +33,7 @@ namespace Arcontio.View.MapGrid
         [Header("Materials")]
         [Tooltip("Material Unlit/Texture per disegnare la mesh terreno (atlas).")]
         [SerializeField] private Material terrainMaterial;
+        [SerializeField] private InputActionReference uiPointAction;
 
         // Stato runtime
         private MapGridConfig _cfg;
@@ -104,13 +107,22 @@ namespace Arcontio.View.MapGrid
             // 8) Setup camera: posizione iniziale + controller
             SetupCamera();
 
-            // 9) Spawn NPC placeholder (finché non bindiamo al simulatore)
-            //SpawnNpcPlaceholders();
+            // 8.5) Input bridge (New Input System)
+            var pointer = gameObject.GetComponent<MapGridPointerInputActionsProvider>();
+            if (pointer == null) pointer = gameObject.AddComponent<MapGridPointerInputActionsProvider>();
+
+            // Qui devi avere un riferimento alla tua InputActionReference “Point”.
+            // Tipicamente è un SerializeField nel Bootstrap, es:
+            // [SerializeField] private InputActionReference uiPointAction;
+            pointer.SetPointAction(uiPointAction);
 
             // 9) Bind World -> View (NPC + Objects)
             var view = gameObject.GetComponent<MapGridWorldView>();
             if (view == null) view = gameObject.AddComponent<MapGridWorldView>();
             view.Init(_cfg);
+
+            // NEW: passa provider alla view
+            view.SetPointerProvider(pointer);
         }
 
         private void ApplyLayoutToMap(MapGridLayout layout)

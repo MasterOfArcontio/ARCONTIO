@@ -52,38 +52,6 @@ namespace Arcontio.Core
                 outEvents.Add(e);
         }
     }
-
-    /// <summary>
-    /// Marker interface per eventi.
-    /// </summary>
-    public interface ISimEvent { }
-
-    // Esempi di eventi
-    public sealed class NpcBecameHungry : ISimEvent
-    {
-        public readonly int NpcId;
-        public NpcBecameHungry(int npcId) { NpcId = npcId; }
-    }
-
-    public sealed class ResourceShortage : ISimEvent
-    {
-        public readonly string ResourceName;
-        public ResourceShortage(string resourceName) { ResourceName = resourceName; }
-    }
-
-    public sealed class NpcWasFed : ISimEvent
-    {
-        public readonly int NpcId;
-        public readonly int UsedFood;
-        public readonly float HungerAfter;
-
-        public NpcWasFed(int npcId, int usedFood, float hungerAfter)
-        {
-            NpcId = npcId;
-            UsedFood = usedFood;
-            HungerAfter = hungerAfter;
-        }
-    }
 }
 
 namespace Arcontio.Core

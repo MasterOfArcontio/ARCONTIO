@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Arcontio.Core;
 
 namespace Arcontio.View.MapGrid
@@ -12,9 +13,41 @@ namespace Arcontio.View.MapGrid
     {
         [Header("References")]
         [SerializeField] private MapGridConfig cfg;
+        [SerializeField] private MapGridPointerInputActionsProvider pointerProvider;
+        [Tooltip("Camera usata per WorldToScreen/ScreenToWorld. Se null, fallback: Camera.main o prima camera attiva trovata.")]
+        [SerializeField] private Camera worldCamera;
+        
+        // Cache interna per evitare Find/scan ogni frame.
+        private Camera _resolvedWorldCamera;
 
         [Header("Sprite fallbacks")]
         [SerializeField] private string defaultNpcSpritePath = "MapGrid/Sprites/NPC_Astro";
+
+        [Header("NPC balloons (view-only)")]
+        [Tooltip("Durata in secondi per cui un balloon resta visibile sopra l'NPC.")]
+        [SerializeField] private float npcBalloonVisibleSeconds = 1.25f;
+
+        [Tooltip("Offset verticale (world units) del balloon rispetto allo sprite NPC.")]
+        [SerializeField] private float npcBalloonYOffsetWorld = 0.55f;
+
+        [Tooltip("Resources path per balloon 'Eat'.")]
+        [SerializeField] private string balloonEatSpritePath = "MapGrid/Sprites/Balloons/Balloon_Eat";
+
+        [Tooltip("Resources path per balloon 'Steal'.")]
+        [SerializeField] private string balloonStealSpritePath = "MapGrid/Sprites/Balloons/Balloon_Steal";
+
+        [Tooltip("Resources path per balloon 'TheftWitnessed'.")]
+        [SerializeField] private string balloonTheftWitnessedSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftWitnessed";
+
+        [Tooltip("Resources path per balloon 'TheftSuffered'.")]
+        [SerializeField] private string balloonTheftSufferedSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftSuffered";
+
+        [Header("Debug overlays")]
+        [Tooltip("Sprite usato per evidenziare celle viste (DebugFovTelemetry). Deve essere un Sprite in Resources.")]
+        [SerializeField] private string fovOverlaySpritePath = "MapGrid/Sprites/CellHighlight";
+
+        [Tooltip("Sorting order dell'overlay FOV. Deve stare sotto NPC/Objects ma sopra il terreno.")]
+        [SerializeField] private int fovOverlayOrder = 25;
 
         [Header("Sorting")]
         [SerializeField] private int terrainOrder = 0;
@@ -22,6 +55,7 @@ namespace Arcontio.View.MapGrid
         [SerializeField] private int npcBaseOrder = 100;
         [SerializeField] private bool sortByY = true; // DF-like
 
+        // ---------------- Core binding ----------------
         private World _world;
 
         private Transform _objectsRoot;
@@ -32,6 +66,26 @@ namespace Arcontio.View.MapGrid
         private readonly Dictionary<string, Sprite> _spriteCache = new();
 
         private Sprite _defaultNpcSprite;
+        private MapGridPointerInputActionsProvider _pointerProvider;
+
+        // ---------------- Tooltip system (view-only) ----------------
+        private MapGridNpcHoverTooltipSystem _hoverTooltip;
+
+        // ---------------- Debug overlay: FOV heatmap ----------------
+        private MapGridFovHeatmapOverlay _fovOverlay;
+
+        // ---------------- Debug overlay: Summary cards (F1) ----------------
+        //
+        // Requisito:
+        // - quando attivo: tooltip sparisce e compaiono schede sopra ogni NPC e oggetto interagibile.
+        // - quando disattivo: schede spariscono e torna tooltip.
+        private MapGridEntitySummaryOverlay _summaryOverlay;
+        private bool _summaryOverlayEnabled;
+
+        /// <summary>
+        /// Flag read-only: utile ad altri sistemi view-only per “spegnersi” quando il SummaryOverlay è attivo.
+        /// </summary>
+        public bool IsSummaryOverlayEnabled => _summaryOverlayEnabled;
 
         public void Init(MapGridConfig config)
         {
@@ -46,10 +100,34 @@ namespace Arcontio.View.MapGrid
             // default npc sprite: prima da config, altrimenti fallback
             var npcPath = cfg?.npc?.spriteResourcePath;
             if (string.IsNullOrWhiteSpace(npcPath)) npcPath = defaultNpcSpritePath;
-            _defaultNpcSprite = LoadSpriteCached(npcPath);
 
+            _defaultNpcSprite = LoadSpriteCached(npcPath);
             if (_defaultNpcSprite == null)
                 Debug.LogWarning($"[MapGrid] Default NPC sprite not found at Resources/{npcPath}.png");
+
+            // Tooltip/hover system: lo inizializziamo qui così resta totalmente “View-only”.
+            _hoverTooltip = new MapGridNpcHoverTooltipSystem();
+
+            // ============================================================
+            // Debug overlay: FOV heatmap
+            // ============================================================
+            // Nota:
+            // - L'overlay legge dal World.DebugFovTelemetry.
+            // - Se la feature è disabilitata da config, _world.DebugFovTelemetry sarà null
+            //   e quindi non renderizziamo nulla.
+            _fovOverlay = new MapGridFovHeatmapOverlay();
+            _fovOverlay.Init(transform, cfg.tileSizeWorld, fovOverlaySpritePath, fovOverlayOrder);
+
+            // ============================================================
+            // Debug overlay: Summary cards (F1)
+            // ============================================================
+            // Nota:
+            // - View-only.
+            // - Non deve mai “bloccare” la sim: se world/camera null, semplicemente non renderizza.
+            _summaryOverlay = new MapGridEntitySummaryOverlay();
+            _summaryOverlay.AttachTo(transform);          // ✅ QUESTA RIGA MANCAVA
+            _summaryOverlay.SetEnabled(false);
+            _summaryOverlayEnabled = false;
         }
 
         private void Update()
@@ -60,11 +138,155 @@ namespace Arcontio.View.MapGrid
             _world ??= MapGridWorldProvider.TryGetWorld();
             if (_world == null) return;
 
+            // ============================================================
+            // INPUT (debug): F1 toggle SummaryOverlay
+            // ============================================================
+            //
+            // Scelta tecnica:
+            // - Uso diretto Keyboard.current per un toggle debug.
+            // - Così non devo toccare il file .inputactions.
+            //
+            // Se in futuro vuoi “configurabile”, lo facciamo via InputActionReference.
+            if (Keyboard.current != null && Keyboard.current.f9Key.wasPressedThisFrame)
+            {
+                // Debug UX: Shift + toggle => reset posizioni card (offset) e forza relayout iniziale.
+                bool reset = (Keyboard.current.leftShiftKey != null && Keyboard.current.leftShiftKey.isPressed)
+                             || (Keyboard.current.rightShiftKey != null && Keyboard.current.rightShiftKey.isPressed);
+
+                if (reset && _summaryOverlay != null)
+                    _summaryOverlay.ClearOffsetsAndRequestRelayout();
+
+                ToggleSummaryOverlay();
+            }
+
             SyncObjects();
             SyncNpcs();
 
             // (opzionale) cleanup: se entità spariscono, rimuovi view
             CleanupMissing();
+
+            // ============================================================
+            // DEBUG FOV OVERLAY (heatmap su finestre N tick)
+            // ============================================================
+            // Policy UX:
+            // - Mostriamo la heatmap dell'NPC "attivo":
+            //   - se il mouse è sopra un NPC, usiamo quello.
+            //   - altrimenti fallback: primo NPC esistente.
+            //
+            // Nota:
+            // - la view NON ricalcola la percezione.
+            // - legge il buffer READ del core (DebugFovTelemetry), che contiene la somma
+            //   dei coni nella finestra di N tick.
+            if (_world.DebugFovTelemetry != null && _fovOverlay != null)
+            {
+                int activeNpcId = ResolveActiveNpcForFovOverlay();
+                if (activeNpcId > 0 && _world.DebugFovTelemetry.TryGetReadHeat(activeNpcId, out var heat))
+                {
+                    int windowTicks = _world.DebugFovTelemetry.WindowTicks;
+                    _fovOverlay.Render(heat, _world.DebugFovTelemetry.Width, _world.DebugFovTelemetry.Height, windowTicks);
+                }
+                else
+                {
+                    _fovOverlay.Clear();
+                }
+            }
+
+            // ============================================================
+            // Summary overlay (F1) vs Hover tooltip (default)
+            // ============================================================
+            var cam = ResolveWorldCamera();
+            if (_summaryOverlayEnabled)
+            {
+                // Tooltip OFF (hard) + overlay ON
+                _hoverTooltip.Hide();
+
+                if (cam != null && _summaryOverlay != null)
+                    _summaryOverlay.Tick(_world, cam, cfg.tileSizeWorld);
+            }
+            else
+            {
+                // Overlay OFF + tooltip ON (normal)
+                if (_summaryOverlay != null)
+                    _summaryOverlay.SetEnabled(false);
+
+                if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var p))
+                {
+                    // Fail-safe: nessun tooltip se manca input o camera
+                }
+                else
+                {
+                    _hoverTooltip.Tick(_world, cam, p, cfg.tileSizeWorld);
+                }
+            }
+        }
+
+        private void ToggleSummaryOverlay()
+        {
+            _summaryOverlayEnabled = !_summaryOverlayEnabled;
+
+            if (_summaryOverlay != null)
+                _summaryOverlay.SetEnabled(_summaryOverlayEnabled);
+
+            // Nota:
+            // - quando abilito, forzo Hide del tooltip per evitare “ghost” UI.
+            // - quando disabilito, il tooltip riparte al prossimo Tick (Update).
+            if (_summaryOverlayEnabled)
+                _hoverTooltip.Hide();
+        }
+
+        /// <summary>
+        /// Decide quale NPC considerare "attivo" per l'overlay FOV.
+        ///
+        /// Regola (semplice, debug):
+        /// 1) se puntatore sopra una cella che contiene NPC => quel NPC
+        /// 2) altrimenti => primo NPC nel world (se esiste)
+        /// </summary>
+        private int ResolveActiveNpcForFovOverlay()
+        {
+            /*// 1) prova hover: pointer -> world -> cell -> npc
+            var cam = ResolveWorldCamera();
+            if (cam != null && _pointerProvider != null && _pointerProvider.TryGetPointerScreenPosition(out var p))
+            {
+                Vector3 wp = cam.ScreenToWorldPoint(new Vector3(p.x, p.y, 0f));
+                int cellX = Mathf.FloorToInt(wp.x / cfg.tileSizeWorld);
+                int cellY = Mathf.FloorToInt(wp.y / cfg.tileSizeWorld);
+
+                int hovered = FindNpcAtCell(_world, cellX, cellY);
+                if (hovered > 0)
+                    return hovered;
+            }
+
+            // 2) fallback: primo NPC esistente
+            foreach (var kv in _world.NpcCore)
+                return kv.Key;
+
+            return -1;*/
+
+            // Questo blocco di modifica fa sì che se il mouse non è su un NPC, la heatmap viene nascosta
+            var cam = ResolveWorldCamera();
+            if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var p))
+                return -1;
+
+            Vector3 wp = cam.ScreenToWorldPoint(new Vector3(p.x, p.y, Mathf.Abs(cam.transform.position.z)));
+            wp.z = 0f;
+
+            var hit = Physics2D.OverlapPoint(wp);
+            if (hit == null) return -1;
+
+            var handle = hit.GetComponent<MapGridNpcViewHandle>();
+            return handle != null ? handle.NpcId : -1;
+        }
+
+        private static int FindNpcAtCell(World world, int x, int y)
+        {
+            if (world == null) return -1;
+            foreach (var kv in world.GridPos)
+            {
+                var p = kv.Value;
+                if (p.X == x && p.Y == y)
+                    return kv.Key;
+            }
+            return -1;
         }
 
         private void SyncNpcs()
@@ -78,14 +300,48 @@ namespace Arcontio.View.MapGrid
                 {
                     sr = CreateSpriteRenderer(_npcsRoot, $"NPC_{npcId}", _defaultNpcSprite);
                     _npcViews[npcId] = sr;
+
+                    // ---- NEW: collider + handle per hover ----
+                    // Motivazione:
+                    // - la view non deve conoscere input system complessi
+                    // - con un BoxCollider2D posso fare Physics2D.Raycast in modo semplice.
+                    EnsureNpcHoverComponents(sr.gameObject, npcId);
+
+                    // ---- NEW: balloon view ----
+                    // Un piccolo fumetto sopra la testa dell'NPC, quando il core emette NpcBalloonSignal.
+                    EnsureNpcBalloonComponents(sr.gameObject, npcId);
                 }
 
                 sr.transform.position = CellCenterWorld(pos.X, pos.Y);
-
-                sr.sortingOrder = sortByY
-                    ? npcBaseOrder - pos.Y
-                    : npcBaseOrder;
+                sr.sortingOrder = sortByY ? npcBaseOrder - pos.Y : npcBaseOrder;
             }
+        }
+
+        private void EnsureNpcBalloonComponents(GameObject npcGo, int npcId)
+        {
+            if (npcGo == null) return;
+
+            var balloon = npcGo.GetComponent<MapGridNpcBalloonView>();
+            if (balloon == null)
+                balloon = npcGo.AddComponent<MapGridNpcBalloonView>();
+
+            // Mapping sprite per kind.
+            // Nota:
+            // - Lo teniamo qui (WorldView) perché è l'unico posto che conosce i path Resources della mappa.
+            var map = new Dictionary<Arcontio.Core.NpcBalloonKind, string>
+            {
+                { Arcontio.Core.NpcBalloonKind.Eat, balloonEatSpritePath },
+                { Arcontio.Core.NpcBalloonKind.Steal, balloonStealSpritePath },
+                { Arcontio.Core.NpcBalloonKind.TheftWitnessed, balloonTheftWitnessedSpritePath },
+                { Arcontio.Core.NpcBalloonKind.TheftSuffered, balloonTheftSufferedSpritePath }
+            };
+
+            balloon.Init(npcId, npcBalloonYOffsetWorld, npcBalloonVisibleSeconds, map);
+        }
+
+        public void SetPointerProvider(MapGridPointerInputActionsProvider provider)
+        {
+            _pointerProvider = provider;
         }
 
         private void SyncObjects()
@@ -102,7 +358,8 @@ namespace Arcontio.View.MapGrid
 
                     if (_world.TryGetObjectDef(inst.DefId, out var def))
                     {
-                        // Il tuo JSON ha "SpriteKey". Assumo che in C# ObjectDef abbia "SpriteKey".
+                        // Il tuo JSON ha "SpriteKey".
+                        // Assumo che in C# ObjectDef abbia "SpriteKey".
                         spriteKey = def.SpriteKey;
                     }
 
@@ -118,10 +375,7 @@ namespace Arcontio.View.MapGrid
                 }
 
                 sr.transform.position = CellCenterWorld(inst.CellX, inst.CellY);
-
-                sr.sortingOrder = sortByY
-                    ? objectBaseOrder - inst.CellY
-                    : objectBaseOrder;
+                sr.sortingOrder = sortByY ? objectBaseOrder - inst.CellY : objectBaseOrder;
 
                 // Stock label (solo se è FoodStock)
                 var label = sr.GetComponent<MapGridStockLabel>();
@@ -143,7 +397,8 @@ namespace Arcontio.View.MapGrid
         {
             // NPC: se non esiste più in GridPos, distruggi view
             // (Oggi è ok O(n) perché poche entità; se cresce, ottimizziamo con stamp tick.)
-            var npcToRemove = ListPool<int>.Get();
+            var npcToRemove = ListPool.Get();
+
             foreach (var id in _npcViews.Keys)
                 if (!_world.GridPos.ContainsKey(id))
                     npcToRemove.Add(id);
@@ -152,11 +407,14 @@ namespace Arcontio.View.MapGrid
             {
                 if (_npcViews.TryGetValue(id, out var sr) && sr != null)
                     Destroy(sr.gameObject);
+
                 _npcViews.Remove(id);
             }
-            ListPool<int>.Release(npcToRemove);
 
-            var objToRemove = ListPool<int>.Get();
+            ListPool.Release(npcToRemove);
+
+            var objToRemove = ListPool.Get();
+
             foreach (var id in _objectViews.Keys)
                 if (!_world.Objects.ContainsKey(id))
                     objToRemove.Add(id);
@@ -165,9 +423,11 @@ namespace Arcontio.View.MapGrid
             {
                 if (_objectViews.TryGetValue(id, out var sr) && sr != null)
                     Destroy(sr.gameObject);
+
                 _objectViews.Remove(id);
             }
-            ListPool<int>.Release(objToRemove);
+
+            ListPool.Release(objToRemove);
         }
 
         private Vector3 CellCenterWorld(int cellX, int cellY)
@@ -186,17 +446,16 @@ namespace Arcontio.View.MapGrid
             sr.sprite = sprite;
             sr.sortingOrder = 0;
 
-            // Se vuoi evitare che terreno copra sprites: assicurati terrenoOrder << objectBaseOrder
+            // Se vuoi evitare che terreno copra sprites: assicurati terrainOrder << objectBaseOrder
             // Il terreno (mesh) non usa sortingOrder; quindi questo va bene.
-
             // Se sprite null, l'oggetto esiste comunque e lo vedi in hierarchy (debug).
+
             return sr;
         }
 
         private Sprite LoadSpriteCached(string resourcePath)
         {
-            if (string.IsNullOrWhiteSpace(resourcePath))
-                return null;
+            if (string.IsNullOrWhiteSpace(resourcePath)) return null;
 
             if (_spriteCache.TryGetValue(resourcePath, out var s) && s != null)
                 return s;
@@ -207,13 +466,99 @@ namespace Arcontio.View.MapGrid
         }
 
         /// <summary>
+        /// NEW:
+        /// Garantisce che l’NPC view sia hittabile dal mouse e che porti l’id dell’NPC.
+        ///
+        /// Nota architetturale:
+        /// - NON aggiungiamo dipendenze al Core.
+        /// - L’NPC id resta un dato “view-only” (handle) per risalire al World.
+        /// </summary>
+        private void EnsureNpcHoverComponents(GameObject npcGo, int npcId)
+        {
+            var handle = npcGo.GetComponent<MapGridNpcViewHandle>();
+            if (handle == null) handle = npcGo.AddComponent<MapGridNpcViewHandle>();
+            handle.NpcId = npcId;
+
+            // Collider 2D per raycast.
+            var col = npcGo.GetComponent<BoxCollider2D>();
+            if (col == null) col = npcGo.AddComponent<BoxCollider2D>();
+
+            // Dimensione collider: 1 cella.
+            // (Se in futuro sprite NPC è più grande/piccolo, puoi esporre un moltiplicatore in config.)
+            col.size = new Vector2(cfg.tileSizeWorld, cfg.tileSizeWorld);
+            col.offset = Vector2.zero;
+            col.isTrigger = true; // così non rompe eventuali collisioni fisiche future.
+        }
+
+        /// <summary>
         /// Piccola pool per evitare allocazioni in cleanup (debug-friendly).
         /// </summary>
-        private static class ListPool<T>
+        private static class ListPool
         {
-            private static readonly Stack<List<T>> _pool = new();
-            public static List<T> Get() => _pool.Count > 0 ? _pool.Pop() : new List<T>(64);
-            public static void Release(List<T> list) { list.Clear(); _pool.Push(list); }
+            private static readonly Stack<List<int>> _pool = new();
+
+            public static List<int> Get()
+                => _pool.Count > 0 ? _pool.Pop() : new List<int>(64);
+
+            public static void Release(List<int> list)
+            {
+                list.Clear();
+                _pool.Push(list);
+            }
         }
+
+        /// <summary>
+        /// Risolve in modo robusto la camera usata per la conversione World→Screen.
+        /// Evita dipendenze dal tag MainCamera (Camera.main) che spesso in scene debug non è settato.
+        /// Priorità:
+        /// 1) Camera assegnata da Inspector (worldCamera)
+        /// 2) Cache già risolta
+        /// 3) Camera.main
+        /// 4) Prima camera attiva in scena (preferendo orthographic)
+        /// </summary>
+        private Camera ResolveWorldCamera()
+        {
+            // 1) Inspector override
+            if (worldCamera != null)
+            {
+                _resolvedWorldCamera = worldCamera;
+                return worldCamera;
+            }
+
+            // 2) Cache
+            if (_resolvedWorldCamera != null && _resolvedWorldCamera.isActiveAndEnabled)
+                return _resolvedWorldCamera;
+
+            // 3) MainCamera tag
+            var main = Camera.main;
+            if (main != null)
+            {
+                _resolvedWorldCamera = main;
+                return main;
+            }
+
+            // 4) Fallback: prima camera attiva, preferendo ortografica
+            var cams = Camera.allCameras;
+            Camera best = null;
+
+            for (int i = 0; i < cams.Length; i++)
+            {
+                var c = cams[i];
+                if (c == null || !c.isActiveAndEnabled) continue;
+
+                if (best == null) best = c;
+
+                // Preferisci ortografica (MapGrid tipicamente è ortho)
+                if (c.orthographic)
+                {
+                    best = c;
+                    break;
+                }
+            }
+
+            _resolvedWorldCamera = best;
+            return best;
+        }
+
     }
 }

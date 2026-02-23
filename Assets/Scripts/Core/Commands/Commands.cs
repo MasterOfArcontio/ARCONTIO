@@ -9,10 +9,11 @@ namespace Arcontio.Core
     /// </summary>
     public interface ICommand
     {
+        string Name => GetType().Name;
         void Execute(World world, MessageBus bus);
     }
 
-    public sealed class FeedNpcCommand : ICommand
+ /*   public sealed class FeedNpcCommand : ICommand
     {
         private readonly int _npcId;
         private readonly int _foodAmount;
@@ -40,5 +41,5 @@ namespace Arcontio.Core
             // Evento "fact" di debug/telemetria: descrive cosa è successo davvero
             bus.Publish(new NpcWasFed(_npcId, used, needs.Hunger01));
         }
-    }
+    }*/
 }

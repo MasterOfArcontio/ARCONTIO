@@ -51,7 +51,7 @@ namespace Arcontio.Core
                 return;
             }
 
-            if (e is NpcWasFed fed)
+            if (e is NpcWasFedEvent fed)
             {
                 ArcontioLogger.Info(
                     new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Event", npcId: fed.NpcId),

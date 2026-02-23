@@ -5,7 +5,7 @@ namespace Arcontio.Core
 {
     /// <summary>
     /// EatFromStockCommand (Day9):
-    /// Consuma 1 unit� da uno stock di cibo (oggetto in mondo).
+    /// Consuma 1 unità da uno stock di cibo (oggetto in mondo).
     ///
     /// Effetto:
     /// - decrementa FoodStockComponent.Units
@@ -36,6 +36,15 @@ namespace Arcontio.Core
 
             if (stock.Units <= 0)
                 return;
+
+            // ACTION TRACE (debug/overlay): l'NPC sta consumando cibo da uno stock visibile.
+            world.SetNpcAction(_npcId, NpcActionState.Eat("EatFromStock", _foodObjId));
+
+            // BALLOON SIGNAL (view): fumetto "Eat"
+            // Nota:
+            // - Non è un evento di simulazione.
+            // - È un segnale osservabile one-shot: la view lo mostrerà per pochi secondi.
+            world.EmitNpcBalloon(_npcId, NpcBalloonKind.Eat, subjectId: _foodObjId);
 
             // 1) Mutazione stock
             stock.Units -= 1;
