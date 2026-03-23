@@ -1,6 +1,7 @@
 using Arcontio.Core.Diagnostics;
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Arcontio.Core
 {
@@ -35,6 +36,9 @@ namespace Arcontio.Core
 
             // Oggetti visti -> memoria
             _rules.Add(new ObjectSpottedMemoryRule());
+            
+            // NPC visti -> memoria
+            _rules.Add(new NpcSpottedMemoryRule());
 
             // Furto cibo (Day9)
             _rules.Add(new FoodStolenMemoryRule());
@@ -148,27 +152,58 @@ namespace Arcontio.Core
                             {
                                 // Victim that *sees* the theft (otherwise it would not pass perception filters above).
                                 world.EmitNpcBalloon(npcId, NpcBalloonKind.TheftSuffered, subjectId: fe.ThiefNpcId, secondarySubjectId: fe.VictimNpcId);
+
+                                // Patch 0.01P3 extension:
+                                // COMMUNICAZIONE del furto (vittima).
+                                // Se la vittima percepisce il furto, può diffondere un report ad altri NPC.
+                                // Nota architetturale:
+                                // - NON pubblichiamo direttamente su TokenBus (qui non abbiamo accesso).
+                                // - Accodiamo su World.QueueTokenOut(...).
+                                // - SimulationHost flush-a e poi Delivery/Assimilation fanno il resto.
+                                QueueTheftCommunicationTokens(
+                                    world,
+                                    tick,
+                                    speakerId: npcId,
+                                    roleIsVictim: true,
+                                    thiefNpcId: fe.ThiefNpcId,
+                                    victimNpcId: fe.VictimNpcId,
+                                    cellX: fe.CellX,
+                                    cellY: fe.CellY,
+                                    baseQuality01: quality);
                             }
                             else
                             {
                                 // Third-party witness.
                                 world.EmitNpcBalloon(npcId, NpcBalloonKind.TheftWitnessed, subjectId: fe.ThiefNpcId, secondarySubjectId: fe.VictimNpcId);
+
+                                // Patch 0.01P3 extension:
+                                // COMMUNICAZIONE del furto (testimone).
+                                QueueTheftCommunicationTokens(
+                                    world,
+                                    tick,
+                                    speakerId: npcId,
+                                    roleIsVictim: false,
+                                    thiefNpcId: fe.ThiefNpcId,
+                                    victimNpcId: fe.VictimNpcId,
+                                    cellX: fe.CellX,
+                                    cellY: fe.CellY,
+                                    baseQuality01: quality);
                             }
                         }
 
                         // ============================================================
-                        // DAY10: Object-memory store (NpcObjectMemoryStore)
+                        // DAY10+: Observed-entity memory store (NpcObjectMemoryStore generalized)
                         // ============================================================
                         // Nota (molto verbosa ma importante):
                         // Questo blocco NON sostituisce le MemoryTrace narrative.
-                        // Serve a mantenere una lista compatta di oggetti conosciuti (cibo/letto/etc.)
+                        // Serve a mantenere una lista compatta di entità conosciute (oggetti + NPC) (cibo/letto/etc.)
                         // per evitare sia:
                         // - telepatia (scansione globale di world.Objects)
                         // - polling costoso (ricerche ripetute ogni tick)
                         //
                         // Lo aggiorniamo SOLO se questo npcId è un testimone valido dellevento
                         // (range + cono + LOS già verificati sopra).
-                        TryUpsertObjectMemoryFromSpotted(world, npcId, e, quality, tick);
+                        TryUpsertObservedEntityMemoryFromSpotted(world, npcId, e, quality, tick);
 
                         telemetry.Counter("MemoryEncodingSystem.TracesEncodedAttempts", 1);
 
@@ -212,6 +247,94 @@ namespace Arcontio.Core
         }
 
         // ============================================================
+        // Patch 0.01P3 extension: Theft communication (event-driven tokens)
+        // ============================================================
+
+        /// <summary>
+        /// QueueTheftCommunicationTokens:
+        /// Accoda su World dei TokenEnvelope che rappresentano il "report" del furto.
+        ///
+        /// Perché qui (e non altrove):
+        /// - MemoryEncodingSystem è l'unico punto in cui sappiamo con certezza chi è un testimone valido
+        ///   (range + cono + LOS già applicati).
+        /// - Se un NPC non percepisce il furto, NON dovrebbe poterlo comunicare.
+        ///
+        /// Perché accodiamo (e non pubblichiamo subito):
+        /// - Questo System non riceve TokenBus.
+        /// - Il flush viene fatto dal SimulationHost in un punto centrale, mantenendo la dipendenza corretta.
+        ///
+        /// Scelte v0:
+        /// - Canale: AlarmShout (è una notizia "urgente" e deve poter attraversare corridoi con BFS).
+        /// - Destinatari: tutti gli altri NPC (v0 semplice). TokenDeliveryPipeline filtrerà per range.
+        ///   (In futuro: bounding box / area query / social network).
+        ///
+        /// Contenuto token:
+        /// - SubjectId = thiefNpcId
+        /// - SecondarySubjectId = victimNpcId
+        /// - Cell = cellX/cellY (luogo del furto)
+        /// </summary>
+        private void QueueTheftCommunicationTokens(
+            World world,
+            Tick tick,
+            int speakerId,
+            bool roleIsVictim,
+            int thiefNpcId,
+            int victimNpcId,
+            int cellX,
+            int cellY,
+            float baseQuality01)
+        {
+            if (world == null) return;
+
+            // Determiniamo tipo token in base al ruolo dello speaker.
+            TokenType ttype = roleIsVictim ? TokenType.TheftReportVictim : TokenType.TheftReportWitness;
+
+            // Intensità e reliability di base:
+            // - le moduleremo leggermente su quality (perché quality include distanza/cone/LOS).
+            // - manteniamo comunque un minimo, perché "furto" è un evento importante.
+            float q = baseQuality01;
+            if (q < 0.05f) q = 0.05f;
+            if (q > 1f) q = 1f;
+
+            float intensity = roleIsVictim
+                ? Mathf.Clamp01(0.75f + 0.25f * q)   // vittima: più "emotivo" => intensità alta
+                : Mathf.Clamp01(0.60f + 0.30f * q);  // testimone: un filo meno
+
+            float reliability = Mathf.Clamp01(0.60f + 0.40f * q);
+
+            var token = new SymbolicToken(
+                type: ttype,
+                subjectId: thiefNpcId,
+                intensity01: intensity,
+                reliability01: reliability,
+                chainDepth: 0,
+                hasCell: true,
+                cellX: cellX,
+                cellY: cellY,
+                secondarySubjectId: victimNpcId);
+
+            // Broadcast v0: 1 envelope per NPC listener.
+            // Nota performance:
+            // - È O(N) per report.
+            // - In 0.01 con poche decine/centinaia di NPC è ok.
+            // - TokenDeliveryPipeline farà drop per range.
+            for (int i = 0; i < _npcIds.Count; i++)
+            {
+                int listenerId = _npcIds[i];
+                if (listenerId == speakerId)
+                    continue;
+
+                // Envelope 1:1
+                world.QueueTokenOut(new TokenEnvelope(
+                    speakerId: speakerId,
+                    listenerId: listenerId,
+                    channel: TokenChannel.AlarmShout,
+                    tickIndex: tick.Index,
+                    token: token));
+            }
+        }
+
+        // ============================================================
         // DAY10: Object-memory store helpers
         // ============================================================
 
@@ -219,8 +342,69 @@ namespace Arcontio.Core
         /// Se levento è ObjectSpottedEvent, aggiorna lo store ad-hoc NpcObjectMemoryStore del testimone.
         /// Questo è il punto di integrazione perception ? eventi ? conoscenza.
         /// </summary>
-        private static void TryUpsertObjectMemoryFromSpotted(World world, int witnessNpcId, ISimEvent e, float reliability01, Tick tick)
+        private static void TryUpsertObservedEntityMemoryFromSpotted(World world, int witnessNpcId, ISimEvent e, float reliability01, Tick tick)
         {
+            // Fast-dispatch:
+            // - Day10 origin: questo helper nasceva solo per ObjectSpottedEvent.
+            // - Day10+ (Step4): lo estendiamo anche a NpcSpottedEvent, perché ora lo store
+            //   è "Observed entities" (oggetti + NPC).
+            if (e is NpcSpottedEvent ne)
+            {
+                // Safety: NPC witness esiste?
+                if (!world.ExistsNpc(witnessNpcId))
+                    return;
+
+                // Safety: store esiste? (difensivo: anche se CreateNpc lo dovrebbe creare)
+                if (!world.NpcObjectMemory.TryGetValue(witnessNpcId, out var storeNpc) || storeNpc == null)
+                {
+                    int cap = world.Global.NpcObjectMemorySlots;
+                    if (cap <= 0) cap = 24;
+                    storeNpc = new NpcObjectMemoryStore(cap);
+                    world.NpcObjectMemory[witnessNpcId] = storeNpc;
+                }
+
+                // Tick: tick.Index è long. In Day10 per semplicità castiamo a int.
+                int nowTickNpc = (int)tick.Index;
+
+                // Utility: per Step4 è una euristica minimale.
+                // In futuro: un NPC potrebbe essere più/meno "utile" a seconda di goals, relazioni sociali, etc.
+                float utility01Npc = 0.50f;
+
+                // Facts osservabili:
+                // Qui NON stiamo facendo "telepatia", perché questo helper viene chiamato SOLO
+                // se witnessNpcId è stato già validato come testimone (range + cono + LOS).
+                // NOTA:
+                // ObservedFlags è definito come enum nested dentro NpcObjectMemoryStore.
+                // Qui lo qualifichiamo esplicitamente per evitare ambiguità di namespace.
+                NpcObjectMemoryStore.ObservedFlags flags = NpcObjectMemoryStore.ObservedFlags.None;
+                int carriedFoodApprox = 0;
+
+                if (world.NpcPrivateFood.TryGetValue(ne.ObservedNpcId, out int realFood) && realFood > 0)
+                {
+                    flags |= NpcObjectMemoryStore.ObservedFlags.HasCarriedFood;
+
+                    // In Step4 usiamo una approssimazione banale = valore reale.
+                    // In futuro potresti:
+                    // - quantizzare (1, 2-3, 4+)
+                    // - degradare nel tempo
+                    // - dipendere dalla qualità witnessQuality01
+                    carriedFoodApprox = realFood;
+                }
+
+                storeNpc.UpsertNpc(
+                    nowTick: nowTickNpc,
+                    npcIdObserved: ne.ObservedNpcId,
+                    x: ne.CellX,
+                    y: ne.CellY,
+                    reliability01: reliability01,
+                    utility01: utility01Npc,
+                    flags: flags,
+                    carriedFoodUnitsApprox: carriedFoodApprox
+                );
+
+                return;
+            }
+
             if (e is not ObjectSpottedEvent ev)
                 return;
 
@@ -264,7 +448,7 @@ namespace Arcontio.Core
             // Upsert = Update+Insert:
             // - se già presente: refresh lastSeen/pos/reliability
             // - se non presente: inserisci o rimpiazza entry peggiore
-            store.Upsert(
+            store.UpsertWorldObject(
                 nowTick,
                 ev.DefId,
                 ev.ObjectId,
@@ -415,6 +599,10 @@ namespace Arcontio.Core
 
                 case ObjectSpottedEvent oe:
                     x = oe.CellX; y = oe.CellY;
+                    return true;
+
+                case NpcSpottedEvent ne:
+                    x = ne.CellX; y = ne.CellY;
                     return true;
 
                 case FoodStolenEvent fe:

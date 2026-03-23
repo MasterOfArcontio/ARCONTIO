@@ -119,6 +119,80 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!114 &330395218
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc1515ab76e54f068e2f2207940fab32, type: 3}
+  m_Name: Global/Point
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
+  m_Asset: {fileID: -944628639613478452, guid: 3f24997ecb1dd23489c2ec4adc434fc9, type: 3}
+  m_ActionId: 8a781a14-5343-4927-944d-a7af700a0ff7
+--- !u!1 &978041307
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 978041308}
+  - component: {fileID: 978041309}
+  m_Layer: 0
+  m_Name: InputBridge_MapGrid
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &978041308
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 978041307}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &978041309
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 978041307}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8a6536689986d6f44891ef6486e8aeba, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Arcontio.View.MapGrid.MapGridPointerInputActionsProvider
+  pointAction: {fileID: 330395218}
+  autoEnable: 1
+--- !u!114 &1532244798
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc1515ab76e54f068e2f2207940fab32, type: 3}
+  m_Name: Global/Point
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
+  m_Asset: {fileID: -944628639613478452, guid: 3f24997ecb1dd23489c2ec4adc434fc9, type: 3}
+  m_ActionId: 8a781a14-5343-4927-944d-a7af700a0ff7
 --- !u!1 &1877693686
 GameObject:
   m_ObjectHideFlags: 0
@@ -185,6 +259,7 @@ MonoBehaviour:
   worldCamera: {fileID: 1897790990}
   cameraRig: {fileID: 1897790991}
   terrainMaterial: {fileID: 0}
+  uiPointAction: {fileID: 1532244798}
 --- !u!1 &1897790988
 GameObject:
   m_ObjectHideFlags: 0
@@ -197,8 +272,9 @@ GameObject:
   - component: {fileID: 1897790990}
   - component: {fileID: 1897790989}
   - component: {fileID: 1897790993}
+  - component: {fileID: 1897790994}
   m_Layer: 0
-  m_Name: Main Camera
+  m_Name: MainCamera
   m_TagString: MainCamera
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -295,6 +371,26 @@ MonoBehaviour:
   zoomSpeed: 1
   minOrthoSize: 2
   maxOrthoSize: 600
+--- !u!114 &1897790994
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1897790988}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6a160d838ff8b4b4693ac20007e008c7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.2D.PixelPerfect::UnityEngine.U2D.PixelPerfectCamera
+  m_AssetsPPU: 32
+  m_RefResolutionX: 1280
+  m_RefResolutionY: 720
+  m_UpscaleRT: 1
+  m_PixelSnapping: 0
+  m_CropFrameX: 1
+  m_CropFrameY: 1
+  m_StretchFill: 0
 --- !u!1 &1920651926
 GameObject:
   m_ObjectHideFlags: 0
@@ -339,6 +435,79 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 691064d11abf35b41aacc83c01267f0d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: '::'
+--- !u!1 &2100005871
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2100005872}
+  - component: {fileID: 2100005873}
+  m_Layer: 0
+  m_Name: MapGridRuntimeDevToolsOverlay
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2100005872
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2100005871}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2100005873
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2100005871}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e4f0eaa070fe6f446a14dbd93f7e53ab, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Arcontio.View.MapGrid.MapGridRuntimeDevToolsOverlay
+  cfg:
+    mapWidth: 0
+    mapHeight: 0
+    tileSizeWorld: 1
+    tilePixels: 32
+    chunkSize: 16
+    terrainAtlasResourcePath: 
+    tileDefs: []
+    layoutResourcePath: 
+    camera:
+      startZoom: 18
+      minZoom: 6
+      maxZoom: 40
+      zoomSpeed: 2
+      edgePanBorderPx: 18
+      edgePanSpeedWorld: 18
+      panSmoothTime: 0.1
+      panMaxSpeed: 200
+      rightMouseDragPan: 1
+    npc:
+      spriteResourcePath: 
+      spawnCount: 10
+    panSmoothTime: 0.1
+    panMaxSpeed: 200
+    rightMouseDragPan: 1
+  worldCamera: {fileID: 1897790990}
+  pointerProvider: {fileID: 978041309}
+  toggleKey: 96
+  defaultMapName: devmap
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -346,3 +515,5 @@ SceneRoots:
   - {fileID: 1897790991}
   - {fileID: 1877693687}
   - {fileID: 1920651927}
+  - {fileID: 978041308}
+  - {fileID: 2100005872}

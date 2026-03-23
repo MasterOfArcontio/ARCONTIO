@@ -7,6 +7,11 @@ namespace Arcontio.Core
     /// - Questo è volutamente "stupido": TargetCell + optional reason.
     /// - La decisione (Rules/Decision) scrive l'intent.
     /// - Un sistema fisico (MovementSystem) lo esegue step-by-step.
+    ///
+    /// PATCH NOTE (runtime fix):
+    /// - Aggiungiamo BlockedTicks per implementare "stuck detection".
+    ///   Questo contatore viene gestito dal MovementSystem, NON dalle Rules,
+    ///   perché solo il livello fisico sa quando davvero "non riesci ad avanzare".
     /// </summary>
     public struct MoveIntent
     {
@@ -24,6 +29,20 @@ namespace Arcontio.Core
         /// Opzionale: oggetto a cui stai andando (stock cibo, letto, ecc.)
         /// </summary>
         public int TargetObjectId;
+
+        /// <summary>
+        /// Contatore di "blocco" per intent attivi che non riescono a progredire.
+        ///
+        /// Semantica:
+        /// - incrementato dal MovementSystem se in un tick NON riesci ad avanzare
+        ///   verso TargetX/TargetY (cella occupata / blocco movimento / fallback fallito).
+        /// - resettato a 0 quando il movimento fa almeno uno step.
+        ///
+        /// Uso:
+        /// - dopo N tick consecutivi di blocco, il MovementSystem cancella l'intento
+        ///   per sbloccare la simulazione e consentire re-plan.
+        /// </summary>
+        public int BlockedTicks;
     }
 
     public enum MoveIntentReason
@@ -32,7 +51,8 @@ namespace Arcontio.Core
         SeekFood = 1,
         SeekBed = 2,
         Wander = 3,
-        SeekTalkTarget = 4
+        SeekTalkTarget = 4,
+        DebugClick = 5
     }
 
     /// <summary>

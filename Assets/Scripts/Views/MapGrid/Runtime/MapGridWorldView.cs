@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Arcontio.Core;
+using SocialViewer.UI;
 
 namespace Arcontio.View.MapGrid
 {
@@ -42,12 +43,36 @@ namespace Arcontio.View.MapGrid
         [Tooltip("Resources path per balloon 'TheftSuffered'.")]
         [SerializeField] private string balloonTheftSufferedSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftSuffered";
 
+        // Patch 0.01P3:
+        // Balloon comunicazione.
+        // IMPORTANTE: l'utente vuole i file in:
+        //   Assets/Resources/MapGrid/Sprites/Balloons
+        // e con naming:
+        //   Balloon_nomeballoon
+        [SerializeField] private string balloonTokenOutSpritePath = "MapGrid/Sprites/Balloons/Balloon_TokenOut";
+        [SerializeField] private string balloonTokenInSpritePath = "MapGrid/Sprites/Balloons/Balloon_TokenIn";
+
+        // Patch 0.01P3 extension: sprite per comunicazione furto (IN/OUT differenziati per ruolo)
+        [SerializeField] private string balloonTheftVictimOutSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftReportVictimOut";
+        [SerializeField] private string balloonTheftVictimInSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftReportVictimIn";
+        [SerializeField] private string balloonTheftWitnessOutSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftReportWitnessOut";
+        [SerializeField] private string balloonTheftWitnessInSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftReportWitnessIn";
+
         [Header("Debug overlays")]
         [Tooltip("Sprite usato per evidenziare celle viste (DebugFovTelemetry). Deve essere un Sprite in Resources.")]
         [SerializeField] private string fovOverlaySpritePath = "MapGrid/Sprites/CellHighlight";
 
         [Tooltip("Sorting order dell'overlay FOV. Deve stare sotto NPC/Objects ma sopra il terreno.")]
         [SerializeField] private int fovOverlayOrder = 25;
+
+        // ============================================================
+        // Debug overlay: Landmark nodes/edges (v0.02 Day1)
+        // ============================================================
+        [Tooltip("Sprite usato come marker per i nodi landmark (overlay debug).")]
+        [SerializeField] private string landmarkOverlayNodeSpritePath = "MapGrid/Sprites/CellHighlight";
+
+        [Tooltip("Sorting order dell'overlay Landmark. Per debug è consigliato che stia SOPRA NPC/Objects, così i marker non vengono occlusi quando un NPC ci passa sopra.")]
+        [SerializeField] private int landmarkOverlayOrder = 24;
 
         [Header("Sorting")]
         [SerializeField] private int terrainOrder = 0;
@@ -71,8 +96,15 @@ namespace Arcontio.View.MapGrid
         // ---------------- Tooltip system (view-only) ----------------
         private MapGridNpcHoverTooltipSystem _hoverTooltip;
 
+        // ---------------- Always-on overlay: pointer cell coords (Patch 0.01P2) ----------------
+        private MapGridPointerCoordsOverlay _pointerCoords;
+
         // ---------------- Debug overlay: FOV heatmap ----------------
         private MapGridFovHeatmapOverlay _fovOverlay;
+
+        // ---------------- Debug overlay: Landmarks/edges (v0.02 Day1) ----------------
+        private MapGridLandmarkOverlay _landmarkOverlay;
+        private bool _landmarkOverlayEnabled;
 
         // ---------------- Debug overlay: Summary cards (F1) ----------------
         //
@@ -82,10 +114,49 @@ namespace Arcontio.View.MapGrid
         private MapGridEntitySummaryOverlay _summaryOverlay;
         private bool _summaryOverlayEnabled;
 
+        // ============================================================
+        // Debug click-to-move (runtime test tool)
+        // ============================================================
+        // UX voluta:
+        // - premi K quando hai selezionato / puntato un NPC => quel NPC diventa il target sticky
+        // - poi clicchi una cella della mappa => emettiamo un MoveIntent verso quella cella
+        //
+        // Perché sticky:
+        // - se usassimo l'NPC sotto il mouse al momento del click, quando clicchi il terreno
+        //   non staresti più sopra l'NPC e quindi il comando non partirebbe.
+        private bool _debugClickMoveModeEnabled;
+        private int _debugClickMoveNpcId = -1;
+
         /// <summary>
         /// Flag read-only: utile ad altri sistemi view-only per “spegnersi” quando il SummaryOverlay è attivo.
         /// </summary>
         public bool IsSummaryOverlayEnabled => _summaryOverlayEnabled;
+
+        // ============================================================
+        // DevTools bridge (v0.02.RDM)
+        // ============================================================
+        //
+        // Motivazione:
+        // - Il DevMode runtime (MapGridRuntimeDevToolsOverlay) ha bisogno di:
+        //   1) MapGridConfig effettivamente in uso (caricata dal JSON ufficiale)
+        //   2) Provider input puntatore (New Input System) già configurato dal Bootstrap
+        //   3) Camera di riferimento per ScreenToWorld
+        //
+        // Problema risolto:
+        // - Se MapGridConfig è una classe [Serializable] e non un asset, Unity la serializza "inline".
+        //   L'Inspector mostra quindi un albero di campi (mapWidth, mapHeight, ...).
+        //   Questo porta l'utente a dover duplicare la config manualmente nel DevToolsOverlay.
+        //
+        // Soluzione:
+        // - Espongo accessori read-only "safe" su MapGridWorldView.
+        // - Il DevToolsOverlay può auto-bindarsi senza richiedere configurazione manuale.
+        //
+        // Nota:
+        // - Queste property NON introducono dipendenze core->view: restiamo view-only.
+        // - Sono volutamente read-only per evitare che il DevTools modifichi la config a runtime.
+        public MapGridConfig RuntimeConfig => cfg;
+        public MapGridPointerInputActionsProvider RuntimePointerProvider => _pointerProvider != null ? _pointerProvider : pointerProvider;
+        public Camera RuntimeWorldCamera => worldCamera != null ? worldCamera : (Camera.main != null ? Camera.main : FindObjectOfType<Camera>());
 
         public void Init(MapGridConfig config)
         {
@@ -108,6 +179,11 @@ namespace Arcontio.View.MapGrid
             // Tooltip/hover system: lo inizializziamo qui così resta totalmente “View-only”.
             _hoverTooltip = new MapGridNpcHoverTooltipSystem();
 
+            // Patch 0.01P2:
+            // indicatore costante in alto a sinistra con le coordinate della cella sotto il mouse.
+            // Nota: deve restare attivo anche quando SummaryOverlay è ON (tooltip off).
+            _pointerCoords = new MapGridPointerCoordsOverlay();
+
             // ============================================================
             // Debug overlay: FOV heatmap
             // ============================================================
@@ -117,6 +193,36 @@ namespace Arcontio.View.MapGrid
             //   e quindi non renderizziamo nulla.
             _fovOverlay = new MapGridFovHeatmapOverlay();
             _fovOverlay.Init(transform, cfg.tileSizeWorld, fovOverlaySpritePath, fovOverlayOrder);
+
+            // ============================================================
+            // Debug overlay: Landmarks/edges (v0.02 Day1)
+            // ============================================================
+            // Nota:
+            // - In Day1 non ci sono ancora dati landmark reali: l'overlay renderizza liste vuote.
+            // - Serve però per verificare toggle UI + pipeline view->world->overlay.
+            _landmarkOverlay = new MapGridLandmarkOverlay();
+
+            // ------------------------------------------------------------
+            // HOTFIX (Day2/Day3 debug UX): Landmark overlay non deve sparire sotto gli NPC.
+            // ------------------------------------------------------------
+            // Problema osservato in runtime:
+            // - quando un NPC passa sopra un nodo, alcuni marker/linee "spariscono".
+            // Causa reale:
+            // - non è (necessariamente) un problema di memoria/registry: è rendering order.
+            // - di default landmarkOverlayOrder (24) è SOTTO npcBaseOrder (100) e objectBaseOrder (50).
+            //   quindi SpriteRenderer/LineRenderer dell'overlay vengono occlusi da NPC/oggetti.
+            // Fix:
+            // - forziamo un sorting order minimo sopra NPC/objects.
+            // Nota:
+            // - questo è un overlay debug, quindi la scelta UX migliore è "sempre visibile".
+            int safeLandmarkOverlayOrder = landmarkOverlayOrder;
+            int minAboveNpc = npcBaseOrder + 5;
+            int minAboveObj = objectBaseOrder + 5;
+            if (safeLandmarkOverlayOrder < minAboveNpc) safeLandmarkOverlayOrder = minAboveNpc;
+            if (safeLandmarkOverlayOrder < minAboveObj) safeLandmarkOverlayOrder = minAboveObj;
+
+            _landmarkOverlay.Init(transform, cfg.tileSizeWorld, landmarkOverlayNodeSpritePath, safeLandmarkOverlayOrder);
+            _landmarkOverlayEnabled = false;
 
             // ============================================================
             // Debug overlay: Summary cards (F1)
@@ -159,6 +265,59 @@ namespace Arcontio.View.MapGrid
                 ToggleSummaryOverlay();
             }
 
+// ============================================================
+// INPUT (debug): L toggle LandmarkOverlay (v0.02 Day1)
+// ============================================================
+// Scelta:
+// - hotkey semplice per debug (come SummaryOverlay), senza toccare .inputactions.
+// - se in futuro vuoi, lo rendiamo InputActionReference.
+if (Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.current.lKey.wasPressedThisFrame)
+{
+    _landmarkOverlayEnabled = !_landmarkOverlayEnabled;
+    _landmarkOverlay?.SetEnabled(_landmarkOverlayEnabled);
+}
+
+            // ============================================================
+            // INPUT (debug): K toggle Click-To-Move mode
+            // ============================================================
+            // UX:
+            // - alla pressione di K proviamo a catturare un NPC "sticky":
+            //   1) NPCSelection.SelectedNpcId
+            //   2) NPC sotto il mouse in quel momento
+            // - se troviamo un NPC valido, attiviamo/disattiviamo la modalita'
+            //   e memorizziamo il target sticky.
+            // - se non troviamo nessun NPC, il toggle non si attiva (evitiamo false aspettative).
+            if (Keyboard.current != null && Keyboard.current.kKey != null && Keyboard.current.kKey.wasPressedThisFrame)
+            {
+                int selectedNpcId = NPCSelection.SelectedNpcId;
+                int hoveredNpcId = ResolveHoveredNpcId();
+                int candidateNpcId = selectedNpcId > 0 ? selectedNpcId : hoveredNpcId;
+
+                if (_debugClickMoveModeEnabled)
+                {
+                    // Seconda pressione: spegniamo sempre la modalita'.
+                    _debugClickMoveModeEnabled = false;
+                    _debugClickMoveNpcId = -1;
+                }
+                else if (candidateNpcId > 0)
+                {
+                    _debugClickMoveModeEnabled = true;
+                    _debugClickMoveNpcId = candidateNpcId;
+                }
+            }
+
+            // ============================================================
+            // INPUT (debug): Click-To-Move command emission
+            // ============================================================
+            // Regola:
+            // - funziona solo se la modalita' e' attiva e abbiamo un NPC sticky valido.
+            // - il click sinistro su una cella della mappa emette un SetMoveIntentCommand
+            //   verso quella cella.
+            if (_debugClickMoveModeEnabled && _debugClickMoveNpcId > 0 && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+            {
+                TryIssueDebugClickMoveOrder(_debugClickMoveNpcId);
+            }
+
             SyncObjects();
             SyncNpcs();
 
@@ -177,9 +336,13 @@ namespace Arcontio.View.MapGrid
             // - la view NON ricalcola la percezione.
             // - legge il buffer READ del core (DebugFovTelemetry), che contiene la somma
             //   dei coni nella finestra di N tick.
+            // Calcoliamo UNA volta l'NPC “attivo” per gli overlay diagnostici.
+            // Questo evita shadowing di variabili locali e garantisce coerenza: FOV e Landmark
+            // devono riferirsi allo stesso soggetto quando l'utente muove il mouse.
+            int activeNpcId = ResolveActiveNpcForFovOverlay();
+
             if (_world.DebugFovTelemetry != null && _fovOverlay != null)
             {
-                int activeNpcId = ResolveActiveNpcForFovOverlay();
                 if (activeNpcId > 0 && _world.DebugFovTelemetry.TryGetReadHeat(activeNpcId, out var heat))
                 {
                     int windowTicks = _world.DebugFovTelemetry.WindowTicks;
@@ -192,9 +355,45 @@ namespace Arcontio.View.MapGrid
             }
 
             // ============================================================
+            // LANDMARK OVERLAY (v0.02 Day1)
+            // ============================================================
+            // Policy UX:
+            // - Mostriamo (come per FOV) SOLO l'NPC “attivo”.
+            // - In Day1, il core non fornisce ancora nodi/edges: overlay vuoto, ma toggle verificabile.
+            if (_landmarkOverlayEnabled && _landmarkOverlay != null)
+            {
+                if (activeNpcId > 0)
+                    _landmarkOverlay.Render(_world, activeNpcId);
+                else
+                    _landmarkOverlay.Clear();
+            }
+
+            // ============================================================
             // Summary overlay (F1) vs Hover tooltip (default)
             // ============================================================
             var cam = ResolveWorldCamera();
+
+            // ============================================================
+            // Always-on pointer coords overlay (Patch 0.01P2)
+            // ============================================================
+            // Aggiorniamo SEMPRE (indipendentemente da SummaryOverlay), perché è un indicatore costante.
+            if (_pointerCoords != null)
+            {
+                if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var pp) || cfg.tileSizeWorld <= 0f)
+                {
+                    _pointerCoords.SetUnknown();
+                }
+                else
+                {
+                    Vector3 wp = cam.ScreenToWorldPoint(new Vector3(pp.x, pp.y, 0f));
+                    int cx = Mathf.FloorToInt(wp.x / cfg.tileSizeWorld);
+                    int cy = Mathf.FloorToInt(wp.y / cfg.tileSizeWorld);
+
+                    bool inBounds = (_world != null) && _world.InBounds(cx, cy);
+                    _pointerCoords.SetCell(cx, cy, inBounds);
+                }
+            }
+
             if (_summaryOverlayEnabled)
             {
                 // Tooltip OFF (hard) + overlay ON
@@ -263,18 +462,59 @@ namespace Arcontio.View.MapGrid
             return -1;*/
 
             // Questo blocco di modifica fa sì che se il mouse non è su un NPC, la heatmap viene nascosta
+            return ResolveHoveredNpcId();
+        }
+
+        private int ResolveHoveredNpcId()
+        {
+            if (_world == null || cfg == null || cfg.tileSizeWorld <= 0f)
+                return -1;
+
+            var cam = ResolveWorldCamera();
+            if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var pointer))
+                return -1;
+
+            Vector3 wp = cam.ScreenToWorldPoint(new Vector3(pointer.x, pointer.y, Mathf.Abs(cam.transform.position.z)));
+            wp.z = 0f;
+
+            int cellX = Mathf.FloorToInt(wp.x / cfg.tileSizeWorld);
+            int cellY = Mathf.FloorToInt(wp.y / cfg.tileSizeWorld);
+
+            if (!_world.InBounds(cellX, cellY))
+                return -1;
+
+            return FindNpcAtCell(_world, cellX, cellY);
+        }
+
+        private void TryIssueDebugClickMoveOrder(int npcId)
+        {
+            if (_world == null || cfg == null || cfg.tileSizeWorld <= 0f) return;
+            if (!_world.NpcCore.ContainsKey(npcId)) return;
+
             var cam = ResolveWorldCamera();
             if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var p))
-                return -1;
+                return;
 
             Vector3 wp = cam.ScreenToWorldPoint(new Vector3(p.x, p.y, Mathf.Abs(cam.transform.position.z)));
             wp.z = 0f;
 
-            var hit = Physics2D.OverlapPoint(wp);
-            if (hit == null) return -1;
+            int cellX = Mathf.FloorToInt(wp.x / cfg.tileSizeWorld);
+            int cellY = Mathf.FloorToInt(wp.y / cfg.tileSizeWorld);
 
-            var handle = hit.GetComponent<MapGridNpcViewHandle>();
-            return handle != null ? handle.NpcId : -1;
+            if (!_world.InBounds(cellX, cellY))
+                return;
+
+            var cmd = new SetMoveIntentCommand(npcId, new MoveIntent
+            {
+                Active = true,
+                TargetX = cellX,
+                TargetY = cellY,
+                Reason = MoveIntentReason.Wander,
+                TargetObjectId = 0,
+                BlockedTicks = 0,
+            });
+
+            SimulationHost.Instance?.EnqueueExternalCommand(cmd);
         }
 
         private static int FindNpcAtCell(World world, int x, int y)
@@ -333,7 +573,17 @@ namespace Arcontio.View.MapGrid
                 { Arcontio.Core.NpcBalloonKind.Eat, balloonEatSpritePath },
                 { Arcontio.Core.NpcBalloonKind.Steal, balloonStealSpritePath },
                 { Arcontio.Core.NpcBalloonKind.TheftWitnessed, balloonTheftWitnessedSpritePath },
-                { Arcontio.Core.NpcBalloonKind.TheftSuffered, balloonTheftSufferedSpritePath }
+                { Arcontio.Core.NpcBalloonKind.TheftSuffered, balloonTheftSufferedSpritePath },
+
+                // Patch 0.01P3
+                { Arcontio.Core.NpcBalloonKind.TokenOut, balloonTokenOutSpritePath },
+                { Arcontio.Core.NpcBalloonKind.TokenIn, balloonTokenInSpritePath },
+
+                // Patch 0.01P3 extension: comunicazione furto
+                { Arcontio.Core.NpcBalloonKind.TheftReportVictimOut, balloonTheftVictimOutSpritePath },
+                { Arcontio.Core.NpcBalloonKind.TheftReportVictimIn, balloonTheftVictimInSpritePath },
+                { Arcontio.Core.NpcBalloonKind.TheftReportWitnessOut, balloonTheftWitnessOutSpritePath },
+                { Arcontio.Core.NpcBalloonKind.TheftReportWitnessIn, balloonTheftWitnessInSpritePath },
             };
 
             balloon.Init(npcId, npcBalloonYOffsetWorld, npcBalloonVisibleSeconds, map);

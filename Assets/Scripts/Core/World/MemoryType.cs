@@ -26,6 +26,7 @@ namespace Arcontio.Core
         AidRequested,
 
         ObjectSpotted,
+        NpcSpotted,
 
         // Crime (future)
         TheftWitnessed,             // Ho visto un furto

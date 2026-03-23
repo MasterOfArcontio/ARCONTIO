@@ -119,6 +119,34 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!114 &432641650
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc1515ab76e54f068e2f2207940fab32, type: 3}
+  m_Name: Gameplay/TogglePause
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
+  m_Asset: {fileID: -944628639613478452, guid: 3f24997ecb1dd23489c2ec4adc434fc9, type: 3}
+  m_ActionId: e54664e1-b10a-4129-bf6e-e3638b57ff62
+--- !u!114 &474828863
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc1515ab76e54f068e2f2207940fab32, type: 3}
+  m_Name: Gameplay/StepTick
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
+  m_Asset: {fileID: -944628639613478452, guid: 3f24997ecb1dd23489c2ec4adc434fc9, type: 3}
+  m_ActionId: 2d1392fb-8de8-41d1-a2b6-f1c0c3819065
 --- !u!1 &1110507245
 GameObject:
   m_ObjectHideFlags: 0
@@ -192,9 +220,27 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Arcontio.Core.SimulationHost
   tickDeltaTime: 1
-  ticksPerSecond: 30
-  debugScenario: 9
+  ticksPerSecond: 10
+  debugScenario: 11
   day8LogEveryTicks: 10
+  startPaused: 1
+  togglePauseAction: {fileID: 432641650}
+  stepOneTickAction: {fileID: 474828863}
+  stepTenTicksAction: {fileID: 1642290482}
+--- !u!114 &1642290482
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fc1515ab76e54f068e2f2207940fab32, type: 3}
+  m_Name: Gameplay/Step10Ticks
+  m_EditorClassIdentifier: Unity.InputSystem::UnityEngine.InputSystem.InputActionReference
+  m_Asset: {fileID: -944628639613478452, guid: 3f24997ecb1dd23489c2ec4adc434fc9, type: 3}
+  m_ActionId: ff97bbc6-b352-44c7-a6ae-8e604533171b
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

@@ -7,7 +7,7 @@ namespace Arcontio.Core
     /// 
     /// Nota:
     /// - Cresce nel tempo.
-    /// - Non Ë linguaggio naturale: sono categorie astratte.
+    /// - Non √® linguaggio naturale: sono categorie astratte.
     /// </summary>
     public enum TokenType
     {
@@ -17,6 +17,16 @@ namespace Arcontio.Core
 
         // Social request
         HelpRequest,
+
+        // Crime / Theft communication (Patch 0.01P3 extension)
+        // Nota:
+        // - Non sono eventi "oggettivi" del mondo (quelli restano FoodStolenEvent).
+        // - Sono messaggi simbolici che un NPC pu√≤ diffondere ad altri.
+        // - Li distinguiamo tra "vittima" e "testimone" perch√© il contesto cambia:
+        //   la vittima tende ad avere una forte intensit√† emotiva, il testimone tende ad
+        //   essere pi√π "descrittivo".
+        TheftReportVictim,
+        TheftReportWitness,
 
         // (futuro) DeathNotice, Accusation, ResourceHint, ecc.
     }
@@ -31,24 +41,33 @@ namespace Arcontio.Core
     {
         public readonly TokenType Type;
 
-        // SubjectId: chi/che cosa Ë il focus del token
+        // SubjectId: chi/che cosa √® il focus del token
         // - predatorId per PredatorAlert
         // - attackerId per AlarmDanger (se vuoi)
         // - speakerId non va qui: sta nell'envelope
         public readonly int SubjectId;
+
+        // SecondarySubjectId (Patch 0.01P3 extension): soggetto secondario opzionale.
+        // Motivazione:
+        // - MemoryTrace supporta gi√† SecondarySubjectId.
+        // - Per comunicazioni di crimine (furto) vogliamo rappresentare sia "chi" (ladro)
+        //   sia "a chi" (vittima), senza dover inferire in modo fragile.
+        // Convenzione:
+        // - < 0 => assente.
+        public readonly int SecondarySubjectId;
 
         // Opzionale: localizzazione del contenuto ("qui")
         public readonly int CellX;
         public readonly int CellY;
         public readonly bool HasCell;
 
-        // Intensit‡/urgenza percepita (0..1)
+        // Intensit√†/urgenza percepita (0..1)
         public readonly float Intensity01;
 
-        // Affidabilit‡ del contenuto (0..1)
+        // Affidabilit√† del contenuto (0..1)
         public readonly float Reliability01;
 
-        // Provenienza: quante "catene" ha gi‡ attraversato (rumor vs diretto)
+        // Provenienza: quante "catene" ha gi√† attraversato (rumor vs diretto)
         public readonly int ChainDepth;
 
         public SymbolicToken(
@@ -59,10 +78,12 @@ namespace Arcontio.Core
             int chainDepth = 0,
             bool hasCell = false,
             int cellX = 0,
-            int cellY = 0)
+            int cellY = 0,
+            int secondarySubjectId = -1)
         {
             Type = type;
             SubjectId = subjectId;
+            SecondarySubjectId = secondarySubjectId;
             Intensity01 = Clamp01(intensity01);
             Reliability01 = Clamp01(reliability01);
             ChainDepth = chainDepth < 0 ? 0 : chainDepth;
@@ -74,9 +95,10 @@ namespace Arcontio.Core
 
         public override string ToString()
         {
+            string sec = SecondarySubjectId >= 0 ? $" sec={SecondarySubjectId}" : string.Empty;
             if (HasCell)
-                return $"{Type} subj={SubjectId} int={Intensity01:0.00} rel={Reliability01:0.00} depth={ChainDepth} cell=({CellX},{CellY})";
-            return $"{Type} subj={SubjectId} int={Intensity01:0.00} rel={Reliability01:0.00} depth={ChainDepth}";
+                return $"{Type} subj={SubjectId}{sec} int={Intensity01:0.00} rel={Reliability01:0.00} depth={ChainDepth} cell=({CellX},{CellY})";
+            return $"{Type} subj={SubjectId}{sec} int={Intensity01:0.00} rel={Reliability01:0.00} depth={ChainDepth}";
         }
 
         private static float Clamp01(float v)
@@ -88,7 +110,7 @@ namespace Arcontio.Core
     }
 
     /// <summary>
-    /// TokenChannel: "come" Ë stato comunicato.
+    /// TokenChannel: "come" √® stato comunicato.
     /// </summary>
     public enum TokenChannel
     {
@@ -102,8 +124,8 @@ namespace Arcontio.Core
     /// 
     /// - SpeakerId: chi parla
     /// - ListenerId: chi ascolta (1:1 per ora)
-    /// - Channel: come Ë stato trasmesso
-    /// - Tick: quando Ë stato emesso
+    /// - Channel: come √® stato trasmesso
+    /// - Tick: quando √® stato emesso
     /// - Token: contenuto simbolico
     /// </summary>
     public readonly struct TokenEnvelope

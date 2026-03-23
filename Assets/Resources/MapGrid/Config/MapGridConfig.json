@@ -29,10 +29,17 @@
     "startZoom": 18.0,
     "minZoom": 6.0,
     "maxZoom": 40.0,
-    "zoomSpeed": 2.0,
+    "zoomSpeed": 5.0,
 
-    "panSmoothTime": 1,
-    "panMaxSpeed": 250.0,
+    "pixelPerfectZoom": {
+      "enabled": true,
+      "minAssetsPpu": 16,
+      "maxAssetsPpu": 128,
+      "stepAssetsPpu": 2
+    },
+
+    "panSmoothTime": 0.3,
+    "panMaxSpeed": 550.0,
     "rightMouseDragPan": true,
 
 
@@ -41,7 +48,7 @@
   },
 
   "npc": {
-    "spriteResourcePath": "MapGrid/Sprites/NPC_00",
+    "spriteResourcePath": "MapGrid/Sprites/NPC_01",
     "spawnCount": 12
   }
 }

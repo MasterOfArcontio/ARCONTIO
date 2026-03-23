@@ -6,8 +6,8 @@ namespace Arcontio.Core
     /// - produce MemoryType.PredatorRumor
     /// 
     /// Scopo:
-    /// - non Ë "ho visto il predatore"
-    /// - Ë "ho sentito dire che c'Ë un predatore/pericolo"
+    /// - non √® "ho visto il predatore"
+    /// - √® "ho sentito dire che c'√® un predatore/pericolo"
     /// </summary>
     public sealed class AssimilatePredatorAlertRule : ITokenAssimilationRule
     {
@@ -29,14 +29,14 @@ namespace Arcontio.Core
             // (in futuro moltiplicheremo per trustFactor)
             float rumorReliability = env.Token.Reliability01 * 0.75f;
 
-            // ChainDepth aumenta: se lo rispiegher‡, sar‡ ancora meno affidabile
-            // (oggi non lo persistiamo nella trace; lo useremo pi˘ avanti)
+            // ChainDepth aumenta: se lo rispiegher√†, sar√† ancora meno affidabile
+            // (oggi non lo persistiamo nella trace; lo useremo pi√π avanti)
             // int newDepth = env.Token.ChainDepth + 1;
 
-            // Intensit‡ rumor: pi˘ bassa dellíintensit‡ ìinternaî tipica
+            // Intensit√† rumor: pi√π bassa dell¬íintensit√† ¬ìinterna¬î tipica
             float rumorIntensity = env.Token.Intensity01 * 0.60f;
 
-            // Decay rumor pi˘ veloce del diretto
+            // Decay rumor pi√π veloce del diretto
             float decay = 0.0060f;
 
             int cx = 0, cy = 0;
@@ -73,7 +73,7 @@ namespace Arcontio.Core
     /// - token HelpRequest
     /// - produce MemoryType.AidRequested
     /// 
-    /// » una trace "leggera": serve pi˘ come trigger decisionale futuro.
+    /// √à una trace "leggera": serve pi√π come trigger decisionale futuro.
     /// </summary>
     public sealed class AssimilateHelpRequestRule : ITokenAssimilationRule
     {
@@ -89,11 +89,11 @@ namespace Arcontio.Core
             if (!world.ExistsNpc(env.ListenerId))
                 return false;
 
-            // Reliability: richiesta aiuto di solito non Ë "vero/falso" ma "ha chiesto"
-            // perÚ teniamo comunque un valore per coerenza.
+            // Reliability: richiesta aiuto di solito non √® "vero/falso" ma "ha chiesto"
+            // per√≤ teniamo comunque un valore per coerenza.
             float reliability = env.Token.Reliability01;
 
-            // Intensit‡: teniamo un valore medio, modulato dal token
+            // Intensit√†: teniamo un valore medio, modulato dal token
             float intensity = 0.50f * env.Token.Intensity01;
 
             // Decay: abbastanza rapido (richiesta aiuto "scade")
@@ -111,6 +111,77 @@ namespace Arcontio.Core
                 Reliability01 = reliability,
                 DecayPerTick01 = decay,
                 // Gestione dell'origine della notizia
+                IsHeard = true,
+                HeardKind = heardKind,
+                SourceSpeakerId = env.SpeakerId
+            };
+
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// AssimilateTheftReportRule (Patch 0.01P3 extension):
+    /// - token TheftReportVictim / TheftReportWitness
+    /// - produce una MemoryTrace "crime heard" nel listener.
+    ///
+    /// Design v0:
+    /// - Non creiamo un nuovo MemoryType dedicato (tipo TheftRumor) perch√© la tassonomia
+    ///   gi√† contiene TheftWitnessed/TheftSuffered e la trace pu√≤ marcare IsHeard=true.
+    /// - Usiamo SecondarySubjectId per conservare la vittima quando √® nota.
+    ///
+    /// Mapping:
+    /// - TheftReportVictim  -> MemoryType.TheftSuffered   (heard)
+    /// - TheftReportWitness -> MemoryType.TheftWitnessed  (heard)
+    ///
+    /// SubjectId / SecondarySubjectId:
+    /// - SubjectId = thiefNpcId
+    /// - SecondarySubjectId = victimNpcId (se presente)
+    ///
+    /// Nota:
+    /// - Per TheftReportVictim il victimNpcId spesso coincide con SpeakerId, ma non lo assumiamo.
+    /// </summary>
+    public sealed class AssimilateTheftReportRule : ITokenAssimilationRule
+    {
+        public bool Matches(in TokenEnvelope env)
+        {
+            return env.Token.Type == TokenType.TheftReportVictim ||
+                   env.Token.Type == TokenType.TheftReportWitness;
+        }
+
+        public bool TryAssimilate(World world, in TokenEnvelope env, out MemoryTrace outTrace)
+        {
+            outTrace = default;
+
+            if (!world.ExistsNpc(env.ListenerId))
+                return false;
+
+            // Reliability e intensit√†: per i report di crimine manteniamo un peso relativamente alto,
+            // ma pi√π basso del "diretto" perch√© comunque √® un racconto.
+            float reliability = env.Token.Reliability01 * 0.85f;
+            float intensity = env.Token.Intensity01 * 0.70f;
+
+            // Decay: crimine rimane pi√π a lungo del rumor di predatore? Qui scegliamo un valore medio.
+            float decay = 0.0055f;
+
+            HeardKind heardKind = env.Token.ChainDepth == 0 ? HeardKind.DirectHeard : HeardKind.RumorHeard;
+
+            MemoryType mtype = env.Token.Type == TokenType.TheftReportVictim
+                ? MemoryType.TheftSuffered
+                : MemoryType.TheftWitnessed;
+
+            outTrace = new MemoryTrace
+            {
+                Type = mtype,
+                SubjectId = env.Token.SubjectId, // thief
+                SecondarySubjectId = env.Token.SecondarySubjectId, // victim (se nota)
+                CellX = env.Token.HasCell ? env.Token.CellX : -1,
+                CellY = env.Token.HasCell ? env.Token.CellY : -1,
+                Intensity01 = intensity,
+                Reliability01 = reliability,
+                DecayPerTick01 = decay,
+
+                // Origine comunicazione
                 IsHeard = true,
                 HeardKind = heardKind,
                 SourceSpeakerId = env.SpeakerId

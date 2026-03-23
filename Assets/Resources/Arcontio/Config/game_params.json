@@ -2,15 +2,68 @@
   "worldWidth": 64,
   "worldHeight": 64,
   "Language": "it",
+  "npcVisionRangeCells": 17,
+  "npcOperationalRangeCells": 20,
+  "npcVisionUseCone": true,
+  "npcVisionConeSlope": 1.0,
+  "npcVisionFovDegrees": 90,
+  "debug_fov": {
+    "enabled": true,
+    "window_ticks": 8,
+    "use_los": true,
+    "activeNpcOnly": true
+  },
   "Logging": {
     "MinLevel": "Trace",
     "WriteUnityConsole": true,
     "WriteFile": true,
-
     "FileFormat": "html",
     "FileNamePattern": "arcontio_{yyyyMMdd_HHmmss}.html",
-
     "IncludeTimestamp": true,
     "IncludeTick": true
+  },
+  "inventory": {
+    "inventory_max_units": 30
+  },
+  "landmarks": {
+    "enableLandmarkSystem": true,
+    "maxLandmarksPerNpc": 64,
+    "maxEdgesPerNpc": 128,
+    "maxPoiAnchorsPerNpc": 32,
+    "maxWorldLandmarks": 512,
+    "maxEdgesPerLandmark": 8,
+    "merge_radius": 1,
+    "candidate": {
+      "candidate_cooldown_ticks": 6,
+      "junction_min_exits": 3
+    },
+    "eviction": {
+      "eviction_stale_ticks": 60000,
+      "eviction_cooldown_ticks": 120
+    },
+    "retry": {
+      "retry_backoff_min_ticks": 10,
+      "retry_backoff_max_ticks": 80
+    },
+    "debug": {
+      "enabled": true,
+      "overlay_default_enabled": false,
+      "activeNpcOnly": true,
+      "microTestDummyGraph": false,
+      "microTestDummyDistanceCells": 2
+    },
+    "localSearch": {
+      "enabled": true,
+      "useJumpPointSearch": true,
+      "maxExpandedNodes": 64,
+      "maxIterations": 128,
+      "maxSearchRadius": 10,
+      "maxJumpDistance": 12,
+      "heuristicWeight": 1.0,
+      "recentVisitedMemory": 16,
+      "debugLog": false,
+      "commitMinSteps": 3,
+      "preventImmediateBacktrack": true
+    }
   }
 }

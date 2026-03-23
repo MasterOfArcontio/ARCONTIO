@@ -9,7 +9,7 @@ namespace Arcontio.Core
     /// TokenEmissionPipeline:
     /// Trasforma MemoryTrace -> TokenEnvelope quando due NPC sono in contatto.
     ///
-    /// PerchÈ non Ë un ISystem:
+    /// Perch√© non √® un ISystem:
     /// - ISystem.Update(...) non riceve TokenBus.
     /// - Con pipe separate (B), l'orchestrazione deve essere fatta dal SimulationHost.
     /// </summary>
@@ -56,7 +56,7 @@ namespace Arcontio.Core
 
             // Reset "giornaliero" semplice:
             // Assunzione: 1 tick = 1 minuto => 1440 tick = 1 giorno.
-            // » un placeholder che sostituirai con un calendario vero.
+            // √à un placeholder che sostituirai con un calendario vero.
             if (tick.Index % 1440 == 0)
                 _tokensEmittedToday.Clear();
 
@@ -65,7 +65,7 @@ namespace Arcontio.Core
 
             int envelopesEmitted = 0;
 
-            // Contatti per prossimit‡ (O(N^2) per ora: ok per 400 NPC)
+            // Contatti per prossimit√† (O(N^2) per ora: ok per 400 NPC)
             for (int i = 0; i < _npcIds.Count; i++)
             {
                 int a = _npcIds[i];
@@ -145,10 +145,18 @@ namespace Arcontio.Core
                     }
 
                     // NOTA IMPORTANTE (Opzione 2):
-                    // - Passiamo tick.Index alla rule, cosÏ puÚ costruire un envelope con TickIndex corretto.
+                    // - Passiamo tick.Index alla rule, cos√¨ pu√≤ costruire un envelope con TickIndex corretto.
                     if (rule.TryCreateToken(world, tick.Index, speakerId, listenerId, trace, out var env))
                     {
-                        tokenBus.Publish(env);
+                        // Patch 0.01P3 (architetturalmente corretto):
+                        // NON pubblichiamo direttamente sul bus, altrimenti perdiamo osservabilit√†
+                        // per i token generati in altri punti (es. iniezioni scenario in SimulationHost).
+                        //
+                        // Punto canonico di OUT:
+                        // - aggiorna DebugNpcTokenLog
+                        // - emette balloon TokenOut
+                        // - pubblica sul TokenBusOut
+                        world.PublishTokenOut(tokenBus, env);
 
                         _lastShareTick[key] = tick.Index;
 
@@ -188,7 +196,7 @@ namespace Arcontio.Core
         /// - speaker e listener devono essere in celle adiacenti (Manhattan=1)
         /// - listener deve essere nella cella "frontale" dello speaker (in base a Facing)
         ///
-        /// Questo serve per evitare che ìparlinoî anche se sono spalla-a-spalla o dietro.
+        /// Questo serve per evitare che ‚Äúparlino‚Äù anche se sono spalla-a-spalla o dietro.
         /// </summary>
         private static bool CanDirectlyTalk(World world, int speakerId, int listenerId)
         {

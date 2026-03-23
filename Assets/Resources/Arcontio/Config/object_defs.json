@@ -90,6 +90,18 @@
       ]
     },
     {
+      "Id": "door_wood_good",
+      "DisplayName": "Door Wood Good",
+      "SpriteKey": "MapGrid/Sprites/Objects/door_wood_good",
+      "IsOccluder": true,
+      "IsInteractable": true,
+      "BlocksVision": true,
+      "BlocksMovement": true,
+      "VisionCost": 1.0,
+      "MaxHp": 50,
+      "Hardness": 0.4
+    },
+    {
       "Id": "wall_stone",
       "DisplayName": "Stone Wall",
       "SpriteKey": "MapGrid/Sprites/Objects/Wall_stone",

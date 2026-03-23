@@ -60,7 +60,7 @@ namespace Arcontio.Core
             }
             else
             {
-                world.FoodStocks[_foodObjId] = stock;
+                world.SetFoodStock(_foodObjId, stock);
             }
 
             // 2) Mutazione hunger

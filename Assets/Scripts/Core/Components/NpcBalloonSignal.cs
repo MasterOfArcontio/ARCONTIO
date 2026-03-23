@@ -22,7 +22,20 @@ namespace Arcontio.Core
         Eat = 1,
         Steal = 2,
         TheftWitnessed = 3,
-        TheftSuffered = 4
+        TheftSuffered = 4,
+        TokenOut = 5,
+        TokenIn = 6,
+
+        // Patch 0.01P3 extension:
+        // Balloon specifici per la COMUNICAZIONE di un furto avvenuto.
+        // Importante: questi NON sono i balloon "ho visto il furto" (quelli sono TheftWitnessed/TheftSuffered).
+        // Qui stiamo mostrando l'atto comunicativo:
+        // - OUT: lo speaker sta diffondendo un report
+        // - IN: il listener ha ricevuto quel report
+        TheftReportVictimOut = 7,
+        TheftReportVictimIn = 8,
+        TheftReportWitnessOut = 9,
+        TheftReportWitnessIn = 10,
     }
 
     /// <summary>

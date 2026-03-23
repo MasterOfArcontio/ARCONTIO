@@ -11,24 +11,24 @@ namespace Arcontio.Core
     /// - Reagisce a eventi (TickPulseEvent) e produce Commands.
     ///
     /// Decisione v0:
-    /// - se hungry: privato -> stock community (VISIBILE) -> furto (se moralit�/emergenza)
-    /// - se tired: letto community libero (VISIBILE) -> letto altrui (se moralit�/emergenza)
+    /// - se hungry: privato -> stock community (VISIBILE) -> furto (se moralità/emergenza)
+    /// - se tired: letto community libero (VISIBILE) -> letto altrui (se moralità/emergenza)
     ///
     /// IMPORTANTISSIMO (patch):
-    /// In ARCONTIO la visibilit� non � "telepatia".
-    /// Se un oggetto � dietro un muro, la decisione *non deve* poterlo usare come se fosse noto.
+    /// In ARCONTIO la visibilità non è "telepatia".
+    /// Se un oggetto è dietro un muro, la decisione *non deve* poterlo usare come se fosse noto.
     ///
     /// Per questo motivo qui applichiamo un filtro "Visible" minimale:
     /// - posizione NPC: world.GridPos[npcId]
     /// - posizione oggetto: world.Objects[objId].CellX/CellY
-    /// - visibilit�: world.HasLineOfSight(nx,ny,ox,oy) + range discreto
+    /// - visibilità: world.HasLineOfSight(nx,ny,ox,oy) + range discreto
     ///
     /// Nota pragmatica:
     /// - NON applichiamo il cono FOV (orientamento) in questa rule,
-    ///   perch� per una decisione "mangio" spesso ti interessa la *conoscenza pratica* dell'oggetto
+    ///   perché per una decisione "mangio" spesso ti interessa la *conoscenza pratica* dell'oggetto
     ///   (es. lo hai visto un secondo fa, ti giri, ecc.).
     /// - Se in futuro vuoi coerenza totale col pipeline Range?Cone?LOS, il posto giusto
-    ///   � far s� che NeedsDecisionRule consulti Memory/ObjectPerception, non il World "nudo".
+    ///   è far sì che NeedsDecisionRule consulti Memory/ObjectPerception, non il World "nudo".
     /// </summary>
     public sealed class NeedsDecisionRule : IRule
     {
@@ -36,8 +36,8 @@ namespace Arcontio.Core
         private readonly int _decisionEveryTicks;
 
         // Range di ricerca "decisionale" per cibo/letto.
-        // � volutamente conservativo: evita che un NPC "usi" risorse che stanno a met� mappa
-        // solo perch� la LOS non � bloccata (corridoio lungo, ecc.).
+        // È volutamente conservativo: evita che un NPC "usi" risorse che stanno a metà mappa
+        // solo perché la LOS non è bloccata (corridoio lungo, ecc.).
         private readonly int _maxSeekRangeCells;
 
         public NeedsDecisionRule(int decisionEveryTicks = 10, int maxSeekRangeCells = 8)
@@ -128,13 +128,13 @@ namespace Arcontio.Core
         /// 1) cibo privato addosso
         /// 2) cibo community visibile: se sei sulla cella -> mangia, altrimenti -> muoviti
         /// 3) se NON esiste cibo legale e "okToSteal":
-        ///    3a) stock privato a terra (OwnerKind=Npc, OwnerId!=me) visibile: se sei sulla cella -> ruba unit�, altrimenti -> muoviti
+        ///    3a) stock privato a terra (OwnerKind=Npc, OwnerId!=me) visibile: se sei sulla cella -> ruba unità, altrimenti -> muoviti
         ///    3b) altrimenti prova furto "addosso" (NpcPrivateFood) come fallback
         ///
         /// Nota:
         /// - Questo metodo evita sia "mangiare a distanza" sia "rubare a distanza".
         /// - Il movimento viene espresso tramite SetMoveIntentCommand.
-        ///   (Se nel tuo branch non esiste ancora MoveIntent, questo � il punto dove dovrai allineare i tipi.)
+        ///   (Se nel tuo branch non esiste ancora MoveIntent, questo è il punto dove dovrai allineare i tipi.)
         /// </summary>
         private bool TryPlanEatOrMove(
             World world,
@@ -156,22 +156,125 @@ namespace Arcontio.Core
                 return true;
             }
 
-            // 2) stock community (VISIBILE)
-            // Nota: qui stava il bug storico.
-            // Prima bastava "Units>0" => telepatia (mangio dietro un muro).
-            // Ora: range + LOS + (Day10) "se non sei sulla cella -> muoviti".
+            
+            // 1b) Patch 5.1 (revised): stock privato *mio* a terra (Pinned BELIEF, non memoria percettiva e non telepatia)
+            //
+            // Bug che correggiamo:
+            // - Se un NPC ha cibo "privato" NON addosso (NpcPrivateFood=0) ma depositato a terra
+            //   in uno stock OwnerKind=Npc, OwnerId=thisNpc, la logica precedente lo ignorava
+            //   e l'NPC poteva morire di fame o passare direttamente a rubare.
+            //
+            // Policy ARCONTIO (manifesto):
+            // - La decisione deve usare percezione/memoria soggettiva, NON scansioni globali.
+            //
+            // Regola fisica (richiesta utente):
+            // - Per mangiare o rubare cibo a terra dallo stock, devi essere SULLA cella dello stock (co-locazione).
+            // - Se non sei sulla cella, pianifica un MoveIntent verso l'ultima cella nota dello stock.
+            int ownFoodObj = FindPinnedBelievedOwnNpcFoodStock(world, npcId, _maxSeekRangeCells, out int ox, out int oy);
+            if (ownFoodObj != 0)
+            {
+                if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+                    return false;
+
+                if (nx == ox && ny == oy)
+                {
+                    // Sei arrivato nella cella dove *credi* di avere il tuo stock privato.
+                    //
+                    // Ora facciamo la verifica "locale" (non telepatica):
+                    // - se lo stock esiste ancora IN QUELLA CELLA ed è effettivamente ancora tuo e non vuoto -> mangia.
+                    // - altrimenti, significa che l'NPC ha appena scoperto una discrepanza (furto/distruzione/spostamento).
+                    //   In questo caso invalidiamo la belief e proseguiamo con le alternative (community / furto).
+                    int objAtCell = world.GetObjectAt(ox, oy);
+
+                    bool foundMyStockHere = false;
+
+                    if (objAtCell == ownFoodObj && world.FoodStocks.TryGetValue(ownFoodObj, out var st))
+                    {
+                        if (st.Units > 0 && st.OwnerKind == OwnerKind.Npc && st.OwnerId == npcId)
+                        {
+                            foundMyStockHere = true;
+                        }
+                    }
+
+                    if (foundMyStockHere)
+                    {
+                        // Stock confermato sul posto: l'NPC può mangiare.
+                        cmd = new EatFromStockCommand(npcId, ownFoodObj);
+                        return true;
+                    }
+
+                    // Scoperta locale: lo stock non è dove doveva essere, o non è più mio.
+                    // Aggiorniamo la belief pinned: da questo momento non lo considero più disponibile.
+                    world.RemovePinnedFoodStockBelief(npcId, ownFoodObj);
+
+                    // Nota:
+                    // - Qui NON creiamo ancora un evento di "furto sospettato": sarebbe un sistema separato.
+                    // - Per ora ci limitiamo a far sì che l'NPC non resti bloccato a cercare all'infinito.
+                }
+
+                // Non sei ancora arrivato: vai sulla cella ricordata dello stock.
+                didMove = true;
+
+                cmd = new SetMoveIntentCommand(npcId, new MoveIntent
+                {
+                    Active = true,
+                    TargetX = ox,
+                    TargetY = oy,
+                    Reason = MoveIntentReason.SeekFood,
+                    TargetObjectId = ownFoodObj
+                });
+
+                return true;
+            }
+
+// 2) stock community (visibile OR remembered)
+            // -----------------------------------------------------------------
+            // REGRESSION FIX (0.02.05.2b):
+            // Nelle patch recenti abbiamo irrigidito molto la rule per evitare
+            // telepatia sui food stock community. Il risultato collaterale, però,
+            // è stato questo:
+            // - se l'NPC VEDEVA uno stock community, lo registrava correttamente
+            //   nella memoria oggetti;
+            // - ma appena usciva dalla LOS corrente, la decisione smetteva di
+            //   considerarlo un target valido, perché qui interrogavamo SOLO
+            //   FindVisibleCommunityFoodStock(...).
+            //
+            // Questo inibiva un comportamento che in versioni precedenti era di
+            // fatto possibile: "ho fame, so dove c'è cibo, quindi vado a prenderlo
+            // anche se in questo tick non lo sto vedendo".
+            //
+            // La correzione qui sotto mantiene il vincolo anti-telepatia:
+            // - PRIMA preferiamo uno stock realmente visibile ORA;
+            // - SE non c'è nulla di visibile, usiamo uno stock community ricordato
+            //   nella memoria soggettiva dell'NPC.
+            //
+            // Quindi la conoscenza torna ad essere operativa, ma senza tornare a
+            // scandire il mondo globale come facevano le versioni "telepatiche".
             int foodObj = FindVisibleCommunityFoodStock(world, npcId, _maxSeekRangeCells);
+            bool foodTargetFromMemory = false;
+            int fx = 0, fy = 0;
+
+            if (foodObj != 0)
+            {
+                if (!TryGetObjectCell(world, foodObj, out fx, out fy))
+                    return false;
+            }
+            else
+            {
+                // Fallback memory-driven: uso SOLO ciò che l'NPC ricorda di avere visto.
+                foodObj = FindRememberedCommunityFoodStock(world, npcId, _maxSeekRangeCells, out fx, out fy);
+                foodTargetFromMemory = foodObj != 0;
+            }
+
             if (foodObj != 0)
             {
                 if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
                     return false;
 
-                if (!TryGetObjectCell(world, foodObj, out int fx, out int fy))
-                    return false;
-
                 if (nx == fx && ny == fy)
                 {
                     // IMPORTANTISSIMO: mangio solo se sono sullo stock.
+                    // La validazione runtime finale resta comunque nel comando.
                     cmd = new EatFromStockCommand(npcId, foodObj);
                     return true;
                 }
@@ -185,10 +288,14 @@ namespace Arcontio.Core
                     Reason = MoveIntentReason.SeekFood,
                     TargetObjectId = foodObj
                 });
+
+                // Nota molto utile per la lettura futura di questo ramo:
+                // non cambia il tipo di comando, cambia solo la sorgente decisionale
+                // del target. La card debug distinguerà poi Visible vs KnownObject.
                 return true;
             }
 
-            // 3) furto se moralit�/emergenza
+            // 3) furto se moralità/emergenza
             float law = world.Social.TryGetValue(npcId, out var soc) ? soc.JusticePerception01 : 0.5f;
             bool emergency = needs.Hunger01 >= 0.95f;
             bool okToSteal = emergency || law < 0.45f;
@@ -196,60 +303,194 @@ namespace Arcontio.Core
             if (!okToSteal)
                 return false;
 
-            // 3a) Day10: furto da stock privato a terra (non addosso)
-            // Questo � il caso che vuoi testare: FoodStockComponent con OwnerKind=Npc, OwnerId=victim.
-            int stolenStockObj = FindVisibleOtherNpcFoodStock(world, npcId, _maxSeekRangeCells);
-            if (stolenStockObj != 0)
+            // 3a) Day10/Step5: furto da stock privato a terra (non addosso)
+//
+// CAMBIO ARCHITETTURALE (Step5):
+// - Prima: FindVisibleOtherNpcFoodStock() scandiva world.FoodStocks => era "conoscenza globale".
+// - Ora: scegliamo il target SOLO dalla memoria soggettiva dell'NPC (World.NpcObjectMemory[npcId]).
+//
+// Nota importante:
+// - In execution (Step2) abbiamo già blindato il comando: il furto da stock è valido SOLO se sei sulla cella dello stock.
+// - Qui, lato planning, facciamo la stessa cosa: se non sei sulla cella -> SetMoveIntentCommand.
+int stolenStockObj = FindRememberedOtherNpcFoodStock(world, npcId, _maxSeekRangeCells, out int sx, out int sy, out int victimOwnerId);
+if (stolenStockObj != 0)
+{
+    if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+        return false;
+
+    if (nx == sx && ny == sy)
+    {
+        // Ruba davvero solo se sei sullo stock (regola: stesso tile).
+        didSteal = true;
+        cmd = new StealFromStockCommand(npcId, stolenStockObj);
+        return true;
+    }
+
+    // Altrimenti ti avvicini prima: niente furto "a distanza".
+    didMove = true;
+    didSteal = true; // stai pianificando un'azione antisociale
+
+    cmd = new SetMoveIntentCommand(npcId, new MoveIntent
+    {
+        Active = true,
+        TargetX = sx,
+        TargetY = sy,
+        Reason = MoveIntentReason.SeekFood,
+        TargetObjectId = stolenStockObj
+    });
+
+    return true;
+}
+    // 3b) Step5: furto di cibo "addosso" (NPC -> NPC)
+    //
+    // CAMBIO ARCHITETTURALE (Step5):
+    // - Prima: FindNpcWithPrivateFood() scandiva world.NpcPrivateFood => telepatia (conoscenza globale).
+    // - Ora: scegliamo la vittima SOLO dalla memoria soggettiva:
+    //   World.NpcObjectMemory[npcId] con entry Kind=Npc e flag "HasCarriedFood".
+    //
+    // Regola di interazione (design):
+    // - Il furto "addosso" è valido solo se sei ADIACENTE (Manhattan=1) e senza occlusioni (LOS).
+    // - Se non sei in range, devi prima muoverti verso la last-known cell della vittima.
+    int victim = FindRememberedNpcWithCarriedFood(world, npcId, _maxSeekRangeCells, out int vx, out int vy, out int carriedApprox);
+    if (victim != 0)
+    {
+        if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+            return false;
+
+        int manhattan = Mathf.Abs(vx - nx) + Mathf.Abs(vy - ny);
+
+        // Se sei già vicino, prova il furto (execution farà comunque i check runtime Step2).
+        if (manhattan == 1 && world.HasLineOfSight(nx, ny, vx, vy))
+        {
+            didSteal = true;
+            cmd = new StealPrivateFoodCommand(npcId, victim);
+            return true;
+        }
+
+        // Altrimenti: prima insegui la last-known cell della vittima.
+        didMove = true;
+        didSteal = true;
+
+        cmd = new SetMoveIntentCommand(npcId, new MoveIntent
+        {
+            Active = true,
+            TargetX = vx,
+            TargetY = vy,
+            Reason = MoveIntentReason.SeekFood,
+
+            // Nota:
+            // - MoveIntent oggi non ha TargetNpcId.
+            // - NON usiamo TargetObjectId per non confondere i sistemi che assumono "oggetto nel mondo".
+            TargetObjectId = 0
+        });
+
+        return true;
+    }
+
+    return false;
+}
+        /// <summary>
+        /// FindRememberedCommunityFoodStock (0.02.05.2b):
+        ///
+        /// Scopo:
+        /// - ripristinare il comportamento corretto "ho visto del cibo, quindi posso
+        ///   tornarci anche se ora non lo sto guardando", SENZA reintrodurre telepatia.
+        ///
+        /// Principio architetturale:
+        /// - NON scandiamo il mondo per cercare cibo community;
+        /// - scandiamo invece la memoria soggettiva world.NpcObjectMemory[npcId].
+        ///
+        /// Validazione minima:
+        /// - l'entry deve essere un WorldObject compatibile con un food stock;
+        /// - l'oggetto reale, se ancora esiste, deve risultare uno stock community con units > 0;
+        /// - usiamo la posizione reale se l'oggetto è ancora nel World, altrimenti la last-known cell.
+        ///
+        /// Questa validazione non è telepatia "forte":
+        /// stiamo controllando lo stato dell'oggetto che l'NPC ricorda già, non stiamo
+        /// cercando nuovi target globali fuori dalla sua conoscenza.
+        /// </summary>
+        private static int FindRememberedCommunityFoodStock(
+            World world,
+            int npcId,
+            int maxRangeCells,
+            out int sx,
+            out int sy)
+        {
+            sx = 0;
+            sy = 0;
+
+            if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+                return 0;
+
+            if (!world.NpcObjectMemory.TryGetValue(npcId, out var mem) || mem == null)
+                return 0;
+
+            int bestObjId = 0;
+            int bestDist = int.MaxValue;
+            int bestX = 0;
+            int bestY = 0;
+
+            for (int i = 0; i < mem.Slots.Length; i++)
             {
-                if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
-                    return false;
+                var e = mem.Slots[i];
+                if (!e.IsValid)
+                    continue;
 
-                if (!TryGetObjectCell(world, stolenStockObj, out int sx, out int sy))
-                    return false;
+                if (e.Kind != NpcObjectMemoryStore.SubjectKind.WorldObject)
+                    continue;
 
-                if (nx == sx && ny == sy)
+                int objId = e.SubjectId != 0 ? e.SubjectId : e.ObjectId;
+                if (objId == 0)
+                    continue;
+
+                if (!world.FoodStocks.TryGetValue(objId, out var st))
+                    continue;
+
+                if (st.Units <= 0)
+                    continue;
+
+                if (st.OwnerKind != OwnerKind.Community || st.OwnerId != 0)
+                    continue;
+
+                int ox = e.CellX;
+                int oy = e.CellY;
+                if (world.Objects.TryGetValue(objId, out var inst) && inst != null)
                 {
-                    // Ruba davvero solo se sei sullo stock.
-                    didSteal = true;
-                    cmd = new StealFromStockCommand(npcId, stolenStockObj);
-                    return true;
+                    ox = inst.CellX;
+                    oy = inst.CellY;
                 }
 
-                // Altrimenti ti avvicini prima: niente furto "a distanza".
-                didMove = true;
-                didSteal = true; // stai pianificando un'azione antisociale
-                cmd = new SetMoveIntentCommand(npcId, new MoveIntent
+                // Il cibo community ricordato non deve essere filtrato dal range locale immediato,
+                // altrimenti l'NPC smette di tornare verso uno stock che sa già esistere fuori LOS.
+                int manhattan = Mathf.Abs(ox - nx) + Mathf.Abs(oy - ny);
+
+                if (manhattan < bestDist)
                 {
-                    Active = true,
-                    TargetX = sx,
-                    TargetY = sy,
-                    Reason = MoveIntentReason.SeekFood,
-                    TargetObjectId = stolenStockObj
-                });
-                return true;
+                    bestDist = manhattan;
+                    bestObjId = objId;
+                    bestX = ox;
+                    bestY = oy;
+                }
             }
 
-            // 3b) fallback: furto di cibo "addosso" (NpcPrivateFood)
-            int victim = FindNpcWithPrivateFood(world, npcId);
-            if (victim != 0)
+            if (bestObjId != 0)
             {
-                didSteal = true;
-                cmd = new StealPrivateFoodCommand(npcId, victim);
-                return true;
+                sx = bestX;
+                sy = bestY;
             }
 
-            return false;
+            return bestObjId;
         }
 
         /// <summary>
-        /// Trova uno stock di cibo della Community che l'NPC pu� *realisticamente* usare:
+        /// Trova uno stock di cibo della Community che l'NPC può *realisticamente* usare:
         /// - lo stock deve avere Units > 0
         /// - deve essere OwnerKind=Community, OwnerId=0 (convenzione attuale)
         /// - deve essere "visibile" secondo un test minimo (range + LOS)
         ///
-        /// Perch� qui e non in World?
-        /// - World � "verit� oggettiva" e dovrebbe restare tendenzialmente neutro.
-        /// - La nozione di "posso usarlo perch� lo vedo" � una policy decisionale.
+        /// Perché qui e non in World?
+        /// - World è "verità oggettiva" e dovrebbe restare tendenzialmente neutro.
+        /// - La nozione di "posso usarlo perché lo vedo" è una policy decisionale.
         /// </summary>
         private static int FindVisibleCommunityFoodStock(World world, int npcId, int maxRangeCells)
         {
@@ -276,7 +517,7 @@ namespace Arcontio.Core
                 if (manhattan > maxRangeCells)
                     continue;
 
-                // LOS: se un muro � in mezzo, HasLineOfSight deve tornare false.
+                // LOS: se un muro è in mezzo, HasLineOfSight deve tornare false.
                 if (!world.HasLineOfSight(nx, ny, ox, oy))
                     continue;
 
@@ -286,16 +527,7 @@ namespace Arcontio.Core
             return 0;
         }
 
-        private static int FindNpcWithPrivateFood(World world, int exceptNpcId)
-        {
-            foreach (var kv in world.NpcPrivateFood)
-            {
-                if (kv.Key == exceptNpcId) continue;
-                if (kv.Value > 0) return kv.Key;
-            }
-            return 0;
-        }
-
+        
         /// <summary>
         /// Day10: trova uno stock di cibo privato (OwnerKind=Npc) appartenente ad un altro NPC,
         /// che sia visibile (range + LOS) e con Units > 0.
@@ -305,40 +537,272 @@ namespace Arcontio.Core
         ///   ma una query su NpcObjectMemoryStore (conoscenza soggettiva).
         /// - Per il test Day10 (seed) va benissimo: vogliamo validare meccanica furto + witness.
         /// </summary>
-        private static int FindVisibleOtherNpcFoodStock(World world, int npcId, int maxRangeCells)
+        
+        
+/// <summary>
+/// Step5: cerca nella MEMORIA soggettiva dell'NPC uno stock di cibo privato (OwnerKind=Npc)
+/// appartenente ad un altro NPC.
+///
+/// Principio:
+/// - la scelta del target deve essere memory-driven, non world-driven.
+/// - quindi NON scandiamo world.FoodStocks; scandiamo invece world.NpcObjectMemory[npcId].
+///
+/// Nota sulla robustezza:
+/// - per evitare target "fantasma", facciamo una validazione puntuale sull'ObjectId:
+///   world.FoodStocks.TryGetValue(objId, out st) e Units>0.
+/// - questa NON è telepatia: non stiamo "cercando" cibo nel mondo, stiamo solo verificando
+///   se l'ID che ricordo esiste ancora ed è effettivamente uno stock di cibo.
+///
+/// Ritorna:
+/// - objectId dello stock se trovato
+/// - out sx/sy = cella target (preferiamo la cella reale dal World se disponibile, altrimenti memoria)
+/// - out ownerId = npc "vittima" (proprietario dello stock)
+/// </summary>
+
+        /// <summary>
+        /// Step5+Fix runtime:
+        /// Trova, nella MEMORIA soggettiva dell'NPC, uno stock di cibo privato appartenente a SE STESSO
+        /// (OwnerKind=Npc, OwnerId=npcId).
+        ///
+        /// Perché esiste:
+        /// - Caso comune: l'NPC deposita il proprio cibo a terra (stock privato) e poi deve tornarci per mangiare.
+        /// - Senza questo ramo, l'NPC ignora il proprio stock a terra e passa a community/steal, risultando illogico.
+        ///
+        /// Policy:
+        /// - Memory-driven: nessuna scansione globale del mondo per scegliere "che cosa c'è in giro".
+        /// - Validazione runtime: anche se la memoria è stale, in execution i comandi verificano lo stato reale.
+        /// </summary>
+        private static 
+        /// <summary>
+        /// FindPinnedBelievedOwnNpcFoodStock (Patch 5.1 - revised):
+        ///
+        /// Scopo:
+        /// - trovare "il mio stock privato a terra" usando una lista PINNED di belief,
+        ///   non dipendente dalla memoria percettiva e non dipendente da scansioni globali del World.
+        ///
+        /// Perché:
+        /// - Bug: l'NPC poteva ignorare il suo stock privato a terra se non era dentro NpcObjectMemory.
+        /// - Vincolo manifesto: l'NPC NON deve sapere automaticamente se qualcuno gli ruba lo stock fuori vista.
+        ///
+        /// Comportamento:
+        /// - L'NPC usa solo le "last known coordinates" conservate nella belief.
+        /// - Se è già arrivato in quella cella e lo stock non c'è (o non è più suo / è vuoto),
+        ///   allora la belief viene invalidata (RemovePinnedFoodStockBelief) e la rule prosegue
+        ///   con le alternative (community / furto).
+        /// - Se NON è ancora arrivato, pianifichiamo MoveIntent verso quella cella per ispezione.
+        /// </summary>
+        int FindPinnedBelievedOwnNpcFoodStock(
+            World world,
+            int npcId,
+            int maxRangeCells,
+            out int bestX,
+            out int bestY)
         {
+            bestX = 0;
+            bestY = 0;
+
+            // Se non abbiamo pinned belief, non abbiamo nulla da pianificare.
+            if (!world.NpcPinnedFoodStockBeliefs.TryGetValue(npcId, out var list) || list == null || list.Count == 0)
+                return 0;
+
             if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
                 return 0;
 
-            foreach (var kv in world.FoodStocks)
+            int bestObj = 0;
+            int bestDist = int.MaxValue;
+
+            // IMPORTANTISSIMO:
+            // Qui NON consultiamo World.Objects[objId] per scoprire "dove sta davvero lo stock ora".
+            // Quello sarebbe telepatia. Usiamo solo la posizione che l'NPC crede essere valida (LastKnownX/Y).
+            for (int i = 0; i < list.Count; i++)
             {
-                int objId = kv.Key;
-                var st = kv.Value;
-
-                if (st.Units <= 0) continue;
-
-                // Deve essere privato di un altro NPC.
-                if (st.OwnerKind != OwnerKind.Npc) continue;
-                if (st.OwnerId <= 0) continue;
-                if (st.OwnerId == npcId) continue;
-
-                if (!TryGetObjectCell(world, objId, out int ox, out int oy))
+                var b = list[i];
+                if (!b.IsValid)
                     continue;
+
+                int ox = b.LastKnownX;
+                int oy = b.LastKnownY;
 
                 int manhattan = Mathf.Abs(ox - nx) + Mathf.Abs(oy - ny);
                 if (manhattan > maxRangeCells)
                     continue;
 
-                if (!world.HasLineOfSight(nx, ny, ox, oy))
-                    continue;
-
-                return objId;
+                if (manhattan < bestDist)
+                {
+                    bestDist = manhattan;
+                    bestObj = b.ObjectId;
+                    bestX = ox;
+                    bestY = oy;
+                }
             }
 
-            return 0;
+            return bestObj;
         }
 
-        // ============================================================
+private static int FindRememberedOtherNpcFoodStock(
+    World world,
+    int npcId,
+    int maxRangeCells,
+    out int sx,
+    out int sy,
+    out int ownerId)
+{
+    sx = 0;
+    sy = 0;
+    ownerId = 0;
+
+    if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+        return 0;
+
+    if (!world.NpcObjectMemory.TryGetValue(npcId, out var mem) || mem == null)
+        return 0;
+
+    int bestObjId = 0;
+    int bestDist = int.MaxValue;
+    int bestX = 0;
+    int bestY = 0;
+    int bestOwner = 0;
+
+    for (int i = 0; i < mem.Slots.Length; i++)
+    {
+        var e = mem.Slots[i];
+        if (!e.IsValid) continue;
+
+        if (e.Kind != NpcObjectMemoryStore.SubjectKind.WorldObject)
+            continue;
+
+        // Recuperiamo l'ObjectId in modo robusto (compat: SubjectId e ObjectId possono coincidere).
+        int objId = e.SubjectId != 0 ? e.SubjectId : e.ObjectId;
+        if (objId == 0) continue;
+
+        if (!world.FoodStocks.TryGetValue(objId, out var st))
+            continue;
+
+        if (st.Units <= 0)
+            continue;
+
+        // Deve essere privato di un altro NPC.
+        if (st.OwnerKind != OwnerKind.Npc) continue;
+        if (st.OwnerId <= 0) continue;
+        if (st.OwnerId == npcId) continue;
+
+        // Prendiamo la cella reale se l'oggetto esiste in world.Objects, altrimenti la last-known cell in memoria.
+        int ox = e.CellX;
+        int oy = e.CellY;
+        if (world.Objects.TryGetValue(objId, out var inst) && inst != null)
+        {
+            ox = inst.CellX;
+            oy = inst.CellY;
+        }
+
+        int manhattan = Mathf.Abs(ox - nx) + Mathf.Abs(oy - ny);
+        if (manhattan > maxRangeCells)
+            continue;
+
+        if (manhattan < bestDist)
+        {
+            bestDist = manhattan;
+            bestObjId = objId;
+            bestX = ox;
+            bestY = oy;
+            bestOwner = st.OwnerId;
+        }
+    }
+
+    if (bestObjId != 0)
+    {
+        sx = bestX;
+        sy = bestY;
+        ownerId = bestOwner;
+    }
+
+    return bestObjId;
+}
+
+/// <summary>
+/// Step5: cerca nella MEMORIA soggettiva un NPC osservato che (secondo il ricordo)
+/// aveva cibo addosso.
+///
+/// Importante:
+/// - questa funzione NON guarda world.NpcPrivateFood per scegliere la vittima.
+/// - seleziona la vittima da mem.Slots (Kind=Npc) e flag HasCarriedFood.
+///
+/// Ritorna:
+/// - victimNpcId
+/// - out vx/vy = last-known cell della vittima (o last seen)
+/// - out carriedApprox = stima (debug/UI), non vincolante.
+/// </summary>
+private static int FindRememberedNpcWithCarriedFood(
+    World world,
+    int npcId,
+    int maxRangeCells,
+    out int vx,
+    out int vy,
+    out int carriedApprox)
+{
+    vx = 0;
+    vy = 0;
+    carriedApprox = 0;
+
+    if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+        return 0;
+
+    if (!world.NpcObjectMemory.TryGetValue(npcId, out var mem) || mem == null)
+        return 0;
+
+    int bestVictim = 0;
+    int bestDist = int.MaxValue;
+    int bestX = 0;
+    int bestY = 0;
+    int bestApprox = 0;
+
+    for (int i = 0; i < mem.Slots.Length; i++)
+    {
+        var e = mem.Slots[i];
+        if (!e.IsValid) continue;
+        if (e.Kind != NpcObjectMemoryStore.SubjectKind.Npc)
+            continue;
+
+        int victimId = e.SubjectId;
+        if (victimId <= 0) continue;
+        if (victimId == npcId) continue;
+
+        // Flag "has carried food" (derivato solo quando l'NPC era visibile: Step4).
+        if ((e.Flags & NpcObjectMemoryStore.ObservedFlags.HasCarriedFood) == 0)
+            continue;
+
+        // Se la stima è 0, consideriamolo "non interessante" per il furto.
+        // (In futuro potresti scegliere di rubare comunque, ma qui usiamo una regola semplice.)
+        if (e.CarriedFoodUnitsApprox <= 0)
+            continue;
+
+        int ox = e.CellX;
+        int oy = e.CellY;
+
+        int manhattan = Mathf.Abs(ox - nx) + Mathf.Abs(oy - ny);
+        if (manhattan > maxRangeCells)
+            continue;
+
+        if (manhattan < bestDist)
+        {
+            bestDist = manhattan;
+            bestVictim = victimId;
+            bestX = ox;
+            bestY = oy;
+            bestApprox = e.CarriedFoodUnitsApprox;
+        }
+    }
+
+    if (bestVictim != 0)
+    {
+        vx = bestX;
+        vy = bestY;
+        carriedApprox = bestApprox;
+    }
+
+    return bestVictim;
+}
+// ============================================================
         // SLEEP DECISION
         // ============================================================
 
@@ -355,7 +819,7 @@ namespace Arcontio.Core
                 return true;
             }
 
-            // 2) letto altrui se moralit�/emergenza
+            // 2) letto altrui se moralità/emergenza
             float law = world.Social.TryGetValue(npcId, out var soc) ? soc.JusticePerception01 : 0.5f;
             bool emergency = needs.Fatigue01 >= 0.95f;
             bool okToTrespass = emergency || law < 0.45f;
@@ -422,7 +886,7 @@ namespace Arcontio.Core
                 if (string.IsNullOrWhiteSpace(obj.DefId)) continue;
                 if (!obj.DefId.Contains("bed")) continue;
 
-                // Escludi letti di propriet� dell'NPC.
+                // Escludi letti di proprietà dell'NPC.
                 if (obj.OwnerKind == OwnerKind.Npc && obj.OwnerId == npcId) continue;
 
                 int ox = obj.CellX;
@@ -447,8 +911,8 @@ namespace Arcontio.Core
 
         /// <summary>
         /// Estrae la cella corrente dell'NPC.
-        /// In ARCONTIO la posizione runtime degli NPC � in world.GridPos (component store),
-        /// NON dentro NpcCore (che � pi� "identit�"/stato logico).
+        /// In ARCONTIO la posizione runtime degli NPC è in world.GridPos (component store),
+        /// NON dentro NpcCore (che è più "identità"/stato logico).
         /// </summary>
         private static bool TryGetNpcCell(World world, int npcId, out int x, out int y)
         {
@@ -465,10 +929,10 @@ namespace Arcontio.Core
 
         /// <summary>
         /// Estrae la cella di un oggetto dato il suo objectId.
-        /// Nota: questa � la *singola fonte di verit�* per posizione oggetti in World:
+        /// Nota: questa è la *singola fonte di verità* per posizione oggetti in World:
         /// world.Objects[objId].CellX / CellY.
         ///
-        /// (Il FoodStockComponent NON contiene necessariamente coordinate; � un componente logico.)
+        /// (Il FoodStockComponent NON contiene necessariamente coordinate; è un componente logico.)
         /// </summary>
         private static bool TryGetObjectCell(World world, int objectId, out int x, out int y)
         {

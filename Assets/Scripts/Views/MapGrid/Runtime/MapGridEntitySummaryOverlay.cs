@@ -1,4 +1,5 @@
 using NUnit.Framework;
+using Arcontio.Core;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -182,6 +183,8 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbHeader = new(512);
         private readonly StringBuilder _sbMem = new(1024);
         private readonly StringBuilder _sbObjMem = new(1024);
+        private readonly StringBuilder _sbComms = new(1024);
+        private readonly StringBuilder _sbLandmarks = new(256);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
 
@@ -604,18 +607,105 @@ namespace Arcontio.View.MapGrid
                 world.NpcFacing.TryGetValue(npcId, out var facing);
                 world.Needs.TryGetValue(npcId, out var needs);
 
+                // ============================================================
+                // HEADER / IDENTITY / STATE
+                // ============================================================
+                string navModeHeader = "IDLE";
+                string execPhaseHeader = "NONE";
+                if (world.TryGetNpcMacroRouteDebugReport(npcId, out var routeReportHeader))
+                {
+                    navModeHeader = string.IsNullOrWhiteSpace(routeReportHeader.NavigationMode) ? "IDLE" : routeReportHeader.NavigationMode;
+                    execPhaseHeader = routeReportHeader.ExecutionActive
+                        ? "EXECUTING"
+                        : (!string.IsNullOrEmpty(routeReportHeader.ExecutionFailureReason) ? "FAILED" : "NONE");
+                }
+
+                string actionKindHeader = "Unknown";
+                if (world.TryGetNpcAction(npcId, out var actionHeader))
+                    actionKindHeader = actionHeader.Kind.ToString();
+
                 _sbHeader.Clear();
                 _sbHeader.Append("NPC #").Append(npcId);
-
                 if (!string.IsNullOrEmpty(core.Name))
                     _sbHeader.Append("  ").Append(core.Name);
 
-                _sbHeader.Append("  pos=(").Append(pos.X).Append(",").Append(pos.Y).Append(")")
-                    .Append("  facing=").Append(facing);
-
                 _sbHeader.Append('\n')
+                    .Append("Pos = (").Append(pos.X).Append(',').Append(pos.Y).Append(")")
+                    .Append("   Facing = ").Append(facing)
+                    .Append('\n')
+                    .Append("State = ").Append(actionKindHeader)
+                    .Append("   NavMode = ").Append(navModeHeader)
+                    .Append("   Exec = ").Append(execPhaseHeader)
+                    .Append('\n')
                     .Append("Needs: hunger=").Append(needs.Hunger01.ToString("0.00"))
-                    .Append(" tired=").Append(needs.Fatigue01.ToString("0.00"));
+                    .Append("   tired=").Append(needs.Fatigue01.ToString("0.00"));
+
+                // ============================================================
+                // LANDMARK DEBUG REPORT (v0.02.03 / Day3)
+                // ============================================================
+                // Prima (Day2) questi contatori erano "appesi" all'header.
+                // Ora li spostiamo in una sezione dedicata nella card, per:
+                // - maggiore leggibilità
+                // - supportare il collapse/expand per gruppo
+                _sbLandmarks.Clear();
+                _sbLandmarks.Append("Navigation / MacroRoute\n");
+
+                if (world.TryGetNpcLandmarkDebugReport(npcId, out var lmReport))
+                {
+                    _sbLandmarks.Append("[NAV]\n");
+
+                    if (world.TryGetNpcMacroRouteDebugReport(npcId, out var routeReport))
+                    {
+                        string execPhase;
+                        if (routeReport.ExecutionActive)
+                            execPhase = "EXECUTING";
+                        else if (!string.IsNullOrEmpty(routeReport.ExecutionFailureReason))
+                            execPhase = "FAILED";
+                        else if (string.Equals(routeReport.LastModeSwitchReason, "MoveIntentCompleted", System.StringComparison.Ordinal) || string.Equals(routeReport.LastModeSwitchReason, "LocalSearchCompletedTargetReached", System.StringComparison.Ordinal))
+                            execPhase = "COMPLETED";
+                        else
+                            execPhase = "NONE";
+
+                        _sbLandmarks.Append("NavMode = ").Append(routeReport.NavigationMode).Append('\n')
+                            .Append("ExecActive = ").Append(routeReport.ExecutionActive ? "YES" : "NO").Append('\n')
+                            .Append("ExecPhase = ").Append(execPhase).Append('\n')
+                            .Append("TargetCell = (").Append(routeReport.TargetCellX).Append(',').Append(routeReport.TargetCellY).Append(')').Append('\n')
+                            .Append("ImmediateTarget = (").Append(routeReport.ImmediateTargetX).Append(',').Append(routeReport.ImmediateTargetY).Append(')').Append('\n');
+
+                        if (routeReport.LastModeSwitchTick >= 0)
+                            _sbLandmarks.Append("ModeSwitchTick = ").Append(routeReport.LastModeSwitchTick).Append('\n');
+                        if (!string.IsNullOrEmpty(routeReport.LastModeSwitchReason))
+                            _sbLandmarks.Append("ModeSwitchWhy = ").Append(routeReport.LastModeSwitchReason).Append('\n');
+
+                        _sbLandmarks.Append('\n').Append("[LM PLAN]\n")
+                            .Append("MacroRoute = ").Append(routeReport.HasRoute ? "OK" : "FAIL").Append('\n')
+                            .Append("RouteNodes = ").Append(routeReport.RouteNodeCount).Append('\n')
+                            .Append("StartLM = ").Append(routeReport.StartNodeId).Append('\n')
+                            .Append("TargetLM = ").Append(routeReport.TargetNodeId).Append('\n')
+                            .Append("NextLMIndex = ").Append(routeReport.NextRouteNodeIndex).Append('\n')
+                            .Append("NextLM = ").Append(routeReport.NextRouteNodeId).Append('\n')
+                            .Append("LastMileFlag = ").Append(routeReport.IsDoingLastMile ? "YES" : "NO").Append('\n')
+                            .Append("GoalLocalSearch = ").Append(routeReport.GoalLocalSearchActive ? "ON" : "OFF")
+                            .Append("   Budget = ").Append(routeReport.GoalLocalSearchBudgetRemaining);
+
+                        if (!string.IsNullOrEmpty(routeReport.FailureReason))
+                            _sbLandmarks.Append('\n').Append("RouteFail = ").Append(routeReport.FailureReason);
+                        if (!string.IsNullOrEmpty(routeReport.ExecutionFailureReason))
+                            _sbLandmarks.Append('\n').Append("ExecFail = ").Append(routeReport.ExecutionFailureReason);
+                    }
+
+                    _sbLandmarks.Append('\n').Append('\n').Append("[LM KNOWLEDGE]\n")
+                        .Append("KnownLandmarks = ").Append(lmReport.KnownLandmarksCount).Append('\n')
+                        .Append("KnownEdges = ").Append(lmReport.KnownEdgesCount).Append('\n')
+                        .Append("PoiAnchors = ").Append(lmReport.PoiAnchorCount).Append('\n')
+                        .Append("Replans/min = ").Append(lmReport.ReplansPerMin.ToString("0.0")).Append('\n')
+                        .Append("Failures/min = ").Append(lmReport.FailuresPerMin.ToString("0.0")).Append('\n')
+                        .Append("Blacklist = ").Append(lmReport.BlacklistSize);
+                }
+                else
+                {
+                    _sbLandmarks.Append("<color=#aaaaaa>(no landmark report)</color>");
+                }
 
                 // ============================================================
                 // AZIONE + COLORE (rich text)
@@ -632,8 +722,6 @@ namespace Arcontio.View.MapGrid
                     int age = nowTick - action.StartedTick;
                     if (age < 0) age = 0;
 
-                    // Color mapping (debug UX): scelto per essere leggibile su bg scuro.
-                    // Se vuoi uniformare ai colori del brand/UI, spostiamo la palette in MapGridConfig.
                     string hex = action.Kind switch
                     {
                         Arcontio.Core.NpcActionKind.Idle => "AAAAAA",
@@ -648,13 +736,77 @@ namespace Arcontio.View.MapGrid
                         _ => "FFFFFF"
                     };
 
-                    // Label completa, ma evidenziamo soprattutto il Kind.
-                    // action.ToString() può includere target cell o obj id.
-                    actionRich = $"Action: <color=#{hex}>{action.Kind}</color>  ({action})  age={age}t";
+                    string moveIntentState = "NO";
+                    string moveReason = "None";
+                    int moveTargetX = 0;
+                    int moveTargetY = 0;
+                    int moveTargetObjectId = 0;
+                    int blockedTicks = 0;
+                    if (world.NpcMoveIntents.TryGetValue(npcId, out var mi) && mi.Active)
+                    {
+                        moveIntentState = "YES";
+                        moveReason = mi.Reason.ToString();
+                        moveTargetX = mi.TargetX;
+                        moveTargetY = mi.TargetY;
+                        moveTargetObjectId = mi.TargetObjectId;
+                        blockedTicks = mi.BlockedTicks;
+                    }
+
+                    int visibleCommunityFood = 0;
+                    int rememberedCommunityFood = 0;
+                    string needTargetSource = "None";
+                    string needTargetReason = "NoKnownFoodCandidate";
+                    string goalSource = "None";
+                    ComputeFoodTargetDebug(world, npcId, out visibleCommunityFood, out rememberedCommunityFood);
+                    if (visibleCommunityFood != 0)
+                    {
+                        needTargetSource = "Visible";
+                        needTargetReason = "VisibleCommunityFood";
+                    }
+                    else if (rememberedCommunityFood != 0)
+                    {
+                        needTargetSource = "KnownObject";
+                        needTargetReason = "RememberedCommunityFood";
+                    }
+
+                    if (moveIntentState == "YES")
+                    {
+                        switch (moveReason)
+                        {
+                            case "SeekFood": goalSource = "Hunger"; break;
+                            case "SeekBed": goalSource = "Fatigue"; break;
+                            case "DebugClick": goalSource = "PlayerOrder"; break;
+                            default: goalSource = "AI"; break;
+                        }
+                    }
+
+                    if (moveReason == "DebugClick")
+                    {
+                        needTargetSource = "Suppressed";
+                        needTargetReason = "SuppressedByManualControl";
+                    }
+
+                    var sbGoal = new StringBuilder(256);
+                    sbGoal.Append("Action = <color=#").Append(hex).Append('>').Append(action.Kind).Append("</color>\n")
+                        .Append("ActionLabel = ").Append(action).Append("   age=").Append(age).Append("t\n")
+                        .Append("MoveIntent = ").Append(moveIntentState).Append("   Reason = ").Append(moveReason).Append('\n');
+
+                    if (moveIntentState == "YES")
+                        sbGoal.Append("TargetCell = (").Append(moveTargetX).Append(',').Append(moveTargetY).Append(")   TargetObject = ").Append(moveTargetObjectId).Append("   BlockedTicks = ").Append(blockedTicks).Append('\n');
+                    else if (action.HasTargetCell)
+                        sbGoal.Append("TargetCell = (").Append(action.TargetX).Append(',').Append(action.TargetY).Append(")\n");
+
+                    if (action.TargetObjectId != 0)
+                        sbGoal.Append("ActionTargetObject = ").Append(action.TargetObjectId).Append('\n');
+
+                    sbGoal.Append("NeedTargetSource = ").Append(needTargetSource).Append('\n')
+                        .Append("NeedTargetReason = ").Append(needTargetReason);
+
+                    actionRich = sbGoal.ToString();
                 }
                 else
                 {
-                    actionRich = "Action: <color=#AAAAAA>Unknown</color>";
+                    actionRich = "Action = <color=#AAAAAA>Unknown</color>";
                 }
 
                 // ============================================================
@@ -704,16 +856,143 @@ namespace Arcontio.View.MapGrid
                 // - "Total" = somma, utile per ragionare sullo stato generale.
                 int totalOwned = carriedFood + ownedStockUnits;
 
-                var sb = new StringBuilder(128);
-                sb.AppendLine("Inventory")
-                  .AppendLine($"PrivateFood (carried) units = {carriedFood}")
-                  .AppendLine($"PrivateFood (owned in world) units = {ownedStockUnits}  (piles={ownedStockPiles})")
-                  .AppendLine($"Total private food units = {totalOwned}");
+                int visibleCommunityFoodDbg = 0;
+                int rememberedCommunityFoodDbg = 0;
+                ComputeFoodTargetDebug(world, npcId, out visibleCommunityFoodDbg, out rememberedCommunityFoodDbg);
+
+                var sb = new StringBuilder(256);
+                sb.AppendLine("[NEEDS]")
+                  .AppendLine($"Hunger01 = {needs.Hunger01:0.00}")
+                  .AppendLine($"Fatigue01 = {needs.Fatigue01:0.00}")
+                  .AppendLine()
+                  .AppendLine("[INVENTORY]")
+                  .AppendLine($"PrivateFood (carried) = {carriedFood}")
+                  .AppendLine($"PrivateFood (owned in world) = {ownedStockUnits}  (piles={ownedStockPiles})")
+                  .AppendLine($"Total private food = {totalOwned}");
 
                 if (lastEatTick >= 0)
                     sb.AppendLine($"Last private consume tick = {lastEatTick}");
 
+                sb.AppendLine()
+                  .AppendLine("[FOOD KNOWLEDGE]")
+                  .AppendLine($"Visible community food = {(visibleCommunityFoodDbg != 0 ? visibleCommunityFoodDbg.ToString() : "None")}")
+                  .AppendLine($"Remembered community food = {(rememberedCommunityFoodDbg != 0 ? rememberedCommunityFoodDbg.ToString() : "None")}");
+
                 string invText = sb.ToString();
+
+                // ============================================================
+                // COMUNICAZIONI SIMBOLICHE (Patch 0.01P2)
+                // ============================================================
+                // Requisito:
+                // - Nelle card NPC vogliamo vedere le "tracce simboliche" comunicate.
+                // - Distinzione chiara tra:
+                //   OUT: token pronunciati dall'NPC
+                //   IN:  token sentiti/ricevuti dall'NPC
+                //
+                // Fonte di verità:
+                // - world.DebugNpcTokens (cache view-only)
+                // - popolata dal core in TokenEmissionPipeline (OUT) e TokenDeliveryPipeline (IN).
+                //
+                // Nota UX:
+                // - Mostriamo poche righe per non rendere la card illeggibile.
+                // - Usiamo RichText per colorare le direzioni.
+                _sbComms.Clear();
+                _sbComms.Append("Comms (tokens)\n");
+
+                if (world.DebugNpcTokens != null && world.DebugNpcTokens.TryGetValue(npcId, out var tlog) && tlog != null)
+                {
+                    // Mostriamo gli ultimi N per direzione (N piccolo).
+                    const int MaxPerDir = 4;
+
+                    // OUT (gli ultimi)
+                    var outList = tlog.Outgoing;
+                    int outCount = outList != null ? outList.Count : 0;
+                    _sbComms.Append("<color=#FFAA66>OUT</color>: ");
+                    if (outCount == 0)
+                    {
+                        _sbComms.Append("<color=#aaaaaa>(none)</color>\n");
+                    }
+                    else
+                    {
+                        _sbComms.Append('\n');
+                        int start = Mathf.Max(0, outCount - MaxPerDir);
+                        for (int oi = start; oi < outCount; oi++)
+                        {
+                            var env = outList[oi];
+                            var tok = env.Token;
+
+                            // Formato verbose ma compatto:
+                            // - canale
+                            // - destinatario
+                            // - tipo token + subject
+                            // - eventuale cell
+                            _sbComms.Append("  → ")
+                                .Append(env.ListenerId)
+                                .Append("  ch=").Append(env.Channel)
+                                .Append("  ")
+                                .Append(tok.Type)
+                                .Append(" subj=").Append(tok.SubjectId);
+
+                            // Patch 0.01P3 extension:
+                            // Mostriamo anche il soggetto secondario se presente.
+                            // Esempio utile: TheftReportWitness subj=thief sec=victim
+                            if (tok.SecondarySubjectId >= 0)
+                                _sbComms.Append(" sec=").Append(tok.SecondarySubjectId);
+
+                            if (tok.HasCell)
+                                _sbComms.Append(" cell=(").Append(tok.CellX).Append(',').Append(tok.CellY).Append(')');
+
+                            _sbComms.Append("  I=").Append(tok.Intensity01.ToString("0.00"))
+                                .Append(" R=").Append(tok.Reliability01.ToString("0.00"))
+                                .Append(" d=").Append(tok.ChainDepth)
+                                .Append('\n');
+                        }
+                    }
+
+                    // IN (gli ultimi)
+                    var inList = tlog.Incoming;
+                    int inCount = inList != null ? inList.Count : 0;
+                    _sbComms.Append("<color=#66CCFF>IN</color>: ");
+                    if (inCount == 0)
+                    {
+                        _sbComms.Append("<color=#aaaaaa>(none)</color>\n");
+                    }
+                    else
+                    {
+                        _sbComms.Append('\n');
+                        int start = Mathf.Max(0, inCount - MaxPerDir);
+                        for (int ii = start; ii < inCount; ii++)
+                        {
+                            var env = inList[ii];
+                            var tok = env.Token;
+
+                            _sbComms.Append("  ← ")
+                                .Append(env.SpeakerId)
+                                .Append("  ch=").Append(env.Channel)
+                                .Append("  ")
+                                .Append(tok.Type)
+                                .Append(" subj=").Append(tok.SubjectId);
+
+                            // Patch 0.01P3 extension: soggetto secondario (se presente)
+                            if (tok.SecondarySubjectId >= 0)
+                                _sbComms.Append(" sec=").Append(tok.SecondarySubjectId);
+
+                            if (tok.HasCell)
+                                _sbComms.Append(" cell=(").Append(tok.CellX).Append(',').Append(tok.CellY).Append(')');
+
+                            _sbComms.Append("  I=").Append(tok.Intensity01.ToString("0.00"))
+                                .Append(" R=").Append(tok.Reliability01.ToString("0.00"))
+                                .Append(" d=").Append(tok.ChainDepth)
+                                .Append('\n');
+                        }
+                    }
+                }
+                else
+                {
+                    // Caso più comune nei branch vecchi o quando la feature non è stata inizializzata:
+                    // non deve fare crash, semplicemente mostra "n/a".
+                    _sbComms.Append("<color=#aaaaaa>(no token log)</color>\n");
+                }
 
                 // Memory traces
                 _sbMem.Clear();
@@ -735,9 +1014,19 @@ namespace Arcontio.View.MapGrid
                     }
                 }
 
-                // Known interactables (NpcObjectMemoryStore.Slots)
+                // Known entities (NpcObjectMemoryStore.Slots)
                 _sbObjMem.Clear();
-                _sbObjMem.Append("Known interactables:\n");
+                _sbObjMem.Append("Perception / Knowledge\n");
+
+                if (world.NpcMoveIntents.TryGetValue(npcId, out var dbgMi) && dbgMi.Active)
+                {
+                    _sbObjMem.Append("MoveIntentReason = ").Append(dbgMi.Reason).Append("   TargetObject = ").Append(dbgMi.TargetObjectId).Append("\n");
+                }
+
+                if (world.NpcPinnedFoodStockBeliefs.TryGetValue(npcId, out var pinnedBeliefs) && pinnedBeliefs != null && pinnedBeliefs.Count > 0)
+                {
+                    _sbObjMem.Append("PinnedFoodBeliefs = ").Append(pinnedBeliefs.Count).Append("\n");
+                }
 
                 if (world.NpcObjectMemory.TryGetValue(npcId, out var store) && store != null)
                 {
@@ -747,15 +1036,42 @@ namespace Arcontio.View.MapGrid
                         var e = slots[i];
                         if (!e.IsValid) continue;
 
-                        _sbObjMem.Append("- ").Append(e.DefId);
+                        // ============================================================
+                        // Nota UI (molto verbosa ma utile in debug):
+                        // Questo overlay serve per "vedere" cosa l'NPC crede di sapere.
+                        // NON è la verità globale del mondo: è la cache soggettiva.
+                        //
+                        // Da Step3 in poi, lo store è generalizzato:
+                        // - Kind=WorldObject  -> oggetti interagibili (stock/letto/porta...)
+                        // - Kind=Npc          -> NPC osservati (posizione + facts osservati)
+                        // ============================================================
 
-                        if (e.ObjectId != 0) _sbObjMem.Append(" #").Append(e.ObjectId);
+                        if (e.Kind == NpcObjectMemoryStore.SubjectKind.Npc)
+                        {
+                            _sbObjMem.Append("- NPC #").Append(e.SubjectId)
+                                .Append(" cell=(").Append(e.CellX).Append(",").Append(e.CellY).Append(")");
 
-                        _sbObjMem.Append(" cell=(").Append(e.CellX).Append(",").Append(e.CellY).Append(")")
-                            .Append(" rel=").Append(e.Reliability01.ToString("0.00"))
-                            .Append(" util=").Append(e.UtilityScore01.ToString("0.00"))
-                            .Append(" seen=").Append(e.LastSeenTick)
-                            .Append('\n');
+                            if ((e.Flags & NpcObjectMemoryStore.ObservedFlags.HasCarriedFood) != 0)
+                                _sbObjMem.Append(" carriedFood~").Append(e.CarriedFoodUnitsApprox);
+
+                            _sbObjMem.Append(" rel=").Append(e.Reliability01.ToString("0.00"))
+                                .Append(" util=").Append(e.UtilityScore01.ToString("0.00"))
+                                .Append(" seen=").Append(e.LastSeenTick)
+                                .Append('\n');
+                        }
+                        else
+                        {
+                            // Default: WorldObject (compat con Day10)
+                            _sbObjMem.Append("- ").Append(e.DefId);
+
+                            if (e.ObjectId != 0) _sbObjMem.Append(" #").Append(e.ObjectId);
+
+                            _sbObjMem.Append(" cell=(").Append(e.CellX).Append(",").Append(e.CellY).Append(")")
+                                .Append(" rel=").Append(e.Reliability01.ToString("0.00"))
+                                .Append(" util=").Append(e.UtilityScore01.ToString("0.00"))
+                                .Append(" seen=").Append(e.LastSeenTick)
+                                .Append('\n');
+                        }
                     }
                 }
 
@@ -767,6 +1083,88 @@ namespace Arcontio.View.MapGrid
                 //   quindi usiamo chiamate dirette ma lasciamo che i null-check dentro la view gestiscano.
                 card.SetActionText(actionRich);
                 card.SetInventoryText(invText);
+                card.SetCommsText(_sbComms.ToString());
+
+                // Patch 0.02.03:
+                // nuova sezione nella card per i contatori landmark/edge conosciuti.
+                card.SetLandmarksText(_sbLandmarks.ToString());
+            }
+        }
+
+        // ============================================================
+        // DEBUG HELPERS (food target reasoning)
+        // ============================================================
+        // Questi helper esistono per una ragione molto precisa:
+        // vogliamo rendere leggibile nella card SE il sistema dei bisogni
+        // dispone di un target cibo attuale perché lo vede ORA oppure perché
+        // lo ricorda dalla memoria oggettuale.
+        //
+        // Non sono usati dalla simulazione per decidere; sono solo strumenti
+        // di osservabilità, e quindi possono permettersi un po' di verbosità.
+        private static void ComputeFoodTargetDebug(Arcontio.Core.World world, int npcId, out int visibleCommunityFoodObjId, out int rememberedCommunityFoodObjId)
+        {
+            visibleCommunityFoodObjId = 0;
+            rememberedCommunityFoodObjId = 0;
+
+            if (!world.GridPos.TryGetValue(npcId, out var npcPos))
+                return;
+
+            if (world.NpcObjectMemory.TryGetValue(npcId, out var store) && store != null)
+            {
+                var slots = store.Slots;
+                for (int i = 0; i < slots.Length; i++)
+                {
+                    var e = slots[i];
+                    if (!e.IsValid)
+                        continue;
+                    if (e.Kind != NpcObjectMemoryStore.SubjectKind.WorldObject)
+                        continue;
+
+                    int objId = e.SubjectId != 0 ? e.SubjectId : e.ObjectId;
+                    if (objId == 0)
+                        continue;
+                    if (!world.FoodStocks.TryGetValue(objId, out var st))
+                        continue;
+                    if (st.Units <= 0)
+                        continue;
+                    if (st.OwnerKind != Arcontio.Core.OwnerKind.Community || st.OwnerId != 0)
+                        continue;
+
+                    rememberedCommunityFoodObjId = objId;
+
+                    int ox = e.CellX;
+                    int oy = e.CellY;
+                    if (world.Objects.TryGetValue(objId, out var inst) && inst != null)
+                    {
+                        ox = inst.CellX;
+                        oy = inst.CellY;
+                    }
+
+                    if (world.HasLineOfSight(npcPos.X, npcPos.Y, ox, oy))
+                    {
+                        visibleCommunityFoodObjId = objId;
+                        return;
+                    }
+                }
+            }
+
+            // Fallback puramente osservativo: se non c'è nulla in memoria,
+            // proviamo a capire se almeno in questo tick esiste uno stock community
+            // direttamente visibile. Serve per leggere bug di encoding percettivo.
+            foreach (var kv in world.FoodStocks)
+            {
+                int objId = kv.Key;
+                var st = kv.Value;
+                if (st.Units <= 0)
+                    continue;
+                if (st.OwnerKind != Arcontio.Core.OwnerKind.Community || st.OwnerId != 0)
+                    continue;
+                if (!world.Objects.TryGetValue(objId, out var inst) || inst == null)
+                    continue;
+                if (!world.HasLineOfSight(npcPos.X, npcPos.Y, inst.CellX, inst.CellY))
+                    continue;
+                visibleCommunityFoodObjId = objId;
+                return;
             }
         }
 

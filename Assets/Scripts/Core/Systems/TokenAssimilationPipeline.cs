@@ -14,8 +14,8 @@ namespace Arcontio.Core
     /// - aggiunge una traccia "heard/rumor" nel MemoryStore del listener
     /// 
     /// Nota:
-    /// - NON fa delivery fisica (LOS, distanza, perdita): arriver‡ al Giorno 7.
-    /// - Qui assumiamo che i token nel bus siano gi‡ "destinati" al listener.
+    /// - NON fa delivery fisica (LOS, distanza, perdita): arriver√† al Giorno 7.
+    /// - Qui assumiamo che i token nel bus siano gi√† "destinati" al listener.
     /// </summary>
     public sealed class TokenAssimilationPipeline
     {
@@ -26,6 +26,9 @@ namespace Arcontio.Core
             // Catalogo minimo Giorno 6
             _rules.Add(new AssimilatePredatorAlertRule());
             _rules.Add(new AssimilateHelpRequestRule());
+
+            // Patch 0.01P3 extension: comunicazione furto
+            _rules.Add(new AssimilateTheftReportRule());
         }
 
         /// <summary>
@@ -61,7 +64,7 @@ namespace Arcontio.Core
                     if (!rule.Matches(env))
                         continue;
 
-                    // Questa rule Ë quella "giusta" per questo token (anche se decide di non produrre trace)
+                    // Questa rule √® quella "giusta" per questo token (anche se decide di non produrre trace)
                     handled = true;
 
                     if (rule.TryAssimilate(world, env, out var trace))

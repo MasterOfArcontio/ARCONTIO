@@ -39,14 +39,14 @@ namespace Arcontio.Core
                 if (!world.GridPos.TryGetValue(env.SpeakerId, out var sp)) continue;
                 if (!world.GridPos.TryGetValue(env.ListenerId, out var li)) continue;
 
-                // Distanza ìeffettivaî usata per falloff:
+                // Distanza ‚Äúeffettiva‚Äù usata per falloff:
                 // - ProximityTalk/TargetedVisit: Manhattan (e LOS se attivo)
                 // - AlarmShout: BFS detour distance (aggira muri)
                 int effectiveDist;
 
                 if (env.Channel == TokenChannel.AlarmShout)
                 {
-                    // BFS ìacusticoî: distanza del percorso pi˘ corto aggirando muri
+                    // BFS ‚Äúacustico‚Äù: distanza del percorso pi√π corto aggirando muri
                     if (!TryGetBfsDistance(world, sp.X, sp.Y, li.X, li.Y, maxRange, out effectiveDist))
                     {
                         droppedRange++;
@@ -55,7 +55,7 @@ namespace Arcontio.Core
                 }
                 else
                 {
-                    // Voce ìnormaleî: distanza Manhattan
+                    // Voce ‚Äúnormale‚Äù: distanza Manhattan
                     effectiveDist = Manhattan(sp.X, sp.Y, li.X, li.Y);
                     if (effectiveDist > maxRange)
                     {
@@ -63,7 +63,7 @@ namespace Arcontio.Core
                         continue;
                     }
 
-                    // LOS solo su canali ìotticiî
+                    // LOS solo su canali ‚Äúottici‚Äù
                     if (enableLos)
                     {
                         if (HasBlockingLOS(world, sp.X, sp.Y, li.X, li.Y))
@@ -98,7 +98,8 @@ namespace Arcontio.Core
                     chainDepth: old.ChainDepth,
                     hasCell: old.HasCell,
                     cellX: old.CellX,
-                    cellY: old.CellY
+                    cellY: old.CellY,
+                    secondarySubjectId: old.SecondarySubjectId
                 );
 
                 var arrived = new TokenEnvelope(
@@ -112,7 +113,22 @@ namespace Arcontio.Core
                 tokenBusIn.Publish(arrived);
                 delivered++;
 
-                // DEBUG throttled: cosÏ vedi ìmuro corto vs muro lungoî
+                // Patch 0.01P2 (observability):
+                // Registriamo sul World il token *arrivato* (IN) per il listener.
+                // Cos√¨ la UI pu√≤ mostrare "che cosa hai sentito" senza dipendere
+                // dalla coda effimera TokenBusIn.
+                world.GetOrCreateDebugNpcTokenLog(arrived.ListenerId).RecordIncoming(arrived);
+
+                // Patch 0.01P3:
+                // Balloon "IN" per rendere visibile quando un NPC sente una comunicazione.
+                // Nota Patch 0.01P3 extension:
+                // - Per alcune categorie (furto report vittima/testimone) vogliamo balloon dedicati,
+                //   perch√© sono segnali sociali pi√π importanti del generico TokenIn.
+                // SubjectId = speakerId (chi ha parlato).
+                var inKind = GetIncomingBalloonKindForTokenType(arrived.Token.Type);
+                world.EmitNpcBalloon(arrived.ListenerId, inKind, subjectId: arrived.SpeakerId, secondarySubjectId: arrived.Token.SubjectId);
+
+                // DEBUG throttled: cos√¨ vedi ‚Äúmuro corto vs muro lungo‚Äù
                 if ((tick.Index % 50) == 0)
                 {
                     ArcontioLogger.Debug(
@@ -133,6 +149,27 @@ namespace Arcontio.Core
             telemetry.Counter("TokenDelivery.DroppedTooWeak", droppedTooWeak);
         }
 
+        /// <summary>
+        /// Seleziona il balloon IN in funzione del tipo di token.
+        ///
+        /// Nota:
+        /// - Default: TokenIn.
+        /// - TheftReport*: balloon dedicati.
+        ///
+        /// SecondarySubjectId nel balloon:
+        /// - Qui lo usiamo come "subject secondario" = ladro (SubjectId del token).
+        ///   Questo √® utile in debug e future UI (es: tooltip "ho sentito che NPC#X √® un ladro").
+        /// </summary>
+        private static NpcBalloonKind GetIncomingBalloonKindForTokenType(TokenType type)
+        {
+            switch (type)
+            {
+                case TokenType.TheftReportVictim: return NpcBalloonKind.TheftReportVictimIn;
+                case TokenType.TheftReportWitness: return NpcBalloonKind.TheftReportWitnessIn;
+                default: return NpcBalloonKind.TokenIn;
+            }
+        }
+
         private static int Manhattan(int ax, int ay, int bx, int by)
         {
             int dx = ax - bx; if (dx < 0) dx = -dx;
@@ -141,7 +178,7 @@ namespace Arcontio.Core
         }
 
         // =========================
-        // LOS ìotticoî (blocca)
+        // LOS ‚Äúottico‚Äù (blocca)
         // =========================
         private static bool HasBlockingLOS(World world, int x0, int y0, int x1, int y1)
         {
@@ -153,7 +190,7 @@ namespace Arcontio.Core
                 if (!blocksVision)
                     continue;
 
-                // v0: se Ë un muro pieno, blocchiamo del tutto
+                // v0: se √® un muro pieno, blocchiamo del tutto
                 float cost = visionCost;
                 if (cost >= 1f)
                     return true;
@@ -188,7 +225,7 @@ namespace Arcontio.Core
         }
 
         // =========================
-        // BFS ìacusticoî (detour)
+        // BFS ‚Äúacustico‚Äù (detour)
         // =========================
         private bool TryGetBfsDistance(World world, int sx, int sy, int tx, int ty, int maxRange, out int outDist)
         {
@@ -226,7 +263,7 @@ namespace Arcontio.Core
 
         private void TryEnqueue(World world, int x, int y, int newDist)
         {
-            // v0: il suono non attraversa muri ìfisiciî
+            // v0: il suono non attraversa muri ‚Äúfisici‚Äù
             // (se vuoi usare BlocksVision invece, cambia qui)
             if (world.TryGetOccluder(x, y, out bool blocksVision, out bool blocksMovement, out float visionCost))
             {
