@@ -1108,9 +1108,17 @@ namespace Arcontio.Core
         /// Contratto: viene chiamato da LandmarkPerceptionSystem dopo Range + Cone + LOS.
         ///
         /// Differenze rispetto a NotifyNpcMovedForLandmarkLearning:
-        /// - impara SOLO il nodo (nessun edge, nessun path recording)
+        /// - impara il nodo E gli edge del registry adiacenti (vedi nota sotto)
         /// - non aggiorna LastVisitedLandmarkId (riservato all'apprendimento fisico)
         /// - non fa avanzare la macro-route (dipende dal movimento fisico)
+        ///
+        /// Nota sugli edge:
+        /// Vedere un landmark (porta, junction) include leggere la geometria circostante:
+        /// l'NPC percepisce visivamente quali corridoi/stanze la struttura connette.
+        /// Gli edge vengono appresi SOLO se esistono nel registry oggettivo
+        /// (stessa regola di NotifyNpcMovedForLandmarkLearning: nessun edge "fantasma").
+        /// Senza questo apprendimento, l'A* della macro-route non ha archi da attraversare
+        /// e il grafo soggettivo rimane disconnesso → fallback permanente a GOAL_LOCAL_SEARCH.
         /// </summary>
         public void NotifyNpcSeenLandmark(int npcId, int nodeId)
         {
@@ -1128,8 +1136,31 @@ namespace Arcontio.Core
             long now = TickContext.CurrentTickIndex;
             var mem = EnsureNpcLandmarkMemory(npcId);
 
-            // Impara solo il nodo (anti-thrashing gestito dentro NpcLandmarkMemory).
+            // Impara il nodo (anti-thrashing gestito dentro NpcLandmarkMemory).
             mem.LearnLandmark(nodeId, now, evictionCooldownTicks: Global.LandmarkEvictionCooldownTicks);
+
+            // Impara gli edge del registry adiacenti al nodo visto.
+            // Itera gli edge globali: gli edge sono pochi (adiacenza sparsa, cap maxEdgesPerLandmark),
+            // quindi O(E) è accettabile ogni tick per questo nodo.
+            var edges = LandmarkRegistry.Edges;
+            for (int i = 0; i < edges.Count; i++)
+            {
+                var e = edges[i];
+                if (e == null || !e.IsActive) continue;
+
+                int otherNodeId = 0;
+                if      (e.FromNodeId == nodeId) otherNodeId = e.ToNodeId;
+                else if (e.ToNodeId   == nodeId) otherNodeId = e.FromNodeId;
+                else continue;
+
+                // Apprendi l'edge solo se l'NPC conosce anche l'altro endpoint.
+                // Un NPC non può usare un corridoio di cui non sa dove porta.
+                if (!mem.ContainsLandmark(otherNodeId))
+                    continue;
+
+                mem.LearnEdge(nodeId, otherNodeId, e.CostCells, now,
+                    evictionCooldownTicks: Global.LandmarkEvictionCooldownTicks);
+            }
         }
 
         // ============================================================
