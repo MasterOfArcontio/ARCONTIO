@@ -64,7 +64,7 @@ namespace Arcontio.Core.Config
         // Quando use_hybrid_extractor=true sostituisce GVD-DIN come generatore LM.
         public HybridLandmarkParams hybrid_landmark = new HybridLandmarkParams();
 
-        // ---------------- Landmark Perception (v0.03.03.a) ----------------
+        // ---------------- Landmark Perception (v0.03.04.a) ----------------
         // Apprendimento visivo dei landmark tramite FOV degli NPC.
         // Complementare al learning fisico (NotifyNpcMovedForLandmarkLearning).
         public LandmarkPerceptionParams landmark_perception = new LandmarkPerceptionParams();
@@ -382,7 +382,7 @@ namespace Arcontio.Core.Config
     }
 
     // ============================================================
-    // LANDMARK PERCEPTION (v0.03.03.a)
+    // LANDMARK PERCEPTION (v0.03.04.a)
     // ============================================================
     [Serializable]
     public sealed class LandmarkPerceptionParams
