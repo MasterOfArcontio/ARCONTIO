@@ -16,18 +16,12 @@ namespace Arcontio.Core
     /// l'NPC ignora landmark visibili davanti a sé perché non li ha ancora calpestati.
     /// </para>
     ///
-    /// <para><b>Pipeline di rilevamento (landmark — senza cono):</b></para>
+    /// <para><b>Pipeline di visione (Arcontio Core Standard v1.0):</b></para>
     /// <list type="number">
     ///   <item><b>Range gate</b> — Manhattan &lt;= visionRange</item>
+    ///   <item><b>Cone gate</b> — <see cref="FovUtils.IsInCone"/></item>
     ///   <item><b>LOS gate</b>  — <c>world.HasLineOfSight</c> (Bresenham)</item>
     /// </list>
-    ///
-    /// <para>
-    /// <b>Perché non c'è il cone gate:</b> i landmark sono feature topologiche statiche
-    /// (porte, junction, area center). L'NPC li percepisce per prossimità in tutte le
-    /// direzioni, non solo davanti a sé. Il cono direzionale è corretto per NPC e oggetti
-    /// (entità da "guardare"), non per strutture architetturali ambientali.
-    /// </para>
     ///
     /// <para>
     /// Per ogni landmark visibile chiama <c>world.NotifyNpcSeenLandmark</c>
@@ -74,6 +68,9 @@ namespace Arcontio.Core
             int visionRange = world.Global.NpcVisionRangeCells;
             if (visionRange <= 0) visionRange = 6;
 
+            bool useCone = world.Global.NpcVisionUseCone;
+            float coneSlope = world.Global.NpcVisionConeSlope;
+
             // Snapshot NPC ids (evita iterazioni su Dictionary mentre qualcuno muta lo state)
             _npcIds.Clear();
             foreach (var kv in world.NpcCore)
@@ -88,6 +85,9 @@ namespace Arcontio.Core
 
                 if (!world.GridPos.TryGetValue(npcId, out var op))
                     continue;
+
+                if (!world.NpcFacing.TryGetValue(npcId, out var facing))
+                    facing = CardinalDirection.North;
 
                 int ox = op.X;
                 int oy = op.Y;
@@ -106,10 +106,13 @@ namespace Arcontio.Core
                     if (dist <= 0 || dist > visionRange)
                         continue;
 
+                    // Cone gate: esclude landmark dietro o lateralmente fuori cono.
+                    // In idle l'NPC ruota in tutte e 4 le direzioni (IdleScanSystem),
+                    // quindi la copertura 360° viene garantita nel tempo.
+                    if (useCone && !FovUtils.IsInCone(ox, oy, facing, nx, ny, coneSlope))
+                        continue;
+
                     // LOS gate: Bresenham sull'OcclusionMap — applicato per ultimo (più costoso).
-                    // Nota: nessun cone gate — i landmark sono feature topologiche statiche
-                    // (porte, junction, area center). L'NPC li percepisce per prossimità
-                    // in tutte le direzioni, non per linea di vista direzionale come NPC/oggetti.
                     if (!world.HasLineOfSight(ox, oy, nx, ny))
                         continue;
 
