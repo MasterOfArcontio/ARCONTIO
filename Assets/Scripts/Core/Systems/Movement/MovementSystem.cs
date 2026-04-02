@@ -4,64 +4,78 @@ using UnityEngine;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // MovementSystem — Patch 0.02.05.B: planning di navigazione spostato qui
+    // =============================================================================
     /// <summary>
-    /// MovementSystem (Day10):
-    /// Consuma MoveIntent e prova ad avanzare di 1 cella per tick.
+    /// <b>MovementSystem</b> — esecuzione fisica del movimento NPC tick per tick.
     ///
-    /// Baseline volutamente semplice (v0.01):
-    /// - distanza Manhattan
-    /// - 1 step per tick
-    /// - collisione minima: non entra fuori bounds, non entra in celle bloccate da movimento,
-    ///   non entra in cella con NPC (1 NPC per cella, standard).
+    /// <para>
+    /// Consuma i <see cref="MoveIntent"/> presenti nel World e prova ad avanzare
+    /// ogni NPC di 1 cella per tick verso la destinazione.
+    /// </para>
     ///
-    /// Questo è sufficiente per:
-    /// - muoversi verso cibo/letto
-    /// - testare occlusione/LOS e witness dei furti
+    /// <para><b>Responsabilità di questo System:</b></para>
+    /// <list type="number">
+    ///   <item><b>Inizializzazione navigazione</b> (Patch 0.02.05.B, solo al primo tick
+    ///         di un nuovo intent via <c>intent.IsNew</c>):
+    ///         sceglie direct path o macro-route landmark, prepara i path debug.</item>
+    ///   <item><b>Avanzamento macro-route</b>: quando l'NPC raggiunge un nodo
+    ///         intermedio, avanza al nodo successivo.</item>
+    ///   <item><b>Selezione target effettivo</b>: target finale o prossimo waypoint
+    ///         landmark a seconda della strategia attiva.</item>
+    ///   <item><b>Esecuzione passo fisico</b>: step greedy (asse con distanza maggiore)
+    ///         con fallback sull'altro asse.</item>
+    ///   <item><b>Local search</b>: se il greedy fallisce, bounded search locale
+    ///         per aggirare piccoli ostacoli.</item>
+    ///   <item><b>Stuck detection</b>: se l'NPC non avanza per N tick consecutivi,
+    ///         cancella l'intent per sbloccare il re-plan delle Rule.</item>
+    ///   <item><b>Target validation</b>: se l'oggetto target scompare o si sposta,
+    ///         cancella l'intent.</item>
+    ///   <item><b>Landmark learning</b>: notifica <c>World.NotifyNpcMovedForLandmarkLearning</c>
+    ///         ad ogni passo riuscito.</item>
+    /// </list>
     ///
-    /// In futuro:
-    /// - pathfinding
-    /// - gestione porte (auto-open durante MoveTo)
-    /// - NpcMovedEvent / PerceptionDirty event-driven
-    ///
-    /// PATCH NOTE (runtime fix):
-    /// - Introduciamo "stuck detection" per MoveIntent:
-    ///   se il target cell è occupato o il movimento fallisce ripetutamente,
-    ///   dopo N tick cancelliamo l'intento (così le Rules possono re-plan).
-    /// - Introduciamo anche "target validation" per TargetObjectId:
-    ///   se l'oggetto target scompare / viene consumato / si sposta altrove,
-    ///   cancelliamo l'intento perché la cella target non è più significativa.
-    /// 
-    /// Motivazione:
-    /// - Con lo standard "1 NPC per cella", è frequente che un NPC insegua una cella
-    ///   che nel frattempo diventa occupata (es. stock cibo su cui un altro NPC sta mangiando).
-    /// - Senza invalidazione, l'NPC rimane piantato con intent attivo verso una cella
-    ///   irraggiungibile, anche se esistono target alternativi.
+    /// <para><b>Patch 0.02.05.B:</b></para>
+    /// <para>
+    /// Il planning di navigazione (scelta direct/macro-route, costruzione path debug)
+    /// è stato spostato da <c>SetMoveIntentCommand</c> a questo System, nel metodo
+    /// <see cref="InitializeNavigation"/>. Viene eseguito solo al primo tick di ogni
+    /// nuovo intent (<c>intent.IsNew == true</c>).
+    /// </para>
     /// </summary>
     public sealed class MovementSystem : ISystem
     {
         public int Period => 1;
 
-        // IMPORTANTISSIMO (design + debug):
-        // Questi valori dovrebbero essere letti da config (game_params.json).
-        // Per ora li teniamo qui come baseline sicura per chiudere un bug runtime.
-        // Step successivo (5.1/6A) potrà renderli data-driven.
+        // =====================================================================
+        // COSTANTI DI CONFIGURAZIONE
+        // =====================================================================
+        // TODO: in futuro leggere queste da game_params.json.
+        // Per ora sono costanti compile-time come baseline sicura.
+
+        /// <summary>
+        /// Numero di tick consecutivi di blocco dopo i quali l'intent viene cancellato.
+        /// Serve a sbloccare la simulazione quando un NPC è impossibilitato ad avanzare.
+        /// </summary>
         private const int DefaultIntentStuckTicks = 12;
 
-        // Ogni quanti tick rivalutiamo la validità dell'oggetto target (TargetObjectId).
-        // 1 = ogni tick (più robusto, un po' più costoso ma N è piccolo in Day10).
+        /// <summary>
+        /// Ogni quanti tick si rivaluta la validità dell'oggetto target.
+        /// 1 = ogni tick (più robusto, costo trascurabile con pochi NPC).
+        /// </summary>
         private const int DefaultTargetValidateEveryTicks = 1;
 
-        // PATCH 0.02.05.3:
-        // La ricerca locale non usa più un budget hardcoded puro.
-        // Il valore di fallback resta solo difensivo se per qualche motivo il config non è disponibile.
+        /// <summary>
+        /// Budget di fallback per la bounded search locale.
+        /// Usato solo se il config non è disponibile (difesa estrema).
+        /// </summary>
         private const int DefaultBoundedSearchVisited = 256;
 
         private static Arcontio.Core.Config.LandmarkLocalSearchParams GetLocalSearchConfig(World world)
         {
-            // Difesa estrema: in runtime normale world.Config e Sim devono esistere.
             if (world?.Config?.Sim?.landmarks?.localSearch != null)
                 return world.Config.Sim.landmarks.localSearch;
-
             return new Arcontio.Core.Config.LandmarkLocalSearchParams();
         }
 
@@ -71,9 +85,43 @@ namespace Arcontio.Core
             return Mathf.Max(1, cfg.maxExpandedNodes);
         }
 
+        // ── MOVEMENT CONFIG HELPERS (Patch 0.02.07.A) ───────────────────────
+
+        /// <summary>
+        /// Legge i parametri di movimento da game_params.json (sezione "movement").
+        /// Fallback sicuro se la config non è disponibile.
+        /// </summary>
+        private static Arcontio.Core.Config.MovementParams GetMovementConfig(World world)
+        {
+            if (world?.Config?.Sim?.movement != null)
+                return world.Config.Sim.movement;
+            return new Arcontio.Core.Config.MovementParams();
+        }
+
+        /// <summary>
+        /// Lunghezza del prefix committed per il direct path.
+        /// Da game_params.json → movement.directPrefixCells.
+        /// </summary>
+        private static int GetDirectPrefixCells(World world)
+        {
+            return Mathf.Max(1, GetMovementConfig(world).directPrefixCells);
+        }
+
+        /// <summary>
+        /// True se l'acquisizione del direct richiede il check FOV sul target.
+        /// Da game_params.json → movement.directCheckFovOnAcquisition.
+        /// </summary>
+        private static bool GetDirectCheckFov(World world)
+        {
+            return GetMovementConfig(world).directCheckFovOnAcquisition;
+        }
+
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
-             // Nota: iteriamo su NpcCore.Keys (source of truth degli NPC esistenti)
+            // Carico i parametri di movimento che ci dicono quante celle della mappa posso utilizzare prima di andare in timeout
+            var DefaultIntentStuckTicks = world.Config.Sim.movement?.intentStuckTicksDefault ?? 12;
+
+            // Nota: iteriamo su NpcCore.Keys (source of truth degli NPC esistenti)
             foreach (var npcId in world.NpcCore.Keys)
             {
                 if (!world.NpcMoveIntents.TryGetValue(npcId, out var intent) || !intent.Active)
@@ -81,19 +129,91 @@ namespace Arcontio.Core
                 if (!world.GridPos.TryGetValue(npcId, out var pos))
                     continue;
 
-                // Day5: se esiste una macro-route in esecuzione, prima di qualsiasi altra cosa
-                // proviamo a far avanzare lo stato rispetto alla cella corrente.
-                // Questo gestisce correttamente il caso in cui l'NPC parta gia' sopra lo start landmark
-                // oppure entri sul prossimo landmark e debba immediatamente passare allo step successivo.
+                // ============================================================
+                // PATCH 0.02.05.B: Inizializzazione navigazione (solo primo tick)
+                // ============================================================
+                // Se l'intent è nuovo (appena scritto da SetMoveIntentCommand),
+                // questo è il momento in cui scegliamo la strategia di navigazione:
+                // - direct path: il target è raggiungibile con il greedy locale?
+                // - macro-route landmark: serve passare per nodi intermedi?
+                // Dopo l'inizializzazione, IsNew viene azzerato per non ripetere.
+                if (intent.IsNew)
+                {
+                    InitializeNavigation(world, npcId, ref intent);
+                    world.NpcMoveIntents[npcId] = intent;
+                }
+
+                // Avanza lo stato della macro-route se l'NPC è su un nodo landmark.
                 world.TryAdvanceMacroRouteExecutionAtCell(npcId, pos.X, pos.Y);
 
-                // PATCH 0.02.05.2f:
-                // gerarchia corretta di navigazione:
-                // 1) se il target finale è raggiungibile con un vero path diretto coerente col movimento reale,
-                //    il direct commit ha PRIORITÀ ASSOLUTA e i landmark non devono interferire;
-                // 2) se il target finale non è diretto, usiamo la macro-route landmark se presente;
-                // 3) se nemmeno il landmark immediato è direttamente raggiungibile, più avanti proveremo una
-                //    ricerca locale bounded verso il target effettivo del tick.
+                // ── LAST-MILE → DIRECT PERCETTIVO (Patch 0.02.07.A) ──────────
+                // Quando si entra in last-mile (raggiunto l'ultimo nodo LM),
+                // il documento "Commitment Percettivo" richiede che il tratto
+                // finale verso la destinazione sia trattato come una nuova
+                // acquisizione direct (Regola 1 + prefix commitment).
+                //
+                // Se il target finale è percettivamente visibile dal nodo LM
+                // appena raggiunto → si avvia un prefix commitment direct:
+                //   - NavMode → DIRECT_APPROACHING
+                //   - DirectPrefixStepsRemaining → directPrefixCells
+                //   - il tratto finale usa il greedy diretto con rinnovo FOV
+                //
+                // Se non è visibile → si resta in LAST_MILE greedy (fallback):
+                //   il greedy+local search si occupa di trovare il target.
+                // Patch 0.02.07.B: flag per comunicare al blocco prefix sotto
+                // che la conversione last-mile→direct è avvenuta in questo tick.
+                bool lastMileJustConverted = false;
+
+                if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var lmState)
+                    && lmState != null
+                    && lmState.IsDoingLastMile
+                    && lmState.NavigationMode == "LAST_MILE"
+                    && lmState.DirectPrefixStepsRemaining == 0)
+                {
+                    int lmTargetX = lmState.FinalTargetCellX;
+                    int lmTargetY = lmState.FinalTargetCellY;
+
+                    bool checkFovLm  = GetDirectCheckFov(world);
+                    bool lmVisible   = !checkFovLm
+                                       || CanAcquireDirectPerceptually(world, npcId, lmTargetX, lmTargetY);
+                    bool lmPathClear = lmVisible
+                                       && MovementPathfinder.CanNpcUseDirectPath(world, npcId, lmTargetX, lmTargetY);
+
+                    if (lmPathClear)
+                    {
+                        // Target finale visibile e path libero:
+                        // converti il last-mile in un direct con prefix commitment.
+                        int lmPrefixLen = Mathf.Min(GetDirectPrefixCells(world),
+                            Mathf.Abs(lmTargetX - pos.X) + Mathf.Abs(lmTargetY - pos.Y));
+                        lmState.NavigationMode              = "DIRECT_APPROACHING";
+                        lmState.LastModeSwitchTick          = (int)TickContext.CurrentTickIndex;
+                        lmState.LastModeSwitchReason        = "LastMileConvertedToDirect";
+                        lmState.DirectPrefixStepsRemaining  = Mathf.Max(1, lmPrefixLen);
+                        // IsDoingLastMile rimane true per mantenere la semantica
+                        // "siamo nel tratto finale" — ma ora il controllo lo gestisce
+                        // il prefix commitment invece del greedy LM.
+                        world.Pathfinding.MacroRouteExecution[npcId] = lmState;
+                        // Patch 0.02.07.B — Bug 2 fix:
+                        // Segnala che in questo stesso tick la conversione è avvenuta.
+                        // Il blocco allowPrefix sotto deve saperlo per attivare
+                        // inPrefixCommitment=true senza dover attendere il tick successivo.
+                        lastMileJustConverted = true;
+                    }
+                    // else: LAST_MILE greedy — il sistema procede normalmente.
+                }
+
+                // ============================================================
+                // GERARCHIA DI NAVIGAZIONE (runtime, ogni tick)
+                // ============================================================
+                // 1) Direct path con prefix commitment (priorità assoluta):
+                //    a) Se abbiamo ancora passi del prefix committed → esecuzione
+                //       inerziale: non ricontrolliamo la visibilità completa,
+                //       solo la traversabilità della prossima cella (Regola 3 doc).
+                //    b) Se il prefix è terminato → rivalutiamo l'acquisizione
+                //       (Regola 4 doc): se il target è ancora visibile rinnovo,
+                //       altrimenti passiamo alla macro-route.
+                // 2) Macro-route landmark: se il direct non è disponibile.
+                // 3) Local search bounded: fallback per ostacoli locali.
                 int finalTargetX = intent.TargetX;
                 int finalTargetY = intent.TargetY;
                 int effectiveTargetX = finalTargetX;
@@ -102,13 +222,85 @@ namespace Arcontio.Core
                 int macroNextNodeId = 0;
                 bool usingMacroImmediate = false;
 
-                if (!world.CanNpcUseDirectPath(npcId, finalTargetX, finalTargetY))
+                // ── PREFIX COMMITMENT RUNTIME (Patch 0.02.07.A) ──────────────
+                // Gestisce le regole 3 e 4 del documento "Commitment Percettivo".
+                // IMPORTANTE: il prefix NON si applica durante il last-mile.
+                // Il last-mile viene sempre gestito dalla macro-route (usingMacroImmediate).
+                bool inPrefixCommitment = false;
+                bool isInLastMile = world.Pathfinding.MacroRouteExecution
+                    .TryGetValue(npcId, out var execStateCheck)
+                    && execStateCheck != null && execStateCheck.IsDoingLastMile;
+
+                // Il prefix commitment si applica quando:
+                //   a) Non siamo in last-mile (percorso normal direct), oppure
+                //   b) Siamo in last-mile MA con NavMode DIRECT_APPROACHING
+                //      (last-mile convertito a direct percettivo).
+                // allowPrefix=true se:
+                //   a) Non siamo in last-mile, oppure
+                //   b) Siamo in last-mile con NavMode già DIRECT_APPROACHING (tick precedenti), oppure
+                //   c) La conversione last-mile→direct è avvenuta in QUESTO tick (lastMileJustConverted).
+                bool allowPrefix = !isInLastMile
+                    || lastMileJustConverted
+                    || (isInLastMile
+                        && world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var lmPrefCheck)
+                        && lmPrefCheck != null
+                        && lmPrefCheck.NavigationMode == "DIRECT_APPROACHING");
+
+                if (allowPrefix)
                 {
-                    if (world.TryGetMacroExecutionImmediateTarget(npcId, out int macroTargetX, out int macroTargetY, out macroLastMile, out macroNextNodeId))
+                    if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var execState)
+                        && execState != null && execState.DirectPrefixStepsRemaining > 0)
                     {
-                        effectiveTargetX = macroTargetX;
-                        effectiveTargetY = macroTargetY;
-                        usingMacroImmediate = true;
+                        // Regola 3: siamo nel prefix → esecuzione inerziale verso finalTarget.
+                        inPrefixCommitment = true;
+                    }
+                    else if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var execState2)
+                             && execState2 != null && execState2.DirectPrefixStepsRemaining == 0
+                             && execState2.NavigationMode == "DIRECT_APPROACHING")
+                    {
+                        // Prefix terminato: Regola 4 → rivaluta acquisizione.
+                        bool checkFovRenew  = GetDirectCheckFov(world);
+                        bool canRenew       = !checkFovRenew
+                                             || CanAcquireDirectPerceptually(world, npcId, finalTargetX, finalTargetY);
+                        bool pathStillClear = canRenew
+                                             && MovementPathfinder.CanNpcUseDirectPath(world, npcId, finalTargetX, finalTargetY);
+
+                        if (pathStillClear)
+                        {
+                            execState2.DirectPrefixStepsRemaining = GetDirectPrefixCells(world);
+                            world.Pathfinding.MacroRouteExecution[npcId] = execState2;
+                            inPrefixCommitment = true;
+                        }
+                        // else: esci dal direct, torna al greedy LM last-mile.
+                    }
+                }
+
+                // Se non siamo in prefix commitment, selezioniamo il target normalmente.
+                if (!inPrefixCommitment)
+                {
+                    if (!MovementPathfinder.CanNpcUseDirectPath(world, npcId, finalTargetX, finalTargetY))
+                    {
+                        if (world.TryGetMacroExecutionImmediateTarget(npcId, out int macroTargetX, out int macroTargetY, out macroLastMile, out macroNextNodeId))
+                        {
+                            effectiveTargetX = macroTargetX;
+                            effectiveTargetY = macroTargetY;
+                            usingMacroImmediate = true;
+                        }
+                    }
+                    else if (!isInLastMile)
+                    {
+                        // Fix bug 3: il target è raggiungibile direttamente ma il NavMode
+                        // potrebbe essere rimasto APPROACHING_LM da un piano LM precedente.
+                        // Forziamo DIRECT_APPROACHING per allineare card e comportamento reale.
+                        if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var fixState)
+                            && fixState != null
+                            && fixState.NavigationMode == "APPROACHING_LM")
+                        {
+                            fixState.NavigationMode       = "DIRECT_APPROACHING";
+                            fixState.LastModeSwitchTick   = (int)TickContext.CurrentTickIndex;
+                            fixState.LastModeSwitchReason = "DirectOverrideLm";
+                            world.Pathfinding.MacroRouteExecution[npcId] = fixState;
+                        }
                     }
                 }
 
@@ -146,11 +338,24 @@ namespace Arcontio.Core
                     intent.BlockedTicks = 0;
                     world.NpcMoveIntents[npcId] = intent;
 
-                    // Manteniamo il path debug gia' disegnato ma spegniamo gli stati runtime
-                    // direct/local search, cosi' la card non resta bloccata su una modalita'
-                    // ormai conclusa.
+                    // Fix 0.02.07.A bug 4: pulisci tutti i debug path al completamento.
+                    // Prima li mantenevamo "per mostrare l'ultimo percorso", ma questo
+                    // causava linee residue persistenti dopo l'arrivo.
+                    world.ClearDebugNavigationPathsForNpc(npcId);
                     world.ClearNpcLocalSearchState(npcId, string.Empty);
                     world.ClearNpcDirectCommitState(npcId, string.Empty);
+
+                    // Fix 0.02.07.A bug 3: azzera NavigationMode e DirectPrefixStepsRemaining
+                    // così il prossimo intent parte da uno stato pulito.
+                    if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var doneState)
+                        && doneState != null)
+                    {
+                        doneState.NavigationMode           = string.Empty;
+                        doneState.DirectPrefixStepsRemaining = 0;
+                        doneState.Active                   = false;
+                        world.Pathfinding.MacroRouteExecution[npcId] = doneState;
+                    }
+
                     world.SetNpcIdle(npcId);
                     continue;
                 }
@@ -161,7 +366,7 @@ namespace Arcontio.Core
                 // Se una local search e' attiva, e' LEI la proprietaria del movimento.
                 // Non vogliamo che nello stesso tick la macro-navigation landmark si riprenda
                 // il controllo, altrimenti nasce il ping-pong LM_PATH <-> GOAL_LOCAL_SEARCH.
-                if (world.HasActiveNpcLocalSearch(npcId))
+                if (MovementPathfinder.HasActiveNpcLocalSearch(world, npcId))
                 {
                     // ============================================================
                     // PATCH 0.02.02S - local search difensiva senza deadlock
@@ -185,11 +390,11 @@ namespace Arcontio.Core
                     int localToX = x;
                     int localToY = y;
 
-                    bool hasLocalStep = world.TryGetActiveNpcLocalSearchNextStep(npcId, out int localStepX, out int localStepY);
+                    bool hasLocalStep = MovementPathfinder.TryGetActiveNpcLocalSearchNextStep(world, npcId, out int localStepX, out int localStepY);
                     if (!hasLocalStep)
                     {
-                        hasLocalStep = world.TryReplanNpcLocalSearch(npcId, x, y)
-                            && world.TryGetActiveNpcLocalSearchNextStep(npcId, out localStepX, out localStepY);
+                        hasLocalStep = MovementPathfinder.TryReplanNpcLocalSearch(world, npcId, x, y)
+                            && MovementPathfinder.TryGetActiveNpcLocalSearchNextStep(world, npcId, out localStepX, out localStepY);
                     }
 
                     if (hasLocalStep && TryMoveTo(world, npcId, localStepX, localStepY))
@@ -198,8 +403,8 @@ namespace Arcontio.Core
                         localToX = localStepX;
                         localToY = localStepY;
                     }
-                    else if (world.TryReplanNpcLocalSearch(npcId, x, y)
-                        && world.TryGetActiveNpcLocalSearchNextStep(npcId, out localStepX, out localStepY)
+                    else if (MovementPathfinder.TryReplanNpcLocalSearch(world, npcId, x, y)
+                        && MovementPathfinder.TryGetActiveNpcLocalSearchNextStep(world, npcId, out localStepX, out localStepY)
                         && TryMoveTo(world, npcId, localStepX, localStepY))
                     {
                         localMoved = true;
@@ -210,7 +415,7 @@ namespace Arcontio.Core
                     if (localMoved)
                     {
                         world.NotifyNpcMovedForLandmarkLearning(npcId, fromX: x, fromY: y, toX: localToX, toY: localToY);
-                        world.AdvanceNpcLocalSearchAfterSuccessfulStep(npcId, x, y, localToX, localToY);
+                        MovementPathfinder.AdvanceNpcLocalSearchAfterSuccessfulStep(world, npcId, x, y, localToX, localToY);
                         intent.BlockedTicks = 0;
                         world.NpcMoveIntents[npcId] = intent;
                         continue;
@@ -257,7 +462,7 @@ namespace Arcontio.Core
                 // proviamo comunque a capire se quel landmark è almeno direttamente raggiungibile.
                 // Questo non cambia ancora il comportamento, ma rende molto più leggibili i log
                 // e documenta la distinzione tra "macro target valido" e "macro target localmente accessibile".
-                bool effectiveTargetHasDirectPath = world.CanNpcUseDirectPath(npcId, effectiveTargetX, effectiveTargetY);
+                bool effectiveTargetHasDirectPath = MovementPathfinder.CanNpcUseDirectPath(world, npcId, effectiveTargetX, effectiveTargetY);
 
                 // Tentativo 1: step scelto
                 if (TryMoveTo(world, npcId, x + stepX, y + stepY))
@@ -303,7 +508,7 @@ namespace Arcontio.Core
                 if (!moved)
                 {
                     var fallbackPath = new System.Collections.Generic.List<Vector2Int>(64);
-                    if (world.TryBuildBoundedMovePath(npcId, x, y, effectiveTargetX, effectiveTargetY, GetLocalSearchVisitedBudget(world), fallbackPath)
+                    if (MovementPathfinder.TryBuildBoundedMovePath(world, npcId, x, y, effectiveTargetX, effectiveTargetY, GetLocalSearchVisitedBudget(world), fallbackPath)
                         && fallbackPath.Count >= 2)
                     {
                         int remainingBudget = Mathf.Max(0, GetLocalSearchVisitedBudget(world) - fallbackPath.Count);
@@ -316,7 +521,7 @@ namespace Arcontio.Core
                             movedUsingLocalSearch = true;
                             movedToX = next.x;
                             movedToY = next.y;
-                            world.AdvanceNpcLocalSearchAfterSuccessfulStep(npcId, x, y, next.x, next.y);
+                            MovementPathfinder.AdvanceNpcLocalSearchAfterSuccessfulStep(world, npcId, x, y, next.x, next.y);
                         }
                     }
                 }
@@ -340,16 +545,38 @@ namespace Arcontio.Core
 
                     if (!movedUsingLocalSearch)
                     {
-                        if (usingMacroImmediate)
+                        // Patch 0.02.07.B — Bug 1 fix:
+                        // Se usingMacroImmediate=true ma IsApproachingFirstLm=true,
+                        // l'NPC sta ancora raggiungendo il primo LM (tratto approaching).
+                        // In questo tratto i passi sono di tipo DIRECT (azzurro),
+                        // non LM_PATH (arancione). La transizione a LM_PATH avviene
+                        // solo dopo aver fisicamente raggiunto il primo nodo.
+                        bool isApproaching = usingMacroImmediate
+                            && world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var approachState)
+                            && approachState != null && approachState.IsApproachingFirstLm;
+
+                        if (usingMacroImmediate && !isApproaching)
                         {
+                            // Tratto LM→LM (o last-mile greedy): segmento arancione.
                             world.AppendDebugLmStepForNpc(npcId, x, y, movedToX, movedToY);
                             world.ClearNpcLocalSearchState(npcId, string.Empty);
                             world.ClearNpcDirectCommitState(npcId, string.Empty);
                         }
                         else
                         {
+                            // Tratto direct (approaching, prefix commitment, last-mile direct):
+                            // segmento azzurro.
                             world.AppendDebugDirectStepForNpc(npcId, x, y, movedToX, movedToY);
                             world.ClearNpcLocalSearchState(npcId, string.Empty);
+
+                            // Decrementa il prefix commitment se attivo.
+                            if (inPrefixCommitment
+                                && world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var ps)
+                                && ps != null && ps.DirectPrefixStepsRemaining > 0)
+                            {
+                                ps.DirectPrefixStepsRemaining--;
+                                world.Pathfinding.MacroRouteExecution[npcId] = ps;
+                            }
                         }
                     }
 
@@ -400,11 +627,161 @@ namespace Arcontio.Core
             }
         }
 
+        // =====================================================================
+        // INIZIALIZZAZIONE NAVIGAZIONE (Patch 0.02.05.B / 0.02.07.A)
+        // =====================================================================
+
+        /// <summary>
+        /// Verifica se il TARGET è percettivamente acquisibile per il direct path.
+        ///
+        /// A differenza di <see cref="MovementPathfinder.CanNpcUseDirectPath"/>
+        /// (che verifica la traversabilità dell'intero path), questo metodo verifica
+        /// che il TARGET STESSO sia visibile dall'NPC (Range + FOV + LOS),
+        /// come richiesto dalla regola 1 del documento "Commitment Percettivo".
+        ///
+        /// Solo se directCheckFovOnAcquisition = true in game_params.json.
+        /// </summary>
+        private static bool CanAcquireDirectPerceptually(
+            World world, int npcId, int targetX, int targetY)
+        {
+            if (!world.GridPos.TryGetValue(npcId, out var pos))
+                return false;
+
+            // Legge parametri visivi dall'NPC
+            int   visionRange = world.Global.NpcVisionRangeCells;
+            if (visionRange <= 0) visionRange = 6;
+            bool  useCone   = world.Global.NpcVisionUseCone;
+            float coneSlope = world.Global.NpcVisionConeSlope;
+
+            if (!world.NpcFacing.TryGetValue(npcId, out var facing))
+                facing = CardinalDirection.North;
+
+            // Pipeline canonica: Range → Cone/Front → LOS (uguale a ObjectPerceptionSystem)
+            return FovUtils.IsVisible(world, pos.X, pos.Y, facing,
+                                      targetX, targetY,
+                                      visionRange, useCone, coneSlope);
+        }
+
+        /// <summary>
+        /// Inizializza la strategia di navigazione per un nuovo intent.
+        ///
+        /// <para>
+        /// Viene chiamata <b>una sola volta</b> per ogni intent, al primo tick
+        /// in cui il MovementSystem lo processa (quando <c>intent.IsNew == true</c>).
+        /// Al termine imposta <c>intent.IsNew = false</c>.
+        /// </para>
+        ///
+        /// <para><b>Logica di selezione (Patch 0.02.05.B):</b></para>
+        /// <list type="number">
+        ///   <item>
+        ///     Se <c>CanNpcUseDirectPath</c> ritorna true: il target è raggiungibile
+        ///     con il greedy locale senza ostacoli. Prepara il debug path diretto
+        ///     e pulisce la macro-route (non serve).
+        ///   </item>
+        ///   <item>
+        ///     Altrimenti: avvia la macro-route landmark
+        ///     (<c>BeginMacroRouteExecutionForNpc</c>). Se la macro-route non
+        ///     è disponibile (NPC non conosce landmark), prepara un prefix path
+        ///     diretto come fallback visivo per la card.
+        ///   </item>
+        /// </list>
+        ///
+        /// <para>
+        /// NOTA: questa logica era precedentemente in <c>SetMoveIntentCommand</c>,
+        /// dove violava il contratto del Command (un Command non deve fare planning).
+        /// </para>
+        /// </summary>
+        private static void InitializeNavigation(World world, int npcId, ref MoveIntent intent)
+        {
+            // Marca subito come inizializzato: anche se fallisse tutto,
+            // non vogliamo ripetere l'inizializzazione al tick successivo.
+            intent.IsNew = false;
+
+            if (!world.GridPos.TryGetValue(npcId, out var pos))
+                return;
+
+            int targetX = intent.TargetX;
+            int targetY = intent.TargetY;
+
+            // ── ACQUISIZIONE DIRECT (Patch 0.02.07.A) ────────────────────────
+            // Regola 1 documento "Commitment Percettivo":
+            //   direct = target visibile (Range+FOV+LOS) + path traversabile greedy.
+            //
+            // Se directCheckFovOnAcquisition=true (game_params.json): verifica prima
+            // che il target sia percettivamente visibile, poi che il path sia libero.
+            // Se false: usa solo la traversabilità greedy (modalità legacy).
+            bool checkFov     = GetDirectCheckFov(world);
+            bool targetVisible = !checkFov || CanAcquireDirectPerceptually(world, npcId, targetX, targetY);
+            bool pathClear     = targetVisible && MovementPathfinder.CanNpcUseDirectPath(world, npcId, targetX, targetY);
+
+            if (pathClear)
+            {
+                // ── DIRECT PATH con PREFIX COMMITMENT ────────────────────────
+                // Regola 2: costruisci un prefix path breve (directPrefixCells)
+                // e imposta il contatore PrefixStepsRemaining nello stato esecutivo.
+                // L'NPC eseguirà questo prefix senza ricontrollare la visibilità
+                // completa (solo traversabilità della prossima cella per step).
+                world.ClearDebugMacroRouteForNpc(npcId);
+
+                var directPath = new System.Collections.Generic.List<UnityEngine.Vector2Int>(32);
+                if (MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, pos.X, pos.Y, targetX, targetY, directPath))
+                {
+                    world.SetDebugDirectPathForNpc(npcId, directPath);
+
+                    // Inizializza il prefix commitment.
+                    // Fix 0.02.07.A bug 3: se MacroRouteExecution non esiste (percorso
+                    // puramente direct senza LM), crea uno stato minimo per ospitare
+                    // il contatore PrefixStepsRemaining.
+                    int prefixLen = Mathf.Min(GetDirectPrefixCells(world), directPath.Count - 1);
+                    if (!world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macroState)
+                        || macroState == null)
+                    {
+                        macroState = new NpcMacroRouteExecutionState
+                        {
+                            Active                    = true,
+                            NavigationMode            = "DIRECT_APPROACHING",
+                            LastModeSwitchTick        = (int)TickContext.CurrentTickIndex,
+                            LastModeSwitchReason      = "DirectInit",
+                            DirectPrefixStepsRemaining = prefixLen,
+                        };
+                    }
+                    else
+                    {
+                        macroState.DirectPrefixStepsRemaining = prefixLen;
+                        macroState.NavigationMode             = "DIRECT_APPROACHING";
+                    }
+                    world.Pathfinding.MacroRouteExecution[npcId] = macroState;
+                }
+            }
+            else
+            {
+                // ============================================================
+                // MACRO-ROUTE: serve passare per nodi landmark intermedi
+                // ============================================================
+                // Avvia A* sul grafo soggettivo + inizializza stato esecutivo.
+                world.BeginMacroRouteExecutionForNpc(npcId, targetX, targetY);
+
+                // Fallback: se la macro-route non è disponibile (NPC senza landmark),
+                // prepara un prefix path diretto come debug visivo per la card.
+                if (!world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macroState)
+                    || macroState == null
+                    || !macroState.Active)
+                {
+                    var directPrefix = new System.Collections.Generic.List<UnityEngine.Vector2Int>(32);
+                    if (MovementPathfinder.TryBuildGreedyDirectPrefixPath(world, npcId, pos.X, pos.Y, targetX, targetY, directPrefix))
+                        world.SetDebugDirectPathForNpc(npcId, directPrefix);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Determina se questo tick è il tick corretto per rivalutare la validità
+        /// dell'oggetto target (throttle: ogni DefaultTargetValidateEveryTicks tick).
+        /// </summary>
         private static bool ShouldValidateTargetThisTick(Tick tick)
         {
-            // Nota: Tick non è necessariamente un int; non conosciamo la tua implementazione.
-            // Per evitare dipendenze, usiamo il TickContext globale che già usi per logging.
-            // Se DefaultTargetValidateEveryTicks == 1 -> sempre true.
+            // Usiamo TickContext (globale) invece del parametro tick per coerenza
+            // con il resto del codebase. Se DefaultTargetValidateEveryTicks == 1: sempre true.
             int t = (int)TickContext.CurrentTickIndex;
             return DefaultTargetValidateEveryTicks <= 1 || (t % DefaultTargetValidateEveryTicks) == 0;
         }

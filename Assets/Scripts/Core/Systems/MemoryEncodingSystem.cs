@@ -105,7 +105,8 @@ namespace Arcontio.Core
                         if (!world.GridPos.TryGetValue(npcId, out var p))
                             continue;
 
-                        int dist = Manhattan(p.X, p.Y, evX, evY);
+                        // Patch 0.02.5A: FovUtils.Manhattan è la fonte canonica
+                            int dist = FovUtils.Manhattan(p.X, p.Y, evX, evY);
 
                         if (dist > visionRange)
                             continue;
@@ -116,7 +117,10 @@ namespace Arcontio.Core
                             if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                                 facing = CardinalDirection.North;
 
-                            if (!IsInCone(p.X, p.Y, facing, evX, evY, coneHalfWidthPerStep))
+                            // Patch 0.02.5A: delega a FovUtils.IsInCone (fonte canonica).
+                            // Corregge anche i segni errati del caso South/East presenti
+                            // nella vecchia versione locale di IsInCone.
+                            if (!FovUtils.IsInCone(p.X, p.Y, facing, evX, evY, coneHalfWidthPerStep))
                                 continue;
                         }
 
@@ -239,12 +243,7 @@ namespace Arcontio.Core
             telemetry.Counter("MemoryEncodingSystem.TracesAdded", tracesAdded);
         }
 
-        private static int Manhattan(int ax, int ay, int bx, int by)
-        {
-            int dx = ax - bx; if (dx < 0) dx = -dx;
-            int dy = ay - by; if (dy < 0) dy = -dy;
-            return dx + dy;
-        }
+        // Patch 0.02.5A: Manhattan rimosso — usa FovUtils.Manhattan
 
         // ============================================================
         // Patch 0.01P3 extension: Theft communication (event-driven tokens)
@@ -487,65 +486,21 @@ namespace Arcontio.Core
             return 0.35f;
         }
 
+        // Patch 0.02.5A: IsInCone rimosso — usa FovUtils.IsInCone.
+        // NOTA: la vecchia implementazione aveva i segni di 'side' errati per
+        // i casi South (side=dx invece di -dx) ed East (side=dy invece di -dy).
+        // FovUtils.IsInCone usa i segni corretti (bug corretto in 0.02.5A).
+
         /// <summary>
-        /// IsInCone:
-        /// Cono in griglia deterministico, basato su:
-        /// - forward: quanto è davanti (deve essere > 0)
-        /// - side: quanto è laterale (|side| <= forward * coneHalfWidthPerStep)
+        /// Verifica se la LOS tra due punti è bloccata da un occluder.
         ///
-        /// coneHalfWidthPerStep:
-        /// - 0.0  => solo linea frontale
-        /// - 0.5  => cono stretto
-        /// - 1.0  => cono ampio (?45° su griglia)
-        /// </summary>
-        private static bool IsInCone(int sx, int sy, CardinalDirection facing, int tx, int ty, float coneHalfWidthPerStep)
-        {
-            int dx = tx - sx;
-            int dy = ty - sy;
-
-            int forward, side;
-
-            switch (facing)
-            {
-                case CardinalDirection.North:
-                    forward = dy;
-                    side = dx;
-                    break;
-
-                case CardinalDirection.South:
-                    forward = -dy;
-                    side = dx;
-                    break;
-
-                case CardinalDirection.East:
-                    forward = dx;
-                    side = dy;
-                    break;
-
-                case CardinalDirection.West:
-                    forward = -dx;
-                    side = dy;
-                    break;
-
-                default:
-                    forward = dy;
-                    side = dx;
-                    break;
-            }
-
-            // Deve essere davanti
-            if (forward <= 0) return false;
-
-            // side <= forward * slope
-            float limit = forward * coneHalfWidthPerStep;
-            if (side < 0) side = -side;
-
-            return side <= limit + 0.0001f;
-        }
-
-        /// <summary>
-        /// LOS blocking:
-        /// true se una cella tra start e target blocca la visione.
+        /// <para>
+        /// NOTA: questo metodo è mantenuto localmente perché <c>MemoryEncodingSystem</c>
+        /// non riceve <c>World</c> come campo — lo riceve solo in <c>Update</c>.
+        /// La logica replica intenzionalmente <c>World.HasLineOfSight</c> (Bresenham).
+        /// In futuro, quando il System riceverà un riferimento stabile al World,
+        /// si potrà unificare delegando a <c>world.HasLineOfSight</c>.
+        /// </para>
         /// </summary>
         private static bool HasBlockingLOS(World world, int x0, int y0, int x1, int y1)
         {

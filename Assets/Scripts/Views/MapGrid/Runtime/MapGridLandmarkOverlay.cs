@@ -7,64 +7,105 @@ namespace Arcontio.View.MapGrid
     /// <summary>
     /// Debug overlay per il sistema Landmark.
     ///
-    /// Day5 patch:
-    /// - mantiene i tre layer gia' esistenti (WORLD / KNOWN / ROUTE)
-    /// - aggiunge per ogni nodo una piccola label world-space con ID/tipo
-    /// - non introduce nessun parametro JSON nuovo: e' una feature puramente debug
-    ///
-    /// Nota architetturale:
-    /// - le label sono TextMesh pooled, quindi non richiedono Canvas/TMP
-    /// - il contenuto della label arriva dal Core tramite LandmarkOverlayNode.Label
+    /// Patch 0.03.01.h:
+    /// - Rimosso interamente il sistema TextMesh label (illeggibile a qualsiasi scala).
+    /// - Le etichette sono ora gestite da MapGridLandmarkLabelOverlay (Canvas UI).
+    /// - Esposti WorldNodes / KnownNodes / RouteNodes / GvdNodes come IReadOnlyList
+    ///   per il label overlay.
+    /// - Mantenuto il sistema GVD-DIN overlay (nodi viola, edge, heatmap DT, GVD raw).
     /// </summary>
     public sealed class MapGridLandmarkOverlay
     {
         private Transform _root;
-        private float _tileSizeWorld;
-        private int _sortingOrder;
+        private float     _tileSizeWorld;
+        private int       _sortingOrder;
+        private Sprite    _nodeSprite;
+        private Material  _lineMaterial;
+        private bool      _enabled;
 
-        private Sprite _nodeSprite;
-        private Material _lineMaterial;
+        // ============================================================
+        // POOL NODI E EDGE (layer WORLD / KNOWN / ROUTE / PATH)
+        // ============================================================
 
-        private readonly List<SpriteRenderer> _worldNodePool = new();
-        private readonly List<LineRenderer> _worldEdgePool = new();
-        private readonly List<TextMesh> _worldLabelPool = new();
-        private readonly List<LandmarkOverlayNode> _worldNodes = new();
-        private readonly List<LandmarkOverlayEdge> _worldEdges = new();
+        private readonly List<SpriteRenderer>      _worldNodePool = new();
+        private readonly List<LineRenderer>        _worldEdgePool = new();
+        private readonly List<LandmarkOverlayNode> _worldNodes    = new();
+        private readonly List<LandmarkOverlayEdge> _worldEdges    = new();
 
-        private readonly List<SpriteRenderer> _knownNodePool = new();
-        private readonly List<LineRenderer> _knownEdgePool = new();
-        private readonly List<TextMesh> _knownLabelPool = new();
-        private readonly List<LandmarkOverlayNode> _knownNodes = new();
-        private readonly List<LandmarkOverlayEdge> _knownEdges = new();
+        private readonly List<SpriteRenderer>      _knownNodePool = new();
+        private readonly List<LineRenderer>        _knownEdgePool = new();
+        private readonly List<LandmarkOverlayNode> _knownNodes    = new();
+        private readonly List<LandmarkOverlayEdge> _knownEdges    = new();
 
-        private readonly List<SpriteRenderer> _routeNodePool = new();
-        private readonly List<LineRenderer> _routeEdgePool = new();
-        private readonly List<TextMesh> _routeLabelPool = new();
-        private readonly List<LandmarkOverlayNode> _routeNodes = new();
-        private readonly List<LandmarkOverlayEdge> _routeEdges = new();
+        private readonly List<SpriteRenderer>      _routeNodePool = new();
+        private readonly List<LineRenderer>        _routeEdgePool = new();
+        private readonly List<LandmarkOverlayNode> _routeNodes    = new();
+        private readonly List<LandmarkOverlayEdge> _routeEdges    = new();
 
-        private readonly List<LineRenderer> _lmPathEdgePool = new();
-        private readonly List<LandmarkOverlayEdge> _lmPathEdges = new();
+        private readonly List<LineRenderer>        _lmPathEdgePool    = new();
+        private readonly List<LandmarkOverlayEdge> _lmPathEdges       = new();
+        private readonly List<LineRenderer>        _directPathEdgePool = new();
+        private readonly List<LandmarkOverlayEdge> _directPathEdges   = new();
+        private readonly List<LineRenderer>        _jumpPathEdgePool  = new();
+        private readonly List<LandmarkOverlayEdge> _jumpPathEdges     = new();
 
-        private readonly List<LineRenderer> _directPathEdgePool = new();
-        private readonly List<LandmarkOverlayEdge> _directPathEdges = new();
+        // ============================================================
+        // POOL GVD-DIN (v0.03 — patch 0.03.01.a)
+        // ============================================================
 
-        private readonly List<LineRenderer> _jumpPathEdgePool = new();
-        private readonly List<LandmarkOverlayEdge> _jumpPathEdges = new();
+        // Layer 1 — DT heatmap
+        private readonly Dictionary<int, SpriteRenderer> _dtCellRenderers = new(1024);
+        private readonly Stack<SpriteRenderer>           _dtCellPool       = new(1024);
+        private readonly List<int>                       _dtLastActiveKeys = new(1024);
 
-        private bool _enabled;
+        // Layer 2 — GVD Raw
+        private readonly Dictionary<int, SpriteRenderer> _gvdRawRenderers     = new(512);
+        private readonly Stack<SpriteRenderer>           _gvdRawPool           = new(512);
+        private readonly List<int>                       _gvdRawLastActiveKeys = new(512);
 
-        private static readonly Color WorldColor = new Color(1f, 1f, 1f, 0.85f);
-        private static readonly Color KnownColor = new Color(0.20f, 1.00f, 0.55f, 1f);
-        private static readonly Color RouteColor = new Color(1.00f, 0.65f, 0.15f, 1f);
-        private static readonly Color LmPathColor = new Color(1.00f, 0.65f, 0.15f, 1f);
+        // Layer 3 — GVD Nodes/Edges post-pruning
+        private readonly List<SpriteRenderer>      _gvdNodePool = new();
+        private readonly List<LandmarkOverlayNode> _gvdNodes    = new();
+        private readonly List<LineRenderer>        _gvdEdgePool = new();
+        private readonly List<LandmarkOverlayEdge> _gvdEdges    = new();
+
+        private readonly GvdDinOverlaySnapshot _gvdDinSnapshot = new GvdDinOverlaySnapshot();
+
+        // Flag layer GVD-DIN attivi (settati da SetGvdDinLayerFlags)
+        private bool _showDtHeatmap;
+        private bool _showGvdRaw;
+        private bool _showGvdNodes;
+
+        // ============================================================
+        // COLORI
+        // ============================================================
+
+        private static readonly Color WorldColor      = new Color(1f,    1f,    1f,    0.85f);
+        private static readonly Color KnownColor      = new Color(0.20f, 1.00f, 0.55f, 1f);
+        private static readonly Color RouteColor      = new Color(1.00f, 0.65f, 0.15f, 1f);
+        private static readonly Color LmPathColor     = new Color(1.00f, 0.65f, 0.15f, 1f);
         private static readonly Color DirectPathColor = new Color(0.20f, 0.75f, 1.00f, 1f);
-        private static readonly Color JumpPathColor = new Color(1.00f, 0.20f, 0.75f, 1f);
+        private static readonly Color JumpPathColor   = new Color(1.00f, 0.20f, 0.75f, 1f);
+        private static readonly Color GvdNodeColor    = new Color(0.70f, 0.10f, 1.00f, 1f);
+        private static readonly Color GvdRawColor     = new Color(0.00f, 1.00f, 1.00f, 0.60f);
+
+        // ============================================================
+        // ACCESSO READ-ONLY NODI (consumati da MapGridLandmarkLabelOverlay)
+        // ============================================================
+
+        public IReadOnlyList<LandmarkOverlayNode> WorldNodes => _worldNodes;
+        public IReadOnlyList<LandmarkOverlayNode> KnownNodes => _knownNodes;
+        public IReadOnlyList<LandmarkOverlayNode> RouteNodes => _routeNodes;
+        public IReadOnlyList<LandmarkOverlayNode> GvdNodes   => _gvdNodes;
+
+        // ============================================================
+        // INIT
+        // ============================================================
 
         public void Init(Transform parent, float tileSizeWorld, string nodeSpriteResourcesPath, int sortingOrder)
         {
             _tileSizeWorld = tileSizeWorld;
-            _sortingOrder = sortingOrder;
+            _sortingOrder  = sortingOrder;
 
             var go = new GameObject("LandmarkOverlay");
             _root = go.transform;
@@ -92,56 +133,181 @@ namespace Arcontio.View.MapGrid
 
         public bool IsEnabled => _enabled;
 
+        public void SetGvdDinLayerFlags(bool showDtHeatmap, bool showGvdRaw, bool showGvdNodes)
+        {
+            _showDtHeatmap = showDtHeatmap;
+            _showGvdRaw    = showGvdRaw;
+            _showGvdNodes  = showGvdNodes;
+        }
+
+        // ============================================================
+        // CLEAR
+        // ============================================================
+
         public void Clear()
         {
-            DisableAll(_worldNodePool); DisableAll(_worldEdgePool); DisableAll(_worldLabelPool);
-            DisableAll(_knownNodePool); DisableAll(_knownEdgePool); DisableAll(_knownLabelPool);
-            DisableAll(_routeNodePool); DisableAll(_routeEdgePool); DisableAll(_routeLabelPool);
+            DisableAll(_worldNodePool); DisableAll(_worldEdgePool);
+            DisableAll(_knownNodePool); DisableAll(_knownEdgePool);
+            DisableAll(_routeNodePool); DisableAll(_routeEdgePool);
             DisableAll(_lmPathEdgePool);
             DisableAll(_directPathEdgePool);
             DisableAll(_jumpPathEdgePool);
+            ClearDtHeatmap();
+            ClearGvdRaw();
+            DisableAll(_gvdNodePool);
+            DisableAll(_gvdEdgePool);
         }
+
+        // ============================================================
+        // RENDER
+        // ============================================================
 
         public void Render(World world, int npcId)
         {
-            if (!_enabled || world == null || _root == null)
-                return;
+            if (!_enabled || world == null || _root == null) return;
 
-            world.GetNpcLandmarkOverlayData(npcId, _worldNodes, _worldEdges, _knownNodes, _knownEdges, _routeNodes, _routeEdges, _lmPathEdges, _directPathEdges, _jumpPathEdges, out var _routeReport);
+            world.GetNpcLandmarkOverlayData(
+                npcId,
+                _worldNodes, _worldEdges,
+                _knownNodes, _knownEdges,
+                _routeNodes, _routeEdges,
+                _lmPathEdges, _directPathEdges, _jumpPathEdges,
+                out var _routeReport);
 
             RenderNodes(_worldNodes, _worldNodePool, WorldColor, 0.35f);
             RenderEdges(_worldEdges, _worldEdgePool, WorldColor, 0.03f);
-            // Label world (bianca): più piccola di meno della metà rispetto a prima,
-            // e leggermente spostata a sinistra per non collidere con le altre due.
-            RenderLabels(_worldNodes, _worldLabelPool, WorldColor, 0.09f, xOffsetTiles: -0.22f, yOffsetTiles: 0.24f);
 
             RenderNodes(_knownNodes, _knownNodePool, KnownColor, 0.48f);
             RenderEdges(_knownEdges, _knownEdgePool, KnownColor, 0.055f);
-            // Label known (verde): tenuta circa sopra il centro del nodo.
-            RenderLabels(_knownNodes, _knownLabelPool, KnownColor, 0.10f, xOffsetTiles: 0.00f, yOffsetTiles: 0.38f);
 
             RenderNodes(_routeNodes, _routeNodePool, RouteColor, 0.62f);
-            // Il vecchio layer route-edge astratto resta volutamente vuoto: il percorso vero
-            // viene ora disegnato con tre layer separati cella-per-cella.
             RenderEdges(_routeEdges, _routeEdgePool, RouteColor, 0.09f);
-            // Label route (gialla): spostata a destra e un po' più in alto,
-            // così lo stesso nodo può mostrare fino a tre etichette leggibili senza sovrapporsi.
-            RenderLabels(_routeNodes, _routeLabelPool, RouteColor, 0.11f, xOffsetTiles: 0.22f, yOffsetTiles: 0.52f);
 
-            // PATCH 0.02.05.2e:
-            // Nuovo overlay del path reale/inteso, sempre cella-per-cella e mai come segmento astratto.
-            RenderEdges(_lmPathEdges, _lmPathEdgePool, LmPathColor, 0.11f);
+            RenderEdges(_lmPathEdges,     _lmPathEdgePool,     LmPathColor,     0.11f);
             RenderEdges(_directPathEdges, _directPathEdgePool, DirectPathColor, 0.11f);
-            RenderEdges(_jumpPathEdges, _jumpPathEdgePool, JumpPathColor, 0.11f);
+            RenderEdges(_jumpPathEdges,   _jumpPathEdgePool,   JumpPathColor,   0.11f);
+
+            RenderGvdDin(world);
         }
+
+        // ============================================================
+        // GVD-DIN
+        // ============================================================
+
+        private void RenderGvdDin(World world)
+        {
+            world.GetGvdDinOverlayData(_gvdDinSnapshot);
+
+            if (!_gvdDinSnapshot.IsValid)
+            {
+                ClearDtHeatmap(); ClearGvdRaw();
+                DisableAll(_gvdNodePool); DisableAll(_gvdEdgePool);
+                _gvdNodes.Clear(); _gvdEdges.Clear();
+                return;
+            }
+
+            if (_showDtHeatmap) RenderDtHeatmap(_gvdDinSnapshot.DtCells);
+            else                ClearDtHeatmap();
+
+            if (_showGvdRaw)    RenderGvdRaw(_gvdDinSnapshot.GvdRawCells);
+            else                ClearGvdRaw();
+
+            if (_showGvdNodes)
+            {
+                _gvdNodes.Clear(); _gvdNodes.AddRange(_gvdDinSnapshot.GvdNodes);
+                _gvdEdges.Clear(); _gvdEdges.AddRange(_gvdDinSnapshot.GvdEdges);
+                RenderNodes(_gvdNodes, _gvdNodePool, GvdNodeColor, 0.50f);
+                RenderEdges(_gvdEdges, _gvdEdgePool, GvdNodeColor, 0.07f);
+            }
+            else
+            {
+                DisableAll(_gvdNodePool); DisableAll(_gvdEdgePool);
+                _gvdNodes.Clear(); _gvdEdges.Clear();
+            }
+        }
+
+        private void RenderDtHeatmap(List<GvdDinOverlayCellDt> cells)
+        {
+            foreach (int k in _dtLastActiveKeys)
+                if (_dtCellRenderers.TryGetValue(k, out var sr) && sr != null)
+                    sr.gameObject.SetActive(false);
+            _dtLastActiveKeys.Clear();
+
+            foreach (var cell in cells)
+            {
+                int key = cell.CellY * 10000 + cell.CellX;
+                if (!_dtCellRenderers.TryGetValue(key, out var sr) || sr == null)
+                {
+                    sr = _dtCellPool.Count > 0 ? _dtCellPool.Pop() : CreateCellRenderer("DT");
+                    _dtCellRenderers[key] = sr;
+                }
+                sr.gameObject.SetActive(true);
+                sr.transform.localPosition = new Vector3((cell.CellX + 0.5f) * _tileSizeWorld, (cell.CellY + 0.5f) * _tileSizeWorld, 0f);
+                var c = Color.Lerp(Color.blue, Color.red, cell.DtNormalized01);
+                sr.color = new Color(c.r, c.g, c.b, 0.45f);
+                _dtLastActiveKeys.Add(key);
+            }
+        }
+
+        private void RenderGvdRaw(List<GvdDinOverlayCellGvd> cells)
+        {
+            foreach (int k in _gvdRawLastActiveKeys)
+                if (_gvdRawRenderers.TryGetValue(k, out var sr) && sr != null)
+                    sr.gameObject.SetActive(false);
+            _gvdRawLastActiveKeys.Clear();
+
+            foreach (var cell in cells)
+            {
+                int key = cell.CellY * 10000 + cell.CellX;
+                if (!_gvdRawRenderers.TryGetValue(key, out var sr) || sr == null)
+                {
+                    sr = _gvdRawPool.Count > 0 ? _gvdRawPool.Pop() : CreateCellRenderer("GVD");
+                    _gvdRawRenderers[key] = sr;
+                }
+                sr.gameObject.SetActive(true);
+                sr.transform.localPosition = new Vector3((cell.CellX + 0.5f) * _tileSizeWorld, (cell.CellY + 0.5f) * _tileSizeWorld, 0f);
+                sr.color = GvdRawColor;
+                _gvdRawLastActiveKeys.Add(key);
+            }
+        }
+
+        private void ClearDtHeatmap()
+        {
+            foreach (int k in _dtLastActiveKeys)
+                if (_dtCellRenderers.TryGetValue(k, out var sr) && sr != null)
+                    sr.gameObject.SetActive(false);
+            _dtLastActiveKeys.Clear();
+        }
+
+        private void ClearGvdRaw()
+        {
+            foreach (int k in _gvdRawLastActiveKeys)
+                if (_gvdRawRenderers.TryGetValue(k, out var sr) && sr != null)
+                    sr.gameObject.SetActive(false);
+            _gvdRawLastActiveKeys.Clear();
+        }
+
+        private SpriteRenderer CreateCellRenderer(string tag)
+        {
+            var go = new GameObject($"LM_Cell_{tag}");
+            go.transform.SetParent(_root, false);
+            go.transform.localScale = Vector3.one * _tileSizeWorld;
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sortingOrder = _sortingOrder - 1;
+            sr.sprite = _nodeSprite;
+            return sr;
+        }
+
+        // ============================================================
+        // POOL HELPERS
+        // ============================================================
 
         private void RenderNodes(List<LandmarkOverlayNode> nodes, List<SpriteRenderer> pool, Color color, float nodeScale)
         {
             EnsureNodePool(pool, nodes.Count, color, nodeScale);
             for (int i = 0; i < nodes.Count; i++)
             {
-                var n = nodes[i];
-                var sr = pool[i];
+                var n = nodes[i]; var sr = pool[i];
                 sr.gameObject.SetActive(true);
                 sr.transform.localPosition = new Vector3((n.CellX + 0.5f) * _tileSizeWorld, (n.CellY + 0.5f) * _tileSizeWorld, 0f);
                 sr.sprite = _nodeSprite;
@@ -155,37 +321,15 @@ namespace Arcontio.View.MapGrid
             EnsureEdgePool(pool, edges.Count, color, width);
             for (int i = 0; i < edges.Count; i++)
             {
-                var e = edges[i];
-                var lr = pool[i];
+                var e = edges[i]; var lr = pool[i];
                 lr.gameObject.SetActive(true);
-                Vector3 a = new Vector3((e.Ax + 0.5f) * _tileSizeWorld, (e.Ay + 0.5f) * _tileSizeWorld, 0f);
-                Vector3 b = new Vector3((e.Bx + 0.5f) * _tileSizeWorld, (e.By + 0.5f) * _tileSizeWorld, 0f);
                 lr.positionCount = 2;
-                lr.startWidth = width;
-                lr.endWidth = width;
-                lr.startColor = color;
-                lr.endColor = color;
-                lr.SetPosition(0, a);
-                lr.SetPosition(1, b);
+                lr.startWidth = width; lr.endWidth = width;
+                lr.startColor = color; lr.endColor = color;
+                lr.SetPosition(0, new Vector3((e.Ax + 0.5f) * _tileSizeWorld, (e.Ay + 0.5f) * _tileSizeWorld, 0f));
+                lr.SetPosition(1, new Vector3((e.Bx + 0.5f) * _tileSizeWorld, (e.By + 0.5f) * _tileSizeWorld, 0f));
             }
             for (int i = edges.Count; i < pool.Count; i++)
-                pool[i].gameObject.SetActive(false);
-        }
-
-        private void RenderLabels(List<LandmarkOverlayNode> nodes, List<TextMesh> pool, Color color, float charScale, float xOffsetTiles, float yOffsetTiles)
-        {
-            EnsureLabelPool(pool, nodes.Count, color, charScale);
-            for (int i = 0; i < nodes.Count; i++)
-            {
-                var n = nodes[i];
-                var tm = pool[i];
-                tm.gameObject.SetActive(true);
-                tm.text = string.IsNullOrEmpty(n.Label) ? n.NodeId.ToString() : n.Label;
-                tm.color = color;
-                tm.transform.localPosition = new Vector3((n.CellX + 0.5f + xOffsetTiles) * _tileSizeWorld, (n.CellY + 0.5f + yOffsetTiles) * _tileSizeWorld, 0f);
-                tm.characterSize = charScale;
-            }
-            for (int i = nodes.Count; i < pool.Count; i++)
                 pool[i].gameObject.SetActive(false);
         }
 
@@ -196,16 +340,13 @@ namespace Arcontio.View.MapGrid
                 var go = new GameObject($"LM_Node_{pool.Count}");
                 go.transform.SetParent(_root, false);
                 var sr = go.AddComponent<SpriteRenderer>();
-                sr.sortingOrder = _sortingOrder;
-                sr.sprite = _nodeSprite;
-                sr.color = color;
+                sr.sortingOrder = _sortingOrder; sr.sprite = _nodeSprite; sr.color = color;
                 go.transform.localScale = Vector3.one * nodeScale;
                 pool.Add(sr);
             }
             for (int i = 0; i < pool.Count; i++)
             {
-                var sr = pool[i];
-                if (sr == null) continue;
+                var sr = pool[i]; if (sr == null) continue;
                 sr.color = color;
                 sr.transform.localScale = Vector3.one * nodeScale;
                 sr.sortingOrder = _sortingOrder;
@@ -219,71 +360,25 @@ namespace Arcontio.View.MapGrid
                 var go = new GameObject($"LM_Edge_{pool.Count}");
                 go.transform.SetParent(_root, false);
                 var lr = go.AddComponent<LineRenderer>();
-                lr.useWorldSpace = false;
-                lr.loop = false;
-                lr.widthMultiplier = 1f;
+                lr.useWorldSpace = false; lr.loop = false; lr.widthMultiplier = 1f;
                 lr.sortingOrder = _sortingOrder;
-                if (_lineMaterial != null)
-                    lr.material = _lineMaterial;
+                if (_lineMaterial != null) lr.material = _lineMaterial;
                 pool.Add(lr);
             }
             for (int i = 0; i < pool.Count; i++)
             {
-                var lr = pool[i];
-                if (lr == null) continue;
+                var lr = pool[i]; if (lr == null) continue;
                 lr.sortingOrder = _sortingOrder;
-                if (_lineMaterial != null)
-                    lr.material = _lineMaterial;
-                lr.startColor = color;
-                lr.endColor = color;
-                lr.startWidth = width;
-                lr.endWidth = width;
-            }
-        }
-
-        private void EnsureLabelPool(List<TextMesh> pool, int needed, Color color, float charScale)
-        {
-            while (pool.Count < needed)
-            {
-                var go = new GameObject($"LM_Label_{pool.Count}");
-                go.transform.SetParent(_root, false);
-                var tm = go.AddComponent<TextMesh>();
-                tm.anchor = TextAnchor.MiddleCenter;
-                tm.alignment = TextAlignment.Center;
-                tm.fontSize = 32;
-                tm.characterSize = charScale;
-                tm.text = string.Empty;
-                tm.color = color;
-                var mr = go.GetComponent<MeshRenderer>();
-                if (mr != null)
-                    mr.sortingOrder = _sortingOrder + 1;
-                pool.Add(tm);
-            }
-            for (int i = 0; i < pool.Count; i++)
-            {
-                var tm = pool[i];
-                if (tm == null) continue;
-                tm.color = color;
-                tm.characterSize = charScale;
-                var mr = tm.GetComponent<MeshRenderer>();
-                if (mr != null)
-                    mr.sortingOrder = _sortingOrder + 1;
+                if (_lineMaterial != null) lr.material = _lineMaterial;
+                lr.startColor = color; lr.endColor = color;
+                lr.startWidth = width; lr.endWidth = width;
             }
         }
 
         private static void DisableAll(List<SpriteRenderer> pool)
-        {
-            for (int i = 0; i < pool.Count; i++) if (pool[i] != null) pool[i].gameObject.SetActive(false);
-        }
+        { for (int i = 0; i < pool.Count; i++) if (pool[i] != null) pool[i].gameObject.SetActive(false); }
 
         private static void DisableAll(List<LineRenderer> pool)
-        {
-            for (int i = 0; i < pool.Count; i++) if (pool[i] != null) pool[i].gameObject.SetActive(false);
-        }
-
-        private static void DisableAll(List<TextMesh> pool)
-        {
-            for (int i = 0; i < pool.Count; i++) if (pool[i] != null) pool[i].gameObject.SetActive(false);
-        }
+        { for (int i = 0; i < pool.Count; i++) if (pool[i] != null) pool[i].gameObject.SetActive(false); }
     }
 }

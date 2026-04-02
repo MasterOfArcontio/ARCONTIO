@@ -273,20 +273,67 @@ namespace Arcontio.Core
 
                 if (nx == fx && ny == fy)
                 {
-                    // IMPORTANTISSIMO: mangio solo se sono sullo stock.
-                    // La validazione runtime finale resta comunque nel comando.
+                    // Arrivo sulla cella target.
+                    // Se il target veniva dalla memoria, verifica locale: il cibo è ancora qui?
+                    if (foodTargetFromMemory)
+                    {
+                        bool foodStillHere = world.FoodStocks.TryGetValue(foodObj, out var st)
+                                            && st.Units > 0;
+
+                        if (!foodStillHere)
+                        {
+                            // Scoperta locale: il cibo non c'è più.
+                            // Invalida il memory slot — l'NPC sa ora che è obsoleto.
+                            if (world.NpcObjectMemory.TryGetValue(npcId, out var mem) && mem != null)
+                            {
+                                for (int si = 0; si < mem.Slots.Length; si++)
+                                {
+                                    ref var slot = ref mem.Slots[si];
+                                    if (!slot.IsValid) continue;
+                                    int slotObjId = slot.SubjectId != 0 ? slot.SubjectId : slot.ObjectId;
+                                    if (slotObjId == foodObj)
+                                    {
+                                        slot.IsValid = false;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // Balloon debug: cibo non trovato dove ricordato.
+                            world.EmitNpcBalloon(npcId, NpcBalloonKind.FoodNotFound);
+                            return false;
+                        }
+                    }
+
+                    // Cibo confermato (visibile o verificato localmente): mangia.
                     cmd = new EatFromStockCommand(npcId, foodObj);
                     return true;
                 }
 
                 didMove = true;
+
+                // Fix stuck detection: se c'è già un MoveIntent attivo verso
+                // le stesse coordinate, non sovrascriverlo. La Rule viene chiamata
+                // ogni _decisionEveryTicks tick e senza questo check resetta
+                // BlockedTicks ogni volta, impedendo allo stuck detection di
+                // scattare quando il target è fisicamente irraggiungibile.
+                if (world.NpcMoveIntents.TryGetValue(npcId, out var existingIntent)
+                    && existingIntent.Active
+                    && existingIntent.TargetX == fx
+                    && existingIntent.TargetY == fy)
+                {
+                    // Intent già attivo verso lo stesso target: non sovrascrivere.
+                    // MovementSystem gestirà lo stuck o troverà un percorso.
+                    return true;
+                }
+
                 cmd = new SetMoveIntentCommand(npcId, new MoveIntent
                 {
                     Active = true,
                     TargetX = fx,
                     TargetY = fy,
                     Reason = MoveIntentReason.SeekFood,
-                    TargetObjectId = foodObj
+                    TargetObjectId = foodTargetFromMemory ? 0 : foodObj
                 });
 
                 // Nota molto utile per la lettura futura di questo ramo:
@@ -443,26 +490,34 @@ if (stolenStockObj != 0)
                 if (objId == 0)
                     continue;
 
-                if (!world.FoodStocks.TryGetValue(objId, out var st))
+                // Filtro ownership da metadati memoria (scritti al momento della percezione).
+                if (e.OwnerKind != OwnerKind.Community || e.OwnerId != 0)
                     continue;
 
-                if (st.Units <= 0)
-                    continue;
-
-                if (st.OwnerKind != OwnerKind.Community || st.OwnerId != 0)
-                    continue;
-
+                // Coordinate: usa quelle reali se l'oggetto esiste ancora,
+                // altrimenti usa quelle ricordate (l'NPC non sa che è sparito).
+                // NON saltiamo lo slot se l'oggetto non esiste più in FoodStocks:
+                // l'NPC deve poter andare alle coordinate ricordate per scoprire
+                // che il cibo non c'è più (scoperta locale all'arrivo).
                 int ox = e.CellX;
                 int oy = e.CellY;
-                if (world.Objects.TryGetValue(objId, out var inst) && inst != null)
-                {
-                    ox = inst.CellX;
-                    oy = inst.CellY;
-                }
 
-                // Il cibo community ricordato non deve essere filtrato dal range locale immediato,
-                // altrimenti l'NPC smette di tornare verso uno stock che sa già esistere fuori LOS.
+                if (world.FoodStocks.TryGetValue(objId, out var st))
+                {
+                    // Oggetto esiste: filtra stock esauriti e aggiorna posizione reale.
+                    if (st.Units <= 0)
+                        continue;
+                    if (world.Objects.TryGetValue(objId, out var inst) && inst != null)
+                    {
+                        ox = inst.CellX;
+                        oy = inst.CellY;
+                    }
+                }
+                // else: oggetto non in FoodStocks → usa coordinate di memoria.
+
                 int manhattan = Mathf.Abs(ox - nx) + Mathf.Abs(oy - ny);
+                if (manhattan > maxRangeCells)
+                    continue;
 
                 if (manhattan < bestDist)
                 {

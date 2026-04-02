@@ -989,7 +989,9 @@ namespace Arcontio.Core
                 if (dist > vision) continue;
 
                 // Riusa la stessa logica del sistema (replicata qui per debug)
-                if (!IsInCone_Debug(np.X, np.Y, facing, obj.CellX, obj.CellY, cone))
+                // Patch 0.02.5A: IsInCone_Debug rimosso — delega a FovUtils.IsInCone.
+                // FovUtils è la fonte canonica unica del cono in tutto il progetto.
+                if (!FovUtils.IsInCone(np.X, np.Y, facing, obj.CellX, obj.CellY, cone))
                     continue;
 
                 seen.Add(obj.DefId);
@@ -1364,7 +1366,7 @@ namespace Arcontio.Core
             // 5 NPC: uno "low law" che tenderà a rubare, altri più legali.
             int npc1 = _world.CreateNpc(
                 new NpcCore { Name = "T10_NPC1_Thief", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
-                new Needs { Hunger01 = 0.90f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                new Needs { Hunger01 = 0.00f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
                 x: 15, y: 15
             );
@@ -1433,29 +1435,10 @@ namespace Arcontio.Core
 
         }
 
-        // Copia ridotta della logica "IsInCone" per debug snapshot.
-        // (Tenuta qui per non dipendere da metodi privati del system)
-        private static bool IsInCone_Debug(int sx, int sy, CardinalDirection facing, int tx, int ty, float coneHalfWidthPerStep)
-        {
-            int dx = tx - sx;
-            int dy = ty - sy;
+        // Patch 0.02.5A: IsInCone_Debug rimosso.
+        // Usava Mathf.FloorToInt invece di (int)Math.Floor — semantica equivalente
+        // ma diversa dalla versione canonica. Sostituito con FovUtils.IsInCone.
 
-            int forward, side;
-
-            switch (facing)
-            {
-                case CardinalDirection.North: forward = dy; side = dx; break;
-                case CardinalDirection.South: forward = -dy; side = -dx; break;
-                case CardinalDirection.East: forward = dx; side = -dy; break;
-                case CardinalDirection.West: forward = -dx; side = dy; break;
-                default: return false;
-            }
-
-            if (forward <= 0) return false;
-
-            int absSide = side < 0 ? -side : side;
-            return absSide <= Mathf.FloorToInt(forward * coneHalfWidthPerStep + 0.0001f);
-        }
         private void LateUpdate()
         {
             // flush ?soft? a fine frame (evita I/O per log write singolo)

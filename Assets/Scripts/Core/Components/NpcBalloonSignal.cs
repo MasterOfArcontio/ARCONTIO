@@ -36,6 +36,10 @@ namespace Arcontio.Core
         TheftReportVictimIn = 8,
         TheftReportWitnessOut = 9,
         TheftReportWitnessIn = 10,
+
+        // Debug: l'NPC è arrivato dove ricordava il cibo ma non lo ha trovato.
+        // Solo per osservabilità in runtime — non ha impatto sulla simulazione.
+        FoodNotFound = 11,
     }
 
     /// <summary>

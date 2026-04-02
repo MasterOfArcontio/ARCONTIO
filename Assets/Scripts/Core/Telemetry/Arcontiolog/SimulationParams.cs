@@ -48,6 +48,21 @@ namespace Arcontio.Core.Config
 
         // ---------------- Landmark pathfinding (v0.02) ----------------
         public LandmarkSystemParams landmarks = new LandmarkSystemParams();
+
+        // ---------------- Movement (v0.02.05.B) ----------------
+        public MovementParams movement = new MovementParams();
+
+        // ---------------- GVD-DIN (v0.03) ----------------
+        // Sistema GVD dinamico condition-based + pruning.
+        // Attivo quando gvd_din.enabled=true E hybrid_landmark.use_hybrid_extractor=false.
+        // Mantenuto per backward compatibility e confronto visivo.
+        public GvdDinParams gvd_din = new GvdDinParams();
+
+        // ---------------- Hybrid Landmark Extractor (v0.03.02.a) ----------------
+        // Sistema ibrido 6-passi: Distance Transform → Bridge Detection →
+        // Flood Fill → Landmark per regione → ChokePoint → Pruning.
+        // Quando use_hybrid_extractor=true sostituisce GVD-DIN come generatore LM.
+        public HybridLandmarkParams hybrid_landmark = new HybridLandmarkParams();
     }
 
     // ============================================================
@@ -72,6 +87,44 @@ namespace Arcontio.Core.Config
     }
 
     // ============================================================
+    // ============================================================
+    // MOVEMENT (Patch 0.02.07.A)
+    // ============================================================
+    [Serializable]
+    public sealed class MovementParams
+    {
+        // Timeout in ticks spendibili prima di stoppare il movimento senza condizioni particolari
+        public int intentStuckTicksDefault = 12;
+
+        // Timeout in ticks spendibili prima di stoppare il movimento nella fase finale
+        public int intentStuckTicksLastMile = 8;
+
+        // Timeout in ticks spendibili prima di stoppare il movimento che è già in blocco
+        public int intentStuckTicksBlocked = 6;
+
+        // ── DIRECT PATH CON COMMITMENT PERCETTIVO (Patch 0.02.07.A) ──────────
+        //
+        // Implementa il modello "Movimento Direct con Commitment Percettivo":
+        //   Direct = innesco percettivo (Range + FOV + LOS sul TARGET)
+        //          + esecuzione inerziale breve su prefix pre-calcolato.
+        //
+        // Lunghezza del prefix path committed (in celle).
+        // L'NPC costruisce questo segmento al momento dell'acquisizione del
+        // direct e lo esegue senza ricontrollare la visibilità completa.
+        // Solo la prossima cella viene verificata (IsMovementBlocked) a ogni step.
+        // Al termine del prefix, rivaluta: se il target è ancora visibile
+        // (Range + FOV + LOS) rinnova il commitment; altrimenti esce dal direct.
+        // Range raccomandato: 2-4 celle. Default: 3.
+        public int directPrefixCells = 3;
+
+        // Se true, l'acquisizione del direct richiede che il TARGET sia
+        // percettivamente visibile (Range + FOV + LOS) al momento dell'innesco.
+        // Se false, usa solo IsMovementBlocked per l'attraversabilità (legacy).
+        public bool directCheckFovOnAcquisition = true;
+    }
+
+
+    // ============================================================
     // LANDMARKS (v0.02)
     // ============================================================
     [Serializable]
@@ -94,8 +147,8 @@ namespace Arcontio.Core.Config
         // Merge
         public float merge_radius = 1.5f;
 
-        // Candidate detection
-        public LandmarkCandidateParams candidate = new LandmarkCandidateParams();
+        // Nota (v0.03.02.a): candidate detection params rimossi.
+        // junction_min_exits/candidate_cooldown_ticks erano del vecchio sistema Doorway/Junction.
 
         // Eviction/deactivation params
         public LandmarkEvictionParams eviction = new LandmarkEvictionParams();
@@ -113,12 +166,9 @@ namespace Arcontio.Core.Config
         public LandmarkLocalSearchParams localSearch = new LandmarkLocalSearchParams();
     }
 
-    [Serializable]
-    public sealed class LandmarkCandidateParams
-    {
-        public int candidate_cooldown_ticks = 6;
-        public int junction_min_exits = 3;
-    }
+    // Nota (v0.03.02.a): LandmarkCandidateParams rimossa.
+    // candidate_cooldown_ticks e junction_min_exits erano usati solo nel vecchio
+    // sistema Doorway/Junction eliminato in questa patch.
 
     [Serializable]
     public sealed class LandmarkEvictionParams
@@ -137,10 +187,11 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class DebugLandmarksParams
     {
-        public bool enabled = false;
+        public bool enabled      = false;
         public bool activeNpcOnly = true;
-        public bool microTestDummyGraph = false;
-        public int microTestDummyDistanceCells = 2;
+        // Nota (v0.03.02.a): microTestDummyGraph e microTestDummyDistanceCells rimossi.
+        // Erano scaffolding di test del vecchio sistema. World.cs li usava solo
+        // nei metodi GetNpcLandmarkDebugInfo — da aggiornare contestualmente.
     }
 
     [Serializable]
@@ -221,6 +272,108 @@ namespace Arcontio.Core.Config
         // Dopo quante ripetizioni dello stesso fallimento iniziamo ad escalare in modo
         // piu' aggressivo budget/raggio del fallback.
         public int repeatedFailureEscalationThreshold = 2;
+    }
+
+    // ============================================================
+    // GVD-DIN (v0.03)
+    // ============================================================
+    // GVD-DIN = Generalized Voronoi Diagram Dinamico condition-based + pruning.
+    // Sostituisce la candidate detection dei landmark (vecchio sistema Doorway/Junction
+    // da IsDoorDef + IsJunction hardcoded) con uno scheletro topologico derivato
+    // dalla Distance Transform della mappa.
+    //
+    // Quando enabled=false il vecchio sistema rimane attivo invariato.
+    // Quando enabled=true il LandmarkRegistry bypassa il vecchio detection e usa GvdDinComputer.
+    // ============================================================
+    [Serializable]
+    public sealed class GvdDinParams
+    {
+        // Master switch: se false, il vecchio sistema Doorway/Junction resta attivo.
+        public bool enabled = false;
+
+        // Lunghezza minima (in celle) di un ramo GVD per sopravvivere al pruning.
+        // Rami più corti vengono eliminati perché corrispondono a dettagli geometrici
+        // irrilevanti per la navigazione (piccole nicchie, spigoli).
+        // Valore consigliato: 2-4 celle.
+        public int pruning_min_branch_length = 3;
+
+        // Valore minimo della Distance Transform per candidare una cella come AreaCenter.
+        // Con AC_MIN_DT=4: corridoi fino a 7c (DT_max=3) non producono AreaCenter.
+        // Solo stanze con DT_max >= 4 (larghezza interna >= 8 celle) ottengono un AreaCenter.
+        // Patch 0.03.01.j: alzato da 2 a 4.
+        public int area_center_min_dt_value = 4;
+
+        // Distanza minima (Manhattan) in celle tra due AreaCenter.
+        // Evita che stanze grandi producano una griglia regolare di massimi locali ravvicinati.
+        // Valore consigliato: 4-8 celle. Default: 5.
+        public int area_center_min_spacing_cells = 5;
+
+        // Raggio di merge specifico per i nodi GVD-DIN (sostituisce landmarks.merge_radius).
+        // Un valore più alto (es. 2.5) consolida i Junction ravvicinati prodotti dal
+        // criterio B nei corridoi larghi senza toccare il merge globale.
+        // Default: 2.5 (corridoio 3c+T: ~6 Junction → 1-2 dopo merge).
+        public float merge_radius_gvd = 2.5f;
+
+        // Parametri debug overlay GVD-DIN.
+        public GvdDinDebugParams debug = new GvdDinDebugParams();
+    }
+
+    [Serializable]
+    public sealed class GvdDinDebugParams
+    {
+        // Se true, mostra la heatmap della Distance Transform (gradiente blu->bianco per cella).
+        // Utile per verificare che la DT sia calcolata correttamente prima di guardare il GVD.
+        // ATTENZIONE: costa N*M sprite renderer. Tenerlo false in produzione.
+        public bool show_dt_heatmap = false;
+
+        // Se true, mostra le celle GVD grezze pre-pruning come dot ciano.
+        // Utile per verificare la correttezza topologica dello scheletro prima del pruning.
+        public bool show_gvd_raw = false;
+
+        // Se true, mostra i vertici GVD post-pruning come nodi viola nel landmark overlay.
+        // Questi sono i nodi che entrano effettivamente nel LandmarkRegistry.
+        public bool show_gvd_nodes = true;
+    }
+
+    // ============================================================
+    // HYBRID LANDMARK EXTRACTOR PARAMS (v0.03.02.a)
+    // ============================================================
+    [Serializable]
+    public sealed class HybridLandmarkParams
+    {
+        // Se true, usa HybridLandmarkExtractor al posto di GVD-DIN.
+        // Se false, il comportamento è identico alle versioni precedenti.
+        public bool use_hybrid_extractor = false;
+
+        // Soglia DT che separa "zona aperta" (stanza) da "zona stretta" (corridoio).
+        // Patch 0.03.02.a.6: sostituisce dt_bridge_max.
+        //
+        // Celle con DT >= dt_open_threshold → zona aperta → super-nodo nel grafo contratto.
+        // Celle con DT <  dt_open_threshold → zona stretta → arco candidato bridge.
+        //
+        // Il grafo contratto su cui gira Tarjan ha come nodi le stanze e come archi
+        // i corridoi — indipendentemente dalla larghezza del corridoio.
+        //
+        // Valore consigliato per ARCONTIO:
+        //   dt_open_threshold = 2: corridoi 1-2c (DT=1) sono "stretti",
+        //                          stanze con DT>=2 sono "aperte".
+        //   dt_open_threshold = 3: include come "stretti" anche i bordi delle stanze.
+        public int dt_open_threshold = 2;
+
+        // Distanza minima Manhattan tra due candidati per il merge nel pruning.
+        // ChokePoint entro questa distanza da un RoomCenter: il ChokePoint vince.
+        // Due RoomCenter entro questa distanza: vince quello con DT più alta.
+        public float merge_radius = 2.5f;
+
+        // Numero minimo di celle perché una regione generi un landmark.
+        // Regioni più piccole di questo valore vengono ignorate.
+        public int min_region_area = 4;
+
+        // Tolleranza per la mediana ortogonale (Tecnica B).
+        // |distanza_sinistra - distanza_destra| <= median_tolerance → candidata.
+        // Valore 1 = bilanciamento quasi perfetto richiesto.
+        // Alzare → più candidati (stanze asimmetriche incluse).
+        public int median_tolerance = 1;
     }
 
     // ============================================================

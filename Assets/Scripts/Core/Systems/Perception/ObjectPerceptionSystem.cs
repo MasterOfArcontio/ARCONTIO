@@ -4,15 +4,37 @@ using System.Collections.Generic;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // ObjectPerceptionSystem â€” Patch 0.02.5A
+    // Geometria FOV centralizzata in FovUtils.cs
+    // =============================================================================
     /// <summary>
-    /// ObjectPerceptionSystem:
-    /// - per ogni NPC, valuta quali oggetti "interagibili" sono visibili
-    /// - produce ObjectSpottedEvent per MemoryEncodingSystem
+    /// <b>ObjectPerceptionSystem</b> â€” percezione visiva degli oggetti interagibili.
     ///
-    /// Day9+:
-    /// - gli occluder (muri/porte) sono oggetti nel World, MA:
-    ///   - non generano ObjectSpottedEvent se IsInteractable=false
-    ///   - bloccano la LOS tramite World.OcclusionMap
+    /// <para>
+    /// Per ogni NPC attivo, valuta quali oggetti sono visibili e produce un
+    /// <c>ObjectSpottedEvent</c> per ciascuno, consumato da <c>MemoryEncodingSystem</c>
+    /// per aggiornare la memoria percettiva dell'NPC osservatore.
+    /// </para>
+    ///
+    /// <para><b>Pipeline di visione (Arcontio Core Standard v1.0):</b></para>
+    /// <list type="number">
+    ///   <item><b>Range gate</b> â€” Manhattan &lt;= visionRange (gate piÃ¹ economico, primo)</item>
+    ///   <item><b>Cone gate</b> â€” <see cref="FovUtils.IsInCone"/> oppure <see cref="FovUtils.IsInFront"/></item>
+    ///   <item><b>LOS gate</b>  â€” <c>world.HasLineOfSight</c> (Bresenham, gate piÃ¹ costoso, ultimo)</item>
+    /// </list>
+    ///
+    /// <para><b>Regole sugli oggetti:</b></para>
+    /// <list type="bullet">
+    ///   <item>Solo oggetti con <c>def.IsInteractable = true</c> producono eventi.</item>
+    ///   <item>Occluder (muri/porte) bloccano la LOS ma non generano eventi.</item>
+    /// </list>
+    ///
+    /// <para>
+    /// <b>Patch 0.02.5A:</b> i metodi privati <c>IsInCone</c>, <c>IsInFront</c>
+    /// e <c>Manhattan</c> sono stati rimossi. Tutta la geometria FOV delega a
+    /// <see cref="FovUtils"/> (fonte canonica unica).
+    /// </para>
     /// </summary>
     public sealed class ObjectPerceptionSystem : ISystem
     {
@@ -33,7 +55,7 @@ namespace Arcontio.Core
             float coneSlope = world.Global.NpcVisionConeSlope;
 
             // Back-compat: se stai ancora usando "NpcVisionConeHalfWidthPerStep"
-            // e NpcVisionConeSlope non è impostato, copia.
+            // e NpcVisionConeSlope non ï¿½ impostato, copia.
             if (coneSlope <= 0f && world.Global.NpcVisionConeHalfWidthPerStep > 0f)
                 coneSlope = world.Global.NpcVisionConeHalfWidthPerStep;
 
@@ -99,29 +121,32 @@ namespace Arcontio.Core
                     if (!def.IsInteractable)
                         continue;
 
-                    int dist = Manhattan(np.X, np.Y, obj.CellX, obj.CellY);
+                    // Patch 0.02.5A: FovUtils.Manhattan Ã¨ la fonte canonica
+                    int dist = FovUtils.Manhattan(np.X, np.Y, obj.CellX, obj.CellY);
                     if (dist > visionRange)
                         continue;
 
                     // Cone check (opzionale)
                     if (useCone)
                     {
-                        if (!IsInCone(np.X, np.Y, facing, obj.CellX, obj.CellY, coneSlope))
+                        // Patch 0.02.5A: delega a FovUtils (fonte canonica del cono)
+                        if (!FovUtils.IsInCone(np.X, np.Y, facing, obj.CellX, obj.CellY, coneSlope))
                             continue;
                     }
                     else
                     {
-                        // modalità legacy: "davanti" (linea frontale)
-                        if (!IsInFront(np.X, np.Y, facing, obj.CellX, obj.CellY))
+                        // modalitï¿½ legacy: "davanti" (linea frontale)
+                        // ModalitÃ  legacy (useCone=false): solo linea frontale cardinale
+                        if (!FovUtils.IsInFront(np.X, np.Y, facing, obj.CellX, obj.CellY))
                             continue;
                     }
 
-                    // LOS check (questo è il pezzo che ti mancava nel T9)
+                    // LOS check (questo ï¿½ il pezzo che ti mancava nel T9)
                     if (!world.HasLineOfSight(np.X, np.Y, obj.CellX, obj.CellY))
                         continue;
 
-                    float q = 1f - (dist / (float)visionRange);
-                    if (q < 0.05f) q = 0.05f;
+                    // Patch 0.02.5A: qualitÃ  centralizzata in FovUtils.ObservationQuality
+                    float q = FovUtils.ObservationQuality(dist, visionRange);
 
                     bus.Publish(new ObjectSpottedEvent(
                         observerNpcId: npcId,
@@ -143,12 +168,12 @@ namespace Arcontio.Core
         ///
         /// Pipeline coerente con ARCONTIO Core Standard:
         /// - Range gate
-        /// - Cone gate (90° su 4 orientamenti)
+        /// - Cone gate (90ï¿½ su 4 orientamenti)
         /// - LOS via OcclusionMap (World.HasLineOfSight)
         ///
         /// Nota:
         /// - Per performance (debug), facciamo uno scan brute-force nel bounding box.
-        /// - È accettabile perché:
+        /// - ï¿½ accettabile perchï¿½:
         ///   - mappe piccole
         ///   - feature disattivabile
         ///   - finestra N tick (non per forza ogni frame)
@@ -180,20 +205,22 @@ namespace Arcontio.Core
                     if (!world.InBounds(x, y))
                         continue;
 
-                    int dist = Manhattan(originX, originY, x, y);
+                    int dist = FovUtils.Manhattan(originX, originY, x, y);
                     if (dist > visionRange)
                         continue;
 
                     // Cone check (opzionale)
                     if (useCone)
                     {
-                        if (!IsInCone(originX, originY, facing, x, y, coneSlope))
+                        // Patch 0.02.5A: usa FovUtils anche nel debug FOV scan
+                        if (!FovUtils.IsInCone(originX, originY, facing, x, y, coneSlope))
                             continue;
                     }
                     else
                     {
-                        // modalità legacy: "davanti"
-                        if (!IsInFront(originX, originY, facing, x, y))
+                        // modalitï¿½ legacy: "davanti"
+                        // ModalitÃ  legacy (useCone=false) nel debug FOV scan
+                        if (!FovUtils.IsInFront(originX, originY, facing, x, y))
                             continue;
                     }
 
@@ -209,66 +236,12 @@ namespace Arcontio.Core
             }
         }
 
-        private static int Manhattan(int ax, int ay, int bx, int by)
-        {
-            int dx = ax - bx; if (dx < 0) dx = -dx;
-            int dy = ay - by; if (dy < 0) dy = -dy;
-            return dx + dy;
-        }
+        // Patch 0.02.5A: Manhattan rimosso â€” usa FovUtils.Manhattan
 
-        private static bool IsInFront(int sx, int sy, CardinalDirection facing, int tx, int ty)
-        {
-            int dx = tx - sx;
-            int dy = ty - sy;
+        // Patch 0.02.5A: IsInFront rimosso â€” usa FovUtils.IsInFront
 
-            return facing switch
-            {
-                CardinalDirection.North => dy > 0 && dx == 0,
-                CardinalDirection.South => dy < 0 && dx == 0,
-                CardinalDirection.East => dx > 0 && dy == 0,
-                CardinalDirection.West => dx < 0 && dy == 0,
-                _ => false
-            };
-        }
 
-        /// <summary>
-        /// Cono su griglia:
-        /// - forward deve essere > 0
-        /// - |side| <= floor(forward * slope)
-        /// slope:
-        /// - 0.0 => linea
-        /// - 0.5 => cono stretto
-        /// - 1.0 => cono ampio (circa 45° su Manhattan grid)
-        /// </summary>
-        private static bool IsInCone(int sx, int sy, CardinalDirection facing, int tx, int ty, float slope)
-        {
-            int dx = tx - sx;
-            int dy = ty - sy;
+        // Patch 0.02.5A: IsInCone rimosso â€” usa FovUtils.IsInCone
 
-            int forward, side;
-
-            switch (facing)
-            {
-                case CardinalDirection.North:
-                    forward = dy; side = dx; break;
-                case CardinalDirection.South:
-                    forward = -dy; side = -dx; break;
-                case CardinalDirection.East:
-                    forward = dx; side = -dy; break;
-                case CardinalDirection.West:
-                    forward = -dx; side = dy; break;
-                default:
-                    return false;
-            }
-
-            if (forward <= 0)
-                return false;
-
-            int absSide = side < 0 ? -side : side;
-
-            // floor(forward * slope)
-            int maxSide = (int)Math.Floor((forward * slope) + 0.0001f);
-            return absSide <= maxSide;
-        }
     }
 }

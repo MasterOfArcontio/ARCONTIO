@@ -10,29 +10,85 @@ using static UnityEditor.PlayerSettings;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // World.cs — Patch 0.02.5A (commenti verbosi)
+    // =============================================================================
     /// <summary>
-    /// World:
-    /// Contiene stato globale + component store.
+    /// <b>World</b> — contenitore centrale dello stato simulativo di Arcontio.
     ///
-    /// Day10 (patch):
-    /// - Gli "occluder" NON sono piÃ¹ una struttura separata: sono oggetti del mondo (WorldObjectInstance)
-    /// - Manteniamo una OcclusionMap interna (griglia) come CACHE derivata da World.Objects
-    ///   per query veloci: BlocksVision/BlocksMovement.
+    /// <para>
+    /// Il World è il "source of truth" di tutti i fatti oggettivi della simulazione:
+    /// posizioni, componenti NPC, oggetti, occlusione, landmark, config globale.
+    /// NON contiene AI, logica di decisione o logica di rendering.
+    /// </para>
     ///
-    /// Nota:
-    /// - Restiamo coerenti col Core Standard: 1 object per cell.
-    /// - La cache viene aggiornata quando crei/distruggi oggetti o quando SetOccluder (wrapper) modifica celle.
+    /// <para><b>Principio architetturale fondamentale (Manifesto Arcontio):</b></para>
+    /// <para>
+    /// Il World contiene FATTI OGGETTIVI. La conoscenza soggettiva degli NPC
+    /// (cosa sanno, cosa hanno visto, cosa ricordano) sta nei component store
+    /// per-NPC (Memory, NpcObjectMemory, NpcLandmarkMemory, NpcPinnedFoodStockBeliefs).
+    /// Questa distinzione è NON negoziabile: viola il manifesto qualsiasi
+    /// Rule o System che usa World direttamente per decisioni che dovrebbero
+    /// basarsi sulla percezione dell'NPC.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>GlobalState</b> — config runtime (vision range, token params, ecc.)</item>
+    ///   <item><b>Component stores NPC</b> — NpcCore, Needs, Social, GridPos, NpcFacing, ecc.</item>
+    ///   <item><b>Component stores oggetti</b> — Objects, FoodStocks, ObjectUse, ecc.</item>
+    ///   <item><b>Memoria NPC</b> — Memory, NpcObjectMemory, NpcLandmarkMemory</item>
+    ///   <item><b>Cache derivate</b> — OcclusionMap, _objIdByCell, _blocksVision/Movement</item>
+    ///   <item><b>Pathfinding state</b> — delegato a <see cref="PathfindingState"/></item>
+    ///   <item><b>Debug/telemetry</b> — DebugFovTelemetry, DebugNpcTokens (solo osservabilità)</item>
+    /// </list>
+    ///
+    /// <para><b>Occluder policy (Day10+):</b></para>
+    /// <para>
+    /// Gli occluder NON sono più una struttura separata: sono oggetti del mondo
+    /// (<see cref="WorldObjectInstance"/>) con flag nella <see cref="ObjectDef"/>.
+    /// La <see cref="OcclusionMap"/> è una CACHE derivata da World.Objects per
+    /// query veloci di visione/movimento. Viene aggiornata incrementalmente
+    /// quando si creano/distruggono oggetti con flag IsOccluder/BlocksVision/BlocksMovement.
+    /// </para>
+    ///
+    /// <para><b>Standard 1 object per cell:</b></para>
+    /// <para>
+    /// Una cella può contenere al massimo 1 oggetto. L'indice <c>_objIdByCell</c>
+    /// mantiene la mappatura cella→objectId in O(1). <c>CreateObject</c> rifiuta
+    /// il piazzamento se la cella è già occupata.
+    /// </para>
+    ///
+    /// <para><b>Patch 0.02.5A:</b> solo aggiornamento commenti.</para>
     /// </summary>
     public sealed class World
     {
-        // ============================================================
+        // =====================================================================
         // GLOBAL / CONFIG
-        // ============================================================
+        // =====================================================================
+        // GlobalState contiene tutti i parametri di configurazione runtime
+        // che influenzano il comportamento della simulazione: vision range,
+        // token params, needs thresholds, landmark params, ecc.
+        //
+        // NOTA: GlobalState è una struct (valore), quindi viene copiata se
+        // passata per valore. Usare sempre 'world.Global.X' per accedere.
+        // =====================================================================
 
+        /// <summary>
+        /// Stato globale e parametri di configurazione runtime della simulazione.
+        /// Letto da tutti i System e le Rule che hanno bisogno di parametri condivisi.
+        /// </summary>
         public GlobalState Global;
 
-        // Dimensione griglia simulatore (spostabile in game_params.json)
+        /// <summary>
+        /// Larghezza della griglia in celle. Impostata da <c>InitMap</c>.
+        /// Leggibile da game_params.json tramite <c>WorldConfig.Sim.worldWidth</c>.
+        /// </summary>
         public int MapWidth { get; private set; }
+
+        /// <summary>
+        /// Altezza della griglia in celle. Impostata da <c>InitMap</c>.
+        /// </summary>
         public int MapHeight { get; private set; }
 
         // ============================================================
@@ -48,7 +104,7 @@ namespace Arcontio.Core
         ///   e avanzata 1 volta per tick dal SimulationHost.
         ///
         /// IMPORTANTISSIMO:
-        /// - Questa NON Ã¨ logica di simulazione.
+        /// - Questa NON è logica di simulazione.
         /// - Ã solo un canale di osservabilitÃ  per la view/debug.
         /// </summary>
         public DebugFovTelemetry DebugFovTelemetry { get; private set; }
@@ -57,9 +113,9 @@ namespace Arcontio.Core
         /// LandmarkRegistry (v0.02 Day2): registro oggettivo dei landmark.
         ///
         /// Nota:
-        /// - Ã world-side (non per-NPC).
+        /// - E' world-side (non per-NPC).
         /// - Viene costruito in bootstrap (SimulationHost) dopo il seeding della mappa.
-        /// - La view puÃ² leggerlo in modo read-only tramite GetNpcLandmarkOverlayData.
+        /// - La view può leggerlo in modo read-only tramite GetNpcLandmarkOverlayData.
         /// </summary>
         public LandmarkRegistry LandmarkRegistry { get; private set; }
 
@@ -77,22 +133,6 @@ namespace Arcontio.Core
         /// - Ã diagnostica: puÃ² essere disabilitata/ignorata senza cambiare gameplay.
         /// </summary>
         public readonly Dictionary<int, DebugNpcTokenLog> DebugNpcTokens = new();
-
-        // ============================================================
-        // LOCAL SEARCH FAILURE LEARNING (anti-loop avanzato)
-        // ============================================================
-        // Queste strutture sono volutamente molto piccole e locali.
-        // NON rappresentano conoscenza globale del mondo: servono solo a ricordare
-        // che una certa micro-ricerca locale, in quel contesto, ha gia' fallito
-        // poco fa, cosi' l'NPC non ripete immediatamente la stessa micro-scelta.
-        [Serializable]
-        public sealed class LocalSearchFailureRecord
-        {
-            public int FailureCount;
-            public int LastFailedTick = -1;
-            public int BlockedFirstStepCellIndex = -1;
-            public int LastProgressCellIndex = -1;
-        }
 
         /// <summary>
         /// TokenOutQueue (Patch 0.01P3 extension): coda "deferred" di TokenEnvelope OUT.
@@ -274,14 +314,33 @@ namespace Arcontio.Core
         // Definizioni logiche degli oggetti (caricate da ObjectDatabaseLoader)
         public readonly Dictionary<string, ObjectDef> ObjectDefs = new();
 
-        // ============================================================
+        // =====================================================================
         // COMPONENT STORES (NPC)
-        // ============================================================
+        // =====================================================================
+        // Ogni dizionario è un "component store": mappa npcId → componente.
+        // Questo pattern è ispirato all'ECS (Entity Component System):
+        // gli NPC non sono oggetti monolitici ma insiemi di componenti separati.
+        //
+        // ACCESSO: sempre tramite TryGetValue (difensivo) o tramite le API
+        // di World (es. TryGetNpcPos, GetFacing) che gestiscono i fallback.
+        //
+        // CHIAVE: npcId (int), assegnato in sequenza da _nextNpcId (parte da 1).
+        //         0 è riservato come "nessun NPC" / valore invalido.
+        // =====================================================================
 
+        /// <summary>Dati anagrafici e tratti di personalità dell'NPC (nome, carisma, ecc.).</summary>
         public readonly Dictionary<int, NpcCore> NpcCore = new();
+
+        /// <summary>Bisogni primari dell'NPC: fame, fatica, morale.</summary>
         public readonly Dictionary<int, Needs> Needs = new();
+
+        /// <summary>Stato sociale dell'NPC: leadership score, loyalty, justice perception.</summary>
         public readonly Dictionary<int, Social> Social = new();
+
+        /// <summary>Posizione corrente sulla griglia (cella X, Y). Source of truth per il movimento.</summary>
         public readonly Dictionary<int, GridPosition> GridPos = new();
+
+        /// <summary>Orientamento corrente dell'NPC (N/E/S/W). Influenza il cono visivo.</summary>
         public readonly Dictionary<int, CardinalDirection> NpcFacing = new();
 
         // ============================================================
@@ -347,6 +406,15 @@ namespace Arcontio.Core
         //
         public readonly Dictionary<int, NpcLandmarkMemory> NpcLandmarkMemory = new Dictionary<int, NpcLandmarkMemory>(2048);
 
+        /// <summary>
+        /// Store per-NPC degli edge complessi imparati dalla navigazione fisica.
+        /// Patch 0.02.09.A — chiave: npcId, valore: NpcComplexEdgeMemories.
+        /// NOTA: il campo si chiama NpcComplexEdgeMemories (plurale) per evitare
+        /// il conflitto di nome con la classe NpcComplexEdgeMemory.
+        /// </summary>
+        public readonly Dictionary<int, NpcComplexEdgeMemory> NpcComplexEdgeMemories
+            = new Dictionary<int, NpcComplexEdgeMemory>(256);
+
         // ============================================================
         // DEBUG CLICK-MOVE / MACRO ROUTE OVERLAY
         // ============================================================
@@ -359,39 +427,48 @@ namespace Arcontio.Core
         // - la view deve poi leggere il risultato in modo read-only attraverso
         //   GetNpcLandmarkOverlayData, senza rifare planning lato view.
         public readonly Dictionary<int, NpcMacroRoutePlan> NpcMacroRoutes = new Dictionary<int, NpcMacroRoutePlan>(256);
-        public readonly Dictionary<int, NpcMacroRouteExecutionState> NpcMacroRouteExecution = new Dictionary<int, NpcMacroRouteExecutionState>(256);
 
         // ============================================================
-        // DEBUG NAVIGATION PATHS (cella-per-cella)
+        // PATHFINDING STATE (stato esecutivo pathfinding per-NPC)
         // ============================================================
-        // Questi store esistono solo per osservabilita' runtime.
-        // Non sono la fonte di verita' del pathfinding: servono a disegnare l'overlay
-        // distinguendo chiaramente i tratti prodotti da:
-        // - LM_PATH
-        // - DIRECT_COMMIT
-        // - GOAL_LOCAL_SEARCH / JPS
-        public readonly Dictionary<int, List<GridPosition>> DebugLmPathCells = new Dictionary<int, List<GridPosition>>(256);
-        public readonly Dictionary<int, List<GridPosition>> DebugDirectPathCells = new Dictionary<int, List<GridPosition>>(256);
-        public readonly Dictionary<int, List<GridPosition>> DebugJumpPathCells = new Dictionary<int, List<GridPosition>>(256);
-
-        // Stato esecutivo opzionale per direct/local search. Per la patch corrente viene usato
-        // soprattutto per debug card, overlay e controllo del lifecycle della ricerca locale.
-        public readonly Dictionary<int, NpcDirectCommitExecutionState> NpcDirectCommitExecution = new Dictionary<int, NpcDirectCommitExecutionState>(256);
-        public readonly Dictionary<int, NpcGoalLocalSearchExecutionState> NpcGoalLocalSearchExecution = new Dictionary<int, NpcGoalLocalSearchExecutionState>(256);
-
-        // npcId -> (signature locale -> record di fallimento recente)
-        public readonly Dictionary<int, Dictionary<long, LocalSearchFailureRecord>> NpcLocalSearchFailureLearning = new Dictionary<int, Dictionary<long, LocalSearchFailureRecord>>(256);
-// ============================================================
+        // Lo stato esecutivo del pathfinding (macro-route execution, direct commit,
+        // local search, failure learning, debug path cella-per-cella) è stato
+        // estratto in PathfindingState per alleggerire World.cs.
+        //
+        // Accedere sempre tramite world.Pathfinding.X() invece di world.X() direttamente.
+        //
+        // Vedi: Scripts/Core/World/PathfindingState.cs
+        public PathfindingState Pathfinding { get; private set; }
+        // =====================================================================
         // COMPONENT STORES (OBJECTS)
-        // ============================================================
+        // =====================================================================
+        // Stesso pattern component store degli NPC, ma per gli oggetti del mondo.
+        // Chiave: objectId (int), assegnato in sequenza da _nextObjectId (parte da 1).
+        //
+        // REGOLA "1 object per cell":
+        // Una cella può contenere al massimo 1 oggetto. Questo è enforced da
+        // CreateObject tramite l'indice _objIdByCell. Violarlo produce comportamenti
+        // non definiti nella pipeline di percezione e occlusione.
+        // =====================================================================
 
-        // Oggetti nel mondo
+        /// <summary>
+        /// Registro di tutti gli oggetti del mondo.
+        /// Contiene istanza, posizione, defId, ownerKind/ownerId.
+        /// </summary>
         public readonly Dictionary<int, WorldObjectInstance> Objects = new();
 
-        // Use state (letto occupato, ecc.)
+        /// <summary>
+        /// Stato di utilizzo degli oggetti interagibili (letto libero/occupato, ecc.).
+        /// Consultato da NeedsDecisionRule per decidere se un letto è disponibile.
+        /// </summary>
         public readonly Dictionary<int, ObjectUseState> ObjectUse = new();
 
-        // Food stock ?in-world? (pile/stockpile)
+        /// <summary>
+        /// Stock di cibo associato agli oggetti food_stock nel mondo.
+        /// Un food_stock con Units = 0 è considerato esaurito.
+        /// Scrivere qui direttamente è sconsigliato: usa <see cref="SetFoodStock"/>
+        /// per mantenere coerenza con i pinned belief degli NPC.
+        /// </summary>
         public readonly Dictionary<int, FoodStockComponent> FoodStocks = new();
         // ============================================================
         // OWNERSHIP / POSSESSION (Pinned *belief*, NOT telepathy)
@@ -449,41 +526,94 @@ namespace Arcontio.Core
         // Nota: un muro Ã¨ un oggetto, e qui mettiamo i suoi flags runtime (vision/movement + cost).
         public readonly Dictionary<int, Occluder> ObjectOccluders = new();
 
-        // ============================================================
-        // MOVEMENT / SCAN (intent + execution state)
-        // ============================================================
+        // =====================================================================
+        // MOVEMENT / SCAN (intent + stato esecuzione)
+        // =====================================================================
+        // Il movimento in Arcontio è intenzionale (non fisico diretto):
+        //   1) Una Rule/Decision scrive un MoveIntent nel World.
+        //   2) Il MovementSystem esegue fisicamente il movimento tick per tick.
+        //
+        // Questo disaccoppiamento permette di:
+        //   - gestire collisioni senza che le Rule debbano preoccuparsene
+        //   - cancellare/modificare l'intento da fuori senza interrompere il System
+        //   - osservare lo stato di movimento dalla View senza accedere al System
+        //
+        // Lo scan (IdleScanSystem) implementa "nessuna visione a 360° gratuita":
+        // un NPC idle ruota periodicamente per coprire gli angoli ciechi.
+        // =====================================================================
 
         /// <summary>
-        /// Intento di movimento per NPC.
-        /// - Scritto dalla decision pipeline (Rules/Decision).
-        /// - Consumato dal MovementSystem (fisico).
+        /// Intento di movimento per NPC: verso quale cella si sta muovendo e perché.
+        /// <list type="bullet">
+        ///   <item>Scritto da Rule/Command (es. <c>SetMoveIntentCommand</c>).</item>
+        ///   <item>Consumato da <c>MovementSystem</c> ogni tick.</item>
+        ///   <item>Se <c>Active = false</c>: l'NPC è fermo (o ha raggiunto la destinazione).</item>
+        /// </list>
         /// </summary>
         public readonly Dictionary<int, MoveIntent> NpcMoveIntents = new();
 
         /// <summary>
         /// Stato di scan direzionale per NPC.
-        /// - "Nessuna visione a 360Â° gratuita": scan = 4 turn consecutivi.
-        /// - Consumato da IdleScanSystem.
+        /// <list type="bullet">
+        ///   <item>Uno scan = 4 rotazioni consecutive (una per tick).</item>
+        ///   <item>Attivato da <c>IdleScanSystem</c> quando l'NPC è idle.</item>
+        ///   <item>Implementa "nessuna visione a 360° gratuita" del manifesto.</item>
+        /// </list>
         /// </summary>
         public readonly Dictionary<int, ScanState> NpcScanStates = new();
 
 
-        // ============================================================
-        // INTERNAL GRID INDEXES / CACHES
-        // ============================================================
+        // =====================================================================
+        // INTERNAL GRID INDEXES / CACHE
+        // =====================================================================
+        // Queste strutture sono CACHE DERIVATE dallo stato degli oggetti.
+        // Non sono fonti di verità: vengono ricostruite da RebuildDerivedCachesGlobal
+        // e mantenute incrementalmente da CreateObject/DestroyObject.
+        //
+        // _objIdByCell: permette GetObjectAt(x,y) in O(1) invece di O(N).
+        //               Valore -1 = cella vuota (sentinella).
+        //
+        // _blocksVision / _blocksMovement: cache booleana dell'occlusione.
+        //   Derivata dai flag ObjectDef (IsOccluder, BlocksVision, BlocksMovement).
+        //   Usata da HasLineOfSight e IsMovementBlocked (chiamate molto frequenti).
+        //
+        // IMPORTANTE: dopo qualsiasi modifica agli oggetti che influisce sull'occlusione,
+        // queste cache DEVONO essere aggiornate. In DevMode usare RebuildDerivedCachesGlobal.
+        // =====================================================================
 
-        // 1 object per cell -> indice rapido cella->objId
-        private int[] _objIdByCell; // length = MapWidth*MapHeight, -1 = empty
+        /// <summary>
+        /// Indice cella → objectId. Dimensione: MapWidth * MapHeight.
+        /// Valore -1 = cella vuota. Aggiornato da CreateObject/DestroyObject.
+        /// </summary>
+        private int[] _objIdByCell;
 
-        // Cache occlusione: derivata dagli oggetti (ObjectOccluders o def flags)
-        private bool[] _blocksVision;    // length = MapWidth*MapHeight
-        private bool[] _blocksMovement;  // length = MapWidth*MapHeight
+        /// <summary>
+        /// Cache booleana: la cella blocca la visione? Derivata dagli ObjectDef.
+        /// Usata da <c>HasLineOfSight</c> ogni tick per ogni NPC.
+        /// </summary>
+        private bool[] _blocksVision;
 
-        // ============================================================
-        // IDS
-        // ============================================================
+        /// <summary>
+        /// Cache booleana: la cella blocca il movimento? Derivata dagli ObjectDef.
+        /// Usata da <c>MovementSystem.TryMoveTo</c> ogni tick.
+        /// </summary>
+        private bool[] _blocksMovement;
 
+        // =====================================================================
+        // ID COUNTERS
+        // =====================================================================
+        // I counter sono incrementali e non riutilizzano ID liberati.
+        // Questo garantisce che ogni NPC/oggetto abbia un ID univoco per tutta
+        // la durata della simulazione, semplificando debug e log.
+        //
+        // NOTA: ID = 0 è riservato come sentinella "nessuno/invalido".
+        // I counter partono da 1 per rispettare questa convenzione.
+        // =====================================================================
+
+        /// <summary>Prossimo ID NPC disponibile. Incrementato da <c>CreateNpc</c>.</summary>
         private int _nextNpcId = 1;
+
+        /// <summary>Prossimo ID oggetto disponibile. Incrementato da <c>CreateObject</c>.</summary>
         private int _nextObjectId = 1;
 
         // ============================================================
@@ -503,6 +633,14 @@ namespace Arcontio.Core
             // - La build vera e propria avviene dopo il seeding (SimulationHost), quando
             //   oggetti come muri/porte sono stati piazzati sulla griglia.
             LandmarkRegistry = new LandmarkRegistry();
+
+            // ============================================================
+            // PATHFINDING STATE — inizializzazione
+            // ============================================================
+            // PathfindingState riceve la config per leggere i parametri di
+            // local search (commitMinSteps, failureLearning, ecc.) senza
+            // dipendere da singleton statici.
+            Pathfinding = new PathfindingState(config);
 
             // ============================================================
             // DEBUG FOV TELEMETRY (config-driven)
@@ -832,7 +970,7 @@ namespace Arcontio.Core
         public bool InBounds(int x, int y)
             => x >= 0 && y >= 0 && x < MapWidth && y < MapHeight;
 
-        private int CellIndex(int x, int y) => (y * MapWidth) + x;
+        public int CellIndex(int x, int y) => (y * MapWidth) + x;
 
         public int GetObjectAt(int x, int y)
         {
@@ -860,6 +998,21 @@ namespace Arcontio.Core
             {
                 mem = new NpcLandmarkMemory(maxLandmarks: Global.MaxLandmarksPerNpc, maxEdges: Global.MaxEdgesPerNpc);
                 NpcLandmarkMemory[npcId] = mem;
+            }
+            return mem;
+        }
+
+        /// <summary>
+        /// Crea (se mancante) lo store degli edge complessi per un NPC.
+        /// Patch 0.02.09.A.
+        /// </summary>
+        private NpcComplexEdgeMemory EnsureNpcComplexEdgeMemory(int npcId)
+        {
+            if (!NpcComplexEdgeMemories.TryGetValue(npcId, out var mem) || mem == null)
+            {
+                int maxEdges = Global.MaxEdgesPerNpc > 0 ? Global.MaxEdgesPerNpc : 128;
+                mem = new NpcComplexEdgeMemory(maxEdges);
+                NpcComplexEdgeMemories[npcId] = mem;
             }
             return mem;
         }
@@ -895,7 +1048,12 @@ namespace Arcontio.Core
 
             // Day3: impariamo SOLO se la cella di arrivo è un nodo landmark.
             if (!LandmarkRegistry.TryGetActiveNodeIdAtCell(toX, toY, out int nodeId))
+            {
+                // Patch 0.02.09.A: accumula il passo nel recording attivo se presente.
+                if (NpcComplexEdgeMemories.TryGetValue(npcId, out var recMem) && recMem != null)
+                    recMem.RecordStep(toX, toY);
                 return;
+            }
 
             long now = TickContext.CurrentTickIndex;
 
@@ -910,8 +1068,26 @@ namespace Arcontio.Core
             {
                 if (LandmarkRegistry.TryGetActiveEdgeCostCells(prev, nodeId, out int costCells))
                 {
+                    // Edge semplice nel registry: apprendi normalmente.
                     mem.LearnEdge(prev, nodeId, costCells, now, evictionCooldownTicks: Global.LandmarkEvictionCooldownTicks);
                 }
+                else
+                {
+                    // Patch 0.02.09.A: edge NON nel registry → tenta di produrre
+                    // un edge complesso soggettivo dal recording accumulato.
+                    var complexMem = EnsureNpcComplexEdgeMemory(npcId);
+                    complexMem.TryCompleteRecording(nodeId, now, out _);
+                }
+                // In ogni caso: avvia un nuovo recording dal nodo corrente.
+                // Patch 0.02.09.A: anche dopo un edge semplice, partiamo a registrare
+                // il prossimo tratto (potrebbe non avere un edge nel registry).
+                EnsureNpcComplexEdgeMemory(npcId).StartPathRecording(nodeId, toX, toY);
+            }
+            else if (prev == 0)
+            {
+                // Primo landmark visto: avvia il recording.
+                // Patch 0.02.09.A
+                EnsureNpcComplexEdgeMemory(npcId).StartPathRecording(nodeId, toX, toY);
             }
 
             // Aggiorniamo sempre l'ultimo landmark visitato quando ne vediamo uno.
@@ -1239,204 +1415,132 @@ namespace Arcontio.Core
             }
         }
 
+        /// <summary>
+        /// Avvia l'esecuzione della macro-route per un NPC verso la cella target.
+        /// Pianifica (o ripianifica) la route, poi delega l'inizializzazione
+        /// dello stato esecutivo a <see cref="PathfindingState.BeginMacroRouteExecution"/>.
+        /// </summary>
         public void BeginMacroRouteExecutionForNpc(int npcId, int targetX, int targetY)
         {
             if (!ExistsNpc(npcId))
                 return;
 
+            // Pianifica (o aggiorna) la macro-route nel registro NpcMacroRoutes.
             RebuildDebugMacroRouteForNpc(npcId, targetX, targetY);
 
-            if (!NpcMacroRoutes.TryGetValue(npcId, out var plan) || plan == null || !plan.Succeeded)
-            {
-                NpcMacroRouteExecution.Remove(npcId);
-                return;
-            }
+            // Ottieni la posizione corrente dell'NPC per decidere se saltare il primo nodo.
+            GridPos.TryGetValue(npcId, out var pos);
 
-            var state = new NpcMacroRouteExecutionState
-            {
-                Active = true,
-                IsDoingLastMile = false,
-                NextRouteNodeIndex = 0,
-                FinalTargetCellX = targetX,
-                FinalTargetCellY = targetY,
-                ImmediateTargetX = targetX,
-                ImmediateTargetY = targetY,
-                FailureReason = string.Empty,
-            };
-
-            if (GridPos.TryGetValue(npcId, out var pos) && plan.NodeIds.Count > 0)
-            {
-                if (LandmarkRegistry != null && LandmarkRegistry.TryGetActiveNodeById(plan.NodeIds[0], out var startNode) && startNode != null)
-                {
-                    if (startNode.CellX == pos.X && startNode.CellY == pos.Y)
-                        state.NextRouteNodeIndex = 1;
-                }
-            }
-
-            if (state.NextRouteNodeIndex >= plan.NodeIds.Count)
-            {
-                state.IsDoingLastMile = true;
-                state.ImmediateTargetX = targetX;
-                state.ImmediateTargetY = targetY;
-            }
-            else if (LandmarkRegistry != null && LandmarkRegistry.TryGetActiveNodeById(plan.NodeIds[state.NextRouteNodeIndex], out var nextNode) && nextNode != null)
-            {
-                state.ImmediateTargetX = nextNode.CellX;
-                state.ImmediateTargetY = nextNode.CellY;
-            }
-            else
-            {
-                state.IsDoingLastMile = true;
-                state.ImmediateTargetX = targetX;
-                state.ImmediateTargetY = targetY;
-            }
-
-            NpcMacroRouteExecution[npcId] = state;
+            // Delega l'inizializzazione dello stato esecutivo a PathfindingState.
+            Pathfinding.BeginMacroRouteExecution(npcId, targetX, targetY, pos, NpcMacroRoutes, LandmarkRegistry);
         }
 
+        /// <summary>
+        /// Cancella la macro-route pianificata e il suo stato esecutivo per un NPC.
+        /// Delega a <see cref="PathfindingState.ClearMacroRoute"/>.
+        /// </summary>
         public void ClearDebugMacroRouteForNpc(int npcId)
         {
-            NpcMacroRoutes.Remove(npcId);
-            NpcMacroRouteExecution.Remove(npcId);
+            Pathfinding.ClearMacroRoute(npcId, NpcMacroRoutes);
         }
 
+        /// <summary>
+        /// Avanza l'esecuzione della macro-route quando l'NPC raggiunge la cella indicata.
+        /// Delega la logica a <see cref="PathfindingState.TryAdvanceMacroRouteAtCell"/>.
+        /// </summary>
         public bool TryAdvanceMacroRouteExecutionAtCell(int npcId, int cellX, int cellY)
         {
-            if (!NpcMacroRouteExecution.TryGetValue(npcId, out var state) || state == null || !state.Active)
-                return false;
-            if (!NpcMacroRoutes.TryGetValue(npcId, out var plan) || plan == null || !plan.Succeeded)
-                return false;
-
-            bool changed = false;
-            if (!state.IsDoingLastMile)
-            {
-                while (state.NextRouteNodeIndex < plan.NodeIds.Count)
-                {
-                    if (LandmarkRegistry == null || !LandmarkRegistry.TryGetActiveNodeById(plan.NodeIds[state.NextRouteNodeIndex], out var nextNode) || nextNode == null)
-                    {
-                        state.IsDoingLastMile = true;
-                        state.ImmediateTargetX = state.FinalTargetCellX;
-                        state.ImmediateTargetY = state.FinalTargetCellY;
-                        changed = true;
-                        break;
-                    }
-
-                    if (nextNode.CellX != cellX || nextNode.CellY != cellY)
-                        break;
-
-                    state.NextRouteNodeIndex++;
-                    changed = true;
-                }
-
-                if (state.NextRouteNodeIndex >= plan.NodeIds.Count)
-                {
-                    state.IsDoingLastMile = true;
-                    state.ImmediateTargetX = state.FinalTargetCellX;
-                    state.ImmediateTargetY = state.FinalTargetCellY;
-                    changed = true;
-                }
-                else if (!state.IsDoingLastMile && LandmarkRegistry != null && LandmarkRegistry.TryGetActiveNodeById(plan.NodeIds[state.NextRouteNodeIndex], out var currentNode) && currentNode != null)
-                {
-                    state.ImmediateTargetX = currentNode.CellX;
-                    state.ImmediateTargetY = currentNode.CellY;
-                }
-            }
-            else
-            {
-                state.ImmediateTargetX = state.FinalTargetCellX;
-                state.ImmediateTargetY = state.FinalTargetCellY;
-            }
-
-            NpcMacroRouteExecution[npcId] = state;
-            return changed;
+            return Pathfinding.TryAdvanceMacroRouteAtCell(npcId, cellX, cellY, NpcMacroRoutes, LandmarkRegistry);
         }
 
+        /// <summary>
+        /// Restituisce il target immediato della macro-route in esecuzione.
+        /// Delega a <see cref="PathfindingState.TryGetMacroExecutionImmediateTarget"/>.
+        /// </summary>
         public bool TryGetMacroExecutionImmediateTarget(int npcId, out int targetX, out int targetY, out bool isLastMile, out int nextNodeId)
         {
-            targetX = 0;
-            targetY = 0;
-            isLastMile = false;
-            nextNodeId = 0;
-
-            if (!NpcMacroRouteExecution.TryGetValue(npcId, out var state) || state == null || !state.Active)
-                return false;
-
-            targetX = state.ImmediateTargetX;
-            targetY = state.ImmediateTargetY;
-            isLastMile = state.IsDoingLastMile;
-
-            if (!isLastMile && NpcMacroRoutes.TryGetValue(npcId, out var plan) && plan != null && state.NextRouteNodeIndex >= 0 && state.NextRouteNodeIndex < plan.NodeIds.Count)
-                nextNodeId = plan.NodeIds[state.NextRouteNodeIndex];
-
-            return true;
+            return Pathfinding.TryGetMacroExecutionImmediateTarget(npcId, out targetX, out targetY, out isLastMile, out nextNodeId, NpcMacroRoutes);
         }
 
+        /// <summary>
+        /// Marca l'esecuzione della macro-route come bloccata.
+        /// Delega a <see cref="PathfindingState.MarkMacroRouteBlocked"/>.
+        /// </summary>
         public void MarkMacroRouteExecutionBlocked(int npcId, bool duringLastMile)
         {
-            if (!NpcMacroRouteExecution.TryGetValue(npcId, out var state) || state == null)
-                return;
-
-            state.Active = false;
-            state.FailureReason = duringLastMile ? "BlockedLastMile" : "BlockedToNextLandmark";
-            NpcMacroRouteExecution[npcId] = state;
+            Pathfinding.MarkMacroRouteBlocked(npcId, duringLastMile);
         }
 
+        /// <summary>
+        /// Produce il report di debug della navigazione per un NPC (usato dalla card UI overlay).
+        /// Aggrega lo stato da: MoveIntent, MacroRouteExecution, DirectCommit, GoalLocalSearch,
+        /// debug path cells — tutti gestiti da <see cref="PathfindingState"/>.
+        /// </summary>
         public bool TryGetNpcMacroRouteDebugReport(int npcId, out NpcMacroRouteDebugReport report)
         {
-            // Runtime-first: la card deve funzionare anche senza macro-route LM attiva.
-            bool hasPlan = NpcMacroRoutes.TryGetValue(npcId, out var plan) && plan != null;
-            bool hasMacroState = NpcMacroRouteExecution.TryGetValue(npcId, out var state) && state != null;
-            bool hasDirectState = NpcDirectCommitExecution.TryGetValue(npcId, out var directState) && directState != null;
-            bool hasLocalState = NpcGoalLocalSearchExecution.TryGetValue(npcId, out var localState) && localState != null;
+            // Recupera i dati dal piano macro-route (World-side).
+            bool hasPlan       = NpcMacroRoutes.TryGetValue(npcId, out var plan) && plan != null;
             bool hasMoveIntent = NpcMoveIntents.TryGetValue(npcId, out var intent) && intent.Active;
 
+            // Recupera gli stati esecutivi da PathfindingState.
+            bool hasMacroState  = Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var state)      && state != null;
+            bool hasDirectState = Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var directState) && directState != null;
+            bool hasLocalState  = Pathfinding.GoalLocalSearchExecution.TryGetValue(npcId, out var localState) && localState != null;
+
+            // Se non c'è nulla di attivo, non c'è report.
             if (!hasPlan && !hasMacroState && !hasDirectState && !hasLocalState && !hasMoveIntent)
             {
                 report = default;
                 return false;
             }
 
-            bool execActive = false;
-            bool isLastMile = false;
-            int nextIndex = -1;
-            int nextNodeId = 0;
-            int routeNodeCount = hasPlan ? plan.NodeIds.Count : 0;
-            int startNodeId = hasPlan ? plan.StartNodeId : 0;
-            int targetNodeId = hasPlan ? plan.TargetNodeId : 0;
-            int targetCellX = hasPlan ? plan.TargetCellX : 0;
-            int targetCellY = hasPlan ? plan.TargetCellY : 0;
-            string failureReason = hasPlan ? (plan.FailureReason ?? string.Empty) : string.Empty;
-            int immediateX = targetCellX;
-            int immediateY = targetCellY;
-            string execFail = string.Empty;
-            string navigationMode = "IDLE";
-            int lastModeSwitchTick = -1;
-            string lastModeSwitchReason = string.Empty;
-            bool goalLocalSearchActive = false;
-            int goalLocalSearchBudgetRemaining = 0;
+            bool   execActive                  = false;
+            bool   isLastMile                  = false;
+            int    nextIndex                   = -1;
+            int    nextNodeId                  = 0;
+            int    routeNodeCount              = hasPlan ? plan.NodeIds.Count : 0;
+            int    startNodeId                 = hasPlan ? plan.StartNodeId  : 0;
+            int    targetNodeId                = hasPlan ? plan.TargetNodeId : 0;
+            int    targetCellX                 = hasPlan ? plan.TargetCellX  : 0;
+            int    targetCellY                 = hasPlan ? plan.TargetCellY  : 0;
+            string failureReason               = hasPlan ? (plan.FailureReason ?? string.Empty) : string.Empty;
+            int    immediateX                  = targetCellX;
+            int    immediateY                  = targetCellY;
+            string execFail                    = string.Empty;
+            string navigationMode              = "IDLE";
+            int    lastModeSwitchTick          = -1;
+            string lastModeSwitchReason        = string.Empty;
+            bool   goalLocalSearchActive       = false;
+            int    goalLocalSearchBudgetRemaining = 0;
 
+            // MoveIntent: fonte di verità del target se attivo.
             if (hasMoveIntent)
             {
                 targetCellX = intent.TargetX;
                 targetCellY = intent.TargetY;
-                immediateX = intent.TargetX;
-                immediateY = intent.TargetY;
-                execActive = true;
+                immediateX  = intent.TargetX;
+                immediateY  = intent.TargetY;
+                execActive  = true;
             }
 
+            // MacroRoute execution state.
             if (hasMacroState)
             {
-                execActive = execActive || state.Active;
-                isLastMile = state.IsDoingLastMile;
-                nextIndex = state.NextRouteNodeIndex;
-                immediateX = state.ImmediateTargetX;
-                immediateY = state.ImmediateTargetY;
-                execFail = state.FailureReason ?? string.Empty;
-                navigationMode = !string.IsNullOrEmpty(state.NavigationMode) ? state.NavigationMode : (state.Active ? "LM_PATH" : navigationMode);
-                lastModeSwitchTick = state.LastModeSwitchTick;
+                execActive         = execActive || state.Active;
+                isLastMile         = state.IsDoingLastMile;
+                nextIndex          = state.NextRouteNodeIndex;
+                immediateX         = state.ImmediateTargetX;
+                immediateY         = state.ImmediateTargetY;
+                execFail           = state.FailureReason ?? string.Empty;
+                navigationMode     = !string.IsNullOrEmpty(state.NavigationMode)
+                                         ? state.NavigationMode
+                                         : (state.Active ? "LM_PATH" : navigationMode);
+                lastModeSwitchTick   = state.LastModeSwitchTick;
                 lastModeSwitchReason = state.LastModeSwitchReason ?? string.Empty;
+
                 if (!isLastMile && hasPlan && nextIndex >= 0 && nextIndex < plan.NodeIds.Count)
                     nextNodeId = plan.NodeIds[nextIndex];
+
                 if (targetCellX == 0 && targetCellY == 0)
                 {
                     targetCellX = state.FinalTargetCellX;
@@ -1444,61 +1548,64 @@ namespace Arcontio.Core
                 }
             }
 
+            // Direct commit state (priorità su macro-route per il target immediato).
             if (hasDirectState && directState.Active)
             {
-                execActive = true;
-                immediateX = directState.ImmediateTargetX;
-                immediateY = directState.ImmediateTargetY;
-                targetCellX = directState.FinalTargetCellX;
-                targetCellY = directState.FinalTargetCellY;
+                execActive    = true;
+                immediateX    = directState.ImmediateTargetX;
+                immediateY    = directState.ImmediateTargetY;
+                targetCellX   = directState.FinalTargetCellX;
+                targetCellY   = directState.FinalTargetCellY;
                 navigationMode = "DIRECT_COMMIT";
                 if (string.IsNullOrEmpty(lastModeSwitchReason))
                     lastModeSwitchReason = "DirectCommitActive";
             }
 
+            // Goal local search state (priorità massima sul target immediato).
             if (hasLocalState && localState.Active)
             {
-                execActive = true;
-                goalLocalSearchActive = true;
+                execActive                    = true;
+                goalLocalSearchActive         = true;
                 goalLocalSearchBudgetRemaining = localState.BudgetRemaining;
-                immediateX = localState.ImmediateTargetX;
-                immediateY = localState.ImmediateTargetY;
-                targetCellX = localState.FinalTargetCellX;
-                targetCellY = localState.FinalTargetCellY;
+                immediateX    = localState.ImmediateTargetX;
+                immediateY    = localState.ImmediateTargetY;
+                targetCellX   = localState.FinalTargetCellX;
+                targetCellY   = localState.FinalTargetCellY;
                 navigationMode = "GOAL_LOCAL_SEARCH";
                 if (string.IsNullOrEmpty(lastModeSwitchReason))
                     lastModeSwitchReason = "LocalSearchActive";
             }
 
+            // Fallback navigationMode dai debug path se nessuno stato è esplicitamente attivo.
             if (execActive && navigationMode == "IDLE")
             {
-                if (DebugJumpPathCells.TryGetValue(npcId, out var jumpDbg) && jumpDbg != null && jumpDbg.Count >= 2)
+                if (Pathfinding.DebugJumpPathCells.TryGetValue(npcId, out var jumpDbg) && jumpDbg != null && jumpDbg.Count >= 2)
                     navigationMode = "GOAL_LOCAL_SEARCH";
-                else if (DebugDirectPathCells.TryGetValue(npcId, out var directDbg) && directDbg != null && directDbg.Count >= 2)
+                else if (Pathfinding.DebugDirectPathCells.TryGetValue(npcId, out var directDbg) && directDbg != null && directDbg.Count >= 2)
                     navigationMode = "DIRECT_COMMIT";
                 else if (hasPlan)
                     navigationMode = "LM_PATH";
             }
 
             report = new NpcMacroRouteDebugReport(
-                hasRoute: hasPlan && plan.Succeeded,
-                startNodeId: startNodeId,
-                targetNodeId: targetNodeId,
-                routeNodeCount: routeNodeCount,
-                targetCellX: targetCellX,
-                targetCellY: targetCellY,
-                failureReason: failureReason,
-                executionActive: execActive,
-                isDoingLastMile: isLastMile,
-                nextRouteNodeIndex: nextIndex,
-                nextRouteNodeId: nextNodeId,
-                immediateTargetX: immediateX,
-                immediateTargetY: immediateY,
-                executionFailureReason: execFail,
-                navigationMode: navigationMode,
-                lastModeSwitchTick: lastModeSwitchTick,
-                lastModeSwitchReason: lastModeSwitchReason,
-                goalLocalSearchActive: goalLocalSearchActive,
+                hasRoute:                      hasPlan && plan.Succeeded,
+                startNodeId:                   startNodeId,
+                targetNodeId:                  targetNodeId,
+                routeNodeCount:                routeNodeCount,
+                targetCellX:                   targetCellX,
+                targetCellY:                   targetCellY,
+                failureReason:                 failureReason,
+                executionActive:               execActive,
+                isDoingLastMile:               isLastMile,
+                nextRouteNodeIndex:            nextIndex,
+                nextRouteNodeId:               nextNodeId,
+                immediateTargetX:              immediateX,
+                immediateTargetY:              immediateY,
+                executionFailureReason:        execFail,
+                navigationMode:                navigationMode,
+                lastModeSwitchTick:            lastModeSwitchTick,
+                lastModeSwitchReason:          lastModeSwitchReason,
+                goalLocalSearchActive:         goalLocalSearchActive,
                 goalLocalSearchBudgetRemaining: goalLocalSearchBudgetRemaining
             );
             return true;
@@ -1533,20 +1640,8 @@ namespace Arcontio.Core
             }
 
             var dbg = Config?.Sim?.landmarks?.debug;
-            bool microTestEnabled = dbg != null && dbg.enabled && dbg.microTestDummyGraph;
-
-            if (microTestEnabled)
-            {
-                // Report coerente con il grafo dummy generato in GetNpcLandmarkOverlayData().
-                report = new NpcLandmarkDebugReport(
-                    knownLandmarksCount: 2,
-                    knownEdgesCount: 1,
-                    poiAnchorCount: 0,
-                    replansPerMin: 0f,
-                    failuresPerMin: 0f,
-                    blacklistSize: 0);
-                return true;
-            }
+            // Nota (v0.03.02.a): microTestDummyGraph rimosso — scaffolding Day1 non più necessario.
+            // Il grafo landmark reale è disponibile dal Day2.
 
             // Day3: contatori soggettivi.
             // Importante:
@@ -1644,29 +1739,7 @@ namespace Arcontio.Core
             if (!NpcCore.ContainsKey(npcId))
                 return;
 
-            var dbg = Config?.Sim?.landmarks?.debug;
-            bool microTestEnabled = dbg != null && dbg.enabled && dbg.microTestDummyGraph;
-
-            if (microTestEnabled)
-            {
-                if (GridPos.TryGetValue(npcId, out var gp))
-                {
-                    int dx = Mathf.Max(1, dbg.microTestDummyDistanceCells);
-                    int ax = Mathf.Clamp(gp.X, 0, MapWidth - 1);
-                    int ay = Mathf.Clamp(gp.Y, 0, MapHeight - 1);
-                    int bx = Mathf.Clamp(ax + dx, 0, MapWidth - 1);
-                    int by = ay;
-
-                    if (bx == ax)
-                        bx = Mathf.Clamp(ax - dx, 0, MapWidth - 1);
-
-                    outWorldNodes?.Add(new LandmarkOverlayNode(cellX: ax, cellY: ay, kind: 0));
-                    outWorldNodes?.Add(new LandmarkOverlayNode(cellX: bx, cellY: by, kind: 0));
-                    outWorldEdges?.Add(new LandmarkOverlayEdge(ax: ax, ay: ay, bx: bx, by: by, reliability01: 1f));
-                }
-
-                return;
-            }
+            // Nota (v0.03.02.a): microTestDummyGraph rimosso — scaffolding Day1 non più necessario.
 
             // ============================================================
             // WORLD GRAPH
@@ -1691,294 +1764,137 @@ namespace Arcontio.Core
             // ============================================================
             FillDebugNavigationPathOverlayData(npcId, outLmPathEdges, outDirectPathEdges, outJumpPathEdges);
         }
+        /// <summary>
+        /// Riempie gli edge di overlay cella-per-cella per i tre layer di navigazione.
+        /// Delega a <see cref="PathfindingState.FillDebugNavigationPathOverlayData"/>.
+        /// </summary>
         private void FillDebugNavigationPathOverlayData(
             int npcId,
             System.Collections.Generic.List<LandmarkOverlayEdge> outLmPathEdges,
             System.Collections.Generic.List<LandmarkOverlayEdge> outDirectPathEdges,
             System.Collections.Generic.List<LandmarkOverlayEdge> outJumpPathEdges)
         {
-            if (outLmPathEdges != null) outLmPathEdges.Clear();
-            if (outDirectPathEdges != null) outDirectPathEdges.Clear();
-            if (outJumpPathEdges != null) outJumpPathEdges.Clear();
-
-            if (DebugLmPathCells.TryGetValue(npcId, out var lmCells) && lmCells != null)
-                AppendOverlayEdgesFromCellPath(lmCells, outLmPathEdges);
-
-            if (DebugDirectPathCells.TryGetValue(npcId, out var directCells) && directCells != null)
-                AppendOverlayEdgesFromCellPath(directCells, outDirectPathEdges);
-
-            if (DebugJumpPathCells.TryGetValue(npcId, out var jumpCells) && jumpCells != null)
-                AppendOverlayEdgesFromCellPath(jumpCells, outJumpPathEdges);
+            Pathfinding.FillDebugNavigationPathOverlayData(npcId, outLmPathEdges, outDirectPathEdges, outJumpPathEdges);
         }
 
-        private static void AppendOverlayEdgesFromCellPath(
-            System.Collections.Generic.List<GridPosition> path,
-            System.Collections.Generic.List<LandmarkOverlayEdge> outEdges)
-        {
-            if (path == null || outEdges == null || path.Count < 2)
-                return;
-
-            for (int i = 0; i < path.Count - 1; i++)
-            {
-                var a = path[i];
-                var b = path[i + 1];
-                outEdges.Add(new LandmarkOverlayEdge(ax: a.X, ay: a.Y, bx: b.X, by: b.Y, reliability01: 1f));
-            }
-        }
-
+        /// <summary>
+        /// Cancella tutti i debug path e gli stati DirectCommit/GoalLocalSearch per un NPC.
+        /// Delega a <see cref="PathfindingState.ClearDebugNavigationPaths"/>.
+        /// </summary>
         public void ClearDebugNavigationPathsForNpc(int npcId)
         {
-            DebugLmPathCells.Remove(npcId);
-            DebugDirectPathCells.Remove(npcId);
-            DebugJumpPathCells.Remove(npcId);
-            NpcDirectCommitExecution.Remove(npcId);
-            NpcGoalLocalSearchExecution.Remove(npcId);
+            Pathfinding.ClearDebugNavigationPaths(npcId);
         }
 
+        /// <summary>
+        /// Imposta il path diretto (DIRECT_COMMIT) per un NPC.
+        /// Delega a <see cref="PathfindingState.SetDebugDirectPath"/>.
+        /// </summary>
         public void SetDebugDirectPathForNpc(int npcId, System.Collections.Generic.List<Vector2Int> path)
         {
-            var list = EnsureDebugPathList(DebugDirectPathCells, npcId);
-            CopyVectorPathToGridPath(path, list);
-
-            var state = new NpcDirectCommitExecutionState
-            {
-                Active = list.Count >= 2,
-                FinalTargetCellX = list.Count > 0 ? list[list.Count - 1].X : 0,
-                FinalTargetCellY = list.Count > 0 ? list[list.Count - 1].Y : 0,
-                ImmediateTargetX = list.Count > 1 ? list[1].X : 0,
-                ImmediateTargetY = list.Count > 1 ? list[1].Y : 0,
-                NextPathIndex = list.Count > 1 ? 1 : 0,
-                FailureReason = string.Empty,
-            };
-            state.CurrentPath.Clear();
-            state.CurrentPath.AddRange(list);
-            NpcDirectCommitExecution[npcId] = state;
-
-            if (NpcMacroRouteExecution.TryGetValue(npcId, out var macro) && macro != null)
-            {
-                macro.NavigationMode = state.Active ? "DIRECT_COMMIT" : macro.NavigationMode;
-                macro.LastModeSwitchTick = (int)TickContext.CurrentTickIndex;
-                macro.LastModeSwitchReason = state.Active ? "DirectPathPrepared" : macro.LastModeSwitchReason;
-                NpcMacroRouteExecution[npcId] = macro;
-            }
+            Pathfinding.SetDebugDirectPath(npcId, path);
         }
 
+        /// <summary>
+        /// Imposta il path di local search / JPS (GOAL_LOCAL_SEARCH) per un NPC.
+        /// Delega a <see cref="PathfindingState.SetDebugJumpPath"/>.
+        /// </summary>
         public void SetDebugJumpPathForNpc(int npcId, System.Collections.Generic.List<Vector2Int> path, int budgetRemaining)
         {
-            var list = EnsureDebugPathList(DebugJumpPathCells, npcId);
-            CopyVectorPathToGridPath(path, list);
-
-            var state = new NpcGoalLocalSearchExecutionState
-            {
-                Active = list.Count >= 2,
-                FinalTargetCellX = list.Count > 0 ? list[list.Count - 1].X : 0,
-                FinalTargetCellY = list.Count > 0 ? list[list.Count - 1].Y : 0,
-                ImmediateTargetX = list.Count > 1 ? list[1].X : 0,
-                ImmediateTargetY = list.Count > 1 ? list[1].Y : 0,
-                BudgetRemaining = budgetRemaining,
-                NextPathIndex = list.Count > 1 ? 1 : 0,
-                CommitStepsRemaining = GetLocalSearchCommitMinSteps(),
-                HasLastSuccessfulStep = false,
-                LastStepFromX = 0,
-                LastStepFromY = 0,
-                LastStepToX = 0,
-                LastStepToY = 0,
-                FailureReason = string.Empty,
-            };
-            state.CurrentPath.Clear();
-            state.CurrentPath.AddRange(list);
-            NpcGoalLocalSearchExecution[npcId] = state;
-
-            if (NpcDirectCommitExecution.TryGetValue(npcId, out var direct) && direct != null)
-            {
-                direct.Active = false;
-                direct.FailureReason = string.Empty;
-                NpcDirectCommitExecution[npcId] = direct;
-            }
-
-            if (NpcMacroRouteExecution.TryGetValue(npcId, out var macro) && macro != null)
-            {
-                macro.NavigationMode = state.Active ? "GOAL_LOCAL_SEARCH" : macro.NavigationMode;
-                macro.LastModeSwitchTick = (int)TickContext.CurrentTickIndex;
-                macro.LastModeSwitchReason = state.Active ? "DirectBlocked" : macro.LastModeSwitchReason;
-                NpcMacroRouteExecution[npcId] = macro;
-            }
+            Pathfinding.SetDebugJumpPath(npcId, path, budgetRemaining);
         }
 
+        /// <summary>
+        /// Aggiunge uno step al debug path LM (verde) per un NPC.
+        /// Delega a <see cref="PathfindingState.AppendDebugLmStep"/>.
+        /// </summary>
         public void AppendDebugLmStepForNpc(int npcId, int fromX, int fromY, int toX, int toY)
         {
-            AppendDebugStep(DebugLmPathCells, npcId, fromX, fromY, toX, toY);
+            Pathfinding.AppendDebugLmStep(npcId, fromX, fromY, toX, toY);
         }
 
+        /// <summary>
+        /// Stub per compatibilità — il path direct viene impostato per intero in SetDebugDirectPathForNpc.
+        /// </summary>
         public void AppendDebugDirectStepForNpc(int npcId, int fromX, int fromY, int toX, int toY)
         {
-            // Intenzionalmente vuoto: manteniamo solo il path azzurro completo pianificato.
+            Pathfinding.AppendDebugDirectStep(npcId, fromX, fromY, toX, toY);
         }
 
+        /// <summary>
+        /// Stub per compatibilità — il path jump viene impostato per intero in SetDebugJumpPathForNpc.
+        /// </summary>
         public void AppendDebugJumpStepForNpc(int npcId, int fromX, int fromY, int toX, int toY)
         {
-            // Intenzionalmente vuoto: manteniamo un solo magenta, quello del path locale corrente.
+            Pathfinding.AppendDebugJumpStep(npcId, fromX, fromY, toX, toY);
         }
 
         // ============================================================
-        // LOCAL SEARCH FAILURE LEARNING HELPERS
+        // FAILURE LEARNING / CLEAR STATE — deleghe a PathfindingState
         // ============================================================
-        private long MakeLocalSearchFailureSignature(int originX, int originY, int targetX, int targetY)
-        {
-            unchecked
-            {
-                long a = ((long)(originX & 0xFFFF) << 48);
-                long b = ((long)(originY & 0xFFFF) << 32);
-                long c = ((long)(targetX & 0xFFFF) << 16);
-                long d = (long)(targetY & 0xFFFF);
-                return a | b | c | d;
-            }
-        }
+        // Questi metodi sono stati estratti in PathfindingState.
+        // World espone solo wrapper pubblici per compatibilità con il codice
+        // che li chiama tramite world.X(...).
 
-        private Dictionary<long, LocalSearchFailureRecord> EnsureNpcLocalSearchFailureLearning(int npcId)
-        {
-            if (!NpcLocalSearchFailureLearning.TryGetValue(npcId, out var map) || map == null)
-            {
-                map = new Dictionary<long, LocalSearchFailureRecord>(16);
-                NpcLocalSearchFailureLearning[npcId] = map;
-            }
-            return map;
-        }
-
-        private void PruneExpiredLocalSearchFailures(int npcId, int memoryTicks, int nowTick)
-        {
-            if (memoryTicks <= 0)
-                return;
-            if (!NpcLocalSearchFailureLearning.TryGetValue(npcId, out var map) || map == null || map.Count == 0)
-                return;
-
-            var toRemove = new List<long>();
-            foreach (var kv in map)
-            {
-                var rec = kv.Value;
-                if (rec == null)
-                {
-                    toRemove.Add(kv.Key);
-                    continue;
-                }
-                if (nowTick - rec.LastFailedTick > memoryTicks)
-                    toRemove.Add(kv.Key);
-            }
-
-            for (int i = 0; i < toRemove.Count; i++)
-                map.Remove(toRemove[i]);
-        }
-
-        private bool TryGetRecentLocalSearchFailure(int npcId, long signature, int memoryTicks, int nowTick, out LocalSearchFailureRecord record)
-        {
-            record = null;
-            PruneExpiredLocalSearchFailures(npcId, memoryTicks, nowTick);
-            if (!NpcLocalSearchFailureLearning.TryGetValue(npcId, out var map) || map == null)
-                return false;
-            if (!map.TryGetValue(signature, out record) || record == null)
-                return false;
-            if (memoryTicks > 0 && nowTick - record.LastFailedTick > memoryTicks)
-                return false;
-            return true;
-        }
-
-        private void RememberLocalSearchFailure(int npcId, int originX, int originY, int targetX, int targetY, int blockedFirstStepCellIndex, int lastProgressCellIndex)
-        {
-            var cfg = Config?.Sim?.landmarks?.localSearch ?? new Arcontio.Core.Config.LandmarkLocalSearchParams();
-            if (!cfg.enableFailureLearning)
-                return;
-
-            int nowTick = (int)TickContext.CurrentTickIndex;
-            var map = EnsureNpcLocalSearchFailureLearning(npcId);
-            var sig = MakeLocalSearchFailureSignature(originX, originY, targetX, targetY);
-            if (!map.TryGetValue(sig, out var rec) || rec == null)
-            {
-                rec = new LocalSearchFailureRecord();
-                map[sig] = rec;
-            }
-
-            rec.FailureCount++;
-            rec.LastFailedTick = nowTick;
-            rec.BlockedFirstStepCellIndex = blockedFirstStepCellIndex;
-            rec.LastProgressCellIndex = lastProgressCellIndex;
-        }
-
-        private void RememberLocalSearchSuccess(int npcId, int originX, int originY, int targetX, int targetY)
-        {
-            if (!NpcLocalSearchFailureLearning.TryGetValue(npcId, out var map) || map == null)
-                return;
-
-            map.Remove(MakeLocalSearchFailureSignature(originX, originY, targetX, targetY));
-        }
-
+        /// <summary>
+        /// Cancella il failure learning della local search per un NPC.
+        /// Delega a <see cref="PathfindingState.ClearLocalSearchFailureLearning"/>.
+        /// </summary>
         public void ClearNpcLocalSearchFailureLearning(int npcId)
         {
-            NpcLocalSearchFailureLearning.Remove(npcId);
+            Pathfinding.ClearLocalSearchFailureLearning(npcId);
         }
 
+        /// <summary>
+        /// Azzera lo stato della local search per un NPC.
+        /// Delega a <see cref="PathfindingState.ClearLocalSearchState"/>.
+        /// </summary>
         public void ClearNpcLocalSearchState(int npcId, string failureReason = "")
         {
-            DebugJumpPathCells.Remove(npcId);
-            if (NpcGoalLocalSearchExecution.TryGetValue(npcId, out var state) && state != null)
-            {
-                state.Active = false;
-                state.FailureReason = failureReason ?? string.Empty;
-                NpcGoalLocalSearchExecution[npcId] = state;
-            }
-            else
-            {
-                NpcGoalLocalSearchExecution.Remove(npcId);
-            }
+            Pathfinding.ClearLocalSearchState(npcId, failureReason);
         }
 
+        /// <summary>
+        /// Azzera lo stato del direct commit per un NPC.
+        /// Delega a <see cref="PathfindingState.ClearDirectCommitState"/>.
+        /// </summary>
         public void ClearNpcDirectCommitState(int npcId, string failureReason = "")
         {
-            if (NpcDirectCommitExecution.TryGetValue(npcId, out var state) && state != null)
-            {
-                state.Active = false;
-                state.FailureReason = failureReason ?? string.Empty;
-                NpcDirectCommitExecution[npcId] = state;
-            }
-            else
-            {
-                NpcDirectCommitExecution.Remove(npcId);
-            }
+            Pathfinding.ClearDirectCommitState(npcId, failureReason);
         }
 
-        private static System.Collections.Generic.List<GridPosition> EnsureDebugPathList(
-            Dictionary<int, List<GridPosition>> store,
-            int npcId)
-        {
-            if (!store.TryGetValue(npcId, out var list) || list == null)
-            {
-                list = new List<GridPosition>(64);
-                store[npcId] = list;
-            }
-            return list;
-        }
+        // ============================================================
+        // GVD-DIN OVERLAY DATA (v0.03)
+        // ============================================================
 
-        private static void CopyVectorPathToGridPath(System.Collections.Generic.List<Vector2Int> src, System.Collections.Generic.List<GridPosition> dst)
+        /// <summary>
+        /// Popola il GvdDinOverlaySnapshot per il debug overlay.
+        ///
+        /// Patch 0.03.02.a.3:
+        /// Il metodo ora passa anche quando hybrid_landmark.use_hybrid_extractor=true,
+        /// non solo quando gvd_din.enabled=true.
+        /// LandmarkRegistry.FillGvdDinOverlayData gestisce già entrambi i branch.
+        /// </summary>
+        public void GetGvdDinOverlayData(GvdDinOverlaySnapshot snapshot)
         {
-            dst.Clear();
-            if (src == null)
+            if (snapshot == null)
                 return;
 
-            for (int i = 0; i < src.Count; i++)
-                dst.Add(new GridPosition(src[i].x, src[i].y));
-        }
+            snapshot.Clear(); // IsValid = false per default
 
-        private static void AppendDebugStep(Dictionary<int, List<GridPosition>> store, int npcId, int fromX, int fromY, int toX, int toY)
-        {
-            var list = EnsureDebugPathList(store, npcId);
-            if (list.Count == 0)
-                list.Add(new GridPosition(fromX, fromY));
-            else
-            {
-                var last = list[list.Count - 1];
-                if (last.X != fromX || last.Y != fromY)
-                    list.Add(new GridPosition(fromX, fromY));
-            }
-            list.Add(new GridPosition(toX, toY));
+            // Controlla se almeno uno dei due sistemi è attivo.
+            // Hybrid ha priorità su GVD-DIN (stesso ordine di LandmarkRegistry).
+            var hybridCfg = Config?.Sim?.hybrid_landmark;
+            bool hybridActive = hybridCfg != null && hybridCfg.use_hybrid_extractor;
+
+            var gvdCfg = Config?.Sim?.gvd_din;
+            bool gvdActive = gvdCfg != null && gvdCfg.enabled;
+
+            if (!hybridActive && !gvdActive)
+                return;
+
+            // Delega al LandmarkRegistry che conosce entrambi i computer.
+            LandmarkRegistry?.FillGvdDinOverlayData(snapshot);
         }
 
         private void FillDebugMacroRouteOverlayData(
@@ -2021,7 +1937,7 @@ namespace Arcontio.Core
         /// SetFoodStock (Patch 5.1):
         /// Punto unico (best practice) per scrivere/aggiornare FoodStocks.
         ///
-        /// PerchÃ© esiste:
+        /// Perché esiste:
         /// - Evita "footgun" dove qualcuno fa FoodStocks[objId]=... senza aggiornare altri sistemi.
         /// - Qui aggiorniamo anche il pinned belief (NpcPinnedFoodStockBeliefs) quando appropriato.
         ///
@@ -2035,10 +1951,10 @@ namespace Arcontio.Core
             // Scrittura del componente oggettivo (fact).
             FoodStocks[objectId] = stock;
 
-            // Se lo stock Ã¨ privato di un NPC, aggiungiamo (o aggiorniamo) la belief pinned.
-            // Nota: questo non significa che l'NPC lo "vede ora", significa che lo stock Ã¨ stato
-            // creato/assegnato a lui in un punto del gameplay dove la conoscenza Ã¨ implicita
-            // (es. lo ha posato lui, lo ha ricevuto come proprietÃ ).
+            // Se lo stock è privato di un NPC, aggiungiamo (o aggiorniamo) la belief pinned.
+            // Nota: questo non significa che l'NPC lo "vede ora", significa che lo stock è stato
+            // creato/assegnato a lui in un punto del gameplay dove la conoscenza è implicita
+            // (es. lo ha posato lui, lo ha ricevuto come proprietà ).
             if (stock.OwnerKind == OwnerKind.Npc && stock.OwnerId != 0)
             {
                 if (Objects.TryGetValue(objectId, out var obj) && obj != null)
@@ -2358,8 +2274,8 @@ if (!NpcAction.ContainsKey(id))
         /// Imposta lo stato di azione dell'NPC.
         /// 
         /// Nota:
-        /// - Non validiamo "consistenza semantica" qui (es: puoi dire Eat anche se non c'Ã¨ cibo).
-        /// - Questo Ã¨ volutamente un canale descrittivo/diagnostico.
+        /// - Non validiamo "consistenza semantica" qui (es: puoi dire Eat anche se non c'è cibo).
+        /// - Questo è volutamente un canale descrittivo/diagnostico.
         /// - Le guardie sono solo su ExistsNpc.
         /// </summary>
         public void SetNpcAction(int npcId, NpcActionState state)
@@ -2742,62 +2658,6 @@ if (!NpcAction.ContainsKey(id))
             return bv;
         }
 
-        /// <summary>
-        /// Wrapper legacy: SetOccluder(x,y,Occluder).
-        ///
-        /// Per non rompere i test/seed giÃ  scritti, questo:
-        /// - crea (o aggiorna) un oggetto in quella cella con defId="_runtime_occluder"
-        /// - lo mette in ObjectOccluders e aggiorna la cache.
-        ///
-        /// Migrazione consigliata:
-        /// - sostituiscilo con CreateObject("wall_stone", x,y) ecc.
-        /// </summary>
-        public void SetOccluder(int x, int y, Occluder occ)
-        {
-            if (!InBounds(x, y)) return;
-
-            // assicura una def runtime (se manca, la creiamo al volo)
-            const string runtimeDef = "_runtime_occluder";
-            if (!ObjectDefs.ContainsKey(runtimeDef))
-            {
-                ObjectDefs[runtimeDef] = new ObjectDef
-                {
-                    Id = runtimeDef,
-                    DisplayName = "Runtime Occluder",
-                    IsOccluder = true,
-                    BlocksVision = true,
-                    BlocksMovement = true,
-                    VisionCost = 1f
-                };
-            }
-
-            int existing = GetObjectAt(x, y);
-            int objId;
-
-            if (existing >= 0)
-            {
-                objId = existing;
-                // se c?Ã¨ un oggetto ?normale? giÃ  piazzato, qui sei in conflitto con 1 object/cell.
-                // Per il debug: logghiamo e sovrascriviamo SOLO l?occlusione cache, senza cambiare l?oggetto.
-                // Se vuoi muro ?vero?, devi piazzare l?oggetto muro e non un letto nella stessa cella.
-                Debug.LogWarning($"[World] SetOccluder: cell ({x},{y}) already has obj={existing}. " +
-                                 $"Keeping object, overriding occlusion cache only.");
-            }
-            else
-            {
-                objId = CreateObject(runtimeDef, x, y, OwnerKind.None, -1);
-                if (objId < 0) return;
-            }
-
-            // store runtime occluder component
-            ObjectOccluders[objId] = occ;
-
-            // aggiorna cache cella
-            int idx = CellIndex(x, y);
-            _blocksVision[idx] = occ.BlocksVision;
-            _blocksMovement[idx] = occ.BlocksMovement;
-        }
-
         private void RebuildOcclusionCell(int x, int y)
         {
             if (!InBounds(x, y)) return;
@@ -2825,1028 +2685,105 @@ if (!NpcAction.ContainsKey(id))
 
 
         // ============================================================
-        // MOVEMENT PATH HELPERS (patch 0.02.05.2f)
-        // ============================================================
+        // =====================================================================
+        // MOVEMENT PATH HELPERS — Patch 0.02.05.B
+        // =====================================================================
+        // Questi metodi erano precedentemente implementati qui.
+        // Sono stati spostati in MovementPathfinder (Scripts/Core/Systems/Movement/)
+        // perché sono algoritmi di navigazione, non dati del World.
+        //
+        // Questi thin wrapper mantengono la firma pubblica invariata per
+        // compatibilità con MovementSystem, DevOrderNpcMoveToCellCommand
+        // e qualsiasi altro consumer che chiama world.X(npcId, ...).
+        //
+        // NOTA: i metodi di gestione dello stato local search (HasActiveNpcLocalSearch,
+        // TryReplanNpcLocalSearch, ecc.) sono anch'essi in MovementPathfinder perché
+        // sono strettamente accoppiati agli algoritmi di navigazione locale.
+        // =====================================================================
 
         /// <summary>
-        /// Prova a costruire un percorso "diretto" coerente con il movimento reale dell'NPC.
-        ///
-        /// IMPORTANTISSIMO:
-        /// - Qui "diretto" NON significa semplicemente "vedo il target".
-        /// - Significa invece: "se da questa cella continuo a fare step greedy verso il target,
-        ///   riesco davvero ad arrivarci senza urtare muri e senza attraversare NPC".
-        ///
-        /// Perché serve questa distinzione:
-        /// - in ARCONTIO vogliamo che il Direct Commit abbia priorità sui landmark,
-        ///   ma solo quando esiste davvero un piano locale eseguibile;
-        /// - se usassimo solo la LOS, potremmo etichettare come diretto un movimento che poi
-        ///   si schianta contro un muro o contro una geometria concava.
-        ///
-        /// Output:
-        /// - outCells contiene SEMPRE la sequenza completa delle celle del path, inclusa la sorgente.
-        /// - se il metodo restituisce false, outCells viene lasciata vuota.
+        /// True se l'NPC ha una local search attiva in questo tick.
+        /// Delega a <see cref="MovementPathfinder.HasActiveNpcLocalSearch"/>.
         /// </summary>
-        public bool TryBuildGreedyDirectPath(int npcId, int startX, int startY, int targetX, int targetY, List<Vector2Int> outCells)
-        {
-            if (outCells == null)
-                return false;
-
-            outCells.Clear();
-
-            if (!InBounds(startX, startY) || !InBounds(targetX, targetY))
-                return false;
-
-            outCells.Add(new Vector2Int(startX, startY));
-
-            int x = startX;
-            int y = startY;
-
-            // Difesa importante: mettiamo un tetto di sicurezza per evitare loop infiniti
-            // in caso di bug logici futuri.
-            int safety = MapWidth * MapHeight + 8;
-
-            while ((x != targetX || y != targetY) && safety-- > 0)
-            {
-                int dx = targetX - x;
-                int dy = targetY - y;
-
-                int stepX = 0;
-                int stepY = 0;
-
-                if (Mathf.Abs(dx) >= Mathf.Abs(dy))
-                    stepX = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
-                else
-                    stepY = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
-
-                int nextX = x + stepX;
-                int nextY = y + stepY;
-
-                bool moved = false;
-                if (IsWalkableForPathing(npcId, nextX, nextY, targetX, targetY))
-                {
-                    x = nextX;
-                    y = nextY;
-                    outCells.Add(new Vector2Int(x, y));
-                    moved = true;
-                }
-                else
-                {
-                    // Fallback minimo coerente con MovementSystem: se l'asse scelto non funziona,
-                    // proviamo l'altro asse. Se fallisce anche quello, il path diretto NON esiste.
-                    if (stepX != 0)
-                    {
-                        stepX = 0;
-                        stepY = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
-                    }
-                    else
-                    {
-                        stepY = 0;
-                        stepX = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
-                    }
-
-                    nextX = x + stepX;
-                    nextY = y + stepY;
-
-                    if ((stepX != 0 || stepY != 0) && IsWalkableForPathing(npcId, nextX, nextY, targetX, targetY))
-                    {
-                        x = nextX;
-                        y = nextY;
-                        outCells.Add(new Vector2Int(x, y));
-                        moved = true;
-                    }
-                }
-
-                if (!moved)
-                {
-                    outCells.Clear();
-                    return false;
-                }
-            }
-
-            if (x != targetX || y != targetY)
-            {
-                outCells.Clear();
-                return false;
-            }
-
-            return true;
-        }
+ /*       public bool HasActiveNpcLocalSearch(int npcId)
+            => MovementPathfinder.HasActiveNpcLocalSearch(this, npcId);
 
         /// <summary>
-        /// Costruisce il prefisso diretto massimo coerente con il MovementSystem.
-        /// Non richiede che il target finale sia interamente raggiungibile: si ferma al primo blocco.
-        /// Serve per rendere visibile la fase direct iniziale anche nei casi "direct poi local search".
+        /// Restituisce il prossimo step della local search attiva.
+        /// Delega a <see cref="MovementPathfinder.TryGetActiveNpcLocalSearchNextStep"/>.
         /// </summary>
-        public bool TryBuildGreedyDirectPrefixPath(int npcId, int startX, int startY, int targetX, int targetY, List<Vector2Int> outCells)
-        {
-            if (outCells == null)
-                return false;
-
-            outCells.Clear();
-            if (!InBounds(startX, startY) || !InBounds(targetX, targetY))
-                return false;
-
-            int x = startX;
-            int y = startY;
-            outCells.Add(new Vector2Int(x, y));
-
-            int safety = (MapWidth * MapHeight) + 8;
-            while ((x != targetX || y != targetY) && safety-- > 0)
-            {
-                int dx = targetX - x;
-                int dy = targetY - y;
-
-                int stepX = 0;
-                int stepY = 0;
-                if (Mathf.Abs(dx) >= Mathf.Abs(dy))
-                    stepX = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
-                else
-                    stepY = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
-
-                bool moved = false;
-                int nextX = x + stepX;
-                int nextY = y + stepY;
-                if (IsWalkableForPathing(npcId, nextX, nextY, targetX, targetY))
-                {
-                    x = nextX;
-                    y = nextY;
-                    outCells.Add(new Vector2Int(x, y));
-                    moved = true;
-                }
-                else
-                {
-                    if (stepX != 0)
-                    {
-                        stepX = 0;
-                        stepY = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
-                    }
-                    else
-                    {
-                        stepY = 0;
-                        stepX = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
-                    }
-
-                    nextX = x + stepX;
-                    nextY = y + stepY;
-                    if ((stepX != 0 || stepY != 0) && IsWalkableForPathing(npcId, nextX, nextY, targetX, targetY))
-                    {
-                        x = nextX;
-                        y = nextY;
-                        outCells.Add(new Vector2Int(x, y));
-                        moved = true;
-                    }
-                }
-
-                if (!moved)
-                    break;
-            }
-
-            return outCells.Count >= 2;
-        }
-
-        // ============================================================
-        // PATCH 0.02.02R / 0.02.02Q compat - helper richiesti dal
-        // MovementSystem attuale per la local search bounded.
-        // ============================================================
-
-        public bool HasActiveNpcLocalSearch(int npcId)
-        {
-            return NpcGoalLocalSearchExecution.TryGetValue(npcId, out var state)
-                && state != null
-                && state.Active;
-        }
-
         public bool TryGetActiveNpcLocalSearchNextStep(int npcId, out int stepX, out int stepY)
-        {
-            stepX = 0;
-            stepY = 0;
-
-            if (!NpcGoalLocalSearchExecution.TryGetValue(npcId, out var state) || state == null || !state.Active)
-                return false;
-
-            if (state.CurrentPath == null || state.CurrentPath.Count == 0)
-                return false;
-
-            // NextPathIndex punta alla prossima cella da consumare.
-            if (state.NextPathIndex < 0 || state.NextPathIndex >= state.CurrentPath.Count)
-                return false;
-
-            var next = state.CurrentPath[state.NextPathIndex];
-            stepX = next.X;
-            stepY = next.Y;
-            return true;
-        }
-
-        public void AdvanceNpcLocalSearchAfterSuccessfulStep(int npcId, int fromX, int fromY, int toX, int toY)
-        {
-            if (!NpcGoalLocalSearchExecution.TryGetValue(npcId, out var state) || state == null || !state.Active)
-                return;
-
-            // Memorizziamo l’ultimo passo riuscito per poter impedire
-            // il replan immediato inverso A -> B -> A.
-            state.HasLastSuccessfulStep = true;
-            state.LastStepFromX = fromX;
-            state.LastStepFromY = fromY;
-            state.LastStepToX = toX;
-            state.LastStepToY = toY;
-
-            if (state.CommitStepsRemaining > 0)
-                state.CommitStepsRemaining--;
-
-            if (state.BudgetRemaining > 0)
-                state.BudgetRemaining--;
-
-            // Avanza l’indice del path se il passo eseguito coincide con quello atteso.
-            if (state.NextPathIndex >= 0 && state.NextPathIndex < state.CurrentPath.Count)
-            {
-                var expected = state.CurrentPath[state.NextPathIndex];
-                if (expected.X == toX && expected.Y == toY)
-                {
-                    state.NextPathIndex++;
-                }
-                else
-                {
-                    // Riallineamento difensivo: cerchiamo la cella raggiunta nel path corrente.
-                    int found = -1;
-                    for (int i = 0; i < state.CurrentPath.Count; i++)
-                    {
-                        if (state.CurrentPath[i].X == toX && state.CurrentPath[i].Y == toY)
-                        {
-                            found = i;
-                            break;
-                        }
-                    }
-
-                    state.NextPathIndex = found >= 0 ? found + 1 : state.CurrentPath.Count;
-                }
-            }
-
-            // Caso 1: target finale raggiunto -> chiusura pulita.
-            if (toX == state.FinalTargetCellX && toY == state.FinalTargetCellY)
-            {
-                state.Active = false;
-                state.CurrentPath.Clear();
-                state.NextPathIndex = 0;
-                state.ImmediateTargetX = toX;
-                state.ImmediateTargetY = toY;
-
-                NpcGoalLocalSearchExecution[npcId] = state;
-                DebugJumpPathCells.Remove(npcId);
-                SetMacroRouteNavigationMode(npcId, "IDLE", "LocalSearchCompletedTargetReached");
-                return;
-            }
-
-            // Caso 2: mini-path consumato ma problema locale non ancora risolto.
-            // NON rilasciamo subito a LM_PATH: forziamo un replan al tick successivo.
-            if (state.NextPathIndex >= state.CurrentPath.Count)
-            {
-                state.CurrentPath.Clear();
-                state.NextPathIndex = 0;
-                state.ImmediateTargetX = state.FinalTargetCellX;
-                state.ImmediateTargetY = state.FinalTargetCellY;
-
-                // Manteniamo almeno 1 tick di ownership locale.
-                state.CommitStepsRemaining = Mathf.Max(state.CommitStepsRemaining, 1);
-
-                NpcGoalLocalSearchExecution[npcId] = state;
-                DebugJumpPathCells.Remove(npcId);
-                SetMacroRouteNavigationMode(npcId, "GOAL_LOCAL_SEARCH", "LocalSearchNeedsReplan");
-                return;
-            }
-
-            // Caso 3: path locale ancora vivo -> aggiorna il prossimo step e il magenta.
-            var nextStep = state.CurrentPath[state.NextPathIndex];
-            state.ImmediateTargetX = nextStep.X;
-            state.ImmediateTargetY = nextStep.Y;
-
-            NpcGoalLocalSearchExecution[npcId] = state;
-            RefreshDebugJumpPathFromLocalState(npcId);
-            SetMacroRouteNavigationMode(npcId, "GOAL_LOCAL_SEARCH", "LocalSearchStepCommitted");
-        }
-
-        public bool TryReplanNpcLocalSearch(int npcId, int currentX, int currentY)
-        {
-            if (!NpcGoalLocalSearchExecution.TryGetValue(npcId, out var state) || state == null || !state.Active)
-                return false;
-
-            var cfg = Config?.Sim?.landmarks?.localSearch ?? new LandmarkLocalSearchParams();
-
-            int maxVisited = state.BudgetRemaining > 0
-                ? Mathf.Max(8, state.BudgetRemaining)
-                : Mathf.Max(8, cfg.maxExpandedNodes);
-
-            var path = new List<Vector2Int>(64);
-
-            if (!TryBuildBoundedMovePath(
-                    npcId,
-                    currentX,
-                    currentY,
-                    state.FinalTargetCellX,
-                    state.FinalTargetCellY,
-                    maxVisited,
-                    path) || path.Count < 2)
-            {
-                state.FailureReason = "LocalReplanFailed";
-                NpcGoalLocalSearchExecution[npcId] = state;
-                return false;
-            }
-
-            // Guardrail anti backtrack immediato: se siamo ancora nel commitment
-            // e il nuovo primo passo è l’inverso esatto dell’ultimo passo riuscito, lo rifiutiamo.
-            if (ShouldPreventImmediateLocalBacktrack()
-                && state.CommitStepsRemaining > 0
-                && state.HasLastSuccessfulStep)
-            {
-                var next = path[1];
-                bool isImmediateBacktrack =
-                    currentX == state.LastStepToX &&
-                    currentY == state.LastStepToY &&
-                    next.x == state.LastStepFromX &&
-                    next.y == state.LastStepFromY;
-
-                if (isImmediateBacktrack)
-                {
-                    state.FailureReason = "RejectedImmediateBacktrack";
-                    NpcGoalLocalSearchExecution[npcId] = state;
-                    return false;
-                }
-            }
-
-            state.CurrentPath.Clear();
-            for (int i = 0; i < path.Count; i++)
-                state.CurrentPath.Add(new GridPosition(path[i].x, path[i].y));
-
-            // La cella [0] è la posizione corrente, quindi il prossimo step è [1].
-            state.NextPathIndex = 1;
-            state.ImmediateTargetX = state.CurrentPath[1].X;
-            state.ImmediateTargetY = state.CurrentPath[1].Y;
-            state.FailureReason = string.Empty;
-            state.Active = true;
-
-            NpcGoalLocalSearchExecution[npcId] = state;
-            RefreshDebugJumpPathFromLocalState(npcId);
-            SetMacroRouteNavigationMode(npcId, "GOAL_LOCAL_SEARCH", "LocalSearchReplanned");
-            return true;
-        }
-
-        private void SetMacroRouteNavigationMode(int npcId, string navigationMode, string reason)
-        {
-            // ============================================================
-            // Helper centralizzato per aggiornare lo stato di navigazione
-            // visibile nella card/debug report.
-            //
-            // NOTA:
-            // - non crea una macro-route dal nulla
-            // - aggiorna solo se per quell'NPC esiste già uno stato runtime
-            //   della macro execution
-            // ============================================================
-
-            if (!NpcMacroRouteExecution.TryGetValue(npcId, out var exec) || exec == null)
-                return;
-
-            exec.NavigationMode = navigationMode ?? string.Empty;
-            exec.LastModeSwitchReason = reason ?? string.Empty;
-            exec.LastModeSwitchTick = (int)TickContext.CurrentTickIndex;
-
-            NpcMacroRouteExecution[npcId] = exec;
-        }
-
-        private void RefreshDebugJumpPathFromLocalState(int npcId)
-        {
-            // ============================================================
-            // Il magenta visibile deve rappresentare UN SOLO path locale
-            // attivo corrente, non la somma di:
-            // - planned vecchio
-            // - storico eseguito
-            // - replanning precedenti
-            //
-            // Questo metodo riscrive il buffer magenta a partire soltanto
-            // dal path locale attualmente attivo.
-            // ============================================================
-
-            if (!NpcGoalLocalSearchExecution.TryGetValue(npcId, out var state)
-                || state == null
-                || !state.Active
-                || state.CurrentPath == null
-                || state.CurrentPath.Count < 2)
-            {
-                DebugJumpPathCells.Remove(npcId);
-                return;
-            }
-
-            int startIndex = Mathf.Clamp(
-                Mathf.Max(0, state.NextPathIndex - 1),
-                0,
-                state.CurrentPath.Count - 1);
-
-            var list = EnsureDebugPathList(DebugJumpPathCells, npcId);
-            list.Clear();
-
-            for (int i = startIndex; i < state.CurrentPath.Count; i++)
-                list.Add(state.CurrentPath[i]);
-
-            if (list.Count < 2)
-                DebugJumpPathCells.Remove(npcId);
-        }
-
-        private bool ShouldPreventImmediateLocalBacktrack()
-        {
-            // ============================================================
-            // Se true, quando la local search deve fare replan durante il
-            // commitment, il nuovo primo passo non può essere l'inverso
-            // immediato dell'ultimo passo riuscito.
-            //
-            // Questo è il guardrail che evita il ping-pong:
-            // A -> B
-            // poi replan
-            // poi B -> A
-            // ============================================================
-
-            return Config?.Sim?.landmarks?.localSearch?.preventImmediateBacktrack ?? true;
-        }
-
-        private int GetLocalSearchCommitMinSteps()
-        {
-            // ============================================================
-            // Numero minimo di step per cui la local search mantiene la
-            // ownership del movimento prima di poter considerare un replan
-            // o un rilascio.
-            // ============================================================
-
-            return Mathf.Max(1, Config?.Sim?.landmarks?.localSearch?.commitMinSteps ?? 3);
-        }
-
+            => MovementPathfinder.TryGetActiveNpcLocalSearchNextStep(this, npcId, out stepX, out stepY);
 
         /// <summary>
-        /// Wrapper comodo per i punti del codice che vogliono solo sapere se il Direct Commit
-        /// è legalmente attivabile, senza avere bisogno della lista completa di celle.
+        /// Avanza lo stato della local search dopo un passo riuscito.
+        /// Delega a <see cref="MovementPathfinder.AdvanceNpcLocalSearchAfterSuccessfulStep"/>.
+        /// </summary>
+        public void AdvanceNpcLocalSearchAfterSuccessfulStep(int npcId, int fromX, int fromY, int toX, int toY)
+            => MovementPathfinder.AdvanceNpcLocalSearchAfterSuccessfulStep(this, npcId, fromX, fromY, toX, toY);
+
+        /// <summary>
+        /// Tenta di ripianificare la local search dall'posizione corrente.
+        /// Delega a <see cref="MovementPathfinder.TryReplanNpcLocalSearch"/>.
+        /// </summary>
+        public bool TryReplanNpcLocalSearch(int npcId, int currentX, int currentY)
+            => MovementPathfinder.TryReplanNpcLocalSearch(this, npcId, currentX, currentY);
+
+        /// <summary>
+        /// True se il target è raggiungibile con path greedy diretto (senza macro-route).
+        /// Delega a <see cref="MovementPathfinder.CanNpcUseDirectPath"/>.
         /// </summary>
         public bool CanNpcUseDirectPath(int npcId, int targetX, int targetY)
-        {
-            if (!GridPos.TryGetValue(npcId, out var pos))
-                return false;
-
-            var scratch = new List<Vector2Int>(32);
-            return TryBuildGreedyDirectPath(npcId, pos.X, pos.Y, targetX, targetY, scratch);
-        }
+            => MovementPathfinder.CanNpcUseDirectPath(this, npcId, targetX, targetY);
 
         /// <summary>
-        /// Ricerca locale bounded su griglia 4-direzionale.
-        ///
-        /// IMPORTANTISSIMO:
-        /// - Questa NON è una sostituzione filosofica del sistema landmark.
-        /// - È un fallback operativo molto locale pensato per uscire da casi patologici:
-        ///   stanze, muri a U semplici, landmark immediato dietro ostacolo, ecc.
-        ///
-        /// Restituisce un path cella-per-cella completo (inclusa la sorgente) se riesce.
+        /// Costruisce un path greedy diretto completo verso il target.
+        /// Delega a <see cref="MovementPathfinder.TryBuildGreedyDirectPath"/>.
+        /// </summary>
+        public bool TryBuildGreedyDirectPath(int npcId, int startX, int startY, int targetX, int targetY, List<Vector2Int> outCells)
+            => MovementPathfinder.TryBuildGreedyDirectPath(this, npcId, startX, startY, targetX, targetY, outCells);
+
+        /// <summary>
+        /// Costruisce il prefisso diretto massimo (si ferma al primo blocco).
+        /// Delega a <see cref="MovementPathfinder.TryBuildGreedyDirectPrefixPath"/>.
+        /// </summary>
+        public bool TryBuildGreedyDirectPrefixPath(int npcId, int startX, int startY, int targetX, int targetY, List<Vector2Int> outCells)
+            => MovementPathfinder.TryBuildGreedyDirectPrefixPath(this, npcId, startX, startY, targetX, targetY, outCells);
+
+        /// <summary>
+        /// Ricerca locale bounded (BFS/JPS) per aggirare ostacoli locali.
+        /// Delega a <see cref="MovementPathfinder.TryBuildBoundedMovePath"/>.
         /// </summary>
         public bool TryBuildBoundedMovePath(int npcId, int startX, int startY, int targetX, int targetY, int maxVisited, List<Vector2Int> outCells)
-        {
-            if (outCells == null)
-                return false;
-
-            outCells.Clear();
-
-            if (!InBounds(startX, startY) || !InBounds(targetX, targetY))
-                return false;
-
-            var cfg = Config?.Sim?.landmarks?.localSearch ?? new Arcontio.Core.Config.LandmarkLocalSearchParams();
-            if (!cfg.enabled)
-                return false;
-
-            int expandedLimit = maxVisited > 0 ? Mathf.Min(maxVisited, Mathf.Max(8, cfg.maxExpandedNodes)) : Mathf.Max(8, cfg.maxExpandedNodes);
-            int iterationLimit = Mathf.Max(expandedLimit, cfg.maxIterations);
-            int radiusLimit = Mathf.Max(1, cfg.maxSearchRadius);
-            int jumpLimit = Mathf.Max(1, cfg.maxJumpDistance);
-            float hWeight = cfg.heuristicWeight <= 0f ? 1f : cfg.heuristicWeight;
-            int nowTick = (int)TickContext.CurrentTickIndex;
-
-            int blockedFirstStepCellIndex = -1;
-            if (cfg.enableFailureLearning)
-            {
-                long signature = MakeLocalSearchFailureSignature(startX, startY, targetX, targetY);
-                if (TryGetRecentLocalSearchFailure(npcId, signature, Mathf.Max(1, cfg.failureMemoryTicks), nowTick, out var recentFailure) && recentFailure != null)
-                {
-                    blockedFirstStepCellIndex = recentFailure.BlockedFirstStepCellIndex;
-                    if (recentFailure.FailureCount >= Mathf.Max(1, cfg.repeatedFailureEscalationThreshold))
-                    {
-                        expandedLimit = Mathf.Max(expandedLimit, cfg.maxExpandedNodes * Mathf.Max(1, cfg.fallbackExpandedNodesMultiplier));
-                        iterationLimit = Mathf.Max(iterationLimit, cfg.maxIterations * Mathf.Max(1, cfg.fallbackExpandedNodesMultiplier));
-                        radiusLimit = Mathf.Max(radiusLimit, cfg.maxSearchRadius + Mathf.Max(0, cfg.fallbackRadiusBonus));
-                        jumpLimit = Mathf.Max(jumpLimit, cfg.maxJumpDistance + Mathf.Max(0, cfg.fallbackRadiusBonus / 2));
-                    }
-                }
-            }
-
-            var candidatePath = new List<Vector2Int>(64);
-            var partialBestPath = new List<Vector2Int>(64);
-            bool foundCompletePath;
-
-            if (cfg.useJumpPointSearch)
-            {
-                foundCompletePath = TryBuildBoundedJpsPathInternal(
-                    npcId, startX, startY, targetX, targetY,
-                    expandedLimit, iterationLimit, radiusLimit, jumpLimit, hWeight,
-                    blockedFirstStepCellIndex,
-                    candidatePath,
-                    partialBestPath);
-            }
-            else
-            {
-                foundCompletePath = TryBuildSimpleBoundedBfsPathAdvanced(
-                    npcId, startX, startY, targetX, targetY,
-                    expandedLimit, radiusLimit, blockedFirstStepCellIndex,
-                    candidatePath,
-                    partialBestPath);
-            }
-
-            if (!foundCompletePath && cfg.enableSmartFallback)
-            {
-                int expandedFallbackLimit = Mathf.Max(expandedLimit, cfg.maxExpandedNodes * Mathf.Max(1, cfg.fallbackExpandedNodesMultiplier));
-                int radiusFallbackLimit = Mathf.Max(radiusLimit, cfg.maxSearchRadius + Mathf.Max(0, cfg.fallbackRadiusBonus));
-                int jumpFallbackLimit = Mathf.Max(jumpLimit, cfg.maxJumpDistance + Mathf.Max(0, cfg.fallbackRadiusBonus / 2));
-                int iterationFallbackLimit = Mathf.Max(iterationLimit, cfg.maxIterations * Mathf.Max(1, cfg.fallbackExpandedNodesMultiplier));
-
-                if (cfg.useJumpPointSearch)
-                {
-                    var jpsFallbackPath = new List<Vector2Int>(64);
-                    var jpsFallbackPartial = new List<Vector2Int>(64);
-                    if (TryBuildBoundedJpsPathInternal(
-                        npcId, startX, startY, targetX, targetY,
-                        expandedFallbackLimit, iterationFallbackLimit, radiusFallbackLimit, jumpFallbackLimit, hWeight,
-                        blockedFirstStepCellIndex,
-                        jpsFallbackPath,
-                        jpsFallbackPartial))
-                    {
-                        candidatePath = jpsFallbackPath;
-                        partialBestPath = jpsFallbackPartial;
-                        foundCompletePath = true;
-                    }
-                    else if (jpsFallbackPartial.Count > partialBestPath.Count)
-                    {
-                        partialBestPath = jpsFallbackPartial;
-                    }
-                }
-
-                if (!foundCompletePath && cfg.fallbackUseBoundedBfs)
-                {
-                    var bfsFallbackPath = new List<Vector2Int>(64);
-                    var bfsFallbackPartial = new List<Vector2Int>(64);
-                    if (TryBuildSimpleBoundedBfsPathAdvanced(
-                        npcId, startX, startY, targetX, targetY,
-                        expandedFallbackLimit, radiusFallbackLimit, blockedFirstStepCellIndex,
-                        bfsFallbackPath,
-                        bfsFallbackPartial))
-                    {
-                        candidatePath = bfsFallbackPath;
-                        partialBestPath = bfsFallbackPartial;
-                        foundCompletePath = true;
-                    }
-                    else if (bfsFallbackPartial.Count > partialBestPath.Count)
-                    {
-                        partialBestPath = bfsFallbackPartial;
-                    }
-                }
-            }
-
-            if (foundCompletePath && candidatePath.Count >= 2)
-            {
-                if (cfg.enablePathSmoothing)
-                    SmoothCellPath(npcId, candidatePath, Mathf.Max(2, cfg.smoothingLookahead), outCells);
-                else
-                    outCells.AddRange(candidatePath);
-
-                RememberLocalSearchSuccess(npcId, startX, startY, targetX, targetY);
-                return outCells.Count >= 2;
-            }
-
-            if (partialBestPath.Count >= 2)
-            {
-                if (cfg.enablePathSmoothing)
-                    SmoothCellPath(npcId, partialBestPath, Mathf.Max(2, cfg.smoothingLookahead), outCells);
-                else
-                    outCells.AddRange(partialBestPath);
-
-                int blockedStep = outCells.Count >= 2 ? CellIndex(outCells[1].x, outCells[1].y) : -1;
-                int progressCell = outCells.Count > 0 ? CellIndex(outCells[outCells.Count - 1].x, outCells[outCells.Count - 1].y) : -1;
-                RememberLocalSearchFailure(npcId, startX, startY, targetX, targetY, blockedStep, progressCell);
-                return outCells.Count >= 2;
-            }
-
-            RememberLocalSearchFailure(npcId, startX, startY, targetX, targetY, blockedFirstStepCellIndex, -1);
-            return false;
-        }
-
-        private bool TryBuildBoundedJpsPathInternal(
-            int npcId,
-            int startX,
-            int startY,
-            int targetX,
-            int targetY,
-            int expandedLimit,
-            int iterationLimit,
-            int radiusLimit,
-            int jumpLimit,
-            float hWeight,
-            int blockedFirstStepCellIndex,
-            List<Vector2Int> outPath,
-            List<Vector2Int> outBestProgressPath)
-        {
-            outPath.Clear();
-            outBestProgressPath.Clear();
-
-            var start = new Vector2Int(startX, startY);
-            var target = new Vector2Int(targetX, targetY);
-
-            var open = new List<JpsOpenNode>(64);
-            var bestG = new Dictionary<JpsStateKey, int>(128);
-            var parents = new Dictionary<JpsStateKey, JpsParentInfo>(128);
-
-            var startKey = new JpsStateKey(startX, startY, 0, 0);
-            open.Add(new JpsOpenNode(startX, startY, 0, 0, 0, HeuristicManhattan(startX, startY, targetX, targetY, hWeight)));
-            bestG[startKey] = 0;
-            parents[startKey] = new JpsParentInfo(startKey, false);
-
-            int expanded = 0;
-            int iterations = 0;
-            JpsStateKey foundKey = default;
-            bool found = false;
-            JpsStateKey bestFrontierKey = startKey;
-            float bestFrontierH = HeuristicManhattan(startX, startY, targetX, targetY, hWeight);
-
-            while (open.Count > 0 && iterations < iterationLimit)
-            {
-                iterations++;
-                int bestIndex = 0;
-                float bestF = open[0].F;
-                float bestH = open[0].H;
-                for (int i = 1; i < open.Count; i++)
-                {
-                    var cand = open[i];
-                    if (cand.F < bestF || (Mathf.Approximately(cand.F, bestF) && cand.H < bestH))
-                    {
-                        bestIndex = i;
-                        bestF = cand.F;
-                        bestH = cand.H;
-                    }
-                }
-
-                var current = open[bestIndex];
-                open.RemoveAt(bestIndex);
-                var currentKey = new JpsStateKey(current.X, current.Y, current.DirX, current.DirY);
-
-                if (!bestG.TryGetValue(currentKey, out int knownG) || knownG != current.G)
-                    continue;
-
-                if (current.H < bestFrontierH)
-                {
-                    bestFrontierH = current.H;
-                    bestFrontierKey = currentKey;
-                }
-
-                if (current.X == targetX && current.Y == targetY)
-                {
-                    found = true;
-                    foundKey = currentKey;
-                    break;
-                }
-
-                expanded++;
-                if (expanded > expandedLimit)
-                    break;
-
-                var dirs = GetJpsSuccessorDirections(npcId, current.X, current.Y, current.DirX, current.DirY, targetX, targetY);
-                for (int i = 0; i < dirs.Count; i++)
-                {
-                    var dir = dirs[i];
-
-                    if (current.X == startX && current.Y == startY && blockedFirstStepCellIndex >= 0)
-                    {
-                        int firstStepX = current.X + dir.x;
-                        int firstStepY = current.Y + dir.y;
-                        if (InBounds(firstStepX, firstStepY) && CellIndex(firstStepX, firstStepY) == blockedFirstStepCellIndex)
-                            continue;
-                    }
-
-                    if (TryJumpStraight(npcId, start, target, current.X, current.Y, dir.x, dir.y, radiusLimit, jumpLimit, out var jumpPoint, out int stepCost))
-                    {
-                        int g2 = current.G + stepCost;
-                        var succKey = new JpsStateKey(jumpPoint.x, jumpPoint.y, dir.x, dir.y);
-                        if (bestG.TryGetValue(succKey, out int oldG) && oldG <= g2)
-                            continue;
-
-                        bestG[succKey] = g2;
-                        parents[succKey] = new JpsParentInfo(currentKey, true);
-                        float h = HeuristicManhattan(jumpPoint.x, jumpPoint.y, targetX, targetY, hWeight);
-                        open.Add(new JpsOpenNode(jumpPoint.x, jumpPoint.y, dir.x, dir.y, g2, g2 + h, h));
-                    }
-                }
-            }
-
-            if (found)
-            {
-                BuildExpandedPathFromJpsStates(foundKey, parents, outPath);
-                return outPath.Count > 0 && outPath[outPath.Count - 1] == target;
-            }
-
-            BuildExpandedPathFromJpsStates(bestFrontierKey, parents, outBestProgressPath);
-            return false;
-        }
-
-        private void BuildExpandedPathFromJpsStates(JpsStateKey terminalKey, Dictionary<JpsStateKey, JpsParentInfo> parents, List<Vector2Int> outCells)
-        {
-            outCells.Clear();
-            var jumpStates = new List<JpsStateKey>(32);
-            var walkKey = terminalKey;
-            jumpStates.Add(walkKey);
-            while (parents.TryGetValue(walkKey, out var parentInfo) && parentInfo.HasParent)
-            {
-                walkKey = parentInfo.Parent;
-                jumpStates.Add(walkKey);
-            }
-            jumpStates.Reverse();
-
-            if (jumpStates.Count == 0)
-                return;
-
-            outCells.Add(new Vector2Int(jumpStates[0].X, jumpStates[0].Y));
-            for (int i = 1; i < jumpStates.Count; i++)
-            {
-                ExpandStraightSegment(outCells, jumpStates[i - 1].X, jumpStates[i - 1].Y, jumpStates[i].X, jumpStates[i].Y);
-            }
-        }
-
-        private bool TryBuildSimpleBoundedBfsPathAdvanced(
-            int npcId,
-            int startX,
-            int startY,
-            int targetX,
-            int targetY,
-            int maxVisited,
-            int radiusLimit,
-            int blockedFirstStepCellIndex,
-            List<Vector2Int> outPath,
-            List<Vector2Int> outBestProgressPath)
-        {
-            outPath.Clear();
-            outBestProgressPath.Clear();
-            var start = new Vector2Int(startX, startY);
-            var target = new Vector2Int(targetX, targetY);
-            var frontier = new Queue<Vector2Int>();
-            var visited = new HashSet<Vector2Int>();
-            var cameFrom = new Dictionary<Vector2Int, Vector2Int>();
-            frontier.Enqueue(start);
-            visited.Add(start);
-            Vector2Int[] dirs = new[] { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1), };
-            bool found = false;
-            int expanded = 0;
-            Vector2Int best = start;
-            int bestH = Mathf.Abs(target.x - start.x) + Mathf.Abs(target.y - start.y);
-            while (frontier.Count > 0)
-            {
-                var cur = frontier.Dequeue();
-                int curH = Mathf.Abs(target.x - cur.x) + Mathf.Abs(target.y - cur.y);
-                if (curH < bestH)
-                {
-                    best = cur;
-                    bestH = curH;
-                }
-                if (cur == target) { found = true; break; }
-                expanded++;
-                if (expanded > maxVisited) break;
-                for (int i = 0; i < dirs.Length; i++)
-                {
-                    var nxt = cur + dirs[i];
-                    if (visited.Contains(nxt)) continue;
-                    if (Mathf.Abs(nxt.x - start.x) + Mathf.Abs(nxt.y - start.y) > radiusLimit) continue;
-                    if (cur == start && blockedFirstStepCellIndex >= 0 && InBounds(nxt.x, nxt.y) && CellIndex(nxt.x, nxt.y) == blockedFirstStepCellIndex) continue;
-                    if (!IsWalkableForPathing(npcId, nxt.x, nxt.y, targetX, targetY)) continue;
-                    visited.Add(nxt); cameFrom[nxt] = cur; frontier.Enqueue(nxt);
-                }
-            }
-            if (found)
-            {
-                ReconstructGridPath(start, target, cameFrom, outPath);
-                return outPath.Count > 0 && outPath[outPath.Count - 1] == target;
-            }
-            if (best != start)
-                ReconstructGridPath(start, best, cameFrom, outBestProgressPath);
-            return false;
-        }
-
-        private void ReconstructGridPath(Vector2Int start, Vector2Int target, Dictionary<Vector2Int, Vector2Int> cameFrom, List<Vector2Int> outPath)
-        {
-            outPath.Clear();
-            var rev = new List<Vector2Int>(64);
-            var walk = target;
-            rev.Add(walk);
-            while (walk != start)
-            {
-                if (!cameFrom.TryGetValue(walk, out var prev)) { outPath.Clear(); return; }
-                walk = prev; rev.Add(walk);
-            }
-            rev.Reverse(); outPath.AddRange(rev);
-        }
-
-        private void SmoothCellPath(int npcId, List<Vector2Int> rawPath, int lookahead, List<Vector2Int> outSmoothed)
-        {
-            outSmoothed.Clear();
-            if (rawPath == null || rawPath.Count == 0)
-                return;
-            if (rawPath.Count <= 2)
-            {
-                outSmoothed.AddRange(rawPath);
-                return;
-            }
-
-            var directScratch = new List<Vector2Int>(64);
-            int anchorIndex = 0;
-            outSmoothed.Add(rawPath[0]);
-
-            while (anchorIndex < rawPath.Count - 1)
-            {
-                int bestIndex = anchorIndex + 1;
-                List<Vector2Int> bestSegment = null;
-                int maxIndex = Mathf.Min(rawPath.Count - 1, anchorIndex + Mathf.Max(2, lookahead));
-                for (int testIndex = maxIndex; testIndex > anchorIndex + 1; testIndex--)
-                {
-                    directScratch.Clear();
-                    var a = rawPath[anchorIndex];
-                    var b = rawPath[testIndex];
-                    if (TryBuildGreedyDirectPath(npcId, a.x, a.y, b.x, b.y, directScratch) && directScratch.Count >= 2)
-                    {
-                        bestIndex = testIndex;
-                        bestSegment = new List<Vector2Int>(directScratch);
-                        break;
-                    }
-                }
-
-                if (bestSegment != null)
-                {
-                    for (int i = 1; i < bestSegment.Count; i++)
-                    {
-                        if (outSmoothed.Count == 0 || outSmoothed[outSmoothed.Count - 1] != bestSegment[i])
-                            outSmoothed.Add(bestSegment[i]);
-                    }
-                    anchorIndex = bestIndex;
-                }
-                else
-                {
-                    var step = rawPath[anchorIndex + 1];
-                    if (outSmoothed[outSmoothed.Count - 1] != step)
-                        outSmoothed.Add(step);
-                    anchorIndex++;
-                }
-            }
-        }
-
-        private float HeuristicManhattan(int x, int y, int tx, int ty, float weight)
-        {
-            return (Mathf.Abs(tx - x) + Mathf.Abs(ty - y)) * weight;
-        }
-
-        private List<Vector2Int> GetJpsSuccessorDirections(int npcId, int x, int y, int dirX, int dirY, int targetX, int targetY)
-        {
-            var dirs = new List<Vector2Int>(4);
-            if (dirX == 0 && dirY == 0)
-            {
-                dirs.Add(new Vector2Int(1, 0)); dirs.Add(new Vector2Int(-1, 0)); dirs.Add(new Vector2Int(0, 1)); dirs.Add(new Vector2Int(0, -1));
-                return dirs;
-            }
-
-            dirs.Add(new Vector2Int(dirX, dirY));
-
-            // Pruning straight-only (4-connected): oltre al vicino naturale in avanti,
-            // aggiungiamo i forced neighbours implicati da ostacoli laterali.
-            if (dirX != 0)
-            {
-                bool upBlocked = !IsWalkableForPathing(npcId, x, y + 1, targetX, targetY);
-                bool downBlocked = !IsWalkableForPathing(npcId, x, y - 1, targetX, targetY);
-                if (upBlocked && IsWalkableForPathing(npcId, x + dirX, y + 1, targetX, targetY)) dirs.Add(new Vector2Int(0, 1));
-                if (downBlocked && IsWalkableForPathing(npcId, x + dirX, y - 1, targetX, targetY)) dirs.Add(new Vector2Int(0, -1));
-            }
-            else
-            {
-                bool rightBlocked = !IsWalkableForPathing(npcId, x + 1, y, targetX, targetY);
-                bool leftBlocked = !IsWalkableForPathing(npcId, x - 1, y, targetX, targetY);
-                if (rightBlocked && IsWalkableForPathing(npcId, x + 1, y + dirY, targetX, targetY)) dirs.Add(new Vector2Int(1, 0));
-                if (leftBlocked && IsWalkableForPathing(npcId, x - 1, y + dirY, targetX, targetY)) dirs.Add(new Vector2Int(-1, 0));
-            }
-            return dirs;
-        }
-
-        private bool TryJumpStraight(int npcId, Vector2Int searchOrigin, Vector2Int target, int x, int y, int dirX, int dirY, int radiusLimit, int jumpLimit, out Vector2Int jumpPoint, out int stepCost)
-        {
-            jumpPoint = default;
-            stepCost = 0;
-            int curX = x;
-            int curY = y;
-            for (int dist = 1; dist <= jumpLimit; dist++)
-            {
-                curX += dirX; curY += dirY;
-                if (!IsWalkableForPathing(npcId, curX, curY, target.x, target.y))
-                    return false;
-                if (Mathf.Abs(curX - searchOrigin.x) + Mathf.Abs(curY - searchOrigin.y) > radiusLimit)
-                    return false;
-                stepCost++;
-                if (curX == target.x && curY == target.y)
-                {
-                    jumpPoint = new Vector2Int(curX, curY);
-                    return true;
-                }
-                if (HasForcedNeighbourAt(npcId, curX, curY, dirX, dirY, target.x, target.y))
-                {
-                    jumpPoint = new Vector2Int(curX, curY);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        private bool HasForcedNeighbourAt(int npcId, int x, int y, int dirX, int dirY, int targetX, int targetY)
-        {
-            if (dirX != 0)
-            {
-                bool upBlocked = !IsWalkableForPathing(npcId, x, y + 1, targetX, targetY);
-                bool downBlocked = !IsWalkableForPathing(npcId, x, y - 1, targetX, targetY);
-                if (upBlocked && IsWalkableForPathing(npcId, x + dirX, y + 1, targetX, targetY)) return true;
-                if (downBlocked && IsWalkableForPathing(npcId, x + dirX, y - 1, targetX, targetY)) return true;
-                return false;
-            }
-            if (dirY != 0)
-            {
-                bool rightBlocked = !IsWalkableForPathing(npcId, x + 1, y, targetX, targetY);
-                bool leftBlocked = !IsWalkableForPathing(npcId, x - 1, y, targetX, targetY);
-                if (rightBlocked && IsWalkableForPathing(npcId, x + 1, y + dirY, targetX, targetY)) return true;
-                if (leftBlocked && IsWalkableForPathing(npcId, x - 1, y + dirY, targetX, targetY)) return true;
-            }
-            return false;
-        }
-
-        private static void ExpandStraightSegment(List<Vector2Int> outCells, int ax, int ay, int bx, int by)
-        {
-            int dx = Math.Sign(bx - ax);
-            int dy = Math.Sign(by - ay);
-            int x = ax;
-            int y = ay;
-            while (x != bx || y != by)
-            {
-                x += dx;
-                y += dy;
-                outCells.Add(new Vector2Int(x, y));
-            }
-        }
-
-        private readonly struct JpsStateKey
-        {
-            public readonly int X; public readonly int Y; public readonly int DirX; public readonly int DirY;
-            public JpsStateKey(int x, int y, int dirX, int dirY) { X = x; Y = y; DirX = dirX; DirY = dirY; }
-        }
-
-        private readonly struct JpsOpenNode
-        {
-            public readonly int X; public readonly int Y; public readonly int DirX; public readonly int DirY; public readonly int G; public readonly float F; public readonly float H;
-            public JpsOpenNode(int x, int y, int dirX, int dirY, int g, float f, float h = 0f) { X = x; Y = y; DirX = dirX; DirY = dirY; G = g; F = f; H = h; }
-        }
-
-        private readonly struct JpsParentInfo
-        {
-            public readonly JpsStateKey Parent; public readonly bool HasParent;
-            public JpsParentInfo(JpsStateKey parent, bool hasParent) { Parent = parent; HasParent = hasParent; }
-        }
-
-        /// <summary>
-        /// Predicato shared per path helper.
-
-        ///
-        /// Nota importante:
-        /// - permettiamo di "entrare" nella cella target anche se è il target del path;
-        /// - per tutte le altre celle manteniamo lo standard 1 NPC per cella.
-        /// </summary>
-        private bool IsWalkableForPathing(int npcId, int x, int y, int targetX, int targetY)
-        {
-            if (!InBounds(x, y))
-                return false;
-            if (IsMovementBlocked(x, y))
-                return false;
-
-            if (TryGetNpcAt(x, y, out int otherNpcId) && otherNpcId != npcId)
-            {
-                if (x != targetX || y != targetY)
-                    return false;
-            }
-
-            return true;
-        }
-
+            => MovementPathfinder.TryBuildBoundedMovePath(this, npcId, startX, startY, targetX, targetY, maxVisited, outCells);
+ */
         // ============================================================
         // LOS helpers (Bresenham)
         // ============================================================
 
         /// <summary>
-        /// LOS discreta (grid) con Bresenham.
-        /// Regola: se una cella intermedia ha BlocksVision=true => LOS bloccata.
-        /// Nota: non controlliamo la cella sorgente; controlliamo le celle "attraversate".
+        /// Verifica la Line of Sight (LOS) discreta su griglia con algoritmo di Bresenham.
+        ///
+        /// <para><b>Regola:</b> se una cella intermedia ha <c>BlocksVision = true</c>
+        /// (derivato dall'OcclusionMap) la LOS è bloccata.</para>
+        ///
+        /// <para>
+        /// La cella sorgente NON viene controllata (l'NPC può stare dentro un muro
+        /// in scenari di test senza che la LOS sia sempre bloccata).
+        /// La cella target viene controllata: se è un muro, la LOS è bloccata.
+        /// </para>
+        ///
+        /// <para>
+        /// Questo è il gate LOS usato da <c>ObjectPerceptionSystem</c>,
+        /// <c>NpcPerceptionSystem</c>, <c>TokenDeliveryPipeline</c> e altri.
+        /// È il punto centrale dell'occlusione visiva in Arcontio.
+        /// </para>
+        ///
+        /// <para>
+        /// <b>Performance:</b> O(max(|dx|, |dy|)) per chiamata.
+        /// Chiamato molto frequentemente (ogni NPC per ogni oggetto/NPC ogni tick).
+        /// La cache <c>_blocksVision[]</c> rende ogni step O(1).
+        /// </para>
         /// </summary>
         public bool HasLineOfSight(int sx, int sy, int tx, int ty)
         {
@@ -3933,8 +2870,26 @@ if (!NpcAction.ContainsKey(id))
         }
     }
 
+    // =============================================================================
+    // GlobalState
+    // =============================================================================
     /// <summary>
-    /// Stato globale del mondo.
+    /// <b>GlobalState</b> — parametri di configurazione runtime della simulazione.
+    ///
+    /// <para>
+    /// Contiene tutti i "tunable" che i System e le Rule leggono ogni tick.
+    /// Viene popolato nel costruttore di <see cref="World"/> a partire da
+    /// <see cref="WorldConfig"/> (letto da <c>game_params.json</c>) e può
+    /// essere sovrascritto dai seed di scenario in <c>SimulationHost</c>.
+    /// </para>
+    ///
+    /// <para>
+    /// È una <c>struct</c> per evitare allocazioni heap, ma questo significa
+    /// che viene copiata se passata per valore. Accedere sempre tramite
+    /// <c>world.Global.X</c> (campo pubblico del World).
+    /// </para>
+    ///
+    /// <para><b>Patch 0.02.5A:</b> solo aggiornamento commenti.</para>
     /// </summary>
     public struct GlobalState
     {

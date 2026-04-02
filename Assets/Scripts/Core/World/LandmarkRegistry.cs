@@ -1,15 +1,16 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using Arcontio.Core.Config; // HybridLandmarkParams, GvdDinParams
 
 namespace Arcontio.Core
 {
     /// <summary>
-    /// LandmarkRegistry (v0.02 - Day2):
+    /// LandmarkRegistry (v0.02 - Day2 | v0.03 - Patch 0.03.01.b):
     /// registro "oggettivo" dei landmark.
     ///
     /// Cosa contiene:
-    /// - LandmarkNode: punti notevoli sulla griglia (Doorway, Junction).
+    /// - LandmarkNode: punti notevoli sulla griglia (Doorway, Junction, AreaCenter GVD).
     /// - LandmarkEdge: adiacenza sparsa tra nodi (edge minimi in bootstrap).
     ///
     /// Importante (scelta progettuale ARCONTIO):
@@ -18,11 +19,14 @@ namespace Arcontio.Core
     /// - Il layer soggettivo (Day3+) potrà "ancorarsi" a questi nodi, o copiarli/filtrarli.
     ///
     /// Patch 0.02D2_1:
-    /// - Implementiamo:
-    ///   1) candidate detection: Doorway + Junction
-    ///   2) merge (merge_radius)
-    ///   3) cap globale (maxWorldLandmarks) con policy soft: IsActive=false (NO delete)
-    ///   4) edge minimi in bootstrap: scan cardinali fino al prossimo landmark
+    /// - candidate detection: Doorway + Junction (vecchio sistema)
+    /// - merge, cap globale, edge minimi bootstrap
+    ///
+    /// Patch 0.03.01.b:
+    /// - Integrazione GvdDinComputer: quando gvd_din.enabled=true,
+    ///   RebuildFromWorld bypassa il vecchio detection e usa il GVD.
+    /// - Il vecchio sistema rimane invariato ed è attivo quando enabled=false.
+    /// - Aggiunto LandmarkKind.AreaCenter per i massimi locali DT.
     /// </summary>
     public sealed class LandmarkRegistry
     {
@@ -32,8 +36,9 @@ namespace Arcontio.Core
 
         public enum LandmarkKind
         {
-            Doorway = 1,
-            Junction = 2,
+            Doorway    = 1,
+            Junction   = 2,
+            AreaCenter = 3, // Nuovo (v0.03): massimo locale DT in zona aperta
         }
 
         [Serializable]
@@ -89,147 +94,127 @@ namespace Arcontio.Core
         public IReadOnlyList<LandmarkEdge> Edges => _edges;
 
         // ============================================================
+        // GVD-DIN COMPUTER (v0.03)
+        // ============================================================
+        // Istanza del computer GVD-DIN.
+        // Viene creata lazy al primo RebuildFromWorld con gvd_din.enabled=true.
+        // Rimane null se il sistema GVD-DIN non viene mai attivato.
+        //
+        // Nota: è un campo di classe (non ricreato ogni rebuild) per riusare
+        // gli array interni (DtValues, _nearestObstacle) senza GC.
+        // Computer GVD-DIN — lazy-init, riusa gli array interni tra rebuild.
+        private GvdDinComputer _gvdDinComputer;
+
+        // Extractor Hybrid — lazy-init, mantiene lo stato DT/bridge per il debug overlay.
+        // Patch 0.03.02.a.2: istanza invece di chiamata statica, necessario per FillOverlaySnapshot.
+        private HybridLandmarkExtractor _hybridExtractor;
+
+        // ============================================================
         // REBUILD (bootstrap)
         // ============================================================
 
         /// <summary>
-        /// RebuildFromWorld:
-        /// ricostruisce il registry a partire dallo stato corrente della mappa.
+        /// RebuildFromWorld — ricostruisce il registry a partire dalla mappa corrente.
         ///
-        /// Nota:
-        /// - In 0.02 lo usiamo come "bootstrap" dopo il seeding.
-        /// - In futuro potremo fare update incrementale (event-driven) per porte/muri.
+        /// Patch 0.03.02.a — tre branch in ordine di priorità:
+        ///   1) HybridLandmarkExtractor (use_hybrid_extractor=true) — sistema principale
+        ///   2) GVD-DIN (gvd_din.enabled=true) — sistema precedente, mantenuto per confronto
+        ///   3) [RIMOSSO] Vecchio sistema Doorway/Junction eliminato in questa patch
         /// </summary>
         public void RebuildFromWorld(World world)
         {
             if (world == null) return;
-           
+
             _nodes.Clear();
             _edges.Clear();
             _activeNodeIdByCellIndex.Clear();
             _nextNodeId = 1;
-
-            // Cache della width per calcolo index (necessaria per query runtime cell->node).
             _mapWidthForCellIndex = world.MapWidth;
 
-            // Leggiamo parametri.
             var lm = world.Config?.Sim?.landmarks;
-            float mergeRadius = lm != null ? lm.merge_radius : 1.0f;
-            int minExits = lm != null && lm.candidate != null ? lm.candidate.junction_min_exits : 3;
-            int maxWorld = lm != null ? lm.maxWorldLandmarks : 512;
-            int maxEdgesPerLandmark = lm != null ? lm.maxEdgesPerLandmark : 8;
-
+            float mergeRadius         = lm != null ? lm.merge_radius        : 1.5f;
+            int   maxWorld            = lm != null ? lm.maxWorldLandmarks    : 512;
+            int   maxEdgesPerLandmark = lm != null ? lm.maxEdgesPerLandmark  : 8;
             if (mergeRadius < 0) mergeRadius = 0;
-            if (minExits < 3) minExits = 3;
             if (maxWorld <= 0) maxWorld = 1;
             if (maxEdgesPerLandmark <= 0) maxEdgesPerLandmark = 1;
 
-            // ------------------------------------------------------------
-            // 1) Candidate detection: DOORWAY
-            // ------------------------------------------------------------
-            // Strategia (minimalista):
-            // - consideriamo "porta" qualsiasi oggetto con DefId che inizia con "door_".
-            // - è volutamente una convenzione di naming: semplice e leggibile.
-            // - se in futuro introduciamo una property IsDoor, sostituiamo qui.
-            foreach (var kv in world.Objects)
+            // ============================================================
+            // BRANCH 1 — HYBRID LANDMARK EXTRACTOR (v0.03.02.a)
+            // ============================================================
+            var hybridCfg = world.Config?.Sim?.hybrid_landmark;
+            if (hybridCfg != null && hybridCfg.use_hybrid_extractor)
             {
-                var obj = kv.Value;
-                if (obj == null) continue;
+                int w = world.MapWidth, h = world.MapHeight;
+                var walkable = new bool[w, h];
+                for (int y = 0; y < h; y++)
+                    for (int x = 0; x < w; x++)
+                        walkable[x, y] = !world.BlocksMovementAt(x, y);
 
-                if (!world.ObjectDefs.TryGetValue(obj.DefId, out var def) || def == null)
-                    continue;
+                // Lazy-init — mantiene lo stato DT/bridge per FillGvdDinOverlayData.
+                if (_hybridExtractor == null)
+                    _hybridExtractor = new HybridLandmarkExtractor();
 
-                if (!IsDoorDef(def.Id))
-                    continue;
+                var candidates = _hybridExtractor.Extract(walkable, w, h, hybridCfg);
 
-                AddOrMergeNode(obj.CellX, obj.CellY, LandmarkKind.Doorway, mergeRadius);
-            }
+                float chokeMerge  = hybridCfg.merge_radius > 0 ? hybridCfg.merge_radius : mergeRadius;
 
-            // ------------------------------------------------------------
-            // 2) Candidate detection: JUNCTION
-            // ------------------------------------------------------------
-            // Junction = cella navigabile con >= N uscite "stabili".
-            // "stabile" qui significa: dipende solo dalla geometria (BlocksMovement),
-            // non dalla presenza runtime di NPC.
-            for (int y = 0; y < world.MapHeight; y++)
-            {
-                for (int x = 0; x < world.MapWidth; x++)
+                foreach (var c in candidates)
                 {
-                    if (world.BlocksMovementAt(x, y))
-                        continue;
-                    
-                    // Controllo se sono in presenza di una giunzione a + o a T
-                    if (!IsJunction(world, x, y))
-                        continue;
-
-                    AddOrMergeNode(x, y, LandmarkKind.Junction, mergeRadius);
+                    var kind = c.Type == HybridLandmarkExtractor.LandmarkType.ChokePoint
+                        ? LandmarkKind.Junction
+                        : LandmarkKind.AreaCenter;
+                    float r = c.Type == HybridLandmarkExtractor.LandmarkType.ChokePoint
+                        ? chokeMerge
+                        : mergeRadius;
+                    AddOrMergeNode(c.Position.x, c.Position.y, kind, r);
                 }
             }
+            // ============================================================
+            // BRANCH 2 — GVD-DIN (v0.03.01.x)
+            // ============================================================
+            else
+            {
+                var gvdCfg = world.Config?.Sim?.gvd_din;
+                if (gvdCfg != null && gvdCfg.enabled)
+                {
+                    if (_gvdDinComputer == null)
+                        _gvdDinComputer = new GvdDinComputer();
 
-            // ------------------------------------------------------------
-            // 3) Cap globale: soft deactivate (IsActive=false)
-            // ------------------------------------------------------------
+                    int pruningMinBranch     = gvdCfg.pruning_min_branch_length     > 0 ? gvdCfg.pruning_min_branch_length     : 3;
+                    int areaCenterMinDtVal   = gvdCfg.area_center_min_dt_value      > 0 ? gvdCfg.area_center_min_dt_value      : 4;
+                    int areaCenterMinSpacing = gvdCfg.area_center_min_spacing_cells > 0 ? gvdCfg.area_center_min_spacing_cells : 5;
+                    float gvdMergeRadius     = gvdCfg.merge_radius_gvd              > 0 ? gvdCfg.merge_radius_gvd              : mergeRadius;
+
+                    _gvdDinComputer.Compute(world, pruningMinBranch, areaCenterMinDtVal, areaCenterMinSpacing);
+
+                    for (int vi = 0; vi < _gvdDinComputer.Vertices.Count; vi++)
+                    {
+                        var v    = _gvdDinComputer.Vertices[vi];
+                        var kind = v.Kind == GvdDinComputer.GvdVertexKind.Junction
+                            ? LandmarkKind.Junction : LandmarkKind.AreaCenter;
+                        float r  = v.Kind == GvdDinComputer.GvdVertexKind.Junction
+                            ? gvdMergeRadius : mergeRadius;
+                        AddOrMergeNode(v.CellX, v.CellY, kind, r);
+                    }
+                }
+                // Nota (v0.03.02.a): vecchio sistema Doorway/Junction rimosso.
+                // Se entrambi i flag sono false il registry rimane vuoto.
+            }
+
+            // Passi comuni a tutti i branch
             ApplyGlobalCap(maxWorld);
-
-            // ------------------------------------------------------------
-            // 4) Ricostruisco indice rapido per nodi attivi
-            // ------------------------------------------------------------
             RebuildActiveCellIndex(world);
-
-            // ------------------------------------------------------------
-            // 5) Edge minimi (bootstrap)
-            // ------------------------------------------------------------
             BuildMinimalEdges(world, maxEdgesPerLandmark);
         }
 
         // ============================================================
         // INTERNALS
         // ============================================================
-        private static bool IsJunction(World world, int cx, int cy)
-        {
-            // Primo controllo sulle diagonali che devono essere piene
-            for (int dy = -1; dy <= 1; dy += 2)
-            {
-                for (int dx = -1; dx <= 1; dx += 2)
-                {
-                    int x = cx + dx;
-                    int y = cy + dy;
-
-                    if (x < 0 || x >= world.MapWidth || y < 0 || y >= world.MapHeight)
-                        return false;
-
-                    if (!world.BlocksMovementAt(x, y))
-                        return false;
-                }
-            }
-
-            // Secondo controllo sulla intersezione a +, qua può esserci al massimo un oggetto (Caso di giunzione a T)
-            int blocks = 0;
-            for (int dy = -1; dy <= 1; dy++)
-            {
-                for (int dx = -1; dx <= 1; dx++)
-                {
-                    // Scarta il centro
-                    if ((dx == 0) && (dy == 0)) continue;
-
-                    // Scarta le diagonali
-                    if (Math.Abs(dx) + Math.Abs(dy) != 1) continue;
-
-                    int x = cx + dx;
-                    int y = cy + dy;
-
-                    if (world.BlocksMovementAt(x, y))  blocks++;
-                }
-            }
-            if (blocks <= 1) return true; 
-            else return false;
-        }
-
-        private static bool IsDoorDef(string defId)
-        {
-            if (string.IsNullOrEmpty(defId)) return false;
-            return defId.StartsWith("door_", StringComparison.OrdinalIgnoreCase);
-        }
+        // Nota (v0.03.02.a): IsJunction e IsDoorDef rimossi.
+        // Erano usati solo dal vecchio sistema Doorway/Junction (eliminato).
+        // Il rilevamento topologico è ora delegato a HybridLandmarkExtractor
+        // (Bridge Detection) o a GvdDinComputer (Criteri A+B).
 
         private LandmarkNode AddOrMergeNode(int x, int y, LandmarkKind kind, float mergeRadius)
         {
@@ -653,11 +638,38 @@ namespace Arcontio.Core
         // ============================================================
 
         /// <summary>
+        /// FillGvdDinOverlayData (v0.03 | v0.03.02.a.2):
+        /// Popola il GvdDinOverlaySnapshot con i dati dell'ultima computazione.
+        /// Chiamato da World.GetGvdDinOverlayData().
+        ///
+        /// Patch 0.03.02.a.2: delega a HybridLandmarkExtractor se attivo,
+        /// altrimenti a GvdDinComputer come in precedenza.
+        /// Layer: DtCells (heatmap DT), GvdRawCells (bridge/GVD raw), GvdNodes (candidati).
+        /// </summary>
+        public void FillGvdDinOverlayData(GvdDinOverlaySnapshot snapshot)
+        {
+            if (snapshot == null) return;
+            snapshot.Clear(); // IsValid = false per default
+
+            // Branch Hybrid: usa l'extractor se attivo nell'ultimo rebuild.
+            if (_hybridExtractor != null)
+            {
+                _hybridExtractor.FillOverlaySnapshot(snapshot);
+                return;
+            }
+
+            // Branch GVD-DIN: usa il computer come prima.
+            if (_gvdDinComputer == null) return;
+            _gvdDinComputer.FillOverlaySnapshot(snapshot, _mapWidthForCellIndex);
+        }
+
+        /// <summary>
         /// Converte il registry in un formato view-only (nodi+edges con coordinate).
         ///
         /// Nota:
         /// - In Day2 l'overlay renderizza il registry oggettivo.
         /// - In Day3+ potremo scegliere di renderizzare invece la versione "soggettiva" per NPC.
+        /// - Patch 0.03.01.b: aggiunto supporto label per AreaCenter.
         /// </summary>
         public void FillOverlayData(List<LandmarkOverlayNode> outNodes, List<LandmarkOverlayEdge> outEdges)
         {
@@ -670,7 +682,11 @@ namespace Arcontio.Core
                 {
                     var n = _nodes[i];
                     if (n == null || !n.IsActive) continue;
-                    string label = n.Kind == LandmarkKind.Doorway ? $"D#{n.Id}" : $"J#{n.Id}";
+                    string label = n.Kind == LandmarkKind.Doorway
+                        ? $"D#{n.Id}"
+                        : n.Kind == LandmarkKind.AreaCenter
+                            ? $"A#{n.Id}"
+                            : $"J#{n.Id}";
                     outNodes.Add(new LandmarkOverlayNode(cellX: n.CellX, cellY: n.CellY, kind: (int)n.Kind, nodeId: n.Id, label: label));
                 }
             }

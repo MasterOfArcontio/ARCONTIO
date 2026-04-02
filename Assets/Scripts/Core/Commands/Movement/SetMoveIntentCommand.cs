@@ -1,59 +1,155 @@
+// =============================================================================
+// SetMoveIntentCommand.cs
+// Namespace: Arcontio.Core
+// Patch: 0.02.05.B
+// =============================================================================
+//
+// PROBLEMA RISOLTO IN QUESTA PATCH
+// ─────────────────────────────────────────────────────────────────────────────
+// Prima di questa patch, SetMoveIntentCommand.Execute eseguiva logica di
+// planning non banale:
+//   - valutava se usare direct path o macro-route landmark
+//   - costruiva il path greedy diretto (TryBuildGreedyDirectPath)
+//   - avviava l'esecuzione della macro-route (BeginMacroRouteExecutionForNpc)
+//   - costruiva un prefix path come fallback
+//
+// Questo violava il contratto di ICommand:
+//   "Un comando muta il World in modo atomico e minimale.
+//    Non fa planning, non decide strategie di navigazione."
+//
+// La logica di selezione del tipo di navigazione appartiene al MovementSystem,
+// che ha accesso al tick context, può valutare lo stato frame per frame, e
+// può reagire ai cambiamenti del mondo (ostacoli dinamici, NPC che bloccano).
+//
+// NUOVO CONTRATTO (Patch 0.02.05.B)
+// ─────────────────────────────────────────────────────────────────────────────
+// SetMoveIntentCommand fa SOLO queste cose:
+//   1) Scrive il MoveIntent nel World con IsNew = true.
+//   2) Pulisce gli stati di navigazione precedenti.
+//   3) Imposta NpcAction a MoveTo per osservabilità immediata nella View.
+//
+// Il MovementSystem, al primo tick con IsNew = true, esegue:
+//   - CanNpcUseDirectPath → sceglie direct o macro-route
+//   - BeginMacroRouteExecutionForNpc o SetDebugDirectPathForNpc
+//   - Imposta IsNew = false
+//
+// PERCHÉ IL FLAG IsNew NEL MOVEINTENT
+// ─────────────────────────────────────────────────────────────────────────────
+// Il flag IsNew è autocontenuto nella struct e rende il contratto esplicito:
+// "questo intent non è ancora stato inizializzato dal MovementSystem".
+// Evita di dover passare il tick al Command o leggere TickContext
+// (che sarebbe un accoppiamento indesiderato in un Command).
+// =============================================================================
+
 namespace Arcontio.Core
 {
     /// <summary>
-    /// Comando minimale per scrivere un MoveIntent nel World.
-    /// Serve per mantenere la regola: le Rules producono comandi, non mutano direttamente il World.
+    /// <b>SetMoveIntentCommand</b> — scrive un <see cref="MoveIntent"/> nel World.
+    ///
+    /// <para>
+    /// Questo comando è <b>intenzionalmente minimale</b>: trasferisce la decisione
+    /// della Rule nel World in modo atomico, senza fare alcun planning.
+    /// Rispetta il principio fondamentale di Arcontio:
+    /// <i>"Le Rule producono comandi, non mutano direttamente il World."</i>
+    /// </para>
+    ///
+    /// <para><b>Cosa fa questo comando:</b></para>
+    /// <list type="number">
+    ///   <item>Scrive il <see cref="MoveIntent"/> con <c>IsNew = true</c>,
+    ///         segnalando al <c>MovementSystem</c> che serve inizializzazione.</item>
+    ///   <item>Pulisce tutti gli stati di navigazione precedenti (debug path,
+    ///         macro-route, local search, direct commit).</item>
+    ///   <item>Aggiorna <c>NpcAction</c> per osservabilità immediata nella View.</item>
+    /// </list>
+    ///
+    /// <para><b>Cosa NON fa (Patch 0.02.05.B):</b></para>
+    /// <list type="bullet">
+    ///   <item>NON valuta se usare direct path o macro-route.</item>
+    ///   <item>NON costruisce alcun path.</item>
+    ///   <item>NON chiama <c>BeginMacroRouteExecutionForNpc</c>.</item>
+    /// </list>
+    ///
+    /// <para>
+    /// Tutta la logica di inizializzazione della navigazione è stata spostata
+    /// in <see cref="MovementSystem.InitializeNavigation"/>, che la esegue
+    /// al primo tick di ogni nuovo intent (<c>intent.IsNew == true</c>).
+    /// </para>
+    ///
+    /// <para><b>Patch:</b> 0.02.05.B</para>
     /// </summary>
     public sealed class SetMoveIntentCommand : ICommand
     {
+        /// <summary>ID dell'NPC a cui applicare l'intent.</summary>
         private readonly int _npcId;
+
+        /// <summary>Intent di movimento da scrivere nel World.</summary>
         private readonly MoveIntent _intent;
 
+        /// <summary>
+        /// Costruisce il comando.
+        /// </summary>
+        /// <param name="npcId">ID dell'NPC che deve muoversi.</param>
+        /// <param name="intent">Intent di movimento (target cell, reason, ecc.).</param>
         public SetMoveIntentCommand(int npcId, MoveIntent intent)
         {
-            _npcId = npcId;
+            _npcId  = npcId;
             _intent = intent;
         }
 
+        /// <summary>Nome del comando per logging e debug.</summary>
+        public string Name => nameof(SetMoveIntentCommand);
+
+        /// <inheritdoc/>
         public void Execute(World world, MessageBus bus)
         {
-            world.SetMoveIntent(_npcId, _intent);
-            world.ClearDebugNavigationPathsForNpc(_npcId);
-
             if (_intent.Active)
             {
-                world.SetNpcAction(_npcId, NpcActionState.MoveTo(_intent.TargetX, _intent.TargetY, _intent.Reason.ToString()));
+                // ============================================================
+                // INTENT ATTIVO: nuovo movimento richiesto
+                // ============================================================
 
-                // PATCH 0.02.05.2f:
-                // prima di armare la macro-route landmark, verifichiamo se il target è già
-                // raggiungibile con un vero percorso diretto coerente con il MovementSystem.
-                // In quel caso NON dobbiamo costruire una deviazione verso landmark lontani,
-                // perché violeremmo la priorità architetturale "direct first".
-                if (world.CanNpcUseDirectPath(_npcId, _intent.TargetX, _intent.TargetY))
-                {
-                    world.ClearDebugMacroRouteForNpc(_npcId);
-                    var directPath = new System.Collections.Generic.List<UnityEngine.Vector2Int>(32);
-                    if (world.GridPos.TryGetValue(_npcId, out var pos) && world.TryBuildGreedyDirectPath(_npcId, pos.X, pos.Y, _intent.TargetX, _intent.TargetY, directPath))
-                        world.SetDebugDirectPathForNpc(_npcId, directPath);
-                }
-                else
-                {
-                    world.BeginMacroRouteExecutionForNpc(_npcId, _intent.TargetX, _intent.TargetY);
+                // Copia l'intent e imposta IsNew = true.
+                // Il MovementSystem leggerà questo flag al primo tick e
+                // inizializzerà la navigazione (direct path o macro-route).
+                var intent   = _intent;
+                intent.IsNew = true;
 
-                    if (!world.NpcMacroRouteExecution.TryGetValue(_npcId, out var macroState) || macroState == null || !macroState.Active)
-                    {
-                        var directPrefix = new System.Collections.Generic.List<UnityEngine.Vector2Int>(32);
-                        if (world.GridPos.TryGetValue(_npcId, out var pos) && world.TryBuildGreedyDirectPrefixPath(_npcId, pos.X, pos.Y, _intent.TargetX, _intent.TargetY, directPrefix))
-                            world.SetDebugDirectPathForNpc(_npcId, directPrefix);
-                    }
-                }
-            }
-            else
-            {
-                world.SetNpcIdle(_npcId);
+                // Pulisce gli stati di navigazione del tick precedente.
+                // Fondamentale: senza questo, il MovementSystem potrebbe
+                // ereditare un debug path o una macro-route della navigazione
+                // precedente e fare scelte incoerenti.
+                world.ClearDebugNavigationPathsForNpc(_npcId);
                 world.ClearDebugMacroRouteForNpc(_npcId);
                 world.ClearNpcLocalSearchState(_npcId, string.Empty);
                 world.ClearNpcDirectCommitState(_npcId, string.Empty);
+
+                // Scrive l'intent nel World (source of truth del movimento NPC).
+                world.SetMoveIntent(_npcId, intent);
+
+                // Aggiorna NpcAction immediatamente per la View.
+                // Usiamo il target finale (non quello effettivo della macro-route):
+                // la View mostrerà la destinazione intenzionale dell'NPC, non
+                // il prossimo waypoint landmark intermedio.
+                world.SetNpcAction(_npcId, NpcActionState.MoveTo(
+                    _intent.TargetX,
+                    _intent.TargetY,
+                    _intent.Reason.ToString()
+                ));
+            }
+            else
+            {
+                // ============================================================
+                // INTENT INATTIVO: cancellazione / reset del movimento
+                // ============================================================
+                // L'NPC deve fermarsi. Puliamo tutto lo stato di navigazione
+                // e portiamo l'NPC in idle.
+
+                world.SetMoveIntent(_npcId, _intent);
+                world.ClearDebugNavigationPathsForNpc(_npcId);
+                world.ClearDebugMacroRouteForNpc(_npcId);
+                world.ClearNpcLocalSearchState(_npcId, string.Empty);
+                world.ClearNpcDirectCommitState(_npcId, string.Empty);
+                world.SetNpcIdle(_npcId);
             }
         }
     }

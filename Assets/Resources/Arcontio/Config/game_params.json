@@ -25,6 +25,13 @@
   "inventory": {
     "inventory_max_units": 30
   },
+  "movement": {
+    "intentStuckTicksDefault": 12,
+    "intentStuckTicksLastMile": 8,
+    "intentStuckTicksBlocked": 6,
+    "directPrefixCells": 3,
+    "directCheckFovOnAcquisition": true
+  },
   "landmarks": {
     "enableLandmarkSystem": true,
     "maxLandmarksPerNpc": 64,
@@ -33,10 +40,6 @@
     "maxWorldLandmarks": 512,
     "maxEdgesPerLandmark": 8,
     "merge_radius": 1,
-    "candidate": {
-      "candidate_cooldown_ticks": 6,
-      "junction_min_exits": 3
-    },
     "eviction": {
       "eviction_stale_ticks": 60000,
       "eviction_cooldown_ticks": 120
@@ -47,15 +50,12 @@
     },
     "debug": {
       "enabled": true,
-      "overlay_default_enabled": false,
-      "activeNpcOnly": true,
-      "microTestDummyGraph": false,
-      "microTestDummyDistanceCells": 2
+      "activeNpcOnly": true
     },
     "localSearch": {
       "enabled": true,
       "useJumpPointSearch": true,
-      "maxExpandedNodes": 64,
+      "maxExpandedNodes": 128,
       "maxIterations": 128,
       "maxSearchRadius": 10,
       "maxJumpDistance": 12,
@@ -65,5 +65,24 @@
       "commitMinSteps": 3,
       "preventImmediateBacktrack": true
     }
+  },
+  "gvd_din": {
+    "enabled": true,
+    "pruning_min_branch_length": 3,
+    "area_center_min_dt_value": 4,
+    "area_center_min_spacing_cells": 5,
+    "merge_radius_gvd": 2.5,
+    "debug": {
+      "show_dt_heatmap": false,
+      "show_gvd_raw": false,
+      "show_gvd_nodes": true
+    }
+  },
+  "hybrid_landmark": {
+    "use_hybrid_extractor": false,
+    "dt_open_threshold": 3,
+    "merge_radius": 2.5,
+    "min_region_area": 4,
+    "median_tolerance": 1
   }
 }

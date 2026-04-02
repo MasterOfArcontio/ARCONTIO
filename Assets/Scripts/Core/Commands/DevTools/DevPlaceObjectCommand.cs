@@ -58,13 +58,13 @@ namespace Arcontio.Core.Commands.DevTools
             }
 
             // Ownership devtool: default None.
-            int objId = world.CreateObject(_defId, _x, _y, OwnerKind.None, -1);
+            int objId = world.CreateObject(_defId, _x, _y, OwnerKind.Community, 0);
             
             if (_defId == "food_stock") // o come si chiama nel tuo catalogo
             {
                 world.SetFoodStock(objId, new FoodStockComponent
                 {
-                    Units = 2,
+                    Units = 1,
                     OwnerKind = OwnerKind.Community,   // oppure None/Public
                     OwnerId = 0                        // se richiesto dal tipo
                 });

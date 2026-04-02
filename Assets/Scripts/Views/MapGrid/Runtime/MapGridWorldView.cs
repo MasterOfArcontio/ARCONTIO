@@ -58,6 +58,9 @@ namespace Arcontio.View.MapGrid
         [SerializeField] private string balloonTheftWitnessOutSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftReportWitnessOut";
         [SerializeField] private string balloonTheftWitnessInSpritePath = "MapGrid/Sprites/Balloons/Balloon_TheftReportWitnessIn";
 
+        [Tooltip("[DEBUG] Balloon mostrato quando l'NPC arriva dove ricordava il cibo ma non lo trova più.")]
+        [SerializeField] private string balloonFoodNotFoundSpritePath = "MapGrid/Sprites/Balloons/Balloon_FoodNotFound";
+
         [Header("Debug overlays")]
         [Tooltip("Sprite usato per evidenziare celle viste (DebugFovTelemetry). Deve essere un Sprite in Resources.")]
         [SerializeField] private string fovOverlaySpritePath = "MapGrid/Sprites/CellHighlight";
@@ -105,6 +108,20 @@ namespace Arcontio.View.MapGrid
         // ---------------- Debug overlay: Landmarks/edges (v0.02 Day1) ----------------
         private MapGridLandmarkOverlay _landmarkOverlay;
         private bool _landmarkOverlayEnabled;
+
+        // Patch 0.03.02.a.2: label landmark via Canvas UI.
+        private MapGridLandmarkLabelOverlay _landmarkLabelOverlay;
+
+        // Patch 0.03.02.a.4: overlay valori DT numerici per debug (tasto D).
+        private MapGridDtValueOverlay _dtValueOverlay;
+        private bool                  _dtValueOverlayEnabled;
+        private GvdDinOverlaySnapshot _dtSnapshot = new GvdDinOverlaySnapshot();
+
+        // ---------------- Debug overlay: GVD-DIN (v0.03) ----------------
+        // Il toggle GVD-DIN riusa _landmarkOverlay (stessa istanza), attivando
+        // i layer GVD-DIN interni tramite SetGvdDinLayerFlags().
+        // Viene mostrato solo quando il LandmarkOverlay è attivo.
+        private bool _gvdDinOverlayEnabled;
 
         // ---------------- Debug overlay: Summary cards (F1) ----------------
         //
@@ -224,6 +241,16 @@ namespace Arcontio.View.MapGrid
             _landmarkOverlay.Init(transform, cfg.tileSizeWorld, landmarkOverlayNodeSpritePath, safeLandmarkOverlayOrder);
             _landmarkOverlayEnabled = false;
 
+            // Patch 0.03.01.h: inizializza il label overlay Canvas UI.
+            _landmarkLabelOverlay = new MapGridLandmarkLabelOverlay();
+            _landmarkLabelOverlay.Init(transform);
+            // Parte disabilitato — si attiva insieme a _landmarkOverlay con il tasto L.
+
+            // Patch 0.03.02.a.4: overlay valori DT numerici (tasto D).
+            _dtValueOverlay = new MapGridDtValueOverlay();
+            _dtValueOverlay.Init(transform);
+            _dtValueOverlayEnabled = false;
+
             // ============================================================
             // Debug overlay: Summary cards (F1)
             // ============================================================
@@ -232,8 +259,9 @@ namespace Arcontio.View.MapGrid
             // - Non deve mai “bloccare” la sim: se world/camera null, semplicemente non renderizza.
             _summaryOverlay = new MapGridEntitySummaryOverlay();
             _summaryOverlay.AttachTo(transform);          // ✅ QUESTA RIGA MANCAVA
-            _summaryOverlay.SetEnabled(false);
-            _summaryOverlayEnabled = false;
+            // Card overlay attiva di default all'avvio.
+            _summaryOverlay.SetEnabled(true);
+            _summaryOverlayEnabled = true;
         }
 
         private void Update()
@@ -275,6 +303,55 @@ if (Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.curren
 {
     _landmarkOverlayEnabled = !_landmarkOverlayEnabled;
     _landmarkOverlay?.SetEnabled(_landmarkOverlayEnabled);
+    // Patch 0.03.01.h: label overlay segue il toggle L.
+    _landmarkLabelOverlay?.SetEnabled(_landmarkOverlayEnabled);
+
+    // Se si spegne il landmark overlay, azzera anche il flag GVD-DIN.
+    if (!_landmarkOverlayEnabled && _gvdDinOverlayEnabled)
+    {
+        _gvdDinOverlayEnabled = false;
+        _landmarkOverlay?.SetGvdDinLayerFlags(false, false, false);
+    }
+}
+
+// ============================================================
+// INPUT (debug): G toggle GVD-DIN overlay layer (v0.03)
+// ============================================================
+// Attiva/disattiva i tre layer GVD-DIN sovrapposti al LandmarkOverlay.
+// Funziona solo se il LandmarkOverlay è già attivo (L premuto).
+// Legge i flag di visibilità da game_params.json (gvd_din.debug.*).
+if (Keyboard.current != null && Keyboard.current.gKey != null && Keyboard.current.gKey.wasPressedThisFrame)
+{
+    _gvdDinOverlayEnabled = !_gvdDinOverlayEnabled;
+
+    // Se il landmark overlay non è attivo, lo attiviamo automaticamente.
+    if (_gvdDinOverlayEnabled && !_landmarkOverlayEnabled)
+    {
+        _landmarkOverlayEnabled = true;
+        _landmarkOverlay?.SetEnabled(true);
+    }
+
+    // Leggiamo i flag da config (così l'utente può cambiarli nel JSON senza ricompilare).
+    if (_landmarkOverlay != null && _world != null)
+    {
+        var gvdCfg = _world.Config?.Sim?.gvd_din?.debug;
+        bool showDt    = _gvdDinOverlayEnabled && (gvdCfg?.show_dt_heatmap ?? false);
+        bool showRaw   = _gvdDinOverlayEnabled && (gvdCfg?.show_gvd_raw    ?? false);
+        bool showNodes = _gvdDinOverlayEnabled && (gvdCfg?.show_gvd_nodes  ?? true);
+        _landmarkOverlay.SetGvdDinLayerFlags(showDt, showRaw, showNodes);
+    }
+}
+
+// ============================================================
+// INPUT (debug): D toggle DT value overlay (v0.03.02.a.4)
+// ============================================================
+// Mostra il valore numerico della Distance Transform su ogni cella.
+// Utile per verificare che la DT sia calcolata correttamente.
+// Indipendente da L e G — può essere attivato da solo.
+if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.current.dKey.wasPressedThisFrame)
+{
+    _dtValueOverlayEnabled = !_dtValueOverlayEnabled;
+    _dtValueOverlay?.SetEnabled(_dtValueOverlayEnabled);
 }
 
             // ============================================================
@@ -368,6 +445,48 @@ if (Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.curren
                     _landmarkOverlay.Clear();
             }
 
+            // Patch 0.03.01.h: render label overlay Canvas UI.
+            // Legge i nodi già popolati da _landmarkOverlay.Render() tramite le
+            // proprietà read-only WorldNodes / KnownNodes / RouteNodes / GvdNodes.
+            if (_landmarkOverlayEnabled && _landmarkLabelOverlay != null && _world != null)
+            {
+                var cam2 = ResolveWorldCamera();
+                float tileSize = cfg != null ? cfg.tileSizeWorld : 1f;
+                if (activeNpcId > 0 && cam2 != null)
+                {
+                    // Converti IReadOnlyList → List per la firma del metodo Render.
+                    // Usiamo liste temporanee locali — il costo è trascurabile (solo riferimenti).
+                    var wn = new System.Collections.Generic.List<LandmarkOverlayNode>(_landmarkOverlay.WorldNodes);
+                    var kn = new System.Collections.Generic.List<LandmarkOverlayNode>(_landmarkOverlay.KnownNodes);
+                    var rn = new System.Collections.Generic.List<LandmarkOverlayNode>(_landmarkOverlay.RouteNodes);
+                    var gn = new System.Collections.Generic.List<LandmarkOverlayNode>(_landmarkOverlay.GvdNodes);
+                    _landmarkLabelOverlay.Render(_world, cam2, tileSize, wn, kn, rn, gn);
+                }
+                else
+                {
+                    _landmarkLabelOverlay.Clear();
+                }
+            }
+
+            // Patch 0.03.02.a.4: render DT value overlay (tasto D).
+            // Riusa lo snapshot GVD-DIN già popolato nell'Update precedente
+            // da LandmarkOverlay.Render → GetGvdDinOverlayData.
+            if (_dtValueOverlayEnabled && _dtValueOverlay != null && _world != null)
+            {
+                var cam3 = ResolveWorldCamera();
+                float tileSize3 = cfg != null ? cfg.tileSizeWorld : 1f;
+                if (cam3 != null)
+                {
+                    // Popola lo snapshot DT fresco per questo frame
+                    _world.GetGvdDinOverlayData(_dtSnapshot);
+                    _dtValueOverlay.Render(_dtSnapshot, cam3, tileSize3);
+                }
+                else
+                {
+                    _dtValueOverlay.Clear();
+                }
+            }
+
             // ============================================================
             // Summary overlay (F1) vs Hover tooltip (default)
             // ============================================================
@@ -396,7 +515,7 @@ if (Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.curren
 
             if (_summaryOverlayEnabled)
             {
-                // Tooltip OFF (hard) + overlay ON
+                // Card avanzata ON, tooltip sempre nascosto.
                 _hoverTooltip.Hide();
 
                 if (cam != null && _summaryOverlay != null)
@@ -404,7 +523,7 @@ if (Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.curren
             }
             else
             {
-                // Overlay OFF + tooltip ON (normal)
+                // Overlay OFF + tooltip ON (comportamento legacy con F9).
                 if (_summaryOverlay != null)
                     _summaryOverlay.SetEnabled(false);
 
@@ -584,6 +703,9 @@ if (Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.curren
                 { Arcontio.Core.NpcBalloonKind.TheftReportVictimIn, balloonTheftVictimInSpritePath },
                 { Arcontio.Core.NpcBalloonKind.TheftReportWitnessOut, balloonTheftWitnessOutSpritePath },
                 { Arcontio.Core.NpcBalloonKind.TheftReportWitnessIn, balloonTheftWitnessInSpritePath },
+
+                // Debug: cibo non trovato alla posizione ricordata
+                { Arcontio.Core.NpcBalloonKind.FoodNotFound, balloonFoodNotFoundSpritePath },
             };
 
             balloon.Init(npcId, npcBalloonYOffsetWorld, npcBalloonVisibleSeconds, map);

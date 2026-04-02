@@ -137,6 +137,19 @@ namespace Arcontio.Core
         public string NavigationMode = string.Empty;
         public int LastModeSwitchTick = -1;
         public string LastModeSwitchReason = string.Empty;
+
+        // ── DIRECT PREFIX COMMITMENT (Patch 0.02.07.A) ──────────────
+        // Passi del prefix committed ancora da eseguire.
+        // >0 = esecuzione inerziale del prefix (no re-check FOV).
+        // 0  = prefix terminato, rivalutare acquisizione.
+        public int DirectPrefixStepsRemaining;
+
+        // FIX Patch 0.02.07.B — Bug 1 approaching:
+        // True finché l'NPC non ha ancora raggiunto fisicamente il primo nodo
+        // landmark della route. In questo tratto i passi devono essere tracciati
+        // come DIRECT (azzurro), non LM_PATH (arancione).
+        // Azzerato in TryAdvanceMacroRouteAtCell al primo avanzamento di NextRouteNodeIndex.
+        public bool IsApproachingFirstLm;
     }
 
 
@@ -274,6 +287,101 @@ namespace Arcontio.Core
             Bx = bx;
             By = by;
             Reliability01 = reliability01;
+        }
+    }
+
+    // ============================================================
+    // GVD-DIN OVERLAY TYPES (v0.03)
+    // ============================================================
+    // Questi tipi supportano i tre layer di debug del sistema GVD-DIN:
+    //   1) GvdDinOverlayCellDt  — heatmap della Distance Transform
+    //   2) GvdDinOverlayCellGvd — celle GVD grezze pre-pruning
+    //   3) I nodi GVD post-pruning riusano LandmarkOverlayNode con Kind=GvdVertex
+    //
+    // Nota architetturale:
+    // - Questi dati vengono prodotti da GvdDinComputer (v0.03) e trasportati
+    //   alla view tramite World.GetGvdDinOverlayData().
+    // - La view NON conosce GvdDinComputer: legge solo questi contratti.
+    // ============================================================
+
+    /// <summary>
+    /// Cella con valore Distance Transform per l'overlay heatmap.
+    /// - CellX/CellY: coordinata griglia.
+    /// - DtValue: distanza alla parete più vicina (0 = muro/adiacente, max = centro stanza).
+    /// - DtNormalized01: valore normalizzato 0..1 per la colorazione (0=scuro, 1=chiaro).
+    /// </summary>
+    [Serializable]
+    public readonly struct GvdDinOverlayCellDt
+    {
+        public readonly int CellX;
+        public readonly int CellY;
+        public readonly int DtValue;
+        public readonly float DtNormalized01;
+
+        public GvdDinOverlayCellDt(int cellX, int cellY, int dtValue, float dtNormalized01)
+        {
+            CellX = cellX;
+            CellY = cellY;
+            DtValue = dtValue;
+            DtNormalized01 = dtNormalized01;
+        }
+    }
+
+    /// <summary>
+    /// Cella GVD grezza pre-pruning per l'overlay dot ciano.
+    /// - CellX/CellY: coordinata griglia.
+    /// - ObstacleA/ObstacleB: indici lineari (y*width+x) dei due ostacoli equidistanti.
+    ///   Usati solo per debug avanzato; la view semplice ignora questi campi.
+    /// </summary>
+    [Serializable]
+    public readonly struct GvdDinOverlayCellGvd
+    {
+        public readonly int CellX;
+        public readonly int CellY;
+        public readonly int ObstacleA;
+        public readonly int ObstacleB;
+
+        public GvdDinOverlayCellGvd(int cellX, int cellY, int obstacleA = -1, int obstacleB = -1)
+        {
+            CellX = cellX;
+            CellY = cellY;
+            ObstacleA = obstacleA;
+            ObstacleB = obstacleB;
+        }
+    }
+
+    /// <summary>
+    /// Snapshot completo dei dati GVD-DIN per un singolo frame di debug overlay.
+    /// Prodotto da World.GetGvdDinOverlayData() e consumato da MapGridLandmarkOverlay.
+    ///
+    /// Nota: le liste sono pre-allocate e riutilizzate tra frame per evitare GC.
+    /// Il caller (MapGridLandmarkOverlay) deve passare le stesse istanze ogni frame.
+    /// </summary>
+    public sealed class GvdDinOverlaySnapshot
+    {
+        // Layer 1: heatmap DT — celle con dtValue > 0 (celle walkable).
+        public readonly List<GvdDinOverlayCellDt> DtCells = new List<GvdDinOverlayCellDt>(512);
+
+        // Layer 2: celle GVD grezze pre-pruning.
+        public readonly List<GvdDinOverlayCellGvd> GvdRawCells = new List<GvdDinOverlayCellGvd>(256);
+
+        // Layer 3: nodi GVD post-pruning (= candidati landmark GVD-DIN).
+        // Usano LandmarkOverlayNode con Kind=3 (GvdVertex) per distinzione visiva.
+        public readonly List<LandmarkOverlayNode> GvdNodes = new List<LandmarkOverlayNode>(64);
+
+        // Edge tra nodi GVD post-pruning (scheletro topologico).
+        public readonly List<LandmarkOverlayEdge> GvdEdges = new List<LandmarkOverlayEdge>(128);
+
+        // Stato del sistema: true se GVD-DIN è enabled e i dati sono validi.
+        public bool IsValid = false;
+
+        public void Clear()
+        {
+            DtCells.Clear();
+            GvdRawCells.Clear();
+            GvdNodes.Clear();
+            GvdEdges.Clear();
+            IsValid = false;
         }
     }
 }

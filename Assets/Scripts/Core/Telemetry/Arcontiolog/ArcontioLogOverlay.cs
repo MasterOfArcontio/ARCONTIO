@@ -33,6 +33,9 @@ namespace Arcontio.View
         [Header("Placement")]
         [SerializeField] private bool bottomRight = true;
 
+        [Tooltip("Se false, la finestra log non viene mostrata.")]
+        [SerializeField] private bool visible = false;
+
         [Header("Buffer")]
         [SerializeField] private int maxLines = 45;
 
@@ -51,8 +54,7 @@ namespace Arcontio.View
             if (_instance != null && _instance != this) { Destroy(gameObject); return; }
             _instance = this;
             DontDestroyOnLoad(gameObject);
-            BuildUi();
-            DrainPending();
+            if (visible) { BuildUi(); DrainPending(); }
         }
 
         private void Update()

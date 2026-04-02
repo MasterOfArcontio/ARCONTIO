@@ -1,17 +1,24 @@
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // MoveIntent — Patch 0.02.05.B: aggiunto campo IsNew
+    // =============================================================================
     /// <summary>
-    /// Intento di movimento minimale.
+    /// <b>MoveIntent</b> — intento di movimento minimale per un NPC.
     ///
-    /// Filosofia:
-    /// - Questo è volutamente "stupido": TargetCell + optional reason.
-    /// - La decisione (Rules/Decision) scrive l'intent.
-    /// - Un sistema fisico (MovementSystem) lo esegue step-by-step.
+    /// <para>
+    /// Filosofia: struct volutamente "stupida" — solo target cell + reason debuggabile.
+    /// Nessuna logica di navigazione interna.
+    /// </para>
     ///
-    /// PATCH NOTE (runtime fix):
-    /// - Aggiungiamo BlockedTicks per implementare "stuck detection".
-    ///   Questo contatore viene gestito dal MovementSystem, NON dalle Rules,
-    ///   perché solo il livello fisico sa quando davvero "non riesci ad avanzare".
+    /// <para><b>Chi scrive:</b> Rule/Decision tramite <c>SetMoveIntentCommand</c>.</para>
+    /// <para><b>Chi esegue:</b> <c>MovementSystem</c> ogni tick.</para>
+    ///
+    /// <para>
+    /// <b>Patch 0.02.05.B:</b> aggiunto <see cref="IsNew"/> per segnalare al
+    /// <c>MovementSystem</c> che l'intent è appena stato scritto e non ancora
+    /// inizializzato (nessuna macro-route o direct path preparati).
+    /// </para>
     /// </summary>
     public struct MoveIntent
     {
@@ -31,20 +38,27 @@ namespace Arcontio.Core
         public int TargetObjectId;
 
         /// <summary>
-        /// Contatore di "blocco" per intent attivi che non riescono a progredire.
-        ///
-        /// Semantica:
-        /// - incrementato dal MovementSystem se in un tick NON riesci ad avanzare
-        ///   verso TargetX/TargetY (cella occupata / blocco movimento / fallback fallito).
-        /// - resettato a 0 quando il movimento fa almeno uno step.
-        ///
-        /// Uso:
-        /// - dopo N tick consecutivi di blocco, il MovementSystem cancella l'intento
-        ///   per sbloccare la simulazione e consentire re-plan.
+        /// Contatore di tick consecutivi in cui il movimento è bloccato.
+        /// Incrementato dal MovementSystem se in un tick l'NPC non riesce ad avanzare.
+        /// Azzerato ogni volta che l'NPC fa almeno uno step.
+        /// Quando supera DefaultIntentStuckTicks, il MovementSystem cancella l'intent.
         /// </summary>
         public int BlockedTicks;
+
+        /// <summary>
+        /// Flag "primo tick" (Patch 0.02.05.B).
+        ///
+        /// Impostato a true da SetMoveIntentCommand quando scrive un nuovo intent attivo.
+        /// Il MovementSystem lo legge al primo tick, esegue InitializeNavigation
+        /// (sceglie direct path o macro-route, prepara i path debug), poi lo azzera.
+        ///
+        /// Questo meccanismo permette di spostare il planning di navigazione
+        /// dal Command (dove non appartiene) al MovementSystem (dove appartiene).
+        /// </summary>
+        public bool IsNew;
     }
 
+    // I tipi di movimento che abbiamo finora
     public enum MoveIntentReason
     {
         None = 0,

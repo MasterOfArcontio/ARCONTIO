@@ -4,22 +4,37 @@ using System.Collections.Generic;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // NpcPerceptionSystem — Patch 0.02.5A
+    // Geometria FOV centralizzata in FovUtils.cs
+    // =============================================================================
     /// <summary>
-    /// NpcPerceptionSystem:
-    /// - per ogni NPC, valuta quali altri NPC sono visibili (range + cono + LOS)
-    /// - produce NpcSpottedEvent
+    /// <b>NpcPerceptionSystem</b> — percezione visiva degli altri NPC.
     ///
-    /// Perché esiste:
-    /// - Step4: vogliamo poter popolare la memoria "Observed entities" anche con NPC osservati,
-    ///   evitando qualsiasi scansione globale nel planning (no telepatia).
+    /// <para>
+    /// Per ogni NPC osservatore, valuta quali altri NPC sono visibili e produce
+    /// un <c>NpcSpottedEvent</c> per ciascuno. Questo alimenta il sistema di
+    /// memoria "Observed entities", eliminando qualsiasi scansione globale
+    /// nel planning (no telepatia: un NPC sa solo chi ha visto).
+    /// </para>
     ///
-    /// Coerenza con ARCONTIO Core Standard v1.0:
-    /// - Pipeline visione unica: Range -> Cone -> LOS (OcclusionMap)
-    /// - FOV: 90° con 4 orientamenti (N/E/S/W), implementata come "cone" discreto via slope
+    /// <para><b>Pipeline di visione (Arcontio Core Standard v1.0):</b></para>
+    /// <list type="number">
+    ///   <item><b>Range gate</b> — Manhattan &lt;= visionRange</item>
+    ///   <item><b>Cone gate</b> — <see cref="FovUtils.IsInCone"/></item>
+    ///   <item><b>LOS gate</b>  — <c>world.HasLineOfSight</c> (Bresenham)</item>
+    /// </list>
     ///
-    /// Nota implementativa:
-    /// - Questo system è volutamente simile a ObjectPerceptionSystem per mantenere la coerenza.
-    /// - In futuro potrebbe essere ottimizzato (spatial hashing, region query, ecc.).
+    /// <para>
+    /// La struttura è volutamente speculare a <c>ObjectPerceptionSystem</c>
+    /// per mantenere la coerenza della pipeline. In futuro potrà essere
+    /// ottimizzata con spatial hashing o region query.
+    /// </para>
+    ///
+    /// <para>
+    /// <b>Patch 0.02.5A:</b> il metodo privato <c>IsInCone</c> è stato rimosso.
+    /// Tutta la geometria FOV delega a <see cref="FovUtils"/>.
+    /// </para>
     /// </summary>
     public sealed class NpcPerceptionSystem : ISystem
     {
@@ -71,27 +86,30 @@ namespace Arcontio.Core
                     int tx = tp.X;
                     int ty = tp.Y;
 
-                    int dx = tx - ox; if (dx < 0) dx = -dx;
-                    int dy = ty - oy; if (dy < 0) dy = -dy;
-                    int dist = dx + dy;
+                    // Range gate: il più economico — elimina subito i target lontani
+                    // senza dover calcolare cono o LOS.
+                    int dist = FovUtils.Manhattan(ox, oy, tx, ty);
 
+                    // dist == 0: stessa cella (non si può "vedere" se stessi).
                     if (dist <= 0)
                         continue;
 
+                    // dist > visionRange: fuori range massimo di visione.
                     if (dist > visionRange)
                         continue;
 
-                    if (useCone && !IsInCone(ox, oy, facing, tx, ty, coneSlope))
+                    // Patch 0.02.5A: delega a FovUtils (fonte canonica del cono)
+                    if (useCone && !FovUtils.IsInCone(ox, oy, facing, tx, ty, coneSlope))
                         continue;
 
-                    // LOS: usa OcclusionMap via World.HasLineOfSight
+                    // LOS gate: Bresenham sull'OcclusionMap — applicato per ultimo perché più costoso.
+                    // Se la LOS è bloccata da un muro/porta, l'NPC non vede il target.
                     if (!world.HasLineOfSight(ox, oy, tx, ty))
                         continue;
 
-                    // Witness quality: oggi una funzione semplice della distanza.
-                    // (Si potrebbe pesare anche orientamento, qualità visiva, ecc.)
-                    float q = 1f - (dist / (float)visionRange);
-                    if (q < 0.05f) q = 0.05f;
+                    // Patch 0.02.5A: qualità centralizzata in FovUtils.ObservationQuality.
+                    // In futuro si potrebbe pesare anche l'orientamento relativo (frontal bonus).
+                    float q = FovUtils.ObservationQuality(dist, visionRange);
 
                     bus.Publish(new NpcSpottedEvent(
                         observerNpcId: observerId,
@@ -108,35 +126,7 @@ namespace Arcontio.Core
             telemetry.Counter("NpcPerceptionSystem.NpcSpottedEvents", spotted);
         }
 
-        static bool IsInCone(int sx, int sy, CardinalDirection facing, int tx, int ty, float slope)
-        {
-            int dx = tx - sx;
-            int dy = ty - sy;
+        // Patch 0.02.5A: IsInCone rimosso — usa FovUtils.IsInCone
 
-            int forward, side;
-
-            switch (facing)
-            {
-                case CardinalDirection.North:
-                    forward = dy; side = dx; break;
-                case CardinalDirection.South:
-                    forward = -dy; side = -dx; break;
-                case CardinalDirection.East:
-                    forward = dx; side = -dy; break;
-                case CardinalDirection.West:
-                    forward = -dx; side = dy; break;
-                default:
-                    return false;
-            }
-
-            if (forward <= 0)
-                return false;
-
-            int absSide = side < 0 ? -side : side;
-
-            // floor(forward * slope)
-            int maxSide = (int)Math.Floor((forward * slope) + 0.0001f);
-            return absSide <= maxSide;
-        }
     }
 }
