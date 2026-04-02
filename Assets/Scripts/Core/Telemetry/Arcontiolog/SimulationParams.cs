@@ -390,9 +390,11 @@ namespace Arcontio.Core.Config
         // Se true, gli NPC imparano i landmark che vedono nel FOV (oltre che calpestando).
         public bool enabled = true;
 
-        // Frequenza di scansione in tick (1 = ogni tick, 3 = ogni 3 tick, ecc.).
-        // I landmark non si spostano, quindi scansionare ogni tick è ridondante.
-        public int period = 3;
+        // Frequenza di scansione in tick (1 = ogni tick, N = ogni N tick).
+        // ATTENZIONE: scegliere valori coprimi con il periodo di IdleScanSystem (12)
+        // per evitare che alcune direzioni vengano sistematicamente saltate.
+        // Default 1: gira ogni tick, costo minimo (landmark statici, solo Range+LOS).
+        public int period = 1;
     }
 
     // ============================================================

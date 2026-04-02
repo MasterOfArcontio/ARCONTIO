@@ -87,6 +87,6 @@
   },
   "landmark_perception": {
     "enabled": true,
-    "period": 3
+    "period": 1
   }
 }
