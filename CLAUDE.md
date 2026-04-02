@@ -187,35 +187,87 @@ Parametri in `game_params.json → landmark_perception`:
 
 **Stato:** design definito, implementazione non ancora avviata.
 
-Estensione di `LandmarkPerceptionSystem`: quando un NPC vede **due landmark
-contemporaneamente** nello stesso tick, può inferire un edge soggettivo tra loro
-— non perché lo ha camminato, ma perché percepisce la geometria.
+Estensione di `LandmarkPerceptionSystem`: l'NPC inferisce edge soggettivi
+tra landmark tramite due meccanismi distinti, applicati in cascata.
+
+---
+
+#### Meccanismo 1 — Simultaneità visiva (priorità)
+
+Se due landmark A e B sono **visibili nello stesso tick**, l'NPC li collega direttamente.
 
 **Trigger:** coppia (A, B) visibili nello stesso tick con:
 - `Manhattan(A.cell, B.cell) <= subjective_edge_max_dist`
 - (opzionale) `world.HasLineOfSight(A.cell, B.cell)`
 
-**Costo dell'edge:** `Manhattan(A.cell, B.cell)` — stima ottimistica.
+**Costo:** `Manhattan(A.cell, B.cell)` — stima ottimistica.
 
-**Reliability:**
-- Edge fisico (da movimento): confidence iniziale `0.25f`
-- Edge visivo (inferito): confidence iniziale `subjective_edge_base_reliability` (es. `0.15f`)
-- Se l'NPC cammina fisicamente l'edge in seguito → reinforced normalmente (`+0.10f`)
+---
 
-**Architettura:**
+#### Meccanismo 2 — Ibrido fisico + visivo (fallback)
+
+Se A e B **non** sono visibili contemporaneamente, ma:
+- esiste un **recording fisico attivo** da un landmark A precedentemente calpestato
+  (`NpcComplexEdgeMemory.IsRecordingActive`, `LastVisitedLandmarkId = A`)
+- l'NPC vede **B nel FOV** in questo tick
+
+→ crea un edge provvisorio `A → B` con costo reale parziale:
+
+```
+costo = StepCount (passi fisici da A a posizione corrente)
+      + Manhattan(npc_pos, B.cell) (stima visiva tratto rimanente)
+```
+
+**Prerequisito:** l'NPC deve aver calpestato fisicamente almeno un landmark in
+passato (per avviare il recording). Bootstrap puramente visivo non supportato
+per scelta progettuale: la conoscenza emerge dall'esperienza fisica.
+
+**Lifecycle dell'edge provvisorio:**
+- Creato con reliability = `subjective_edge_base_reliability` (es. `0.15f`)
+- Se in seguito l'NPC calpesta fisicamente B → `NotifyNpcMovedForLandmarkLearning`
+  sovrascrive con costo reale completo e reliability `0.25f` → edge confermato
+
+---
+
+#### Reliability
+
+| Tipo edge | Confidence iniziale |
+|-----------|-------------------|
+| Fisico (camminato) | `0.25f` |
+| Visivo simultaneo | `subjective_edge_base_reliability` (es. `0.15f`) |
+| Ibrido fisico+visivo | `subjective_edge_base_reliability` |
+
+Se l'NPC cammina fisicamente qualsiasi edge → reinforced normalmente (`+0.10f`).
+
+---
+
+#### Architettura
+
 ```
 LandmarkPerceptionSystem.Update()
     → visibleNodeIds (lista nodi visti in questo tick)
-    → loop su coppie (A, B):
+
+    // Meccanismo 1: simultaneità visiva
+    → loop su coppie (A, B) in visibleNodeIds:
         → dist check + LOS(A,B) opzionale
         → world.NotifyNpcSeenLandmarkPair(npcId, nodeA, nodeB, costCells)
 
-World.NotifyNpcSeenLandmarkPair()   ← nuovo metodo da creare
+    // Meccanismo 2: ibrido fisico+visivo
+    → per ogni nodeB in visibleNodeIds:
+        → se recording attivo (NpcComplexEdgeMemory) da nodeA
+        → se nodeA NON visibile nello stesso tick (evita duplicato con mec.1)
+        → costo = StepCount + Manhattan(npc_pos, B.cell)
+        → world.NotifyNpcSeenLandmarkPair(npcId, nodeA, nodeB, costo)
+
+World.NotifyNpcSeenLandmarkPair(npcId, nodeA, nodeB, costCells)  ← nuovo metodo
     → mem.LearnEdge(A, B, cost, now, evictionCooldown)
       con confidence = subjective_edge_base_reliability
 ```
 
-**Parametri da aggiungere a `landmark_perception` in `game_params.json`:**
+---
+
+#### Parametri da aggiungere a `landmark_perception` in `game_params.json`
+
 ```json
 {
   "subjective_edges_enabled": true,
@@ -224,9 +276,13 @@ World.NotifyNpcSeenLandmarkPair()   ← nuovo metodo da creare
 }
 ```
 
-**File da leggere prima di implementare:**
-- `LandmarkPerceptionSystem.cs` — aggiungere raccolta `visibleNodeIds` e loop coppie
+---
+
+#### File da leggere prima di implementare
+
+- `LandmarkPerceptionSystem.cs` — raccolta `visibleNodeIds`, loop coppie, meccanismo 2
 - `World.cs` → `NotifyNpcSeenLandmark` — aggiungere `NotifyNpcSeenLandmarkPair`
+- `NpcComplexEdgeMemory.cs` → `IsRecordingActive`, `StepCount` — verificare API disponibile
 - `NpcLandmarkMemory.cs` → `LearnEdge` — già supporta confidence arbitraria
 - `SimulationParams.cs` → `LandmarkPerceptionParams` — aggiungere 3 nuovi parametri
 
