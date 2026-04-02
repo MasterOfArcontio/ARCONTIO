@@ -1102,7 +1102,7 @@ namespace Arcontio.Core
 
 
         /// <summary>
-        /// NotifyNpcSeenLandmark (v0.03.04.a):
+        /// NotifyNpcSeenLandmark (v0.03.03.a):
         /// apprendimento visivo — l'NPC ha visto un landmark nel FOV senza calpestarci sopra.
         ///
         /// Contratto: viene chiamato da LandmarkPerceptionSystem dopo Range + Cone + LOS.
