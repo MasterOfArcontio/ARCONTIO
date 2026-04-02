@@ -4,7 +4,7 @@ using System.Collections.Generic;
 namespace Arcontio.Core
 {
     // =============================================================================
-    // LandmarkPerceptionSystem — v0.03.03
+    // LandmarkPerceptionSystem — v0.03.04.a
     // =============================================================================
     /// <summary>
     /// <b>LandmarkPerceptionSystem</b> — apprendimento visivo dei landmark tramite FOV.
