@@ -84,5 +84,9 @@
     "merge_radius": 2.5,
     "min_region_area": 4,
     "median_tolerance": 1
+  },
+  "landmark_perception": {
+    "enabled": true,
+    "period": 3
   }
 }

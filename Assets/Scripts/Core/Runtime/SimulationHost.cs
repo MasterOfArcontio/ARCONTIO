@@ -313,6 +313,17 @@ namespace Arcontio.Core
 
 
             // ******************************************************************************************************************************
+            // 5.1C) LANDMARK PERCEPTION (v0.03.03) - LandmarkPerceptionSystem
+            // ******************************************************************************************************************************
+            // Apprendimento visivo dei landmark tramite FOV degli NPC.
+            // Complementa il learning fisico (NotifyNpcMovedForLandmarkLearning).
+            // Deve stare DOPO NpcLandmarkMemorySystem (processa i nodi già manutenuti).
+            {
+                int lpPeriod = _world.Config?.Sim?.landmark_perception?.period ?? 3;
+                _scheduler.AddSystem(new LandmarkPerceptionSystem(lpPeriod));
+            }
+
+            // ******************************************************************************************************************************
             // 5.2) SCAN IN IDLE - IdleScan
             // ******************************************************************************************************************************
             // Quando l?NPC è idle, ruota (scan) per evitare ?visione 360 gratuita?.

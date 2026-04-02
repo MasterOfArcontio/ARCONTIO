@@ -1101,6 +1101,37 @@ namespace Arcontio.Core
 
 
 
+        /// <summary>
+        /// NotifyNpcSeenLandmark (v0.03.03):
+        /// apprendimento visivo — l'NPC ha visto un landmark nel FOV senza calpestarci sopra.
+        ///
+        /// Contratto: viene chiamato da LandmarkPerceptionSystem dopo Range + Cone + LOS.
+        ///
+        /// Differenze rispetto a NotifyNpcMovedForLandmarkLearning:
+        /// - impara SOLO il nodo (nessun edge, nessun path recording)
+        /// - non aggiorna LastVisitedLandmarkId (riservato all'apprendimento fisico)
+        /// - non fa avanzare la macro-route (dipende dal movimento fisico)
+        /// </summary>
+        public void NotifyNpcSeenLandmark(int npcId, int nodeId)
+        {
+            // Se il sistema landmarks è disabilitato, non impariamo nulla.
+            if (!Global.EnableLandmarkSystem)
+                return;
+
+            if (LandmarkRegistry == null)
+                return;
+
+            // Se l'NPC non esiste, abort.
+            if (!NpcCore.ContainsKey(npcId))
+                return;
+
+            long now = TickContext.CurrentTickIndex;
+            var mem = EnsureNpcLandmarkMemory(npcId);
+
+            // Impara solo il nodo (anti-thrashing gestito dentro NpcLandmarkMemory).
+            mem.LearnLandmark(nodeId, now, evictionCooldownTicks: Global.LandmarkEvictionCooldownTicks);
+        }
+
         // ============================================================
         // DAY4 - MACRO ROUTE PLANNER (A*)
         // ============================================================

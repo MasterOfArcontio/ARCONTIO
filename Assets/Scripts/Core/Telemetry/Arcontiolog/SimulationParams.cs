@@ -63,6 +63,11 @@ namespace Arcontio.Core.Config
         // Flood Fill → Landmark per regione → ChokePoint → Pruning.
         // Quando use_hybrid_extractor=true sostituisce GVD-DIN come generatore LM.
         public HybridLandmarkParams hybrid_landmark = new HybridLandmarkParams();
+
+        // ---------------- Landmark Perception (v0.03.03) ----------------
+        // Apprendimento visivo dei landmark tramite FOV degli NPC.
+        // Complementare al learning fisico (NotifyNpcMovedForLandmarkLearning).
+        public LandmarkPerceptionParams landmark_perception = new LandmarkPerceptionParams();
     }
 
     // ============================================================
@@ -374,6 +379,20 @@ namespace Arcontio.Core.Config
         // Valore 1 = bilanciamento quasi perfetto richiesto.
         // Alzare → più candidati (stanze asimmetriche incluse).
         public int median_tolerance = 1;
+    }
+
+    // ============================================================
+    // LANDMARK PERCEPTION (v0.03.03)
+    // ============================================================
+    [Serializable]
+    public sealed class LandmarkPerceptionParams
+    {
+        // Se true, gli NPC imparano i landmark che vedono nel FOV (oltre che calpestando).
+        public bool enabled = true;
+
+        // Frequenza di scansione in tick (1 = ogni tick, 3 = ogni 3 tick, ecc.).
+        // I landmark non si spostano, quindi scansionare ogni tick è ridondante.
+        public int period = 3;
     }
 
     // ============================================================
