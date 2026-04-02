@@ -313,7 +313,7 @@ namespace Arcontio.Core
 
 
             // ******************************************************************************************************************************
-            // 5.1C) LANDMARK PERCEPTION (v0.03.04.a) - LandmarkPerceptionSystem
+            // 5.1C) LANDMARK PERCEPTION (v0.03.03.a — Landmark Perception) - LandmarkPerceptionSystem
             // ******************************************************************************************************************************
             // Apprendimento visivo dei landmark tramite FOV degli NPC.
             // Complementa il learning fisico (NotifyNpcMovedForLandmarkLearning).
