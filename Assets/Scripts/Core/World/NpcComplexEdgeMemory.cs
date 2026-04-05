@@ -147,6 +147,20 @@ namespace Arcontio.Core
         public bool IsRecording => _activeRecording != null;
 
         /// <summary>
+        /// ID del nodo landmark da cui è partito il recording attivo.
+        /// Ritorna 0 se nessun recording è attivo.
+        /// Usato da LandmarkPerceptionSystem per il Meccanismo 2 (ibrido fisico+visivo).
+        /// </summary>
+        public int ActiveRecordingFromNodeId => _activeRecording?.FromNodeId ?? 0;
+
+        /// <summary>
+        /// Numero di passi accumulati nel recording attivo (inclusa la cella di partenza).
+        /// Ritorna 0 se nessun recording è attivo.
+        /// Usato come StepCount nel costo del Meccanismo 2 (ibrido fisico+visivo).
+        /// </summary>
+        public int ActiveRecordingStepCount => _activeRecording?.Steps.Count ?? 0;
+
+        /// <summary>
         /// Accesso in lettura agli edge complessi (per l'overlay e il planner).
         /// </summary>
         public IReadOnlyDictionary<NpcLandmarkMemory.EdgeKey, ComplexEdge> Edges => _edges;

@@ -197,7 +197,13 @@ namespace Arcontio.Core
         /// - costCells e' preso dal registry oggettivo (bootstrap Day2).
         /// - anti-thrashing come per i nodi.
         /// </summary>
-        public void LearnEdge(int nodeA, int nodeB, int costCells, long nowTick, int evictionCooldownTicks)
+        /// <param name="initialConfidence">
+        /// Confidence iniziale per edge nuovi (default 0.25f per edge fisici).
+        /// Passare un valore inferiore (es. 0.15f) per edge soggettivi visivi
+        /// (v0.03.04.c-ComplexEdge_Creation). Per edge già esistenti viene sempre
+        /// applicato il rinforzo standard (+0.10f), indipendentemente da questo valore.
+        /// </param>
+        public void LearnEdge(int nodeA, int nodeB, int costCells, long nowTick, int evictionCooldownTicks, float initialConfidence = 0.25f)
         {
             if (nodeA == 0 || nodeB == 0) return;
             if (nodeA == nodeB) return;
@@ -221,7 +227,7 @@ namespace Arcontio.Core
                     Key = key,
                     CostCells = costCells,
                     LastSeenTick = nowTick,
-                    Confidence01 = 0.25f,
+                    Confidence01 = Mathf.Clamp01(initialConfidence),
                 };
             }
         }

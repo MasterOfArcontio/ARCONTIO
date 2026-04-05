@@ -1163,6 +1163,57 @@ namespace Arcontio.Core
             }
         }
 
+        /// <summary>
+        /// NotifyNpcSeenLandmarkPair (v0.03.04.c-ComplexEdge_Creation):
+        /// crea un edge soggettivo tra due nodi landmark inferiti dalla percezione visiva.
+        ///
+        /// <para>
+        /// Chiamato da <c>LandmarkPerceptionSystem</c> con due meccanismi distinti:
+        /// </para>
+        /// <list type="number">
+        ///   <item>
+        ///     <b>Simultaneità visiva</b>: nodi A e B visibili nello stesso tick →
+        ///     costo = Manhattan(A, B).
+        ///   </item>
+        ///   <item>
+        ///     <b>Ibrido fisico+visivo</b>: recording fisico attivo da nodo A +
+        ///     nodo B visibile nel FOV → costo = StepCount + Manhattan(npc_pos, B).
+        ///   </item>
+        /// </list>
+        ///
+        /// <para>
+        /// L'edge viene appreso in <c>NpcLandmarkMemory</c> con la confidence visiva
+        /// (<paramref name="confidence"/>), inferiore a quella degli edge fisici (0.25f).
+        /// Se l'edge esiste già (es. percorso fisicamente), viene solo rinforzato (+0.10f)
+        /// senza abbassare la confidence già acquisita.
+        /// </para>
+        /// </summary>
+        /// <param name="npcId">NPC che inferisce l'edge.</param>
+        /// <param name="nodeA">Primo nodo dell'edge (non orientato).</param>
+        /// <param name="nodeB">Secondo nodo dell'edge (non orientato).</param>
+        /// <param name="costCells">Costo stimato in celle.</param>
+        /// <param name="confidence">Confidence iniziale (solo per edge nuovi).</param>
+        public void NotifyNpcSeenLandmarkPair(int npcId, int nodeA, int nodeB, int costCells, float confidence)
+        {
+            if (!Global.EnableLandmarkSystem) return;
+            if (LandmarkRegistry == null)     return;
+            if (!NpcCore.ContainsKey(npcId))  return;
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB) return;
+            if (costCells < 1) costCells = 1;
+
+            long now = TickContext.CurrentTickIndex;
+            var mem = EnsureNpcLandmarkMemory(npcId);
+
+            // Entrambi gli endpoint devono essere già noti all'NPC.
+            // Un NPC non può costruire un percorso verso un nodo di cui non sa l'esistenza.
+            if (!mem.ContainsLandmark(nodeA) || !mem.ContainsLandmark(nodeB))
+                return;
+
+            mem.LearnEdge(nodeA, nodeB, costCells, now,
+                evictionCooldownTicks: Global.LandmarkEvictionCooldownTicks,
+                initialConfidence: confidence);
+        }
+
         // ============================================================
         // DAY4 - MACRO ROUTE PLANNER (A*)
         // ============================================================

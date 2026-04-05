@@ -395,6 +395,25 @@ namespace Arcontio.Core.Config
         // per evitare che alcune direzioni vengano sistematicamente saltate.
         // Default 1: gira ogni tick, costo minimo (landmark statici, solo Range+LOS).
         public int period = 1;
+
+        // ── Edge soggettivi da percezione visiva (v0.03.04.c-ComplexEdge_Creation) ──────────
+        //
+        // Meccanismo 1 — Simultaneità visiva:
+        //   due landmark visibili nello stesso tick → edge soggettivo diretto.
+        //
+        // Meccanismo 2 — Ibrido fisico+visivo:
+        //   recording fisico attivo da nodo A + nodo B visibile nel FOV → edge provvisorio A→B.
+        //   Costo = StepCount fisici da A + Manhattan(npc_pos, B).
+
+        // Se true, abilita la creazione di edge soggettivi da percezione visiva.
+        public bool subjective_edges_enabled = true;
+
+        // Distanza Manhattan massima (in celle) tra due landmark per creare un edge visivo (Meccanismo 1).
+        public int subjective_edge_max_dist = 8;
+
+        // Confidence iniziale degli edge soggettivi visivi (Meccanismo 1 e 2).
+        // Inferiore agli edge fisici (0.25f) per riflettere l'incertezza della stima visiva.
+        public float subjective_edge_base_reliability = 0.15f;
     }
 
     // ============================================================
