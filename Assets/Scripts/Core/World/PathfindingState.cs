@@ -136,6 +136,18 @@ namespace Arcontio.Core
             = new Dictionary<int, NpcGoalLocalSearchExecutionState>(256);
 
         // =====================================================================
+        // STORE: FAILURE LADDER — BACK-OFF PER MACRO-ROUTE (v0.03.05-FailureLadder)
+        // =====================================================================
+        // npcId → stato del back-off corrente.
+        // Quando un NPC rimane bloccato per intentStuckTicks consecutivi, invece di
+        // cancellare immediatamente l'intent, entra in back-off per N tick.
+        // Al termine del back-off, tenta un replan (InitializeNavigation con IsNew=true).
+        // Se il replan fallisce di nuovo, incrementa lo stage. Dopo backoff_max_stages
+        // fallimenti consecutivi, l'intent viene cancellato (comportamento originale).
+        public readonly Dictionary<int, NpcMoveBackOffState> MoveBackOff
+            = new Dictionary<int, NpcMoveBackOffState>(256);
+
+        // =====================================================================
         // STORE: FAILURE LEARNING (anti-loop micro-ricerca)
         // =====================================================================
         // npcId → (signature_origine_destinazione → record di fallimento recente).
@@ -406,6 +418,76 @@ namespace Arcontio.Core
             state.Active        = false;
             state.FailureReason = duringLastMile ? "BlockedLastMile" : "BlockedToNextLandmark";
             MacroRouteExecution[npcId] = state;
+        }
+
+        // =====================================================================
+        // API: FAILURE LADDER — BACK-OFF (v0.03.05-FailureLadder)
+        // =====================================================================
+
+        /// <summary>
+        /// Avvia o incrementa il back-off per un NPC che si è bloccato.
+        /// Lo stage indica il numero di fallimenti consecutivi (1 = primo, 2 = secondo, ...).
+        /// La durata del back-off scala con lo stage secondo i parametri di configurazione.
+        /// </summary>
+        public void BeginMoveBackOff(int npcId, long nowTick, int stage, MovementParams mvParams)
+        {
+            int duration = stage <= 1
+                ? (mvParams?.backoff_stage1_ticks ?? 24)
+                : (mvParams?.backoff_stage2_ticks ?? 60);
+
+            MoveBackOff[npcId] = new NpcMoveBackOffState
+            {
+                Active       = true,
+                ResumeAtTick = nowTick + duration,
+                Stage        = stage
+            };
+        }
+
+        /// <summary>
+        /// True se l'NPC è attualmente in back-off e non deve muoversi.
+        /// </summary>
+        public bool IsMoveBackOffActive(int npcId, long nowTick)
+        {
+            if (!MoveBackOff.TryGetValue(npcId, out var s) || s == null || !s.Active)
+                return false;
+            return nowTick < s.ResumeAtTick;
+        }
+
+        /// <summary>
+        /// Se il back-off è scaduto in questo tick, lo disattiva e ritorna true
+        /// insieme allo stage appena terminato. Il chiamante deve tentare un replan.
+        /// Ritorna false se l'NPC non è in back-off o il back-off non è ancora scaduto.
+        /// </summary>
+        public bool TryExpireMoveBackOff(int npcId, long nowTick, out int stage)
+        {
+            stage = 0;
+            if (!MoveBackOff.TryGetValue(npcId, out var s) || s == null || !s.Active)
+                return false;
+            if (nowTick < s.ResumeAtTick)
+                return false;
+
+            stage    = s.Stage;
+            s.Active = false;
+            MoveBackOff[npcId] = s;
+            return true;
+        }
+
+        /// <summary>
+        /// Stage del back-off corrente (0 se nessun back-off attivo o registrato).
+        /// </summary>
+        public int GetMoveBackOffStage(int npcId)
+        {
+            if (!MoveBackOff.TryGetValue(npcId, out var s) || s == null)
+                return 0;
+            return s.Stage;
+        }
+
+        /// <summary>
+        /// Cancella il back-off per un NPC (intent completato con successo o cancellato).
+        /// </summary>
+        public void ClearMoveBackOff(int npcId)
+        {
+            MoveBackOff.Remove(npcId);
         }
 
         // =====================================================================

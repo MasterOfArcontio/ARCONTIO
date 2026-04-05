@@ -126,6 +126,24 @@ namespace Arcontio.Core.Config
         // percettivamente visibile (Range + FOV + LOS) al momento dell'innesco.
         // Se false, usa solo IsMovementBlocked per l'attraversabilità (legacy).
         public bool directCheckFovOnAcquisition = true;
+
+        // ── FAILURE LADDER: BACK-OFF / REPLAN (v0.03.05-FailureLadder) ──────
+        //
+        // Quando un NPC è bloccato per intentStuckTicksDefault tick consecutivi,
+        // invece di cancellare subito l'intent, entra in back-off e tenta un replan.
+        //
+        // Stage 1 (primo stuck): aspetta backoff_stage1_ticks, poi replan.
+        // Stage 2 (secondo stuck): aspetta backoff_stage2_ticks, poi replan.
+        // Stage > backoff_max_stages: cancella l'intent (comportamento precedente).
+        //
+        // Valori conservativi di default:
+        //   stage1 = 24 tick (~2 cicli IdleScan = NPC ha il tempo di ruotare e
+        //             aggiornare la percezione prima di ritentare)
+        //   stage2 = 60 tick (ostacolo dinamico: attesa più lunga)
+        //   max_stages = 2 (dopo 2 fallimenti: rinuncia)
+        public int backoff_stage1_ticks = 24;
+        public int backoff_stage2_ticks = 60;
+        public int backoff_max_stages   = 2;
     }
 
 

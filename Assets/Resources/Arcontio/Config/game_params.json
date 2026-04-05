@@ -30,7 +30,10 @@
     "intentStuckTicksLastMile": 8,
     "intentStuckTicksBlocked": 6,
     "directPrefixCells": 3,
-    "directCheckFovOnAcquisition": true
+    "directCheckFovOnAcquisition": true,
+    "backoff_stage1_ticks": 24,
+    "backoff_stage2_ticks": 60,
+    "backoff_max_stages": 2
   },
   "landmarks": {
     "enableLandmarkSystem": true,
