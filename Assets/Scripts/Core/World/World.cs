@@ -1611,6 +1611,47 @@ namespace Arcontio.Core
         }
 
         /// <summary>
+        /// BlacklistBlockedMacroEdge (v0.03.05-FailureLadder):
+        /// penalizza l'edge (fromNode → toNode) che si è rivelato bloccato durante
+        /// la navigazione, riducendo la sua confidence in entrambi gli store soggettivi.
+        ///
+        /// <para>
+        /// Effetto: al prossimo A*, questo edge riceverà una penalità maggiore
+        /// (<c>reliabilityPenalty = (1 − confidence) × 2</c>) oppure sarà evicto
+        /// dal TickMaintenance se la confidence scende sotto la soglia minima.
+        /// </para>
+        ///
+        /// <para>
+        /// Chiamato da MovementSystem quando l'NPC entra in BackOff su una macro-route.
+        /// Stage 1 → penalità lieve (<c>blacklist_penalty_stage1</c>).
+        /// Stage 2+ → penalità forte (<c>blacklist_penalty_stage2</c>).
+        /// </para>
+        /// </summary>
+        public void BlacklistBlockedMacroEdge(int npcId, int fromNodeId, int toNodeId, int stage)
+        {
+            if (fromNodeId == 0 || toNodeId == 0 || fromNodeId == toNodeId) return;
+            if (!NpcCore.ContainsKey(npcId)) return;
+
+            var mvParams = Config?.Sim?.movement;
+            float penalty = stage <= 1
+                ? (mvParams?.blacklist_penalty_stage1 ?? 0.12f)
+                : (mvParams?.blacklist_penalty_stage2 ?? 0.35f);
+
+            // Penalizza in NpcLandmarkMemory (edge semplici, usati dall'A*).
+            if (NpcLandmarkMemory.TryGetValue(npcId, out var lmMem) && lmMem != null)
+                lmMem.PenalizeEdge(fromNodeId, toNodeId, penalty);
+
+            // Penalizza in NpcComplexEdgeMemory (edge fisici/visivi).
+            if (NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem) && complexMem != null)
+            {
+                complexMem.PenalizeComplexEdge(fromNodeId, toNodeId, penalty);
+                // Stage 2+: marca come Risky per segnalare ai sistemi futuri.
+                if (stage >= 2)
+                    complexMem.SetEdgeFlag(fromNodeId, toNodeId, ComplexEdgeFlags.Risky);
+            }
+        }
+
+        /// <summary>
         /// Produce il report di debug della navigazione per un NPC (usato dalla card UI overlay).
         /// Aggrega lo stato da: MoveIntent, MacroRouteExecution, DirectCommit, GoalLocalSearch,
         /// debug path cells — tutti gestiti da <see cref="PathfindingState"/>.

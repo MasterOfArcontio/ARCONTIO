@@ -237,6 +237,29 @@ namespace Arcontio.Core
         // ============================================================
 
         /// <summary>
+        /// Penalizza un edge noto riducendo la sua confidence.
+        /// Usato dalla failure ladder (v0.03.05-FailureLadder) quando l'NPC
+        /// si blocca mentre percorre il tratto verso <paramref name="nodeB"/>.
+        ///
+        /// <para>
+        /// Se la confidence scende sotto la soglia minima di eviction
+        /// (gestita da TickMaintenance), l'edge verrà rimosso al prossimo ciclo.
+        /// Se l'edge non esiste, la chiamata è no-op.
+        /// </para>
+        /// </summary>
+        /// <param name="nodeA">Primo endpoint dell'edge.</param>
+        /// <param name="nodeB">Secondo endpoint dell'edge.</param>
+        /// <param name="penalty">Penalità da sottrarre alla confidence (0..1).</param>
+        public void PenalizeEdge(int nodeA, int nodeB, float penalty)
+        {
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB || penalty <= 0f) return;
+            var key = new EdgeKey(nodeA, nodeB);
+            if (!_edgesByKey.TryGetValue(key, out var e)) return;
+            e.Confidence01 = Mathf.Clamp01(e.Confidence01 - penalty);
+            _edgesByKey[key] = e;
+        }
+
+        /// <summary>
         /// TickMaintenance:
         /// applica:
         /// - eviction per staleness

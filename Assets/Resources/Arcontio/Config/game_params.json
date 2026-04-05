@@ -33,7 +33,9 @@
     "directCheckFovOnAcquisition": true,
     "backoff_stage1_ticks": 24,
     "backoff_stage2_ticks": 60,
-    "backoff_max_stages": 2
+    "backoff_max_stages": 2,
+    "blacklist_penalty_stage1": 0.12,
+    "blacklist_penalty_stage2": 0.35
   },
   "landmarks": {
     "enableLandmarkSystem": true,

@@ -663,6 +663,17 @@ namespace Arcontio.Core
                             world.MarkMacroRouteExecutionBlocked(npcId, duringLastMile: macroLastMile);
                             world.SetNpcIdle(npcId);
 
+                            // Task 5 — Blacklist edge bloccato.
+                            // Penalizza il macro-edge che ha causato lo stallo così che
+                            // il prossimo A* su grafo tenda a evitarlo.
+                            if (usingMacroImmediate && macroNextNodeId != 0)
+                            {
+                                int fromNodeId = world.NpcLandmarkMemory.TryGetValue(npcId, out var lmMemBl)
+                                    ? lmMemBl.LastVisitedLandmarkId : 0;
+                                if (fromNodeId != 0)
+                                    world.BlacklistBlockedMacroEdge(npcId, fromNodeId, macroNextNodeId, currentStage);
+                            }
+
                             ArcontioLogger.Trace(
                                 new LogContext(tick: (int)nowTickLong, channel: "Move", npcId: npcId, cell: (x, y)),
                                 new LogBlock(LogLevel.Trace, "log.move.backoff_started")

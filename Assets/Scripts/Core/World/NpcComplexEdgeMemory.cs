@@ -442,6 +442,23 @@ namespace Arcontio.Core
                 edge.ClearFlag(flag);
         }
 
+        /// <summary>
+        /// Applica una penalità alla confidence di un edge complesso esistente.
+        /// Chiamato da <c>World.BlacklistBlockedMacroEdge</c> quando l'NPC risulta
+        /// bloccato su un macro-edge durante il Failure Ladder (Task 5).
+        /// </summary>
+        /// <param name="nodeA">Endpoint A dell'edge.</param>
+        /// <param name="nodeB">Endpoint B dell'edge.</param>
+        /// <param name="penalty">Valore da sottrarre alla confidence (clampato a 0).</param>
+        public void PenalizeComplexEdge(int nodeA, int nodeB, float penalty)
+        {
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB || penalty <= 0f) return;
+            var key = new NpcLandmarkMemory.EdgeKey(nodeA, nodeB);
+            if (!_edges.TryGetValue(key, out var e)) return;
+            e.Confidence -= penalty;
+            if (e.Confidence < 0f) e.Confidence = 0f;
+        }
+
         // =====================================================================
         // HELPER PLANNER A*
         // =====================================================================

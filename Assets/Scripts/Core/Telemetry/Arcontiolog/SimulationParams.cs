@@ -144,6 +144,16 @@ namespace Arcontio.Core.Config
         public int backoff_stage1_ticks = 24;
         public int backoff_stage2_ticks = 60;
         public int backoff_max_stages   = 2;
+
+        // ── BLACKLIST EDGE (v0.03.05-FailureLadder) ──────────────────────────
+        // Quando l'NPC entra in back-off mentre percorre un edge della macro-route,
+        // la confidence di quell'edge viene ridotta per penalizzarlo nel prossimo A*.
+        // Stage 1 (primo stuck): penalità lieve — l'edge potrebbe essere temporaneamente
+        //   bloccato (altro NPC in transito, ostacolo dinamico).
+        // Stage 2+ (secondo stuck): penalità forte — l'edge è probabilmente inutilizzabile.
+        // La penalità viene applicata sia in NpcLandmarkMemory che in NpcComplexEdgeMemory.
+        public float blacklist_penalty_stage1 = 0.12f;
+        public float blacklist_penalty_stage2 = 0.35f;
     }
 
 
