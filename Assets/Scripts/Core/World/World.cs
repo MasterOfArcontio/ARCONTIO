@@ -1888,7 +1888,6 @@ namespace Arcontio.Core
             if (outComplexEdges != null && LandmarkRegistry != null
                 && NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem) && complexMem != null)
             {
-                var waypoints = new System.Collections.Generic.List<(int x, int y)>(32);
                 foreach (var kv in complexMem.Edges)
                 {
                     var ce = kv.Value;
@@ -1902,62 +1901,46 @@ namespace Arcontio.Core
                         continue;
                     }
 
-                    // Ricostruisce il percorso reale partendo da Key.A.
-                    // Se l'endpoint finale è lontano da Key.B (path registrato in senso B→A),
-                    // riprova partendo da Key.B.
-                    ReconstructComplexEdgeWaypoints(nA.CellX, nA.CellY, ce.Segments, waypoints);
-                    var last = waypoints[waypoints.Count - 1];
-                    int distToB = UnityEngine.Mathf.Abs(last.x - nB.CellX)
-                                + UnityEngine.Mathf.Abs(last.y - nB.CellY);
-                    if (distToB > 3)
-                        ReconstructComplexEdgeWaypoints(nB.CellX, nB.CellY, ce.Segments, waypoints);
-
-                    // Emette un LandmarkOverlayEdge per ogni tratto cardinale ricostruito.
-                    for (int w = 0; w < waypoints.Count - 1; w++)
+                    // Determina il nodo di partenza: prova da Key.A camminando i segmenti;
+                    // se l'endpoint finale è lontano da Key.B, il path fu registrato in senso
+                    // inverso (B→A) → parti da Key.B.
+                    int startX = nA.CellX, startY = nA.CellY;
                     {
-                        var p0 = waypoints[w];
-                        var p1 = waypoints[w + 1];
-                        outComplexEdges.Add(new LandmarkOverlayEdge(p0.x, p0.y, p1.x, p1.y, ce.Confidence));
+                        int cx2 = startX, cy2 = startY;
+                        for (int s = 0; s < ce.Segments.Count; s++)
+                            ApplySegment(ce.Segments[s], ref cx2, ref cy2);
+                        int distToB = System.Math.Abs(cx2 - nB.CellX) + System.Math.Abs(cy2 - nB.CellY);
+                        if (distToB > 3) { startX = nB.CellX; startY = nB.CellY; }
+                    }
+
+                    // Emette un LandmarkOverlayEdge per ogni tratto cardinale.
+                    // cx/cy seguono il cursore cella per cella tra i waypoint di svolta.
+                    int cx = startX, cy = startY;
+                    for (int s = 0; s < ce.Segments.Count; s++)
+                    {
+                        int nx = cx, ny = cy;
+                        ApplySegment(ce.Segments[s], ref nx, ref ny);
+                        outComplexEdges.Add(new LandmarkOverlayEdge(cx, cy, nx, ny, ce.Confidence));
+                        cx = nx; cy = ny;
                     }
                 }
             }
         }
 
         /// <summary>
-        /// Ricostruisce i waypoint di un ComplexEdge seguendo i PathSegment cardinali.
-        /// Partendo da (<paramref name="startX"/>, <paramref name="startY"/>),
-        /// applica ciascun segmento direzione/lunghezza e aggiunge il punto finale
-        /// di ogni tratto alla lista.
-        ///
-        /// <para>
-        /// Il risultato ha un waypoint per ogni cambio di direzione + il punto iniziale,
-        /// producendo la forma "a scalini" del percorso reale su griglia.
-        /// </para>
+        /// Applica un PathSegment al cursore (cx, cy) modificandolo in-place.
         /// </summary>
-        private static void ReconstructComplexEdgeWaypoints(
-            int startX, int startY,
-            System.Collections.Generic.List<PathSegment> segments,
-            System.Collections.Generic.List<(int x, int y)> outWaypoints)
+        private static void ApplySegment(PathSegment seg, ref int cx, ref int cy)
         {
-            outWaypoints.Clear();
-            outWaypoints.Add((startX, startY));
-            int cx = startX, cy = startY;
-            for (int i = 0; i < segments.Count; i++)
+            switch (seg.Direction)
             {
-                var seg = segments[i];
-                int dx = 0, dy = 0;
-                switch (seg.Direction)
-                {
-                    case CardinalDirection.North: dy = +1; break;
-                    case CardinalDirection.East:  dx = +1; break;
-                    case CardinalDirection.South: dy = -1; break;
-                    case CardinalDirection.West:  dx = -1; break;
-                }
-                cx += dx * seg.Length;
-                cy += dy * seg.Length;
-                outWaypoints.Add((cx, cy));
+                case CardinalDirection.North: cy += seg.Length; break;
+                case CardinalDirection.East:  cx += seg.Length; break;
+                case CardinalDirection.South: cy -= seg.Length; break;
+                case CardinalDirection.West:  cx -= seg.Length; break;
             }
         }
+
         /// <summary>
         /// Riempie gli edge di overlay cella-per-cella per i tre layer di navigazione.
         /// Delega a <see cref="PathfindingState.FillDebugNavigationPathOverlayData"/>.
