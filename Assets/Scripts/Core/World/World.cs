@@ -1214,6 +1214,32 @@ namespace Arcontio.Core
                 initialConfidence: confidence);
         }
 
+        /// <summary>
+        /// NotifyNpcSeenLandmarkPairComplex (v0.03.04.c — Meccanismo 2):
+        /// crea un <see cref="ComplexEdge"/> visivo in <see cref="NpcComplexEdgeMemories"/>
+        /// tra il nodo fisicamente calpestato (nodeA = ultimo da recording) e un nodo
+        /// visto nel FOV (nodeB). A differenza di <see cref="NotifyNpcSeenLandmarkPair"/>
+        /// (che crea edge semplici in NpcLandmarkMemory), questo percorso entra nel
+        /// layer giallo dell'overlay e verrà confermato o sostituito quando l'NPC
+        /// percorre fisicamente il tratto.
+        /// </summary>
+        public void NotifyNpcSeenLandmarkPairComplex(int npcId, int nodeA, int nodeB, int costCells, float confidence)
+        {
+            if (!Global.EnableLandmarkSystem) return;
+            if (LandmarkRegistry == null)     return;
+            if (!NpcCore.ContainsKey(npcId))  return;
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB) return;
+            if (costCells < 1) costCells = 1;
+
+            // Entrambi i nodi devono essere già noti all'NPC (stessa regola di NotifyNpcSeenLandmarkPair).
+            if (!NpcLandmarkMemory.TryGetValue(npcId, out var lmMem)) return;
+            if (!lmMem.ContainsLandmark(nodeA) || !lmMem.ContainsLandmark(nodeB)) return;
+
+            long now = TickContext.CurrentTickIndex;
+            var complexMem = EnsureNpcComplexEdgeMemory(npcId);
+            complexMem.LearnVisualEdge(nodeA, nodeB, costCells, now, confidence);
+        }
+
         // ============================================================
         // DAY4 - MACRO ROUTE PLANNER (A*)
         // ============================================================

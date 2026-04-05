@@ -214,7 +214,10 @@ namespace Arcontio.Core
                     int manDist = FovUtils.Manhattan(ox, oy, nodeB.CellX, nodeB.CellY);
                     int cost    = stepCount + manDist;
 
-                    world.NotifyNpcSeenLandmarkPair(npcId, fromNodeId, nodeBId, cost, reliability);
+                    // Meccanismo 2 → ComplexEdge in NpcComplexEdgeMemory (layer giallo overlay).
+                    // Il nodo di partenza è fisicamente calpestato (recording attivo), quindi
+                    // l'edge è più fondato di un edge puramente visivo e merita un layer separato.
+                    world.NotifyNpcSeenLandmarkPairComplex(npcId, fromNodeId, nodeBId, cost, reliability);
                     edgesCreated++;
                 }
             }

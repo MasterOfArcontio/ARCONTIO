@@ -292,6 +292,61 @@ namespace Arcontio.Core
         // =====================================================================
 
         /// <summary>
+        /// Crea o aggiorna un <see cref="ComplexEdge"/> inferito visivamente
+        /// (Meccanismo 2 — ibrido fisico+visivo di LandmarkPerceptionSystem).
+        ///
+        /// <para>
+        /// A differenza di <see cref="TryCompleteRecording"/>, questo edge nasce senza
+        /// segmenti fisici: il percorso non è stato percorso interamente, ma è stato
+        /// stimato visivamente (StepCount dal nodo di partenza + Manhattan visivo al target).
+        /// I <see cref="ComplexEdge.Segments"/> restano vuoti fino a quando l'NPC non
+        /// percorre fisicamente il tratto; a quel punto <see cref="TryCompleteRecording"/>
+        /// sovrascrive con i segmenti reali e confidence 0.25f.
+        /// </para>
+        ///
+        /// <para>
+        /// Se l'edge fisico già esiste (con segmenti), questa chiamata è no-op per
+        /// non degradare un'informazione più precisa con una stima visiva.
+        /// </para>
+        /// </summary>
+        /// <param name="nodeA">ID nodo di partenza (l'ultimo calpestato fisicamente).</param>
+        /// <param name="nodeB">ID nodo di destinazione (visto nel FOV).</param>
+        /// <param name="cost">Stima del costo (StepCount + Manhattan).</param>
+        /// <param name="nowTick">Tick corrente.</param>
+        /// <param name="confidence">Confidence iniziale (es. 0.15f).</param>
+        public void LearnVisualEdge(int nodeA, int nodeB, int cost, long nowTick, float confidence)
+        {
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB || cost < 1) return;
+
+            var key = new NpcLandmarkMemory.EdgeKey(nodeA, nodeB);
+
+            // Se esiste già un edge fisico (con segmenti), non degradarlo con una stima visiva.
+            if (_edges.TryGetValue(key, out var existing))
+            {
+                if (existing.Segments != null && existing.Segments.Count > 0)
+                    return; // edge fisico: non toccare
+                // Edge visivo già presente: rinforza solo se il nuovo costo è migliore.
+                if (cost < existing.BaseCost)
+                    existing.BaseCost = cost;
+                existing.LastSeenTick = nowTick;
+                return;
+            }
+
+            // Edge nuovo: verifica cap.
+            if (_edges.Count >= _maxEdges)
+            {
+                EvictLeastConfident();
+                if (_edges.Count >= _maxEdges)
+                    return;
+            }
+
+            var edge = new ComplexEdge(key, new List<PathSegment>(), nowTick);
+            edge.BaseCost   = cost;
+            edge.Confidence = confidence > 0f ? confidence : 0.01f;
+            _edges[key] = edge;
+        }
+
+        /// <summary>
         /// Aggiunge o aggiorna un <see cref="ComplexEdge"/> nello store.
         ///
         /// <para>
@@ -314,7 +369,19 @@ namespace Arcontio.Core
         {
             if (_edges.TryGetValue(key, out var existing))
             {
-                // Edge già noto: aggiorna se il nuovo percorso è migliore.
+                // Edge fisico in arrivo (con segmenti reali): sovrascrive sempre un
+                // eventuale edge visivo precedente (senza segmenti), che era solo una stima.
+                bool incomingIsPhysical = segments != null && segments.Count > 0;
+                bool existingIsVisual   = existing.Segments == null || existing.Segments.Count == 0;
+                if (incomingIsPhysical && existingIsVisual)
+                {
+                    existing.Segments.Clear();
+                    existing.Segments.AddRange(segments);
+                    existing.BaseCost = cost;
+                    existing.Reinforce(nowTick);
+                    return existing;
+                }
+                // Edge fisico vs fisico: aggiorna solo se il nuovo percorso è migliore.
                 existing.UpdateIfBetter(segments, cost, nowTick);
                 return existing;
             }
