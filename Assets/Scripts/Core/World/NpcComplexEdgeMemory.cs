@@ -362,6 +362,57 @@ namespace Arcontio.Core
         }
 
         // =====================================================================
+        // HELPER PLANNER A*
+        // =====================================================================
+
+        /// <summary>
+        /// Aggiunge al buffer i vicini ComplexEdge noti per il nodo
+        /// <paramref name="nodeId"/>.
+        ///
+        /// <para>
+        /// <b>Non</b> svuota il buffer prima di appendere: i vicini ComplexEdge
+        /// vengono accodati ai vicini semplici già presenti (prodotti da
+        /// <c>NpcLandmarkMemory.FillKnownNeighbors</c>). Il loop A* elabora
+        /// poi l'intero buffer in un'unica passata, gestendo automaticamente
+        /// i duplicati tramite il confronto g-score.
+        /// </para>
+        ///
+        /// <para>
+        /// Condizione di inclusione: l'altro endpoint dell'edge deve essere
+        /// conosciuto dall'NPC nella sua memoria semplice
+        /// (<paramref name="landmarkMem"/>.<c>ContainsLandmark</c>).
+        /// Questo evita che l'A* navighi verso nodi che l'NPC non conosce.
+        /// </para>
+        ///
+        /// <para><b>v0.03.04.b — ComplexEdge integrazione planner A*</b></para>
+        /// </summary>
+        /// <param name="nodeId">Nodo corrente espanso dall'A*.</param>
+        /// <param name="landmarkMem">Memoria semplice dell'NPC (verifica endpoint noto).</param>
+        /// <param name="outNeighbors">Buffer in output — i vicini ComplexEdge vengono appesi.</param>
+        public void FillKnownComplexNeighbors(
+            int nodeId,
+            NpcLandmarkMemory landmarkMem,
+            List<NpcLandmarkMemory.KnownNeighbor> outNeighbors)
+        {
+            if (outNeighbors == null || nodeId == 0 || _edges.Count == 0 || landmarkMem == null)
+                return;
+
+            foreach (var kv in _edges)
+            {
+                var ce = kv.Value;
+                int otherNode;
+                if      (ce.Key.A == nodeId) otherNode = ce.Key.B;
+                else if (ce.Key.B == nodeId) otherNode = ce.Key.A;
+                else continue;
+
+                // Includi solo se l'NPC conosce anche l'endpoint di arrivo
+                if (!landmarkMem.ContainsLandmark(otherNode)) continue;
+
+                outNeighbors.Add(new NpcLandmarkMemory.KnownNeighbor(otherNode, ce.BaseCost, ce.Confidence));
+            }
+        }
+
+        // =====================================================================
         // MANUTENZIONE
         // =====================================================================
 
