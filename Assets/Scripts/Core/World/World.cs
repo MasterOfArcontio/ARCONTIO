@@ -1809,6 +1809,7 @@ namespace Arcontio.Core
     System.Collections.Generic.List<LandmarkOverlayEdge> outLmPathEdges,
     System.Collections.Generic.List<LandmarkOverlayEdge> outDirectPathEdges,
     System.Collections.Generic.List<LandmarkOverlayEdge> outJumpPathEdges,
+    System.Collections.Generic.List<LandmarkOverlayEdge> outComplexEdges,
     out NpcMacroRouteDebugReport routeReport)
         {
             // ============================================================
@@ -1845,6 +1846,7 @@ namespace Arcontio.Core
             if (outLmPathEdges != null) outLmPathEdges.Clear();
             if (outDirectPathEdges != null) outDirectPathEdges.Clear();
             if (outJumpPathEdges != null) outJumpPathEdges.Clear();
+            if (outComplexEdges != null) outComplexEdges.Clear();
 
             if (!TryGetNpcMacroRouteDebugReport(npcId, out routeReport))
                 routeReport = default;
@@ -1876,6 +1878,23 @@ namespace Arcontio.Core
             // PATH RUNTIME CELLA-PER-CELLA
             // ============================================================
             FillDebugNavigationPathOverlayData(npcId, outLmPathEdges, outDirectPathEdges, outJumpPathEdges);
+
+            // ============================================================
+            // COMPLEX EDGES (v0.03.04.c-ComplexEdge_Creation)
+            // Edge soggettivi fisicamente percorsi dall'NPC, non nel registry globale.
+            // Visualizzati in giallo per distinguerli dagli edge semplici (verde).
+            // ============================================================
+            if (outComplexEdges != null && LandmarkRegistry != null
+                && NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem) && complexMem != null)
+            {
+                foreach (var kv in complexMem.Edges)
+                {
+                    var ce = kv.Value;
+                    if (!LandmarkRegistry.TryGetActiveNodeById(ce.Key.A, out var nA) || nA == null) continue;
+                    if (!LandmarkRegistry.TryGetActiveNodeById(ce.Key.B, out var nB) || nB == null) continue;
+                    outComplexEdges.Add(new LandmarkOverlayEdge(nA.CellX, nA.CellY, nB.CellX, nB.CellY, ce.Confidence));
+                }
+            }
         }
         /// <summary>
         /// Riempie gli edge di overlay cella-per-cella per i tre layer di navigazione.

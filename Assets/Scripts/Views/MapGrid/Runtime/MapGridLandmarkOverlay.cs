@@ -49,6 +49,10 @@ namespace Arcontio.View.MapGrid
         private readonly List<LineRenderer>        _jumpPathEdgePool  = new();
         private readonly List<LandmarkOverlayEdge> _jumpPathEdges     = new();
 
+        // v0.03.04.c-ComplexEdge_Creation: edge soggettivi fisicamente percorsi (giallo)
+        private readonly List<LineRenderer>        _complexEdgePool = new();
+        private readonly List<LandmarkOverlayEdge> _complexEdges    = new();
+
         // ============================================================
         // POOL GVD-DIN (v0.03 — patch 0.03.01.a)
         // ============================================================
@@ -86,8 +90,10 @@ namespace Arcontio.View.MapGrid
         private static readonly Color LmPathColor     = new Color(1.00f, 0.65f, 0.15f, 1f);
         private static readonly Color DirectPathColor = new Color(0.20f, 0.75f, 1.00f, 1f);
         private static readonly Color JumpPathColor   = new Color(1.00f, 0.20f, 0.75f, 1f);
-        private static readonly Color GvdNodeColor    = new Color(0.70f, 0.10f, 1.00f, 1f);
-        private static readonly Color GvdRawColor     = new Color(0.00f, 1.00f, 1.00f, 0.60f);
+        private static readonly Color GvdNodeColor      = new Color(0.70f, 0.10f, 1.00f, 1f);
+        private static readonly Color GvdRawColor       = new Color(0.00f, 1.00f, 1.00f, 0.60f);
+        // v0.03.04.c-ComplexEdge_Creation: giallo — distinto da verde (known) e arancione (route)
+        private static readonly Color ComplexEdgeColor  = new Color(1.00f, 1.00f, 0.00f, 1f);
 
         // ============================================================
         // ACCESSO READ-ONLY NODI (consumati da MapGridLandmarkLabelOverlay)
@@ -152,6 +158,7 @@ namespace Arcontio.View.MapGrid
             DisableAll(_lmPathEdgePool);
             DisableAll(_directPathEdgePool);
             DisableAll(_jumpPathEdgePool);
+            DisableAll(_complexEdgePool);
             ClearDtHeatmap();
             ClearGvdRaw();
             DisableAll(_gvdNodePool);
@@ -172,6 +179,7 @@ namespace Arcontio.View.MapGrid
                 _knownNodes, _knownEdges,
                 _routeNodes, _routeEdges,
                 _lmPathEdges, _directPathEdges, _jumpPathEdges,
+                _complexEdges,
                 out var _routeReport);
 
             RenderNodes(_worldNodes, _worldNodePool, WorldColor, 0.35f);
@@ -186,6 +194,10 @@ namespace Arcontio.View.MapGrid
             RenderEdges(_lmPathEdges,     _lmPathEdgePool,     LmPathColor,     0.11f);
             RenderEdges(_directPathEdges, _directPathEdgePool, DirectPathColor, 0.11f);
             RenderEdges(_jumpPathEdges,   _jumpPathEdgePool,   JumpPathColor,   0.11f);
+
+            // v0.03.04.c-ComplexEdge_Creation: edge fisicamente percorsi, giallo, leggermente
+            // più sottili degli edge di route (0.09f) per non coprire il grafo soggettivo.
+            RenderEdges(_complexEdges, _complexEdgePool, ComplexEdgeColor, 0.07f);
 
             RenderGvdDin(world);
         }
