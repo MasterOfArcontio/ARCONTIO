@@ -186,7 +186,8 @@ namespace Arcontio.View.MapGrid
             RenderEdges(_worldEdges, _worldEdgePool, WorldColor, 0.03f);
 
             RenderNodes(_knownNodes, _knownNodePool, KnownColor, 0.48f);
-            RenderEdges(_knownEdges, _knownEdgePool, KnownColor, 0.055f);
+            // v0.03.04.c: edge semplici (verdi) nascosti — il layer significativo è il giallo ComplexEdge.
+            DisableAll(_knownEdgePool);
 
             RenderNodes(_routeNodes, _routeNodePool, RouteColor, 0.62f);
             RenderEdges(_routeEdges, _routeEdgePool, RouteColor, 0.09f);
