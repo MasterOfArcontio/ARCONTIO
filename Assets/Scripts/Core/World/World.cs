@@ -1882,18 +1882,80 @@ namespace Arcontio.Core
             // ============================================================
             // COMPLEX EDGES (v0.03.04.c-ComplexEdge_Creation)
             // Edge soggettivi fisicamente percorsi dall'NPC, non nel registry globale.
-            // Visualizzati in giallo per distinguerli dagli edge semplici (verde).
+            // Visualizzati in giallo come percorso reale su griglia (scalini cardinali),
+            // non come linea retta tra i due endpoint.
             // ============================================================
             if (outComplexEdges != null && LandmarkRegistry != null
                 && NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem) && complexMem != null)
             {
+                var waypoints = new System.Collections.Generic.List<(int x, int y)>(32);
                 foreach (var kv in complexMem.Edges)
                 {
                     var ce = kv.Value;
                     if (!LandmarkRegistry.TryGetActiveNodeById(ce.Key.A, out var nA) || nA == null) continue;
                     if (!LandmarkRegistry.TryGetActiveNodeById(ce.Key.B, out var nB) || nB == null) continue;
-                    outComplexEdges.Add(new LandmarkOverlayEdge(nA.CellX, nA.CellY, nB.CellX, nB.CellY, ce.Confidence));
+
+                    if (ce.Segments == null || ce.Segments.Count == 0)
+                    {
+                        // Nessun segmento: fallback linea retta tra i due nodi.
+                        outComplexEdges.Add(new LandmarkOverlayEdge(nA.CellX, nA.CellY, nB.CellX, nB.CellY, ce.Confidence));
+                        continue;
+                    }
+
+                    // Ricostruisce il percorso reale partendo da Key.A.
+                    // Se l'endpoint finale è lontano da Key.B (path registrato in senso B→A),
+                    // riprova partendo da Key.B.
+                    ReconstructComplexEdgeWaypoints(nA.CellX, nA.CellY, ce.Segments, waypoints);
+                    var last = waypoints[waypoints.Count - 1];
+                    int distToB = UnityEngine.Mathf.Abs(last.x - nB.CellX)
+                                + UnityEngine.Mathf.Abs(last.y - nB.CellY);
+                    if (distToB > 3)
+                        ReconstructComplexEdgeWaypoints(nB.CellX, nB.CellY, ce.Segments, waypoints);
+
+                    // Emette un LandmarkOverlayEdge per ogni tratto cardinale ricostruito.
+                    for (int w = 0; w < waypoints.Count - 1; w++)
+                    {
+                        var p0 = waypoints[w];
+                        var p1 = waypoints[w + 1];
+                        outComplexEdges.Add(new LandmarkOverlayEdge(p0.x, p0.y, p1.x, p1.y, ce.Confidence));
+                    }
                 }
+            }
+        }
+
+        /// <summary>
+        /// Ricostruisce i waypoint di un ComplexEdge seguendo i PathSegment cardinali.
+        /// Partendo da (<paramref name="startX"/>, <paramref name="startY"/>),
+        /// applica ciascun segmento direzione/lunghezza e aggiunge il punto finale
+        /// di ogni tratto alla lista.
+        ///
+        /// <para>
+        /// Il risultato ha un waypoint per ogni cambio di direzione + il punto iniziale,
+        /// producendo la forma "a scalini" del percorso reale su griglia.
+        /// </para>
+        /// </summary>
+        private static void ReconstructComplexEdgeWaypoints(
+            int startX, int startY,
+            System.Collections.Generic.List<PathSegment> segments,
+            System.Collections.Generic.List<(int x, int y)> outWaypoints)
+        {
+            outWaypoints.Clear();
+            outWaypoints.Add((startX, startY));
+            int cx = startX, cy = startY;
+            for (int i = 0; i < segments.Count; i++)
+            {
+                var seg = segments[i];
+                int dx = 0, dy = 0;
+                switch (seg.Direction)
+                {
+                    case CardinalDirection.North: dy = +1; break;
+                    case CardinalDirection.East:  dx = +1; break;
+                    case CardinalDirection.South: dy = -1; break;
+                    case CardinalDirection.West:  dx = -1; break;
+                }
+                cx += dx * seg.Length;
+                cy += dy * seg.Length;
+                outWaypoints.Add((cx, cy));
             }
         }
         /// <summary>
