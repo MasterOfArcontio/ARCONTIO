@@ -1920,10 +1920,13 @@ namespace Arcontio.Core
                     if (!LandmarkRegistry.TryGetActiveNodeById(ce.Key.A, out var nA) || nA == null) continue;
                     if (!LandmarkRegistry.TryGetActiveNodeById(ce.Key.B, out var nB) || nB == null) continue;
 
-                    // Nessun segmento fisico: edge visivo (Meccanismo 2) non ancora percorso.
-                    // Non visualizzare: non abbiamo un percorso reale da mostrare.
                     if (ce.Segments == null || ce.Segments.Count == 0)
+                    {
+                        // Edge visivo (Meccanismo 2): percorso fisico non ancora noto.
+                        // Visualizzato come linea retta tra i due nodi (stima).
+                        outComplexEdges.Add(new LandmarkOverlayEdge(nA.CellX, nA.CellY, nB.CellX, nB.CellY, ce.Confidence));
                         continue;
+                    }
 
                     // Determina il nodo di partenza: prova da Key.A camminando i segmenti;
                     // se l'endpoint finale è lontano da Key.B, il path fu registrato in senso
