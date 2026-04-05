@@ -11,19 +11,20 @@
 | Versione | Focus principale | Periodo stimato | Stato |
 |----------|-----------------|-----------------|-------|
 | v0.01 | Sistemi base: perception, memory, token | ✅ Completata | — |
-| v0.02 | Pathfinding landmark + ComplexEdge + failure ladder | Aprile 2026 | 🔄 In chiusura |
-| v0.03 | NpcDnaProfile · NpcProfile · Needs System · BeliefStore | Maggio–Giugno 2026 | ⏳ Pending |
-| v0.04 | Decision Layer completo | Giugno–Luglio 2026 | ⏳ Pending |
-| v0.05 | Job System + Step System | Luglio–Agosto 2026 | ⏳ Pending |
-| v0.06 | Role System + CognitiveModulators | Agosto 2026 | ⏳ Pending |
-| v0.07 | Petition System + Mobilità Sociale | Settembre 2026 | ⏳ Pending |
-| v0.08 | ScheduleFrame + Planner Istituzionale | Ottobre 2026 | ⏳ Pending |
-| v0.09 | Integration · Stress Test · Debug Overlay completo | Ottobre–Novembre 2026 | ⏳ Pending |
+| v0.02 | Sistemi base 2 | ✅ Completata | — |
+| v0.03 | Pathfinding landmark + ComplexEdge + failure ladder | Aprile 2026 | ✅ Completata | — |
+| v0.04 | NpcDnaProfile · NpcProfile · Needs System · BeliefStore | Maggio–Giugno 2026 | ⏳ Pending |
+| v0.05 | Decision Layer completo | Giugno–Luglio 2026 | ⏳ Pending |
+| v0.06 | Job System + Step System | Luglio–Agosto 2026 | ⏳ Pending |
+| v0.07 | Role System + CognitiveModulators | Agosto 2026 | ⏳ Pending |
+| v0.08 | Petition System + Mobilità Sociale | Settembre 2026 | ⏳ Pending |
+| v0.09 | ScheduleFrame + Planner Istituzionale | Ottobre 2026 | ⏳ Pending |
+| v0.10 | Integration · Stress Test · Debug Overlay completo | Ottobre–Novembre 2026 | ⏳ Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | 🎯 Target |
 
 ---
 
-## v0.02 — Chiusura Landmark Pathfinding
+## v0.03 — Chiusura Landmark Pathfinding
 
 **Obiettivo:** Liquidare il debito tecnico accumulato e portare il sistema di navigazione a uno stato completo e stabile prima di costruire i layer NPC sopra.
 
@@ -33,21 +34,21 @@
 - NpcObjectMemory (cibo community) ✅
 - ComplexEdge strutture dati + recording ✅
 
-### Tabella sessioni v0.02
+### Tabella sessioni v0.03
 
 | # | Giorno | Data stimata | Task | Sistema | Stato |
 |---|--------|-------------|------|---------|-------|
-| 1 | Lun | Apr 2026 | ComplexEdge: integrazione planner A* | Pathfinding | ⏳ |
-| 2 | Mer | Apr 2026 | ComplexEdge: overlay visivo giallo + test | Pathfinding | ⏳ |
-| 3 | Gio | Apr 2026 | Job GoTo: integrazione landmark + safe point | Job System | ⏳ |
-| 4 | Lun | Apr 2026 | Failure ladder: BackOff / Replan | Pathfinding | ⏳ |
-| 5 | Mer | Apr 2026 | Failure ladder: Blacklist edge | Pathfinding | ⏳ |
-| 6 | Gio | Apr 2026 | Stress test 10–50 NPC, tuning parametri | Performance | ⏳ |
-| 7 | Lun | Apr 2026 | Definition of Done v0.02: verifica criteri | QA | ⏳ |
-| 8 | Mer | Apr 2026 | Bug fix emergenti dallo stress test | QA | ⏳ |
-| 9 | Gio | Apr 2026 | Chiusura doc v0.02 + CLAUDE.md aggiornato | Documentazione | ⏳ |
+| 1 | Lun | Apr 2026 | ComplexEdge: integrazione planner A* | Pathfinding | ✅ |
+| 2 | Mer | Apr 2026 | ComplexEdge: overlay visivo giallo + test | Pathfinding | ✅ |
+| 3 | Gio | Apr 2026 | Job GoTo: integrazione landmark + safe point | Job System | ✅ |
+| 4 | Lun | Apr 2026 | Failure ladder: BackOff / Replan | Pathfinding | ✅ |
+| 5 | Mer | Apr 2026 | Failure ladder: Blacklist edge | Pathfinding | ✅ |
+| 6 | Gio | Apr 2026 | Stress test 10–50 NPC, tuning parametri | Performance | ✅ |
+| 7 | Lun | Apr 2026 | Definition of Done v0.03: verifica criteri | QA | ✅ |
+| 8 | Mer | Apr 2026 | Bug fix emergenti dallo stress test | QA | ✅ |
+| 9 | Gio | Apr 2026 | Chiusura doc v0.03 + CLAUDE.md aggiornato | Documentazione | ✅ |
 
-### Definition of Done v0.02
+### Definition of Done v0.03
 
 | Criterio | Stato |
 |----------|-------|
@@ -55,15 +56,15 @@
 | Macro-route + last-mile funzionanti | ✅ |
 | NpcObjectMemory: cibo community memorizzato e cercato | ✅ |
 | ComplexEdge: strutture dati + recording attivi | ✅ |
-| ComplexEdge: integrazione nel planner A* | ⏳ |
-| ComplexEdge: overlay visivo giallo | ⏳ |
-| Failure ladder operativa (BackOff / Replan / Blacklist) | ⏳ |
-| Job GoTo usa landmark con safe point | ⏳ |
-| Stress test 10–50 NPC senza thrashing | ⏳ |
+| ComplexEdge: integrazione nel planner A* | ✅ |
+| ComplexEdge: overlay visivo giallo | ✅ |
+| Failure ladder operativa (BackOff / Replan / Blacklist) | ✅ |
+| Job GoTo usa landmark con safe point | POSTICIPATO |
+| Stress test 10–50 NPC senza thrashing | ✅ |
 
 ---
 
-## v0.03 — Fondamenta NPC (DNA · Needs · BeliefStore)
+## v0.04 — Fondamenta NPC (DNA · Needs · BeliefStore)
 
 **Obiettivo:** Costruire le strutture dati fondamentali di ogni NPC. Tutto il comportamento emergente dipende da questi layer — vanno fatti bene prima di procedere.
 
@@ -73,7 +74,7 @@
 - Needs System — Fame, Sete, Riposo, Salute, Comfort, Sicurezza, Stabilità, Socialità
 - `BeliefStore` — aggregazione lazy della memoria per il Decision Layer
 
-### Tabella sessioni v0.03
+### Tabella sessioni v0.04
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
@@ -96,7 +97,7 @@
 | 17 | Mer | BeliefStore | Query API per il Decision Layer | ⏳ |
 | 18 | Gio | QA | Test: BeliefStore vs MemoryStore, verifica omniscience | ⏳ |
 
-### Definition of Done v0.03
+### Definition of Done v0.04
 
 | Criterio | Stato |
 |----------|-------|
@@ -110,7 +111,7 @@
 
 ---
 
-## v0.04 — Decision Layer
+## v0.05 — Decision Layer
 
 **Obiettivo:** Implementare il cervello decisionale dell'NPC. È il layer più complesso dell'intero sistema — la fase più a rischio di slittamento.
 
@@ -120,7 +121,7 @@
 - Fase 2: scoring composito
 - Fase 3: selezione weighted random con rumore
 
-### Tabella sessioni v0.04
+### Tabella sessioni v0.05
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
@@ -137,7 +138,7 @@
 | 11 | Mer | QA | Test end-to-end: DNA → Decision → Intenzione | ⏳ |
 | 12 | Gio | QA | Verifica omniscience + audit input Decision Layer | ⏳ |
 
-### Definition of Done v0.04
+### Definition of Done v0.05
 
 | Criterio | Stato |
 |----------|-------|
@@ -163,7 +164,7 @@
 - Step base: MoveTo, Reserve, Release, Wait, Observe, Search, PickUp, Drop, Consume, Communicate, Evaluate
 - Failure learning: `(npcId, targetCell) → failureTick`
 
-### Tabella sessioni v0.05
+### Tabella sessioni v0.06
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
@@ -180,7 +181,7 @@
 | 11 | Mer | Job | Failure learning: (npcId, targetCell) → failureTick | ⏳ |
 | 12 | Gio | QA | Test end-to-end: Intenzione → Job → Step → Command → World | ⏳ |
 
-### Definition of Done v0.05
+### Definition of Done v0.06
 
 | Criterio | Stato |
 |----------|-------|
@@ -194,7 +195,7 @@
 
 ---
 
-## v0.06 — Role System + CognitiveModulators
+## v0.07 — Role System + CognitiveModulators
 
 **Obiettivo:** Dare a ogni NPC un carattere cognitivo e un'identità professionale che influenzi concretamente le sue decisioni. Prima versione di comportamento emergente differenziato per ruolo.
 
@@ -203,7 +204,7 @@
 - Role bias: ObligationProfile attivato da AssignedRole
 - Distanza DNA↔NpcProfile come trigger insoddisfazione
 
-### Tabella sessioni v0.06
+### Tabella sessioni v0.07
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
@@ -217,7 +218,7 @@
 | 8 | Mer | Stress | Distanza DNA↔NpcProfile: trigger insoddisfazione attivo | ⏳ |
 | 9 | Gio | QA | Audit: NPC con ruoli diversi producono comportamenti diversi | ⏳ |
 
-### Definition of Done v0.06
+### Definition of Done v0.07
 
 | Criterio | Stato |
 |----------|-------|
@@ -228,7 +229,7 @@
 
 ---
 
-## v0.07 — Petition System + Mobilità Sociale
+## v0.08 — Petition System + Mobilità Sociale
 
 **Obiettivo:** Implementare il ciclo sociale emergente bottom-up. I bisogni degli NPC diventano petizioni, le petizioni alimentano la struttura della colonia, la struttura abilita la mobilità di ruolo.
 
@@ -240,7 +241,7 @@
 - Candidatura bottom-up + cooptazione top-down
 - Rifiuto con escalation giudice / breakdown emotivo
 
-### Tabella sessioni v0.07
+### Tabella sessioni v0.08
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
@@ -257,7 +258,7 @@
 | 11 | Mer | Mobilità | Rifiuto NPC: breakdown emotivo (psicologico) | ⏳ |
 | 12 | Gio | QA | Test ciclo completo: petizione → posizione → assegnazione | ⏳ |
 
-### Definition of Done v0.07
+### Definition of Done v0.08
 
 | Criterio | Stato |
 |----------|-------|
@@ -272,7 +273,7 @@
 
 ---
 
-## v0.08 — ScheduleFrame + Planner Istituzionale
+## v0.09 — ScheduleFrame + Planner Istituzionale
 
 **Obiettivo:** Completare il layer istituzionale con la gestione degli schedule e il modello emergenziale Scenario C. Prima versione di risposta collettiva coordinata senza god mode.
 
@@ -282,7 +283,7 @@
 - Integrazione ScheduleFrame nel Decision Layer Fase 1
 - Emergenza Scenario C: priorità per categoria ruolo
 
-### Tabella sessioni v0.08
+### Tabella sessioni v0.09
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
@@ -296,7 +297,7 @@
 | 8 | Mer | QA | Audit: il planner non ha god mode | ⏳ |
 | 9 | Gio | QA | Stress test emergenza con 20+ NPC | ⏳ |
 
-### Definition of Done v0.08
+### Definition of Done v0.09
 
 | Criterio | Stato |
 |----------|-------|
@@ -308,7 +309,7 @@
 
 ---
 
-## v0.09 — Integration + Stress Test + Debug Overlay
+## v0.10 — Integration + Stress Test + Debug Overlay
 
 **Obiettivo:** Validare l'intero sistema NPC end-to-end, ottimizzare le performance, completare il debug overlay e verificare sistematicamente l'omniscience constraint su tutti i layer.
 
@@ -317,7 +318,7 @@
 - Profiling per NPC (tick budget)
 - Audit omniscience sistematico
 
-### Tabella sessioni v0.09
+### Tabella sessioni v0.10
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
@@ -334,7 +335,7 @@
 | 11 | Mer | QA | Bug fix emergenti dalla regressione | ⏳ |
 | 12 | Gio | Doc | Definition of Done v0.09 + CLAUDE.md aggiornato | ⏳ |
 
-### Definition of Done v0.09
+### Definition of Done v0.10
 
 | Criterio | Stato |
 |----------|-------|
@@ -371,14 +372,14 @@
 
 | Versione | Settimane | Sessioni totali | Periodo |
 |----------|-----------|-----------------|---------|
-| v0.02 | 3 | 9 | Aprile 2026 |
-| v0.03 | 6 | 18 | Maggio–Giugno 2026 |
-| v0.04 | 4 | 12 | Giugno–Luglio 2026 |
-| v0.05 | 4 | 12 | Luglio–Agosto 2026 |
-| v0.06 | 3 | 9 | Agosto 2026 |
-| v0.07 | 4 | 12 | Settembre 2026 |
-| v0.08 | 3 | 9 | Ottobre 2026 |
-| v0.09 | 4 | 12 | Ottobre–Novembre 2026 |
+| v0.03 | 3 | 9 | Aprile 2026 |
+| v0.04 | 6 | 18 | Maggio–Giugno 2026 |
+| v0.05 | 4 | 12 | Giugno–Luglio 2026 |
+| v0.06 | 4 | 12 | Luglio–Agosto 2026 |
+| v0.07 | 3 | 9 | Agosto 2026 |
+| v0.08 | 4 | 12 | Settembre 2026 |
+| v0.09 | 3 | 9 | Ottobre 2026 |
+| v0.10 | 4 | 12 | Ottobre–Novembre 2026 |
 | **Totale** | **31** | **93** | **Apr → Nov 2026** |
 
 > **Buffer consigliato:** +2–3 settimane. Le fasi v0.04 (Decision Layer) e v0.05 (Job System) sono le più a rischio di slittamento per bug subdoli legati all'omniscience constraint.
