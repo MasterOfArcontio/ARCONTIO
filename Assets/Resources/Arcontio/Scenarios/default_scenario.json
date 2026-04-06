@@ -1,0 +1,82 @@
+{
+  "chunkIndex": 0,
+  "savedAtTick": 0,
+  "npcs": [
+    {
+      "npcId": 0,
+      "dna": {
+        "identity": {
+          "name": "T10_NPC1_Thief",
+          "originTag": "unknown",
+          "birthTick": 0,
+          "narrativeNotes": ""
+        },
+        "capacities": {
+          "strength01": 0.5,
+          "endurance01": 0.5,
+          "agility01": 0.5,
+          "baseIntelligence01": 0.5,
+          "competenceCap": [ 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]
+        },
+        "preferenceSeeds": [ 0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ],
+        "dispositions": {
+          "introversion01": 0.5,
+          "aggressiveness01": 0.2,
+          "curiosity01": 0.5,
+          "cooperativeness01": 0.7
+        },
+        "socialPosition": {
+          "socialClass": "lower",
+          "initialGroupId": -1,
+          "initialReputation01": 0.5
+        },
+        "obligationFrame": {
+          "seeds": [ 0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ],
+          "culturalOrigin": "unknown"
+        },
+        "thresholds": {
+          "needAlert01": 0.5,
+          "needCritical01": 0.8,
+          "roleDissatisfaction01": 0.6,
+          "stressCritical01": 0.8
+        },
+        "cognitiveModulators": {
+          "impulsivity01": 0.5,
+          "riskAversion01": 0.5,
+          "conformism01": 0.5,
+          "optimism01": 0.5,
+          "stressResilience01": 0.5,
+          "sociability01": 0.5,
+          "driftResistance01": 0.5,
+          "traumaSensitivity01": 0.5,
+          "memoryResilience01": 0.5,
+          "rumination01": 0.25,
+          "gullibility01": 0.5
+        },
+        "traits": 0,
+        "tags": []
+      },
+      "profile": {
+        "competence": [ 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 ],
+        "preference":  [ 0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ],
+        "obligation":  [ 0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ],
+        "assignedRole": ""
+      },
+      "needs": {
+        "hunger01": 0.0,
+        "fatigue01": 0.2,
+        "morale01": 0.7
+      },
+      "social": {
+        "leadershipScore": 0.2,
+        "loyaltyToLeader01": 0.5,
+        "justicePerception01": 0.2
+      },
+      "spawnX": 15,
+      "spawnY": 15,
+      "facingDir": 1,
+      "activeJobJson": "",
+      "memoryTraces": []
+    }
+  ]
+}

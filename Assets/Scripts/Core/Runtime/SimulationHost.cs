@@ -1,6 +1,7 @@
 // Assets/Scripts/Core/Runtime/SimulationHost.cs
 using Arcontio.Core.Diagnostics;
 using Arcontio.Core.Logging;
+using Arcontio.Core.Save;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Security.Cryptography;
@@ -38,6 +39,11 @@ namespace Arcontio.Core
             Day9_NeedsOwnership = 9,
             Day10_Move_Memory_Theft = 10,
             P0_02_Landmark_PathFinding = 11,
+            /// <summary>
+            /// Carica NPC da Resources/Arcontio/Scenarios/default_scenario.json.
+            /// Se il file non esiste, fa fallback a P0_02_Landmark_PathFinding.
+            /// </summary>
+            FromScenarioFile = 99,
         }
 
         // Log sintetico per tick (solo per questo scenario)
@@ -778,6 +784,10 @@ namespace Arcontio.Core
                     Seed_P0_02_Landmark_PathFinding();
                     break;
 
+                case DebugScenario.FromScenarioFile:
+                    Seed_FromScenarioFile();
+                    break;
+
                 default:
                     Seed_Day7();
                     break;
@@ -1305,6 +1315,35 @@ namespace Arcontio.Core
                     .AddField("foodPrivateHidden ", foodPrivateHidden));*/
 
         }
+        // ============================================================
+        // SCENARIO DA FILE (v0.04.07.b)
+        // ============================================================
+        // Legge gli NPC da Resources/Arcontio/Scenarios/default_scenario.json.
+        // Se il file non esiste o è vuoto, fa fallback a Seed_P0_02_Landmark_PathFinding.
+        // Il file di scenario non contiene oggetti/muri: quelli restano hardcoded
+        // oppure verranno spostati in un formato separato in una sessione futura.
+        private void Seed_FromScenarioFile()
+        {
+            ArcontioLogger.Info(
+                new LogContext(tick: 0, channel: "ScenarioLoader"),
+                new LogBlock(LogLevel.Info, "log.seed.name")
+                    .AddField("seed", "Seed_FromScenarioFile")
+                    .AddField("path", "Resources/Arcontio/Scenarios/default_scenario")
+            );
+
+            bool loaded = NpcScenarioLoader.TryLoadDefaultAndSpawn(_world);
+
+            if (!loaded)
+            {
+                ArcontioLogger.Info(
+                    new LogContext(tick: 0, channel: "ScenarioLoader"),
+                    new LogBlock(LogLevel.Info, "log.scenario.fallback")
+                        .AddField("reason", "default_scenario.json non trovato — fallback a P0_02")
+                );
+                Seed_P0_02_Landmark_PathFinding();
+            }
+        }
+
         // ============================================================
         // 0.02 LANDMARK PATHFINDING SCENARIO
         // ============================================================
