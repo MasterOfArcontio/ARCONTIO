@@ -78,10 +78,10 @@
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
-| 1 | Lun | NpcDnaProfile | Struttura C# completa con tutti i campi | ⏳ |
-| 2 | Mer | NpcProfile | CompetenceProfile + PreferenceProfile + ObligationProfile | ⏳ |
-| 3 | Gio | NpcProfile | AssignedRole + serializzazione JSON | ⏳ |
-| 4 | Lun | NpcProfile | Calcolo distanza DNA↔NpcProfile | ⏳ |
+| 1 | Lun | NpcDnaProfile | Struttura C# completa con tutti i campi | ✅ |
+| 2 | Mer | NpcProfile | CompetenceProfile + PreferenceProfile + ObligationProfile | ✅ |
+| 3 | Gio | NpcProfile | AssignedRole + serializzazione JSON | ✅ |
+| 4 | Lun | NpcProfile | Calcolo distanza DNA↔NpcProfile | ✅ |
 | 5 | Mer | NpcProfile | Integrazione con NPC esistenti (migrazione) | ⏳ |
 | 6 | Gio | Debug | Overlay debug distanza DNA↔NpcProfile | ⏳ |
 | 7 | Lun | Needs | Struttura Need generica con NeedAlert + NeedCritical | ⏳ |
@@ -101,9 +101,9 @@
 
 | Criterio | Stato |
 |----------|-------|
-| NpcDnaProfile: tutti i campi implementati e serializzabili | ⏳ |
-| NpcProfile: tre assi (Competence/Preference/Obligation) per dominio | ⏳ |
-| Distanza DNA↔NpcProfile calcolabile on-demand | ⏳ |
+| NpcDnaProfile: tutti i campi implementati e serializzabili | ✅ |
+| NpcProfile: tre assi (Competence/Preference/Obligation) per dominio | ✅ |
+| Distanza DNA↔NpcProfile calcolabile on-demand | ✅ |
 | Tutti i 10 need implementati con NeedAlert + NeedCritical | ⏳ |
 | Decay differenziato per categoria (rapido/lento) | ⏳ |
 | BeliefStore attivo con aggiornamento lazy | ⏳ |
