@@ -11,12 +11,14 @@ namespace Arcontio.Core
     // dipende dal confronto tra NpcDnaProfile e NpcProfile (sessione 2).
     //
     // Nota sull'overlap con strutture esistenti:
-    // - NpcCore (NPCComponents.cs) è un placeholder che verrà migrato in sessione 5.
+    // - NpcCore (NPCComponents.cs) è un placeholder che verrà rimosso in sessione 5.
     //   I suoi campi (Name, Charisma, Decisiveness, Empathy, Ambition) mappano
     //   rispettivamente su Identity.Name, CognitiveModulators e Dispositions qui sotto.
-    // - PersonalityMemoryParams.Resilience01 e CognitiveModulators.Resilience01 sono
-    //   lo stesso concetto. In sessione 5, PersonalityMemoryParams.Resilience01 verrà
-    //   inizializzato da questo campo.
+    // - PersonalityMemoryParams è assorbito da CognitiveModulators in sessione 5:
+    //     .Resilience01        → CognitiveModulators.MemoryResilience01
+    //     .TraumaSensitivity01 → CognitiveModulators.TraumaSensitivity01
+    //     .Rumination01        → CognitiveModulators.Rumination01
+    //     .Gullibility01       → CognitiveModulators.Gullibility01
     // ─────────────────────────────────────────────────────────────────────────
 
 
@@ -264,16 +266,22 @@ namespace Arcontio.Core
     /// Modulatori cognitivi stabili: influenzano la valutazione delle opzioni
     /// e il comportamento decisionale nelle formule di scoring (v0.05+).
     ///
-    /// Nota: Resilience01 è lo stesso concetto di PersonalityMemoryParams.Resilience01.
-    /// In sessione 5, PersonalityMemoryParams.Resilience01 verrà inizializzato
-    /// direttamente da questo campo invece di usare il default statico.
+    /// Contiene anche i parametri di memoria individuale (assorbiti da
+    /// PersonalityMemoryParams in sessione 5): TraumaSensitivity01, MemoryResilience01,
+    /// Rumination01, Gullibility01.
+    ///
+    /// Distinzione tra i due campi di resilienza:
+    ///   StressResilience01  — resistenza allo stress di ruolo e ai cambiamenti sociali
+    ///   MemoryResilience01  — velocità di recupero dai ricordi traumatici (decay memoria)
     ///
     /// Mappa con NpcCore (placeholder che verrà rimosso in sessione 5):
-    ///   NpcCore.Charisma    → Sociability01
+    ///   NpcCore.Charisma     → Sociability01
     ///   NpcCore.Decisiveness → inverso di Impulsivity01
     /// </summary>
     public readonly struct NpcCognitiveModulators
     {
+        // ── Modulatori decisionali ────────────────────────────────────────────
+
         /// <summary>0 = molto riflessivo, 1 = molto impulsivo.</summary>
         public readonly float Impulsivity01;
 
@@ -287,11 +295,11 @@ namespace Arcontio.Core
         public readonly float Optimism01;
 
         /// <summary>
-        /// Resistenza psicologica allo stress e ai cambiamenti.
-        /// 0 = fragile, 1 = molto resiliente.
-        /// Vedi nota su PersonalityMemoryParams.Resilience01.
+        /// Resistenza allo stress di ruolo e ai cambiamenti sociali.
+        /// 0 = fragile (crolla sotto pressione), 1 = molto resiliente.
+        /// Distinto da MemoryResilience01 che riguarda il decay della memoria.
         /// </summary>
-        public readonly float Resilience01;
+        public readonly float StressResilience01;
 
         /// <summary>0 = solitario, 1 = fortemente socievole.</summary>
         public readonly float Sociability01;
@@ -303,22 +311,63 @@ namespace Arcontio.Core
         /// </summary>
         public readonly float DriftResistance01;
 
+        // ── Parametri di memoria individuale ─────────────────────────────────
+        // Assorbiti da PersonalityMemoryParams in sessione 5.
+        // Rendono il sistema di memoria individuale per NPC invece che uniforme.
+
+        /// <summary>
+        /// Sensibilità al trauma: eventi violenti generano tracce di memoria più intense.
+        /// 0 = insensibile, 1 = altamente traumatizzabile.
+        /// Mappa su PersonalityMemoryParams.TraumaSensitivity01.
+        /// </summary>
+        public readonly float TraumaSensitivity01;
+
+        /// <summary>
+        /// Velocità di recupero dai ricordi traumatici.
+        /// 0 = le memorie traumatiche persistono a lungo (decay lento),
+        /// 1 = recupera rapidamente (decay veloce).
+        /// Mappa su PersonalityMemoryParams.Resilience01.
+        /// </summary>
+        public readonly float MemoryResilience01;
+
+        /// <summary>
+        /// Tendenza a rimuginare: le memorie intense si autodecay più lentamente.
+        /// 0 = dimentica facilmente, 1 = rimugina molto.
+        /// Mappa su PersonalityMemoryParams.Rumination01.
+        /// </summary>
+        public readonly float Rumination01;
+
+        /// <summary>
+        /// Credulità verso i rumor: accetta informazioni di seconda mano con bassa affidabilità.
+        /// 0 = molto scettico, 1 = molto credulo.
+        /// Mappa su PersonalityMemoryParams.Gullibility01.
+        /// </summary>
+        public readonly float Gullibility01;
+
         public NpcCognitiveModulators(
             float impulsivity01,
             float riskAversion01,
             float conformism01,
             float optimism01,
-            float resilience01,
+            float stressResilience01,
             float sociability01,
-            float driftResistance01)
+            float driftResistance01,
+            float traumaSensitivity01,
+            float memoryResilience01,
+            float rumination01,
+            float gullibility01)
         {
-            Impulsivity01    = impulsivity01;
-            RiskAversion01   = riskAversion01;
-            Conformism01     = conformism01;
-            Optimism01       = optimism01;
-            Resilience01     = resilience01;
-            Sociability01    = sociability01;
-            DriftResistance01 = driftResistance01;
+            Impulsivity01      = impulsivity01;
+            RiskAversion01     = riskAversion01;
+            Conformism01       = conformism01;
+            Optimism01         = optimism01;
+            StressResilience01 = stressResilience01;
+            Sociability01      = sociability01;
+            DriftResistance01  = driftResistance01;
+            TraumaSensitivity01 = traumaSensitivity01;
+            MemoryResilience01 = memoryResilience01;
+            Rumination01       = rumination01;
+            Gullibility01      = gullibility01;
         }
     }
 
