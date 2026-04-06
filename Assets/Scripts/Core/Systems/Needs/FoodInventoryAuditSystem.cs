@@ -24,7 +24,7 @@ namespace Arcontio.Core
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
             _npcIds.Clear();
-            _npcIds.AddRange(world.NpcCore.Keys);
+            _npcIds.AddRange(world.NpcDna.Keys);
 
             int suspected = 0;
 
@@ -41,7 +41,7 @@ namespace Arcontio.Core
                     continue;
                 }
 
-                // Se è diminuito, manca cibo
+                // Se ï¿½ diminuito, manca cibo
                 if (cur < prev)
                 {
                     int missingUnits = prev - cur;

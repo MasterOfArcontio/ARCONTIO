@@ -35,7 +35,7 @@ namespace Arcontio.Core
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>GlobalState</b> — config runtime (vision range, token params, ecc.)</item>
-    ///   <item><b>Component stores NPC</b> — NpcCore, Needs, Social, GridPos, NpcFacing, ecc.</item>
+    ///   <item><b>Component stores NPC</b> — NpcDna, NpcProfiles, Needs, Social, GridPos, NpcFacing, ecc.</item>
     ///   <item><b>Component stores oggetti</b> — Objects, FoodStocks, ObjectUse, ecc.</item>
     ///   <item><b>Memoria NPC</b> — Memory, NpcObjectMemory, NpcLandmarkMemory</item>
     ///   <item><b>Cache derivate</b> — OcclusionMap, _objIdByCell, _blocksVision/Movement</item>
@@ -328,8 +328,17 @@ namespace Arcontio.Core
         //         0 è riservato come "nessun NPC" / valore invalido.
         // =====================================================================
 
-        /// <summary>Dati anagrafici e tratti di personalità dell'NPC (nome, carisma, ecc.).</summary>
-        public readonly Dictionary<int, NpcCore> NpcCore = new();
+        /// <summary>
+        /// DNA immutabile per-NPC: natura originale, seed, soglie, modulatori cognitivi.
+        /// Source of truth per l'esistenza di un NPC (sostituisce NpcCore rimosso in v0.04.05).
+        /// </summary>
+        public readonly Dictionary<int, NpcDnaProfile> NpcDna = new();
+
+        /// <summary>
+        /// Profilo runtime mutabile per-NPC: competenza, preferenza, obbligo correnti.
+        /// Inizializzato da NpcDna tramite NpcProfile.InitFromDna().
+        /// </summary>
+        public readonly Dictionary<int, NpcProfile> NpcProfiles = new();
 
         /// <summary>Bisogni primari dell'NPC: fame, fatica, morale.</summary>
         public readonly Dictionary<int, Needs> Needs = new();
@@ -1043,7 +1052,7 @@ namespace Arcontio.Core
                 return;
 
             // Se l'NPC non esiste, abort.
-            if (!NpcCore.ContainsKey(npcId))
+            if (!NpcDna.ContainsKey(npcId))
                 return;
 
             // Day3: impariamo SOLO se la cella di arrivo è un nodo landmark.
@@ -1130,7 +1139,7 @@ namespace Arcontio.Core
                 return;
 
             // Se l'NPC non esiste, abort.
-            if (!NpcCore.ContainsKey(npcId))
+            if (!NpcDna.ContainsKey(npcId))
                 return;
 
             long now = TickContext.CurrentTickIndex;
@@ -1197,7 +1206,7 @@ namespace Arcontio.Core
         {
             if (!Global.EnableLandmarkSystem) return;
             if (LandmarkRegistry == null)     return;
-            if (!NpcCore.ContainsKey(npcId))  return;
+            if (!NpcDna.ContainsKey(npcId))  return;
             if (nodeA == 0 || nodeB == 0 || nodeA == nodeB) return;
             if (costCells < 1) costCells = 1;
 
@@ -1227,7 +1236,7 @@ namespace Arcontio.Core
         {
             if (!Global.EnableLandmarkSystem) return;
             if (LandmarkRegistry == null)     return;
-            if (!NpcCore.ContainsKey(npcId))  return;
+            if (!NpcDna.ContainsKey(npcId))  return;
             if (nodeA == 0 || nodeB == 0 || nodeA == nodeB) return;
             if (costCells < 1) costCells = 1;
 
@@ -1630,7 +1639,7 @@ namespace Arcontio.Core
         public void BlacklistBlockedMacroEdge(int npcId, int fromNodeId, int toNodeId, int stage)
         {
             if (fromNodeId == 0 || toNodeId == 0 || fromNodeId == toNodeId) return;
-            if (!NpcCore.ContainsKey(npcId)) return;
+            if (!NpcDna.ContainsKey(npcId)) return;
 
             var mvParams = Config?.Sim?.movement;
             float penalty = stage <= 1
@@ -1812,7 +1821,7 @@ namespace Arcontio.Core
             // - Day1: micro-test fittizio per validare overlay.
             // - Day2: registry oggettivo (World-side) che possiamo giÃ  contare/mostrare.
 
-            bool npcExists = NpcCore.ContainsKey(npcId);
+            bool npcExists = NpcDna.ContainsKey(npcId);
             if (!npcExists)
             {
                 report = default;
@@ -1918,7 +1927,7 @@ namespace Arcontio.Core
             if (!TryGetNpcMacroRouteDebugReport(npcId, out routeReport))
                 routeReport = default;
 
-            if (!NpcCore.ContainsKey(npcId))
+            if (!NpcDna.ContainsKey(npcId))
                 return;
 
             // Nota (v0.03.02.a): microTestDummyGraph rimosso — scaffolding Day1 non più necessario.
@@ -2344,7 +2353,7 @@ namespace Arcontio.Core
         // NPC API
         // ============================================================
 
-        public bool ExistsNpc(int npcId) => npcId > 0 && NpcCore.ContainsKey(npcId);
+        public bool ExistsNpc(int npcId) => npcId > 0 && NpcDna.ContainsKey(npcId);
         public bool AreBonded(int aNpcId, int bNpcId)
         {
             // STUB (roadmap): quando introdurrai bond graph,
@@ -2352,29 +2361,32 @@ namespace Arcontio.Core
             return false;
         }
 
-        public int CreateNpc(NpcCore core, Needs needs, Social social, int x, int y)
+        public int CreateNpc(NpcDnaProfile dna, Needs needs, Social social, int x, int y)
         {
             int id = _nextNpcId++;
 
-            NpcCore[id] = core;
+            // DNA e profilo runtime
+            NpcDna[id]      = dna;
+            NpcProfiles[id] = NpcProfile.InitFromDna(dna);
+
             Needs[id] = needs;
             Social[id] = social;
             GridPos[id] = new GridPosition(x, y);
             NpcFacing[id] = CardinalDirection.North;
 
-            // Memory params
-            if (!MemoryParams.ContainsKey(id))
-                MemoryParams[id] = PersonalityMemoryParams.DefaultNpc();
+            // MemoryParams — inizializzati dal DNA (valori individuali, non default statici)
+            MemoryParams[id] = new PersonalityMemoryParams
+            {
+                MaxTraces           = 128,
+                TraumaSensitivity01 = dna.CognitiveModulators.TraumaSensitivity01,
+                Resilience01        = dna.CognitiveModulators.MemoryResilience01,
+                Rumination01        = dna.CognitiveModulators.Rumination01,
+                Gullibility01       = dna.CognitiveModulators.Gullibility01
+            };
 
-            // MemoryStore: NON ha costruttore con maxTraces.
-            // Imposti MaxTraces dopo la creazione.
+            // MemoryStore
             var store = new MemoryStore();
-
-            // PrioritÃ : se hai un config globale, usalo; altrimenti fallback su PersonalityMemoryParams.
-            int maxTraces = MemoryParams[id].MaxTraces;
-            if (Global.NpcObjectMemorySlots > 0) { /* non Ã¨ maxTraces: Ã¨ slots oggetti (altro). */ }
-
-            store.MaxTraces = maxTraces;
+            store.MaxTraces = MemoryParams[id].MaxTraces;
             Memory[id] = store;
 
             // Private food init (se non presente)

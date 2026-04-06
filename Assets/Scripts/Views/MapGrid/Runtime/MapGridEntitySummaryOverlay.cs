@@ -198,11 +198,11 @@ namespace Arcontio.View.MapGrid
         {
             _npcToRemove.Clear();
 
-            // Remove NPC that no longer exist (NpcCore acts as "presence" store).
+            // Remove NPC che non esistono più (NpcDna è il registro canonico).
             foreach (var kv in _npcCards)
             {
                 int npcId = kv.Key;
-                if (!world.NpcCore.ContainsKey(npcId))
+                if (!world.NpcDna.ContainsKey(npcId))
                     _npcToRemove.Add(npcId);
             }
 
@@ -220,7 +220,7 @@ namespace Arcontio.View.MapGrid
             }
 
             // Add missing NPC cards
-            foreach (var kv in world.NpcCore)
+            foreach (var kv in world.NpcDna)
             {
                 int npcId = kv.Key;
 
@@ -600,7 +600,7 @@ namespace Arcontio.View.MapGrid
                 var card = kv.Value;
 
                 // Presence
-                if (!world.NpcCore.TryGetValue(npcId, out var core))
+                if (!world.NpcDna.TryGetValue(npcId, out var dna))
                     continue;
 
                 world.GridPos.TryGetValue(npcId, out var pos);
@@ -626,8 +626,8 @@ namespace Arcontio.View.MapGrid
 
                 _sbHeader.Clear();
                 _sbHeader.Append("NPC #").Append(npcId);
-                if (!string.IsNullOrEmpty(core.Name))
-                    _sbHeader.Append("  ").Append(core.Name);
+                if (!string.IsNullOrEmpty(dna.Identity.Name))
+                    _sbHeader.Append("  ").Append(dna.Identity.Name);
 
                 _sbHeader.Append('\n')
                     .Append("Pos = (").Append(pos.X).Append(',').Append(pos.Y).Append(")")

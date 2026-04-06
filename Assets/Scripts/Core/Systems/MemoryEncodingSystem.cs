@@ -79,7 +79,7 @@ namespace Arcontio.Core
 
             // Preleva lista NPC
             _npcIds.Clear();
-            _npcIds.AddRange(world.NpcCore.Keys);
+            _npcIds.AddRange(world.NpcDna.Keys);
 
             int tracesAdded = 0;
 

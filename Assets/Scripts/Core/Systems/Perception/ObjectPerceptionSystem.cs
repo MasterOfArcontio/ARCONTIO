@@ -45,7 +45,7 @@ namespace Arcontio.Core
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
-            if (world.Objects.Count == 0 || world.NpcCore.Count == 0)
+            if (world.Objects.Count == 0 || world.NpcDna.Count == 0)
                 return;
 
             int visionRange = world.Global.NpcVisionRangeCells;
@@ -60,7 +60,7 @@ namespace Arcontio.Core
                 coneSlope = world.Global.NpcVisionConeHalfWidthPerStep;
 
             _npcIds.Clear();
-            _npcIds.AddRange(world.NpcCore.Keys);
+            _npcIds.AddRange(world.NpcDna.Keys);
 
             _objIds.Clear();
             _objIds.AddRange(world.Objects.Keys);

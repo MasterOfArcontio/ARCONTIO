@@ -61,7 +61,7 @@ namespace Arcontio.Core
                 _tokensEmittedToday.Clear();
 
             _npcIds.Clear();
-            _npcIds.AddRange(world.NpcCore.Keys);
+            _npcIds.AddRange(world.NpcDna.Keys);
 
             int envelopesEmitted = 0;
 

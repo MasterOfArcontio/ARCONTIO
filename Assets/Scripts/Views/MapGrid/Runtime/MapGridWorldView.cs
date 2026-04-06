@@ -575,7 +575,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             }
 
             // 2) fallback: primo NPC esistente
-            foreach (var kv in _world.NpcCore)
+            foreach (var kv in _world.NpcDna)
                 return kv.Key;
 
             return -1;*/
@@ -608,7 +608,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
         private void TryIssueDebugClickMoveOrder(int npcId)
         {
             if (_world == null || cfg == null || cfg.tileSizeWorld <= 0f) return;
-            if (!_world.NpcCore.ContainsKey(npcId)) return;
+            if (!_world.NpcDna.ContainsKey(npcId)) return;
 
             var cam = ResolveWorldCamera();
             if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var p))

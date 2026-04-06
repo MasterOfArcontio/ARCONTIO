@@ -6,7 +6,7 @@ namespace SocialViewer.UI.Graph
     /// <summary>
     /// GraphNodeSpawner
     ///
-    /// Responsabilità (UI bootstrap):
+    /// Responsabilitï¿½ (UI bootstrap):
     /// - Genera in runtime i nodi (sfere) sotto NodesRoot.
     /// - Inizializza i componenti dei nodi: ID logico, UI events, drag, forwarder, view.
     /// - Posiziona i nodi in una griglia (per ora).
@@ -77,13 +77,13 @@ namespace SocialViewer.UI.Graph
             // 1) Recupero simulatore
             // ------------------------------------------------------------
             // Se avvii la scena AtomView SENZA passare da Bootstrap,
-            // SimulationHost.Instance può essere null.
+            // SimulationHost.Instance puï¿½ essere null.
             var host = SimulationHost.Instance;
             if (host == null)
             {
                 Debug.LogError(
-                    "[GraphNodeSpawner] SimulationHost.Instance è null.\n" +
-                    "Cause più comune: hai premuto Play direttamente in Scene_AtomView.\n" +
+                    "[GraphNodeSpawner] SimulationHost.Instance ï¿½ null.\n" +
+                    "Cause piï¿½ comune: hai premuto Play direttamente in Scene_AtomView.\n" +
                     "Soluzione: premi Play in Scene_Bootstrap (dove vive ArcontioRuntime) e poi switcha vista."
                 );
                 return;
@@ -92,7 +92,7 @@ namespace SocialViewer.UI.Graph
             var world = host.World;
             if (world == null)
             {
-                Debug.LogError("[GraphNodeSpawner] host.World è null (non dovrebbe accadere).");
+                Debug.LogError("[GraphNodeSpawner] host.World ï¿½ null (non dovrebbe accadere).");
                 return;
             }
 
@@ -102,17 +102,17 @@ namespace SocialViewer.UI.Graph
             ClearNodes();
 
             // ------------------------------------------------------------
-            // 3) Loop su NPC reali (World.NpcCore contiene la lista NPC)
+            // 3) Loop su NPC reali (World.NpcDna contiene la lista NPC)
             // ------------------------------------------------------------
-            // Importante: World.NpcCore è un Dictionary<int, NpcCore>.
-            // La chiave è l'ID NPC "reale" del simulatore.
+            // Importante: World.NpcDna ï¿½ un Dictionary<int, NpcDnaProfile>.
+            // La chiave ï¿½ l'ID NPC "reale" del simulatore.
             int safeCols = Mathf.Max(1, cols);
             int iNode = 0;
 
-            foreach (var kv in world.NpcCore)
+            foreach (var kv in world.NpcDna)
             {
                 int npcId = kv.Key;       // ID REALE (persistente e coerente)
-                var core = kv.Value;      // dati base (nome, tratti, ecc.)
+                var dna = kv.Value;       // DNA dell'NPC (nome via dna.Identity.Name, ecc.)
 
                 // ------------------------------------------------------------
                 // A) Crea nodo UI disattivo (per inizializzare prima di OnEnable)
@@ -122,7 +122,7 @@ namespace SocialViewer.UI.Graph
                 go.SetActive(false);
 
                 // ------------------------------------------------------------
-                // B) RectTransform (servirà per posizionamento)
+                // B) RectTransform (servirï¿½ per posizionamento)
                 // ------------------------------------------------------------
                 RectTransform rt = go.GetComponent<RectTransform>();
                 if (rt == null)
@@ -145,7 +145,7 @@ namespace SocialViewer.UI.Graph
                 {
                     Debug.LogWarning(
                         $"[GraphNodeSpawner] NPCNodeCollision non trovato nel prefab '{go.name}'. " +
-                        "Il magnet system / collision registry non potrà usare questo nodo."
+                        "Il magnet system / collision registry non potrï¿½ usare questo nodo."
                     );
                 }
 
@@ -159,7 +159,7 @@ namespace SocialViewer.UI.Graph
 
                     // Stato iniziale: per ora mettiamo "Idle".
                     // In futuro lo ricavi da Needs/Work/Social del World (bridge di aggiornamento).
-                    uiEvents.SetNodeInfo(npcId, core.Name, "Idle");
+                    uiEvents.SetNodeInfo(npcId, dna.Identity.Name, "Idle");
                 }
                 else
                 {
@@ -167,7 +167,7 @@ namespace SocialViewer.UI.Graph
                 }
 
                 // ------------------------------------------------------------
-                // E) Input forwarding (pan/zoom quando mouse è sopra la sfera)
+                // E) Input forwarding (pan/zoom quando mouse ï¿½ sopra la sfera)
                 // ------------------------------------------------------------
                 var forwarder = go.GetComponent<GraphInputForwarder>();
                 if (forwarder != null)
@@ -195,7 +195,7 @@ namespace SocialViewer.UI.Graph
                 // ------------------------------------------------------------
                 var view = go.GetComponent<NPCNodeView>();
                 if (view != null)
-                    view.Bind(npcId, core.Name, "Idle");
+                    view.Bind(npcId, dna.Identity.Name, "Idle");
 
                 // ------------------------------------------------------------
                 // H) Posizionamento iniziale
@@ -207,7 +207,7 @@ namespace SocialViewer.UI.Graph
                 rt.anchoredPosition = new Vector2(col * spacingX, -row * spacingY);
 
                 // ------------------------------------------------------------
-                // I) Attiva nodo: ora OnEnable può registrarsi correttamente
+                // I) Attiva nodo: ora OnEnable puï¿½ registrarsi correttamente
                 // ------------------------------------------------------------
                 go.SetActive(true);
                 iNode++;

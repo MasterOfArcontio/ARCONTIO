@@ -59,7 +59,7 @@ namespace Arcontio.Core
 
             int ate = 0, slept = 0, antisocial = 0, moved = 0;
 
-            foreach (var npcId in world.NpcCore.Keys)
+            foreach (var npcId in world.NpcDna.Keys)
             {
                 if (!world.Needs.TryGetValue(npcId, out var needs)) continue;
 

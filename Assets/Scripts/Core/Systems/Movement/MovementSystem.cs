@@ -121,8 +121,8 @@ namespace Arcontio.Core
             // Carico i parametri di movimento che ci dicono quante celle della mappa posso utilizzare prima di andare in timeout
             var DefaultIntentStuckTicks = world.Config.Sim.movement?.intentStuckTicksDefault ?? 12;
 
-            // Nota: iteriamo su NpcCore.Keys (source of truth degli NPC esistenti)
-            foreach (var npcId in world.NpcCore.Keys)
+            // Nota: iteriamo su NpcDna.Keys (source of truth degli NPC esistenti)
+            foreach (var npcId in world.NpcDna.Keys)
             {
                 if (!world.NpcMoveIntents.TryGetValue(npcId, out var intent) || !intent.Active)
                     continue;

@@ -188,7 +188,7 @@ namespace Arcontio.View.MapGrid
             {
                 sb.Append("\n<b>NPC</b>\n");
 
-                string name = world.NpcCore.TryGetValue(npcId, out var core) ? core.Name : $"NPC_{npcId}";
+                string name = world.NpcDna.TryGetValue(npcId, out var dna) ? dna.Identity.Name : $"NPC_{npcId}";
                 sb.Append("Name: <b>").Append(name).Append("</b>")
                   .Append("  <color=#aaaaaa>#").Append(npcId).Append("</color>\n");
 

@@ -5,14 +5,14 @@ namespace Arcontio.Core
 {
     /// <summary>
     /// PrivateFoodAuditSystem (Day9):
-    /// Deduzione v0: un NPC nota che il suo cibo privato è diminuito rispetto all'ultima verifica.
+    /// Deduzione v0: un NPC nota che il suo cibo privato ï¿½ diminuito rispetto all'ultima verifica.
     ///
-    /// - NON dice chi è stato.
+    /// - NON dice chi ï¿½ stato.
     /// - Produce FoodMissingEvent -> FoodMissingMemoryRule -> memoria sospetto.
     ///
     /// Nota importante:
-    /// - Questo system è una scorciatoia "di gameplay" per testare il ramo rumor/sospetto.
-    /// - In futuro l'audit sarà un'azione (l'NPC controlla la scorta).
+    /// - Questo system ï¿½ una scorciatoia "di gameplay" per testare il ramo rumor/sospetto.
+    /// - In futuro l'audit sarï¿½ un'azione (l'NPC controlla la scorta).
     /// </summary>
     public sealed class PrivateFoodAuditSystem : ISystem
     {
@@ -32,13 +32,13 @@ namespace Arcontio.Core
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
-            if (world.NpcCore.Count == 0) return;
+            if (world.NpcDna.Count == 0) return;
 
             if ((tick.Index % _auditEveryTicks) != 0)
                 return;
 
             _npcIds.Clear();
-            _npcIds.AddRange(world.NpcCore.Keys);
+            _npcIds.AddRange(world.NpcDna.Keys);
 
             int missingEvents = 0;
 

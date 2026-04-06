@@ -521,7 +521,7 @@ namespace Arcontio.View.MapGrid
             if (hasNpc)
             {
                 var facing = world.GetFacing(npcId);
-                string npcName = world.NpcCore.TryGetValue(npcId, out var core) ? core.Name : "<unnamed>";
+                string npcName = world.NpcDna.TryGetValue(npcId, out var dna) ? dna.Identity.Name : "<unnamed>";
                 GUILayout.Label($"NPC: {npcId}  '{npcName}'  Facing: {facing}");
             }
             else

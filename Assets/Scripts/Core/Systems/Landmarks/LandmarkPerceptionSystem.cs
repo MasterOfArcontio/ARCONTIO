@@ -81,7 +81,7 @@ namespace Arcontio.Core
             if (world.LandmarkRegistry == null || world.LandmarkRegistry.ActiveNodesCount == 0)
                 return;
 
-            if (world.NpcCore.Count == 0)
+            if (world.NpcDna.Count == 0)
                 return;
 
             int visionRange = world.Global.NpcVisionRangeCells;
@@ -97,7 +97,7 @@ namespace Arcontio.Core
 
             // Snapshot NPC ids (evita iterazioni su Dictionary mentre qualcuno muta lo state)
             _npcIds.Clear();
-            foreach (var kv in world.NpcCore)
+            foreach (var kv in world.NpcDna)
                 _npcIds.Add(kv.Key);
 
             var nodes    = world.LandmarkRegistry.Nodes;

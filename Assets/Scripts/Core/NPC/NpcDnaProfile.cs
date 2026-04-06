@@ -456,5 +456,49 @@ namespace Arcontio.Core
             Traits              = traits;
             Tags                = tags;
         }
+
+        /// <summary>
+        /// Crea un NpcDnaProfile con valori neutri (0.5 su tutti gli assi).
+        /// Usato per spawn dev/debug e scenari di test dove non serve un DNA specifico.
+        /// In gameplay, ogni NPC dovrebbe avere un DNA definito esplicitamente.
+        /// </summary>
+        public static NpcDnaProfile CreateDefault(
+            string name,
+            string originTag = "unknown",
+            int    birthTick = 0)
+        {
+            int count = (int)DomainKind.COUNT;
+
+            var midSeeds = new float[count];
+            var caps     = new float[count];
+            for (int i = 0; i < count; i++) { midSeeds[i] = 0.5f; caps[i] = 1f; }
+
+            return new NpcDnaProfile(
+                identity: new NpcIdentity(name, originTag, birthTick),
+                capacities: new NpcCapacities(0.5f, 0.5f, 0.5f, 0.5f, caps),
+                preferences: new NpcPreferenceSeeds((float[])midSeeds.Clone()),
+                dispositions: new NpcDispositions(0.5f, 0.2f, 0.5f, 0.7f),
+                socialPosition: new NpcSocialPosition("lower", -1, 0.5f),
+                obligationFrame: new NpcObligationFrame((float[])midSeeds.Clone(), originTag),
+                thresholds: new NpcThresholds(
+                    needAlert01: 0.5f,
+                    needCritical01: 0.8f,
+                    roleDissatisfaction01: 0.6f,
+                    stressCritical01: 0.8f),
+                cognitiveModulators: new NpcCognitiveModulators(
+                    impulsivity01:      0.5f,
+                    riskAversion01:     0.5f,
+                    conformism01:       0.5f,
+                    optimism01:         0.5f,
+                    stressResilience01: 0.5f,
+                    sociability01:      0.5f,
+                    driftResistance01:  0.5f,
+                    traumaSensitivity01: 0.5f,
+                    memoryResilience01: 0.5f,
+                    rumination01:       0.25f,
+                    gullibility01:      0.5f),
+                traits: NpcTraitKind.None
+            );
+        }
     }
 }

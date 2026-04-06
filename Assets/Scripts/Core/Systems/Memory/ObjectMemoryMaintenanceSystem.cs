@@ -19,10 +19,10 @@ namespace Arcontio.Core
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
-            if (world.NpcCore.Count == 0) return;
+            if (world.NpcDna.Count == 0) return;
 
             _npcIds.Clear();
-            _npcIds.AddRange(world.NpcCore.Keys);
+            _npcIds.AddRange(world.NpcDna.Keys);
 
             int cleaned = 0;
             int now = (int)tick.Index;
