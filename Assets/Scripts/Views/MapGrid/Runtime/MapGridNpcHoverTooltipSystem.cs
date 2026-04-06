@@ -30,6 +30,20 @@ namespace Arcontio.View.MapGrid
         private int _lastCellY = int.MinValue;
         private float _refreshCooldown;
 
+        // ── Dati esposti per overlay esterni ─────────────────────────────────
+
+        /// <summary>
+        /// ID dell'NPC attualmente sotto il puntatore, -1 se nessuno.
+        /// Usato da MapGridDnaDriftOverlay per sapere quale NPC mostrare.
+        /// </summary>
+        public int HoveredNpcId { get; private set; } = -1;
+
+        /// <summary>
+        /// Posizione schermo del puntatore nell'ultimo tick.
+        /// Usato da MapGridDnaDriftOverlay per posizionarsi sotto il tooltip.
+        /// </summary>
+        public Vector2 PointerScreenPos { get; private set; }
+
         public MapGridNpcHoverTooltipSystem()
         {
             _overlay = new MapGridNpcTooltipOverlay();
@@ -45,6 +59,7 @@ namespace Arcontio.View.MapGrid
             _lastCellX = int.MinValue;
             _lastCellY = int.MinValue;
             _refreshCooldown = 0f;
+            HoveredNpcId = -1;
         }
 
         /// <summary>
@@ -56,8 +71,12 @@ namespace Arcontio.View.MapGrid
             if (world == null || cam == null || tileSizeWorld <= 0f)
             {
                 _overlay.Hide();
+                HoveredNpcId = -1;
                 return;
             }
+
+            // Aggiorna posizione puntatore per overlay esterni (MapGridDnaDriftOverlay)
+            PointerScreenPos = pointerScreenPos;
 
             // Pointer -> world -> grid cell
             Vector3 wp = cam.ScreenToWorldPoint(new Vector3(pointerScreenPos.x, pointerScreenPos.y, 0f));
@@ -83,6 +102,9 @@ namespace Arcontio.View.MapGrid
 
                 int npcId = FindNpcAtCell(world, cellX, cellY);
                 int objId = FindObjectAtCell(world, cellX, cellY);
+
+                // Aggiorna l'ID hovered per overlay esterni (es. MapGridDnaDriftOverlay)
+                HoveredNpcId = npcId;
 
                 string txt = BuildTooltip(world, cellX, cellY, npcId, objId);
                 _overlay.Show(txt, pointerScreenPos);
