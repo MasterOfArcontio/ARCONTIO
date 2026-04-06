@@ -15,19 +15,17 @@ namespace Arcontio.Core.Save
     // L'intero salvataggio di una simulazione è quindi N file separati.
     //
     // Uso tipico (save):
-    //   var entries = NpcSaveSystem.BuildEntries(npcIds, world, currentTick);
+    //   var entries = NpcSaveSystem.BuildEntries(world, currentTick);
     //   NpcSaveSystem.SaveAllChunks(entries, currentTick, slotName);
     //
-    // Uso tipico (load):
+    // Uso tipico (load / scenario):
     //   var entries = NpcSaveSystem.LoadAllChunks(slotName);
-    //   NpcSaveSystem.ApplyEntries(entries, world);
+    //   NpcSaveSystem.SpawnFromEntries(entries, world);
     //
-    // Nota architetturale (sessione 5):
-    //   BuildEntries e ApplyEntries non sono ancora collegati a World
-    //   perché NpcProfile non è ancora registrato come component store in World.
-    //   In sessione 5 (integrazione NPC esistenti), World acquisirà un dizionario
-    //   per-NPC di NpcProfile e questi metodi verranno completati.
-    //   Per ora, BuildEntries riceve i dati esplicitamente.
+    // v0.04.07.b:
+    //   BuildEntry ora include DNA, posizione spawn e Social.
+    //   Aggiunto BuildEntriesFromWorld per costruire le entry direttamente dal World.
+    //   Aggiunto SpawnFromEntries per creare gli NPC nel World da una lista di entry.
     // ─────────────────────────────────────────────────────────────────────────
 
     public static class NpcSaveSystem
@@ -43,17 +41,26 @@ namespace Arcontio.Core.Save
         // ── Costruzione delle entry ────────────────────────────────────────────
 
         /// <summary>
-        /// Costruisce una NpcSaveEntry per un singolo NPC.
+        /// Costruisce una NpcSaveEntry completa per un singolo NPC.
         ///
-        /// profile: NpcProfile runtime dell'NPC (sessione 5: verrà letto da World).
+        /// dna:     DNA immutabile dell'NPC.
+        /// profile: NpcProfile runtime dell'NPC.
         /// needs:   Needs corrente dell'NPC.
+        /// social:  Stato sociale corrente.
         /// store:   MemoryStore dell'NPC. Può essere null (nessuna traccia).
+        /// x, y:    Posizione attuale nella griglia.
+        /// facing:  Orientamento attuale.
         /// </summary>
         public static NpcSaveEntry BuildEntry(
-            int        npcId,
-            NpcProfile profile,
-            Needs      needs,
-            MemoryStore store)
+            int              npcId,
+            NpcDnaProfile    dna,
+            NpcProfile       profile,
+            Needs            needs,
+            Social           social,
+            MemoryStore      store,
+            int              x,
+            int              y,
+            CardinalDirection facing = CardinalDirection.North)
         {
             // Serializza tracce di memoria
             MemoryTraceSaveData[] tracesDtos = Array.Empty<MemoryTraceSaveData>();
@@ -66,12 +73,45 @@ namespace Arcontio.Core.Save
 
             return new NpcSaveEntry
             {
-                npcId        = npcId,
-                profile      = NpcProfileSaveData.FromProfile(profile),
-                needs        = NeedsSaveData.FromNeeds(needs),
+                npcId         = npcId,
+                dna           = dna    != null ? NpcDnaSaveData.From(dna)          : null,
+                profile       = profile != null ? NpcProfileSaveData.FromProfile(profile) : null,
+                needs         = NeedsSaveData.FromNeeds(needs),
+                social        = SocialSaveData.From(social),
+                spawnX        = x,
+                spawnY        = y,
+                facingDir     = (int)facing,
                 activeJobJson = string.Empty,  // placeholder — Job System v0.06
-                memoryTraces = tracesDtos
+                memoryTraces  = tracesDtos
             };
+        }
+
+        /// <summary>
+        /// Costruisce tutte le entry NPC direttamente dal World.
+        /// Legge DNA, Profile, Needs, Social, GridPos e Facing dai dizionari del World.
+        /// </summary>
+        public static List<NpcSaveEntry> BuildEntriesFromWorld(World world)
+        {
+            var result = new List<NpcSaveEntry>(world.NpcDna.Count);
+
+            foreach (var kv in world.NpcDna)
+            {
+                int npcId = kv.Key;
+                var dna   = kv.Value;
+
+                world.NpcProfiles.TryGetValue(npcId, out var profile);
+                world.Needs.TryGetValue(npcId, out var needs);
+                world.Social.TryGetValue(npcId, out var social);
+                world.Memory.TryGetValue(npcId, out var store);
+                world.GridPos.TryGetValue(npcId, out var gridPos);
+                var facing = world.GetFacing(npcId);
+
+                result.Add(BuildEntry(
+                    npcId, dna, profile, needs, social, store,
+                    gridPos.X, gridPos.Y, facing));
+            }
+
+            return result;
         }
 
         // ── Salvataggio ────────────────────────────────────────────────────────
@@ -177,39 +217,88 @@ namespace Arcontio.Core.Save
             return JsonUtility.FromJson<NpcChunkSaveData>(json);
         }
 
-        // ── Applicazione al mondo (stub per sessione 5) ────────────────────────
+        // ── Spawn NPC da entry ─────────────────────────────────────────────────
 
         /// <summary>
-        /// Applica le entry caricate al World.
+        /// Crea gli NPC nel World da una lista di NpcSaveEntry.
         ///
-        /// STUB: in sessione 5, quando NpcProfile sarà un component store in World,
-        /// questo metodo popolerà i dizionari per-NPC di NpcProfile, Needs e MemoryStore.
+        /// Per ogni entry:
+        ///   1. Ricostruisce NpcDnaProfile dal DTO (o usa CreateDefault se mancante)
+        ///   2. Chiama world.CreateNpc(dna, needs, social, x, y) → ottiene l'id assegnato
+        ///   3. Applica l'orientamento con world.SetFacing
+        ///   4. Se NpcProfile è presente, lo carica nel dizionario world.NpcProfiles
+        ///   5. Se memoryTraces è presente, le carica nel MemoryStore dell'NPC
         ///
-        /// Per ora ricostruisce i NpcProfile e li restituisce come dizionario.
-        /// Needs e MemoryStore devono essere applicati da chi chiama questo metodo
-        /// usando le API esistenti di World.
+        /// Nota: world.CreateNpc assegna un id sequenziale (non usa entry.npcId).
+        /// Gli id possono divergere tra salvataggio e caricamento se il mondo
+        /// contiene già NPC prima di chiamare SpawnFromEntries.
+        /// Per scenari di definizione (tick=0, mondo vuoto), gli id coincidono.
+        ///
+        /// Restituisce la mappa oldId→newId per eventuali fix-up di riferimenti.
         /// </summary>
-        public static Dictionary<int, NpcProfile> ApplyEntries(
+        public static Dictionary<int, int> SpawnFromEntries(
             IReadOnlyList<NpcSaveEntry> entries,
-            out Dictionary<int, Needs>            needsOut,
-            out Dictionary<int, List<MemoryTrace>> tracesOut)
+            World world)
         {
-            var profiles = new Dictionary<int, NpcProfile>(entries.Count);
-            needsOut     = new Dictionary<int, Needs>(entries.Count);
-            tracesOut    = new Dictionary<int, List<MemoryTrace>>(entries.Count);
+            var idMap = new Dictionary<int, int>(entries.Count);
 
             foreach (var entry in entries)
             {
-                profiles[entry.npcId] = entry.profile.ToProfile();
-                needsOut[entry.npcId] = entry.needs.ToNeeds();
+                // Ricostruisci DNA (fallback a CreateDefault se mancante)
+                NpcDnaProfile dna = entry.dna != null
+                    ? entry.dna.To()
+                    : NpcDnaProfile.CreateDefault("npc_" + entry.npcId);
 
-                var traces = new List<MemoryTrace>(
-                    entry.memoryTraces?.Length ?? 0);
+                // Ricostruisci Needs e Social
+                Needs  needs  = entry.needs  != null ? entry.needs.ToNeeds()   : default;
+                Social social = entry.social != null ? entry.social.To()        : default;
 
+                // Crea l'NPC nel World
+                int newId = world.CreateNpc(dna, needs, social, entry.spawnX, entry.spawnY);
+                idMap[entry.npcId] = newId;
+
+                // Orientamento
+                world.SetFacing(newId, (CardinalDirection)entry.facingDir);
+
+                // Profile runtime: sovrascrive quello generato da CreateNpc
+                if (entry.profile != null)
+                    world.NpcProfiles[newId] = entry.profile.ToProfile();
+
+                // Tracce di memoria
+                if (entry.memoryTraces != null && entry.memoryTraces.Length > 0
+                    && world.Memory.TryGetValue(newId, out var store) && store != null)
+                {
+                    foreach (var dto in entry.memoryTraces)
+                        store.Traces.Add(dto.ToTrace());
+                }
+            }
+
+            return idMap;
+        }
+
+        /// <summary>
+        /// Versione legacy — deprecata in v0.04.07.b.
+        /// Usa SpawnFromEntries per creare gli NPC direttamente nel World.
+        /// </summary>
+        [System.Obsolete("Usa SpawnFromEntries(entries, world) — restituisce gli id creati e applica DNA + posizione.")]
+        public static Dictionary<int, NpcProfile> ApplyEntries(
+            IReadOnlyList<NpcSaveEntry> entries,
+            out Dictionary<int, Needs>             needsOut,
+            out Dictionary<int, List<MemoryTrace>> tracesOut)
+        {
+            var profiles = new Dictionary<int, NpcProfile>(entries.Count);
+            needsOut  = new Dictionary<int, Needs>(entries.Count);
+            tracesOut = new Dictionary<int, List<MemoryTrace>>(entries.Count);
+
+            foreach (var entry in entries)
+            {
+                if (entry.profile != null) profiles[entry.npcId] = entry.profile.ToProfile();
+                if (entry.needs   != null) needsOut[entry.npcId]  = entry.needs.ToNeeds();
+
+                var traces = new List<MemoryTrace>(entry.memoryTraces?.Length ?? 0);
                 if (entry.memoryTraces != null)
                     foreach (var dto in entry.memoryTraces)
                         traces.Add(dto.ToTrace());
-
                 tracesOut[entry.npcId] = traces;
             }
 
