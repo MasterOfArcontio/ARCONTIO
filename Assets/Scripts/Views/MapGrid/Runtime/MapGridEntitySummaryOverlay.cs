@@ -1085,9 +1085,15 @@ namespace Arcontio.View.MapGrid
                 card.SetInventoryText(invText);
                 card.SetCommsText(_sbComms.ToString());
 
-                // Patch 0.02.03:
-                // nuova sezione nella card per i contatori landmark/edge conosciuti.
+                // Patch 0.02.03: landmark/edge conosciuti.
                 card.SetLandmarksText(_sbLandmarks.ToString());
+
+                // DNA DRIFT (v0.04.07.b) — barre proporzionali
+                if (world.NpcProfiles.TryGetValue(npcId, out var profile))
+                {
+                    var driftResult = NpcDnaDistance.Compute(dna, profile);
+                    card.UpdateDnaDrift(dna, profile, driftResult);
+                }
             }
         }
 
