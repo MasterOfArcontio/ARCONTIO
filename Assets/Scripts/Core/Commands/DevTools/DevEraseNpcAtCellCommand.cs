@@ -14,7 +14,7 @@ namespace Arcontio.Core.Commands.DevTools
     ///
     /// Motivazione della pulizia estesa:
     /// - In ARCONTIO gli NPC hanno più store paralleli (Needs, Memory, Intent, ecc.).
-    /// - Se eliminiamo solo NpcCore/GridPos, rimangono entry "orfane" che possono:
+    /// - Se eliminiamo solo NpcDna/GridPos, rimangono entry "orfane" che possono:
     ///   - inquinare debug overlay
     ///   - far fallire assert / controlli ExistsNpc
     ///   - generare side-effect nei sistemi (es. movement/scan)
@@ -52,7 +52,8 @@ namespace Arcontio.Core.Commands.DevTools
             // RIMOZIONE DAGLI STORE "CORE"
             // ============================================================
 
-            world.NpcCore.Remove(npcId);
+            world.NpcDna.Remove(npcId);
+            world.NpcProfiles.Remove(npcId);
             world.Needs.Remove(npcId);
             world.Social.Remove(npcId);
             world.GridPos.Remove(npcId);

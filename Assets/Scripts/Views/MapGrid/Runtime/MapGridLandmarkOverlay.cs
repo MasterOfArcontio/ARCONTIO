@@ -49,6 +49,10 @@ namespace Arcontio.View.MapGrid
         private readonly List<LineRenderer>        _jumpPathEdgePool  = new();
         private readonly List<LandmarkOverlayEdge> _jumpPathEdges     = new();
 
+        // v0.03.04.c-ComplexEdge_Creation: edge soggettivi fisicamente percorsi (giallo)
+        private readonly List<LineRenderer>        _complexEdgePool = new();
+        private readonly List<LandmarkOverlayEdge> _complexEdges    = new();
+
         // ============================================================
         // POOL GVD-DIN (v0.03 — patch 0.03.01.a)
         // ============================================================
@@ -86,8 +90,10 @@ namespace Arcontio.View.MapGrid
         private static readonly Color LmPathColor     = new Color(1.00f, 0.65f, 0.15f, 1f);
         private static readonly Color DirectPathColor = new Color(0.20f, 0.75f, 1.00f, 1f);
         private static readonly Color JumpPathColor   = new Color(1.00f, 0.20f, 0.75f, 1f);
-        private static readonly Color GvdNodeColor    = new Color(0.70f, 0.10f, 1.00f, 1f);
-        private static readonly Color GvdRawColor     = new Color(0.00f, 1.00f, 1.00f, 0.60f);
+        private static readonly Color GvdNodeColor      = new Color(0.70f, 0.10f, 1.00f, 1f);
+        private static readonly Color GvdRawColor       = new Color(0.00f, 1.00f, 1.00f, 0.60f);
+        // v0.03.04.c-ComplexEdge_Creation: giallo — distinto da verde (known) e arancione (route)
+        private static readonly Color ComplexEdgeColor  = new Color(1.00f, 1.00f, 0.00f, 1f);
 
         // ============================================================
         // ACCESSO READ-ONLY NODI (consumati da MapGridLandmarkLabelOverlay)
@@ -152,6 +158,7 @@ namespace Arcontio.View.MapGrid
             DisableAll(_lmPathEdgePool);
             DisableAll(_directPathEdgePool);
             DisableAll(_jumpPathEdgePool);
+            DisableAll(_complexEdgePool);
             ClearDtHeatmap();
             ClearGvdRaw();
             DisableAll(_gvdNodePool);
@@ -172,6 +179,7 @@ namespace Arcontio.View.MapGrid
                 _knownNodes, _knownEdges,
                 _routeNodes, _routeEdges,
                 _lmPathEdges, _directPathEdges, _jumpPathEdges,
+                _complexEdges,
                 out var _routeReport);
 
             RenderNodes(_worldNodes, _worldNodePool, WorldColor, 0.35f);
@@ -186,6 +194,11 @@ namespace Arcontio.View.MapGrid
             RenderEdges(_lmPathEdges,     _lmPathEdgePool,     LmPathColor,     0.11f);
             RenderEdges(_directPathEdges, _directPathEdgePool, DirectPathColor, 0.11f);
             RenderEdges(_jumpPathEdges,   _jumpPathEdgePool,   JumpPathColor,   0.11f);
+
+            // v0.03.04.c-ComplexEdge_Creation: edge fisicamente percorsi, giallo.
+            // Usa RenderComplexEdgesChained: segmenti dello stesso percorso vengono
+            // fusi in un unico LineRenderer multi-punto per mostrare la forma a scalino.
+            RenderComplexEdgesChained(_complexEdges, _complexEdgePool, ComplexEdgeColor, 0.10f);
 
             RenderGvdDin(world);
         }
@@ -331,6 +344,80 @@ namespace Arcontio.View.MapGrid
             }
             for (int i = edges.Count; i < pool.Count; i++)
                 pool[i].gameObject.SetActive(false);
+        }
+
+        /// <summary>
+        /// Renderizza i ComplexEdge come percorsi a scalino.
+        ///
+        /// <para>
+        /// Ogni ComplexEdge è una sequenza di <see cref="LandmarkOverlayEdge"/> concatenati
+        /// (il punto B del segmento i coincide con il punto A del segmento i+1).
+        /// Invece di creare un <c>LineRenderer</c> per ogni segmento (che produce linee
+        /// brevi difficili da distinguere), raggruppa i segmenti connessi in un unico
+        /// <c>LineRenderer</c> con N+1 waypoint, mostrando la forma a scalino in modo
+        /// inequivocabile.
+        /// </para>
+        /// </summary>
+        private void RenderComplexEdgesChained(
+            List<LandmarkOverlayEdge> edges,
+            List<LineRenderer> pool,
+            Color color,
+            float width)
+        {
+            if (edges.Count == 0)
+            {
+                for (int i = 0; i < pool.Count; i++)
+                    if (pool[i] != null) pool[i].gameObject.SetActive(false);
+                return;
+            }
+
+            // Passo 1: individua i limiti di ogni catena (= un ComplexEdge).
+            // Una nuova catena inizia quando il punto B del segmento precedente
+            // NON coincide con il punto A del segmento corrente.
+            var chainStarts = new System.Collections.Generic.List<int>(8) { 0 };
+            for (int i = 1; i < edges.Count; i++)
+            {
+                var prev = edges[i - 1];
+                var curr = edges[i];
+                if (prev.Bx != curr.Ax || prev.By != curr.Ay)
+                    chainStarts.Add(i);
+            }
+
+            // Passo 2: assicura che ci siano abbastanza LineRenderer nel pool.
+            EnsureEdgePool(pool, chainStarts.Count, color, width);
+
+            // Passo 3: renderizza ogni catena su un unico LineRenderer.
+            for (int c = 0; c < chainStarts.Count; c++)
+            {
+                int segStart = chainStarts[c];
+                int segEnd   = (c + 1 < chainStarts.Count) ? chainStarts[c + 1] : edges.Count;
+                int segCount = segEnd - segStart;
+
+                var lr = pool[c];
+                lr.gameObject.SetActive(true);
+                lr.positionCount = segCount + 1; // N segmenti = N+1 waypoint
+                lr.startWidth = width; lr.endWidth = width;
+                lr.startColor = color; lr.endColor = color;
+
+                // Primo waypoint: inizio del primo segmento della catena.
+                var first = edges[segStart];
+                lr.SetPosition(0, new Vector3(
+                    (first.Ax + 0.5f) * _tileSizeWorld,
+                    (first.Ay + 0.5f) * _tileSizeWorld, 0f));
+
+                // Waypoint successivi: fine di ogni segmento.
+                for (int j = 0; j < segCount; j++)
+                {
+                    var e = edges[segStart + j];
+                    lr.SetPosition(j + 1, new Vector3(
+                        (e.Bx + 0.5f) * _tileSizeWorld,
+                        (e.By + 0.5f) * _tileSizeWorld, 0f));
+                }
+            }
+
+            // Passo 4: disabilita i LineRenderer in eccesso.
+            for (int i = chainStarts.Count; i < pool.Count; i++)
+                if (pool[i] != null) pool[i].gameObject.SetActive(false);
         }
 
         private void EnsureNodePool(List<SpriteRenderer> pool, int needed, Color color, float nodeScale)

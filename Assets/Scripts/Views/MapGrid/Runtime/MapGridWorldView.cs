@@ -96,9 +96,6 @@ namespace Arcontio.View.MapGrid
         private Sprite _defaultNpcSprite;
         private MapGridPointerInputActionsProvider _pointerProvider;
 
-        // ---------------- Tooltip system (view-only) ----------------
-        private MapGridNpcHoverTooltipSystem _hoverTooltip;
-
         // ---------------- Always-on overlay: pointer cell coords (Patch 0.01P2) ----------------
         private MapGridPointerCoordsOverlay _pointerCoords;
 
@@ -192,9 +189,6 @@ namespace Arcontio.View.MapGrid
             _defaultNpcSprite = LoadSpriteCached(npcPath);
             if (_defaultNpcSprite == null)
                 Debug.LogWarning($"[MapGrid] Default NPC sprite not found at Resources/{npcPath}.png");
-
-            // Tooltip/hover system: lo inizializziamo qui così resta totalmente “View-only”.
-            _hoverTooltip = new MapGridNpcHoverTooltipSystem();
 
             // Patch 0.01P2:
             // indicatore costante in alto a sinistra con le coordinate della cella sotto il mouse.
@@ -515,26 +509,13 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             if (_summaryOverlayEnabled)
             {
-                // Card avanzata ON, tooltip sempre nascosto.
-                _hoverTooltip.Hide();
-
                 if (cam != null && _summaryOverlay != null)
                     _summaryOverlay.Tick(_world, cam, cfg.tileSizeWorld);
             }
             else
             {
-                // Overlay OFF + tooltip ON (comportamento legacy con F9).
                 if (_summaryOverlay != null)
                     _summaryOverlay.SetEnabled(false);
-
-                if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var p))
-                {
-                    // Fail-safe: nessun tooltip se manca input o camera
-                }
-                else
-                {
-                    _hoverTooltip.Tick(_world, cam, p, cfg.tileSizeWorld);
-                }
             }
         }
 
@@ -544,12 +525,6 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             if (_summaryOverlay != null)
                 _summaryOverlay.SetEnabled(_summaryOverlayEnabled);
-
-            // Nota:
-            // - quando abilito, forzo Hide del tooltip per evitare “ghost” UI.
-            // - quando disabilito, il tooltip riparte al prossimo Tick (Update).
-            if (_summaryOverlayEnabled)
-                _hoverTooltip.Hide();
         }
 
         /// <summary>
@@ -575,7 +550,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             }
 
             // 2) fallback: primo NPC esistente
-            foreach (var kv in _world.NpcCore)
+            foreach (var kv in _world.NpcDna)
                 return kv.Key;
 
             return -1;*/
@@ -608,7 +583,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
         private void TryIssueDebugClickMoveOrder(int npcId)
         {
             if (_world == null || cfg == null || cfg.tileSizeWorld <= 0f) return;
-            if (!_world.NpcCore.ContainsKey(npcId)) return;
+            if (!_world.NpcDna.ContainsKey(npcId)) return;
 
             var cam = ResolveWorldCamera();
             if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var p))

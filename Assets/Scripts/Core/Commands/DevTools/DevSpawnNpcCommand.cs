@@ -14,7 +14,7 @@ namespace Arcontio.Core.Commands.DevTools
     ///   - non spawniamo su celle che bloccano movement (es. muri).
     ///
     /// Nota:
-    /// - In questa versione la creazione usa valori semplici/deterministici per NpcCore/Needs/Social.
+    /// - In questa versione la creazione usa valori semplici/deterministici per NpcDnaProfile/Needs/Social.
     /// - Se in futuro vuoi spawnare "archetipi" (es. thief, victim, witness), questo comando è il punto giusto.
     /// </summary>
     public sealed class DevSpawnNpcCommand : ICommand
@@ -55,14 +55,7 @@ namespace Arcontio.Core.Commands.DevTools
             // Name deterministico e leggibile in debug.
             // Nota: _nextNpcId è interno al world, quindi non possiamo usarlo qui senza creare una API;
             // usiamo un nome "a coordinate" (univoco abbastanza per scenari di test).
-            var core = new NpcCore
-            {
-                Name = $"DEV_NPC({_x},{_y})",
-                Charisma = 0.5f,
-                Decisiveness = 0.5f,
-                Empathy = 0.5f,
-                Ambition = 0.5f,
-            };
+            var dna = NpcDnaProfile.CreateDefault($"DEV_NPC({_x},{_y})");
 
             // Needs "safe": nessuna emergenza iniziale.
             var needs = new Needs
@@ -81,7 +74,7 @@ namespace Arcontio.Core.Commands.DevTools
                 JusticePerception01 = 0.5f,
             };
 
-            int npcId = world.CreateNpc(core, needs, social, _x, _y);
+            int npcId = world.CreateNpc(dna, needs, social, _x, _y);
             world.SetFacing(npcId, _facing);
 
             // Nota:

@@ -5,7 +5,7 @@ namespace Arcontio.Core
 {
     /// <summary>
     /// NeedsDecaySystem (Day9):
-    /// System deterministico “basso livello”.
+    /// System deterministico ï¿½basso livelloï¿½.
     ///
     /// - Applica fame/stanchezza ad ogni tick usando NeedsConfig.
     /// - NON decide cosa fare (quello sta nelle Rules).
@@ -18,12 +18,12 @@ namespace Arcontio.Core
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
-            if (world.NpcCore.Count == 0) return;
+            if (world.NpcDna.Count == 0) return;
 
             var cfg = world.Global.Needs;
 
             _npcIds.Clear();
-            _npcIds.AddRange(world.NpcCore.Keys);
+            _npcIds.AddRange(world.NpcDna.Keys);
 
             int updated = 0;
 
@@ -32,11 +32,11 @@ namespace Arcontio.Core
                 int npcId = _npcIds[i];
                 if (!world.Needs.TryGetValue(npcId, out var n)) continue;
 
-                // Hunger01 cresce con il tempo (più fame)
+                // Hunger01 cresce con il tempo (piï¿½ fame)
                 n.Hunger01 += cfg.satietyDecayPerTick;
                 if (n.Hunger01 > 1f) n.Hunger01 = 1f;
 
-                // Fatigue01 cresce con il tempo (più stanchezza)
+                // Fatigue01 cresce con il tempo (piï¿½ stanchezza)
                 n.Fatigue01 += cfg.restDecayPerTick;
                 if (n.Fatigue01 > 1f) n.Fatigue01 = 1f;
 

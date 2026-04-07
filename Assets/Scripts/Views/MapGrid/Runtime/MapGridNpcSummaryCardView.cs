@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Arcontio.Core;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -54,6 +55,7 @@ namespace Arcontio.View.MapGrid
         private const string KeyLandmarks = "Landmarks";
         private const string KeyMemoryTraces = "MemoryTraces";
         private const string KeyKnownObjects = "KnownObjects";
+        private const string KeyDnaDrift = "DnaDrift";
 
         // ============================================================
         // SECTION STATE
@@ -66,6 +68,11 @@ namespace Arcontio.View.MapGrid
         private SectionView _landmarksSection;
         private SectionView _memSection;
         private SectionView _objMemSection;
+        private SectionView _dnaDriftSection;
+
+        // ── DNA DRIFT bars ────────────────────────────────────────────────────
+        // [axisIndex 0=Pref 1=Comp 2=Obl][domainIndex 0..7]
+        private BarRow[][] _driftDomainRows;
 
         /// <summary>
         /// Stato collapse "globale" per sezione.
@@ -153,6 +160,11 @@ namespace Arcontio.View.MapGrid
             _objMemSection = BuildSection(_root.transform, KeyKnownObjects, "Perception / Knowledge", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _objMemSection.RootImage.color = new Color(0.05f, 0.25f, 0.45f, 0.72f);
 
+            // DNA DRIFT (v0.04.06 → v0.04.07.b) — barre proporzionali uGUI
+            _dnaDriftSection = BuildSection(_root.transform, KeyDnaDrift, "DNA DRIFT", DefaultBodyFont, FontStyle.Normal, collapsible: true);
+            _dnaDriftSection.RootImage.color = new Color(0.30f, 0.10f, 0.15f, 0.78f);
+            BuildDnaDriftRows(_dnaDriftSection);
+
             SetVisible(false);
         }
 
@@ -213,6 +225,41 @@ namespace Arcontio.View.MapGrid
                 _landmarksSection.BodyText.text = text ?? string.Empty;
         }
 
+        // ── Nomi dominio (indici 1..8 di DomainKind) ─────────────────────────
+        private static readonly string[] DomainLabels =
+            { "Agric", "Costru", "Sicur", "Artig", "Magaz", "Gover", "Socia", "Esplor" };
+
+        private static readonly string[] AxisLabels = { "PREFERENZE", "COMPETENZA", "OBBLIGO" };
+
+        /// <summary>
+        /// Aggiorna la sezione DNA DRIFT con barre proporzionali.
+        /// Chiama questo metodo ogni frame quando la card è visibile.
+        /// </summary>
+        public void UpdateDnaDrift(NpcDnaProfile dna, NpcProfile profile, DnaDistanceResult result)
+        {
+            if (_driftDomainRows == null) return; // non ancora costruito
+
+            float[] prefSeeds = dna.Preferences.Seeds;
+            float[] oblSeeds  = dna.ObligationFrame.Seeds;
+
+            for (int d = 1; d < (int)DomainKind.COUNT; d++)
+            {
+                int di = d - 1;
+
+                float dnaPref  = prefSeeds != null && d < prefSeeds.Length ? prefSeeds[d] : 0f;
+                float currPref = profile.Preference.Values[d];
+                _driftDomainRows[0][di].Set(DomainLabels[di], Mathf.Abs(currPref - dnaPref));
+
+                // Competenza: scostamento = quanto ha sviluppato dal punto di partenza (0)
+                float currComp = profile.Competence.Values[d];
+                _driftDomainRows[1][di].Set(DomainLabels[di], currComp);
+
+                float dnaObl  = oblSeeds != null && d < oblSeeds.Length ? oblSeeds[d] : 0f;
+                float currObl = profile.Obligation.Values[d];
+                _driftDomainRows[2][di].Set(DomainLabels[di], Mathf.Abs(currObl - dnaObl));
+            }
+        }
+
         /// <summary>Mostra/nasconde (senza distruggere).</summary>
         public void SetVisible(bool visible)
         {
@@ -233,6 +280,161 @@ namespace Arcontio.View.MapGrid
         public Vector2 GetCanvasLocalPosition()
         {
             return _rootRt != null ? _rootRt.anchoredPosition : Vector2.zero;
+        }
+
+        // ============================================================
+        // DNA DRIFT — build e bar rows
+        // ============================================================
+
+        private const float BarMaxWidth  = 130f;
+        private const float BarHeight    = 10f;
+        private const float RowHeight    = 14f;
+        private const int   LabelWidth   = 56;
+        private const int   ValueWidth   = 32;
+
+        /// <summary>
+        /// Inner class che rappresenta una riga con barra proporzionale.
+        /// Usa Image.Type.Filled per evitare conflitti col layout group.
+        /// </summary>
+        private sealed class BarRow
+        {
+            public Text  LabelText;
+            public Image BarFill;   // Image.Type.Filled — fillAmount controlla la proporzione
+            public Text  ValueText;
+
+            public void Set(string label, float value01)
+            {
+                float v = Mathf.Clamp01(value01);
+                LabelText.text = label;
+                BarFill.fillAmount = v;
+                BarFill.color = BarColor(v);
+                ValueText.text = v.ToString("0.00");
+            }
+
+            private static Color BarColor(float v)
+            {
+                if (v < 0.35f) return new Color(0.22f, 0.75f, 0.22f);
+                if (v < 0.65f) return new Color(0.90f, 0.78f, 0.10f);
+                return new Color(0.85f, 0.18f, 0.18f);
+            }
+        }
+
+        private void BuildDnaDriftRows(SectionView section)
+        {
+            // Nascondi il Text standard (non usiamo testo per questa sezione)
+            if (section.BodyText != null)
+                section.BodyText.gameObject.SetActive(false);
+
+            var parent = section.BodyGo.transform;
+
+            // ── Righe per-dominio (3 assi × 8 domini) ────────────────────────
+            _driftDomainRows = new BarRow[3][];
+            for (int axis = 0; axis < 3; axis++)
+            {
+                MakeAxisLabel(parent, AxisLabels[axis]);
+
+                _driftDomainRows[axis] = new BarRow[8];
+                for (int d = 0; d < 8; d++)
+                    _driftDomainRows[axis][d] = MakeBarRow(parent, DomainLabels[d]);
+            }
+        }
+
+        private static BarRow MakeBarRow(Transform parent, string label)
+        {
+            var rowGo = new GameObject("BarRow_" + label);
+            rowGo.transform.SetParent(parent, false);
+
+            var hl = rowGo.AddComponent<HorizontalLayoutGroup>();
+            // childControlHeight/Width=true: HLG assegna esattamente preferredHeight/Width ai figli
+            // childForceExpand=false: i figli NON si allargano per riempire lo spazio extra
+            hl.childControlHeight     = true;
+            hl.childControlWidth      = true;
+            hl.childForceExpandHeight = false;
+            hl.childForceExpandWidth  = false;
+            hl.spacing = 4;
+
+            rowGo.AddComponent<LayoutElement>().preferredHeight = RowHeight;
+
+            // Label
+            var labelGo = new GameObject("Label");
+            labelGo.transform.SetParent(rowGo.transform, false);
+            var labelTxt = labelGo.AddComponent<Text>();
+            labelTxt.font = GetUiFont();
+            labelTxt.fontSize = 10;
+            labelTxt.alignment = TextAnchor.MiddleLeft;
+            labelTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            labelTxt.verticalOverflow   = VerticalWrapMode.Truncate;
+            labelTxt.raycastTarget = false;
+            var labelLe = labelGo.AddComponent<LayoutElement>();
+            labelLe.preferredWidth  = LabelWidth;
+            labelLe.preferredHeight = RowHeight;
+
+            // Barra sfondo (nero) — contiene la fill via Image.Type.Filled
+            var barBgGo = new GameObject("BarBg");
+            barBgGo.transform.SetParent(rowGo.transform, false);
+            var barBgImg = barBgGo.AddComponent<Image>();
+            barBgImg.color = Color.black;
+            barBgImg.raycastTarget = false;
+            var barBgLe = barBgGo.AddComponent<LayoutElement>();
+            barBgLe.preferredWidth  = BarMaxWidth;
+            barBgLe.preferredHeight = BarHeight;
+
+            // Barra fill — Image.Type.Filled copre l'intero sfondo
+            // fillAmount=[0..1] controlla quanta parte colorata è visibile
+            var barFillGo = new GameObject("BarFill");
+            barFillGo.transform.SetParent(barBgGo.transform, false);
+            var barFillImg = barFillGo.AddComponent<Image>();
+            barFillImg.raycastTarget = false;
+            barFillImg.type        = Image.Type.Filled;
+            barFillImg.fillMethod  = Image.FillMethod.Horizontal;
+            barFillImg.fillOrigin  = (int)Image.OriginHorizontal.Left;
+            barFillImg.fillAmount  = 0f;
+            var barFillRt = barFillGo.GetComponent<RectTransform>();
+            barFillRt.anchorMin = Vector2.zero;
+            barFillRt.anchorMax = Vector2.one;
+            barFillRt.offsetMin = Vector2.zero;
+            barFillRt.offsetMax = Vector2.zero;
+
+            // Valore numerico
+            var valueGo = new GameObject("Value");
+            valueGo.transform.SetParent(rowGo.transform, false);
+            var valueTxt = valueGo.AddComponent<Text>();
+            valueTxt.font = GetUiFont();
+            valueTxt.fontSize = 10;
+            valueTxt.alignment = TextAnchor.MiddleRight;
+            valueTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            valueTxt.verticalOverflow   = VerticalWrapMode.Truncate;
+            valueTxt.raycastTarget = false;
+            var valueLe = valueGo.AddComponent<LayoutElement>();
+            valueLe.preferredWidth  = ValueWidth;
+            valueLe.preferredHeight = RowHeight;
+
+            return new BarRow
+            {
+                LabelText = labelTxt,
+                BarFill   = barFillImg,
+                ValueText = valueTxt
+            };
+        }
+
+        private static void MakeAxisLabel(Transform parent, string text)
+        {
+            var go = new GameObject("AxisLabel_" + text);
+            go.transform.SetParent(parent, false);
+
+            var le = go.AddComponent<LayoutElement>();
+            le.preferredHeight = 16f;
+
+            var txt = go.AddComponent<Text>();
+            txt.font = GetUiFont();
+            txt.fontSize = 10;
+            txt.fontStyle = FontStyle.Bold;
+            txt.alignment = TextAnchor.MiddleLeft;
+            txt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            txt.verticalOverflow   = VerticalWrapMode.Truncate;
+            txt.color = new Color(0.75f, 0.90f, 1.00f);
+            txt.raycastTarget = false;
+            txt.text = text;
         }
 
         // ============================================================

@@ -10,11 +10,11 @@ namespace Arcontio.Views
             var host = SimulationHost.Instance;
             if (host == null)
             {
-                Debug.LogError("[MapView] SimulationHost.Instance è null. Non stai usando Bootstrap o runtime non persistente.");
+                Debug.LogError("[MapView] SimulationHost.Instance ï¿½ null. Non stai usando Bootstrap o runtime non persistente.");
                 return;
             }
 
-            Debug.Log($"[MapView] Connesso. Tick attuale = {host.TickIndex}, NPC = {host.World.NpcCore.Count}");
+            Debug.Log($"[MapView] Connesso. Tick attuale = {host.TickIndex}, NPC = {host.World.NpcDna.Count}");
         }
     }
 }

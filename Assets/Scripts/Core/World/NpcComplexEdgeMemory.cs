@@ -147,6 +147,20 @@ namespace Arcontio.Core
         public bool IsRecording => _activeRecording != null;
 
         /// <summary>
+        /// ID del nodo landmark da cui è partito il recording attivo.
+        /// Ritorna 0 se nessun recording è attivo.
+        /// Usato da LandmarkPerceptionSystem per il Meccanismo 2 (ibrido fisico+visivo).
+        /// </summary>
+        public int ActiveRecordingFromNodeId => _activeRecording?.FromNodeId ?? 0;
+
+        /// <summary>
+        /// Numero di passi accumulati nel recording attivo (inclusa la cella di partenza).
+        /// Ritorna 0 se nessun recording è attivo.
+        /// Usato come StepCount nel costo del Meccanismo 2 (ibrido fisico+visivo).
+        /// </summary>
+        public int ActiveRecordingStepCount => _activeRecording?.Steps.Count ?? 0;
+
+        /// <summary>
         /// Accesso in lettura agli edge complessi (per l'overlay e il planner).
         /// </summary>
         public IReadOnlyDictionary<NpcLandmarkMemory.EdgeKey, ComplexEdge> Edges => _edges;
@@ -278,6 +292,61 @@ namespace Arcontio.Core
         // =====================================================================
 
         /// <summary>
+        /// Crea o aggiorna un <see cref="ComplexEdge"/> inferito visivamente
+        /// (Meccanismo 2 — ibrido fisico+visivo di LandmarkPerceptionSystem).
+        ///
+        /// <para>
+        /// A differenza di <see cref="TryCompleteRecording"/>, questo edge nasce senza
+        /// segmenti fisici: il percorso non è stato percorso interamente, ma è stato
+        /// stimato visivamente (StepCount dal nodo di partenza + Manhattan visivo al target).
+        /// I <see cref="ComplexEdge.Segments"/> restano vuoti fino a quando l'NPC non
+        /// percorre fisicamente il tratto; a quel punto <see cref="TryCompleteRecording"/>
+        /// sovrascrive con i segmenti reali e confidence 0.25f.
+        /// </para>
+        ///
+        /// <para>
+        /// Se l'edge fisico già esiste (con segmenti), questa chiamata è no-op per
+        /// non degradare un'informazione più precisa con una stima visiva.
+        /// </para>
+        /// </summary>
+        /// <param name="nodeA">ID nodo di partenza (l'ultimo calpestato fisicamente).</param>
+        /// <param name="nodeB">ID nodo di destinazione (visto nel FOV).</param>
+        /// <param name="cost">Stima del costo (StepCount + Manhattan).</param>
+        /// <param name="nowTick">Tick corrente.</param>
+        /// <param name="confidence">Confidence iniziale (es. 0.15f).</param>
+        public void LearnVisualEdge(int nodeA, int nodeB, int cost, long nowTick, float confidence)
+        {
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB || cost < 1) return;
+
+            var key = new NpcLandmarkMemory.EdgeKey(nodeA, nodeB);
+
+            // Se esiste già un edge fisico (con segmenti), non degradarlo con una stima visiva.
+            if (_edges.TryGetValue(key, out var existing))
+            {
+                if (existing.Segments != null && existing.Segments.Count > 0)
+                    return; // edge fisico: non toccare
+                // Edge visivo già presente: rinforza solo se il nuovo costo è migliore.
+                if (cost < existing.BaseCost)
+                    existing.BaseCost = cost;
+                existing.LastSeenTick = nowTick;
+                return;
+            }
+
+            // Edge nuovo: verifica cap.
+            if (_edges.Count >= _maxEdges)
+            {
+                EvictLeastConfident();
+                if (_edges.Count >= _maxEdges)
+                    return;
+            }
+
+            var edge = new ComplexEdge(key, new List<PathSegment>(), nowTick);
+            edge.BaseCost   = cost;
+            edge.Confidence = confidence > 0f ? confidence : 0.01f;
+            _edges[key] = edge;
+        }
+
+        /// <summary>
         /// Aggiunge o aggiorna un <see cref="ComplexEdge"/> nello store.
         ///
         /// <para>
@@ -300,7 +369,19 @@ namespace Arcontio.Core
         {
             if (_edges.TryGetValue(key, out var existing))
             {
-                // Edge già noto: aggiorna se il nuovo percorso è migliore.
+                // Edge fisico in arrivo (con segmenti reali): sovrascrive sempre un
+                // eventuale edge visivo precedente (senza segmenti), che era solo una stima.
+                bool incomingIsPhysical = segments != null && segments.Count > 0;
+                bool existingIsVisual   = existing.Segments == null || existing.Segments.Count == 0;
+                if (incomingIsPhysical && existingIsVisual)
+                {
+                    existing.Segments.Clear();
+                    existing.Segments.AddRange(segments);
+                    existing.BaseCost = cost;
+                    existing.Reinforce(nowTick);
+                    return existing;
+                }
+                // Edge fisico vs fisico: aggiorna solo se il nuovo percorso è migliore.
                 existing.UpdateIfBetter(segments, cost, nowTick);
                 return existing;
             }
@@ -359,6 +440,74 @@ namespace Arcontio.Core
         {
             if (TryGetComplexEdge(nodeA, nodeB, out var edge))
                 edge.ClearFlag(flag);
+        }
+
+        /// <summary>
+        /// Applica una penalità alla confidence di un edge complesso esistente.
+        /// Chiamato da <c>World.BlacklistBlockedMacroEdge</c> quando l'NPC risulta
+        /// bloccato su un macro-edge durante il Failure Ladder (Task 5).
+        /// </summary>
+        /// <param name="nodeA">Endpoint A dell'edge.</param>
+        /// <param name="nodeB">Endpoint B dell'edge.</param>
+        /// <param name="penalty">Valore da sottrarre alla confidence (clampato a 0).</param>
+        public void PenalizeComplexEdge(int nodeA, int nodeB, float penalty)
+        {
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB || penalty <= 0f) return;
+            var key = new NpcLandmarkMemory.EdgeKey(nodeA, nodeB);
+            if (!_edges.TryGetValue(key, out var e)) return;
+            e.Confidence -= penalty;
+            if (e.Confidence < 0f) e.Confidence = 0f;
+        }
+
+        // =====================================================================
+        // HELPER PLANNER A*
+        // =====================================================================
+
+        /// <summary>
+        /// Aggiunge al buffer i vicini ComplexEdge noti per il nodo
+        /// <paramref name="nodeId"/>.
+        ///
+        /// <para>
+        /// <b>Non</b> svuota il buffer prima di appendere: i vicini ComplexEdge
+        /// vengono accodati ai vicini semplici già presenti (prodotti da
+        /// <c>NpcLandmarkMemory.FillKnownNeighbors</c>). Il loop A* elabora
+        /// poi l'intero buffer in un'unica passata, gestendo automaticamente
+        /// i duplicati tramite il confronto g-score.
+        /// </para>
+        ///
+        /// <para>
+        /// Condizione di inclusione: l'altro endpoint dell'edge deve essere
+        /// conosciuto dall'NPC nella sua memoria semplice
+        /// (<paramref name="landmarkMem"/>.<c>ContainsLandmark</c>).
+        /// Questo evita che l'A* navighi verso nodi che l'NPC non conosce.
+        /// </para>
+        ///
+        /// <para><b>v0.03.04.b — ComplexEdge integrazione planner A*</b></para>
+        /// </summary>
+        /// <param name="nodeId">Nodo corrente espanso dall'A*.</param>
+        /// <param name="landmarkMem">Memoria semplice dell'NPC (verifica endpoint noto).</param>
+        /// <param name="outNeighbors">Buffer in output — i vicini ComplexEdge vengono appesi.</param>
+        public void FillKnownComplexNeighbors(
+            int nodeId,
+            NpcLandmarkMemory landmarkMem,
+            List<NpcLandmarkMemory.KnownNeighbor> outNeighbors)
+        {
+            if (outNeighbors == null || nodeId == 0 || _edges.Count == 0 || landmarkMem == null)
+                return;
+
+            foreach (var kv in _edges)
+            {
+                var ce = kv.Value;
+                int otherNode;
+                if      (ce.Key.A == nodeId) otherNode = ce.Key.B;
+                else if (ce.Key.B == nodeId) otherNode = ce.Key.A;
+                else continue;
+
+                // Includi solo se l'NPC conosce anche l'endpoint di arrivo
+                if (!landmarkMem.ContainsLandmark(otherNode)) continue;
+
+                outNeighbors.Add(new NpcLandmarkMemory.KnownNeighbor(otherNode, ce.BaseCost, ce.Confidence));
+            }
         }
 
         // =====================================================================

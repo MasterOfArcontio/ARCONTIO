@@ -35,7 +35,7 @@ namespace Arcontio.Core
             // Nota importante (molto verbosa ma utile):
             // Qui iteriamo su NpcCore perché nel Core standard l’elenco “canonico” degli NPC
             // è quello (non world.Npcs).
-            foreach (var kv in world.NpcCore)
+            foreach (var kv in world.NpcDna)
             {
                 int npcId = kv.Key;
 

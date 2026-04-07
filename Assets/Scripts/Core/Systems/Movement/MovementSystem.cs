@@ -121,8 +121,8 @@ namespace Arcontio.Core
             // Carico i parametri di movimento che ci dicono quante celle della mappa posso utilizzare prima di andare in timeout
             var DefaultIntentStuckTicks = world.Config.Sim.movement?.intentStuckTicksDefault ?? 12;
 
-            // Nota: iteriamo su NpcCore.Keys (source of truth degli NPC esistenti)
-            foreach (var npcId in world.NpcCore.Keys)
+            // Nota: iteriamo su NpcDna.Keys (source of truth degli NPC esistenti)
+            foreach (var npcId in world.NpcDna.Keys)
             {
                 if (!world.NpcMoveIntents.TryGetValue(npcId, out var intent) || !intent.Active)
                     continue;
@@ -141,6 +141,33 @@ namespace Arcontio.Core
                 {
                     InitializeNavigation(world, npcId, ref intent);
                     world.NpcMoveIntents[npcId] = intent;
+                }
+
+                // ── FAILURE LADDER: CHECK BACK-OFF (v0.03.05-FailureLadder) ─────────
+                {
+                    long nowTick = TickContext.CurrentTickIndex;
+
+                    // Se il back-off è ancora attivo: NPC in pausa, salta il movimento.
+                    if (world.Pathfinding.IsMoveBackOffActive(npcId, nowTick))
+                        continue;
+
+                    // Se il back-off è appena scaduto: tenta replan (re-inizializza navigazione).
+                    if (world.Pathfinding.TryExpireMoveBackOff(npcId, nowTick, out int expiredStage))
+                    {
+                        intent.IsNew        = true;
+                        intent.BlockedTicks = 0;
+                        world.NpcMoveIntents[npcId] = intent;
+                        InitializeNavigation(world, npcId, ref intent);
+                        world.NpcMoveIntents[npcId] = intent;
+
+                        ArcontioLogger.Trace(
+                            new LogContext(tick: (int)nowTick, channel: "Move", npcId: npcId, cell: (pos.X, pos.Y)),
+                            new LogBlock(LogLevel.Trace, "log.move.backoff_replan")
+                                .AddField("targetX", intent.TargetX)
+                                .AddField("targetY", intent.TargetY)
+                                .AddField("expiredStage", expiredStage)
+                        );
+                    }
                 }
 
                 // Avanza lo stato della macro-route se l'NPC è su un nodo landmark.
@@ -344,6 +371,7 @@ namespace Arcontio.Core
                     world.ClearDebugNavigationPathsForNpc(npcId);
                     world.ClearNpcLocalSearchState(npcId, string.Empty);
                     world.ClearNpcDirectCommitState(npcId, string.Empty);
+                    world.Pathfinding.ClearMoveBackOff(npcId); // failure ladder reset
 
                     // Fix 0.02.07.A bug 3: azzera NavigationMode e DirectPrefixStepsRemaining
                     // così il prossimo intent parte da uno stato pulito.
@@ -589,28 +617,72 @@ namespace Arcontio.Core
 
                     if (intent.BlockedTicks >= DefaultIntentStuckTicks)
                     {
-                        // Cancelliamo l'intento: il target cell è di fatto irraggiungibile (occupata o bloccata).
-                        // Questo sblocca la simulazione: al tick successivo le Rules possono fare re-plan
-                        // scegliendo un target alternativo (altro cibo in vista/memoria, ecc.).
-                        intent.Active = false;
-                        intent.BlockedTicks = 0;
-                        world.NpcMoveIntents[npcId] = intent;
-                        world.ClearNpcLocalSearchState(npcId, "IntentCancelledStuck");
-                        world.ClearNpcDirectCommitState(npcId, "IntentCancelledStuck");
-                        world.SetNpcIdle(npcId);
-                        world.MarkMacroRouteExecutionBlocked(npcId, duringLastMile: macroLastMile);
+                        // ── FAILURE LADDER (v0.03.05-FailureLadder) ──────────────────────
+                        // Invece di cancellare subito l'intent, tenta prima un back-off+replan.
+                        // Stage 1 → back-off breve → replan.
+                        // Stage 2 → back-off lungo → replan.
+                        // Stage > backoff_max_stages → cancella intent (comportamento originale).
+                        var mvParams      = world.Config?.Sim?.movement;
+                        int maxStages     = mvParams?.backoff_max_stages ?? 2;
+                        int currentStage  = world.Pathfinding.GetMoveBackOffStage(npcId) + 1;
+                        long nowTickLong  = TickContext.CurrentTickIndex;
 
-                        ArcontioLogger.Trace(
-                            new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (x, y)),
-                            new LogBlock(LogLevel.Trace, "log.move.intent_cancelled_stuck")
-                                .AddField("targetX", intent.TargetX)
-                                .AddField("targetY", intent.TargetY)
-                                .AddField("effectiveTargetX", effectiveTargetX)
-                                .AddField("effectiveTargetY", effectiveTargetY)
-                                .AddField("usingMacroImmediate", usingMacroImmediate)
-                                .AddField("effectiveTargetHasDirectPath", effectiveTargetHasDirectPath)
-                                .AddField("reason", intent.Reason.ToString())
-                        );
+                        intent.BlockedTicks = 0;
+
+                        if (currentStage > maxStages)
+                        {
+                            // Stage esaurite: cancella l'intent (stesso comportamento precedente).
+                            intent.Active = false;
+                            world.NpcMoveIntents[npcId] = intent;
+                            world.ClearNpcLocalSearchState(npcId, "IntentCancelledStuck");
+                            world.ClearNpcDirectCommitState(npcId, "IntentCancelledStuck");
+                            world.SetNpcIdle(npcId);
+                            world.MarkMacroRouteExecutionBlocked(npcId, duringLastMile: macroLastMile);
+                            world.Pathfinding.ClearMoveBackOff(npcId);
+
+                            ArcontioLogger.Trace(
+                                new LogContext(tick: (int)nowTickLong, channel: "Move", npcId: npcId, cell: (x, y)),
+                                new LogBlock(LogLevel.Trace, "log.move.intent_cancelled_stuck")
+                                    .AddField("targetX", intent.TargetX)
+                                    .AddField("targetY", intent.TargetY)
+                                    .AddField("effectiveTargetX", effectiveTargetX)
+                                    .AddField("effectiveTargetY", effectiveTargetY)
+                                    .AddField("usingMacroImmediate", usingMacroImmediate)
+                                    .AddField("effectiveTargetHasDirectPath", effectiveTargetHasDirectPath)
+                                    .AddField("reason", intent.Reason.ToString())
+                                    .AddField("failureLadderStage", currentStage)
+                            );
+                        }
+                        else
+                        {
+                            // Entra in back-off: NPC pausa, poi al termine tenta replan.
+                            world.NpcMoveIntents[npcId] = intent;
+                            world.Pathfinding.BeginMoveBackOff(npcId, nowTickLong, currentStage, mvParams);
+                            world.ClearNpcLocalSearchState(npcId, "BackOff_Stage" + currentStage);
+                            world.ClearNpcDirectCommitState(npcId, "BackOff_Stage" + currentStage);
+                            world.MarkMacroRouteExecutionBlocked(npcId, duringLastMile: macroLastMile);
+                            world.SetNpcIdle(npcId);
+
+                            // Task 5 — Blacklist edge bloccato.
+                            // Penalizza il macro-edge che ha causato lo stallo così che
+                            // il prossimo A* su grafo tenda a evitarlo.
+                            if (usingMacroImmediate && macroNextNodeId != 0)
+                            {
+                                int fromNodeId = world.NpcLandmarkMemory.TryGetValue(npcId, out var lmMemBl)
+                                    ? lmMemBl.LastVisitedLandmarkId : 0;
+                                if (fromNodeId != 0)
+                                    world.BlacklistBlockedMacroEdge(npcId, fromNodeId, macroNextNodeId, currentStage);
+                            }
+
+                            ArcontioLogger.Trace(
+                                new LogContext(tick: (int)nowTickLong, channel: "Move", npcId: npcId, cell: (x, y)),
+                                new LogBlock(LogLevel.Trace, "log.move.backoff_started")
+                                    .AddField("targetX", intent.TargetX)
+                                    .AddField("targetY", intent.TargetY)
+                                    .AddField("stage", currentStage)
+                                    .AddField("reason", intent.Reason.ToString())
+                            );
+                        }
                     }
                     else
                     {

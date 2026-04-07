@@ -197,7 +197,13 @@ namespace Arcontio.Core
         /// - costCells e' preso dal registry oggettivo (bootstrap Day2).
         /// - anti-thrashing come per i nodi.
         /// </summary>
-        public void LearnEdge(int nodeA, int nodeB, int costCells, long nowTick, int evictionCooldownTicks)
+        /// <param name="initialConfidence">
+        /// Confidence iniziale per edge nuovi (default 0.25f per edge fisici).
+        /// Passare un valore inferiore (es. 0.15f) per edge soggettivi visivi
+        /// (v0.03.04.c-ComplexEdge_Creation). Per edge già esistenti viene sempre
+        /// applicato il rinforzo standard (+0.10f), indipendentemente da questo valore.
+        /// </param>
+        public void LearnEdge(int nodeA, int nodeB, int costCells, long nowTick, int evictionCooldownTicks, float initialConfidence = 0.25f)
         {
             if (nodeA == 0 || nodeB == 0) return;
             if (nodeA == nodeB) return;
@@ -221,7 +227,7 @@ namespace Arcontio.Core
                     Key = key,
                     CostCells = costCells,
                     LastSeenTick = nowTick,
-                    Confidence01 = 0.25f,
+                    Confidence01 = Mathf.Clamp01(initialConfidence),
                 };
             }
         }
@@ -229,6 +235,29 @@ namespace Arcontio.Core
         // ============================================================
         // EVICTION + CAPS (called by System)
         // ============================================================
+
+        /// <summary>
+        /// Penalizza un edge noto riducendo la sua confidence.
+        /// Usato dalla failure ladder (v0.03.05-FailureLadder) quando l'NPC
+        /// si blocca mentre percorre il tratto verso <paramref name="nodeB"/>.
+        ///
+        /// <para>
+        /// Se la confidence scende sotto la soglia minima di eviction
+        /// (gestita da TickMaintenance), l'edge verrà rimosso al prossimo ciclo.
+        /// Se l'edge non esiste, la chiamata è no-op.
+        /// </para>
+        /// </summary>
+        /// <param name="nodeA">Primo endpoint dell'edge.</param>
+        /// <param name="nodeB">Secondo endpoint dell'edge.</param>
+        /// <param name="penalty">Penalità da sottrarre alla confidence (0..1).</param>
+        public void PenalizeEdge(int nodeA, int nodeB, float penalty)
+        {
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB || penalty <= 0f) return;
+            var key = new EdgeKey(nodeA, nodeB);
+            if (!_edgesByKey.TryGetValue(key, out var e)) return;
+            e.Confidence01 = Mathf.Clamp01(e.Confidence01 - penalty);
+            _edgesByKey[key] = e;
+        }
 
         /// <summary>
         /// TickMaintenance:

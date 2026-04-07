@@ -35,7 +35,7 @@ namespace Arcontio.Core
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>GlobalState</b> — config runtime (vision range, token params, ecc.)</item>
-    ///   <item><b>Component stores NPC</b> — NpcCore, Needs, Social, GridPos, NpcFacing, ecc.</item>
+    ///   <item><b>Component stores NPC</b> — NpcDna, NpcProfiles, Needs, Social, GridPos, NpcFacing, ecc.</item>
     ///   <item><b>Component stores oggetti</b> — Objects, FoodStocks, ObjectUse, ecc.</item>
     ///   <item><b>Memoria NPC</b> — Memory, NpcObjectMemory, NpcLandmarkMemory</item>
     ///   <item><b>Cache derivate</b> — OcclusionMap, _objIdByCell, _blocksVision/Movement</item>
@@ -328,8 +328,17 @@ namespace Arcontio.Core
         //         0 è riservato come "nessun NPC" / valore invalido.
         // =====================================================================
 
-        /// <summary>Dati anagrafici e tratti di personalità dell'NPC (nome, carisma, ecc.).</summary>
-        public readonly Dictionary<int, NpcCore> NpcCore = new();
+        /// <summary>
+        /// DNA immutabile per-NPC: natura originale, seed, soglie, modulatori cognitivi.
+        /// Source of truth per l'esistenza di un NPC (sostituisce NpcCore rimosso in v0.04.05).
+        /// </summary>
+        public readonly Dictionary<int, NpcDnaProfile> NpcDna = new();
+
+        /// <summary>
+        /// Profilo runtime mutabile per-NPC: competenza, preferenza, obbligo correnti.
+        /// Inizializzato da NpcDna tramite NpcProfile.InitFromDna().
+        /// </summary>
+        public readonly Dictionary<int, NpcProfile> NpcProfiles = new();
 
         /// <summary>Bisogni primari dell'NPC: fame, fatica, morale.</summary>
         public readonly Dictionary<int, Needs> Needs = new();
@@ -1043,7 +1052,7 @@ namespace Arcontio.Core
                 return;
 
             // Se l'NPC non esiste, abort.
-            if (!NpcCore.ContainsKey(npcId))
+            if (!NpcDna.ContainsKey(npcId))
                 return;
 
             // Day3: impariamo SOLO se la cella di arrivo è un nodo landmark.
@@ -1100,6 +1109,145 @@ namespace Arcontio.Core
         }
 
 
+
+        /// <summary>
+        /// NotifyNpcSeenLandmark (v0.03.03.a — Landmark Perception):
+        /// apprendimento visivo — l'NPC ha visto un landmark nel FOV senza calpestarci sopra.
+        ///
+        /// Contratto: viene chiamato da LandmarkPerceptionSystem dopo Range + Cone + LOS.
+        ///
+        /// Differenze rispetto a NotifyNpcMovedForLandmarkLearning:
+        /// - impara il nodo E gli edge del registry adiacenti (vedi nota sotto)
+        /// - non aggiorna LastVisitedLandmarkId (riservato all'apprendimento fisico)
+        /// - non fa avanzare la macro-route (dipende dal movimento fisico)
+        ///
+        /// Nota sugli edge:
+        /// Vedere un landmark (porta, junction) include leggere la geometria circostante:
+        /// l'NPC percepisce visivamente quali corridoi/stanze la struttura connette.
+        /// Gli edge vengono appresi SOLO se esistono nel registry oggettivo
+        /// (stessa regola di NotifyNpcMovedForLandmarkLearning: nessun edge "fantasma").
+        /// Senza questo apprendimento, l'A* della macro-route non ha archi da attraversare
+        /// e il grafo soggettivo rimane disconnesso → fallback permanente a GOAL_LOCAL_SEARCH.
+        /// </summary>
+        public void NotifyNpcSeenLandmark(int npcId, int nodeId)
+        {
+            // Se il sistema landmarks è disabilitato, non impariamo nulla.
+            if (!Global.EnableLandmarkSystem)
+                return;
+
+            if (LandmarkRegistry == null)
+                return;
+
+            // Se l'NPC non esiste, abort.
+            if (!NpcDna.ContainsKey(npcId))
+                return;
+
+            long now = TickContext.CurrentTickIndex;
+            var mem = EnsureNpcLandmarkMemory(npcId);
+
+            // Impara il nodo (anti-thrashing gestito dentro NpcLandmarkMemory).
+            mem.LearnLandmark(nodeId, now, evictionCooldownTicks: Global.LandmarkEvictionCooldownTicks);
+
+            // Impara gli edge del registry adiacenti al nodo visto.
+            // Itera gli edge globali: gli edge sono pochi (adiacenza sparsa, cap maxEdgesPerLandmark),
+            // quindi O(E) è accettabile ogni tick per questo nodo.
+            var edges = LandmarkRegistry.Edges;
+            for (int i = 0; i < edges.Count; i++)
+            {
+                var e = edges[i];
+                if (e == null || !e.IsActive) continue;
+
+                int otherNodeId = 0;
+                if      (e.FromNodeId == nodeId) otherNodeId = e.ToNodeId;
+                else if (e.ToNodeId   == nodeId) otherNodeId = e.FromNodeId;
+                else continue;
+
+                // Apprendi l'edge solo se l'NPC conosce anche l'altro endpoint.
+                // Un NPC non può usare un corridoio di cui non sa dove porta.
+                if (!mem.ContainsLandmark(otherNodeId))
+                    continue;
+
+                mem.LearnEdge(nodeId, otherNodeId, e.CostCells, now,
+                    evictionCooldownTicks: Global.LandmarkEvictionCooldownTicks);
+            }
+        }
+
+        /// <summary>
+        /// NotifyNpcSeenLandmarkPair (v0.03.04.c-ComplexEdge_Creation):
+        /// crea un edge soggettivo tra due nodi landmark inferiti dalla percezione visiva.
+        ///
+        /// <para>
+        /// Chiamato da <c>LandmarkPerceptionSystem</c> con due meccanismi distinti:
+        /// </para>
+        /// <list type="number">
+        ///   <item>
+        ///     <b>Simultaneità visiva</b>: nodi A e B visibili nello stesso tick →
+        ///     costo = Manhattan(A, B).
+        ///   </item>
+        ///   <item>
+        ///     <b>Ibrido fisico+visivo</b>: recording fisico attivo da nodo A +
+        ///     nodo B visibile nel FOV → costo = StepCount + Manhattan(npc_pos, B).
+        ///   </item>
+        /// </list>
+        ///
+        /// <para>
+        /// L'edge viene appreso in <c>NpcLandmarkMemory</c> con la confidence visiva
+        /// (<paramref name="confidence"/>), inferiore a quella degli edge fisici (0.25f).
+        /// Se l'edge esiste già (es. percorso fisicamente), viene solo rinforzato (+0.10f)
+        /// senza abbassare la confidence già acquisita.
+        /// </para>
+        /// </summary>
+        /// <param name="npcId">NPC che inferisce l'edge.</param>
+        /// <param name="nodeA">Primo nodo dell'edge (non orientato).</param>
+        /// <param name="nodeB">Secondo nodo dell'edge (non orientato).</param>
+        /// <param name="costCells">Costo stimato in celle.</param>
+        /// <param name="confidence">Confidence iniziale (solo per edge nuovi).</param>
+        public void NotifyNpcSeenLandmarkPair(int npcId, int nodeA, int nodeB, int costCells, float confidence)
+        {
+            if (!Global.EnableLandmarkSystem) return;
+            if (LandmarkRegistry == null)     return;
+            if (!NpcDna.ContainsKey(npcId))  return;
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB) return;
+            if (costCells < 1) costCells = 1;
+
+            long now = TickContext.CurrentTickIndex;
+            var mem = EnsureNpcLandmarkMemory(npcId);
+
+            // Entrambi gli endpoint devono essere già noti all'NPC.
+            // Un NPC non può costruire un percorso verso un nodo di cui non sa l'esistenza.
+            if (!mem.ContainsLandmark(nodeA) || !mem.ContainsLandmark(nodeB))
+                return;
+
+            mem.LearnEdge(nodeA, nodeB, costCells, now,
+                evictionCooldownTicks: Global.LandmarkEvictionCooldownTicks,
+                initialConfidence: confidence);
+        }
+
+        /// <summary>
+        /// NotifyNpcSeenLandmarkPairComplex (v0.03.04.c — Meccanismo 2):
+        /// crea un <see cref="ComplexEdge"/> visivo in <see cref="NpcComplexEdgeMemories"/>
+        /// tra il nodo fisicamente calpestato (nodeA = ultimo da recording) e un nodo
+        /// visto nel FOV (nodeB). A differenza di <see cref="NotifyNpcSeenLandmarkPair"/>
+        /// (che crea edge semplici in NpcLandmarkMemory), questo percorso entra nel
+        /// layer giallo dell'overlay e verrà confermato o sostituito quando l'NPC
+        /// percorre fisicamente il tratto.
+        /// </summary>
+        public void NotifyNpcSeenLandmarkPairComplex(int npcId, int nodeA, int nodeB, int costCells, float confidence)
+        {
+            if (!Global.EnableLandmarkSystem) return;
+            if (LandmarkRegistry == null)     return;
+            if (!NpcDna.ContainsKey(npcId))  return;
+            if (nodeA == 0 || nodeB == 0 || nodeA == nodeB) return;
+            if (costCells < 1) costCells = 1;
+
+            // Entrambi i nodi devono essere già noti all'NPC (stessa regola di NotifyNpcSeenLandmarkPair).
+            if (!NpcLandmarkMemory.TryGetValue(npcId, out var lmMem)) return;
+            if (!lmMem.ContainsLandmark(nodeA) || !lmMem.ContainsLandmark(nodeB)) return;
+
+            long now = TickContext.CurrentTickIndex;
+            var complexMem = EnsureNpcComplexEdgeMemory(npcId);
+            complexMem.LearnVisualEdge(nodeA, nodeB, costCells, now, confidence);
+        }
 
         // ============================================================
         // DAY4 - MACRO ROUTE PLANNER (A*)
@@ -1472,6 +1620,47 @@ namespace Arcontio.Core
         }
 
         /// <summary>
+        /// BlacklistBlockedMacroEdge (v0.03.05-FailureLadder):
+        /// penalizza l'edge (fromNode → toNode) che si è rivelato bloccato durante
+        /// la navigazione, riducendo la sua confidence in entrambi gli store soggettivi.
+        ///
+        /// <para>
+        /// Effetto: al prossimo A*, questo edge riceverà una penalità maggiore
+        /// (<c>reliabilityPenalty = (1 − confidence) × 2</c>) oppure sarà evicto
+        /// dal TickMaintenance se la confidence scende sotto la soglia minima.
+        /// </para>
+        ///
+        /// <para>
+        /// Chiamato da MovementSystem quando l'NPC entra in BackOff su una macro-route.
+        /// Stage 1 → penalità lieve (<c>blacklist_penalty_stage1</c>).
+        /// Stage 2+ → penalità forte (<c>blacklist_penalty_stage2</c>).
+        /// </para>
+        /// </summary>
+        public void BlacklistBlockedMacroEdge(int npcId, int fromNodeId, int toNodeId, int stage)
+        {
+            if (fromNodeId == 0 || toNodeId == 0 || fromNodeId == toNodeId) return;
+            if (!NpcDna.ContainsKey(npcId)) return;
+
+            var mvParams = Config?.Sim?.movement;
+            float penalty = stage <= 1
+                ? (mvParams?.blacklist_penalty_stage1 ?? 0.12f)
+                : (mvParams?.blacklist_penalty_stage2 ?? 0.35f);
+
+            // Penalizza in NpcLandmarkMemory (edge semplici, usati dall'A*).
+            if (NpcLandmarkMemory.TryGetValue(npcId, out var lmMem) && lmMem != null)
+                lmMem.PenalizeEdge(fromNodeId, toNodeId, penalty);
+
+            // Penalizza in NpcComplexEdgeMemory (edge fisici/visivi).
+            if (NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem) && complexMem != null)
+            {
+                complexMem.PenalizeComplexEdge(fromNodeId, toNodeId, penalty);
+                // Stage 2+: marca come Risky per segnalare ai sistemi futuri.
+                if (stage >= 2)
+                    complexMem.SetEdgeFlag(fromNodeId, toNodeId, ComplexEdgeFlags.Risky);
+            }
+        }
+
+        /// <summary>
         /// Produce il report di debug della navigazione per un NPC (usato dalla card UI overlay).
         /// Aggrega lo stato da: MoveIntent, MacroRouteExecution, DirectCommit, GoalLocalSearch,
         /// debug path cells — tutti gestiti da <see cref="PathfindingState"/>.
@@ -1632,7 +1821,7 @@ namespace Arcontio.Core
             // - Day1: micro-test fittizio per validare overlay.
             // - Day2: registry oggettivo (World-side) che possiamo giÃ  contare/mostrare.
 
-            bool npcExists = NpcCore.ContainsKey(npcId);
+            bool npcExists = NpcDna.ContainsKey(npcId);
             if (!npcExists)
             {
                 report = default;
@@ -1696,6 +1885,7 @@ namespace Arcontio.Core
     System.Collections.Generic.List<LandmarkOverlayEdge> outLmPathEdges,
     System.Collections.Generic.List<LandmarkOverlayEdge> outDirectPathEdges,
     System.Collections.Generic.List<LandmarkOverlayEdge> outJumpPathEdges,
+    System.Collections.Generic.List<LandmarkOverlayEdge> outComplexEdges,
     out NpcMacroRouteDebugReport routeReport)
         {
             // ============================================================
@@ -1732,11 +1922,12 @@ namespace Arcontio.Core
             if (outLmPathEdges != null) outLmPathEdges.Clear();
             if (outDirectPathEdges != null) outDirectPathEdges.Clear();
             if (outJumpPathEdges != null) outJumpPathEdges.Clear();
+            if (outComplexEdges != null) outComplexEdges.Clear();
 
             if (!TryGetNpcMacroRouteDebugReport(npcId, out routeReport))
                 routeReport = default;
 
-            if (!NpcCore.ContainsKey(npcId))
+            if (!NpcDna.ContainsKey(npcId))
                 return;
 
             // Nota (v0.03.02.a): microTestDummyGraph rimosso — scaffolding Day1 non più necessario.
@@ -1763,7 +1954,70 @@ namespace Arcontio.Core
             // PATH RUNTIME CELLA-PER-CELLA
             // ============================================================
             FillDebugNavigationPathOverlayData(npcId, outLmPathEdges, outDirectPathEdges, outJumpPathEdges);
+
+            // ============================================================
+            // COMPLEX EDGES (v0.03.04.c-ComplexEdge_Creation)
+            // Edge soggettivi fisicamente percorsi dall'NPC, non nel registry globale.
+            // Visualizzati in giallo come percorso reale su griglia (scalini cardinali),
+            // non come linea retta tra i due endpoint.
+            // ============================================================
+            if (outComplexEdges != null && LandmarkRegistry != null
+                && NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem) && complexMem != null)
+            {
+                foreach (var kv in complexMem.Edges)
+                {
+                    var ce = kv.Value;
+                    if (!LandmarkRegistry.TryGetActiveNodeById(ce.Key.A, out var nA) || nA == null) continue;
+                    if (!LandmarkRegistry.TryGetActiveNodeById(ce.Key.B, out var nB) || nB == null) continue;
+
+                    if (ce.Segments == null || ce.Segments.Count == 0)
+                    {
+                        // Edge visivo (Meccanismo 2): percorso fisico non ancora noto.
+                        // Visualizzato come linea retta tra i due nodi (stima).
+                        outComplexEdges.Add(new LandmarkOverlayEdge(nA.CellX, nA.CellY, nB.CellX, nB.CellY, ce.Confidence));
+                        continue;
+                    }
+
+                    // Determina il nodo di partenza: prova da Key.A camminando i segmenti;
+                    // se l'endpoint finale è lontano da Key.B, il path fu registrato in senso
+                    // inverso (B→A) → parti da Key.B.
+                    int startX = nA.CellX, startY = nA.CellY;
+                    {
+                        int cx2 = startX, cy2 = startY;
+                        for (int s = 0; s < ce.Segments.Count; s++)
+                            ApplySegment(ce.Segments[s], ref cx2, ref cy2);
+                        int distToB = System.Math.Abs(cx2 - nB.CellX) + System.Math.Abs(cy2 - nB.CellY);
+                        if (distToB > 3) { startX = nB.CellX; startY = nB.CellY; }
+                    }
+
+                    // Emette un LandmarkOverlayEdge per ogni tratto cardinale.
+                    // cx/cy seguono il cursore cella per cella tra i waypoint di svolta.
+                    int cx = startX, cy = startY;
+                    for (int s = 0; s < ce.Segments.Count; s++)
+                    {
+                        int nx = cx, ny = cy;
+                        ApplySegment(ce.Segments[s], ref nx, ref ny);
+                        outComplexEdges.Add(new LandmarkOverlayEdge(cx, cy, nx, ny, ce.Confidence));
+                        cx = nx; cy = ny;
+                    }
+                }
+            }
         }
+
+        /// <summary>
+        /// Applica un PathSegment al cursore (cx, cy) modificandolo in-place.
+        /// </summary>
+        private static void ApplySegment(PathSegment seg, ref int cx, ref int cy)
+        {
+            switch (seg.Direction)
+            {
+                case CardinalDirection.North: cy += seg.Length; break;
+                case CardinalDirection.East:  cx += seg.Length; break;
+                case CardinalDirection.South: cy -= seg.Length; break;
+                case CardinalDirection.West:  cx -= seg.Length; break;
+            }
+        }
+
         /// <summary>
         /// Riempie gli edge di overlay cella-per-cella per i tre layer di navigazione.
         /// Delega a <see cref="PathfindingState.FillDebugNavigationPathOverlayData"/>.
@@ -2099,7 +2353,7 @@ namespace Arcontio.Core
         // NPC API
         // ============================================================
 
-        public bool ExistsNpc(int npcId) => npcId > 0 && NpcCore.ContainsKey(npcId);
+        public bool ExistsNpc(int npcId) => npcId > 0 && NpcDna.ContainsKey(npcId);
         public bool AreBonded(int aNpcId, int bNpcId)
         {
             // STUB (roadmap): quando introdurrai bond graph,
@@ -2107,29 +2361,32 @@ namespace Arcontio.Core
             return false;
         }
 
-        public int CreateNpc(NpcCore core, Needs needs, Social social, int x, int y)
+        public int CreateNpc(NpcDnaProfile dna, Needs needs, Social social, int x, int y)
         {
             int id = _nextNpcId++;
 
-            NpcCore[id] = core;
+            // DNA e profilo runtime
+            NpcDna[id]      = dna;
+            NpcProfiles[id] = NpcProfile.InitFromDna(dna);
+
             Needs[id] = needs;
             Social[id] = social;
             GridPos[id] = new GridPosition(x, y);
             NpcFacing[id] = CardinalDirection.North;
 
-            // Memory params
-            if (!MemoryParams.ContainsKey(id))
-                MemoryParams[id] = PersonalityMemoryParams.DefaultNpc();
+            // MemoryParams — inizializzati dal DNA (valori individuali, non default statici)
+            MemoryParams[id] = new PersonalityMemoryParams
+            {
+                MaxTraces           = 128,
+                TraumaSensitivity01 = dna.CognitiveModulators.TraumaSensitivity01,
+                Resilience01        = dna.CognitiveModulators.MemoryResilience01,
+                Rumination01        = dna.CognitiveModulators.Rumination01,
+                Gullibility01       = dna.CognitiveModulators.Gullibility01
+            };
 
-            // MemoryStore: NON ha costruttore con maxTraces.
-            // Imposti MaxTraces dopo la creazione.
+            // MemoryStore
             var store = new MemoryStore();
-
-            // PrioritÃ : se hai un config globale, usalo; altrimenti fallback su PersonalityMemoryParams.
-            int maxTraces = MemoryParams[id].MaxTraces;
-            if (Global.NpcObjectMemorySlots > 0) { /* non Ã¨ maxTraces: Ã¨ slots oggetti (altro). */ }
-
-            store.MaxTraces = maxTraces;
+            store.MaxTraces = MemoryParams[id].MaxTraces;
             Memory[id] = store;
 
             // Private food init (se non presente)

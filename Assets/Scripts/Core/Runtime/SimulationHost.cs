@@ -1,6 +1,7 @@
 // Assets/Scripts/Core/Runtime/SimulationHost.cs
 using Arcontio.Core.Diagnostics;
 using Arcontio.Core.Logging;
+using Arcontio.Core.Save;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Security.Cryptography;
@@ -38,6 +39,11 @@ namespace Arcontio.Core
             Day9_NeedsOwnership = 9,
             Day10_Move_Memory_Theft = 10,
             P0_02_Landmark_PathFinding = 11,
+            /// <summary>
+            /// Carica NPC da Resources/Arcontio/Scenarios/default_scenario.json.
+            /// Se il file non esiste, fa fallback a P0_02_Landmark_PathFinding.
+            /// </summary>
+            FromScenarioFile = 99,
         }
 
         // Log sintetico per tick (solo per questo scenario)
@@ -311,6 +317,17 @@ namespace Arcontio.Core
             // Deve stare DOPO il MovementSystem per poter processare le nuove conoscenze acquisite nello stesso tick.
             _scheduler.AddSystem(new NpcLandmarkMemorySystem());
 
+
+            // ******************************************************************************************************************************
+            // 5.1C) LANDMARK PERCEPTION (v0.03.03.a — Landmark Perception) - LandmarkPerceptionSystem
+            // ******************************************************************************************************************************
+            // Apprendimento visivo dei landmark tramite FOV degli NPC.
+            // Complementa il learning fisico (NotifyNpcMovedForLandmarkLearning).
+            // Deve stare DOPO NpcLandmarkMemorySystem (processa i nodi già manutenuti).
+            {
+                int lpPeriod = _world.Config?.Sim?.landmark_perception?.period ?? 3;
+                _scheduler.AddSystem(new LandmarkPerceptionSystem(lpPeriod));
+            }
 
             // ******************************************************************************************************************************
             // 5.2) SCAN IN IDLE - IdleScan
@@ -660,10 +677,10 @@ namespace Arcontio.Core
             if (_tickIndex % 20 == 0)
             {
                 var block = new LogBlock(LogLevel.Debug, "log.memorytest.traces")
-                    .AddField("npcCount", _world.NpcCore.Count)
+                    .AddField("npcCount", _world.NpcDna.Count)
                     .AddField("memoryStores", _world.Memory.Count);
 
-                foreach (var npcId in _world.NpcCore.Keys)
+                foreach (var npcId in _world.NpcDna.Keys)
                 {
                     int traces = _world.Memory.TryGetValue(npcId, out var mem) && mem != null ? mem.Traces.Count : 0;
                     block.AddField($"npc_{npcId}", traces);
@@ -710,7 +727,7 @@ namespace Arcontio.Core
                     new LogContext(tick: _tickIndex, channel: "Arcontio"),
                     new LogBlock(LogLevel.Debug, "log.arcontio.tick_summary")
                         .AddField("food", _world.FoodStocks.Count)
-                        .AddField("npc", _world.NpcCore.Count)
+                        .AddField("npc", _world.NpcDna.Count)
                 );
                 _telemetry.DumpToConsole();
             }
@@ -767,6 +784,10 @@ namespace Arcontio.Core
                     Seed_P0_02_Landmark_PathFinding();
                     break;
 
+                case DebugScenario.FromScenarioFile:
+                    Seed_FromScenarioFile();
+                    break;
+
                 default:
                     Seed_Day7();
                     break;
@@ -816,8 +837,7 @@ namespace Arcontio.Core
 
             int CreateNpcAt(int x, int y, string name)
             {
-                return _world.CreateNpc(
-                    new NpcCore { Name = name, Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+                return _world.CreateNpc(NpcDnaProfile.CreateDefault(name),
                     new Needs { Hunger01 = 0.1f, Fatigue01 = 0.1f, Morale01 = 0.7f },
                     new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
                     x, y
@@ -893,8 +913,7 @@ namespace Arcontio.Core
 
             int CreateNpcAt(int x, int y, string name)
             {
-                return _world.CreateNpc(
-                    new NpcCore { Name = name, Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+                return _world.CreateNpc(NpcDnaProfile.CreateDefault(name),
                     new Needs { Hunger01 = 0.1f, Fatigue01 = 0.1f, Morale01 = 0.7f },
                     new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
                     x, y
@@ -920,8 +939,7 @@ namespace Arcontio.Core
             _world.Global.RepeatShareCooldownTicks = 0;
 
             // 1 NPC che guarda a Est
-            int npc = _world.CreateNpc(
-                new NpcCore { Name = "NPC_T8", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC_T8"),
                 new Needs { Hunger01 = 0.1f, Fatigue01 = 0.1f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
                 0, 0
@@ -1104,24 +1122,21 @@ namespace Arcontio.Core
                                  .AddField("id", wall));
 
             // NPC1: basso rispetto legge (ruberà ?facile?)
-            int npc1 = _world.CreateNpc(
-                new NpcCore { Name = "NPC1", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC1"),
                 new Needs { Hunger01 = 0.85f, Fatigue01 = 0.85f, Morale01 = 0.7f, IsHungry = false },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
                 x: 20, y: 20
             );
 
             // NPC2: alto rispetto legge (non ruba; ha cibo privato)
-            int npc2 = _world.CreateNpc(
-                new NpcCore { Name = "NPC2", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC2"),
                 new Needs { Hunger01 = 0.80f, Fatigue01 = 0.40f, Morale01 = 0.7f, IsHungry = false },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
                 x: 20, y: 22
             );
 
             // NPC3: alto rispetto legge (non ruba; ha cibo privato)
-            int npc3 = _world.CreateNpc(
-                new NpcCore { Name = "NPC3", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC3"),
                 new Needs { Hunger01 = 0.80f, Fatigue01 = 0.40f, Morale01 = 0.7f, IsHungry = false },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
                 x: 28, y: 19
@@ -1235,36 +1250,31 @@ namespace Arcontio.Core
             _world.CreateObject(defId: "wall_stone", x: 16, y: 15);
 
             // 5 NPC: uno "low law" che tenderà a rubare, altri più legali.
-            int npc1 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC1_Thief", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC1_Thief"),
                 new Needs { Hunger01 = 0.90f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
                 x: 5, y: 5
             );
 
-            int npc2 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC2_Owner", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC2_Owner"),
                 new Needs { Hunger01 = 0.40f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
                 x: 18, y: 12
             );
 
-            int npc3 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC3_Witness", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC3_Witness"),
                 new Needs { Hunger01 = 0.30f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.70f },
                 x: 14, y: 12
             );
 
-            int npc4 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC4", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc4 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC4"),
                 new Needs { Hunger01 = 0.60f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
                 x: 22, y: 16
             );
 
-            int npc5 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC5", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc5 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC5"),
                 new Needs { Hunger01 = 0.55f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
                 x: 6, y: 16
@@ -1305,6 +1315,35 @@ namespace Arcontio.Core
                     .AddField("foodPrivateHidden ", foodPrivateHidden));*/
 
         }
+        // ============================================================
+        // SCENARIO DA FILE (v0.04.07.b)
+        // ============================================================
+        // Legge gli NPC da Resources/Arcontio/Scenarios/default_scenario.json.
+        // Se il file non esiste o è vuoto, fa fallback a Seed_P0_02_Landmark_PathFinding.
+        // Il file di scenario non contiene oggetti/muri: quelli restano hardcoded
+        // oppure verranno spostati in un formato separato in una sessione futura.
+        private void Seed_FromScenarioFile()
+        {
+            ArcontioLogger.Info(
+                new LogContext(tick: 0, channel: "ScenarioLoader"),
+                new LogBlock(LogLevel.Info, "log.seed.name")
+                    .AddField("seed", "Seed_FromScenarioFile")
+                    .AddField("path", "Resources/Arcontio/Scenarios/default_scenario")
+            );
+
+            bool loaded = NpcScenarioLoader.TryLoadDefaultAndSpawn(_world);
+
+            if (!loaded)
+            {
+                ArcontioLogger.Info(
+                    new LogContext(tick: 0, channel: "ScenarioLoader"),
+                    new LogBlock(LogLevel.Info, "log.scenario.fallback")
+                        .AddField("reason", "default_scenario.json non trovato — fallback a P0_02")
+                );
+                Seed_P0_02_Landmark_PathFinding();
+            }
+        }
+
         // ============================================================
         // 0.02 LANDMARK PATHFINDING SCENARIO
         // ============================================================
@@ -1364,36 +1403,31 @@ namespace Arcontio.Core
             _world.CreateObject(defId: "door_wood_good", x: 32, y: 24, ownerKind: OwnerKind.Community, ownerId: 0);
 
             // 5 NPC: uno "low law" che tenderà a rubare, altri più legali.
-            int npc1 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC1_Thief", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC1_Thief"),
                 new Needs { Hunger01 = 0.00f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
                 x: 15, y: 15
             );
             /*
-            int npc2 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC2_Owner", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC2_Owner"),
                 new Needs { Hunger01 = 0.40f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
                 x: 18, y: 12
             );
 
-            int npc3 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC3_Witness", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC3_Witness"),
                 new Needs { Hunger01 = 0.30f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.70f },
                 x: 14, y: 12
             );
 
-            int npc4 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC4", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc4 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC4"),
                 new Needs { Hunger01 = 0.60f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
                 x: 22, y: 16
             );
 
-            int npc5 = _world.CreateNpc(
-                new NpcCore { Name = "T10_NPC5", Charisma = 0.4f, Decisiveness = 0.4f, Empathy = 0.4f, Ambition = 0.4f },
+            int npc5 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC5"),
                 new Needs { Hunger01 = 0.55f, Fatigue01 = 0.20f, Morale01 = 0.7f },
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
                 x: 6, y: 16

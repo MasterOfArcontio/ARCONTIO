@@ -47,8 +47,10 @@ namespace Arcontio.Core
     ///   <item><b>Nodi:</b> landmark conosciuti dall'NPC (<c>NpcLandmarkMemory.KnownLandmarks</c>).
     ///   Subset soggettivo del <c>LandmarkRegistry</c> globale — l'NPC non può usare
     ///   un landmark che non ha mai visitato fisicamente.</item>
-    ///   <item><b>Edge:</b> connessioni conosciute dall'NPC (<c>NpcLandmarkMemory.KnownEdges</c>).
-    ///   Peso = CostCells + penalità reliability.</item>
+    ///   <item><b>Edge:</b> connessioni conosciute dall'NPC — due fonti combinate:
+    ///   <c>NpcLandmarkMemory.KnownEdges</c> (edge semplici dal registry) e
+    ///   <c>NpcComplexEdgeMemory</c> (edge percorsi fisicamente, non nel registry).
+    ///   Peso = CostCells/BaseCost + penalità reliability.</item>
     /// </list>
     ///
     /// <para><b>Patch:</b> 0.02.06.A</para>
@@ -301,6 +303,10 @@ namespace Arcontio.Core
             var neighborBuffer = new List<NpcLandmarkMemory.KnownNeighbor>(8);
             var closed         = new HashSet<int>();
 
+            // v0.03.04.b — ComplexEdge: edge percorsi fisicamente ma assenti nel registry.
+            // Recuperato una sola volta prima del loop per evitare lookup ripetuti.
+            world.NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem);
+
             while (open.Count > 0)
             {
                 // Estrai il nodo con f-score minimo dalla open list.
@@ -321,6 +327,12 @@ namespace Arcontio.Core
                 // Restituisce solo i vicini che l'NPC ha imparato tramite esperienza
                 // (movimento fisico), non tutti i vicini nel registry globale.
                 mem.FillKnownNeighbors(current, neighborBuffer);
+
+                // v0.03.04.b — ComplexEdge: appende i vicini degli edge fisicamente percorsi.
+                // Non svuota il buffer: i vicini ComplexEdge si accodano a quelli semplici.
+                // Se un nodo appare in entrambe le fonti, l'A* usa automaticamente il costo
+                // minore tramite il confronto tentativeG >= GetScore(gScore, nb.NodeId).
+                complexMem?.FillKnownComplexNeighbors(current, mem, neighborBuffer);
 
                 for (int i = 0; i < neighborBuffer.Count; i++)
                 {

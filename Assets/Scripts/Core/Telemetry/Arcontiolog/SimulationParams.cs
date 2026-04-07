@@ -63,6 +63,11 @@ namespace Arcontio.Core.Config
         // Flood Fill → Landmark per regione → ChokePoint → Pruning.
         // Quando use_hybrid_extractor=true sostituisce GVD-DIN come generatore LM.
         public HybridLandmarkParams hybrid_landmark = new HybridLandmarkParams();
+
+        // ---------------- Landmark Perception (v0.03.03.a — Landmark Perception) ----------------
+        // Apprendimento visivo dei landmark tramite FOV degli NPC.
+        // Complementare al learning fisico (NotifyNpcMovedForLandmarkLearning).
+        public LandmarkPerceptionParams landmark_perception = new LandmarkPerceptionParams();
     }
 
     // ============================================================
@@ -121,6 +126,34 @@ namespace Arcontio.Core.Config
         // percettivamente visibile (Range + FOV + LOS) al momento dell'innesco.
         // Se false, usa solo IsMovementBlocked per l'attraversabilità (legacy).
         public bool directCheckFovOnAcquisition = true;
+
+        // ── FAILURE LADDER: BACK-OFF / REPLAN (v0.03.05-FailureLadder) ──────
+        //
+        // Quando un NPC è bloccato per intentStuckTicksDefault tick consecutivi,
+        // invece di cancellare subito l'intent, entra in back-off e tenta un replan.
+        //
+        // Stage 1 (primo stuck): aspetta backoff_stage1_ticks, poi replan.
+        // Stage 2 (secondo stuck): aspetta backoff_stage2_ticks, poi replan.
+        // Stage > backoff_max_stages: cancella l'intent (comportamento precedente).
+        //
+        // Valori conservativi di default:
+        //   stage1 = 24 tick (~2 cicli IdleScan = NPC ha il tempo di ruotare e
+        //             aggiornare la percezione prima di ritentare)
+        //   stage2 = 60 tick (ostacolo dinamico: attesa più lunga)
+        //   max_stages = 2 (dopo 2 fallimenti: rinuncia)
+        public int backoff_stage1_ticks = 24;
+        public int backoff_stage2_ticks = 60;
+        public int backoff_max_stages   = 2;
+
+        // ── BLACKLIST EDGE (v0.03.05-FailureLadder) ──────────────────────────
+        // Quando l'NPC entra in back-off mentre percorre un edge della macro-route,
+        // la confidence di quell'edge viene ridotta per penalizzarlo nel prossimo A*.
+        // Stage 1 (primo stuck): penalità lieve — l'edge potrebbe essere temporaneamente
+        //   bloccato (altro NPC in transito, ostacolo dinamico).
+        // Stage 2+ (secondo stuck): penalità forte — l'edge è probabilmente inutilizzabile.
+        // La penalità viene applicata sia in NpcLandmarkMemory che in NpcComplexEdgeMemory.
+        public float blacklist_penalty_stage1 = 0.12f;
+        public float blacklist_penalty_stage2 = 0.35f;
     }
 
 
@@ -374,6 +407,41 @@ namespace Arcontio.Core.Config
         // Valore 1 = bilanciamento quasi perfetto richiesto.
         // Alzare → più candidati (stanze asimmetriche incluse).
         public int median_tolerance = 1;
+    }
+
+    // ============================================================
+    // LANDMARK PERCEPTION (v0.03.03.a — Landmark Perception)
+    // ============================================================
+    [Serializable]
+    public sealed class LandmarkPerceptionParams
+    {
+        // Se true, gli NPC imparano i landmark che vedono nel FOV (oltre che calpestando).
+        public bool enabled = true;
+
+        // Frequenza di scansione in tick (1 = ogni tick, N = ogni N tick).
+        // ATTENZIONE: scegliere valori coprimi con il periodo di IdleScanSystem (12)
+        // per evitare che alcune direzioni vengano sistematicamente saltate.
+        // Default 1: gira ogni tick, costo minimo (landmark statici, solo Range+LOS).
+        public int period = 1;
+
+        // ── Edge soggettivi da percezione visiva (v0.03.04.c-ComplexEdge_Creation) ──────────
+        //
+        // Meccanismo 1 — Simultaneità visiva:
+        //   due landmark visibili nello stesso tick → edge soggettivo diretto.
+        //
+        // Meccanismo 2 — Ibrido fisico+visivo:
+        //   recording fisico attivo da nodo A + nodo B visibile nel FOV → edge provvisorio A→B.
+        //   Costo = StepCount fisici da A + Manhattan(npc_pos, B).
+
+        // Se true, abilita la creazione di edge soggettivi da percezione visiva.
+        public bool subjective_edges_enabled = true;
+
+        // Distanza Manhattan massima (in celle) tra due landmark per creare un edge visivo (Meccanismo 1).
+        public int subjective_edge_max_dist = 8;
+
+        // Confidence iniziale degli edge soggettivi visivi (Meccanismo 1 e 2).
+        // Inferiore agli edge fisici (0.25f) per riflettere l'incertezza della stima visiva.
+        public float subjective_edge_base_reliability = 0.15f;
     }
 
     // ============================================================

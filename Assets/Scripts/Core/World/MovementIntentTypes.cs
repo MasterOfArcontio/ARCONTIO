@@ -1,3 +1,5 @@
+using System;
+
 namespace Arcontio.Core
 {
     // =============================================================================
@@ -67,6 +69,41 @@ namespace Arcontio.Core
         Wander = 3,
         SeekTalkTarget = 4,
         DebugClick = 5
+    }
+
+    // =========================================================================
+    // NpcMoveBackOffState — v0.03.05-FailureLadder
+    // =========================================================================
+    /// <summary>
+    /// Stato del back-off per la failure ladder del movimento.
+    ///
+    /// <para>
+    /// Quando un NPC rimane bloccato per <c>intentStuckTicksDefault</c> tick
+    /// consecutivi, invece di cancellare immediatamente l'intent, entra in
+    /// back-off: pausa il movimento per un periodo configurabile, poi tenta
+    /// un replan della navigazione (<c>InitializeNavigation</c> con <c>IsNew=true</c>).
+    /// </para>
+    ///
+    /// <para><b>Stage:</b> conta i fallimenti consecutivi per lo stesso intent.
+    /// Stage 1 = primo stuck, Stage 2 = secondo stuck, ecc.
+    /// Dopo <c>backoff_max_stages</c> stage, l'intent viene cancellato.</para>
+    /// </summary>
+    [Serializable]
+    public sealed class NpcMoveBackOffState
+    {
+        /// <summary>True se l'NPC è attualmente in back-off.</summary>
+        public bool Active;
+
+        /// <summary>
+        /// Tick a cui il back-off scade e si tenta il replan.
+        /// </summary>
+        public long ResumeAtTick;
+
+        /// <summary>
+        /// Stage corrente (quanti back-off consecutivi per questo intent).
+        /// 1-based: Stage 1 = primo fallimento, Stage 2 = secondo, ecc.
+        /// </summary>
+        public int Stage;
     }
 
     /// <summary>
