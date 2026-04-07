@@ -16,7 +16,7 @@
           "endurance01": 0.5,
           "agility01": 0.5,
           "baseIntelligence01": 0.5,
-          "competenceCap": [ 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ]
+          "competenceCap": [ 0.0, 0.7, 1.0, 0.34, 1.0, 0.42, 1.0, 0.78, 1.0 ]
         },
         "preferenceSeeds": [ 0.0, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5 ],
         "dispositions": {
