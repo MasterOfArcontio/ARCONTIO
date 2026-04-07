@@ -345,10 +345,10 @@ namespace Arcontio.View.MapGrid
             rowGo.transform.SetParent(parent, false);
 
             var hl = rowGo.AddComponent<HorizontalLayoutGroup>();
-            // childControlHeight=false: non sovrascrivere le preferredHeight dei figli
-            // (era true → causava barre alternate più lunghe)
-            hl.childControlHeight  = false;
-            hl.childControlWidth   = false;
+            // childControlHeight/Width=true: HLG assegna esattamente preferredHeight/Width ai figli
+            // childForceExpand=false: i figli NON si allargano per riempire lo spazio extra
+            hl.childControlHeight     = true;
+            hl.childControlWidth      = true;
             hl.childForceExpandHeight = false;
             hl.childForceExpandWidth  = false;
             hl.spacing = 4;
