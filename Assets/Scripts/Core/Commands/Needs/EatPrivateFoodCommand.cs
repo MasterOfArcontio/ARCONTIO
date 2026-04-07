@@ -45,16 +45,15 @@ namespace Arcontio.Core
             
             // 2) Mutazione hunger
             var cfg = world.Global.Needs;
-            needs.Hunger01 -= cfg.eatSatietyGain;
-            if (needs.Hunger01 < 0f) needs.Hunger01 = 0f;
+            needs.AddValue(NeedKind.Hunger, -cfg.eatSatietyGain);
 
             world.Needs[_npcId] = needs;
-             
+
             ArcontioLogger.Debug(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T9", npcId: _npcId),
                 new LogBlock(LogLevel.Debug, "log.t9.eat.private")
                     .AddField("privLeft", world.NpcPrivateFood[_npcId])
-                    .AddField("hungerNow", needs.Hunger01.ToString("0.00"))
+                    .AddField("hungerNow", needs.GetValue(NeedKind.Hunger).ToString("0.00"))
             );
         }
     }

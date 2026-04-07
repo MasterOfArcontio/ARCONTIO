@@ -67,21 +67,20 @@ namespace Arcontio.Core
             use.UsingNpcId = _npcId;
             world.SetUseState(_bedObjId, use);
 
-            // 3) Recupero rest (riduce fatigue)
+            // 3) Recupero rest
             var cfg = world.Global.Needs;
-            needs.Fatigue01 -= cfg.sleepRestGainPerTick;
-            if (needs.Fatigue01 < 0f) needs.Fatigue01 = 0f;
+            needs.AddValue(NeedKind.Rest, -cfg.sleepRestGainPerTick);
 
             world.Needs[_npcId] = needs;
 
             string tag = string.IsNullOrEmpty(_reasonTag) ? "" : $"({_reasonTag}) ";
-             
+
             ArcontioLogger.Debug(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T9", npcId: _npcId),
                 new LogBlock(LogLevel.Debug, "log.t9.sleep")
                     .AddField("tag", tag)
                     .AddField("bedObj", _bedObjId)
-                    .AddField("fatigueNow", needs.Fatigue01.ToString("0.00"))
+                    .AddField("restNow", needs.GetValue(NeedKind.Rest).ToString("0.00"))
             );
         }
     }

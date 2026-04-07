@@ -58,14 +58,7 @@ namespace Arcontio.Core.Commands.DevTools
             var dna = NpcDnaProfile.CreateDefault($"DEV_NPC({_x},{_y})");
 
             // Needs "safe": nessuna emergenza iniziale.
-            var needs = new Needs
-            {
-                Hunger01 = 0.0f,
-                Fatigue01 = 0.0f,
-                Morale01 = 0.5f,
-                IsHungry = false,
-                IsTired = false,
-            };
+            var needs = NpcNeeds.Default();
 
             var social = new Social
             {

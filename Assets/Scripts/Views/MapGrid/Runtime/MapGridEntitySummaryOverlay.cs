@@ -637,8 +637,8 @@ namespace Arcontio.View.MapGrid
                     .Append("   NavMode = ").Append(navModeHeader)
                     .Append("   Exec = ").Append(execPhaseHeader)
                     .Append('\n')
-                    .Append("Needs: hunger=").Append(needs.Hunger01.ToString("0.00"))
-                    .Append("   tired=").Append(needs.Fatigue01.ToString("0.00"));
+                    .Append("Needs: hunger=").Append(needs.GetValue(NeedKind.Hunger).ToString("0.00"))
+                    .Append("   rest=").Append(needs.GetValue(NeedKind.Rest).ToString("0.00"));
 
                 // ============================================================
                 // LANDMARK DEBUG REPORT (v0.02.03 / Day3)
@@ -860,11 +860,18 @@ namespace Arcontio.View.MapGrid
                 int rememberedCommunityFoodDbg = 0;
                 ComputeFoodTargetDebug(world, npcId, out visibleCommunityFoodDbg, out rememberedCommunityFoodDbg);
 
-                var sb = new StringBuilder(256);
-                sb.AppendLine("[NEEDS]")
-                  .AppendLine($"Hunger01 = {needs.Hunger01:0.00}")
-                  .AppendLine($"Fatigue01 = {needs.Fatigue01:0.00}")
-                  .AppendLine()
+                var sb = new StringBuilder(512);
+                sb.AppendLine("[NEEDS]");
+                for (int ki = 0; ki < (int)NeedKind.COUNT; ki++)
+                {
+                    var kind  = (NeedKind)ki;
+                    float val = needs.GetValue(kind);
+                    string flag = needs.IsCritical(kind) ? " [CRITICAL]"
+                                : needs.IsAlert(kind)    ? " [alert]"
+                                : string.Empty;
+                    sb.AppendFormat("{0,-10}{1:0.00}{2}\n", kind, val, flag);
+                }
+                sb.AppendLine()
                   .AppendLine("[INVENTORY]")
                   .AppendLine($"PrivateFood (carried) = {carriedFood}")
                   .AppendLine($"PrivateFood (owned in world) = {ownedStockUnits}  (piles={ownedStockPiles})")

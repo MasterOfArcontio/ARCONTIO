@@ -837,8 +837,11 @@ namespace Arcontio.Core
 
             int CreateNpcAt(int x, int y, string name)
             {
+                var _n = NpcNeeds.Default();
+                _n.SetValue(NeedKind.Hunger, 0.1f);
+                _n.SetValue(NeedKind.Rest,   0.1f);
                 return _world.CreateNpc(NpcDnaProfile.CreateDefault(name),
-                    new Needs { Hunger01 = 0.1f, Fatigue01 = 0.1f, Morale01 = 0.7f },
+                    _n,
                     new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
                     x, y
                 );
@@ -913,8 +916,11 @@ namespace Arcontio.Core
 
             int CreateNpcAt(int x, int y, string name)
             {
+                var _n = NpcNeeds.Default();
+                _n.SetValue(NeedKind.Hunger, 0.1f);
+                _n.SetValue(NeedKind.Rest,   0.1f);
                 return _world.CreateNpc(NpcDnaProfile.CreateDefault(name),
-                    new Needs { Hunger01 = 0.1f, Fatigue01 = 0.1f, Morale01 = 0.7f },
+                    _n,
                     new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
                     x, y
                 );
@@ -1195,8 +1201,8 @@ namespace Arcontio.Core
                     .AddField("id", npc1)
                     .AddField("pos", "(0,0)")
                     .AddField("law", _world.Social[npc1].JusticePerception01.ToString("0.00"))
-                    .AddField("hunger", _world.Needs[npc1].Hunger01.ToString("0.00"))
-                    .AddField("fatigue", _world.Needs[npc1].Fatigue01.ToString("0.00"))
+                    .AddField("hunger", _world.Needs[npc1].GetValue(NeedKind.Hunger).ToString("0.00"))
+                    .AddField("rest",   _world.Needs[npc1].GetValue(NeedKind.Rest).ToString("0.00"))
             );
 
             ArcontioLogger.Info(new LogContext(0, "T9"),
@@ -1205,7 +1211,7 @@ namespace Arcontio.Core
                     .AddField("pos", "(0,2)")
                     .AddField("law", _world.Social[npc2].JusticePerception01.ToString("0.00"))
                     .AddField("privateFood", _world.NpcPrivateFood[npc2])
-                    .AddField("hunger", _world.Needs[npc2].Hunger01.ToString("0.00"))
+                    .AddField("hunger", _world.Needs[npc2].GetValue(NeedKind.Hunger).ToString("0.00"))
             );
 
             ArcontioLogger.Info(new LogContext(0, "T9"),
