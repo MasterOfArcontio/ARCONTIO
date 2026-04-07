@@ -43,8 +43,6 @@ namespace Arcontio.View.MapGrid
         private const float AxisBlockH      = AxisTitleH + DomainsCount * RowH + TotalRowH + 6f;
         private const float PanelH          = PaddingY * 2 + HeaderH + 8f + AxisBlockH * 3 + 12f;
 
-        // Offset verticale rispetto al tooltip uGUI (560×300 px, poi un po' di gap)
-        private const float TooltipH        = 300f;
         private const float GapBelowTooltip = 4f;
 
         // ── Stato visibilità ──────────────────────────────────────────────────
@@ -112,10 +110,18 @@ namespace Arcontio.View.MapGrid
             EnsureStyles();
 
             // Posizionamento: sotto il tooltip uGUI.
-            // Il tooltip è ancorato in alto a sinistra a _anchorScreen (screen coords).
-            // In IMGUI y=0 è in alto, come in screen coords standard.
+            //
+            // Sistemi di coordinate:
+            //   _anchorScreen = PointerScreenPos da InputSystem → y=0 in BASSO (screen space)
+            //   IMGUI GUI.DrawTexture/Label         → y=0 in ALTO  (GUI space)
+            //
+            // Il tooltip uGUI ha pivot=(0,0) e anchoredPosition=pointerPos:
+            //   → il suo bordo INFERIORE è al cursore in screen space
+            //   → in GUI space corrisponde a:  Screen.height - _anchorScreen.y
+            //
+            // Il pannello DRIFT parte appena sotto quel bordo (+ gap).
             float panelX = _anchorScreen.x;
-            float panelY = _anchorScreen.y + TooltipH + GapBelowTooltip;
+            float panelY = Screen.height - _anchorScreen.y + GapBelowTooltip;
 
             // Clamp per restare nel viewport
             panelX = Mathf.Clamp(panelX, 0f, Screen.width  - PanelW);
