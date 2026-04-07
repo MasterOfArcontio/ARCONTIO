@@ -71,11 +71,6 @@ namespace Arcontio.View.MapGrid
         private SectionView _dnaDriftSection;
 
         // ── DNA DRIFT bars ────────────────────────────────────────────────────
-        // Righe summary (totale + 3 assi) e righe per-dominio (8 × 3 assi).
-        private BarRow   _driftTotal;
-        private BarRow   _driftPref;
-        private BarRow   _driftComp;
-        private BarRow   _driftObl;
         // [axisIndex 0=Pref 1=Comp 2=Obl][domainIndex 0..7]
         private BarRow[][] _driftDomainRows;
 
@@ -242,15 +237,9 @@ namespace Arcontio.View.MapGrid
         /// </summary>
         public void UpdateDnaDrift(NpcDnaProfile dna, NpcProfile profile, DnaDistanceResult result)
         {
-            if (_driftTotal == null) return; // non ancora costruito
-
-            _driftTotal.Set("Totale", result.Total);
-            _driftPref.Set("Pref",   result.PreferenceDistance);
-            _driftComp.Set("Comp",   result.CompetenceDistance);
-            _driftObl.Set("Obl",    result.ObligationDistance);
+            if (_driftDomainRows == null) return; // non ancora costruito
 
             float[] prefSeeds = dna.Preferences.Seeds;
-            float[] compCaps  = dna.Capacities.CompetenceCap;
             float[] oblSeeds  = dna.ObligationFrame.Seeds;
 
             for (int d = 1; d < (int)DomainKind.COUNT; d++)
@@ -261,9 +250,9 @@ namespace Arcontio.View.MapGrid
                 float currPref = profile.Preference.Values[d];
                 _driftDomainRows[0][di].Set(DomainLabels[di], Mathf.Abs(currPref - dnaPref));
 
-                float dnaCap   = compCaps != null && d < compCaps.Length ? compCaps[d] : 1f;
+                // Competenza: scostamento = quanto ha sviluppato dal punto di partenza (0)
                 float currComp = profile.Competence.Values[d];
-                _driftDomainRows[1][di].Set(DomainLabels[di], Mathf.Abs(dnaCap - currComp));
+                _driftDomainRows[1][di].Set(DomainLabels[di], currComp);
 
                 float dnaObl  = oblSeeds != null && d < oblSeeds.Length ? oblSeeds[d] : 0f;
                 float currObl = profile.Obligation.Values[d];
@@ -305,20 +294,19 @@ namespace Arcontio.View.MapGrid
 
         /// <summary>
         /// Inner class che rappresenta una riga con barra proporzionale.
+        /// Usa Image.Type.Filled per evitare conflitti col layout group.
         /// </summary>
         private sealed class BarRow
         {
-            public Text          LabelText;
-            public RectTransform BarFillRt;
-            public Image         BarFill;
-            public Text          ValueText;
+            public Text  LabelText;
+            public Image BarFill;   // Image.Type.Filled — fillAmount controlla la proporzione
+            public Text  ValueText;
 
             public void Set(string label, float value01)
             {
                 float v = Mathf.Clamp01(value01);
                 LabelText.text = label;
-                // Sposta il bordo destro della fill: offsetMax.x = larghezza bar
-                BarFillRt.offsetMax = new Vector2(BarMaxWidth * v, 0f);
+                BarFill.fillAmount = v;
                 BarFill.color = BarColor(v);
                 ValueText.text = v.ToString("0.00");
             }
@@ -339,17 +327,10 @@ namespace Arcontio.View.MapGrid
 
             var parent = section.BodyGo.transform;
 
-            // ── Righe summary ─────────────────────────────────────────────────
-            _driftTotal = MakeBarRow(parent, "Totale");
-            _driftPref  = MakeBarRow(parent, "Pref");
-            _driftComp  = MakeBarRow(parent, "Comp");
-            _driftObl   = MakeBarRow(parent, "Obl");
-
             // ── Righe per-dominio (3 assi × 8 domini) ────────────────────────
             _driftDomainRows = new BarRow[3][];
             for (int axis = 0; axis < 3; axis++)
             {
-                // Intestazione asse
                 MakeAxisLabel(parent, AxisLabels[axis]);
 
                 _driftDomainRows[axis] = new BarRow[8];
@@ -364,7 +345,9 @@ namespace Arcontio.View.MapGrid
             rowGo.transform.SetParent(parent, false);
 
             var hl = rowGo.AddComponent<HorizontalLayoutGroup>();
-            hl.childControlHeight  = true;
+            // childControlHeight=false: non sovrascrivere le preferredHeight dei figli
+            // (era true → causava barre alternate più lunghe)
+            hl.childControlHeight  = false;
             hl.childControlWidth   = false;
             hl.childForceExpandHeight = false;
             hl.childForceExpandWidth  = false;
@@ -386,7 +369,7 @@ namespace Arcontio.View.MapGrid
             labelLe.preferredWidth  = LabelWidth;
             labelLe.preferredHeight = RowHeight;
 
-            // Barra sfondo (container)
+            // Barra sfondo (nero) — contiene la fill via Image.Type.Filled
             var barBgGo = new GameObject("BarBg");
             barBgGo.transform.SetParent(rowGo.transform, false);
             var barBgImg = barBgGo.AddComponent<Image>();
@@ -396,18 +379,21 @@ namespace Arcontio.View.MapGrid
             barBgLe.preferredWidth  = BarMaxWidth;
             barBgLe.preferredHeight = BarHeight;
 
-            // Barra fill (figlia, ancorata a sinistra)
+            // Barra fill — Image.Type.Filled copre l'intero sfondo
+            // fillAmount=[0..1] controlla quanta parte colorata è visibile
             var barFillGo = new GameObject("BarFill");
             barFillGo.transform.SetParent(barBgGo.transform, false);
             var barFillImg = barFillGo.AddComponent<Image>();
             barFillImg.raycastTarget = false;
+            barFillImg.type        = Image.Type.Filled;
+            barFillImg.fillMethod  = Image.FillMethod.Horizontal;
+            barFillImg.fillOrigin  = (int)Image.OriginHorizontal.Left;
+            barFillImg.fillAmount  = 0f;
             var barFillRt = barFillGo.GetComponent<RectTransform>();
-            // Ancoraggio: bordo sinistro del parent, altezza 80%
-            barFillRt.anchorMin = new Vector2(0f, 0.10f);
-            barFillRt.anchorMax = new Vector2(0f, 0.90f);
-            barFillRt.pivot     = new Vector2(0f, 0.5f);
+            barFillRt.anchorMin = Vector2.zero;
+            barFillRt.anchorMax = Vector2.one;
             barFillRt.offsetMin = Vector2.zero;
-            barFillRt.offsetMax = Vector2.zero; // larghezza iniziale = 0
+            barFillRt.offsetMax = Vector2.zero;
 
             // Valore numerico
             var valueGo = new GameObject("Value");
@@ -426,7 +412,6 @@ namespace Arcontio.View.MapGrid
             return new BarRow
             {
                 LabelText = labelTxt,
-                BarFillRt = barFillRt,
                 BarFill   = barFillImg,
                 ValueText = valueTxt
             };
