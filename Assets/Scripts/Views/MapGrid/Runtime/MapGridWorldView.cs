@@ -96,12 +96,6 @@ namespace Arcontio.View.MapGrid
         private Sprite _defaultNpcSprite;
         private MapGridPointerInputActionsProvider _pointerProvider;
 
-        // ---------------- Tooltip system (view-only) ----------------
-        private MapGridNpcHoverTooltipSystem _hoverTooltip;
-
-        // ---------------- Debug overlay: DNA DRIFT (v0.04.06) ----------------
-        private MapGridDnaDriftOverlay _dnaDriftOverlay;
-
         // ---------------- Always-on overlay: pointer cell coords (Patch 0.01P2) ----------------
         private MapGridPointerCoordsOverlay _pointerCoords;
 
@@ -195,12 +189,6 @@ namespace Arcontio.View.MapGrid
             _defaultNpcSprite = LoadSpriteCached(npcPath);
             if (_defaultNpcSprite == null)
                 Debug.LogWarning($"[MapGrid] Default NPC sprite not found at Resources/{npcPath}.png");
-
-            // Tooltip/hover system: lo inizializziamo qui così resta totalmente “View-only”.
-            _hoverTooltip = new MapGridNpcHoverTooltipSystem();
-
-            // DNA DRIFT overlay: MonoBehaviour separato, aggiunto come componente allo stesso GameObject.
-            _dnaDriftOverlay = gameObject.AddComponent<MapGridDnaDriftOverlay>();
 
             // Patch 0.01P2:
             // indicatore costante in alto a sinistra con le coordinate della cella sotto il mouse.
@@ -521,48 +509,14 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             if (_summaryOverlayEnabled)
             {
-                // Card avanzata ON, tooltip sempre nascosto.
-                _hoverTooltip.Hide();
-
                 if (cam != null && _summaryOverlay != null)
                     _summaryOverlay.Tick(_world, cam, cfg.tileSizeWorld);
             }
             else
             {
-                // Overlay OFF + tooltip ON (comportamento legacy con F9).
                 if (_summaryOverlay != null)
                     _summaryOverlay.SetEnabled(false);
-
-                if (cam == null || _pointerProvider == null || !_pointerProvider.TryGetPointerScreenPosition(out var p))
-                {
-                    // Fail-safe: nessun tooltip se manca input o camera
-                }
-                else
-                {
-                    _hoverTooltip.Tick(_world, cam, p, cfg.tileSizeWorld);
-
-                    // DNA DRIFT overlay: mostrato solo quando un NPC è hovered e ha profilo
-                    TickDnaDriftOverlay();
-                }
             }
-        }
-
-        private void TickDnaDriftOverlay()
-        {
-            if (_dnaDriftOverlay == null || _world == null) return;
-
-            int npcId = _hoverTooltip.HoveredNpcId;
-            if (npcId < 0
-                || !_world.NpcDna.TryGetValue(npcId, out var dna)
-                || !_world.NpcProfiles.TryGetValue(npcId, out var profile))
-            {
-                _dnaDriftOverlay.Hide();
-                return;
-            }
-
-            // Il tooltip uGUI è ancorato allo stesso screenPos del puntatore.
-            // Lo passiamo come ancora superiore-sinistra del pannello DRIFT.
-            _dnaDriftOverlay.Show(dna, profile, _hoverTooltip.PointerScreenPos);
         }
 
         private void ToggleSummaryOverlay()
@@ -571,15 +525,6 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             if (_summaryOverlay != null)
                 _summaryOverlay.SetEnabled(_summaryOverlayEnabled);
-
-            // Nota:
-            // - quando abilito, forzo Hide del tooltip per evitare “ghost” UI.
-            // - quando disabilito, il tooltip riparte al prossimo Tick (Update).
-            if (_summaryOverlayEnabled)
-            {
-                _hoverTooltip.Hide();
-                _dnaDriftOverlay?.Hide();
-            }
         }
 
         /// <summary>

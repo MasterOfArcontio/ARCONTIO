@@ -54,6 +54,7 @@ namespace Arcontio.View.MapGrid
         private const string KeyLandmarks = "Landmarks";
         private const string KeyMemoryTraces = "MemoryTraces";
         private const string KeyKnownObjects = "KnownObjects";
+        private const string KeyDnaDrift = "DnaDrift";
 
         // ============================================================
         // SECTION STATE
@@ -66,6 +67,7 @@ namespace Arcontio.View.MapGrid
         private SectionView _landmarksSection;
         private SectionView _memSection;
         private SectionView _objMemSection;
+        private SectionView _dnaDriftSection;
 
         /// <summary>
         /// Stato collapse "globale" per sezione.
@@ -153,6 +155,10 @@ namespace Arcontio.View.MapGrid
             _objMemSection = BuildSection(_root.transform, KeyKnownObjects, "Perception / Knowledge", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _objMemSection.RootImage.color = new Color(0.05f, 0.25f, 0.45f, 0.72f);
 
+            // DNA DRIFT (v0.04.06 → v0.04.07.b)
+            _dnaDriftSection = BuildSection(_root.transform, KeyDnaDrift, "DNA DRIFT", DefaultBodyFont, FontStyle.Normal, collapsible: true);
+            _dnaDriftSection.RootImage.color = new Color(0.30f, 0.10f, 0.15f, 0.78f);
+
             SetVisible(false);
         }
 
@@ -211,6 +217,16 @@ namespace Arcontio.View.MapGrid
         {
             if (_landmarksSection?.BodyText != null)
                 _landmarksSection.BodyText.text = text ?? string.Empty;
+        }
+
+        /// <summary>
+        /// Sezione DNA DRIFT (v0.04.06 → v0.04.07.b):
+        /// distanza DNA↔NpcProfile per asse e per dominio.
+        /// </summary>
+        public void SetDnaDriftText(string text)
+        {
+            if (_dnaDriftSection?.BodyText != null)
+                _dnaDriftSection.BodyText.text = text ?? string.Empty;
         }
 
         /// <summary>Mostra/nasconde (senza distruggere).</summary>

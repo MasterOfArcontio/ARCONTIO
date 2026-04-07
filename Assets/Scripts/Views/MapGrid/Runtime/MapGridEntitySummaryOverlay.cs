@@ -185,6 +185,7 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbObjMem = new(1024);
         private readonly StringBuilder _sbComms = new(1024);
         private readonly StringBuilder _sbLandmarks = new(256);
+        private readonly StringBuilder _sbDrift = new(512);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
 
@@ -1085,9 +1086,63 @@ namespace Arcontio.View.MapGrid
                 card.SetInventoryText(invText);
                 card.SetCommsText(_sbComms.ToString());
 
-                // Patch 0.02.03:
-                // nuova sezione nella card per i contatori landmark/edge conosciuti.
+                // Patch 0.02.03: landmark/edge conosciuti.
                 card.SetLandmarksText(_sbLandmarks.ToString());
+
+                // DNA DRIFT (v0.04.07.b)
+                if (world.NpcProfiles.TryGetValue(npcId, out var profile))
+                {
+                    BuildDnaDriftText(_sbDrift, dna, profile);
+                    card.SetDnaDriftText(_sbDrift.ToString());
+                }
+                else
+                {
+                    card.SetDnaDriftText("(nessun profilo runtime)");
+                }
+            }
+        }
+
+        private static readonly string[] _domainNames =
+        {
+            "Agric   ", "Costru  ", "Sicur   ", "Artig   ",
+            "Magaz   ", "Gover   ", "Socia   ", "Esplor  "
+        };
+
+        private static void BuildDnaDriftText(StringBuilder sb, NpcDnaProfile dna, NpcProfile profile)
+        {
+            sb.Clear();
+
+            var result = NpcDnaDistance.Compute(dna, profile);
+            bool dissatisfied = NpcDnaDistance.IsRoleDissatisfied(dna, profile);
+
+            sb.Append("Totale: ").Append(result.Total.ToString("0.000"));
+            if (dissatisfied) sb.Append("  [INSODDISFATTO]");
+            sb.Append('\n');
+            sb.Append("Pref=").Append(result.PreferenceDistance.ToString("0.000"));
+            sb.Append("  Comp=").Append(result.CompetenceDistance.ToString("0.000"));
+            sb.Append("  Obl=").Append(result.ObligationDistance.ToString("0.000"));
+            sb.Append('\n').Append('\n');
+
+            sb.Append("Dom       [Pref]     [Comp/Cap] [Obl]\n");
+
+            float[] prefSeeds = dna.Preferences.Seeds;
+            float[] compCaps  = dna.Capacities.CompetenceCap;
+            float[] oblSeeds  = dna.ObligationFrame.Seeds;
+
+            for (int d = 1; d < (int)DomainKind.COUNT; d++)
+            {
+                float dnaPref  = prefSeeds != null && d < prefSeeds.Length ? prefSeeds[d] : 0f;
+                float currPref = profile.Preference.Values[d];
+                float dnaCap   = compCaps  != null && d < compCaps.Length  ? compCaps[d]  : 1f;
+                float currComp = profile.Competence.Values[d];
+                float dnaObl   = oblSeeds  != null && d < oblSeeds.Length  ? oblSeeds[d]  : 0f;
+                float currObl  = profile.Obligation.Values[d];
+
+                sb.Append(_domainNames[d - 1]);
+                sb.Append(currPref.ToString("0.00")).Append('→').Append(dnaPref.ToString("0.00")).Append("  ");
+                sb.Append(currComp.ToString("0.00")).Append('/').Append(dnaCap.ToString("0.00")).Append("  ");
+                sb.Append(currObl.ToString("0.00")).Append('→').Append(dnaObl.ToString("0.00"));
+                sb.Append('\n');
             }
         }
 
