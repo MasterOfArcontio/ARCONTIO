@@ -64,7 +64,7 @@ namespace Arcontio.Core
                 if (!world.Needs.TryGetValue(npcId, out var needs)) continue;
 
                 // --- MANGIA ---
-                if (needs.Hunger01 >= cfg.hungryThreshold)
+                if (needs.GetValue(NeedKind.Hunger) >= cfg.hungryThreshold)
                 {
                     if (TryPlanEatOrMove(world, npcId, in needs, (int)pulse.TickIndex, out var cmd, out bool didSteal, out bool didMove))
                     {
@@ -85,7 +85,7 @@ namespace Arcontio.Core
                 }
 
                 // --- DORMI ---
-                if (needs.Fatigue01 >= cfg.tiredThreshold)
+                if (needs.GetValue(NeedKind.Rest) >= cfg.tiredThreshold)
                 {
                     if (TryPlanSleep(world, npcId, needs, out var cmd, out bool didTrespass))
                     {

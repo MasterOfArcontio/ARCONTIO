@@ -341,7 +341,7 @@ namespace Arcontio.Core
         public readonly Dictionary<int, NpcProfile> NpcProfiles = new();
 
         /// <summary>Bisogni primari dell'NPC: fame, fatica, morale.</summary>
-        public readonly Dictionary<int, Needs> Needs = new();
+        public readonly Dictionary<int, NpcNeeds> Needs = new();
 
         /// <summary>Stato sociale dell'NPC: leadership score, loyalty, justice perception.</summary>
         public readonly Dictionary<int, Social> Social = new();
@@ -2361,7 +2361,7 @@ namespace Arcontio.Core
             return false;
         }
 
-        public int CreateNpc(NpcDnaProfile dna, Needs needs, Social social, int x, int y)
+        public int CreateNpc(NpcDnaProfile dna, NpcNeeds needs, Social social, int x, int y)
         {
             int id = _nextNpcId++;
 

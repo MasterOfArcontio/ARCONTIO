@@ -4,11 +4,13 @@ using Arcontio.Core.Diagnostics;
 namespace Arcontio.Core
 {
     /// <summary>
-    /// NeedsDecaySystem (Day9):
-    /// System deterministico �basso livello�.
+    /// NeedsDecaySystem (v0.04.07 — struttura generica NpcNeeds):
     ///
-    /// - Applica fame/stanchezza ad ogni tick usando NeedsConfig.
-    /// - NON decide cosa fare (quello sta nelle Rules).
+    /// - Applica decay a Hunger e Rest ogni tick (altri need: decay=0 fino alle sessioni 08–10).
+    /// - Setta i flag IsAlert/IsCritical confrontando ogni Value01 con le soglie DNA
+    ///   (NpcThresholds.NeedAlert01 e NeedCritical01).
+    ///
+    /// NON decide cosa fare — quello sta nelle Rules.
     /// </summary>
     public sealed class NeedsDecaySystem : ISystem
     {
@@ -31,17 +33,27 @@ namespace Arcontio.Core
             {
                 int npcId = _npcIds[i];
                 if (!world.Needs.TryGetValue(npcId, out var n)) continue;
+                if (n.States == null) continue;
 
-                // Hunger01 cresce con il tempo (pi� fame)
-                n.Hunger01 += cfg.satietyDecayPerTick;
-                if (n.Hunger01 > 1f) n.Hunger01 = 1f;
+                // ── Decay attivi (sessione 07: solo Hunger e Rest) ────────────
+                n.AddValue(NeedKind.Hunger, cfg.satietyDecayPerTick);
+                n.AddValue(NeedKind.Rest,   cfg.restDecayPerTick);
 
-                // Fatigue01 cresce con il tempo (pi� stanchezza)
-                n.Fatigue01 += cfg.restDecayPerTick;
-                if (n.Fatigue01 > 1f) n.Fatigue01 = 1f;
+                // ── Flag IsAlert / IsCritical da soglie DNA ───────────────────
+                float alertThr    = 0.60f;
+                float criticalThr = 0.85f;
 
-                // Flag comodo (opzionale)
-                n.IsHungry = n.Hunger01 >= cfg.hungryThreshold;
+                if (world.NpcDna.TryGetValue(npcId, out var dna))
+                {
+                    alertThr    = dna.Thresholds.NeedAlert01;
+                    criticalThr = dna.Thresholds.NeedCritical01;
+                }
+
+                for (int k = 0; k < (int)NeedKind.COUNT; k++)
+                {
+                    float v = n.States[k].Value01;
+                    n.SetFlags((NeedKind)k, v >= alertThr, v >= criticalThr);
+                }
 
                 world.Needs[npcId] = n;
                 updated++;

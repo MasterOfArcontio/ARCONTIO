@@ -327,35 +327,39 @@ namespace Arcontio.Core.Save
 
     /// <summary>
     /// DTO serializzabile per la struct Needs (NPCComponents.cs).
-    /// Serializza solo i valori continui — i flag derivati (IsHungry, IsTired)
-    /// vengono ricalcolati da NeedsDecaySystem al caricamento.
+    /// Serializza solo i valori continui per NeedKind (un float per voce).
+    /// I flag IsAlert/IsCritical sono derivati e vengono ricalcolati da NeedsDecaySystem
+    /// al primo tick dopo il caricamento.
     /// </summary>
     [Serializable]
     public sealed class NeedsSaveData
     {
-        public float hunger01;
-        public float fatigue01;
-        public float morale01;
+        // Indici corrispondenti a NeedKind (0=Hunger, 1=Thirst, 2=Rest, ...)
+        public float[] values;
 
-        public static NeedsSaveData FromNeeds(Needs needs)
+        public static NeedsSaveData FromNpcNeeds(NpcNeeds needs)
         {
-            return new NeedsSaveData
+            int count = (int)NeedKind.COUNT;
+            var vals  = new float[count];
+            if (needs.States != null)
             {
-                hunger01  = needs.Hunger01,
-                fatigue01 = needs.Fatigue01,
-                morale01  = needs.Morale01
-            };
+                for (int i = 0; i < count; i++)
+                    vals[i] = needs.States[i].Value01;
+            }
+            return new NeedsSaveData { values = vals };
         }
 
-        public Needs ToNeeds()
+        public NpcNeeds ToNpcNeeds()
         {
-            return new Needs
+            var n = NpcNeeds.Default();
+            if (values != null)
             {
-                Hunger01  = hunger01,
-                Fatigue01 = fatigue01,
-                Morale01  = morale01
-                // IsHungry e IsTired: ricalcolati da NeedsDecaySystem dopo il caricamento
-            };
+                int count = System.Math.Min(values.Length, (int)NeedKind.COUNT);
+                for (int i = 0; i < count; i++)
+                    n.SetValue((NeedKind)i, values[i]);
+            }
+            return n;
+            // IsAlert/IsCritical: ricalcolati da NeedsDecaySystem dopo il caricamento
         }
     }
 

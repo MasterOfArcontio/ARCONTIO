@@ -1,22 +1,8 @@
 namespace Arcontio.Core
 {
-    /// <summary>
-    /// Bisogni e stati interni che cambiano spesso.
-    /// </summary>
-    public struct Needs
-    {
-        public float Hunger01;   // 0=ok, 1=affamato
-        public float Fatigue01;  // 0=ok, 1=stanco
-        public float Morale01;   // 0=depresso, 1=ottimo
-
-        // timer/accumulatori
-        //public float HungerRate;
-        //public float FatigueRate;
-
-        // Cache/flag derivati (settati dal NeedsDecaySystem)
-        public bool IsHungry;
-        public bool IsTired;
-    }
+    // Needs spostato in Core/Needs/NeedKind.cs (sessione v0.04.07):
+    //   struct NeedState, enum NeedKind, struct NpcNeeds
+    // La vecchia struct Needs (Hunger01/Fatigue01/Morale01) è rimossa.
 
     /// <summary>
     /// Stato sociale (placeholder): reputazione, lealt�, legami, ecc.

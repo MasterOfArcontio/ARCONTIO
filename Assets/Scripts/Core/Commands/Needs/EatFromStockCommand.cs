@@ -130,8 +130,7 @@ namespace Arcontio.Core
 
             // 2) Mutazione hunger
             var cfg = world.Global.Needs;
-            needs.Hunger01 -= cfg.eatSatietyGain;
-            if (needs.Hunger01 < 0f) needs.Hunger01 = 0f;
+            needs.AddValue(NeedKind.Hunger, -cfg.eatSatietyGain);
             world.Needs[_npcId] = needs;
 
             ArcontioLogger.Debug(
@@ -139,7 +138,7 @@ namespace Arcontio.Core
                 new LogBlock(LogLevel.Debug, "log.t9.eat.stock")
                     .AddField("obj", _foodObjId)
                     .AddField("stockLeft", depleted ? 0 : stock.Units)
-                    .AddField("hungerNow", needs.Hunger01.ToString("0.00"))
+                    .AddField("hungerNow", needs.GetValue(NeedKind.Hunger).ToString("0.00"))
                     .AddField("depleted", depleted.ToString())
             );
         }

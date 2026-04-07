@@ -55,7 +55,7 @@ namespace Arcontio.Core.Save
             int              npcId,
             NpcDnaProfile    dna,
             NpcProfile       profile,
-            Needs            needs,
+            NpcNeeds         needs,
             Social           social,
             MemoryStore      store,
             int              x,
@@ -76,7 +76,7 @@ namespace Arcontio.Core.Save
                 npcId         = npcId,
                 dna           = dna    != null ? NpcDnaSaveData.From(dna)          : null,
                 profile       = profile != null ? NpcProfileSaveData.FromProfile(profile) : null,
-                needs         = NeedsSaveData.FromNeeds(needs),
+                needs         = NeedsSaveData.FromNpcNeeds(needs),
                 social        = SocialSaveData.From(social),
                 spawnX        = x,
                 spawnY        = y,
@@ -250,7 +250,7 @@ namespace Arcontio.Core.Save
                     : NpcDnaProfile.CreateDefault("npc_" + entry.npcId);
 
                 // Ricostruisci Needs e Social
-                Needs  needs  = entry.needs  != null ? entry.needs.ToNeeds()   : default;
+                NpcNeeds needs = entry.needs != null ? entry.needs.ToNpcNeeds() : NpcNeeds.Default();
                 Social social = entry.social != null ? entry.social.To()        : default;
 
                 // Crea l'NPC nel World
@@ -283,17 +283,17 @@ namespace Arcontio.Core.Save
         [System.Obsolete("Usa SpawnFromEntries(entries, world) — restituisce gli id creati e applica DNA + posizione.")]
         public static Dictionary<int, NpcProfile> ApplyEntries(
             IReadOnlyList<NpcSaveEntry> entries,
-            out Dictionary<int, Needs>             needsOut,
+            out Dictionary<int, NpcNeeds>           needsOut,
             out Dictionary<int, List<MemoryTrace>> tracesOut)
         {
             var profiles = new Dictionary<int, NpcProfile>(entries.Count);
-            needsOut  = new Dictionary<int, Needs>(entries.Count);
+            needsOut  = new Dictionary<int, NpcNeeds>(entries.Count);
             tracesOut = new Dictionary<int, List<MemoryTrace>>(entries.Count);
 
             foreach (var entry in entries)
             {
                 if (entry.profile != null) profiles[entry.npcId] = entry.profile.ToProfile();
-                if (entry.needs   != null) needsOut[entry.npcId]  = entry.needs.ToNeeds();
+                if (entry.needs   != null) needsOut[entry.npcId]  = entry.needs.ToNpcNeeds();
 
                 var traces = new List<MemoryTrace>(entry.memoryTraces?.Length ?? 0);
                 if (entry.memoryTraces != null)
