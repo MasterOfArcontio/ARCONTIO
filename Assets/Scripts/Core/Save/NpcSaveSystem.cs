@@ -269,7 +269,7 @@ namespace Arcontio.Core.Save
                     && world.Memory.TryGetValue(newId, out var store) && store != null)
                 {
                     foreach (var dto in entry.memoryTraces)
-                        store.Traces.Add(dto.ToTrace());
+                        store.AddOrMerge(dto.ToTrace());
                 }
             }
 
