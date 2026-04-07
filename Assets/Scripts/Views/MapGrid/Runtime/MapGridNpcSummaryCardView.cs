@@ -390,7 +390,7 @@ namespace Arcontio.View.MapGrid
             var barBgGo = new GameObject("BarBg");
             barBgGo.transform.SetParent(rowGo.transform, false);
             var barBgImg = barBgGo.AddComponent<Image>();
-            barBgImg.color = new Color(0.18f, 0.18f, 0.18f, 1f);
+            barBgImg.color = Color.black;
             barBgImg.raycastTarget = false;
             var barBgLe = barBgGo.AddComponent<LayoutElement>();
             barBgLe.preferredWidth  = BarMaxWidth;
