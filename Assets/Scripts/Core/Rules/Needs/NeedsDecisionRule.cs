@@ -84,6 +84,24 @@ namespace Arcontio.Core
                     }
                 }
 
+                // --- BEVI ---
+                // v0.04.08: decay Thirst attivo. Il DrinkCommand e i WorldObject sorgente d'acqua
+                // non sono ancora implementati — il blocco rileva la soglia e logga, ma non emette
+                // comandi. Quando i water source object saranno introdotti, sostituire il log
+                // con TryPlanDrink (analoga a TryPlanEatOrMove).
+                if (needs.GetValue(NeedKind.Thirst) >= cfg.thirstyThreshold)
+                {
+                    ArcontioLogger.Info(
+                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "NeedsDecisionRule"),
+                        new LogBlock(LogLevel.Info, "log.needs.thirst_alert")
+                            .AddField("tick",    pulse.TickIndex)
+                            .AddField("npcId",   npcId)
+                            .AddField("thirst",  needs.GetValue(NeedKind.Thirst).ToString("0.00"))
+                            .AddField("status",  "DrinkCommand_pending_water_objects"));
+                    // TODO v0.04.xx: aggiungere TryPlanDrink quando water source WorldObject esiste
+                    continue;
+                }
+
                 // --- DORMI ---
                 if (needs.GetValue(NeedKind.Rest) >= cfg.tiredThreshold)
                 {
