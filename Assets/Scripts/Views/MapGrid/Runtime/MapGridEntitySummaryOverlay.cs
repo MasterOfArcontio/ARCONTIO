@@ -1095,6 +1095,9 @@ namespace Arcontio.View.MapGrid
                 // Patch 0.02.03: landmark/edge conosciuti.
                 card.SetLandmarksText(_sbLandmarks.ToString());
 
+                // Bisogni (v0.04.08) — barre invertite (piena=ok, vuota=critico)
+                card.UpdateNeedsBars(needs);
+
                 // DNA DRIFT (v0.04.07.b) — barre proporzionali
                 if (world.NpcProfiles.TryGetValue(npcId, out var profile))
                 {

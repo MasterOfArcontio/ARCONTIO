@@ -56,6 +56,7 @@ namespace Arcontio.View.MapGrid
         private const string KeyMemoryTraces = "MemoryTraces";
         private const string KeyKnownObjects = "KnownObjects";
         private const string KeyDnaDrift = "DnaDrift";
+        private const string KeyNeeds    = "Needs";
 
         // ============================================================
         // SECTION STATE
@@ -69,10 +70,15 @@ namespace Arcontio.View.MapGrid
         private SectionView _memSection;
         private SectionView _objMemSection;
         private SectionView _dnaDriftSection;
+        private SectionView _needsSection;
 
         // ── DNA DRIFT bars ────────────────────────────────────────────────────
         // [axisIndex 0=Pref 1=Comp 2=Obl][domainIndex 0..7]
         private BarRow[][] _driftDomainRows;
+
+        // ── Needs bars (v0.04.08) ─────────────────────────────────────────────
+        // [needIndex 0..NeedKind.COUNT-1]
+        private NeedBarRow[] _needBars;
 
         /// <summary>
         /// Stato collapse "globale" per sezione.
@@ -140,8 +146,13 @@ namespace Arcontio.View.MapGrid
             if (_actionSection.BodyText != null) _actionSection.BodyText.supportRichText = true;
 
             // Inventory (cibo trasportato)
-            _inventorySection = BuildSection(_root.transform, KeyInventory, "Inventory / Needs", DefaultBodyFont, FontStyle.Normal, collapsible: true);
+            _inventorySection = BuildSection(_root.transform, KeyInventory, "Inventory", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _inventorySection.RootImage.color = new Color(0.25f, 0.10f, 0.30f, 0.72f);
+
+            // Bisogni (v0.04.08) — barre invertite: piena = soddisfatto, vuota = critico
+            _needsSection = BuildSection(_root.transform, KeyNeeds, "Needs", DefaultBodyFont, FontStyle.Normal, collapsible: true);
+            _needsSection.RootImage.color = new Color(0.10f, 0.25f, 0.30f, 0.72f);
+            BuildNeedsBars(_needsSection);
 
             // Comms (token IN/OUT)
             _commsSection = BuildSection(_root.transform, KeyComms, "Comms", DefaultBodyFont, FontStyle.Normal, collapsible: true);
@@ -511,6 +522,144 @@ namespace Arcontio.View.MapGrid
                 CapTickRt = capTickRt,
                 ValueText = valueTxt
             };
+        }
+
+        // ============================================================
+        // NEEDS BARS — build, factory, update
+        // ============================================================
+
+        /// <summary>
+        /// Riga barra per un singolo bisogno (v0.04.08).
+        ///
+        /// Convenzione invertita: barra piena = bisogno soddisfatto (valore 0),
+        /// barra vuota = bisogno critico (valore 1).
+        /// Colore: verde → giallo → rosso al crescere del valore.
+        /// </summary>
+        private sealed class NeedBarRow
+        {
+            public Text  LabelText;
+            public Image BarFill;  // anchor-based, anchorMax.x = 1 - value01
+            public Text  ValueText;
+
+            // value01: livello bisogno [0..1]  (0=soddisfatto, 1=critico)
+            public void Set(float value01)
+            {
+                float v        = Mathf.Clamp01(value01);
+                float wellness = 1f - v; // barra piena quando bisogno = 0
+
+                var rt = BarFill.rectTransform;
+                rt.anchorMin = new Vector2(0f,       0f);
+                rt.anchorMax = new Vector2(wellness,  1f);
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+
+                BarFill.color  = NeedBarColor(v);
+                ValueText.text = v.ToString("0.00");
+            }
+
+            // v=0 verde (ok), v=0.5 giallo (attenzione), v=0.8+ rosso (critico)
+            private static Color NeedBarColor(float v)
+            {
+                if (v < 0.50f) return new Color(0.22f, 0.75f, 0.22f, 1f);
+                if (v < 0.80f) return new Color(0.90f, 0.78f, 0.10f, 1f);
+                return new Color(0.85f, 0.18f, 0.18f, 1f);
+            }
+        }
+
+        private void BuildNeedsBars(SectionView section)
+        {
+            // Nascondi il Text standard — usiamo solo barre
+            if (section.BodyText != null)
+                section.BodyText.gameObject.SetActive(false);
+
+            var parent = section.BodyGo.transform;
+            int count  = (int)NeedKind.COUNT;
+            _needBars  = new NeedBarRow[count];
+            for (int i = 0; i < count; i++)
+                _needBars[i] = MakeNeedBarRow(parent, ((NeedKind)i).ToString());
+        }
+
+        private static NeedBarRow MakeNeedBarRow(Transform parent, string label)
+        {
+            var rowGo = new GameObject("NeedBar_" + label);
+            rowGo.transform.SetParent(parent, false);
+
+            var hl = rowGo.AddComponent<HorizontalLayoutGroup>();
+            hl.childControlHeight     = true;
+            hl.childControlWidth      = true;
+            hl.childForceExpandHeight = false;
+            hl.childForceExpandWidth  = false;
+            hl.spacing = 4;
+            rowGo.AddComponent<LayoutElement>().preferredHeight = RowHeight;
+
+            // Label
+            var labelGo = new GameObject("Label");
+            labelGo.transform.SetParent(rowGo.transform, false);
+            var labelTxt = labelGo.AddComponent<Text>();
+            labelTxt.font = GetUiFont();
+            labelTxt.fontSize = 10;
+            labelTxt.alignment = TextAnchor.MiddleLeft;
+            labelTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            labelTxt.verticalOverflow   = VerticalWrapMode.Truncate;
+            labelTxt.raycastTarget = false;
+            labelTxt.text = label;
+            var labelLe = labelGo.AddComponent<LayoutElement>();
+            labelLe.preferredWidth  = LabelWidth;
+            labelLe.preferredHeight = RowHeight;
+
+            // BarBg (sfondo scuro)
+            var barBgGo = new GameObject("BarBg");
+            barBgGo.transform.SetParent(rowGo.transform, false);
+            var barBgImg = barBgGo.AddComponent<Image>();
+            barBgImg.color = new Color(0.12f, 0.12f, 0.12f, 0.85f);
+            barBgImg.raycastTarget = false;
+            var barBgLe = barBgGo.AddComponent<LayoutElement>();
+            barBgLe.preferredWidth  = BarMaxWidth;
+            barBgLe.preferredHeight = BarHeight;
+
+            // BarFill — copre [0..wellness] tramite anchor, piena all'avvio
+            var barFillGo = new GameObject("BarFill");
+            barFillGo.transform.SetParent(barBgGo.transform, false);
+            var barFillImg = barFillGo.AddComponent<Image>();
+            barFillImg.color = new Color(0.22f, 0.75f, 0.22f, 1f); // verde default
+            barFillImg.raycastTarget = false;
+            var barFillRt = barFillGo.GetComponent<RectTransform>();
+            barFillRt.anchorMin = Vector2.zero;
+            barFillRt.anchorMax = Vector2.one;
+            barFillRt.offsetMin = Vector2.zero;
+            barFillRt.offsetMax = Vector2.zero;
+
+            // Valore numerico
+            var valueGo = new GameObject("Value");
+            valueGo.transform.SetParent(rowGo.transform, false);
+            var valueTxt = valueGo.AddComponent<Text>();
+            valueTxt.font = GetUiFont();
+            valueTxt.fontSize = 10;
+            valueTxt.alignment = TextAnchor.MiddleRight;
+            valueTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            valueTxt.verticalOverflow   = VerticalWrapMode.Truncate;
+            valueTxt.raycastTarget = false;
+            var valueLe = valueGo.AddComponent<LayoutElement>();
+            valueLe.preferredWidth  = ValueWidth;
+            valueLe.preferredHeight = RowHeight;
+
+            return new NeedBarRow
+            {
+                LabelText = labelTxt,
+                BarFill   = barFillImg,
+                ValueText = valueTxt
+            };
+        }
+
+        /// <summary>
+        /// Aggiorna le barre dei bisogni (v0.04.08).
+        /// Chiama ogni frame quando la card è visibile.
+        /// </summary>
+        public void UpdateNeedsBars(NpcNeeds needs)
+        {
+            if (_needBars == null) return;
+            for (int i = 0; i < _needBars.Length; i++)
+                _needBars[i]?.Set(needs.GetValue((NeedKind)i));
         }
 
         private static void MakeAxisLabel(Transform parent, string text)
