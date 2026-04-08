@@ -249,7 +249,7 @@ namespace Arcontio.View.MapGrid
 
             float[] prefSeeds = dna.Preferences.Seeds;
             float[] oblSeeds  = dna.ObligationFrame.Seeds;
-            float[] compCaps  = dna.Capacities?.CompetenceCap;
+            float[] compCaps  = dna.Capacities.CompetenceCap;
 
             for (int d = 1; d < (int)DomainKind.COUNT; d++)
             {
