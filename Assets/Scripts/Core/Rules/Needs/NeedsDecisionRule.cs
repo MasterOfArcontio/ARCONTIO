@@ -84,6 +84,24 @@ namespace Arcontio.Core
                     }
                 }
 
+                // --- BEVI ---
+                // v0.04.08: decay Thirst attivo. Il DrinkCommand e i WorldObject sorgente d'acqua
+                // non sono ancora implementati — il blocco rileva la soglia e logga, ma non emette
+                // comandi. Quando i water source object saranno introdotti, sostituire il log
+                // con TryPlanDrink (analoga a TryPlanEatOrMove).
+                if (needs.GetValue(NeedKind.Thirst) >= cfg.thirstyThreshold)
+                {
+                    ArcontioLogger.Info(
+                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "NeedsDecisionRule"),
+                        new LogBlock(LogLevel.Info, "log.needs.thirst_alert")
+                            .AddField("tick",    pulse.TickIndex)
+                            .AddField("npcId",   npcId)
+                            .AddField("thirst",  needs.GetValue(NeedKind.Thirst).ToString("0.00"))
+                            .AddField("status",  "DrinkCommand_pending_water_objects"));
+                    // TODO v0.04.xx: aggiungere TryPlanDrink quando water source WorldObject esiste
+                    continue;
+                }
+
                 // --- DORMI ---
                 if (needs.GetValue(NeedKind.Rest) >= cfg.tiredThreshold)
                 {
@@ -139,7 +157,7 @@ namespace Arcontio.Core
         private bool TryPlanEatOrMove(
             World world,
             int npcId,
-            in Needs needs,
+            in NpcNeeds needs,
             int nowTick,
             out ICommand cmd,
             out bool didSteal,
@@ -344,7 +362,7 @@ namespace Arcontio.Core
 
             // 3) furto se moralità/emergenza
             float law = world.Social.TryGetValue(npcId, out var soc) ? soc.JusticePerception01 : 0.5f;
-            bool emergency = needs.Hunger01 >= 0.95f;
+            bool emergency = needs.GetValue(NeedKind.Hunger) >= 0.95f;
             bool okToSteal = emergency || law < 0.45f;
 
             if (!okToSteal)
@@ -861,7 +879,7 @@ private static int FindRememberedNpcWithCarriedFood(
         // SLEEP DECISION
         // ============================================================
 
-        private bool TryPlanSleep(World world, int npcId, Needs needs, out ICommand cmd, out bool didTrespass)
+        private bool TryPlanSleep(World world, int npcId, NpcNeeds needs, out ICommand cmd, out bool didTrespass)
         {
             cmd = null;
             didTrespass = false;
@@ -876,7 +894,7 @@ private static int FindRememberedNpcWithCarriedFood(
 
             // 2) letto altrui se moralità/emergenza
             float law = world.Social.TryGetValue(npcId, out var soc) ? soc.JusticePerception01 : 0.5f;
-            bool emergency = needs.Fatigue01 >= 0.95f;
+            bool emergency = needs.GetValue(NeedKind.Rest) >= 0.95f;
             bool okToTrespass = emergency || law < 0.45f;
 
             if (!okToTrespass)

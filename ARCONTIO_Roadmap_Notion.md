@@ -84,18 +84,19 @@
 | 4 | Lun | NpcProfile | Calcolo distanza DNA↔NpcProfile | ✅ |
 | 5 | Mer | NpcProfile | Integrazione con NPC esistenti (migrazione) | ✅ |
 | 6 | Gio | Debug | Overlay debug distanza DNA↔NpcProfile | ✅ |
-| 7 | Lun | Needs | Struttura Need generica con NeedAlert + NeedCritical | ⏳ |
-| 8 | Mer | Needs | Fame · Sete · Riposo/Sonno | ⏳ |
-| 9 | Gio | Needs | Salute fisica · Comfort termico | ⏳ |
-| 10 | Lun | Needs | Needs psicologici: Sicurezza · Stabilità emotiva · Socialità | ⏳ |
-| 11 | Mer | Needs | Decay system: rapido/lento per categoria | ⏳ |
-| 12 | Gio | Debug | Overlay debug needs per NPC | ⏳ |
-| 13 | Lun | BeliefStore | BeliefEntry: struttura C# completa | ⏳ |
-| 14 | Mer | BeliefStore | Aggregazione lazy da MemoryStore su nuova traccia | ⏳ |
-| 15 | Gio | BeliefStore | Decay confidence + trigger su soglia minima | ⏳ |
-| 16 | Lun | BeliefStore | Invalidazione su job fallito | ⏳ |
-| 17 | Mer | BeliefStore | Query API per il Decision Layer | ⏳ |
-| 18 | Gio | QA | Test: BeliefStore vs MemoryStore, verifica omniscience | ⏳ |
+| 7 | Lun | Needs | Struttura Need generica con NeedAlert + NeedCritical | ✅ |
+| 8 | Mer | Needs | Fame · Sete · Riposo/Sonno | ✅ |
+| 9 | Gio | NpcProfile | PhysicalProfile — tratti fisici mutabili (Strength, Endurance, Agility, Intelligence) | ⏳ |
+| 10 | Lun | Needs | Salute fisica · Comfort termico | ⏳ |
+| 11 | Mer | Needs | Needs psicologici: Sicurezza · Stabilità emotiva · Socialità | ⏳ |
+| 12 | Gio | Needs | Decay system: rapido/lento per categoria | ⏳ |
+| 13 | Lun | Debug | Overlay debug needs per NPC | ⏳ |
+| 14 | Mer | BeliefStore | BeliefEntry: struttura C# completa | ⏳ |
+| 15 | Gio | BeliefStore | Aggregazione lazy da MemoryStore su nuova traccia | ⏳ |
+| 16 | Lun | BeliefStore | Decay confidence + trigger su soglia minima | ⏳ |
+| 17 | Mer | BeliefStore | Invalidazione su job fallito | ⏳ |
+| 18 | Gio | BeliefStore | Query API per il Decision Layer | ⏳ |
+| 19 | Lun | QA | Test: BeliefStore vs MemoryStore, verifica omniscience | ⏳ |
 
 ### Definition of Done v0.04
 
@@ -104,6 +105,7 @@
 | NpcDnaProfile: tutti i campi implementati e serializzabili | ✅ |
 | NpcProfile: tre assi (Competence/Preference/Obligation) per dominio | ✅ |
 | Distanza DNA↔NpcProfile calcolabile on-demand e visibile in overlay F9 | ✅ |
+| PhysicalProfile: tratti fisici mutabili (Strength, Endurance, Agility, Intelligence) | ⏳ |
 | Tutti i 10 need implementati con NeedAlert + NeedCritical | ⏳ |
 | Decay differenziato per categoria (rapido/lento) | ⏳ |
 | BeliefStore attivo con aggiornamento lazy | ⏳ |
@@ -373,7 +375,7 @@
 | Versione | Settimane | Sessioni totali | Periodo |
 |----------|-----------|-----------------|---------|
 | v0.03 | 3 | 9 | Aprile 2026 |
-| v0.04 | 6 | 18 | Maggio–Giugno 2026 |
+| v0.04 | 7 | 19 | Maggio–Giugno 2026 |
 | v0.05 | 4 | 12 | Giugno–Luglio 2026 |
 | v0.06 | 4 | 12 | Luglio–Agosto 2026 |
 | v0.07 | 3 | 9 | Agosto 2026 |

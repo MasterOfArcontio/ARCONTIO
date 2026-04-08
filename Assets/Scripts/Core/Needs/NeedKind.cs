@@ -67,6 +67,18 @@ namespace Arcontio.Core
             return new NpcNeeds { States = new NeedState[(int)NeedKind.COUNT] };
         }
 
+        /// <summary>
+        /// Factory rapida per i test/seed scenario: crea NpcNeeds con Hunger e Rest
+        /// già impostati a valori specifici. Gli altri NeedKind rimangono a 0.
+        /// </summary>
+        public static NpcNeeds Make(float hunger, float rest)
+        {
+            var n = Default();
+            n.SetValue(NeedKind.Hunger, hunger);
+            n.SetValue(NeedKind.Rest,   rest);
+            return n;
+        }
+
         // ── Lettura ────────────────────────────────────────────────────────────
 
         public float GetValue(NeedKind k)

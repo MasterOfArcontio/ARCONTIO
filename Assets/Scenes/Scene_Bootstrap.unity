@@ -221,7 +221,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Arcontio.Core.SimulationHost
   tickDeltaTime: 1
   ticksPerSecond: 10
-  debugScenario: 11
+  debugScenario: 99
   day8LogEveryTicks: 10
   startPaused: 1
   togglePauseAction: {fileID: 432641650}
