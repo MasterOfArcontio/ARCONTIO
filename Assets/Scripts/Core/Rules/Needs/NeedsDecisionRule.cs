@@ -157,7 +157,7 @@ namespace Arcontio.Core
         private bool TryPlanEatOrMove(
             World world,
             int npcId,
-            in Needs needs,
+            in NpcNeeds needs,
             int nowTick,
             out ICommand cmd,
             out bool didSteal,
@@ -879,7 +879,7 @@ private static int FindRememberedNpcWithCarriedFood(
         // SLEEP DECISION
         // ============================================================
 
-        private bool TryPlanSleep(World world, int npcId, Needs needs, out ICommand cmd, out bool didTrespass)
+        private bool TryPlanSleep(World world, int npcId, NpcNeeds needs, out ICommand cmd, out bool didTrespass)
         {
             cmd = null;
             didTrespass = false;
