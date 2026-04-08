@@ -362,7 +362,7 @@ namespace Arcontio.Core
 
             // 3) furto se moralità/emergenza
             float law = world.Social.TryGetValue(npcId, out var soc) ? soc.JusticePerception01 : 0.5f;
-            bool emergency = needs.Hunger01 >= 0.95f;
+            bool emergency = needs.GetValue(NeedKind.Hunger) >= 0.95f;
             bool okToSteal = emergency || law < 0.45f;
 
             if (!okToSteal)
@@ -894,7 +894,7 @@ private static int FindRememberedNpcWithCarriedFood(
 
             // 2) letto altrui se moralità/emergenza
             float law = world.Social.TryGetValue(npcId, out var soc) ? soc.JusticePerception01 : 0.5f;
-            bool emergency = needs.Fatigue01 >= 0.95f;
+            bool emergency = needs.GetValue(NeedKind.Rest) >= 0.95f;
             bool okToTrespass = emergency || law < 0.45f;
 
             if (!okToTrespass)

@@ -946,7 +946,7 @@ namespace Arcontio.Core
 
             // 1 NPC che guarda a Est
             int npc = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC_T8"),
-                new Needs { Hunger01 = 0.1f, Fatigue01 = 0.1f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.1f, 0.1f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
                 0, 0
             );
@@ -1129,21 +1129,21 @@ namespace Arcontio.Core
 
             // NPC1: basso rispetto legge (ruberà ?facile?)
             int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC1"),
-                new Needs { Hunger01 = 0.85f, Fatigue01 = 0.85f, Morale01 = 0.7f, IsHungry = false },
+                NpcNeeds.Make(0.85f, 0.85f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
                 x: 20, y: 20
             );
 
             // NPC2: alto rispetto legge (non ruba; ha cibo privato)
             int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC2"),
-                new Needs { Hunger01 = 0.80f, Fatigue01 = 0.40f, Morale01 = 0.7f, IsHungry = false },
+                NpcNeeds.Make(0.80f, 0.40f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
                 x: 20, y: 22
             );
 
             // NPC3: alto rispetto legge (non ruba; ha cibo privato)
             int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC3"),
-                new Needs { Hunger01 = 0.80f, Fatigue01 = 0.40f, Morale01 = 0.7f, IsHungry = false },
+                NpcNeeds.Make(0.80f, 0.40f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
                 x: 28, y: 19
             );
@@ -1257,31 +1257,31 @@ namespace Arcontio.Core
 
             // 5 NPC: uno "low law" che tenderà a rubare, altri più legali.
             int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC1_Thief"),
-                new Needs { Hunger01 = 0.90f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.90f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
                 x: 5, y: 5
             );
 
             int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC2_Owner"),
-                new Needs { Hunger01 = 0.40f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.40f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
                 x: 18, y: 12
             );
 
             int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC3_Witness"),
-                new Needs { Hunger01 = 0.30f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.30f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.70f },
                 x: 14, y: 12
             );
 
             int npc4 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC4"),
-                new Needs { Hunger01 = 0.60f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.60f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
                 x: 22, y: 16
             );
 
             int npc5 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC5"),
-                new Needs { Hunger01 = 0.55f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.55f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
                 x: 6, y: 16
             );
@@ -1410,31 +1410,31 @@ namespace Arcontio.Core
 
             // 5 NPC: uno "low law" che tenderà a rubare, altri più legali.
             int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC1_Thief"),
-                new Needs { Hunger01 = 0.00f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.00f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
                 x: 15, y: 15
             );
             /*
             int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC2_Owner"),
-                new Needs { Hunger01 = 0.40f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.40f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
                 x: 18, y: 12
             );
 
             int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC3_Witness"),
-                new Needs { Hunger01 = 0.30f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.30f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.70f },
                 x: 14, y: 12
             );
 
             int npc4 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC4"),
-                new Needs { Hunger01 = 0.60f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.60f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
                 x: 22, y: 16
             );
 
             int npc5 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC5"),
-                new Needs { Hunger01 = 0.55f, Fatigue01 = 0.20f, Morale01 = 0.7f },
+                NpcNeeds.Make(0.55f, 0.20f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
                 x: 6, y: 16
             );
