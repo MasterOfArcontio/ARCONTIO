@@ -860,19 +860,9 @@ namespace Arcontio.View.MapGrid
                 int rememberedCommunityFoodDbg = 0;
                 ComputeFoodTargetDebug(world, npcId, out visibleCommunityFoodDbg, out rememberedCommunityFoodDbg);
 
+                // [NEEDS] rimosso: ora visualizzato come barre nella sezione "Needs" della card
                 var sb = new StringBuilder(512);
-                sb.AppendLine("[NEEDS]");
-                for (int ki = 0; ki < (int)NeedKind.COUNT; ki++)
-                {
-                    var kind  = (NeedKind)ki;
-                    float val = needs.GetValue(kind);
-                    string flag = needs.IsCritical(kind) ? " [CRITICAL]"
-                                : needs.IsAlert(kind)    ? " [alert]"
-                                : string.Empty;
-                    sb.AppendFormat("{0,-10}{1:0.00}{2}\n", kind, val, flag);
-                }
-                sb.AppendLine()
-                  .AppendLine("[INVENTORY]")
+                sb.AppendLine("[INVENTORY]")
                   .AppendLine($"PrivateFood (carried) = {carriedFood}")
                   .AppendLine($"PrivateFood (owned in world) = {ownedStockUnits}  (piles={ownedStockPiles})")
                   .AppendLine($"Total private food = {totalOwned}");

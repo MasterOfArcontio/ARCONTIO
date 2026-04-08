@@ -271,10 +271,11 @@ namespace Arcontio.View.MapGrid
                 float currPref = profile.Preference.Values[d];
                 _driftDomainRows[0][di].Set(DomainLabels[di], currPref, dnaPref, 1f);
 
-                // COMPETENZA: parte da 0, cresce con esperienza fino al cap DNA
+                // COMPETENZA: nessun seed DNA → nessun drift, solo barra verde proporzionale al cap
+                // seedValue = currComp per azzerare il drift (non esiste valore "di partenza" nel DNA)
                 float currComp = profile.Competence.Values[d];
                 float compCap  = compCaps  != null && d < compCaps.Length  ? compCaps[d]  : 1f;
-                _driftDomainRows[1][di].Set(DomainLabels[di], currComp, 0f, compCap);
+                _driftDomainRows[1][di].Set(DomainLabels[di], currComp, currComp, compCap);
 
                 // OBBLIGO: seed = valore iniziale DNA, cap = 1.0
                 float dnaObl  = oblSeeds  != null && d < oblSeeds.Length   ? oblSeeds[d]  : 0f;
@@ -350,23 +351,36 @@ namespace Arcontio.View.MapGrid
                 LabelText.text = label;
                 ValueText.text = curr.ToString("0.00");
 
-                // Verde: copre [0 .. currentValue]
-                SetRegion(BarGreen.rectTransform, 0f, curr);
-
-                // Drift: regione [min(seed,curr) .. max(seed,curr)], sovrapposta al verde
+                // Drift direzionale (v0.04.08):
+                //   curr > seed → verde = [0..seed] (baseline DNA), rosso/giallo = [seed..curr]
+                //   curr < seed → rosso/giallo = [0..curr] (valore sceso), verde = [curr..seed] (gap "perso")
+                //   curr == seed → verde = [0..curr], nessun drift visibile
                 if (driftAbs > 0.005f)
                 {
-                    float lo = Mathf.Min(seed, curr);
-                    float hi = Mathf.Max(seed, curr);
-                    SetRegion(BarDrift.rectTransform, lo, hi);
-                    // giallo = drift moderato (<30%), rosso = drift alto (≥30%)
-                    BarDrift.color = driftAbs < 0.30f
-                        ? new Color(0.90f, 0.78f, 0.10f, 1f)
-                        : new Color(0.85f, 0.18f, 0.18f, 1f);
+                    Color driftColor = driftAbs < 0.30f
+                        ? new Color(0.90f, 0.78f, 0.10f, 1f)  // giallo — drift moderato
+                        : new Color(0.85f, 0.18f, 0.18f, 1f); // rosso  — drift alto
+
+                    if (curr > seed)
+                    {
+                        // Valore salito sopra il seed DNA
+                        SetRegion(BarGreen.rectTransform, 0f,   seed); // baseline verde
+                        SetRegion(BarDrift.rectTransform, seed, curr); // eccesso rosso/giallo
+                    }
+                    else
+                    {
+                        // Valore sceso sotto il seed DNA
+                        SetRegion(BarDrift.rectTransform, 0f,   curr); // corrente rosso/giallo
+                        SetRegion(BarGreen.rectTransform, curr, seed); // gap "perso" verde
+                    }
+
+                    BarDrift.color = driftColor;
                     BarDrift.gameObject.SetActive(true);
                 }
                 else
                 {
+                    // Nessun drift: solo barra verde da 0 a curr
+                    SetRegion(BarGreen.rectTransform, 0f, curr);
                     BarDrift.gameObject.SetActive(false);
                 }
 
@@ -538,26 +552,37 @@ namespace Arcontio.View.MapGrid
         private sealed class NeedBarRow
         {
             public Text  LabelText;
-            public Image BarFill;  // anchor-based, anchorMax.x = 1 - value01
-            public Text  ValueText;
+            public Image BarFill;   // anchor-based, anchorMax.x = 1 - value01
+            public Text  ValueText; // supportRichText=true — mostra valore + flag alert/critical
 
-            // value01: livello bisogno [0..1]  (0=soddisfatto, 1=critico)
-            public void Set(float value01)
+            /// <summary>
+            /// Aggiorna la barra del bisogno.
+            /// value01: livello [0..1] — 0=soddisfatto, 1=critico.
+            /// isAlert/isCritical: flag calcolati da NeedsDecaySystem dai DNA thresholds.
+            /// </summary>
+            public void Set(float value01, bool isAlert, bool isCritical)
             {
                 float v        = Mathf.Clamp01(value01);
-                float wellness = 1f - v; // barra piena quando bisogno = 0
+                float wellness = 1f - v;
 
                 var rt = BarFill.rectTransform;
-                rt.anchorMin = new Vector2(0f,       0f);
-                rt.anchorMax = new Vector2(wellness,  1f);
+                rt.anchorMin = new Vector2(0f,      0f);
+                rt.anchorMax = new Vector2(wellness, 1f);
                 rt.offsetMin = Vector2.zero;
                 rt.offsetMax = Vector2.zero;
 
-                BarFill.color  = NeedBarColor(v);
-                ValueText.text = v.ToString("0.00");
+                BarFill.color = NeedBarColor(v);
+
+                // Flag colorato nel testo (rich text abilitato in MakeNeedBarRow)
+                if (isCritical)
+                    ValueText.text = v.ToString("0.00") + " <color=#DA2E2E>[CRIT]</color>";
+                else if (isAlert)
+                    ValueText.text = v.ToString("0.00") + " <color=#E5C71A>[!]</color>";
+                else
+                    ValueText.text = v.ToString("0.00");
             }
 
-            // v=0 verde (ok), v=0.5 giallo (attenzione), v=0.8+ rosso (critico)
+            // v=0 verde (soddisfatto), v≥0.5 giallo, v≥0.8 rosso (critico)
             private static Color NeedBarColor(float v)
             {
                 if (v < 0.50f) return new Color(0.22f, 0.75f, 0.22f, 1f);
@@ -638,6 +663,7 @@ namespace Arcontio.View.MapGrid
             valueTxt.alignment = TextAnchor.MiddleRight;
             valueTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
             valueTxt.verticalOverflow   = VerticalWrapMode.Truncate;
+            valueTxt.supportRichText    = true; // serve per colorare [!]/[CRIT]
             valueTxt.raycastTarget = false;
             var valueLe = valueGo.AddComponent<LayoutElement>();
             valueLe.preferredWidth  = ValueWidth;
@@ -659,7 +685,10 @@ namespace Arcontio.View.MapGrid
         {
             if (_needBars == null) return;
             for (int i = 0; i < _needBars.Length; i++)
-                _needBars[i]?.Set(needs.GetValue((NeedKind)i));
+            {
+                var kind = (NeedKind)i;
+                _needBars[i]?.Set(needs.GetValue(kind), needs.IsAlert(kind), needs.IsCritical(kind));
+            }
         }
 
         private static void MakeAxisLabel(Transform parent, string text)
