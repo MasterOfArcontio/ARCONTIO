@@ -63,9 +63,7 @@
         "assignedRole": ""
       },
       "needs": {
-        "hunger01": 0.0,
-        "fatigue01": 0.2,
-        "morale01": 0.7
+        "values": [0.0, 0.0, 0.2, 0.0, 0.0, 0.0, 0.0, 0.0]
       },
       "social": {
         "leadershipScore": 0.2,

@@ -40,7 +40,7 @@ namespace Arcontio.Core.Save
     //         "tags": ["veterano"]
     //       },
     //       "profile": { "competence": [...], "preference": [...], "obligation": [...] },
-    //       "needs": { "hunger01": 0.1, "fatigue01": 0.1, "morale01": 0.7 },
+    //       "needs": { "values": [0.1, 0.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0] },
     //       "social": { "leadershipScore": 0.2, "loyaltyToLeader01": 0.5, "justicePerception01": 0.5 },
     //       "spawnX": 10,
     //       "spawnY": 10,
