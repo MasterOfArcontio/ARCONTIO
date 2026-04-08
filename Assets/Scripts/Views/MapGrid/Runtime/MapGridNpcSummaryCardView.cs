@@ -232,31 +232,43 @@ namespace Arcontio.View.MapGrid
         private static readonly string[] AxisLabels = { "PREFERENZE", "COMPETENZA", "OBBLIGO" };
 
         /// <summary>
-        /// Aggiorna la sezione DNA DRIFT con barre proporzionali.
-        /// Chiama questo metodo ogni frame quando la card è visibile.
+        /// Aggiorna la sezione DNA DRIFT con barre stratificate (v0.04.08).
+        ///
+        /// Struttura visiva per ogni riga:
+        ///   sfondo grigio   = larghezza piena (max = 1.0)
+        ///   verde           = valore corrente (da 0 a currentValue)
+        ///   giallo/rosso    = drift tra seed DNA e valore corrente
+        ///   tick scuro      = cap massimo raggiungibile (solo se < 1.0)
+        ///   testo           = valore corrente numerico
+        ///
+        /// Il drift è 0 all'avvio (profilo == seed); cresce nel tempo con l'esperienza.
         /// </summary>
         public void UpdateDnaDrift(NpcDnaProfile dna, NpcProfile profile, DnaDistanceResult result)
         {
-            if (_driftDomainRows == null) return; // non ancora costruito
+            if (_driftDomainRows == null) return;
 
             float[] prefSeeds = dna.Preferences.Seeds;
             float[] oblSeeds  = dna.ObligationFrame.Seeds;
+            float[] compCaps  = dna.Capacities?.CompetenceCap;
 
             for (int d = 1; d < (int)DomainKind.COUNT; d++)
             {
                 int di = d - 1;
 
+                // PREFERENZE: seed = valore iniziale DNA, cap = 1.0
                 float dnaPref  = prefSeeds != null && d < prefSeeds.Length ? prefSeeds[d] : 0f;
                 float currPref = profile.Preference.Values[d];
-                _driftDomainRows[0][di].Set(DomainLabels[di], Mathf.Abs(currPref - dnaPref));
+                _driftDomainRows[0][di].Set(DomainLabels[di], currPref, dnaPref, 1f);
 
-                // Competenza: scostamento = quanto ha sviluppato dal punto di partenza (0)
+                // COMPETENZA: parte da 0, cresce con esperienza fino al cap DNA
                 float currComp = profile.Competence.Values[d];
-                _driftDomainRows[1][di].Set(DomainLabels[di], currComp);
+                float compCap  = compCaps  != null && d < compCaps.Length  ? compCaps[d]  : 1f;
+                _driftDomainRows[1][di].Set(DomainLabels[di], currComp, 0f, compCap);
 
-                float dnaObl  = oblSeeds != null && d < oblSeeds.Length ? oblSeeds[d] : 0f;
+                // OBBLIGO: seed = valore iniziale DNA, cap = 1.0
+                float dnaObl  = oblSeeds  != null && d < oblSeeds.Length   ? oblSeeds[d]  : 0f;
                 float currObl = profile.Obligation.Values[d];
-                _driftDomainRows[2][di].Set(DomainLabels[di], Mathf.Abs(currObl - dnaObl));
+                _driftDomainRows[2][di].Set(DomainLabels[di], currObl, dnaObl, 1f);
             }
         }
 
@@ -293,29 +305,88 @@ namespace Arcontio.View.MapGrid
         private const int   ValueWidth   = 32;
 
         /// <summary>
-        /// Inner class che rappresenta una riga con barra proporzionale.
-        /// Usa Image.Type.Filled per evitare conflitti col layout group.
+        /// Riga con barra stratificata (v0.04.08):
+        ///   BarBg (sfondo grigio, larghezza piena)
+        ///     ├─ BarGreen  (verde, da 0 a currentValue) — figlio con anchor [0..curr]
+        ///     ├─ BarDrift  (giallo/rosso, tra seed e curr) — figlio con anchor [lo..hi]
+        ///     └─ CapTick   (trattino scuro verticale al cap) — figlio con anchor [cap..cap]
+        ///
+        /// I figli di BarBg usano ancoraggio proporzionale: modificando anchorMin/Max.x
+        /// il loro posizionamento è relativo alla larghezza del contenitore, che è fissa
+        /// grazie al LayoutElement sul BarBg (preferredWidth = BarMaxWidth).
         /// </summary>
         private sealed class BarRow
         {
-            public Text  LabelText;
-            public Image BarFill;   // Image.Type.Filled — fillAmount controlla la proporzione
-            public Text  ValueText;
+            public Text          LabelText;
+            public Image         BarGreen;   // valore corrente (verde)
+            public Image         BarDrift;   // drift (giallo/rosso)
+            public RectTransform CapTickRt;  // tick verticale scuro al cap
+            public Text          ValueText;
 
-            public void Set(string label, float value01)
+            /// <summary>
+            /// Aggiorna la riga con i tre valori.
+            /// currentValue: valore attuale dell'NPC [0..1]
+            /// seedValue:    valore iniziale (da DNA) [0..1] — punto di riferimento del drift
+            /// capValue:     limite massimo raggiungibile [0..1] — posizione del tick scuro
+            /// </summary>
+            public void Set(string label, float currentValue, float seedValue, float capValue)
             {
-                float v = Mathf.Clamp01(value01);
+                float curr = Mathf.Clamp01(currentValue);
+                float seed = Mathf.Clamp01(seedValue);
+                float cap  = Mathf.Clamp01(capValue);
+                float driftAbs = Mathf.Abs(curr - seed);
+
                 LabelText.text = label;
-                BarFill.fillAmount = v;
-                BarFill.color = BarColor(v);
-                ValueText.text = v.ToString("0.00");
+                ValueText.text = curr.ToString("0.00");
+
+                // Verde: copre [0 .. currentValue]
+                SetRegion(BarGreen.rectTransform, 0f, curr);
+
+                // Drift: regione [min(seed,curr) .. max(seed,curr)], sovrapposta al verde
+                if (driftAbs > 0.005f)
+                {
+                    float lo = Mathf.Min(seed, curr);
+                    float hi = Mathf.Max(seed, curr);
+                    SetRegion(BarDrift.rectTransform, lo, hi);
+                    // giallo = drift moderato (<30%), rosso = drift alto (≥30%)
+                    BarDrift.color = driftAbs < 0.30f
+                        ? new Color(0.90f, 0.78f, 0.10f, 1f)
+                        : new Color(0.85f, 0.18f, 0.18f, 1f);
+                    BarDrift.gameObject.SetActive(true);
+                }
+                else
+                {
+                    BarDrift.gameObject.SetActive(false);
+                }
+
+                // Cap tick: trattino verticale scuro, visibile solo se cap < 1.0
+                if (cap < 0.995f)
+                {
+                    SetTick(CapTickRt, cap);
+                    CapTickRt.gameObject.SetActive(true);
+                }
+                else
+                {
+                    CapTickRt.gameObject.SetActive(false);
+                }
             }
 
-            private static Color BarColor(float v)
+            // Posiziona un'Image come striscia orizzontale [start01 .. end01] nel contenitore
+            private static void SetRegion(RectTransform rt, float start01, float end01)
             {
-                if (v < 0.35f) return new Color(0.22f, 0.75f, 0.22f);
-                if (v < 0.65f) return new Color(0.90f, 0.78f, 0.10f);
-                return new Color(0.85f, 0.18f, 0.18f);
+                rt.anchorMin = new Vector2(start01, 0f);
+                rt.anchorMax = new Vector2(Mathf.Max(start01, end01), 1f);
+                rt.offsetMin = Vector2.zero;
+                rt.offsetMax = Vector2.zero;
+            }
+
+            // Posiziona un thin tick verticale a pos01 nel contenitore
+            private static void SetTick(RectTransform rt, float pos01)
+            {
+                rt.anchorMin = new Vector2(pos01, 0f);
+                rt.anchorMax = new Vector2(pos01, 1f);
+                rt.offsetMin = new Vector2(-1f, 0f);
+                rt.offsetMax = new Vector2(1f,  0f);
             }
         }
 
@@ -341,21 +412,19 @@ namespace Arcontio.View.MapGrid
 
         private static BarRow MakeBarRow(Transform parent, string label)
         {
+            // ── Riga orizzontale (Label | BarBg | Value) ─────────────────────────
             var rowGo = new GameObject("BarRow_" + label);
             rowGo.transform.SetParent(parent, false);
 
             var hl = rowGo.AddComponent<HorizontalLayoutGroup>();
-            // childControlHeight/Width=true: HLG assegna esattamente preferredHeight/Width ai figli
-            // childForceExpand=false: i figli NON si allargano per riempire lo spazio extra
             hl.childControlHeight     = true;
             hl.childControlWidth      = true;
             hl.childForceExpandHeight = false;
             hl.childForceExpandWidth  = false;
             hl.spacing = 4;
-
             rowGo.AddComponent<LayoutElement>().preferredHeight = RowHeight;
 
-            // Label
+            // ── Label ─────────────────────────────────────────────────────────────
             var labelGo = new GameObject("Label");
             labelGo.transform.SetParent(rowGo.transform, false);
             var labelTxt = labelGo.AddComponent<Text>();
@@ -369,33 +438,58 @@ namespace Arcontio.View.MapGrid
             labelLe.preferredWidth  = LabelWidth;
             labelLe.preferredHeight = RowHeight;
 
-            // Barra sfondo (nero) — contiene la fill via Image.Type.Filled
+            // ── Contenitore barra (sfondo grigio, larghezza fissa) ────────────────
+            // I figli usano anchor proporzionali per posizionarsi dentro questo container.
             var barBgGo = new GameObject("BarBg");
             barBgGo.transform.SetParent(rowGo.transform, false);
             var barBgImg = barBgGo.AddComponent<Image>();
-            barBgImg.color = Color.black;
+            barBgImg.color = new Color(0.75f, 0.75f, 0.75f, 0.30f); // grigio trasparente = sfondo
             barBgImg.raycastTarget = false;
             var barBgLe = barBgGo.AddComponent<LayoutElement>();
             barBgLe.preferredWidth  = BarMaxWidth;
             barBgLe.preferredHeight = BarHeight;
 
-            // Barra fill — Image.Type.Filled copre l'intero sfondo
-            // fillAmount=[0..1] controlla quanta parte colorata è visibile
-            var barFillGo = new GameObject("BarFill");
-            barFillGo.transform.SetParent(barBgGo.transform, false);
-            var barFillImg = barFillGo.AddComponent<Image>();
-            barFillImg.raycastTarget = false;
-            barFillImg.type        = Image.Type.Filled;
-            barFillImg.fillMethod  = Image.FillMethod.Horizontal;
-            barFillImg.fillOrigin  = (int)Image.OriginHorizontal.Left;
-            barFillImg.fillAmount  = 0f;
-            var barFillRt = barFillGo.GetComponent<RectTransform>();
-            barFillRt.anchorMin = Vector2.zero;
-            barFillRt.anchorMax = Vector2.one;
-            barFillRt.offsetMin = Vector2.zero;
-            barFillRt.offsetMax = Vector2.zero;
+            // ── Barra verde (valore corrente) ─────────────────────────────────────
+            // Inizialmente a larghezza 0; SetRegion la aggiorna ogni frame.
+            var barGreenGo = new GameObject("BarGreen");
+            barGreenGo.transform.SetParent(barBgGo.transform, false);
+            var barGreenImg = barGreenGo.AddComponent<Image>();
+            barGreenImg.color = new Color(0.22f, 0.75f, 0.22f, 1f);
+            barGreenImg.raycastTarget = false;
+            var barGreenRt = barGreenGo.GetComponent<RectTransform>();
+            barGreenRt.anchorMin = Vector2.zero;
+            barGreenRt.anchorMax = Vector2.zero;
+            barGreenRt.offsetMin = Vector2.zero;
+            barGreenRt.offsetMax = Vector2.zero;
 
-            // Valore numerico
+            // ── Barra drift (giallo/rosso) ────────────────────────────────────────
+            // Sovrapposta al verde: copre la regione tra seed e valore corrente.
+            var barDriftGo = new GameObject("BarDrift");
+            barDriftGo.transform.SetParent(barBgGo.transform, false);
+            var barDriftImg = barDriftGo.AddComponent<Image>();
+            barDriftImg.raycastTarget = false;
+            var barDriftRt = barDriftGo.GetComponent<RectTransform>();
+            barDriftRt.anchorMin = Vector2.zero;
+            barDriftRt.anchorMax = Vector2.zero;
+            barDriftRt.offsetMin = Vector2.zero;
+            barDriftRt.offsetMax = Vector2.zero;
+            barDriftGo.SetActive(false); // nascosto finché non c'è drift
+
+            // ── Cap tick (trattino verticale scuro al limite massimo) ─────────────
+            // Visibile solo se il cap < 1.0 (es. CompetenceCap per asse Competenza).
+            var capTickGo = new GameObject("CapTick");
+            capTickGo.transform.SetParent(barBgGo.transform, false);
+            var capTickImg = capTickGo.AddComponent<Image>();
+            capTickImg.color = new Color(0.08f, 0.08f, 0.08f, 0.90f); // quasi nero
+            capTickImg.raycastTarget = false;
+            var capTickRt = capTickGo.GetComponent<RectTransform>();
+            capTickRt.anchorMin = new Vector2(1f, 0f);
+            capTickRt.anchorMax = new Vector2(1f, 1f);
+            capTickRt.offsetMin = new Vector2(-1f, 0f);
+            capTickRt.offsetMax = new Vector2(1f,  0f);
+            capTickGo.SetActive(false);
+
+            // ── Valore numerico ───────────────────────────────────────────────────
             var valueGo = new GameObject("Value");
             valueGo.transform.SetParent(rowGo.transform, false);
             var valueTxt = valueGo.AddComponent<Text>();
@@ -412,7 +506,9 @@ namespace Arcontio.View.MapGrid
             return new BarRow
             {
                 LabelText = labelTxt,
-                BarFill   = barFillImg,
+                BarGreen  = barGreenImg,
+                BarDrift  = barDriftImg,
+                CapTickRt = capTickRt,
                 ValueText = valueTxt
             };
         }
