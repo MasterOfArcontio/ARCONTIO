@@ -29,7 +29,10 @@ namespace Arcontio.Core
 
         // Classificazione logica
         public bool IsOccluder;       // se true: entra nella occlusion map
-        public bool IsInteractable;   // se true: può finire nella “memoria oggetti interagibili”
+        public bool IsInteractable;
+        public bool IsDoor;           // se true: questo oggetto Ã¨ una porta
+        public bool IsLockable;       // se true: supporta il lock (valido solo se IsDoor=true)
+        public string KeyId;          // DefId dell'oggetto chiave richiesto (valido solo se IsLockable=true)   // se true: può finire nella “memoria oggetti interagibili”
 
         // Occlusion params (validi se IsOccluder=true)
         public bool BlocksVision;

@@ -50,5 +50,9 @@ namespace Arcontio.Core.DevTools
         // Nota: usiamo stringa per stabilità JSON e leggibilità umana.
         public string OwnerKind = "None";
         public int OwnerId = -1;
+
+        // Stato porta (significativo solo se IsDoor=true nella ObjectDef corrispondente)
+        public bool IsOpen   = false;
+        public bool IsLocked = false;
     }
 }

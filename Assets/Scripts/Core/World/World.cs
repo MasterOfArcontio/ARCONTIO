@@ -902,11 +902,13 @@ namespace Arcontio.Core
 
                 data.Objects.Add(new DevMapObject
                 {
-                    DefId = obj.DefId,
-                    X = obj.CellX,
-                    Y = obj.CellY,
+                    DefId     = obj.DefId,
+                    X         = obj.CellX,
+                    Y         = obj.CellY,
                     OwnerKind = obj.OwnerKind.ToString(),
-                    OwnerId = obj.OwnerId,
+                    OwnerId   = obj.OwnerId,
+                    IsOpen    = obj.IsOpen,
+                    IsLocked  = obj.IsLocked,
                 });
             }
 
@@ -964,7 +966,14 @@ namespace Arcontio.Core
                     catch { kind = OwnerKind.None; }
                 }
 
-                CreateObject(o.DefId, o.X, o.Y, kind, o.OwnerId);
+                int newObjId = CreateObject(o.DefId, o.X, o.Y, kind, o.OwnerId);
+
+                // Ripristina stato porta (valido solo per IsDoor=true)
+                if ((o.IsOpen || o.IsLocked) && newObjId >= 0 && Objects.TryGetValue(newObjId, out var newInst))
+                {
+                    newInst.IsOpen   = o.IsOpen;
+                    newInst.IsLocked = o.IsLocked;
+                }
             }
         }
         

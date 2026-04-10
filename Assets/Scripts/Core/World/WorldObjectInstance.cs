@@ -25,9 +25,15 @@ namespace Arcontio.Core
         // Stato runtime (specifico per alcuni oggetti)
         public int OccupantNpcId;   // letto: chi lo occupa, -1 se libero
 
+        // Stato porta (valido solo se ObjectDef.IsDoor = true)
+        public bool IsOpen;         // true = porta aperta, false = chiusa (default)
+        public bool IsLocked;       // true = richiede chiave per aprire (default false)
+
         public WorldObjectInstance()
         {
             OccupantNpcId = -1;
+            IsOpen   = false;
+            IsLocked = false;
             OwnerKind = OwnerKind.None;
             OwnerId = -1;
         }
