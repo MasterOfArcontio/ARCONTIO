@@ -14,11 +14,9 @@ namespace Arcontio.Core
     // - NpcCore (NPCComponents.cs) è un placeholder che verrà rimosso in sessione 5.
     //   I suoi campi (Name, Charisma, Decisiveness, Empathy, Ambition) mappano
     //   rispettivamente su Identity.Name, CognitiveModulators e Dispositions qui sotto.
-    // - PersonalityMemoryParams è assorbito da CognitiveModulators in sessione 5:
-    //     .Resilience01        → CognitiveModulators.MemoryResilience01
-    //     .TraumaSensitivity01 → CognitiveModulators.TraumaSensitivity01
-    //     .Rumination01        → CognitiveModulators.Rumination01
-    //     .Gullibility01       → CognitiveModulators.Gullibility01
+    // - PersonalityMemoryParams è stato eliminato in v0.04.a: i suoi campi erano
+    //   duplicati di CognitiveModulators. MemoryDecaySystem legge ora direttamente
+    //   da NpcDnaProfile.CognitiveModulators (Resilience → MemoryResilience01, ecc.).
     // ─────────────────────────────────────────────────────────────────────────
 
 
@@ -266,9 +264,9 @@ namespace Arcontio.Core
     /// Modulatori cognitivi stabili: influenzano la valutazione delle opzioni
     /// e il comportamento decisionale nelle formule di scoring (v0.05+).
     ///
-    /// Contiene anche i parametri di memoria individuale (assorbiti da
-    /// PersonalityMemoryParams in sessione 5): TraumaSensitivity01, MemoryResilience01,
-    /// Rumination01, Gullibility01.
+    /// Contiene anche i parametri di memoria individuale (già assorbiti da
+    /// PersonalityMemoryParams, eliminata in v0.04.a): TraumaSensitivity01,
+    /// MemoryResilience01, Rumination01, Gullibility01.
     ///
     /// Distinzione tra i due campi di resilienza:
     ///   StressResilience01  — resistenza allo stress di ruolo e ai cambiamenti sociali
@@ -312,13 +310,13 @@ namespace Arcontio.Core
         public readonly float DriftResistance01;
 
         // ── Parametri di memoria individuale ─────────────────────────────────
-        // Assorbiti da PersonalityMemoryParams in sessione 5.
         // Rendono il sistema di memoria individuale per NPC invece che uniforme.
+        // PersonalityMemoryParams è stata eliminata in v0.04.a: questi campi sono
+        // la source of truth letta da MemoryDecaySystem e MemoryEncodingSystem.
 
         /// <summary>
         /// Sensibilità al trauma: eventi violenti generano tracce di memoria più intense.
         /// 0 = insensibile, 1 = altamente traumatizzabile.
-        /// Mappa su PersonalityMemoryParams.TraumaSensitivity01.
         /// </summary>
         public readonly float TraumaSensitivity01;
 
@@ -326,21 +324,18 @@ namespace Arcontio.Core
         /// Velocità di recupero dai ricordi traumatici.
         /// 0 = le memorie traumatiche persistono a lungo (decay lento),
         /// 1 = recupera rapidamente (decay veloce).
-        /// Mappa su PersonalityMemoryParams.Resilience01.
         /// </summary>
         public readonly float MemoryResilience01;
 
         /// <summary>
         /// Tendenza a rimuginare: le memorie intense si autodecay più lentamente.
         /// 0 = dimentica facilmente, 1 = rimugina molto.
-        /// Mappa su PersonalityMemoryParams.Rumination01.
         /// </summary>
         public readonly float Rumination01;
 
         /// <summary>
         /// Credulità verso i rumor: accetta informazioni di seconda mano con bassa affidabilità.
         /// 0 = molto scettico, 1 = molto credulo.
-        /// Mappa su PersonalityMemoryParams.Gullibility01.
         /// </summary>
         public readonly float Gullibility01;
 

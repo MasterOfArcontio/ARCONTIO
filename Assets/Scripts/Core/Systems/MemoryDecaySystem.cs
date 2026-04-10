@@ -9,11 +9,10 @@ namespace Arcontio.Core
     /// - Non crea nuove memorie (nessuna codifica eventi qui)
     /// - Non comunica token
     /// - Si limita ad applicare TickDecay su ogni NPC
-    /// 
-    /// Giorno 3:
-    /// - Il decay Ë modulato dai tratti dell'NPC (PersonalityMemoryParams).
-    ///   Resilience alta => dimentica pi˘ in fretta
-    ///   Rumination alta => dimentica pi˘ lentamente
+    ///
+    /// Il decay √® modulato dai tratti cognitivi del DNA dell'NPC:
+    ///   MemoryResilience01 alta => dimentica pi√π in fretta
+    ///   Rumination01 alta => dimentica pi√π lentamente
     /// </summary>
     public sealed class MemoryDecaySystem : ISystem
     {
@@ -41,14 +40,24 @@ namespace Arcontio.Core
                 if (!world.Memory.TryGetValue(id, out var store) || store == null)
                     continue;
 
-                // Se non troviamo parametri (non dovrebbe accadere), usiamo default.
-                PersonalityMemoryParams p;
-                if (!world.MemoryParams.TryGetValue(id, out p))
-                    p = PersonalityMemoryParams.DefaultNpc();
+                // Legge i tratti individuali direttamente dal DNA (source of truth).
+                // Se l'NPC non ha DNA (non dovrebbe accadere), usa valori neutri.
+                float resilience;
+                float rumination;
+                if (world.NpcDna.TryGetValue(id, out var dna))
+                {
+                    resilience = dna.CognitiveModulators.MemoryResilience01;
+                    rumination = dna.CognitiveModulators.Rumination01;
+                }
+                else
+                {
+                    resilience = 0.50f;
+                    rumination = 0.25f;
+                }
 
-                // Calcolo semplice del moltiplicatore di decay:
-                // - Resilience aumenta decay (dimentica prima)
-                // - Rumination riduce decay (rimugina, trattiene)
+                // Calcolo del moltiplicatore di decay:
+                // - MemoryResilience01 aumenta decay (dimentica prima)
+                // - Rumination01 riduce decay (rimugina, trattiene)
                 //
                 // Esempio:
                 //   Resilience 0.0 => +0%
@@ -58,8 +67,8 @@ namespace Arcontio.Core
                 //   Rumination 1.0 => -50% (non azzeriamo mai del tutto)
                 float decayMultiplier = 1f;
 
-                decayMultiplier += p.Resilience01 * 1.0f;      // +0..+1
-                decayMultiplier -= p.Rumination01 * 0.5f;      // -0..-0.5
+                decayMultiplier += resilience * 1.0f;   // +0..+1
+                decayMultiplier -= rumination * 0.5f;   // -0..-0.5
 
                 // Clamp di sicurezza: non vogliamo decay <= 0
                 if (decayMultiplier < 0.10f) decayMultiplier = 0.10f;

@@ -384,7 +384,6 @@ namespace Arcontio.Core
 
         // Memoria (per-NPC)
         public readonly Dictionary<int, MemoryStore> Memory = new();
-        public readonly Dictionary<int, PersonalityMemoryParams> MemoryParams = new();
 
         // 1 store per NPC
         public readonly Dictionary<int, NpcObjectMemoryStore> NpcObjectMemory =
@@ -2374,19 +2373,9 @@ namespace Arcontio.Core
             GridPos[id] = new GridPosition(x, y);
             NpcFacing[id] = CardinalDirection.North;
 
-            // MemoryParams — inizializzati dal DNA (valori individuali, non default statici)
-            MemoryParams[id] = new PersonalityMemoryParams
-            {
-                MaxTraces           = 128,
-                TraumaSensitivity01 = dna.CognitiveModulators.TraumaSensitivity01,
-                Resilience01        = dna.CognitiveModulators.MemoryResilience01,
-                Rumination01        = dna.CognitiveModulators.Rumination01,
-                Gullibility01       = dna.CognitiveModulators.Gullibility01
-            };
-
-            // MemoryStore
+            // MemoryStore — MaxTraces da config globale, tratti individuali dal DNA
             var store = new MemoryStore();
-            store.MaxTraces = MemoryParams[id].MaxTraces;
+            store.MaxTraces = Config.Sim.memory.max_traces_per_npc;
             Memory[id] = store;
 
             // Private food init (se non presente)

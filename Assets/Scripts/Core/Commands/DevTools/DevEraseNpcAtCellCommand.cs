@@ -71,7 +71,6 @@ namespace Arcontio.Core.Commands.DevTools
             // ============================================================
 
             world.Memory.Remove(npcId);
-            world.MemoryParams.Remove(npcId);
             world.NpcObjectMemory.Remove(npcId);
 
             // Ownership pinned belief

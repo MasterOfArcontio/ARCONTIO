@@ -68,6 +68,11 @@ namespace Arcontio.Core.Config
         // Apprendimento visivo dei landmark tramite FOV degli NPC.
         // Complementare al learning fisico (NotifyNpcMovedForLandmarkLearning).
         public LandmarkPerceptionParams landmark_perception = new LandmarkPerceptionParams();
+
+        // ---------------- Memory System (v0.04.a) ----------------
+        // Parametri globali del sistema di memoria NPC.
+        // I tratti individuali (Resilience, Rumination, ecc.) vengono letti dal DNA.
+        public MemorySystemParams memory = new MemorySystemParams();
     }
 
     // ============================================================
@@ -442,6 +447,19 @@ namespace Arcontio.Core.Config
         // Confidence iniziale degli edge soggettivi visivi (Meccanismo 1 e 2).
         // Inferiore agli edge fisici (0.25f) per riflettere l'incertezza della stima visiva.
         public float subjective_edge_base_reliability = 0.15f;
+    }
+
+    // ============================================================
+    // MEMORY SYSTEM (v0.04.a)
+    // ============================================================
+    [Serializable]
+    public sealed class MemorySystemParams
+    {
+        // Capacità massima di tracce per NPC nel MemoryStore.
+        // Valore globale: tutti gli NPC condividono lo stesso cap.
+        // I tratti individuali (Resilience, Rumination, ecc.) modulano il decay,
+        // non questo limite strutturale.
+        public int max_traces_per_npc = 128;
     }
 
     // ============================================================

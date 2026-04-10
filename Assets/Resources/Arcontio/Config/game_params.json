@@ -96,5 +96,8 @@
     "subjective_edges_enabled": true,
     "subjective_edge_max_dist": 8,
     "subjective_edge_base_reliability": 0.15
+  },
+  "memory": {
+    "max_traces_per_npc": 128
   }
 }
