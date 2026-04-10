@@ -19,7 +19,7 @@ public bool IsDoor;       // true = questo oggetto è una porta
 public bool IsLockable;   // true = supporta il lock (valido solo se IsDoor=true)
 public string KeyId;      // DefId dell'oggetto chiave richiesto (valido solo se IsLockable=true)
 ```
-
+ 
 **`Scripts/Core/World/WorldObjectInstance.cs`**
 Aggiungere i seguenti campi a `WorldObjectInstance`:
 ```csharp
