@@ -969,10 +969,13 @@ namespace Arcontio.Core
                 int newObjId = CreateObject(o.DefId, o.X, o.Y, kind, o.OwnerId);
 
                 // Ripristina stato porta (valido solo per IsDoor=true)
-                if ((o.IsOpen || o.IsLocked) && newObjId >= 0 && Objects.TryGetValue(newObjId, out var newInst))
+                if (newObjId >= 0 && Objects.TryGetValue(newObjId, out var newInst))
                 {
-                    newInst.IsOpen   = o.IsOpen;
-                    newInst.IsLocked = o.IsLocked;
+                    // IsLocked: stato runtime, set diretto (non tocca la OcclusionMap)
+                    if (o.IsLocked) newInst.IsLocked = true;
+
+                    // IsOpen: usa SetDoorOpen per aggiornare anche la OcclusionMap
+                    if (o.IsOpen) SetDoorOpen(newObjId, true);
                 }
             }
         }
@@ -2748,6 +2751,74 @@ if (!NpcAction.ContainsKey(id))
 
             // 4) rimuovi dal registry oggetti
             Objects.Remove(objectId);
+        }
+
+        /// <summary>
+        /// Apre o chiude una porta aggiornando lo stato runtime e le cache di occlusione.
+        ///
+        /// Unico punto autorizzato a modificare WorldObjectInstance.IsOpen.
+        /// Nessun sistema deve scrivere IsOpen direttamente sull'istanza.
+        ///
+        /// Aggiorna immediatamente:
+        ///   - _occlusion[] (OcclusionCell) — usata da HasLineOfSight
+        ///   - _blocksVision[] / _blocksMovement[] — usate da IsMovementBlocked ecc.
+        ///   - ObjectOccluders (per query TryGetOccluder)
+        ///
+        /// NON aggiorna il LandmarkRegistry: le porte sono sempre landmark fissi
+        /// indipendentemente dallo stato IsOpen.
+        /// </summary>
+        public void SetDoorOpen(int objectId, bool isOpen)
+        {
+            if (!Objects.TryGetValue(objectId, out var instance) || instance == null)
+            {
+                Debug.LogError($"[World] SetDoorOpen: oggetto {objectId} non trovato.");
+                return;
+            }
+
+            if (!TryGetObjectDef(instance.DefId, out var def) || def == null || !def.IsDoor)
+            {
+                Debug.LogError($"[World] SetDoorOpen: oggetto {objectId} (def='{instance.DefId}') non è una porta (IsDoor=false).");
+                return;
+            }
+
+            instance.IsOpen = isOpen;
+
+            int x   = instance.CellX;
+            int y   = instance.CellY;
+            int idx = Idx(x, y);
+
+            // Quando aperta: la cella non blocca più movimento né visione.
+            // Quando chiusa: la cella torna ai valori della def.
+            bool blocksVision    = !isOpen && def.BlocksVision;
+            bool blocksMovement  = !isOpen && def.BlocksMovement;
+            float visionCost     = def.VisionCost <= 0f ? 1f : def.VisionCost;
+
+            // Aggiorna _occlusion[] (usata da HasLineOfSight / TryGetOccluder)
+            if (_occlusion != null && _occlusion.Length == MapWidth * MapHeight && InBounds(x, y))
+            {
+                _occlusion[idx] = new OcclusionCell
+                {
+                    OccluderObjectId = objectId,
+                    BlocksVision     = blocksVision,
+                    BlocksMovement   = blocksMovement,
+                    VisionCost       = visionCost
+                };
+            }
+
+            // Aggiorna cache bool[] (usate da IsMovementBlocked / IsVisionBlocked)
+            if (_blocksVision != null && _blocksVision.Length == MapWidth * MapHeight && InBounds(x, y))
+                _blocksVision[CellIndex(x, y)] = blocksVision;
+
+            if (_blocksMovement != null && _blocksMovement.Length == MapWidth * MapHeight && InBounds(x, y))
+                _blocksMovement[CellIndex(x, y)] = blocksMovement;
+
+            // Aggiorna ObjectOccluders (per query TryGetOccluder)
+            ObjectOccluders[objectId] = new Occluder
+            {
+                BlocksVision   = blocksVision,
+                BlocksMovement = blocksMovement,
+                VisionCost     = visionCost
+            };
         }
 
         private void PlaceOccluderInCache(int objectId, int x, int y, ObjectDef def)
