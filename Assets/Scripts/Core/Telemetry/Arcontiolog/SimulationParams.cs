@@ -185,6 +185,11 @@ namespace Arcontio.Core.Config
         // Merge
         public float merge_radius = 1.5f;
 
+        // Pruning di prossimità con i Doorway (PATCH 6 — v0.04.10.h):
+        // Disattiva Junction/AreaCenter entro questa distanza (celle) da un Doorway.
+        // 0 = pruning disabilitato.
+        public float door_prune_radius = 2.0f;
+
         // Nota (v0.03.02.a): candidate detection params rimossi.
         // junction_min_exits/candidate_cooldown_ticks erano del vecchio sistema Doorway/Junction.
 

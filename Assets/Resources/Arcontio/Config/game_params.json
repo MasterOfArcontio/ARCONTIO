@@ -45,6 +45,7 @@
     "maxWorldLandmarks": 512,
     "maxEdgesPerLandmark": 8,
     "merge_radius": 1,
+    "door_prune_radius": 2.0,
     "eviction": {
       "eviction_stale_ticks": 60000,
       "eviction_cooldown_ticks": 120

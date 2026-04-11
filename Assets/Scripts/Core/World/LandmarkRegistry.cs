@@ -224,6 +224,55 @@ namespace Arcontio.Core
                 }
             }
 
+            // ============================================================
+            // PRUNING DI PROSSIMITÀ CON DOORWAY (PATCH 6 — v0.04.10.h)
+            // ============================================================
+            // Dopo che GVD-DIN e porte hanno popolato il registry,
+            // disattiva i nodi Junction/AreaCenter troppo vicini a un Doorway.
+            // Rationale: una porta è già il separatore semantico esplicito di quella
+            // zona — un nodo GVD adiacente è ridondante e confonde l'A* su grafo.
+            //
+            // Usa soft-delete (IsActive=false), coerente con ApplyGlobalCap.
+            // door_prune_radius = 0 → pruning disabilitato.
+            {
+                float doorPruneRadius = lm != null ? lm.door_prune_radius : 2.0f;
+                if (doorPruneRadius > 0f)
+                {
+                    float r2 = doorPruneRadius * doorPruneRadius;
+
+                    // Raccoglie posizioni di tutti i Doorway attivi
+                    var doorCells = new System.Collections.Generic.List<(int x, int y)>();
+                    for (int i = 0; i < _nodes.Count; i++)
+                    {
+                        var n = _nodes[i];
+                        if (n != null && n.IsActive && n.Kind == LandmarkKind.Doorway)
+                            doorCells.Add((n.CellX, n.CellY));
+                    }
+
+                    // Disattiva Junction/AreaCenter entro doorPruneRadius da un Doorway
+                    if (doorCells.Count > 0)
+                    {
+                        for (int i = 0; i < _nodes.Count; i++)
+                        {
+                            var n = _nodes[i];
+                            if (n == null || !n.IsActive) continue;
+                            if (n.Kind == LandmarkKind.Doorway) continue; // i Doorway non vengono mai toccati
+
+                            for (int d = 0; d < doorCells.Count; d++)
+                            {
+                                int ddx = n.CellX - doorCells[d].x;
+                                int ddy = n.CellY - doorCells[d].y;
+                                if (ddx * ddx + ddy * ddy <= r2)
+                                {
+                                    n.IsActive = false;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             // Passi comuni a tutti i branch
             ApplyGlobalCap(maxWorld);
             RebuildActiveCellIndex(world);
