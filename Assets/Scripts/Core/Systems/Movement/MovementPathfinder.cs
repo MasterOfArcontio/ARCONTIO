@@ -1155,7 +1155,20 @@ namespace Arcontio.Core
                 // ── FISICA (BFS/JPS locale): aggira angoli e geometrie concave ──
                 // Usa la cache di occlusione globale per espandere oltre gli angoli.
                 if (world.IsMovementBlocked(x, y))
-                    return false;
+                {
+                    // Fix v0.04.10.n: le porte chiuse non bloccate sono attraversabili
+                    // dal punto di vista del planning BFS: l'NPC può aprirle.
+                    // Il blocco fisico viene gestito a runtime dal rilevamento porta
+                    // in MovementSystem (che emette OpenDoorCommand al momento del passo).
+                    int doorObjId = world.GetObjectAt(x, y);
+                    bool isUnlockedClosedDoor = doorObjId >= 0
+                        && world.Objects.TryGetValue(doorObjId, out var dInst) && dInst != null
+                        && world.TryGetObjectDef(dInst.DefId, out var dDef) && dDef != null
+                        && dDef.IsDoor && !dInst.IsOpen && !dInst.IsLocked;
+                    if (!isUnlockedClosedDoor)
+                        return false;
+                    // Porta chiusa apribile: considerata walkable per BFS, non return false.
+                }
             }
             else
             {

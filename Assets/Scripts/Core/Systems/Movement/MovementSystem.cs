@@ -630,43 +630,53 @@ namespace Arcontio.Core
                 }
                 else
                 {
-                    // ── RILEVAMENTO PORTA (PATCH 4 — v0.04.10.f) ─────────────────────────
-                    // Prima di incrementare BlockedTicks, verifica se la cella verso cui
-                    // l'NPC voleva muoversi è bloccata da una porta.
+                    // ── RILEVAMENTO PORTA (v0.04.10.n) ───────────────────────────────────
+                    // Prima di incrementare BlockedTicks, scansiona tutte e 4 le celle
+                    // cardinali adiacenti all'NPC per trovare una porta chiusa apribile.
                     //
-                    // Casi:
-                    // - Porta aperta ma bloccata   → caso anomalo, log warning + BlockedTicks.
-                    // - Porta chiusa, non bloccata → emetti OpenDoorCommand, NON incrementare
-                    //   BlockedTicks. Il movimento avverrà al tick successivo.
-                    // - Porta chiusa, bloccata     → trattare come muro, BlockedTicks normale.
-                    //   (NOTA FUTURA: con inventario NPC, verificare qui la chiave.)
+                    // Fix v0.04.10.n: in precedenza si controllava solo la cella
+                    // x+primaryStepX, y+primaryStepY (direzione verso il target).
+                    // Se la porta è in una direzione diversa dal target (tipico di un NPC
+                    // in una stanza chiusa il cui target è fuori ma non allineato alla porta),
+                    // il rilevamento mancava la porta e si incrementava BlockedTicks.
+                    //
+                    // Ora si scansionano tutte le 4 direzioni cardinali. La prima porta
+                    // chiusa non bloccata trovata viene aperta; l'NPC non perde il tick.
                     {
-                        int doorCellX = x + primaryStepX;
-                        int doorCellY = y + primaryStepY;
-                        int doorObjId = world.GetObjectAt(doorCellX, doorCellY);
-
-                        if (doorObjId >= 0
-                            && world.Objects.TryGetValue(doorObjId, out var doorInst)
-                            && doorInst != null
-                            && world.TryGetObjectDef(doorInst.DefId, out var doorDef)
-                            && doorDef != null
-                            && doorDef.IsDoor)
+                        bool doorOpenedThisTick = false;
+                        // Ordine: N, S, E, W — arbitrario ma deterministico.
+                        int[] cardDx = { 0,  0, 1, -1 };
+                        int[] cardDy = { 1, -1, 0,  0 };
+                        for (int d = 0; d < 4 && !doorOpenedThisTick; d++)
                         {
-                            if (doorInst.IsOpen)
+                            int cx = x + cardDx[d];
+                            int cy = y + cardDy[d];
+                            int adjObjId = world.GetObjectAt(cx, cy);
+                            if (adjObjId < 0) continue;
+                            if (!world.Objects.TryGetValue(adjObjId, out var adjInst) || adjInst == null) continue;
+                            if (!world.TryGetObjectDef(adjInst.DefId, out var adjDef) || adjDef == null) continue;
+                            if (!adjDef.IsDoor) continue;
+
+                            if (adjInst.IsOpen)
                             {
                                 // Porta aperta ma OcclusionMap non aggiornata: caso anomalo.
                                 UnityEngine.Debug.LogWarning(
-                                    $"[MovementSystem] npc={npcId} bloccato da porta APERTA" +
-                                    $" obj={doorObjId} at ({doorCellX},{doorCellY}). OcclusionMap desincronizzata?");
+                                    $"[MovementSystem] npc={npcId} adiacente a porta APERTA ma bloccato" +
+                                    $" obj={adjObjId} at ({cx},{cy}). OcclusionMap desincronizzata?");
                             }
-                            else if (!doorInst.IsLocked)
+                            else if (!adjInst.IsLocked)
                             {
                                 // Porta chiusa e non bloccata: apri e prosegui al prossimo tick.
-                                new OpenDoorCommand(npcId, doorObjId).Execute(world, bus);
-                                world.NpcMoveIntents[npcId] = intent; // intent invariato, nessun BlockedTick
-                                continue;
+                                new OpenDoorCommand(npcId, adjObjId).Execute(world, bus);
+                                doorOpenedThisTick = true;
                             }
-                            // IsLocked=true: cade nel comportamento normale (muro invalicabile).
+                            // IsLocked=true: trattata come muro, continua a scansionare.
+                        }
+
+                        if (doorOpenedThisTick)
+                        {
+                            world.NpcMoveIntents[npcId] = intent; // intent invariato, nessun BlockedTick
+                            continue;
                         }
                     }
 
