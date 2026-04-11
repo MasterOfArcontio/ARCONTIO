@@ -437,7 +437,7 @@ namespace Arcontio.Core
                             && MovementPathfinder.TryGetActiveNpcLocalSearchNextStep(world, npcId, out localStepX, out localStepY);
                     }
 
-                    if (hasLocalStep && TryMoveTo(world, npcId, localStepX, localStepY))
+                    if (hasLocalStep && TryMoveTo(world, npcId, localStepX, localStepY, bus))
                     {
                         localMoved = true;
                         localToX = localStepX;
@@ -445,7 +445,7 @@ namespace Arcontio.Core
                     }
                     else if (MovementPathfinder.TryReplanNpcLocalSearch(world, npcId, x, y)
                         && MovementPathfinder.TryGetActiveNpcLocalSearchNextStep(world, npcId, out localStepX, out localStepY)
-                        && TryMoveTo(world, npcId, localStepX, localStepY))
+                        && TryMoveTo(world, npcId, localStepX, localStepY, bus))
                     {
                         localMoved = true;
                         localToX = localStepX;
@@ -510,7 +510,7 @@ namespace Arcontio.Core
                 bool effectiveTargetHasDirectPath = MovementPathfinder.CanNpcUseDirectPath(world, npcId, effectiveTargetX, effectiveTargetY);
 
                 // Tentativo 1: step scelto
-                if (TryMoveTo(world, npcId, x + stepX, y + stepY))
+                if (TryMoveTo(world, npcId, x + stepX, y + stepY, bus))
                 {
                     moved = true;
                     movedToX = x + stepX;
@@ -533,7 +533,7 @@ namespace Arcontio.Core
                     // Se anche il fallback non è possibile, restiamo fermi.
                     // Nota: se stepX/stepY sono entrambi 0, TryMoveTo fallirà (bounds) ma preferiamo essere espliciti.
                     if (stepX != 0 || stepY != 0)
-                        if (TryMoveTo(world, npcId, x + stepX, y + stepY))
+                        if (TryMoveTo(world, npcId, x + stepX, y + stepY, bus))
                         {
                             moved = true;
                             movedToX = x + stepX;
@@ -560,7 +560,7 @@ namespace Arcontio.Core
                         world.SetDebugJumpPathForNpc(npcId, fallbackPath, remainingBudget);
 
                         var next = fallbackPath[1];
-                        if (TryMoveTo(world, npcId, next.x, next.y))
+                        if (TryMoveTo(world, npcId, next.x, next.y, bus))
                         {
                             moved = true;
                             movedUsingLocalSearch = true;
@@ -989,15 +989,38 @@ namespace Arcontio.Core
             );
         }
 
-        private static bool TryMoveTo(World world, int npcId, int tx, int ty)
+        private static bool TryMoveTo(World world, int npcId, int tx, int ty, MessageBus bus)
         {
             // Bounds
             if (!world.InBounds(tx, ty))
                 return false;
 
-            // Blocco movimento
+            // Blocco movimento: se la cella è bloccata, controlla se è una porta chiusa apribile.
             if (world.IsMovementBlocked(tx, ty))
-                return false;
+            {
+                int doorObjId = world.GetObjectAt(tx, ty);
+                bool opened = false;
+                if (doorObjId >= 0
+                    && world.Objects.TryGetValue(doorObjId, out var doorInst) && doorInst != null
+                    && world.TryGetObjectDef(doorInst.DefId, out var doorDef) && doorDef != null
+                    && doorDef.IsDoor && !doorInst.IsOpen && !doorInst.IsLocked)
+                {
+                    new OpenDoorCommand(npcId, doorObjId).Execute(world, bus);
+                    opened = true;
+
+                    ArcontioLogger.Trace(
+                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (tx, ty)),
+                        new LogBlock(LogLevel.Trace, "log.move.door_opened_trymoveto")
+                            .AddField("x", tx)
+                            .AddField("y", ty)
+                            .AddField("doorId", doorObjId)
+                    );
+                }
+
+                // Dopo l'apertura la cella potrebbe essere ancora bloccata (porta locked, altro oggetto ecc.).
+                if (!opened || world.IsMovementBlocked(tx, ty))
+                    return false;
+            }
 
             // 1 NPC per cell: se c'è già qualcuno non entriamo.
             if (world.TryGetNpcAt(tx, ty, out _))
