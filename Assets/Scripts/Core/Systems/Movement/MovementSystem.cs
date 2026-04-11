@@ -305,7 +305,19 @@ namespace Arcontio.Core
                 // Se non siamo in prefix commitment, selezioniamo il target normalmente.
                 if (!inPrefixCommitment)
                 {
-                    if (!MovementPathfinder.CanNpcUseDirectPath(world, npcId, finalTargetX, finalTargetY))
+                    // Fix v0.04.10.m: applica lo stesso gate FOV usato in InitializeNavigation.
+                    // In precedenza questo controllo usava solo CanNpcUseDirectPath (traversabilità
+                    // greedy), senza il gate percettivo Range+FOV+LOS su finalTarget.
+                    // Dopo l'apertura delle porte il corridoio risulta greedy-clear per l'intera
+                    // distanza, quindi il check greedy passava anche per target a 26 celle
+                    // (oltre visionRange=17), bypassando la macro-route landmark.
+                    bool checkFovRuntime      = GetDirectCheckFov(world);
+                    bool targetVisibleRuntime = !checkFovRuntime
+                                               || CanAcquireDirectPerceptually(world, npcId, finalTargetX, finalTargetY);
+                    bool directClearRuntime   = targetVisibleRuntime
+                                               && MovementPathfinder.CanNpcUseDirectPath(world, npcId, finalTargetX, finalTargetY);
+
+                    if (!directClearRuntime)
                     {
                         if (world.TryGetMacroExecutionImmediateTarget(npcId, out int macroTargetX, out int macroTargetY, out macroLastMile, out macroNextNodeId))
                         {
