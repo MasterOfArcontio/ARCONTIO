@@ -202,6 +202,28 @@ namespace Arcontio.Core
                 // Se entrambi i flag sono false il registry rimane vuoto.
             }
 
+            // ============================================================
+            // PASSO COMUNE — Porte come Doorway landmark (PATCH 5 — v0.04.10.g)
+            // ============================================================
+            // Indipendente dal sistema di estrazione scelto (Hybrid o GVD-DIN).
+            // Le porte sono sempre separatori semantici dello spazio, indipendentemente
+            // dal loro stato IsOpen: una porta aperta rimane un separatore fisico.
+            //
+            // Merge radius per Doorway fisso a 1 cella: evita di assorbire landmark
+            // adiacenti di tipo diverso (Junction, AreaCenter). Una porta a 2 celle
+            // di larghezza produce due Doorway che vengono mergiati in uno solo.
+            {
+                const float doorMergeRadius = 1.0f;
+                foreach (var kv in world.Objects)
+                {
+                    var instance = kv.Value;
+                    if (instance == null) continue;
+                    if (!world.TryGetObjectDef(instance.DefId, out var def) || def == null) continue;
+                    if (!def.IsDoor) continue;
+                    AddOrMergeNode(instance.CellX, instance.CellY, LandmarkKind.Doorway, doorMergeRadius);
+                }
+            }
+
             // Passi comuni a tutti i branch
             ApplyGlobalCap(maxWorld);
             RebuildActiveCellIndex(world);
