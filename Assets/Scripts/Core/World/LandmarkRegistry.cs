@@ -273,6 +273,81 @@ namespace Arcontio.Core
                 }
             }
 
+            // ============================================================
+            // WAYPOINT INTERMEDI IN SPAZI APERTI (PATCH 7 — v0.04.10.i)
+            // ============================================================
+            // Per ogni coppia di landmark attivi con distanza > waypoint_min_distance,
+            // inserisce AreaCenter waypoints lungo la linea retta che li congiunge,
+            // a intervalli regolari di waypoint_min_distance celle.
+            //
+            // Condizioni per inserire un waypoint:
+            //   1. La linea retta tra A e B è interamente walkable (Bresenham).
+            //   2. Il candidato ha DT >= waypoint_min_dt (zona aperta, non corridoio).
+            //
+            // Usa DtValues di GvdDinComputer (disponibile solo se GVD-DIN era attivo).
+            // Lo snapshot dei nodi è calcolato PRIMA dell'inserimento per evitare
+            // cascate (waypoint tra waypoints).
+            {
+                int waypointMinDist = lm != null ? lm.waypoint_min_distance : 17;
+                int waypointMinDt   = lm != null ? lm.waypoint_min_dt       : 3;
+
+                if (waypointMinDist > 0
+                    && _gvdDinComputer != null
+                    && _gvdDinComputer.DtValues != null
+                    && _gvdDinComputer.MapWidth == world.MapWidth)
+                {
+                    int mapW = world.MapWidth;
+
+                    // Snapshot nodi attivi pre-inserimento
+                    var snapshot = new System.Collections.Generic.List<LandmarkNode>(_nodes.Count);
+                    for (int i = 0; i < _nodes.Count; i++)
+                    {
+                        var n = _nodes[i];
+                        if (n != null && n.IsActive)
+                            snapshot.Add(n);
+                    }
+
+                    for (int i = 0; i < snapshot.Count; i++)
+                    {
+                        for (int j = i + 1; j < snapshot.Count; j++)
+                        {
+                            var a = snapshot[i];
+                            var b = snapshot[j];
+
+                            int ddx = b.CellX - a.CellX;
+                            int ddy = b.CellY - a.CellY;
+                            float dist = UnityEngine.Mathf.Sqrt(ddx * ddx + ddy * ddy);
+
+                            if (dist <= waypointMinDist) continue;
+
+                            // Condizione 1: linea interamente walkable
+                            if (!IsDiscreteLineWalkable(world, a.CellX, a.CellY, b.CellX, b.CellY))
+                                continue;
+
+                            // Inserisce waypoint a intervalli di waypointMinDist lungo il segmento
+                            int segs = (int)(dist / waypointMinDist);
+                            for (int k = 1; k < segs; k++)
+                            {
+                                float t  = k / (float)segs;
+                                int   wx = UnityEngine.Mathf.RoundToInt(a.CellX + ddx * t);
+                                int   wy = UnityEngine.Mathf.RoundToInt(a.CellY + ddy * t);
+
+                                if (!world.InBounds(wx, wy)) continue;
+                                if (world.BlocksMovementAt(wx, wy)) continue;
+
+                                // Condizione 2: DT >= soglia (zona aperta)
+                                int dtIdx = wy * mapW + wx;
+                                if (dtIdx < 0 || dtIdx >= _gvdDinComputer.DtValues.Length) continue;
+                                int dtVal = _gvdDinComputer.DtValues[dtIdx];
+                                if (dtVal == int.MaxValue || dtVal < waypointMinDt) continue;
+
+                                AddOrMergeNode(wx, wy, LandmarkKind.AreaCenter, mergeRadius);
+                            }
+                        }
+                    }
+                }
+            }
+
             // Passi comuni a tutti i branch
             ApplyGlobalCap(maxWorld);
             RebuildActiveCellIndex(world);
@@ -286,6 +361,34 @@ namespace Arcontio.Core
         // Erano usati solo dal vecchio sistema Doorway/Junction (eliminato).
         // Il rilevamento topologico è ora delegato a HybridLandmarkExtractor
         // (Bridge Detection) o a GvdDinComputer (Criteri A+B).
+
+        /// <summary>
+        /// Percorre il segmento discreto (Bresenham) da (x0,y0) a (x1,y1)
+        /// e restituisce true se OGNI cella è walkable nel World.
+        /// Usato da InsertWaypointsBetweenNodes (PATCH 7).
+        /// </summary>
+        private static bool IsDiscreteLineWalkable(World world, int x0, int y0, int x1, int y1)
+        {
+            int dx  = System.Math.Abs(x1 - x0);
+            int dy  = System.Math.Abs(y1 - y0);
+            int sx  = x0 < x1 ? 1 : -1;
+            int sy  = y0 < y1 ? 1 : -1;
+            int err = dx - dy;
+            int cx  = x0;
+            int cy  = y0;
+
+            while (true)
+            {
+                if (!world.InBounds(cx, cy) || world.BlocksMovementAt(cx, cy))
+                    return false;
+                if (cx == x1 && cy == y1)
+                    break;
+                int e2 = 2 * err;
+                if (e2 > -dy) { err -= dy; cx += sx; }
+                if (e2 <  dx) { err += dx; cy += sy; }
+            }
+            return true;
+        }
 
         private LandmarkNode AddOrMergeNode(int x, int y, LandmarkKind kind, float mergeRadius)
         {

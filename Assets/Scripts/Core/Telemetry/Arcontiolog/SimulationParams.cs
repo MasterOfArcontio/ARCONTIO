@@ -190,6 +190,13 @@ namespace Arcontio.Core.Config
         // 0 = pruning disabilitato.
         public float door_prune_radius = 2.0f;
 
+        // Waypoint intermedi in spazi aperti (PATCH 7 — v0.04.10.i):
+        // Inserisce AreaCenter tra coppie di landmark più lontane di questo valore (celle).
+        // 0 = waypoint disabilitati.
+        public int waypoint_min_distance = 17;
+        // DT minimo al punto candidato: filtra corridoi stretti (DT bassa = vicino ai muri).
+        public int waypoint_min_dt = 3;
+
         // Nota (v0.03.02.a): candidate detection params rimossi.
         // junction_min_exits/candidate_cooldown_ticks erano del vecchio sistema Doorway/Junction.
 
