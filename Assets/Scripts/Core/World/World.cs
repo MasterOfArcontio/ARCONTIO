@@ -872,6 +872,13 @@ namespace Arcontio.Core
 
                 if (def.IsOccluder || def.BlocksVision || def.BlocksMovement)
                     PlaceOccluderInCache(objectId, x, y, def);
+
+                // Fix v0.04.10.p: PlaceOccluderInCache usa def.BlocksMovement (stato "chiuso"),
+                // ignorando IsOpen. Se la porta era già aperta, il rebuild resettava _blocksMovement=true
+                // causando una desincronizzazione tra instance.IsOpen e la cache OcclusionMap.
+                // Ripristina lo stato corretto per le porte già aperte.
+                if (def.IsDoor && obj.IsOpen)
+                    SetDoorOpen(objectId, true);
             }
         }
 

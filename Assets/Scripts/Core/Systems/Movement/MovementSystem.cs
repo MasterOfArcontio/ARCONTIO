@@ -1016,28 +1016,6 @@ namespace Arcontio.Core
                             .AddField("doorId", doorObjId)
                     );
                 }
-                else
-                {
-                    // DIAG v0.04.10.o — logga perché la porta non è stata aperta
-                    // (da rimuovere dopo debug)
-                    string diagDefId   = "n/a";
-                    bool   diagIsDoor  = false;
-                    bool   diagIsOpen  = false;
-                    bool   diagIsLocked= false;
-                    if (doorObjId >= 0 && world.Objects.TryGetValue(doorObjId, out var diagInst) && diagInst != null)
-                    {
-                        diagDefId    = diagInst.DefId ?? "null";
-                        diagIsOpen   = diagInst.IsOpen;
-                        diagIsLocked = diagInst.IsLocked;
-                        if (world.TryGetObjectDef(diagInst.DefId, out var diagDef) && diagDef != null)
-                            diagIsDoor = diagDef.IsDoor;
-                    }
-                    UnityEngine.Debug.Log(
-                        $"[TryMoveTo-DIAG] npc={npcId} cell=({tx},{ty}) BLOCKED " +
-                        $"doorObjId={doorObjId} defId={diagDefId} " +
-                        $"IsDoor={diagIsDoor} IsOpen={diagIsOpen} IsLocked={diagIsLocked}"
-                    );
-                }
 
                 // Dopo l'apertura la cella potrebbe essere ancora bloccata (porta locked, altro oggetto ecc.).
                 if (!opened || world.IsMovementBlocked(tx, ty))
