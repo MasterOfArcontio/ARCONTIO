@@ -54,6 +54,121 @@ namespace Arcontio.Core
         // TODO: in futuro leggere queste da game_params.json.
         // Per ora sono costanti compile-time come baseline sicura.
 
+        private static void LogDirectGateDebug(
+            World world,
+            int npcId,
+            string phase,
+            GridPosition pos,
+            int finalTargetX,
+            int finalTargetY,
+            bool checkFov,
+            bool targetVisible,
+            bool pathClear,
+            int effectiveTargetX,
+            int effectiveTargetY,
+            bool inPrefixCommitment,
+            bool isInLastMile,
+            bool lastMileJustConverted,
+            bool usingMacroImmediate,
+            string extraKey = null,
+            object extraValue = null)
+        {
+            int visionRange = world.Global.NpcVisionRangeCells;
+            if (visionRange <= 0) visionRange = 6;
+
+            int dist = FovUtils.Manhattan(pos.X, pos.Y, finalTargetX, finalTargetY);
+            bool overVision = checkFov && dist > visionRange;
+            bool suspiciousDirect = pathClear && overVision;
+
+            if (!world.NpcFacing.TryGetValue(npcId, out var facing))
+                facing = CardinalDirection.North;
+
+            var block = new LogBlock(suspiciousDirect ? LogLevel.Warn : LogLevel.Trace, "log.move.direct_commit_debug")
+                .AddField("phase", phase)
+                .AddField("npcX", pos.X)
+                .AddField("npcY", pos.Y)
+                .AddField("facing", facing)
+                .AddField("finalTargetX", finalTargetX)
+                .AddField("finalTargetY", finalTargetY)
+                .AddField("effectiveTargetX", effectiveTargetX)
+                .AddField("effectiveTargetY", effectiveTargetY)
+                .AddField("manhattanToFinal", dist)
+                .AddField("visionRange", visionRange)
+                .AddField("checkFov", checkFov)
+                .AddField("targetVisible", targetVisible)
+                .AddField("pathClear", pathClear)
+                .AddField("overVision", overVision)
+                .AddField("usingMacroImmediate", usingMacroImmediate)
+                .AddField("inPrefixCommitment", inPrefixCommitment)
+                .AddField("isInLastMile", isInLastMile)
+                .AddField("lastMileJustConverted", lastMileJustConverted);
+
+            if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macroState) && macroState != null)
+            {
+                block.AddField("macroActive", macroState.Active)
+                    .AddField("macroHasUsablePath", macroState.HasUsableMacroPath)
+                    .AddField("macroNavMode", macroState.NavigationMode)
+                    .AddField("macroReason", macroState.LastModeSwitchReason)
+                    .AddField("macroNextRouteNodeIndex", macroState.NextRouteNodeIndex)
+                    .AddField("macroImmediateX", macroState.ImmediateTargetX)
+                    .AddField("macroImmediateY", macroState.ImmediateTargetY)
+                    .AddField("macroPrefixRemaining", macroState.DirectPrefixStepsRemaining)
+                    .AddField("macroApproachingFirstLm", macroState.IsApproachingFirstLm)
+                    .AddField("macroLastMile", macroState.IsDoingLastMile);
+            }
+            else
+            {
+                block.AddField("macroActive", false);
+            }
+
+            if (!string.IsNullOrEmpty(extraKey))
+                block.AddField(extraKey, extraValue);
+
+            var context = new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (pos.X, pos.Y));
+            if (suspiciousDirect)
+                ArcontioLogger.Warn(context, block);
+            else
+                ArcontioLogger.Trace(context, block);
+        }
+
+        private static void LogDebugSegmentStep(
+            World world,
+            int npcId,
+            string segmentKind,
+            int fromX,
+            int fromY,
+            int toX,
+            int toY,
+            bool usingMacroImmediate,
+            bool isApproaching,
+            bool inPrefixCommitment,
+            bool isInLastMile)
+        {
+            var block = new LogBlock(LogLevel.Trace, "log.move.debug_segment_step")
+                .AddField("segmentKind", segmentKind)
+                .AddField("fromX", fromX)
+                .AddField("fromY", fromY)
+                .AddField("toX", toX)
+                .AddField("toY", toY)
+                .AddField("usingMacroImmediate", usingMacroImmediate)
+                .AddField("isApproachingFirstLm", isApproaching)
+                .AddField("inPrefixCommitment", inPrefixCommitment)
+                .AddField("isInLastMile", isInLastMile);
+
+            if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macroState) && macroState != null)
+            {
+                block.AddField("macroNavMode", macroState.NavigationMode)
+                    .AddField("macroReason", macroState.LastModeSwitchReason)
+                    .AddField("macroPrefixRemaining", macroState.DirectPrefixStepsRemaining)
+                    .AddField("macroImmediateX", macroState.ImmediateTargetX)
+                    .AddField("macroImmediateY", macroState.ImmediateTargetY);
+            }
+
+            ArcontioLogger.Trace(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (toX, toY)),
+                block);
+        }
+
         /// <summary>
         /// Numero di tick consecutivi di blocco dopo i quali l'intent viene cancellato.
         /// Serve a sbloccare la simulazione quando un NPC è impossibilitato ad avanzare.
@@ -248,6 +363,8 @@ namespace Arcontio.Core
                 bool macroLastMile = false;
                 int macroNextNodeId = 0;
                 bool usingMacroImmediate = false;
+                bool directClearRuntimeForDebug = false;
+                bool usingGreedyFallbackForDebug = false;
 
                 // ── PREFIX COMMITMENT RUNTIME (Patch 0.02.07.A) ──────────────
                 // Gestisce le regole 3 e 4 del documento "Commitment Percettivo".
@@ -292,6 +409,12 @@ namespace Arcontio.Core
                         bool pathStillClear = canRenew
                                              && MovementPathfinder.CanNpcUseDirectPath(world, npcId, finalTargetX, finalTargetY);
 
+                        LogDirectGateDebug(
+                            world, npcId, "runtime_direct_prefix_renew_gate", pos, finalTargetX, finalTargetY,
+                            checkFovRenew, canRenew, pathStillClear,
+                            effectiveTargetX, effectiveTargetY, inPrefixCommitment, isInLastMile,
+                            lastMileJustConverted, usingMacroImmediate);
+
                         if (pathStillClear)
                         {
                             execState2.DirectPrefixStepsRemaining = GetDirectPrefixCells(world);
@@ -316,6 +439,13 @@ namespace Arcontio.Core
                                                || CanAcquireDirectPerceptually(world, npcId, finalTargetX, finalTargetY);
                     bool directClearRuntime   = targetVisibleRuntime
                                                && MovementPathfinder.CanNpcUseDirectPath(world, npcId, finalTargetX, finalTargetY);
+                    directClearRuntimeForDebug = directClearRuntime;
+
+                    LogDirectGateDebug(
+                        world, npcId, "runtime_direct_gate", pos, finalTargetX, finalTargetY,
+                        checkFovRuntime, targetVisibleRuntime, directClearRuntime,
+                        effectiveTargetX, effectiveTargetY, inPrefixCommitment, isInLastMile,
+                        lastMileJustConverted, usingMacroImmediate);
 
                     if (!directClearRuntime)
                     {
@@ -324,6 +454,17 @@ namespace Arcontio.Core
                             effectiveTargetX = macroTargetX;
                             effectiveTargetY = macroTargetY;
                             usingMacroImmediate = true;
+
+                            LogDirectGateDebug(
+                                world, npcId, "runtime_macro_target_selected", pos, finalTargetX, finalTargetY,
+                                checkFovRuntime, targetVisibleRuntime, directClearRuntime,
+                                effectiveTargetX, effectiveTargetY, inPrefixCommitment, isInLastMile,
+                                lastMileJustConverted, usingMacroImmediate,
+                                extraKey: "macroNextNodeId", extraValue: macroNextNodeId);
+                        }
+                        else
+                        {
+                            usingGreedyFallbackForDebug = true;
                         }
                     }
                     else if (!isInLastMile)
@@ -339,6 +480,12 @@ namespace Arcontio.Core
                             fixState.LastModeSwitchTick   = (int)TickContext.CurrentTickIndex;
                             fixState.LastModeSwitchReason = "DirectOverrideLm";
                             world.Pathfinding.MacroRouteExecution[npcId] = fixState;
+
+                            LogDirectGateDebug(
+                                world, npcId, "runtime_direct_override_lm", pos, finalTargetX, finalTargetY,
+                                checkFovRuntime, targetVisibleRuntime, directClearRuntime,
+                                effectiveTargetX, effectiveTargetY, inPrefixCommitment, isInLastMile,
+                                lastMileJustConverted, usingMacroImmediate);
                         }
                     }
                 }
@@ -604,7 +751,18 @@ namespace Arcontio.Core
                         {
                             // Tratto LM→LM (o last-mile greedy): segmento arancione.
                             world.AppendDebugLmStepForNpc(npcId, x, y, movedToX, movedToY);
+                            LogDebugSegmentStep(world, npcId, "LM_ORANGE", x, y, movedToX, movedToY,
+                                usingMacroImmediate, isApproaching, inPrefixCommitment, isInLastMile);
                             world.ClearNpcLocalSearchState(npcId, string.Empty);
+                            world.ClearNpcDirectCommitState(npcId, string.Empty);
+                        }
+                        else if (usingGreedyFallbackForDebug && !directClearRuntimeForDebug)
+                        {
+                            // Greedy fallback debug: target non ancora acquisito percettivamente.
+                            // Usiamo il layer magenta/rosa per distinguerlo dal direct reale.
+                            world.AppendDebugJumpStepForNpc(npcId, x, y, movedToX, movedToY);
+                            LogDebugSegmentStep(world, npcId, "GREEDY_FALLBACK_PINK", x, y, movedToX, movedToY,
+                                usingMacroImmediate, isApproaching, inPrefixCommitment, isInLastMile);
                             world.ClearNpcDirectCommitState(npcId, string.Empty);
                         }
                         else
@@ -612,7 +770,8 @@ namespace Arcontio.Core
                             // Tratto direct (approaching, prefix commitment, last-mile direct):
                             // segmento azzurro.
                             world.AppendDebugDirectStepForNpc(npcId, x, y, movedToX, movedToY);
-                            world.ClearNpcLocalSearchState(npcId, string.Empty);
+                            LogDebugSegmentStep(world, npcId, "DIRECT_BLUE", x, y, movedToX, movedToY,
+                                usingMacroImmediate, isApproaching, inPrefixCommitment, isInLastMile);
 
                             // Decrementa il prefix commitment se attivo.
                             if (inPrefixCommitment
@@ -853,6 +1012,12 @@ namespace Arcontio.Core
             bool targetVisible = !checkFov || CanAcquireDirectPerceptually(world, npcId, targetX, targetY);
             bool pathClear     = targetVisible && MovementPathfinder.CanNpcUseDirectPath(world, npcId, targetX, targetY);
 
+            LogDirectGateDebug(
+                world, npcId, "init_direct_gate", pos, targetX, targetY,
+                checkFov, targetVisible, pathClear, targetX, targetY,
+                inPrefixCommitment: false, isInLastMile: false,
+                lastMileJustConverted: false, usingMacroImmediate: false);
+
             if (pathClear)
             {
                 // ── DIRECT PATH con PREFIX COMMITMENT ────────────────────────
@@ -890,6 +1055,13 @@ namespace Arcontio.Core
                         macroState.NavigationMode             = "DIRECT_APPROACHING";
                     }
                     world.Pathfinding.MacroRouteExecution[npcId] = macroState;
+
+                    LogDirectGateDebug(
+                        world, npcId, "init_direct_commit", pos, targetX, targetY,
+                        checkFov, targetVisible, pathClear, targetX, targetY,
+                        inPrefixCommitment: true, isInLastMile: false,
+                        lastMileJustConverted: false, usingMacroImmediate: false,
+                        extraKey: "directPathCount", extraValue: directPath.Count);
                 }
             }
             else
@@ -908,7 +1080,32 @@ namespace Arcontio.Core
                 {
                     var directPrefix = new System.Collections.Generic.List<UnityEngine.Vector2Int>(32);
                     if (MovementPathfinder.TryBuildGreedyDirectPrefixPath(world, npcId, pos.X, pos.Y, targetX, targetY, directPrefix))
+                    {
                         world.SetDebugDirectPathForNpc(npcId, directPrefix);
+                        LogDirectGateDebug(
+                            world, npcId, "init_macro_unavailable_direct_prefix_visual", pos, targetX, targetY,
+                            checkFov, targetVisible, pathClear, targetX, targetY,
+                            inPrefixCommitment: false, isInLastMile: false,
+                            lastMileJustConverted: false, usingMacroImmediate: false,
+                            extraKey: "visualPrefixCount", extraValue: directPrefix.Count);
+                    }
+                    else
+                    {
+                        LogDirectGateDebug(
+                            world, npcId, "init_macro_unavailable_no_visual_prefix", pos, targetX, targetY,
+                            checkFov, targetVisible, pathClear, targetX, targetY,
+                            inPrefixCommitment: false, isInLastMile: false,
+                            lastMileJustConverted: false, usingMacroImmediate: false);
+                    }
+                }
+                else
+                {
+                    LogDirectGateDebug(
+                        world, npcId, "init_macro_route_started", pos, targetX, targetY,
+                        checkFov, targetVisible, pathClear,
+                        macroState.ImmediateTargetX, macroState.ImmediateTargetY,
+                        inPrefixCommitment: false, isInLastMile: macroState.IsDoingLastMile,
+                        lastMileJustConverted: false, usingMacroImmediate: true);
                 }
             }
         }

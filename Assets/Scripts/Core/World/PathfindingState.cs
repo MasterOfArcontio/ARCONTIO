@@ -646,11 +646,12 @@ namespace Arcontio.Core
 
         /// <summary>
         /// Aggiunge uno step al debug path Jump (magenta).
-        /// Attualmente intenzionalmente vuoto: manteniamo solo il path locale corrente.
+        /// Usato sia dalla local search sia dal fallback greedy quando il target non e'
+        /// ancora acquisito percettivamente.
         /// </summary>
         public void AppendDebugJumpStep(int npcId, int fromX, int fromY, int toX, int toY)
         {
-            // Intenzionalmente vuoto: il path jump viene impostato per intero in SetDebugJumpPath.
+            AppendDebugStep(DebugJumpPathCells, npcId, fromX, fromY, toX, toY);
         }
 
         // =====================================================================
