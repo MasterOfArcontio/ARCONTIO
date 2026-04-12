@@ -744,6 +744,7 @@ namespace Arcontio.Core
             Global.NpcVisionConeHalfWidthPerStep = slope;
 
             Global.Needs = NeedsConfig.Default();
+            Global.BeliefDecay = BeliefDecayConfig.Default();
 
             // ============================================================
             // Inventory params (data-driven via game_params.json)
@@ -3800,6 +3801,9 @@ if (!NpcAction.ContainsKey(id))
 
         // --- Needs config ---
         public NeedsConfig Needs;
+
+        // --- Belief decay config ---
+        public BeliefDecayConfig BeliefDecay;
 
         // --- Object memory config ---
         public int NpcObjectMemorySlots;       // slot per memoria oggetti interagibili (per NPC)

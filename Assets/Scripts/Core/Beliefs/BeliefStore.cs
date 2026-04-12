@@ -165,6 +165,89 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // TickDecay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un tick di decadimento passivo alle credenze contenute nello store.
+        /// </para>
+        ///
+        /// <para><b>Decay meccanico non decisionale</b></para>
+        /// <para>
+        /// Il metodo non sceglie target, non ordina credenze e non interroga il mondo.
+        /// Aggiorna soltanto <c>Confidence</c>, <c>Freshness</c> e <c>Status</c> in base
+        /// alla categoria della credenza e alle soglie configurate.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Confidence</b>: decade secondo il rate della categoria.</item>
+        ///   <item><b>Freshness</b>: decade piu rapidamente tramite moltiplicatore dedicato.</item>
+        ///   <item><b>Status</b>: passa a <c>Weak</c> sotto soglia o <c>Stale</c> se freshness e troppo bassa.</item>
+        ///   <item><b>Rimozione</b>: elimina entry con confidence arrivata alla soglia minima di rimozione.</item>
+        /// </list>
+        /// </summary>
+        public int TickDecay(BeliefDecayConfig config, float tickScale, out int updated, out int weak, out int stale)
+        {
+            updated = 0;
+            weak = 0;
+            stale = 0;
+
+            if (_entries.Count == 0)
+                return 0;
+
+            if (tickScale <= 0f)
+                tickScale = 1f;
+
+            int removed = 0;
+            float freshnessMultiplier = config.freshnessDecayMultiplier > 0f ? config.freshnessDecayMultiplier : 2f;
+
+            for (int i = _entries.Count - 1; i >= 0; i--)
+            {
+                var entry = _entries[i];
+                if (entry.Status == BeliefStatus.Discarded)
+                {
+                    _entries.RemoveAt(i);
+                    removed++;
+                    continue;
+                }
+
+                float confidenceDecay = config.GetConfidenceDecayFor(entry.Category) * tickScale;
+                float freshnessDecay = confidenceDecay * freshnessMultiplier;
+
+                entry.Confidence = Clamp01(entry.Confidence - confidenceDecay);
+                entry.Freshness = Clamp01(entry.Freshness - freshnessDecay);
+                updated++;
+
+                if (entry.Confidence <= config.removeConfidenceThreshold)
+                {
+                    _entries.RemoveAt(i);
+                    removed++;
+                    continue;
+                }
+
+                if (entry.Freshness <= config.staleFreshnessThreshold)
+                {
+                    entry.Status = BeliefStatus.Stale;
+                    stale++;
+                }
+                else if (entry.Confidence <= config.weakConfidenceThreshold)
+                {
+                    entry.Status = BeliefStatus.Weak;
+                    weak++;
+                }
+                else if (entry.Status != BeliefStatus.Conflicted)
+                {
+                    entry.Status = BeliefStatus.Active;
+                }
+
+                _entries[i] = entry;
+            }
+
+            return removed;
+        }
+
+        // =============================================================================
         // EnsureCapacityForNewEntry
         // =============================================================================
         /// <summary>
@@ -216,6 +299,34 @@ namespace Arcontio.Core
 
             if (weakestIndex >= 0)
                 _entries.RemoveAt(weakestIndex);
+        }
+
+        // =============================================================================
+        // Clamp01
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Limita un valore float all'intervallo normalizzato 0-1 usato dai belief.
+        /// </para>
+        ///
+        /// <para><b>Protezione numerica locale</b></para>
+        /// <para>
+        /// Il decay sottrae valori progressivi da <c>Confidence</c> e <c>Freshness</c>.
+        /// Il clamp impedisce risultati negativi o superiori a 1 quando i valori
+        /// arrivano da merge, config o salvataggi vecchi.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>value</b>: valore da normalizzare.</item>
+        ///   <item><b>return</b>: valore compreso tra 0 e 1.</item>
+        /// </list>
+        /// </summary>
+        private static float Clamp01(float value)
+        {
+            if (value < 0f) return 0f;
+            if (value > 1f) return 1f;
+            return value;
         }
     }
 }

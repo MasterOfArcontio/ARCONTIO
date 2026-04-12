@@ -1,0 +1,16 @@
+{
+  "BeliefDecay": {
+    "foodConfidenceDecayPerTick":      0.0018,
+    "restConfidenceDecayPerTick":      0.0015,
+    "dangerConfidenceDecayPerTick":    0.0005,
+    "socialConfidenceDecayPerTick":    0.0010,
+    "ownershipConfidenceDecayPerTick": 0.0010,
+    "situationConfidenceDecayPerTick": 0.0010,
+    "structureConfidenceDecayPerTick": 0.0002,
+
+    "freshnessDecayMultiplier": 2.0,
+    "weakConfidenceThreshold":  0.20,
+    "staleFreshnessThreshold":  0.01,
+    "removeConfidenceThreshold": 0.001
+  }
+}

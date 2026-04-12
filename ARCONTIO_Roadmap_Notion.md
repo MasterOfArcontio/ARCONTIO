@@ -93,7 +93,7 @@
 | 13 | Lun | Debug | Overlay debug needs per NPC | ✅ |
 | 14 | Mer | BeliefStore | BeliefEntry: struttura C# completa | ✅ |
 | 15 | Gio | BeliefStore | Aggregazione lazy da MemoryStore su nuova traccia | ✅ |
-| 16 | Lun | BeliefStore | Decay confidence + trigger su soglia minima | ⏳ |
+| 16 | Lun | BeliefStore | Decay confidence + trigger su soglia minima | ✅ |
 | 17 | Mer | BeliefStore | Invalidazione su job fallito | ⏳ |
 | 18 | Gio | BeliefStore | Query API per il Decision Layer | ⏳ |
 | 19 | Lun | QA | Test: BeliefStore vs MemoryStore, verifica omniscience | ⏳ |
@@ -124,6 +124,8 @@
 > **Nota step 15 — completato come aggregazione lazy MVP:** `BeliefStore` è ora uno store passivo per-NPC con filtro banale `GetByCategoryAndStatus(...)`, senza metodi tipo "best" e senza ranking decisionale. `BeliefUpdater` aggrega in modo lazy le nuove `MemoryTrace` accettate o rinforzate dal `MemoryStore`, sia dal percorso percettivo diretto (`MemoryEncodingSystem`) sia dal percorso di comunicazione (`TokenAssimilationPipeline`). Le prime regole MVP mappano minacce in `Danger`, oggetti osservati in `Structure` e NPC osservati in `Social`, evitando lookup globali e classificazioni premature non presenti nella trace. Come proposta tecnica accettata, lo store include un cap iniziale conservativo di 64 entry per NPC; il pruning resta minimale e non cognitivo: rimuove prima entry `Discarded`, altrimenti la entry con prodotto `Confidence * Freshness` più basso. Restano futuri decay confidence, trigger su soglia minima, invalidazione su job fallito, policy pruning più ricca e QuerySystem/Explainability dedicati.
 
 > **Nota correttiva step 15 — semantica oggetti nella MemoryTrace:** la memoria percettiva degli oggetti deve portare il tipo osservato. `ObjectSpottedEvent` conteneva già il `DefId`, ma `ObjectSpottedMemoryRule` non lo trasferiva nella `MemoryTrace`. È stato quindi aggiunto `SubjectDefId` alla trace e al DTO di salvataggio, così il `BeliefUpdater` può classificare `ObjectSpotted` in `Food`, `Rest` o `Structure` usando solo la memoria soggettiva. La regola resta conservativa: `food` produce `BeliefCategory.Food`, `bed` produce `BeliefCategory.Rest`, defId assente o non riconosciuto produce `BeliefCategory.Structure`. Nessun lookup su `World.Objects` viene introdotto nel Belief layer.
+
+> **Nota step 16 — completato come decay passivo:** `BeliefDecaySystem` applica decay a `Confidence` e `Freshness` dei `BeliefEntry` per-NPC senza leggere world state oggettivo e senza introdurre logica di query. I rate sono data-driven in `belief_decay_config.json` tramite `BeliefDecayConfig`: Food/Rest decadono rapidamente, Social/Ownership e Situation usano un rate medio provvisorio, Danger decade lentamente e Structure molto lentamente. `Freshness` decade piu rapidamente della confidence tramite moltiplicatore dedicato. Le soglie configurabili marcano le entry come `Weak` o `Stale`; le entry `Discarded` o con confidence arrivata alla soglia di rimozione vengono eliminate dallo store.
 
 ---
 

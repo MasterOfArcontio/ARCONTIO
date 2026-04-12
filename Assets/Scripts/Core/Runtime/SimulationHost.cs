@@ -302,6 +302,11 @@ namespace Arcontio.Core
             NeedsConfigLoader.LoadIntoWorld(_world);
 
             // ******************************************************************************************************************************
+            // 4.3) Carica parametri decadimento BeliefStore da JSON
+            // ******************************************************************************************************************************
+            BeliefDecayConfigLoader.LoadIntoWorld(_world);
+
+            // ******************************************************************************************************************************
             // 5) ISCRIVO I SISTEMI ALLO SCHEDULER
             // ******************************************************************************************************************************
 
@@ -405,6 +410,13 @@ namespace Arcontio.Core
             // Poi decay (maintenance)
             // Non fa nulla finché lo store è vuoto
             _scheduler.AddSystem(new MemoryDecaySystem());
+
+            // ******************************************************************************************************************************
+            // 7.4) DECADIMENTO BELIEFSTORE
+            // ******************************************************************************************************************************
+            // Mantiene confidence/freshness delle credenze soggettive senza leggere
+            // world state globale e senza anticipare il QuerySystem.
+            _scheduler.AddSystem(new BeliefDecaySystem());
 
             // ******************************************************************************************************************************
             // 8) INIZIALIZZO LE RULES
