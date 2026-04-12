@@ -1085,7 +1085,11 @@ namespace Arcontio.View.MapGrid
                 // Patch 0.02.03: landmark/edge conosciuti.
                 card.SetLandmarksText(_sbLandmarks.ToString());
 
-                // Bisogni (v0.04.08) — barre invertite (piena=ok, vuota=critico)
+                // Bisogni (v0.04.13) — barre invertite (piena=ok, vuota=critico).
+                // Sessione 13:
+                //   l'overlay riusa la procedura già esistente della card. La card legge
+                //   tutti i NeedKind via NeedKind.COUNT e visualizza anche i flag critici
+                //   già presenti in NpcNeeds; questo controller deve solo passare lo stato.
                 card.UpdateNeedsBars(needs);
 
                 // DNA DRIFT (v0.04.07.b) — barre proporzionali

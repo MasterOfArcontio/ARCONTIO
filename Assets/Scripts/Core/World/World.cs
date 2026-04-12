@@ -26,7 +26,7 @@ namespace Arcontio.Core
     /// <para>
     /// Il World contiene FATTI OGGETTIVI. La conoscenza soggettiva degli NPC
     /// (cosa sanno, cosa hanno visto, cosa ricordano) sta nei component store
-    /// per-NPC (Memory, NpcObjectMemory, NpcLandmarkMemory, NpcPinnedFoodStockBeliefs).
+    /// per-NPC (Memory, Beliefs, NpcObjectMemory, NpcLandmarkMemory, NpcPinnedFoodStockBeliefs).
     /// Questa distinzione è NON negoziabile: viola il manifesto qualsiasi
     /// Rule o System che usa World direttamente per decisioni che dovrebbero
     /// basarsi sulla percezione dell'NPC.
@@ -382,8 +382,34 @@ namespace Arcontio.Core
         // Le Rule scrivono qui; il MovementSystem consuma e prova ad avanzare.
         //        public readonly Dictionary<int, MoveIntent> MoveIntents = new();
 
-        // Memoria (per-NPC)
+        // Memoria narrativa grezza (per-NPC): conserva le MemoryTrace soggettive.
         public readonly Dictionary<int, MemoryStore> Memory = new();
+
+        // =============================================================================
+        // Beliefs
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Store di credenze aggregate per-NPC, derivato in modo lazy dalle nuove
+        /// <c>MemoryTrace</c> che entrano nel <c>MemoryStore</c>.
+        /// </para>
+        ///
+        /// <para><b>Conoscenza soggettiva, non stato globale</b></para>
+        /// <para>
+        /// Il dizionario vive nel <c>World</c> solo come component store indicizzato per
+        /// NPC, esattamente come <c>Memory</c> e <c>NpcObjectMemory</c>. Le credenze non
+        /// leggono direttamente oggetti, risorse o NPC globali: rappresentano sintesi
+        /// soggettive gia filtrate dal percorso Perception/Token -> Memory.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Chiave</b>: id locale dell'NPC proprietario dello store.</item>
+        ///   <item><b>Valore</b>: <c>BeliefStore</c> passivo e bounded del singolo NPC.</item>
+        ///   <item><b>Scrittura</b>: gestita da <c>BeliefUpdater</c> quando una trace viene inserita o rinforzata.</item>
+        /// </list>
+        /// </summary>
+        public readonly Dictionary<int, BeliefStore> Beliefs = new();
 
         // 1 store per NPC
         public readonly Dictionary<int, NpcObjectMemoryStore> NpcObjectMemory =
@@ -2915,6 +2941,12 @@ namespace Arcontio.Core
             var store = new MemoryStore();
             store.MaxTraces = Config.Sim.memory.max_traces_per_npc;
             Memory[id] = store;
+
+            // BeliefStore soggettivo per-NPC.
+            // Lo inizializziamo insieme al MemoryStore perche l'aggregazione lazy
+            // deve poter scrivere una credenza appena una trace viene accettata,
+            // senza allocazioni o lookup globali nel Decision Layer futuro.
+            Beliefs[id] = new BeliefStore();
 
             // Private food init (se non presente)
             if (!NpcPrivateFood.ContainsKey(id))

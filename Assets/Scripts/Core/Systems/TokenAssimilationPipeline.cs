@@ -20,6 +20,7 @@ namespace Arcontio.Core
     public sealed class TokenAssimilationPipeline
     {
         private readonly List<ITokenAssimilationRule> _rules = new();
+        private readonly BeliefUpdater _beliefUpdater = new();
 
         public TokenAssimilationPipeline()
         {
@@ -69,8 +70,26 @@ namespace Arcontio.Core
 
                     if (rule.TryAssimilate(world, env, out var trace))
                     {
-                        store.AddOrMerge(trace);
+                        var res = store.AddOrMerge(trace);
                         tracesAdded++;
+
+                        // Aggregazione lazy BeliefStore per memorie "sentite":
+                        // il TokenAssimilationPipeline e l'altro punto in cui una
+                        // MemoryTrace entra nel MemoryStore. Aggiorniamo quindi il
+                        // BeliefStore solo se la trace non viene scartata dal cap
+                        // del MemoryStore, mantenendo la stessa regola usata per le
+                        // memorie percettive dirette.
+                        if (res != AddOrMergeResult.Dropped)
+                        {
+                            if (!world.Beliefs.TryGetValue(env.ListenerId, out var beliefStore) || beliefStore == null)
+                            {
+                                beliefStore = new BeliefStore();
+                                world.Beliefs[env.ListenerId] = beliefStore;
+                            }
+
+                            bool beliefUpdated = _beliefUpdater.UpdateFromTrace(trace, beliefStore, (int)tick.Index);
+                            telemetry.Counter(beliefUpdated ? "BeliefUpdater.TraceAggregated" : "BeliefUpdater.TraceIgnored", 1);
+                        }
                         
                         string hk = trace.IsHeard ? trace.HeardKind.ToString() : "Direct";
                         int cd = env.Token.ChainDepth;

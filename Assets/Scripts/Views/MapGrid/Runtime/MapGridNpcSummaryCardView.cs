@@ -76,8 +76,13 @@ namespace Arcontio.View.MapGrid
         // [axisIndex 0=Pref 1=Comp 2=Obl][domainIndex 0..7]
         private BarRow[][] _driftDomainRows;
 
-        // ── Needs bars (v0.04.08) ─────────────────────────────────────────────
+        // ── Needs bars (v0.04.13) ─────────────────────────────────────────────
         // [needIndex 0..NeedKind.COUNT-1]
+        // Sessione 13:
+        //   l'overlay debug needs NON introduce una seconda pipeline UI.
+        //   Riusa queste righe già presenti, indicizzate sull'enum NeedKind,
+        //   così Hunger/Thirst/Rest, Health/Comfort parziali e i needs psicologici
+        //   Security/Stability/Sociality vengono mostrati dallo stesso meccanismo.
         private NeedBarRow[] _needBars;
 
         /// <summary>
@@ -149,7 +154,11 @@ namespace Arcontio.View.MapGrid
             _inventorySection = BuildSection(_root.transform, KeyInventory, "Inventory", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _inventorySection.RootImage.color = new Color(0.25f, 0.10f, 0.30f, 0.72f);
 
-            // Bisogni (v0.04.08) — barre invertite: piena = soddisfatto, vuota = critico
+            // Bisogni (v0.04.13) — barre invertite: piena = soddisfatto, vuota = critico.
+            // Nota architetturale:
+            // questa sezione usa la pipeline esistente BuildNeedsBars -> UpdateNeedsBars.
+            // Non deve duplicare la logica di rendering, perché i flag critici sono già
+            // calcolati in NeedsDecaySystem e visualizzati da NeedBarRow.Set.
             _needsSection = BuildSection(_root.transform, KeyNeeds, "Needs", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _needsSection.RootImage.color = new Color(0.10f, 0.25f, 0.30f, 0.72f);
             BuildNeedsBars(_needsSection);
@@ -678,7 +687,12 @@ namespace Arcontio.View.MapGrid
         }
 
         /// <summary>
-        /// Aggiorna le barre dei bisogni (v0.04.08).
+        /// Aggiorna le barre dei bisogni (v0.04.13).
+        ///
+        /// Sessione 13:
+        ///   questo metodo è il punto di riuso esplicito dell'overlay needs esistente.
+        ///   Non calcola nuove soglie e non introduce nuove funzioni di rendering:
+        ///   legge valore, alert e critical da NpcNeeds, poi delega tutto a NeedBarRow.Set.
         /// Chiama ogni frame quando la card è visibile.
         /// </summary>
         public void UpdateNeedsBars(NpcNeeds needs)

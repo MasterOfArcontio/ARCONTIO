@@ -21,6 +21,8 @@ namespace Arcontio.Core
 
         private readonly List<IMemoryRule> _rules = new();
 
+        private readonly BeliefUpdater _beliefUpdater = new();
+
         // Buffer di eventi del tick (riusato, assegnato dal SimulationHost)
         private List<ISimEvent> _eventsBuffer;
 
@@ -230,6 +232,22 @@ namespace Arcontio.Core
                                 case AddOrMergeResult.Dropped:
                                     telemetry.Counter("MemoryEncodingSystem.TracesDropped", 1);
                                     break;
+                            }
+
+                            // Aggregazione lazy BeliefStore:
+                            // - parte solo dopo che il MemoryStore ha accettato o rinforzato la trace;
+                            // - salta le trace droppate, perche non sono entrate nella memoria soggettiva;
+                            // - non legge stato globale: il BeliefUpdater usa solo MemoryTrace + BeliefStore.
+                            if (res != AddOrMergeResult.Dropped)
+                            {
+                                if (!world.Beliefs.TryGetValue(npcId, out var beliefStore) || beliefStore == null)
+                                {
+                                    beliefStore = new BeliefStore();
+                                    world.Beliefs[npcId] = beliefStore;
+                                }
+
+                                bool beliefUpdated = _beliefUpdater.UpdateFromTrace(trace, beliefStore, (int)tick.Index);
+                                telemetry.Counter(beliefUpdated ? "BeliefUpdater.TraceAggregated" : "BeliefUpdater.TraceIgnored", 1);
                             }
 
                             tracesAdded++;

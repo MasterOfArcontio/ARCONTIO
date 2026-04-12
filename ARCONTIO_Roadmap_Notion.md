@@ -87,12 +87,12 @@
 | 7 | Lun | Needs | Struttura Need generica con NeedAlert + NeedCritical | ✅ |
 | 8 | Mer | Needs | Fame · Sete · Riposo/Sonno | ✅ |
 | 9 | Gio | NpcProfile | PhysicalProfile — tratti fisici mutabili (Strength, Endurance, Agility, Intelligence) | ⏳ |
-| 10 | Lun | Needs | Salute fisica · Comfort termico | ⏳ |
-| 11 | Mer | Needs | Needs psicologici: Sicurezza · Stabilità emotiva · Socialità | ⏳ |
-| 12 | Gio | Needs | Decay system: rapido/lento per categoria | ⏳ |
-| 13 | Lun | Debug | Overlay debug needs per NPC | ⏳ |
-| 14 | Mer | BeliefStore | BeliefEntry: struttura C# completa | ⏳ |
-| 15 | Gio | BeliefStore | Aggregazione lazy da MemoryStore su nuova traccia | ⏳ |
+| 10 | Lun | Needs | Salute fisica · Comfort termico | ⚠️ Parziale |
+| 11 | Mer | Needs | Needs psicologici: Sicurezza · Stabilità emotiva · Socialità | ✅ |
+| 12 | Gio | Needs | Decay system: rapido/lento per categoria | ✅ |
+| 13 | Lun | Debug | Overlay debug needs per NPC | ✅ |
+| 14 | Mer | BeliefStore | BeliefEntry: struttura C# completa | ✅ |
+| 15 | Gio | BeliefStore | Aggregazione lazy da MemoryStore su nuova traccia | ✅ |
 | 16 | Lun | BeliefStore | Decay confidence + trigger su soglia minima | ⏳ |
 | 17 | Mer | BeliefStore | Invalidazione su job fallito | ⏳ |
 | 18 | Gio | BeliefStore | Query API per il Decision Layer | ⏳ |
@@ -106,10 +106,22 @@
 | NpcProfile: tre assi (Competence/Preference/Obligation) per dominio | ✅ |
 | Distanza DNA↔NpcProfile calcolabile on-demand e visibile in overlay F9 | ✅ |
 | PhysicalProfile: tratti fisici mutabili (Strength, Endurance, Agility, Intelligence) | ⏳ |
-| Tutti i 10 need implementati con NeedAlert + NeedCritical | ⏳ |
-| Decay differenziato per categoria (rapido/lento) | ⏳ |
-| BeliefStore attivo con aggiornamento lazy | ⏳ |
+| Tutti gli 8 NeedKind definiti con NeedAlert + NeedCritical; Health/Comfort restano derivativi/parziali | ⚠️ Parziale |
+| Decay differenziato per categoria (rapido/lento) | ✅ |
+| BeliefStore attivo con aggiornamento lazy | ✅ |
 | Nessuna violazione omniscience nei nuovi sistemi | ⏳ |
+
+> **Nota step 10 — stato parziale:** `Health01` non va implementato come bisogno scalare autonomo. Il documento `ARCONTIO BodyWound System v2` elimina il concetto di HP globale e sposta la salute fisica sul futuro sistema anatomico: `BodyGraph`, `WoundInstance`, `Pain01`, `Blood01`, `IsAlive`. Anche `Comfort` non va trattato come valore isolato: resta un bisogno derivativo da ridefinire, con formula basata almeno su dolore, sangue/stato fisico e contesto ambientale. Lo step è quindi architetturalmente chiarito, ma non ancora completo a livello di implementazione runtime.
+
+> **Nota step 11 — completato come baseline:** `Security`, `Stability` e `Sociality` sono attivati come bisogni psicologici interni con decay data-driven lento e flag `NeedAlert`/`NeedCritical` già derivati dalle soglie DNA. L'integrazione con pericoli percepiti, supporto sociale, social trust e BeliefStore/QuerySystem resta futura per non anticipare il Social Layer né introdurre accessi onniscienti.
+
+> **Nota step 12 — completato:** il decay differenziato è esplicitato in due categorie runtime. `Hunger`, `Thirst` e `Rest` usano il gruppo fisiologico rapido; `Security`, `Stability` e `Sociality` usano il gruppo psicologico lento. I valori numerici restano letti da `needs_config.json` e normalizzati con fallback default per evitare che config parziali lascino decay a 0.
+
+> **Nota step 13 — completato tramite riuso:** l'overlay debug needs era già presente nella card NPC e usa `NeedKind.COUNT`, `NpcNeeds.GetValue`, `NpcNeeds.IsAlert` e `NpcNeeds.IsCritical`. La sessione 13 non aggiunge una seconda pipeline UI: documenta e conferma il riuso di `BuildNeedsBars`/`UpdateNeedsBars`/`NeedBarRow.Set`, che mostrano tutti gli 8 need e i flag alert/critical già calcolati dal sistema needs.
+
+> **Nota step 14 — completato come struttura dati:** `BeliefEntry`, `BeliefCategory`, `BeliefStatus` e `BeliefSource` sono stati introdotti come dati puri aderenti al documento `ARCONTIO BeliefStore QuerySystem Architecture`. Non sono ancora implementati `BeliefStore`, `BeliefUpdater`, aggregazione da `MemoryStore`, decay confidence, invalidazione su job fallito o `QuerySystem`, che restano negli step successivi.
+
+> **Nota step 15 — completato come aggregazione lazy MVP:** `BeliefStore` è ora uno store passivo per-NPC con filtro banale `GetByCategoryAndStatus(...)`, senza metodi tipo "best" e senza ranking decisionale. `BeliefUpdater` aggrega in modo lazy le nuove `MemoryTrace` accettate o rinforzate dal `MemoryStore`, sia dal percorso percettivo diretto (`MemoryEncodingSystem`) sia dal percorso di comunicazione (`TokenAssimilationPipeline`). Le prime regole MVP mappano minacce in `Danger`, oggetti osservati in `Structure` e NPC osservati in `Social`, evitando lookup globali e classificazioni premature non presenti nella trace. Come proposta tecnica accettata, lo store include un cap iniziale conservativo di 64 entry per NPC; il pruning resta minimale e non cognitivo: rimuove prima entry `Discarded`, altrimenti la entry con prodotto `Confidence * Freshness` più basso. Restano futuri decay confidence, trigger su soglia minima, invalidazione su job fallito, policy pruning più ricca e QuerySystem/Explainability dedicati.
 
 ---
 

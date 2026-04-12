@@ -1,15 +1,31 @@
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // NeedKind
+    // =============================================================================
     /// <summary>
-    /// Tipi di bisogno primario degli NPC.
+    /// <para>
+    /// Catalogo stabile dei bisogni rappresentabili nello stato runtime per-NPC.
+    /// Ogni valore indicizza un elemento dell'array <c>NpcNeeds.States</c>, quindi
+    /// l'ordine dell'enum è parte del contratto di salvataggio e debug.
+    /// </para>
     ///
-    /// Attivazione per sessione:
-    ///   Sessione 08 — Hunger, Thirst, Rest    (decay attivo)
-    ///   Sessione 09 — Health, Comfort         (decay attivo)
-    ///   Sessione 10 — Security, Stability, Sociality (decay attivo)
+    /// <para><b>Progressive integration dei bisogni</b></para>
+    /// <para>
+    /// Hunger, Thirst e Rest sono bisogni fisiologici diretti. Security, Stability
+    /// e Sociality sono bisogni psicologici attivati in v0.04.11 con decay baseline.
+    /// Health e Comfort restano nel catalogo per compatibilità e UI, ma non devono
+    /// essere trattati come scalari autonomi finché il BodyWound System e la formula
+    /// derivativa del comfort non sono implementati.
+    /// </para>
     ///
-    /// In questa sessione (07) vengono definiti tutti e 8, ma solo Hunger e Rest
-    /// hanno un decay rate configurato in NeedsConfig. Gli altri rimangono a 0.
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>0-2</b>: bisogni fisiologici diretti già operativi.</item>
+    ///   <item><b>3-4</b>: bisogni fisici/comfort presenti ma parziali o derivativi.</item>
+    ///   <item><b>5-7</b>: bisogni psicologici baseline attivati dallo step v0.04.11.</item>
+    ///   <item><b>COUNT</b>: sentinella usata per dimensionare array e overlay debug.</item>
+    /// </list>
     /// </summary>
     public enum NeedKind
     {
