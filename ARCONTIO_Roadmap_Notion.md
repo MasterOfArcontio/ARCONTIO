@@ -123,6 +123,8 @@
 
 > **Nota step 15 — completato come aggregazione lazy MVP:** `BeliefStore` è ora uno store passivo per-NPC con filtro banale `GetByCategoryAndStatus(...)`, senza metodi tipo "best" e senza ranking decisionale. `BeliefUpdater` aggrega in modo lazy le nuove `MemoryTrace` accettate o rinforzate dal `MemoryStore`, sia dal percorso percettivo diretto (`MemoryEncodingSystem`) sia dal percorso di comunicazione (`TokenAssimilationPipeline`). Le prime regole MVP mappano minacce in `Danger`, oggetti osservati in `Structure` e NPC osservati in `Social`, evitando lookup globali e classificazioni premature non presenti nella trace. Come proposta tecnica accettata, lo store include un cap iniziale conservativo di 64 entry per NPC; il pruning resta minimale e non cognitivo: rimuove prima entry `Discarded`, altrimenti la entry con prodotto `Confidence * Freshness` più basso. Restano futuri decay confidence, trigger su soglia minima, invalidazione su job fallito, policy pruning più ricca e QuerySystem/Explainability dedicati.
 
+> **Nota correttiva step 15 — semantica oggetti nella MemoryTrace:** la memoria percettiva degli oggetti deve portare il tipo osservato. `ObjectSpottedEvent` conteneva già il `DefId`, ma `ObjectSpottedMemoryRule` non lo trasferiva nella `MemoryTrace`. È stato quindi aggiunto `SubjectDefId` alla trace e al DTO di salvataggio, così il `BeliefUpdater` può classificare `ObjectSpotted` in `Food`, `Rest` o `Structure` usando solo la memoria soggettiva. La regola resta conservativa: `food` produce `BeliefCategory.Food`, `bed` produce `BeliefCategory.Rest`, defId assente o non riconosciuto produce `BeliefCategory.Structure`. Nessun lookup su `World.Objects` viene introdotto nel Belief layer.
+
 ---
 
 ## v0.05 — Decision Layer

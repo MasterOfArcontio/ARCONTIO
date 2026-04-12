@@ -62,7 +62,7 @@ namespace Arcontio.Core
         public BeliefUpdater()
         {
             _rules.Add(new DangerBeliefAggregationRule());
-            _rules.Add(new StructureBeliefAggregationRule());
+            _rules.Add(new ObjectBeliefAggregationRule());
             _rules.Add(new SocialBeliefAggregationRule());
         }
 
@@ -148,28 +148,31 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
-    // StructureBeliefAggregationRule
+    // ObjectBeliefAggregationRule
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Regola MVP che aggrega memorie di oggetti osservati in credenze
-    /// <c>Structure</c>.
+    /// Regola MVP che aggrega memorie di oggetti osservati in credenze categorizzate
+    /// in base al <c>SubjectDefId</c> già presente nella <c>MemoryTrace</c>.
     /// </para>
     ///
-    /// <para><b>Semantica minima senza accesso globale</b></para>
+    /// <para><b>Semantica fissata al momento percettivo</b></para>
     /// <para>
-    /// <c>MemoryTrace</c> non contiene il <c>DefId</c> dell'oggetto. Per evitare
-    /// letture del world state e classificazioni premature, <c>ObjectSpotted</c>
-    /// viene aggregato come credenza strutturale generica, non come Food o Rest.
+    /// La regola non legge <c>World.Objects</c> e non recupera definizioni globali.
+    /// Usa soltanto il <c>SubjectDefId</c> trascritto nella memoria quando l'NPC ha
+    /// percepito l'oggetto. Se il dato manca, ad esempio per una memoria legacy, la
+    /// categoria resta conservativamente <c>Structure</c>.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Matches</b>: tratta solo <c>MemoryType.ObjectSpotted</c>.</item>
-    ///   <item><b>Apply</b>: preserva posizione stimata, confidence e freshness della trace.</item>
+    ///   <item><b>Food</b>: defId che contiene <c>food</c>.</item>
+    ///   <item><b>Rest</b>: defId che contiene <c>bed</c>.</item>
+    ///   <item><b>Structure fallback</b>: defId assente o non riconosciuto.</item>
     /// </list>
     /// </summary>
-    internal sealed class StructureBeliefAggregationRule : IBeliefAggregationRule
+    internal sealed class ObjectBeliefAggregationRule : IBeliefAggregationRule
     {
         public bool Matches(MemoryTrace trace)
         {
@@ -178,7 +181,8 @@ namespace Arcontio.Core
 
         public void Apply(MemoryTrace trace, BeliefStore store, int currentTick)
         {
-            BeliefAggregationRuleCommon.ApplyCommon(trace, store, currentTick, BeliefCategory.Structure);
+            BeliefCategory category = BeliefAggregationRuleCommon.ClassifyObjectDefId(trace.SubjectDefId);
+            BeliefAggregationRuleCommon.ApplyCommon(trace, store, currentTick, category);
         }
     }
 
@@ -252,6 +256,47 @@ namespace Arcontio.Core
                 trace.Intensity01,
                 currentTick,
                 source);
+        }
+
+        // =============================================================================
+        // ClassifyObjectDefId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte il <c>DefId</c> memorizzato nella trace di un oggetto osservato
+        /// nella categoria belief minima corrispondente.
+        /// </para>
+        ///
+        /// <para><b>Classificazione conservativa senza lookup globale</b></para>
+        /// <para>
+        /// Questa funzione non interroga il database oggetti e non legge il world state.
+        /// Usa solo il testo già conservato nella <c>MemoryTrace</c>. Il matching su
+        /// stringa è volutamente un MVP coerente con le euristiche già presenti per
+        /// cibo e letto; in futuro potrà essere sostituito da tag o proprietà
+        /// serializzate direttamente nella trace.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>food</b>: produce <c>BeliefCategory.Food</c>.</item>
+        ///   <item><b>bed</b>: produce <c>BeliefCategory.Rest</c>.</item>
+        ///   <item><b>fallback</b>: produce <c>BeliefCategory.Structure</c>.</item>
+        /// </list>
+        /// </summary>
+        public static BeliefCategory ClassifyObjectDefId(string subjectDefId)
+        {
+            if (string.IsNullOrWhiteSpace(subjectDefId))
+                return BeliefCategory.Structure;
+
+            string normalized = subjectDefId.ToLowerInvariant();
+
+            if (normalized.Contains("food"))
+                return BeliefCategory.Food;
+
+            if (normalized.Contains("bed"))
+                return BeliefCategory.Rest;
+
+            return BeliefCategory.Structure;
         }
     }
 }

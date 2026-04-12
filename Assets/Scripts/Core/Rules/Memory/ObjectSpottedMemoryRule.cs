@@ -37,6 +37,7 @@ namespace Arcontio.Core
             {
                 Type = MemoryType.ObjectSpotted, // <-- assicurati che esista nel tuo enum
                 SubjectId = ev.ObjectId,         // oppure ev.DefId se preferisci “conoscenza per tipo”
+                SubjectDefId = ev.DefId,
                 CellX = ev.CellX,
                 CellY = ev.CellY,
 

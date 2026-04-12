@@ -91,6 +91,13 @@ namespace Arcontio.Core
                     t.CellX = incoming.CellX;
                     t.CellY = incoming.CellY;
 
+                    // Semantica soggetto:
+                    // se la nuova osservazione porta un tipo esplicito, lo conserviamo
+                    // nella trace rinforzata. Questo evita che un Object/NPC osservato
+                    // perda metadati utili nei merge futuri.
+                    if (!string.IsNullOrWhiteSpace(incoming.SubjectDefId))
+                        t.SubjectDefId = incoming.SubjectDefId;
+
                     // Merge deterministico (stesso schema della versione originale).
                     float mergedIntensity = (t.Intensity01 > incoming.Intensity01) ? t.Intensity01 : incoming.Intensity01;
 
@@ -133,6 +140,13 @@ namespace Arcontio.Core
 
                     // Affidabilita: prendi la migliore
                     t.Reliability01 = (t.Reliability01 > incoming.Reliability01) ? t.Reliability01 : incoming.Reliability01;
+
+                    // Semantica soggetto:
+                    // nel merge cell-centric manteniamo il DefId piu recente quando
+                    // esiste, cosi BeliefUpdater e sistemi futuri leggono solo la
+                    // memoria soggettiva e non devono ricostruire il tipo dal World.
+                    if (!string.IsNullOrWhiteSpace(incoming.SubjectDefId))
+                        t.SubjectDefId = incoming.SubjectDefId;
 
                     // Decay: scegli il piu lento (min) => mantiene piu a lungo
                     t.DecayPerTick01 = (t.DecayPerTick01 < incoming.DecayPerTick01) ? t.DecayPerTick01 : incoming.DecayPerTick01;

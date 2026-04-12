@@ -1,15 +1,33 @@
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // MemoryTrace
+    // =============================================================================
     /// <summary>
-    /// MemoryTrace: unità minima di memoria in un NPC.
-    /// 
-    /// È volutamente "dumb data":
-    /// - Tipo: che cosa è successo (MemoryType)
-    /// - SubjectId: di chi/che cosa parla (es. predatorId, attackerNpcId, victimNpcId)
-    /// - CellX/CellY: dove è accaduto (se rilevante)
-    /// - Intensity01: quanto pesa oggi (0..1)
-    /// - Reliability01: quanto è affidabile (0..1) (per rumor spesso più bassa)
-    /// - DecayPerTick01: quanto cala per tick (0..1 per tick). Il sistema la applica.
+    /// <para>
+    /// Unità minima di memoria soggettiva conservata nel <c>MemoryStore</c> di un
+    /// NPC. La traccia descrive cosa è stato percepito o sentito, dove è avvenuto
+    /// e con quale qualità soggettiva viene ricordato.
+    /// </para>
+    ///
+    /// <para><b>Memoria soggettiva arricchita al momento percettivo</b></para>
+    /// <para>
+    /// La traccia deve contenere le informazioni semantiche già disponibili nel
+    /// momento in cui nasce l'evento percettivo. Per gli oggetti, ad esempio,
+    /// <c>SubjectDefId</c> conserva il tipo osservato (<c>food_stock</c>,
+    /// <c>bed_wood_poor</c>, ecc.) così i layer successivi non devono interrogare
+    /// il <c>World</c> per ricostruire retroattivamente il significato della memoria.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Type</b>: tipo narrativo della memoria.</item>
+    ///   <item><b>SubjectId</b>: id del soggetto principale, se applicabile.</item>
+    ///   <item><b>SubjectDefId</b>: tipo semantico del soggetto quando noto alla percezione.</item>
+    ///   <item><b>CellX/CellY</b>: posizione soggettiva associata alla traccia.</item>
+    ///   <item><b>Intensity/Reliability/Decay</b>: qualità e decadimento della memoria.</item>
+    ///   <item><b>Heard fields</b>: metadati per distinguere esperienza diretta e informazione comunicata.</item>
+    /// </list>
     /// </summary>
     public struct MemoryTrace
     {
@@ -28,6 +46,14 @@ namespace Arcontio.Core
         /// - altri eventi ? 0
         /// </summary>
         public int SecondarySubjectId;
+
+        /// <summary>
+        /// Tipo semantico del soggetto quando il sistema percettivo lo conosce.
+        /// Per <c>ObjectSpotted</c> corrisponde al <c>DefId</c> dell'oggetto visto.
+        /// Resta vuoto per eventi che non hanno un soggetto tipizzato o per memorie
+        /// legacy salvate prima dell'introduzione di questo campo.
+        /// </summary>
+        public string SubjectDefId;
 
         /// <summary>
         /// Coordinate della cella a cui la memoria è associata.
@@ -62,7 +88,8 @@ namespace Arcontio.Core
 
         public override string ToString()
         {
-            return $"{Type} subj={SubjectId} cell=({CellX},{CellY}) I={Intensity01:0.00} R={Reliability01:0.00} d={DecayPerTick01:0.000}";
+            string def = string.IsNullOrWhiteSpace(SubjectDefId) ? "" : $" def={SubjectDefId}";
+            return $"{Type} subj={SubjectId}{def} cell=({CellX},{CellY}) I={Intensity01:0.00} R={Reliability01:0.00} d={DecayPerTick01:0.000}";
         }
     }
 

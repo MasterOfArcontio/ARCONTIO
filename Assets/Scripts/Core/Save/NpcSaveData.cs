@@ -376,6 +376,7 @@ namespace Arcontio.Core.Save
         public int    type;
         public int    subjectId;
         public int    secondarySubjectId;
+        public string subjectDefId;
         public int    cellX;
         public int    cellY;
         public float  intensity01;
@@ -393,6 +394,7 @@ namespace Arcontio.Core.Save
                 type                = (int)t.Type,
                 subjectId           = t.SubjectId,
                 secondarySubjectId  = t.SecondarySubjectId,
+                subjectDefId        = t.SubjectDefId,
                 cellX               = t.CellX,
                 cellY               = t.CellY,
                 intensity01         = t.Intensity01,
@@ -411,6 +413,7 @@ namespace Arcontio.Core.Save
                 Type               = (MemoryType)type,
                 SubjectId          = subjectId,
                 SecondarySubjectId = secondarySubjectId,
+                SubjectDefId       = subjectDefId,
                 CellX              = cellX,
                 CellY              = cellY,
                 Intensity01        = intensity01,
