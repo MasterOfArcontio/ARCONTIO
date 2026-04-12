@@ -41,6 +41,8 @@
 // (che sarebbe un accoppiamento indesiderato in un Command).
 // =============================================================================
 
+using Arcontio.Core.Logging;
+
 namespace Arcontio.Core
 {
     /// <summary>
@@ -108,6 +110,30 @@ namespace Arcontio.Core
                 // INTENT ATTIVO: nuovo movimento richiesto
                 // ============================================================
 
+                bool hadOldIntent = world.NpcMoveIntents.TryGetValue(_npcId, out var oldIntent) && oldIntent.Active;
+                bool hadBackOff = world.Pathfinding.MoveBackOff.TryGetValue(_npcId, out var backOff) && backOff != null && backOff.Active;
+                bool hadLocalSearch = world.Pathfinding.GoalLocalSearchExecution.TryGetValue(_npcId, out var localState) && localState != null && localState.Active;
+                bool hadMacroRoute = world.Pathfinding.MacroRouteExecution.TryGetValue(_npcId, out var macroState) && macroState != null && macroState.Active;
+
+                ArcontioLogger.Trace(
+                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: _npcId),
+                    new LogBlock(LogLevel.Trace, "log.move.intent_command_debug")
+                        .AddField("command", nameof(SetMoveIntentCommand))
+                        .AddField("targetX", _intent.TargetX)
+                        .AddField("targetY", _intent.TargetY)
+                        .AddField("reason", _intent.Reason.ToString())
+                        .AddField("hadOldIntent", hadOldIntent)
+                        .AddField("oldTargetX", hadOldIntent ? oldIntent.TargetX : 0)
+                        .AddField("oldTargetY", hadOldIntent ? oldIntent.TargetY : 0)
+                        .AddField("hadBackOff", hadBackOff)
+                        .AddField("backOffStage", hadBackOff ? backOff.Stage : 0)
+                        .AddField("hadLocalSearch", hadLocalSearch)
+                        .AddField("localFailureReason", hadLocalSearch ? localState.FailureReason : string.Empty)
+                        .AddField("hadMacroRoute", hadMacroRoute)
+                        .AddField("macroNavMode", hadMacroRoute ? macroState.NavigationMode : string.Empty)
+                        .AddField("macroFailureReason", hadMacroRoute ? macroState.FailureReason : string.Empty)
+                );
+
                 // Copia l'intent e imposta IsNew = true.
                 // Il MovementSystem leggerà questo flag al primo tick e
                 // inizializzerà la navigazione (direct path o macro-route).
@@ -122,6 +148,7 @@ namespace Arcontio.Core
                 world.ClearDebugMacroRouteForNpc(_npcId);
                 world.ClearNpcLocalSearchState(_npcId, string.Empty);
                 world.ClearNpcDirectCommitState(_npcId, string.Empty);
+                world.Pathfinding.ClearMoveBackOff(_npcId);
 
                 // Scrive l'intent nel World (source of truth del movimento NPC).
                 world.SetMoveIntent(_npcId, intent);
@@ -149,6 +176,7 @@ namespace Arcontio.Core
                 world.ClearDebugMacroRouteForNpc(_npcId);
                 world.ClearNpcLocalSearchState(_npcId, string.Empty);
                 world.ClearNpcDirectCommitState(_npcId, string.Empty);
+                world.Pathfinding.ClearMoveBackOff(_npcId);
                 world.SetNpcIdle(_npcId);
             }
         }

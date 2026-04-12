@@ -220,6 +220,7 @@ namespace Arcontio.Core
             var state = new NpcMacroRouteExecutionState
             {
                 Active                = true,
+                HasUsableMacroPath    = true,
                 IsDoingLastMile       = false,
                 NextRouteNodeIndex    = 0,
                 FinalTargetCellX      = targetX,
@@ -552,6 +553,13 @@ namespace Arcontio.Core
             var list = EnsureDebugPathList(DebugJumpPathCells, npcId);
             CopyVectorPathToGridPath(path, list);
 
+            GoalLocalSearchExecution.TryGetValue(npcId, out var previousState);
+            bool preserveLastStep = previousState != null
+                && previousState.HasLastSuccessfulStep
+                && list.Count > 0
+                && list[0].X == previousState.LastStepToX
+                && list[0].Y == previousState.LastStepToY;
+
             var state = new NpcGoalLocalSearchExecutionState
             {
                 Active              = list.Count >= 2,
@@ -562,11 +570,11 @@ namespace Arcontio.Core
                 BudgetRemaining     = budgetRemaining,
                 NextPathIndex       = list.Count > 1 ? 1 : 0,
                 CommitStepsRemaining = GetLocalSearchCommitMinSteps(),
-                HasLastSuccessfulStep = false,
-                LastStepFromX       = 0,
-                LastStepFromY       = 0,
-                LastStepToX         = 0,
-                LastStepToY         = 0,
+                HasLastSuccessfulStep = preserveLastStep,
+                LastStepFromX       = preserveLastStep ? previousState.LastStepFromX : 0,
+                LastStepFromY       = preserveLastStep ? previousState.LastStepFromY : 0,
+                LastStepToX         = preserveLastStep ? previousState.LastStepToX : 0,
+                LastStepToY         = preserveLastStep ? previousState.LastStepToY : 0,
                 FailureReason       = string.Empty,
             };
             state.CurrentPath.Clear();

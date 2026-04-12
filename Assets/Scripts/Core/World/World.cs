@@ -1334,25 +1334,37 @@ namespace Arcontio.Core
             long now = TickContext.CurrentTickIndex;
             var complexMem = EnsureNpcComplexEdgeMemory(npcId);
             int beforeCount = complexMem.Count;
-            bool existedBefore = complexMem.HasComplexEdge(nodeA, nodeB);
+            bool existedBefore = complexMem.TryGetComplexEdge(nodeA, nodeB, out var edgeBefore);
+            int beforeCost = edgeBefore != null ? edgeBefore.BaseCost : 0;
+            bool beforeHasSegments = edgeBefore != null && edgeBefore.Segments != null && edgeBefore.Segments.Count > 0;
             complexMem.LearnVisualEdge(nodeA, nodeB, costCells, now, confidence);
             bool existsAfter = complexMem.TryGetComplexEdge(nodeA, nodeB, out var edgeAfter);
-            ArcontioLogger.Trace(
-                new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId),
-                new LogBlock(LogLevel.Trace, "log.lm.complex_edge_debug")
-                    .AddField("phase", "learn_visual_edge")
-                    .AddField("nodeA", nodeA)
-                    .AddField("nodeB", nodeB)
-                    .AddField("costCells", costCells)
-                    .AddField("confidenceInput", confidence)
-                    .AddField("existedBefore", existedBefore)
-                    .AddField("existsAfter", existsAfter)
-                    .AddField("edgeCountBefore", beforeCount)
-                    .AddField("edgeCountAfter", complexMem.Count)
-                    .AddField("edgeCostAfter", edgeAfter != null ? edgeAfter.BaseCost : 0)
-                    .AddField("edgeConfidenceAfter", edgeAfter != null ? edgeAfter.Confidence : 0f)
-                    .AddField("edgeHasSegmentsAfter", edgeAfter != null && edgeAfter.Segments != null && edgeAfter.Segments.Count > 0)
-            );
+            int edgeCostAfter = edgeAfter != null ? edgeAfter.BaseCost : 0;
+            bool edgeHasSegmentsAfter = edgeAfter != null && edgeAfter.Segments != null && edgeAfter.Segments.Count > 0;
+            bool materialChange = !existedBefore
+                || beforeCount != complexMem.Count
+                || beforeCost != edgeCostAfter
+                || beforeHasSegments != edgeHasSegmentsAfter;
+
+            if (materialChange)
+            {
+                ArcontioLogger.Trace(
+                    new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId),
+                    new LogBlock(LogLevel.Trace, "log.lm.complex_edge_debug")
+                        .AddField("phase", "learn_visual_edge")
+                        .AddField("nodeA", nodeA)
+                        .AddField("nodeB", nodeB)
+                        .AddField("costCells", costCells)
+                        .AddField("confidenceInput", confidence)
+                        .AddField("existedBefore", existedBefore)
+                        .AddField("existsAfter", existsAfter)
+                        .AddField("edgeCountBefore", beforeCount)
+                        .AddField("edgeCountAfter", complexMem.Count)
+                        .AddField("edgeCostAfter", edgeCostAfter)
+                        .AddField("edgeConfidenceAfter", edgeAfter != null ? edgeAfter.Confidence : 0f)
+                        .AddField("edgeHasSegmentsAfter", edgeHasSegmentsAfter)
+                );
+            }
         }
 
         // ============================================================
@@ -1397,14 +1409,177 @@ namespace Arcontio.Core
                 return true;
             }
 
-            if (mem.TryFindNearestKnownLandmark(LandmarkRegistry, currentX, currentY, out int nearest))
+            if (TryFindNearestLocallyReachableKnownLandmarkForNpc(
+                    npcId,
+                    mem,
+                    currentX,
+                    currentY,
+                    out int reachable,
+                    out int reachableDistance,
+                    out int nearest,
+                    out int nearestDistance))
             {
-                startNodeId = nearest;
+                startNodeId = reachable;
+                LogStartLandmarkResolutionDebug(npcId, currentX, currentY, nearest, nearestDistance, reachable, reachableDistance, true);
                 return true;
             }
 
-            failReason = "NoResolvableStartLandmark";
+            LogStartLandmarkResolutionDebug(npcId, currentX, currentY, nearest, nearestDistance, 0, -1, false);
+            failReason = "NoLocallyReachableStartLandmark";
             return false;
+        }
+
+        private bool TryFindNearestLocallyReachableKnownLandmarkForNpc(
+            int npcId,
+            NpcLandmarkMemory mem,
+            int currentX,
+            int currentY,
+            out int nodeId,
+            out int distance,
+            out int nearestNodeId,
+            out int nearestDistance)
+        {
+            nodeId = 0;
+            distance = int.MaxValue;
+            nearestNodeId = 0;
+            nearestDistance = int.MaxValue;
+
+            if (mem == null || LandmarkRegistry == null || mem.KnownLandmarksCount <= 0)
+                return false;
+
+            var knownIds = new List<int>(Mathf.Max(1, mem.KnownLandmarksCount));
+            mem.FillKnownLandmarkIds(knownIds);
+
+            var cfg = Config?.Sim?.landmarks?.localSearch ?? new Arcontio.Core.Config.LandmarkLocalSearchParams();
+            int maxVisited = Mathf.Max(64, cfg.maxExpandedNodes * Mathf.Max(1, cfg.fallbackExpandedNodesMultiplier));
+            int radiusLimit = Mathf.Max(16, cfg.maxSearchRadius + Mathf.Max(0, cfg.fallbackRadiusBonus));
+
+            foreach (int knownId in knownIds)
+            {
+                if (!LandmarkRegistry.TryGetActiveNodeById(knownId, out var node))
+                    continue;
+
+                int dist = Mathf.Abs(node.CellX - currentX) + Mathf.Abs(node.CellY - currentY);
+                if (dist < nearestDistance)
+                {
+                    nearestDistance = dist;
+                    nearestNodeId = knownId;
+                }
+
+                if (dist > distance)
+                    continue;
+
+                if (!CanReachLandmarkCellForStartResolution(npcId, currentX, currentY, node.CellX, node.CellY, maxVisited, radiusLimit))
+                    continue;
+
+                if (dist < distance || nodeId == 0)
+                {
+                    nodeId = knownId;
+                    distance = dist;
+                }
+            }
+
+            return nodeId != 0;
+        }
+
+        private bool CanReachLandmarkCellForStartResolution(
+            int npcId,
+            int startX,
+            int startY,
+            int targetX,
+            int targetY,
+            int maxVisited,
+            int radiusLimit)
+        {
+            if (!InBounds(startX, startY) || !InBounds(targetX, targetY))
+                return false;
+
+            if (startX == targetX && startY == targetY)
+                return true;
+
+            if (!IsWalkableForStartLandmarkResolution(npcId, targetX, targetY, targetX, targetY))
+                return false;
+
+            var queue = new Queue<Vector2Int>();
+            var visited = new HashSet<int>();
+
+            queue.Enqueue(new Vector2Int(startX, startY));
+            visited.Add(CellIndex(startX, startY));
+
+            while (queue.Count > 0 && visited.Count <= maxVisited)
+            {
+                var current = queue.Dequeue();
+
+                for (int dir = 0; dir < 4; dir++)
+                {
+                    int nx = current.x + (dir == 0 ? 1 : dir == 1 ? -1 : 0);
+                    int ny = current.y + (dir == 2 ? 1 : dir == 3 ? -1 : 0);
+
+                    if (Mathf.Abs(nx - startX) + Mathf.Abs(ny - startY) > radiusLimit)
+                        continue;
+
+                    if (!IsWalkableForStartLandmarkResolution(npcId, nx, ny, targetX, targetY))
+                        continue;
+
+                    if (nx == targetX && ny == targetY)
+                        return true;
+
+                    int idx = CellIndex(nx, ny);
+                    if (!visited.Add(idx))
+                        continue;
+
+                    queue.Enqueue(new Vector2Int(nx, ny));
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsWalkableForStartLandmarkResolution(int npcId, int x, int y, int targetX, int targetY)
+        {
+            if (!InBounds(x, y))
+                return false;
+
+            if (x == targetX && y == targetY)
+                return !IsMovementBlocked(x, y)
+                    && (!TryGetNpcAt(x, y, out int targetNpcId) || targetNpcId == npcId);
+
+            if (IsMovementBlocked(x, y))
+            {
+                int doorObjId = GetObjectAt(x, y);
+                bool isUnlockedClosedDoor = doorObjId >= 0
+                    && Objects.TryGetValue(doorObjId, out var dInst) && dInst != null
+                    && TryGetObjectDef(dInst.DefId, out var dDef) && dDef != null
+                    && dDef.IsDoor && !dInst.IsOpen && !dInst.IsLocked;
+
+                if (!isUnlockedClosedDoor)
+                    return false;
+            }
+
+            if (TryGetNpcAt(x, y, out int otherNpcId) && otherNpcId != npcId)
+                return false;
+
+            return true;
+        }
+
+        private void LogStartLandmarkResolutionDebug(
+            int npcId,
+            int currentX,
+            int currentY,
+            int nearestNodeId,
+            int nearestDistance,
+            int selectedNodeId,
+            int selectedDistance,
+            bool selectedReachable)
+        {
+            ArcontioLogger.Trace(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (currentX, currentY)),
+                new LogBlock(LogLevel.Trace, "log.lm.start_resolution_debug")
+                    .AddField("nearestNodeId", nearestNodeId)
+                    .AddField("nearestDistance", nearestDistance == int.MaxValue ? -1 : nearestDistance)
+                    .AddField("selectedNodeId", selectedNodeId)
+                    .AddField("selectedDistance", selectedDistance)
+                    .AddField("selectedLocallyReachable", selectedReachable));
         }
 
         /// <summary>
@@ -1413,6 +1588,11 @@ namespace Arcontio.Core
         /// - altrimenti scegliamo il landmark noto piu' vicino alla cella target.
         /// </summary>
         public bool TryResolveTargetLandmark(int npcId, int targetX, int targetY, out int targetNodeId, out string failReason)
+        {
+            return TryResolveTargetLandmark(npcId, 0, targetX, targetY, out targetNodeId, out failReason);
+        }
+
+        public bool TryResolveTargetLandmark(int npcId, int startNodeId, int targetX, int targetY, out int targetNodeId, out string failReason)
         {
             targetNodeId = 0;
             failReason = string.Empty;
@@ -1435,19 +1615,119 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (LandmarkRegistry.TryGetActiveNodeIdAtCell(targetX, targetY, out int nodeAtCell) && mem.ContainsLandmark(nodeAtCell))
+            var cfg = Config?.Sim?.landmarks?.localSearch ?? new Arcontio.Core.Config.LandmarkLocalSearchParams();
+            int maxVisited = Mathf.Max(512, cfg.maxExpandedNodes * Mathf.Max(1, cfg.fallbackExpandedNodesMultiplier));
+            int radiusLimit = Mathf.Max(64, cfg.maxSearchRadius + Mathf.Max(0, cfg.fallbackRadiusBonus * 2));
+
+            if (LandmarkRegistry.TryGetActiveNodeIdAtCell(targetX, targetY, out int nodeAtCell)
+                && mem.ContainsLandmark(nodeAtCell)
+                && (startNodeId == 0 || IsKnownLandmarkReachableForNpc(npcId, startNodeId, nodeAtCell)))
             {
                 targetNodeId = nodeAtCell;
                 return true;
             }
 
-            if (mem.TryFindNearestKnownLandmark(LandmarkRegistry, targetX, targetY, out int nearest))
+            var knownIds = new List<int>(Mathf.Max(1, mem.KnownLandmarksCount));
+            mem.FillKnownLandmarkIds(knownIds);
+
+            int bestNodeId = 0;
+            int bestPathDistance = int.MaxValue;
+            int bestManhattanDistance = int.MaxValue;
+
+            for (int i = 0; i < knownIds.Count; i++)
             {
-                targetNodeId = nearest;
+                int nodeId = knownIds[i];
+                if (!LandmarkRegistry.TryGetActiveNodeById(nodeId, out var node) || node == null)
+                    continue;
+
+                if (startNodeId != 0 && !IsKnownLandmarkReachableForNpc(npcId, startNodeId, nodeId))
+                    continue;
+
+                if (!TryGetResolutionPathDistance(npcId, node.CellX, node.CellY, targetX, targetY, maxVisited, radiusLimit, out int pathDistance))
+                    continue;
+
+                int manhattanDistance = Mathf.Abs(node.CellX - targetX) + Mathf.Abs(node.CellY - targetY);
+                if (pathDistance < bestPathDistance
+                    || (pathDistance == bestPathDistance && manhattanDistance < bestManhattanDistance))
+                {
+                    bestNodeId = nodeId;
+                    bestPathDistance = pathDistance;
+                    bestManhattanDistance = manhattanDistance;
+                }
+            }
+
+            if (bestNodeId != 0)
+            {
+                targetNodeId = bestNodeId;
                 return true;
             }
 
-            failReason = "NoResolvableTargetLandmark";
+            failReason = "NoReachableTargetLandmark";
+            return false;
+        }
+
+        private bool TryGetResolutionPathDistance(
+            int npcId,
+            int startX,
+            int startY,
+            int targetX,
+            int targetY,
+            int maxVisited,
+            int radiusLimit,
+            out int distance)
+        {
+            distance = -1;
+
+            if (!InBounds(startX, startY) || !InBounds(targetX, targetY))
+                return false;
+
+            if (startX == targetX && startY == targetY)
+            {
+                distance = 0;
+                return true;
+            }
+
+            if (!IsWalkableForStartLandmarkResolution(npcId, targetX, targetY, targetX, targetY))
+                return false;
+
+            var queue = new Queue<Vector2Int>();
+            var distances = new Dictionary<int, int>();
+
+            queue.Enqueue(new Vector2Int(startX, startY));
+            distances[CellIndex(startX, startY)] = 0;
+
+            while (queue.Count > 0 && distances.Count <= maxVisited)
+            {
+                var current = queue.Dequeue();
+                int currentDistance = distances[CellIndex(current.x, current.y)];
+
+                for (int dir = 0; dir < 4; dir++)
+                {
+                    int nx = current.x + (dir == 0 ? 1 : dir == 1 ? -1 : 0);
+                    int ny = current.y + (dir == 2 ? 1 : dir == 3 ? -1 : 0);
+
+                    if (Mathf.Abs(nx - startX) + Mathf.Abs(ny - startY) > radiusLimit)
+                        continue;
+
+                    if (!IsWalkableForStartLandmarkResolution(npcId, nx, ny, targetX, targetY))
+                        continue;
+
+                    int nextDistance = currentDistance + 1;
+                    if (nx == targetX && ny == targetY)
+                    {
+                        distance = nextDistance;
+                        return true;
+                    }
+
+                    int idx = CellIndex(nx, ny);
+                    if (distances.ContainsKey(idx))
+                        continue;
+
+                    distances[idx] = nextDistance;
+                    queue.Enqueue(new Vector2Int(nx, ny));
+                }
+            }
+
             return false;
         }
 
@@ -1641,6 +1921,102 @@ namespace Arcontio.Core
             outNodeIds.Reverse();
         }
 
+        private bool IsKnownLandmarkReachableForNpc(int npcId, int startNodeId, int targetNodeId)
+        {
+            if (startNodeId == 0 || targetNodeId == 0)
+                return false;
+            if (startNodeId == targetNodeId)
+                return true;
+            if (!NpcLandmarkMemory.TryGetValue(npcId, out var mem) || mem == null)
+                return false;
+            if (!mem.ContainsLandmark(startNodeId) || !mem.ContainsLandmark(targetNodeId))
+                return false;
+
+            var open = new Queue<int>();
+            var visited = new HashSet<int>();
+            var neighbors = new List<NpcLandmarkMemory.KnownNeighbor>(16);
+            var complexNeighbors = new List<NpcLandmarkMemory.KnownNeighbor>(16);
+            NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem);
+
+            open.Enqueue(startNodeId);
+            visited.Add(startNodeId);
+
+            while (open.Count > 0)
+            {
+                int current = open.Dequeue();
+                mem.FillKnownNeighbors(current, neighbors);
+                complexNeighbors.Clear();
+                complexMem?.FillKnownComplexNeighbors(current, mem, complexNeighbors);
+                for (int i = 0; i < complexNeighbors.Count; i++)
+                    neighbors.Add(complexNeighbors[i]);
+
+                for (int i = 0; i < neighbors.Count; i++)
+                {
+                    int next = neighbors[i].NodeId;
+                    if (next == targetNodeId)
+                        return true;
+                    if (visited.Add(next))
+                        open.Enqueue(next);
+                }
+            }
+
+            return false;
+        }
+
+        private void LogTargetLandmarkResolutionDebug(int npcId, int startNodeId, int targetX, int targetY)
+        {
+            if (!NpcLandmarkMemory.TryGetValue(npcId, out var mem) || mem == null || LandmarkRegistry == null)
+                return;
+
+            var knownIds = new List<int>(Mathf.Max(1, mem.KnownLandmarksCount));
+            mem.FillKnownLandmarkIds(knownIds);
+
+            int nearestId = 0;
+            int nearestDist = int.MaxValue;
+            int bestReachableId = 0;
+            int bestReachableDist = int.MaxValue;
+            int reachableCount = 0;
+
+            for (int i = 0; i < knownIds.Count; i++)
+            {
+                int nodeId = knownIds[i];
+                if (!LandmarkRegistry.TryGetActiveNodeById(nodeId, out var node) || node == null)
+                    continue;
+
+                int dist = Mathf.Abs(node.CellX - targetX) + Mathf.Abs(node.CellY - targetY);
+                if (dist < nearestDist)
+                {
+                    nearestDist = dist;
+                    nearestId = nodeId;
+                }
+
+                bool reachable = IsKnownLandmarkReachableForNpc(npcId, startNodeId, nodeId);
+                if (reachable)
+                {
+                    reachableCount++;
+                    if (dist < bestReachableDist)
+                    {
+                        bestReachableDist = dist;
+                        bestReachableId = nodeId;
+                    }
+                }
+            }
+
+            ArcontioLogger.Trace(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (targetX, targetY)),
+                new LogBlock(LogLevel.Trace, "log.lm.target_resolution_debug")
+                    .AddField("startNodeId", startNodeId)
+                    .AddField("targetX", targetX)
+                    .AddField("targetY", targetY)
+                    .AddField("knownLandmarks", mem.KnownLandmarksCount)
+                    .AddField("nearestNodeId", nearestId)
+                    .AddField("nearestDistance", nearestDist == int.MaxValue ? -1 : nearestDist)
+                    .AddField("nearestReachable", nearestId != 0 && IsKnownLandmarkReachableForNpc(npcId, startNodeId, nearestId))
+                    .AddField("reachableKnownLandmarks", reachableCount)
+                    .AddField("bestReachableNodeId", bestReachableId)
+                    .AddField("bestReachableDistance", bestReachableDist == int.MaxValue ? -1 : bestReachableDist));
+        }
+
         /// <summary>
         /// API job-friendly del Day4:
         /// parte da NPC + cella target e restituisce una macro-route coerente e ripetibile.
@@ -1675,7 +2051,9 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!TryResolveTargetLandmark(npcId, targetX, targetY, out int targetNodeId, out string targetFail))
+            LogTargetLandmarkResolutionDebug(npcId, startNodeId, targetX, targetY);
+
+            if (!TryResolveTargetLandmark(npcId, startNodeId, targetX, targetY, out int targetNodeId, out string targetFail))
             {
                 plan.FailureReason = targetFail;
                 ArcontioLogger.Trace(

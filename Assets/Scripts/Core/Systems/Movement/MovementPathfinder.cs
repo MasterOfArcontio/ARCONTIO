@@ -406,9 +406,26 @@ namespace Arcontio.Core
 
                 if (isImmediateBacktrack)
                 {
-                    state.FailureReason = "RejectedImmediateBacktrack";
-                    world.Pathfinding.GoalLocalSearchExecution[npcId] = state;
-                    return false;
+                    int backtrackCellIndex = world.CellIndex(state.LastStepFromX, state.LastStepFromY);
+                    var alternativePath = new List<Vector2Int>(64);
+
+                    if (!TryBuildBoundedMovePath(
+                            world,
+                            npcId,
+                            currentX,
+                            currentY,
+                            state.FinalTargetCellX,
+                            state.FinalTargetCellY,
+                            maxVisited,
+                            alternativePath,
+                            backtrackCellIndex) || alternativePath.Count < 2)
+                    {
+                        state.FailureReason = "RejectedImmediateBacktrack";
+                        world.Pathfinding.GoalLocalSearchExecution[npcId] = state;
+                        return false;
+                    }
+
+                    path = alternativePath;
                 }
             }
 
@@ -536,7 +553,16 @@ namespace Arcontio.Core
         ///
         /// Restituisce un path cella-per-cella completo (inclusa la sorgente) se riesce.
         /// </summary>
-        public static bool TryBuildBoundedMovePath(World world, int npcId, int startX, int startY, int targetX, int targetY, int maxVisited, List<Vector2Int> outCells)
+        public static bool TryBuildBoundedMovePath(
+            World world,
+            int npcId,
+            int startX,
+            int startY,
+            int targetX,
+            int targetY,
+            int maxVisited,
+            List<Vector2Int> outCells,
+            int forcedBlockedFirstStepCellIndex = -1)
         {
             if (outCells == null)
                 return false;
@@ -557,8 +583,8 @@ namespace Arcontio.Core
             float hWeight = cfg.heuristicWeight <= 0f ? 1f : cfg.heuristicWeight;
             int nowTick = (int)TickContext.CurrentTickIndex;
 
-            int blockedFirstStepCellIndex = -1;
-            if (cfg.enableFailureLearning)
+            int blockedFirstStepCellIndex = forcedBlockedFirstStepCellIndex;
+            if (blockedFirstStepCellIndex < 0 && cfg.enableFailureLearning)
             {
                 long signature = world.Pathfinding.MakeLocalSearchFailureSignature(startX, startY, targetX, targetY);
                 if (world.Pathfinding.TryGetRecentLocalSearchFailure(npcId, signature, Mathf.Max(1, cfg.failureMemoryTicks), nowTick, out var recentFailure) && recentFailure != null)
@@ -577,6 +603,7 @@ namespace Arcontio.Core
             var candidatePath = new List<Vector2Int>(64);
             var partialBestPath = new List<Vector2Int>(64);
             bool foundCompletePath;
+            bool smartFallbackUsed = false;
 
             if (cfg.useJumpPointSearch)
             {
@@ -598,6 +625,7 @@ namespace Arcontio.Core
 
             if (!foundCompletePath && cfg.enableSmartFallback)
             {
+                smartFallbackUsed = true;
                 int expandedFallbackLimit = Mathf.Max(expandedLimit, cfg.maxExpandedNodes * Mathf.Max(1, cfg.fallbackExpandedNodesMultiplier));
                 int radiusFallbackLimit = Mathf.Max(radiusLimit, cfg.maxSearchRadius + Mathf.Max(0, cfg.fallbackRadiusBonus));
                 int jumpFallbackLimit = Mathf.Max(jumpLimit, cfg.maxJumpDistance + Mathf.Max(0, cfg.fallbackRadiusBonus / 2));
@@ -653,6 +681,10 @@ namespace Arcontio.Core
                     outCells.AddRange(candidatePath);
 
                 world.Pathfinding.RememberLocalSearchSuccess(npcId, startX, startY, targetX, targetY);
+                LogBoundedMovePathResult(
+                    world, npcId, "Complete", startX, startY, targetX, targetY,
+                    expandedLimit, iterationLimit, radiusLimit, jumpLimit, smartFallbackUsed,
+                    blockedFirstStepCellIndex, partialBestPath.Count, outCells);
                 return outCells.Count >= 2;
             }
 
@@ -666,11 +698,68 @@ namespace Arcontio.Core
                 int blockedStep = outCells.Count >= 2 ? world.CellIndex(outCells[1].x, outCells[1].y) : -1;
                 int progressCell = outCells.Count > 0 ? world.CellIndex(outCells[outCells.Count - 1].x, outCells[outCells.Count - 1].y) : -1;
                 world.Pathfinding.RememberLocalSearchFailure(npcId, startX, startY, targetX, targetY, blockedStep, progressCell);
-                return outCells.Count >= 2;
+                LogBoundedMovePathResult(
+                    world, npcId, "Partial", startX, startY, targetX, targetY,
+                    expandedLimit, iterationLimit, radiusLimit, jumpLimit, smartFallbackUsed,
+                    blockedFirstStepCellIndex, partialBestPath.Count, outCells);
+                outCells.Clear();
+                return false;
             }
 
             world.Pathfinding.RememberLocalSearchFailure(npcId, startX, startY, targetX, targetY, blockedFirstStepCellIndex, -1);
+            LogBoundedMovePathResult(
+                world, npcId, "Failed", startX, startY, targetX, targetY,
+                expandedLimit, iterationLimit, radiusLimit, jumpLimit, smartFallbackUsed,
+                blockedFirstStepCellIndex, partialBestPath.Count, outCells);
             return false;
+        }
+
+        private static void LogBoundedMovePathResult(
+            World world,
+            int npcId,
+            string resultKind,
+            int startX,
+            int startY,
+            int targetX,
+            int targetY,
+            int expandedLimit,
+            int iterationLimit,
+            int radiusLimit,
+            int jumpLimit,
+            bool smartFallbackUsed,
+            int blockedFirstStepCellIndex,
+            int partialBestCount,
+            List<Vector2Int> path)
+        {
+            int pathCount = path?.Count ?? 0;
+            int firstStepX = pathCount >= 2 ? path[1].x : 0;
+            int firstStepY = pathCount >= 2 ? path[1].y : 0;
+            int lastX = pathCount > 0 ? path[pathCount - 1].x : 0;
+            int lastY = pathCount > 0 ? path[pathCount - 1].y : 0;
+            bool endsAtTarget = pathCount > 0 && lastX == targetX && lastY == targetY;
+
+            ArcontioLogger.Trace(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (startX, startY)),
+                new LogBlock(LogLevel.Trace, "log.move.local_search_result")
+                    .AddField("source", nameof(MovementPathfinder))
+                    .AddField("resultKind", resultKind)
+                    .AddField("startX", startX)
+                    .AddField("startY", startY)
+                    .AddField("targetX", targetX)
+                    .AddField("targetY", targetY)
+                    .AddField("pathCount", pathCount)
+                    .AddField("firstStepX", firstStepX)
+                    .AddField("firstStepY", firstStepY)
+                    .AddField("lastX", lastX)
+                    .AddField("lastY", lastY)
+                    .AddField("endsAtTarget", endsAtTarget)
+                    .AddField("expandedLimit", expandedLimit)
+                    .AddField("iterationLimit", iterationLimit)
+                    .AddField("radiusLimit", radiusLimit)
+                    .AddField("jumpLimit", jumpLimit)
+                    .AddField("smartFallbackUsed", smartFallbackUsed)
+                    .AddField("blockedFirstStepCellIndex", blockedFirstStepCellIndex)
+                    .AddField("partialBestCount", partialBestCount));
         }
 
         private static bool TryBuildBoundedJpsPathInternal(World world, int npcId,

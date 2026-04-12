@@ -477,6 +477,16 @@ namespace Arcontio.Core
             return nodeId != 0;
         }
 
+        public void FillKnownLandmarkIds(List<int> outNodeIds)
+        {
+            outNodeIds?.Clear();
+            if (outNodeIds == null || _landmarksById.Count == 0)
+                return;
+
+            foreach (var kv in _landmarksById)
+                outNodeIds.Add(kv.Key);
+        }
+
         public void FillKnownNeighbors(int nodeId, List<KnownNeighbor> outNeighbors)
         {
             outNeighbors?.Clear();

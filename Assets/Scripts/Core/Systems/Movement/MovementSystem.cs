@@ -169,6 +169,261 @@ namespace Arcontio.Core
                 block);
         }
 
+        private static void LogLocalSearchAttempt(
+            World world,
+            int npcId,
+            int startX,
+            int startY,
+            int finalTargetX,
+            int finalTargetY,
+            int effectiveTargetX,
+            int effectiveTargetY,
+            int budget,
+            bool usingMacroImmediate,
+            bool inPrefixCommitment,
+            bool isInLastMile)
+        {
+            var block = new LogBlock(LogLevel.Trace, "log.move.local_search_attempt")
+                .AddField("startX", startX)
+                .AddField("startY", startY)
+                .AddField("finalTargetX", finalTargetX)
+                .AddField("finalTargetY", finalTargetY)
+                .AddField("effectiveTargetX", effectiveTargetX)
+                .AddField("effectiveTargetY", effectiveTargetY)
+                .AddField("budget", budget)
+                .AddField("usingMacroImmediate", usingMacroImmediate)
+                .AddField("inPrefixCommitment", inPrefixCommitment)
+                .AddField("isInLastMile", isInLastMile);
+
+            if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macroState) && macroState != null)
+            {
+                block.AddField("macroActive", macroState.Active)
+                    .AddField("macroNavMode", macroState.NavigationMode)
+                    .AddField("macroFailureReason", macroState.FailureReason)
+                    .AddField("macroImmediateX", macroState.ImmediateTargetX)
+                    .AddField("macroImmediateY", macroState.ImmediateTargetY)
+                    .AddField("macroNextRouteNodeIndex", macroState.NextRouteNodeIndex);
+            }
+            else
+            {
+                block.AddField("macroActive", false);
+            }
+
+            ArcontioLogger.Trace(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (startX, startY)),
+                block);
+        }
+
+        private static void LogLocalSearchUseResult(
+            World world,
+            int npcId,
+            int startX,
+            int startY,
+            int targetX,
+            int targetY,
+            bool found,
+            System.Collections.Generic.List<Vector2Int> path)
+        {
+            int pathCount = path?.Count ?? 0;
+            int firstStepX = pathCount >= 2 ? path[1].x : 0;
+            int firstStepY = pathCount >= 2 ? path[1].y : 0;
+            int lastX = pathCount > 0 ? path[pathCount - 1].x : 0;
+            int lastY = pathCount > 0 ? path[pathCount - 1].y : 0;
+            bool endsAtTarget = pathCount > 0 && lastX == targetX && lastY == targetY;
+            string resultKind = !found ? "Failed" : (endsAtTarget ? "Complete" : "Partial");
+
+            ArcontioLogger.Trace(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (startX, startY)),
+                new LogBlock(LogLevel.Trace, "log.move.local_search_use_result")
+                    .AddField("source", nameof(MovementSystem))
+                    .AddField("resultKind", resultKind)
+                    .AddField("startX", startX)
+                    .AddField("startY", startY)
+                    .AddField("targetX", targetX)
+                    .AddField("targetY", targetY)
+                    .AddField("found", found)
+                    .AddField("pathCount", pathCount)
+                    .AddField("firstStepX", firstStepX)
+                    .AddField("firstStepY", firstStepY)
+                    .AddField("lastX", lastX)
+                    .AddField("lastY", lastY)
+                    .AddField("endsAtTarget", endsAtTarget));
+        }
+
+        private static bool CanReachMacroImmediateTargetLocally(
+            World world,
+            int npcId,
+            int startX,
+            int startY,
+            int targetX,
+            int targetY)
+        {
+            if (MovementPathfinder.CanNpcUseDirectPath(world, npcId, targetX, targetY))
+                return true;
+
+            var path = new System.Collections.Generic.List<Vector2Int>(64);
+            bool found = MovementPathfinder.TryBuildBoundedMovePath(
+                world, npcId, startX, startY, targetX, targetY, GetLocalSearchVisitedBudget(world), path);
+
+            if (!found || path.Count < 2)
+                return false;
+
+            var last = path[path.Count - 1];
+            return last.x == targetX && last.y == targetY;
+        }
+
+        private static bool TryStartDirectCommit(
+            World world,
+            int npcId,
+            GridPosition pos,
+            int targetX,
+            int targetY,
+            string reason,
+            bool keepLastMile,
+            out int directPathCount)
+        {
+            directPathCount = 0;
+
+            var directPath = new System.Collections.Generic.List<Vector2Int>(32);
+            if (!MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, pos.X, pos.Y, targetX, targetY, directPath)
+                || directPath.Count < 2)
+                return false;
+
+            if (!keepLastMile)
+                world.ClearDebugMacroRouteForNpc(npcId);
+
+            world.ClearNpcLocalSearchState(npcId, "DirectCommitStarted");
+            world.Pathfinding.ClearMoveBackOff(npcId);
+            world.SetDebugDirectPathForNpc(npcId, directPath);
+
+            int prefixLen = Mathf.Min(GetDirectPrefixCells(world), directPath.Count - 1);
+            var directState = new NpcMacroRouteExecutionState
+            {
+                Active                     = true,
+                HasUsableMacroPath         = keepLastMile,
+                IsDoingLastMile            = keepLastMile,
+                NextRouteNodeIndex         = 0,
+                FinalTargetCellX           = targetX,
+                FinalTargetCellY           = targetY,
+                ImmediateTargetX           = targetX,
+                ImmediateTargetY           = targetY,
+                FailureReason              = string.Empty,
+                NavigationMode             = "DIRECT_APPROACHING",
+                LastModeSwitchTick         = (int)TickContext.CurrentTickIndex,
+                LastModeSwitchReason       = reason,
+                DirectPrefixStepsRemaining = Mathf.Max(1, prefixLen),
+                IsApproachingFirstLm       = false,
+            };
+            world.Pathfinding.MacroRouteExecution[npcId] = directState;
+            directPathCount = directPath.Count;
+            return true;
+        }
+
+        private static bool TrySelectDirectCommitNextStep(
+            World world,
+            int npcId,
+            int currentX,
+            int currentY,
+            out int targetX,
+            out int targetY)
+        {
+            targetX = currentX;
+            targetY = currentY;
+
+            if (!world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var directState)
+                || directState == null
+                || !directState.Active
+                || directState.CurrentPath.Count < 2)
+                return false;
+
+            if (directState.NextPathIndex < 1)
+                directState.NextPathIndex = 1;
+
+            if (directState.NextPathIndex < directState.CurrentPath.Count)
+            {
+                var plannedNext = directState.CurrentPath[directState.NextPathIndex];
+                int plannedDist = Mathf.Abs(plannedNext.X - currentX) + Mathf.Abs(plannedNext.Y - currentY);
+                if (plannedDist > 1)
+                {
+                    for (int i = 0; i < directState.CurrentPath.Count; i++)
+                    {
+                        var cell = directState.CurrentPath[i];
+                        if (cell.X == currentX && cell.Y == currentY)
+                        {
+                            directState.NextPathIndex = i + 1;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (directState.NextPathIndex >= directState.CurrentPath.Count)
+            {
+                directState.Active = false;
+                world.Pathfinding.DirectCommitExecution[npcId] = directState;
+                return false;
+            }
+
+            var next = directState.CurrentPath[directState.NextPathIndex];
+            int dist = Mathf.Abs(next.X - currentX) + Mathf.Abs(next.Y - currentY);
+            if (dist != 1)
+            {
+                directState.Active = false;
+                directState.FailureReason = "DirectCommitPathDesynced";
+                world.Pathfinding.DirectCommitExecution[npcId] = directState;
+                return false;
+            }
+
+            directState.ImmediateTargetX = next.X;
+            directState.ImmediateTargetY = next.Y;
+            world.Pathfinding.DirectCommitExecution[npcId] = directState;
+            targetX = next.X;
+            targetY = next.Y;
+            return true;
+        }
+
+        private static void AdvanceDirectCommitAfterMove(World world, int npcId, int movedToX, int movedToY)
+        {
+            if (!world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var directState)
+                || directState == null
+                || directState.CurrentPath.Count == 0)
+                return;
+
+            if (directState.NextPathIndex < directState.CurrentPath.Count)
+            {
+                var expected = directState.CurrentPath[directState.NextPathIndex];
+                if (expected.X == movedToX && expected.Y == movedToY)
+                    directState.NextPathIndex++;
+            }
+
+            if (directState.NextPathIndex >= directState.CurrentPath.Count)
+            {
+                directState.Active = false;
+                directState.ImmediateTargetX = movedToX;
+                directState.ImmediateTargetY = movedToY;
+            }
+            else
+            {
+                var next = directState.CurrentPath[directState.NextPathIndex];
+                directState.Active = true;
+                directState.ImmediateTargetX = next.X;
+                directState.ImmediateTargetY = next.Y;
+            }
+
+            world.Pathfinding.DirectCommitExecution[npcId] = directState;
+        }
+
+        private static bool IsImmediateLocalSearchBacktrack(World world, int npcId, int fromX, int fromY, int toX, int toY)
+        {
+            return world.Pathfinding.GoalLocalSearchExecution.TryGetValue(npcId, out var state)
+                && state != null
+                && state.HasLastSuccessfulStep
+                && fromX == state.LastStepToX
+                && fromY == state.LastStepToY
+                && toX == state.LastStepFromX
+                && toY == state.LastStepFromY;
+        }
+
         /// <summary>
         /// Numero di tick consecutivi di blocco dopo i quali l'intent viene cancellato.
         /// Serve a sbloccare la simulazione quando un NPC è impossibilitato ad avanzare.
@@ -316,8 +571,7 @@ namespace Arcontio.Core
                     int lmTargetY = lmState.FinalTargetCellY;
 
                     bool checkFovLm  = GetDirectCheckFov(world);
-                    bool lmVisible   = !checkFovLm
-                                       || CanAcquireDirectPerceptually(world, npcId, lmTargetX, lmTargetY);
+                    bool lmVisible   = CanAcquireDirectTarget(world, npcId, lmTargetX, lmTargetY, checkFovLm);
                     bool lmPathClear = lmVisible
                                        && MovementPathfinder.CanNpcUseDirectPath(world, npcId, lmTargetX, lmTargetY);
 
@@ -325,21 +579,38 @@ namespace Arcontio.Core
                     {
                         // Target finale visibile e path libero:
                         // converti il last-mile in un direct con prefix commitment.
-                        int lmPrefixLen = Mathf.Min(GetDirectPrefixCells(world),
+                        if (TryStartDirectCommit(
+                                world, npcId, pos, lmTargetX, lmTargetY,
+                                "LastMileConvertedToDirect", keepLastMile: true,
+                                out int lmDirectPathCount))
+                        {
+                            lastMileJustConverted = true;
+
+                            LogDirectGateDebug(
+                                world, npcId, "runtime_last_mile_direct_commit", pos, lmTargetX, lmTargetY,
+                                checkFovLm, lmVisible, lmPathClear,
+                                lmTargetX, lmTargetY, inPrefixCommitment: true, isInLastMile: true,
+                                lastMileJustConverted: true, usingMacroImmediate: false,
+                                extraKey: "directPathCount", extraValue: lmDirectPathCount);
+                        }
+                        else
+                        {
+                            int lmPrefixLen = Mathf.Min(GetDirectPrefixCells(world),
                             Mathf.Abs(lmTargetX - pos.X) + Mathf.Abs(lmTargetY - pos.Y));
-                        lmState.NavigationMode              = "DIRECT_APPROACHING";
-                        lmState.LastModeSwitchTick          = (int)TickContext.CurrentTickIndex;
-                        lmState.LastModeSwitchReason        = "LastMileConvertedToDirect";
-                        lmState.DirectPrefixStepsRemaining  = Mathf.Max(1, lmPrefixLen);
+                            lmState.NavigationMode              = "DIRECT_APPROACHING";
+                            lmState.LastModeSwitchTick          = (int)TickContext.CurrentTickIndex;
+                            lmState.LastModeSwitchReason        = "LastMileConvertedToDirectFallback";
+                            lmState.DirectPrefixStepsRemaining  = Mathf.Max(1, lmPrefixLen);
                         // IsDoingLastMile rimane true per mantenere la semantica
                         // "siamo nel tratto finale" — ma ora il controllo lo gestisce
                         // il prefix commitment invece del greedy LM.
-                        world.Pathfinding.MacroRouteExecution[npcId] = lmState;
+                            world.Pathfinding.MacroRouteExecution[npcId] = lmState;
                         // Patch 0.02.07.B — Bug 2 fix:
                         // Segnala che in questo stesso tick la conversione è avvenuta.
                         // Il blocco allowPrefix sotto deve saperlo per attivare
                         // inPrefixCommitment=true senza dover attendere il tick successivo.
-                        lastMileJustConverted = true;
+                            lastMileJustConverted = true;
+                        }
                     }
                     // else: LAST_MILE greedy — il sistema procede normalmente.
                 }
@@ -404,8 +675,7 @@ namespace Arcontio.Core
                     {
                         // Prefix terminato: Regola 4 → rivaluta acquisizione.
                         bool checkFovRenew  = GetDirectCheckFov(world);
-                        bool canRenew       = !checkFovRenew
-                                             || CanAcquireDirectPerceptually(world, npcId, finalTargetX, finalTargetY);
+                        bool canRenew       = CanAcquireDirectTarget(world, npcId, finalTargetX, finalTargetY, checkFovRenew);
                         bool pathStillClear = canRenew
                                              && MovementPathfinder.CanNpcUseDirectPath(world, npcId, finalTargetX, finalTargetY);
 
@@ -417,7 +687,20 @@ namespace Arcontio.Core
 
                         if (pathStillClear)
                         {
-                            execState2.DirectPrefixStepsRemaining = GetDirectPrefixCells(world);
+                            var renewDirectPath = new System.Collections.Generic.List<Vector2Int>(32);
+                            if (MovementPathfinder.TryBuildGreedyDirectPath(
+                                    world, npcId, pos.X, pos.Y, finalTargetX, finalTargetY, renewDirectPath)
+                                && renewDirectPath.Count >= 2)
+                            {
+                                world.SetDebugDirectPathForNpc(npcId, renewDirectPath);
+                                execState2.DirectPrefixStepsRemaining = Mathf.Min(GetDirectPrefixCells(world), renewDirectPath.Count - 1);
+                            }
+                            else
+                            {
+                                execState2.DirectPrefixStepsRemaining = GetDirectPrefixCells(world);
+                            }
+
+                            execState2.NavigationMode = "DIRECT_APPROACHING";
                             world.Pathfinding.MacroRouteExecution[npcId] = execState2;
                             inPrefixCommitment = true;
                         }
@@ -435,8 +718,7 @@ namespace Arcontio.Core
                     // distanza, quindi il check greedy passava anche per target a 26 celle
                     // (oltre visionRange=17), bypassando la macro-route landmark.
                     bool checkFovRuntime      = GetDirectCheckFov(world);
-                    bool targetVisibleRuntime = !checkFovRuntime
-                                               || CanAcquireDirectPerceptually(world, npcId, finalTargetX, finalTargetY);
+                    bool targetVisibleRuntime = CanAcquireDirectTarget(world, npcId, finalTargetX, finalTargetY, checkFovRuntime);
                     bool directClearRuntime   = targetVisibleRuntime
                                                && MovementPathfinder.CanNpcUseDirectPath(world, npcId, finalTargetX, finalTargetY);
                     directClearRuntimeForDebug = directClearRuntime;
@@ -451,16 +733,43 @@ namespace Arcontio.Core
                     {
                         if (world.TryGetMacroExecutionImmediateTarget(npcId, out int macroTargetX, out int macroTargetY, out macroLastMile, out macroNextNodeId))
                         {
-                            effectiveTargetX = macroTargetX;
-                            effectiveTargetY = macroTargetY;
-                            usingMacroImmediate = true;
+                            bool macroImmediateReachable = CanReachMacroImmediateTargetLocally(
+                                world, npcId, pos.X, pos.Y, macroTargetX, macroTargetY);
 
-                            LogDirectGateDebug(
-                                world, npcId, "runtime_macro_target_selected", pos, finalTargetX, finalTargetY,
-                                checkFovRuntime, targetVisibleRuntime, directClearRuntime,
-                                effectiveTargetX, effectiveTargetY, inPrefixCommitment, isInLastMile,
-                                lastMileJustConverted, usingMacroImmediate,
-                                extraKey: "macroNextNodeId", extraValue: macroNextNodeId);
+                            if (macroImmediateReachable)
+                            {
+                                effectiveTargetX = macroTargetX;
+                                effectiveTargetY = macroTargetY;
+                                usingMacroImmediate = true;
+
+                                LogDirectGateDebug(
+                                    world, npcId, "runtime_macro_target_selected", pos, finalTargetX, finalTargetY,
+                                    checkFovRuntime, targetVisibleRuntime, directClearRuntime,
+                                    effectiveTargetX, effectiveTargetY, inPrefixCommitment, isInLastMile,
+                                    lastMileJustConverted, usingMacroImmediate,
+                                    extraKey: "macroNextNodeId", extraValue: macroNextNodeId);
+                            }
+                            else
+                            {
+                                if (macroLastMile)
+                                {
+                                    world.MarkMacroRouteExecutionBlocked(npcId, duringLastMile: true);
+                                    usingGreedyFallbackForDebug = true;
+                                }
+                                else
+                                {
+                                    effectiveTargetX = macroTargetX;
+                                    effectiveTargetY = macroTargetY;
+                                    usingMacroImmediate = true;
+                                }
+
+                                LogDirectGateDebug(
+                                    world, npcId, "runtime_macro_target_unreachable", pos, finalTargetX, finalTargetY,
+                                    checkFovRuntime, targetVisibleRuntime, directClearRuntime,
+                                    macroTargetX, macroTargetY, inPrefixCommitment, isInLastMile,
+                                    lastMileJustConverted, usingMacroImmediate,
+                                    extraKey: "macroNextNodeId", extraValue: macroNextNodeId);
+                            }
                         }
                         else
                         {
@@ -472,7 +781,24 @@ namespace Arcontio.Core
                         // Fix bug 3: il target è raggiungibile direttamente ma il NavMode
                         // potrebbe essere rimasto APPROACHING_LM da un piano LM precedente.
                         // Forziamo DIRECT_APPROACHING per allineare card e comportamento reale.
-                        if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var fixState)
+                        if (TryStartDirectCommit(
+                                world, npcId, pos, finalTargetX, finalTargetY,
+                                "RuntimeDirectOverrideLm", keepLastMile: false,
+                                out int runtimeDirectPathCount))
+                        {
+                            inPrefixCommitment = true;
+                            effectiveTargetX = finalTargetX;
+                            effectiveTargetY = finalTargetY;
+                            usingMacroImmediate = false;
+
+                            LogDirectGateDebug(
+                                world, npcId, "runtime_direct_commit_override_lm", pos, finalTargetX, finalTargetY,
+                                checkFovRuntime, targetVisibleRuntime, directClearRuntime,
+                                effectiveTargetX, effectiveTargetY, inPrefixCommitment, isInLastMile,
+                                lastMileJustConverted, usingMacroImmediate,
+                                extraKey: "directPathCount", extraValue: runtimeDirectPathCount);
+                        }
+                        else if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var fixState)
                             && fixState != null
                             && fixState.NavigationMode == "APPROACHING_LM")
                         {
@@ -547,6 +873,18 @@ namespace Arcontio.Core
                     continue;
                 }
 
+                bool usingDirectCommitStep = false;
+                bool directCommitCanOwnMovement =
+                    world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var preLocalDirectState)
+                    && preLocalDirectState != null
+                    && preLocalDirectState.Active
+                    && world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var preLocalDirectMacroState)
+                    && preLocalDirectMacroState != null
+                    && preLocalDirectMacroState.NavigationMode == "DIRECT_APPROACHING";
+
+                if (directCommitCanOwnMovement)
+                    world.ClearNpcLocalSearchState(npcId, "DirectCommitOwnsMovement");
+
                 // ============================================================
                 // PATCH 0.02.02P - Local search ownership forte
                 // ============================================================
@@ -614,6 +952,24 @@ namespace Arcontio.Core
                     world.ClearNpcLocalSearchState(npcId, "LocalSearchNoUsableStep");
                 }
 
+                bool directCommitOwnsMovement =
+                    world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var directOwnerState)
+                    && directOwnerState != null
+                    && directOwnerState.Active
+                    && world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var directOwnerMacroState)
+                    && directOwnerMacroState != null
+                    && directOwnerMacroState.NavigationMode == "DIRECT_APPROACHING";
+
+                if ((inPrefixCommitment || directCommitOwnsMovement)
+                    && TrySelectDirectCommitNextStep(world, npcId, x, y, out int directStepX, out int directStepY))
+                {
+                    effectiveTargetX = directStepX;
+                    effectiveTargetY = directStepY;
+                    usingDirectCommitStep = true;
+                    inPrefixCommitment = true;
+                    usingMacroImmediate = false;
+                }
+
                 // Step greedy: preferisci asse con maggiore distanza.
                 // Nota molto importante:
                 // - qui stiamo ancora provando il movimento "economico" standard;
@@ -657,13 +1013,16 @@ namespace Arcontio.Core
                 bool effectiveTargetHasDirectPath = MovementPathfinder.CanNpcUseDirectPath(world, npcId, effectiveTargetX, effectiveTargetY);
 
                 // Tentativo 1: step scelto
-                if (TryMoveTo(world, npcId, x + stepX, y + stepY, bus))
+                int candidateX = x + stepX;
+                int candidateY = y + stepY;
+                if (!IsImmediateLocalSearchBacktrack(world, npcId, x, y, candidateX, candidateY)
+                    && TryMoveTo(world, npcId, candidateX, candidateY, bus))
                 {
                     moved = true;
-                    movedToX = x + stepX;
-                    movedToY = y + stepY;
+                    movedToX = candidateX;
+                    movedToY = candidateY;
                 }
-                else
+                else if (!usingDirectCommitStep)
                 {
                     // Tentativo 2: prova sull'altro asse (fallback minimo)
                     if (stepX != 0)
@@ -680,12 +1039,17 @@ namespace Arcontio.Core
                     // Se anche il fallback non è possibile, restiamo fermi.
                     // Nota: se stepX/stepY sono entrambi 0, TryMoveTo fallirà (bounds) ma preferiamo essere espliciti.
                     if (stepX != 0 || stepY != 0)
-                        if (TryMoveTo(world, npcId, x + stepX, y + stepY, bus))
+                    {
+                        candidateX = x + stepX;
+                        candidateY = y + stepY;
+                        if (!IsImmediateLocalSearchBacktrack(world, npcId, x, y, candidateX, candidateY)
+                            && TryMoveTo(world, npcId, candidateX, candidateY, bus))
                         {
                             moved = true;
-                            movedToX = x + stepX;
-                            movedToY = y + stepY;
+                            movedToX = candidateX;
+                            movedToY = candidateY;
                         }
+                    }
                 }
 
                 // PATCH 0.02.05.2f:
@@ -697,23 +1061,62 @@ namespace Arcontio.Core
                 // - piccole stanze con unica uscita non allineata al target.
                 bool movedUsingLocalSearch = false;
 
-                if (!moved)
+                if (!moved && !usingDirectCommitStep)
                 {
                     var fallbackPath = new System.Collections.Generic.List<Vector2Int>(64);
-                    if (MovementPathfinder.TryBuildBoundedMovePath(world, npcId, x, y, effectiveTargetX, effectiveTargetY, GetLocalSearchVisitedBudget(world), fallbackPath)
-                        && fallbackPath.Count >= 2)
-                    {
-                        int remainingBudget = Mathf.Max(0, GetLocalSearchVisitedBudget(world) - fallbackPath.Count);
-                        world.SetDebugJumpPathForNpc(npcId, fallbackPath, remainingBudget);
+                    int localSearchBudget = GetLocalSearchVisitedBudget(world);
+                    LogLocalSearchAttempt(
+                        world, npcId, x, y, finalTargetX, finalTargetY,
+                        effectiveTargetX, effectiveTargetY, localSearchBudget,
+                        usingMacroImmediate, inPrefixCommitment, isInLastMile);
 
+                    bool localSearchFound = MovementPathfinder.TryBuildBoundedMovePath(
+                        world, npcId, x, y, effectiveTargetX, effectiveTargetY, localSearchBudget, fallbackPath);
+                    LogLocalSearchUseResult(world, npcId, x, y, effectiveTargetX, effectiveTargetY, localSearchFound, fallbackPath);
+
+                    if (localSearchFound && fallbackPath.Count >= 2)
+                    {
                         var next = fallbackPath[1];
-                        if (TryMoveTo(world, npcId, next.x, next.y, bus))
+                        if (world.Pathfinding.GoalLocalSearchExecution.TryGetValue(npcId, out var lastLocalState)
+                            && lastLocalState != null
+                            && lastLocalState.HasLastSuccessfulStep
+                            && x == lastLocalState.LastStepToX
+                            && y == lastLocalState.LastStepToY
+                            && next.x == lastLocalState.LastStepFromX
+                            && next.y == lastLocalState.LastStepFromY)
                         {
-                            moved = true;
-                            movedUsingLocalSearch = true;
-                            movedToX = next.x;
-                            movedToY = next.y;
-                            MovementPathfinder.AdvanceNpcLocalSearchAfterSuccessfulStep(world, npcId, x, y, next.x, next.y);
+                            var alternativePath = new System.Collections.Generic.List<Vector2Int>(64);
+                            int blockedFirstStep = world.CellIndex(lastLocalState.LastStepFromX, lastLocalState.LastStepFromY);
+                            bool alternativeFound = MovementPathfinder.TryBuildBoundedMovePath(
+                                world, npcId, x, y, effectiveTargetX, effectiveTargetY,
+                                localSearchBudget, alternativePath, blockedFirstStep);
+
+                            LogLocalSearchUseResult(world, npcId, x, y, effectiveTargetX, effectiveTargetY, alternativeFound, alternativePath);
+
+                            if (alternativeFound && alternativePath.Count >= 2)
+                            {
+                                fallbackPath = alternativePath;
+                                next = fallbackPath[1];
+                            }
+                            else
+                            {
+                                localSearchFound = false;
+                            }
+                        }
+
+                        if (localSearchFound && fallbackPath.Count >= 2)
+                        {
+                            int remainingBudget = Mathf.Max(0, localSearchBudget - fallbackPath.Count);
+                            world.SetDebugJumpPathForNpc(npcId, fallbackPath, remainingBudget);
+
+                            if (TryMoveTo(world, npcId, next.x, next.y, bus))
+                            {
+                                moved = true;
+                                movedUsingLocalSearch = true;
+                                movedToX = next.x;
+                                movedToY = next.y;
+                                MovementPathfinder.AdvanceNpcLocalSearchAfterSuccessfulStep(world, npcId, x, y, next.x, next.y);
+                            }
                         }
                     }
                 }
@@ -772,6 +1175,9 @@ namespace Arcontio.Core
                             world.AppendDebugDirectStepForNpc(npcId, x, y, movedToX, movedToY);
                             LogDebugSegmentStep(world, npcId, "DIRECT_BLUE", x, y, movedToX, movedToY,
                                 usingMacroImmediate, isApproaching, inPrefixCommitment, isInLastMile);
+
+                            if (usingDirectCommitStep)
+                                AdvanceDirectCommitAfterMove(world, npcId, movedToX, movedToY);
 
                             // Decrementa il prefix commitment se attivo.
                             if (inPrefixCommitment
@@ -960,6 +1366,25 @@ namespace Arcontio.Core
                                       visionRange, useCone, coneSlope);
         }
 
+        private static bool CanAcquireDirectTarget(
+            World world,
+            int npcId,
+            int targetX,
+            int targetY,
+            bool checkFov)
+        {
+            if (!world.GridPos.TryGetValue(npcId, out var pos))
+                return false;
+
+            if (!checkFov)
+                return true;
+
+            if (FovUtils.Manhattan(pos.X, pos.Y, targetX, targetY) <= 1)
+                return true;
+
+            return CanAcquireDirectPerceptually(world, npcId, targetX, targetY);
+        }
+
         /// <summary>
         /// Inizializza la strategia di navigazione per un nuovo intent.
         ///
@@ -1009,7 +1434,7 @@ namespace Arcontio.Core
             // che il target sia percettivamente visibile, poi che il path sia libero.
             // Se false: usa solo la traversabilità greedy (modalità legacy).
             bool checkFov     = GetDirectCheckFov(world);
-            bool targetVisible = !checkFov || CanAcquireDirectPerceptually(world, npcId, targetX, targetY);
+            bool targetVisible = CanAcquireDirectTarget(world, npcId, targetX, targetY, checkFov);
             bool pathClear     = targetVisible && MovementPathfinder.CanNpcUseDirectPath(world, npcId, targetX, targetY);
 
             LogDirectGateDebug(

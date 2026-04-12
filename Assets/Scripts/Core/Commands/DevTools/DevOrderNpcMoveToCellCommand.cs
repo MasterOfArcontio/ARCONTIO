@@ -42,11 +42,35 @@ namespace Arcontio.Core.Commands.DevTools
             if (world == null) return;
             if (!world.ExistsNpc(_npcId)) return;
 
+            bool hadOldIntent = world.NpcMoveIntents.TryGetValue(_npcId, out var oldIntent) && oldIntent.Active;
+            bool hadBackOff = world.Pathfinding.MoveBackOff.TryGetValue(_npcId, out var backOff) && backOff != null && backOff.Active;
+            bool hadLocalSearch = world.Pathfinding.GoalLocalSearchExecution.TryGetValue(_npcId, out var localState) && localState != null && localState.Active;
+            bool hadMacroRoute = world.Pathfinding.MacroRouteExecution.TryGetValue(_npcId, out var macroState) && macroState != null && macroState.Active;
+
+            ArcontioLogger.Trace(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: _npcId),
+                new LogBlock(LogLevel.Trace, "log.move.intent_command_debug")
+                    .AddField("command", nameof(DevOrderNpcMoveToCellCommand))
+                    .AddField("targetX", _targetX)
+                    .AddField("targetY", _targetY)
+                    .AddField("reason", MoveIntentReason.DebugClick.ToString())
+                    .AddField("hadOldIntent", hadOldIntent)
+                    .AddField("oldTargetX", hadOldIntent ? oldIntent.TargetX : 0)
+                    .AddField("oldTargetY", hadOldIntent ? oldIntent.TargetY : 0)
+                    .AddField("hadBackOff", hadBackOff)
+                    .AddField("backOffStage", hadBackOff ? backOff.Stage : 0)
+                    .AddField("hadLocalSearch", hadLocalSearch)
+                    .AddField("localFailureReason", hadLocalSearch ? localState.FailureReason : string.Empty)
+                    .AddField("hadMacroRoute", hadMacroRoute)
+                    .AddField("macroNavMode", hadMacroRoute ? macroState.NavigationMode : string.Empty)
+                    .AddField("macroFailureReason", hadMacroRoute ? macroState.FailureReason : string.Empty));
+
             // Pulisce gli stati di navigazione precedenti.
             world.ClearDebugNavigationPathsForNpc(_npcId);
             world.ClearDebugMacroRouteForNpc(_npcId);
             world.ClearNpcLocalSearchState(_npcId, string.Empty);
             world.ClearNpcDirectCommitState(_npcId, string.Empty);
+            world.Pathfinding.ClearMoveBackOff(_npcId);
 
             // Imposta l'intent con IsNew = true.
             // MovementSystem.InitializeNavigation deciderà al primo tick
