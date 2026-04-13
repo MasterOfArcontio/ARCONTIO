@@ -99,6 +99,8 @@ namespace Arcontio.Core
                 score += AddNeedUrgencyContribution(candidate, config);
                 score += AddCompetenceContribution(context.Profile, candidate, config);
                 score += AddPreferenceContribution(context.Profile, candidate, config);
+                score += AddObligationContribution(context.Profile, candidate, config);
+                score = ApplyMandatoryFloors(context.Profile, candidate, config, score);
 
                 candidate.AttachScore(score, _contributions.ToArray());
                 candidates[i] = candidate;
@@ -204,6 +206,91 @@ namespace Arcontio.Core
             float contribution = profile.Preference.Get(candidate.Metadata.Domain) * config.preferenceWeight;
             _contributions.Add(new DecisionScoreContribution("PreferenceAffinity", contribution));
             return contribution;
+        }
+
+        // =============================================================================
+        // AddObligationContribution
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola il contributo della pressione di obbligo per il dominio
+        /// dell'intenzione candidata.
+        /// </para>
+        ///
+        /// <para><b>ObligationPressure</b></para>
+        /// <para>
+        /// L'obbligo appartiene a <c>NpcProfile</c> perche' e' runtime e puo' essere
+        /// modificato da ruolo, istituzione o pressione culturale. In questa fase
+        /// diventa un termine positivo dello score, separato dal gate leggero della
+        /// Fase 1.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Domain</b>: dominio candidato usato come indice dell'obbligo.</item>
+        ///   <item><b>Weight</b>: peso <c>obligationWeight</c> centralizzato in config.</item>
+        ///   <item><b>Output</b>: contributo positivo allo score finale.</item>
+        /// </list>
+        /// </summary>
+        private float AddObligationContribution(NpcProfile profile, DecisionCandidate candidate, DecisionScoringConfig config)
+        {
+            if (profile == null || profile.Obligation == null || candidate.Metadata.Domain == DomainKind.None)
+            {
+                _contributions.Add(new DecisionScoreContribution("ObligationPressure", 0f));
+                return 0f;
+            }
+
+            float contribution = profile.Obligation.Get(candidate.Metadata.Domain) * config.obligationWeight;
+            _contributions.Add(new DecisionScoreContribution("ObligationPressure", contribution));
+            return contribution;
+        }
+
+        // =============================================================================
+        // ApplyMandatoryFloors
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica i floor obbligatori previsti dalla roadmap per bisogno critico e
+        /// obbligo alto.
+        /// </para>
+        ///
+        /// <para><b>Floor come vincolo spiegabile</b></para>
+        /// <para>
+        /// Il floor non seleziona direttamente il candidato: alza solo lo score minimo
+        /// quando una pressione e' abbastanza forte. Il contributo aggiunto viene
+        /// registrato nel breakdown per rendere visibile il motivo del salto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>CriticalNeedFloor</b>: soglia minima per bisogni critici.</item>
+        ///   <item><b>HighObligationFloor</b>: soglia minima per obblighi sopra threshold.</item>
+        ///   <item><b>Delta</b>: solo la differenza necessaria viene aggiunta al breakdown.</item>
+        /// </list>
+        /// </summary>
+        private float ApplyMandatoryFloors(
+            NpcProfile profile,
+            DecisionCandidate candidate,
+            DecisionScoringConfig config,
+            float currentScore)
+        {
+            float flooredScore = currentScore;
+
+            if (candidate.IsCritical && flooredScore < config.criticalNeedFloor)
+                flooredScore = config.criticalNeedFloor;
+
+            if (profile != null
+                && profile.Obligation != null
+                && candidate.Metadata.Domain != DomainKind.None
+                && profile.Obligation.Get(candidate.Metadata.Domain) >= config.highObligationThreshold
+                && flooredScore < config.highObligationFloor)
+            {
+                flooredScore = config.highObligationFloor;
+            }
+
+            float delta = flooredScore - currentScore;
+            _contributions.Add(new DecisionScoreContribution("MandatoryFloor", delta));
+            return flooredScore;
         }
     }
 }

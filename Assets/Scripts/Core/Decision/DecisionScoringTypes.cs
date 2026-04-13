@@ -66,6 +66,7 @@ namespace Arcontio.Core
         public float cognitiveModulatorWeight;
         public float criticalNeedFloor;
         public float highObligationFloor;
+        public float highObligationThreshold;
 
         public static DecisionScoringConfig Default()
         {
@@ -74,11 +75,12 @@ namespace Arcontio.Core
                 needUrgencyWeight = 1.00f,
                 competenceWeight = 0.20f,
                 preferenceWeight = 0.25f,
-                obligationWeight = 0f,
+                obligationWeight = 0.30f,
                 memoryConfidenceWeight = 0f,
                 cognitiveModulatorWeight = 0f,
-                criticalNeedFloor = 0f,
-                highObligationFloor = 0f
+                criticalNeedFloor = 1.25f,
+                highObligationFloor = 1.00f,
+                highObligationThreshold = 0.75f
             };
         }
     }
