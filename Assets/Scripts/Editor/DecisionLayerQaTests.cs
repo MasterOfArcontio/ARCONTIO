@@ -120,6 +120,44 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // DecisionInputAuditAcceptsWhitelistedPerNpcInputs
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che l'audit del Decision Layer accetti il contesto per-NPC
+        /// costruito senza <c>World</c> e senza <c>MemoryStore</c>.
+        /// </para>
+        ///
+        /// <para><b>Audit omniscience MVP</b></para>
+        /// <para>
+        /// Il test protegge la forma del contratto introdotto in v0.05: il Decision
+        /// Layer riceve dati soggettivi espliciti e non deve richiedere accesso diretto
+        /// a store oggettivi o memoria episodica grezza.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Context</b>: creato dalla factory senza World.</item>
+        ///   <item><b>Audit</b>: eseguito solo sul contesto decisionale.</item>
+        ///   <item><b>Assert</b>: input validi e nota whitelist presente.</item>
+        /// </list>
+        /// </summary>
+        [Test]
+        public void DecisionInputAuditAcceptsWhitelistedPerNpcInputs()
+        {
+            // Arrange: contesto completo, ma confinato a dati per-NPC e belief soggettivi.
+            var context = MakeContext(hunger01: 0.90f, rest01: 0.10f, addFoodBelief: true);
+
+            // Act: l'audit non riceve World e non puo' leggere MemoryStore.
+            var result = DecisionInputAudit.Audit(context);
+
+            // Assert: la whitelist degli input MVP e' soddisfatta.
+            Assert.That(result.IsValid, Is.True);
+            Assert.That(result.MissingRequiredInputCount, Is.EqualTo(0));
+            Assert.That(result.Notes, Does.Contain("DecisionInputWhitelist"));
+        }
+
+        // =============================================================================
         // MakeContext
         // =============================================================================
         /// <summary>
