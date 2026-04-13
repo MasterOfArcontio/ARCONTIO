@@ -240,6 +240,7 @@ namespace Arcontio.Core
         public string FilteredReason;
         public BeliefQueryResult BeliefResult;
         public float FinalScore;
+        public DecisionScoreContribution[] ScoreContributions;
 
         public static DecisionCandidate Available(DecisionIntentMetadata metadata, float urgency01, bool isCritical)
         {
@@ -252,7 +253,8 @@ namespace Arcontio.Core
                 IsAvailable = true,
                 FilteredReason = string.Empty,
                 BeliefResult = BeliefQueryResult.Empty(),
-                FinalScore = 0f
+                FinalScore = 0f,
+                ScoreContributions = System.Array.Empty<DecisionScoreContribution>()
             };
         }
 
@@ -284,6 +286,33 @@ namespace Arcontio.Core
             BeliefResult = beliefResult;
         }
 
+        // =============================================================================
+        // AttachScore
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggancia al candidato lo score finale e il breakdown dei contributi della
+        /// Fase 2.
+        /// </para>
+        ///
+        /// <para><b>Score come dato spiegabile</b></para>
+        /// <para>
+        /// La struttura rimane passiva: non calcola lo score, lo riceve dal servizio
+        /// di scoring. Questo evita di mescolare catalogo, generazione e ranking.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>FinalScore</b>: somma dei contributi pesati.</item>
+        ///   <item><b>ScoreContributions</b>: breakdown leggibile per debug e QA.</item>
+        /// </list>
+        /// </summary>
+        public void AttachScore(float finalScore, DecisionScoreContribution[] contributions)
+        {
+            FinalScore = finalScore;
+            ScoreContributions = contributions ?? System.Array.Empty<DecisionScoreContribution>();
+        }
+
         public static DecisionCandidate Filtered(DecisionIntentMetadata metadata, string reason)
         {
             return new DecisionCandidate
@@ -295,7 +324,8 @@ namespace Arcontio.Core
                 IsAvailable = false,
                 FilteredReason = reason ?? string.Empty,
                 BeliefResult = BeliefQueryResult.Empty(),
-                FinalScore = 0f
+                FinalScore = 0f,
+                ScoreContributions = System.Array.Empty<DecisionScoreContribution>()
             };
         }
 
