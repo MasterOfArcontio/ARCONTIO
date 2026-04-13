@@ -527,8 +527,27 @@ namespace Arcontio.Core
                         intent.IsNew        = true;
                         intent.BlockedTicks = 0;
                         world.NpcMoveIntents[npcId] = intent;
+
+                        MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                            world,
+                            npcId,
+                            PathEventType.BackOffExpired,
+                            pos,
+                            new Vector2Int(intent.TargetX, intent.TargetY),
+                            minVerbosity: 2,
+                            summary: "backoff_expired_stage_" + expiredStage);
+
                         InitializeNavigation(world, npcId, ref intent);
                         world.NpcMoveIntents[npcId] = intent;
+
+                        MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                            world,
+                            npcId,
+                            PathEventType.Replanned,
+                            pos,
+                            new Vector2Int(intent.TargetX, intent.TargetY),
+                            minVerbosity: 2,
+                            summary: "replanned_after_backoff_stage_" + expiredStage);
 
                         ArcontioLogger.Trace(
                             new LogContext(tick: (int)nowTick, channel: "Move", npcId: npcId, cell: (pos.X, pos.Y)),
@@ -869,6 +888,15 @@ namespace Arcontio.Core
                         world.Pathfinding.MacroRouteExecution[npcId] = doneState;
                     }
 
+                    MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                        world,
+                        npcId,
+                        PathEventType.Arrived,
+                        pos,
+                        new Vector2Int(effectiveTargetX, effectiveTargetY),
+                        minVerbosity: 1,
+                        summary: "movement_arrived");
+
                     world.SetNpcIdle(npcId);
                     continue;
                 }
@@ -943,6 +971,16 @@ namespace Arcontio.Core
                         MovementPathfinder.AdvanceNpcLocalSearchAfterSuccessfulStep(world, npcId, x, y, localToX, localToY);
                         intent.BlockedTicks = 0;
                         world.NpcMoveIntents[npcId] = intent;
+
+                        MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                            world,
+                            npcId,
+                            PathEventType.StepSuccess,
+                            new GridPosition(localToX, localToY),
+                            new Vector2Int(effectiveTargetX, effectiveTargetY),
+                            minVerbosity: 3,
+                            summary: "local_search_step_success");
+
                         continue;
                     }
 
@@ -1076,6 +1114,15 @@ namespace Arcontio.Core
 
                     if (localSearchFound && fallbackPath.Count >= 2)
                     {
+                        MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                            world,
+                            npcId,
+                            PathEventType.LocalSearchActivated,
+                            pos,
+                            new Vector2Int(effectiveTargetX, effectiveTargetY),
+                            minVerbosity: 2,
+                            summary: "bounded_local_search_activated");
+
                         var next = fallbackPath[1];
                         if (world.Pathfinding.GoalLocalSearchExecution.TryGetValue(npcId, out var lastLocalState)
                             && lastLocalState != null
@@ -1116,6 +1163,15 @@ namespace Arcontio.Core
                                 movedToX = next.x;
                                 movedToY = next.y;
                                 MovementPathfinder.AdvanceNpcLocalSearchAfterSuccessfulStep(world, npcId, x, y, next.x, next.y);
+
+                                MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                                    world,
+                                    npcId,
+                                    PathEventType.Replanned,
+                                    new GridPosition(next.x, next.y),
+                                    new Vector2Int(effectiveTargetX, effectiveTargetY),
+                                    minVerbosity: 2,
+                                    summary: "bounded_local_search_step_committed");
                             }
                         }
                     }
@@ -1192,6 +1248,15 @@ namespace Arcontio.Core
 
                     intent.BlockedTicks = 0;
                     world.NpcMoveIntents[npcId] = intent;
+
+                    MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                        world,
+                        npcId,
+                        PathEventType.StepSuccess,
+                        new GridPosition(movedToX, movedToY),
+                        new Vector2Int(effectiveTargetX, effectiveTargetY),
+                        minVerbosity: 3,
+                        summary: movedUsingLocalSearch ? "step_success_local_search" : "step_success_standard");
                 }
                 else
                 {
@@ -1234,6 +1299,17 @@ namespace Arcontio.Core
                                 // Porta chiusa e non bloccata: apri e prosegui al prossimo tick.
                                 new OpenDoorCommand(npcId, adjObjId).Execute(world, bus);
                                 doorOpenedThisTick = true;
+
+                                MovementExplainabilityEmitter.TryEmitDoorInteraction(
+                                    world,
+                                    npcId,
+                                    adjObjId,
+                                    new Vector2Int(cx, cy),
+                                    DoorState.Closed,
+                                    DoorState.Open,
+                                    commandEmitted: true,
+                                    accessGranted: true,
+                                    summary: "adjacent_door_opened_during_block_scan");
                             }
                             // IsLocked=true: trattata come muro, continua a scansionare.
                         }
@@ -1246,6 +1322,15 @@ namespace Arcontio.Core
                     }
 
                     intent.BlockedTicks++;
+
+                    MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                        world,
+                        npcId,
+                        PathEventType.Blocked,
+                        pos,
+                        new Vector2Int(effectiveTargetX, effectiveTargetY),
+                        minVerbosity: 2,
+                        summary: "movement_blocked_ticks_" + intent.BlockedTicks);
 
                     if (intent.BlockedTicks >= DefaultIntentStuckTicks)
                     {
@@ -1272,6 +1357,16 @@ namespace Arcontio.Core
                             world.MarkMacroRouteExecutionBlocked(npcId, duringLastMile: macroLastMile);
                             world.Pathfinding.ClearMoveBackOff(npcId);
 
+                            MovementExplainabilityEmitter.TryEmitFailureEvent(
+                                world,
+                                npcId,
+                                FailureType.StuckTimeout,
+                                pos,
+                                new Vector2Int(effectiveTargetX, effectiveTargetY),
+                                blockedTicks: DefaultIntentStuckTicks,
+                                backOffStage: currentStage,
+                                summary: "failure_ladder_exhausted");
+
                             ArcontioLogger.Trace(
                                 new LogContext(tick: (int)nowTickLong, channel: "Move", npcId: npcId, cell: (x, y)),
                                 new LogBlock(LogLevel.Trace, "log.move.intent_cancelled_stuck")
@@ -1294,6 +1389,15 @@ namespace Arcontio.Core
                             world.ClearNpcDirectCommitState(npcId, "BackOff_Stage" + currentStage);
                             world.MarkMacroRouteExecutionBlocked(npcId, duringLastMile: macroLastMile);
                             world.SetNpcIdle(npcId);
+
+                            MovementExplainabilityEmitter.TryEmitExecutionEvent(
+                                world,
+                                npcId,
+                                PathEventType.BackOffStarted,
+                                pos,
+                                new Vector2Int(effectiveTargetX, effectiveTargetY),
+                                minVerbosity: 1,
+                                summary: "backoff_started_stage_" + currentStage);
 
                             // Task 5 — Blacklist edge bloccato.
                             // Penalizza il macro-edge che ha causato lo stallo così che
@@ -1662,6 +1766,25 @@ namespace Arcontio.Core
             world.NpcMoveIntents[npcId] = intent;
             world.SetNpcIdle(npcId);
 
+            GridPosition currentCell = world.GridPos.TryGetValue(npcId, out var pos) ? pos : default;
+            FailureType failureType = why switch
+            {
+                "missing_object" => FailureType.TargetObjectGone,
+                "foodstock_empty" => FailureType.TargetObjectEmpty,
+                "target_moved" => FailureType.TargetMoved,
+                _ => FailureType.Unknown,
+            };
+
+            MovementExplainabilityEmitter.TryEmitFailureEvent(
+                world,
+                npcId,
+                failureType,
+                currentCell,
+                new Vector2Int(intent.TargetX, intent.TargetY),
+                blockedTicks: intent.BlockedTicks,
+                backOffStage: world.Pathfinding.GetMoveBackOffStage(npcId),
+                summary: "target_invalid_" + why);
+
             ArcontioLogger.Trace(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: default),
                 new LogBlock(LogLevel.Trace, "log.move.intent_cancelled_target_invalid")
@@ -1691,6 +1814,17 @@ namespace Arcontio.Core
                 {
                     new OpenDoorCommand(npcId, doorObjId).Execute(world, bus);
                     opened = true;
+
+                    MovementExplainabilityEmitter.TryEmitDoorInteraction(
+                        world,
+                        npcId,
+                        doorObjId,
+                        new Vector2Int(tx, ty),
+                        DoorState.Closed,
+                        DoorState.Open,
+                        commandEmitted: true,
+                        accessGranted: true,
+                        summary: "door_opened_on_try_move_to");
 
                     ArcontioLogger.Trace(
                         new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (tx, ty)),

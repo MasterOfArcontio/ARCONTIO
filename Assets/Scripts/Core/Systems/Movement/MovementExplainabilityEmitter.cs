@@ -85,6 +85,191 @@ namespace Arcontio.Core
                 macroPlan,
                 localPath,
                 verbosity));
+
+            TryEmitExecutionEvent(
+                world,
+                npcId,
+                PathEventType.Started,
+                startCell,
+                new Vector2Int(intent.TargetX, intent.TargetY),
+                minVerbosity: 1,
+                summary: "movement_started_after_initial_plan");
+        }
+
+        // =============================================================================
+        // TryEmitExecutionEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Emette un evento discreto della timeline di esecuzione pathfinding. Il
+        /// metodo e' intenzionalmente one-way: controlla config e store, costruisce lo
+        /// snapshot, poi lo deposita nel registry senza restituire decisioni.
+        /// </para>
+        ///
+        /// <para><b>Timeline runtime</b></para>
+        /// <para>
+        /// Gli eventi prodotti qui sono pensati per UI e log JSONL: rappresentano
+        /// transizioni o anomalie, non la logica che sceglie il prossimo passo.
+        /// </para>
+        /// </summary>
+        public static void TryEmitExecutionEvent(
+            World world,
+            int npcId,
+            PathEventType eventType,
+            GridPosition currentCell,
+            Vector2Int targetCell,
+            int minVerbosity,
+            string summary)
+        {
+            if (!ShouldEmitForNpc(world, npcId, out _, out int verbosity) || verbosity < minVerbosity)
+                return;
+
+            var registry = world.MovementExplainability;
+            if (registry == null)
+                return;
+
+            int intentId = 0;
+            int planId = 0;
+            if (registry.TryGetNpcStore(npcId, out var store) && store != null)
+            {
+                intentId = store.CurrentIntentId;
+                planId = store.CurrentPlanId;
+            }
+
+            registry.EmitExecutionEvent(new PathExecutionEvent
+            {
+                NpcId = npcId,
+                Tick = TickContext.CurrentTickIndex,
+                IntentId = intentId,
+                PlanId = planId,
+                EventType = eventType,
+                ActiveMode = ResolveActiveMode(world, npcId),
+                CurrentCell = new Vector2Int(currentCell.X, currentCell.Y),
+                TargetCell = targetCell,
+                VerbosityLevel = verbosity,
+                Summary = summary ?? string.Empty,
+            });
+        }
+
+        // =============================================================================
+        // TryEmitFailureEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Emette un fallimento strutturato con <see cref="FailureDetail"/>. Viene
+        /// usato quando l'intent viene davvero cancellato, non quando la failure ladder
+        /// sta ancora tentando back-off e replan.
+        /// </para>
+        /// </summary>
+        public static void TryEmitFailureEvent(
+            World world,
+            int npcId,
+            FailureType failureType,
+            GridPosition currentCell,
+            Vector2Int targetCell,
+            int blockedTicks,
+            int backOffStage,
+            string summary)
+        {
+            if (!ShouldEmitForNpc(world, npcId, out _, out int verbosity) || verbosity < 1)
+                return;
+
+            var registry = world.MovementExplainability;
+            if (registry == null)
+                return;
+
+            int intentId = 0;
+            int planId = 0;
+            if (registry.TryGetNpcStore(npcId, out var store) && store != null)
+            {
+                intentId = store.CurrentIntentId;
+                planId = store.CurrentPlanId;
+            }
+
+            string activeMode = ResolveActiveMode(world, npcId);
+            registry.EmitExecutionEvent(new PathExecutionEvent
+            {
+                NpcId = npcId,
+                Tick = TickContext.CurrentTickIndex,
+                IntentId = intentId,
+                PlanId = planId,
+                EventType = PathEventType.Failed,
+                ActiveMode = activeMode,
+                CurrentCell = new Vector2Int(currentCell.X, currentCell.Y),
+                TargetCell = targetCell,
+                HasFailureDetail = true,
+                FailureDetail = new FailureDetail
+                {
+                    FailureType = failureType,
+                    BlockedTicks = blockedTicks,
+                    BackOffStage = backOffStage,
+                    LastActiveMode = activeMode,
+                },
+                VerbosityLevel = verbosity,
+                Summary = summary ?? string.Empty,
+            });
+        }
+
+        // =============================================================================
+        // TryEmitDoorInteraction
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Emette un evento porta quando il movimento incontra o apre un oggetto porta.
+        /// La trace registra lo stato osservato, ma l'apertura resta responsabilita'
+        /// del comando runtime esistente.
+        /// </para>
+        /// </summary>
+        public static void TryEmitDoorInteraction(
+            World world,
+            int npcId,
+            int doorObjectId,
+            Vector2Int doorCell,
+            DoorState stateBefore,
+            DoorState stateAfter,
+            bool commandEmitted,
+            bool accessGranted,
+            string summary)
+        {
+            if (!ShouldEmitForNpc(world, npcId, out _, out int verbosity) || verbosity < 1)
+                return;
+
+            var registry = world.MovementExplainability;
+            if (registry == null)
+                return;
+
+            int intentId = 0;
+            int planId = 0;
+            if (registry.TryGetNpcStore(npcId, out var store) && store != null)
+            {
+                intentId = store.CurrentIntentId;
+                planId = store.CurrentPlanId;
+            }
+
+            GridPosition current = world.GridPos.TryGetValue(npcId, out var pos) ? pos : default;
+            registry.EmitExecutionEvent(new PathExecutionEvent
+            {
+                NpcId = npcId,
+                Tick = TickContext.CurrentTickIndex,
+                IntentId = intentId,
+                PlanId = planId,
+                EventType = PathEventType.DoorInteraction,
+                ActiveMode = ResolveActiveMode(world, npcId),
+                CurrentCell = new Vector2Int(current.X, current.Y),
+                TargetCell = doorCell,
+                HasDoorDetail = true,
+                DoorDetail = new DoorInteractionDetail
+                {
+                    DoorObjectId = doorObjectId,
+                    DoorCell = doorCell,
+                    StateBefore = stateBefore,
+                    StateAfter = stateAfter,
+                    CommandEmitted = commandEmitted,
+                    AccessGranted = accessGranted,
+                },
+                VerbosityLevel = verbosity,
+                Summary = summary ?? string.Empty,
+            });
         }
 
         // =============================================================================
@@ -360,6 +545,39 @@ namespace Arcontio.Core
                 "NpcHasNoGridPos" => InvalidReason.LmPlanFailed,
                 _ => InvalidReason.LmPlanFailed,
             };
+        }
+
+        // =============================================================================
+        // ResolveActiveMode
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricava una stringa diagnostica della modalita' di navigazione attiva dagli
+        /// stati runtime gia' presenti. La funzione non decide quale modalita' usare:
+        /// serve solo a rendere leggibile l'evento EL.
+        /// </para>
+        /// </summary>
+        private static string ResolveActiveMode(World world, int npcId)
+        {
+            if (world == null)
+                return string.Empty;
+
+            if (world.Pathfinding.GoalLocalSearchExecution.TryGetValue(npcId, out var local)
+                && local != null
+                && local.Active)
+                return "GOAL_LOCAL_SEARCH";
+
+            if (world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macro)
+                && macro != null
+                && !string.IsNullOrEmpty(macro.NavigationMode))
+                return macro.NavigationMode;
+
+            if (world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var direct)
+                && direct != null
+                && direct.Active)
+                return "DIRECT_COMMIT";
+
+            return string.Empty;
         }
     }
 }
