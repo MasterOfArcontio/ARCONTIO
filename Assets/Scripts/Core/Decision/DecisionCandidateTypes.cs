@@ -166,6 +166,34 @@ namespace Arcontio.Core
             };
         }
 
+        // =============================================================================
+        // AttachBeliefResult
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggancia al candidato il risultato prodotto dal QuerySystem per il target
+        /// belief richiesto dall'intenzione.
+        /// </para>
+        ///
+        /// <para><b>Risultato spiegabile come dato, non come decisione</b></para>
+        /// <para>
+        /// Il candidato conserva il risultato per la Fase 2, ma non ricalcola score e
+        /// non interroga direttamente il BeliefStore. La scelta del belief resta del
+        /// <c>BeliefQueryService</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>BeliefResult</b>: copia del risultato strutturato da usare negli step successivi.</item>
+        /// </list>
+        /// </summary>
+        public void AttachBeliefResult(BeliefQueryResult beliefResult)
+        {
+            // La Fase 1 non interpreta lo score del belief: conserva solo il risultato
+            // prodotto dal QuerySystem per renderlo disponibile alla Fase 2 e al debug.
+            BeliefResult = beliefResult;
+        }
+
         public static DecisionCandidate Filtered(DecisionIntentMetadata metadata, string reason)
         {
             return new DecisionCandidate

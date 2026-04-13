@@ -28,6 +28,10 @@ namespace Arcontio.Core
     /// </summary>
     public sealed class DecisionCandidateGenerator
     {
+        private const float MinimumObligationForWorkIntent01 = 0.01f;
+
+        private readonly BeliefQueryService _beliefQueryService = new();
+
         // =============================================================================
         // GeneratePhase1Candidates
         // =============================================================================
@@ -96,8 +100,111 @@ namespace Arcontio.Core
             if (!context.ScheduleFrame.Allows(metadata, isCritical))
                 return false;
 
+            if (!PassesObligationGate(context.Profile, metadata, isCritical))
+                return false;
+
             candidate = DecisionCandidate.Available(metadata, urgency, isCritical);
+
+            if (metadata.RequiresBeliefTarget
+                && !TryAttachBeliefTarget(context, metadata, urgency, ref candidate))
+            {
+                return false;
+            }
+
             return true;
+        }
+
+        // =============================================================================
+        // TryAttachBeliefTarget
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega a un candidato un target belief selezionato tramite QuerySystem.
+        /// </para>
+        ///
+        /// <para><b>Decision Layer -> QuerySystem, mai BeliefStore diretto</b></para>
+        /// <para>
+        /// Il metodo costruisce un <c>BeliefQueryContext</c> minimale e delega la
+        /// selezione a <c>BeliefQueryService</c>. Non interpreta direttamente le entry
+        /// del <c>BeliefStore</c> e non consulta lo stato oggettivo del mondo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Null gate</b>: senza store soggettivo non esiste target valido.</item>
+        ///   <item><b>Query</b>: categoria, urgenza, posizione e min confidence.</item>
+        ///   <item><b>Attach</b>: conserva il risultato per scoring e debug successivi.</item>
+        /// </list>
+        /// </summary>
+        private bool TryAttachBeliefTarget(
+            in DecisionEvaluationContext context,
+            DecisionIntentMetadata metadata,
+            float urgency01,
+            ref DecisionCandidate candidate)
+        {
+            if (context.Beliefs == null)
+                return false;
+
+            var query = new BeliefQueryContext(
+                metadata.TargetBeliefCategory,
+                urgency01,
+                context.NpcPosition,
+                context.BeliefQueryConfig.defaultMinConfidence);
+
+            // Il Decision Layer non legge direttamente il BeliefStore per scegliere:
+            // delega al QuerySystem, che applica filtro, ranking e breakdown.
+            var result = _beliefQueryService.QueryBest(
+                context.Beliefs,
+                query,
+                context.BeliefQueryConfig);
+
+            if (result.IsEmpty)
+                return false;
+
+            candidate.AttachBeliefResult(result);
+            return true;
+        }
+
+        // =============================================================================
+        // PassesObligationGate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica il gate minimo basato su <c>ObligationProfile</c> per impedire che
+        /// intenzioni di dominio non motivate entrino nel set candidati.
+        /// </para>
+        ///
+        /// <para><b>ObligationProfile come filtro leggero</b></para>
+        /// <para>
+        /// In questa sessione l'obbligo non e' ancora uno score: diventa solo una
+        /// precondizione conservativa per intenzioni non emergenziali. La pressione
+        /// numerica dell'obbligo verra' valorizzata nella Fase 2.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Emergenza</b>: bisogni critici e intenzioni emergenziali passano sempre.</item>
+        ///   <item><b>Dominio nullo</b>: fallback e osservazione non richiedono obbligo.</item>
+        ///   <item><b>Profilo mancante</b>: fallback permissivo per test e migrazioni.</item>
+        /// </list>
+        /// </summary>
+        private static bool PassesObligationGate(NpcProfile profile, DecisionIntentMetadata metadata, bool isCritical)
+        {
+            // Le intenzioni emergenziali non devono essere bloccate da un profilo
+            // obblighi ancora neutro: fame, riposo e sicurezza restano floor futuri.
+            if (isCritical || metadata.IsEmergencyIntent)
+                return true;
+
+            // Le intenzioni senza dominio non appartengono a un ruolo o obbligo.
+            if (metadata.Domain == DomainKind.None)
+                return true;
+
+            if (profile == null || profile.Obligation == null)
+                return true;
+
+            // Per ora il gate e' volutamente minimo: impedisce solo che una futura
+            // intenzione lavorativa con obbligo zero entri nel set senza motivazione.
+            return profile.Obligation.Get(metadata.Domain) >= MinimumObligationForWorkIntent01;
         }
 
         private static float GetNeedUrgency(NpcNeeds needs, NeedKind need)
