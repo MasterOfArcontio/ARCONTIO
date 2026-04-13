@@ -72,8 +72,8 @@ namespace Arcontio.Core
             return new DecisionScoringConfig
             {
                 needUrgencyWeight = 1.00f,
-                competenceWeight = 0f,
-                preferenceWeight = 0f,
+                competenceWeight = 0.20f,
+                preferenceWeight = 0.25f,
                 obligationWeight = 0f,
                 memoryConfidenceWeight = 0f,
                 cognitiveModulatorWeight = 0f,
