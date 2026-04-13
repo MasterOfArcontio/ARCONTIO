@@ -100,6 +100,9 @@ namespace Arcontio.Core
             if (!context.ScheduleFrame.Allows(metadata, isCritical))
                 return false;
 
+            if (!context.NormContext.Allows(metadata, isCritical))
+                return false;
+
             if (!PassesObligationGate(context.Profile, metadata, isCritical))
                 return false;
 

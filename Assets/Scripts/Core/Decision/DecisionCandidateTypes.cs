@@ -59,6 +59,68 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // DecisionNormContext
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Contesto minimale per filtrare intenzioni che hanno rischio sociale o normativo.
+    /// </para>
+    ///
+    /// <para><b>Norm System non anticipato</b></para>
+    /// <para>
+    /// La roadmap introduce norme complete piu' avanti. Questo contesto non legge
+    /// leggi globali e non calcola punizioni: applica solo una soglia esplicita che
+    /// il chiamante puo' derivare da dati soggettivi, sociali o da policy temporanee.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>NormsActive</b>: abilita o disabilita il filtro normativo.</item>
+    ///   <item><b>MaxAcceptedSocialRisk01</b>: rischio massimo accettabile per l'NPC.</item>
+    ///   <item><b>EmergencyIgnoresSocialRisk</b>: permette a bisogni critici di superare il filtro.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct DecisionNormContext
+    {
+        public readonly bool NormsActive;
+        public readonly float MaxAcceptedSocialRisk01;
+        public readonly bool EmergencyIgnoresSocialRisk;
+
+        public DecisionNormContext(bool normsActive, float maxAcceptedSocialRisk01, bool emergencyIgnoresSocialRisk)
+        {
+            NormsActive = normsActive;
+            MaxAcceptedSocialRisk01 = Clamp01(maxAcceptedSocialRisk01);
+            EmergencyIgnoresSocialRisk = emergencyIgnoresSocialRisk;
+        }
+
+        public static DecisionNormContext Default()
+        {
+            return new DecisionNormContext(false, 1f, true);
+        }
+
+        public bool Allows(DecisionIntentMetadata metadata, bool isCritical)
+        {
+            // Se il filtro normativo non e' attivo, questa fase non scarta nulla.
+            if (!NormsActive || !metadata.RequiresNormCheck)
+                return true;
+
+            // In emergenza critica, la policy MVP puo' permettere azioni ad alto
+            // rischio sociale: la penalita' verra' poi gestita dallo scoring.
+            if (isCritical && EmergencyIgnoresSocialRisk)
+                return true;
+
+            return metadata.SocialRisk01 <= MaxAcceptedSocialRisk01;
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value < 0f) return 0f;
+            if (value > 1f) return 1f;
+            return value;
+        }
+    }
+
+    // =============================================================================
     // DecisionEvaluationContext
     // =============================================================================
     /// <summary>
@@ -80,6 +142,7 @@ namespace Arcontio.Core
     ///   <item><b>Needs/Dna/Profile</b>: stato individuale ammesso.</item>
     ///   <item><b>NpcPosition</b>: posizione necessaria alle query belief.</item>
     ///   <item><b>Beliefs</b>: store soggettivo per-NPC, letto solo via QuerySystem nelle sessioni successive.</item>
+    ///   <item><b>NormContext</b>: filtro esplicito per rischio sociale e norme MVP.</item>
     /// </list>
     /// </summary>
     public readonly struct DecisionEvaluationContext
@@ -93,6 +156,7 @@ namespace Arcontio.Core
         public readonly BeliefStore Beliefs;
         public readonly BeliefQueryConfig BeliefQueryConfig;
         public readonly DecisionScheduleFrame ScheduleFrame;
+        public readonly DecisionNormContext NormContext;
 
         public DecisionEvaluationContext(
             int npcId,
@@ -104,6 +168,31 @@ namespace Arcontio.Core
             BeliefStore beliefs,
             BeliefQueryConfig beliefQueryConfig,
             DecisionScheduleFrame scheduleFrame)
+            : this(
+                npcId,
+                tick,
+                needs,
+                dna,
+                profile,
+                npcPosition,
+                beliefs,
+                beliefQueryConfig,
+                scheduleFrame,
+                DecisionNormContext.Default())
+        {
+        }
+
+        public DecisionEvaluationContext(
+            int npcId,
+            int tick,
+            NpcNeeds needs,
+            NpcDnaProfile dna,
+            NpcProfile profile,
+            Vector2Int npcPosition,
+            BeliefStore beliefs,
+            BeliefQueryConfig beliefQueryConfig,
+            DecisionScheduleFrame scheduleFrame,
+            DecisionNormContext normContext)
         {
             NpcId = npcId;
             Tick = tick;
@@ -114,6 +203,7 @@ namespace Arcontio.Core
             Beliefs = beliefs;
             BeliefQueryConfig = beliefQueryConfig;
             ScheduleFrame = scheduleFrame;
+            NormContext = normContext;
         }
     }
 

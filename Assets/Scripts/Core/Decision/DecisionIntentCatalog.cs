@@ -33,20 +33,22 @@ namespace Arcontio.Core
         SearchWater = 4,
         RestKnownPlace = 5,
         SearchRestPlace = 6,
-        SeekSafety = 7,
-        MaintainStability = 8,
-        SeekSocialContact = 9,
-        AskForHelp = 10,
-        CommunicateKnownDanger = 11,
-        PatrolArea = 12,
-        FarmFood = 13,
-        BuildStructure = 14,
-        CraftItem = 15,
-        HaulToStorage = 16,
-        ManageStorage = 17,
-        GovernColony = 18,
-        ExploreArea = 19,
-        WaitAndObserve = 20
+        TakeRestrictedFood = 7,
+        UseRestrictedRestPlace = 8,
+        SeekSafety = 9,
+        MaintainStability = 10,
+        SeekSocialContact = 11,
+        AskForHelp = 12,
+        CommunicateKnownDanger = 13,
+        PatrolArea = 14,
+        FarmFood = 15,
+        BuildStructure = 16,
+        CraftItem = 17,
+        HaulToStorage = 18,
+        ManageStorage = 19,
+        GovernColony = 20,
+        ExploreArea = 21,
+        WaitAndObserve = 22
     }
 
     // =============================================================================
@@ -71,6 +73,8 @@ namespace Arcontio.Core
     ///   <item><b>PrimaryNeed</b>: bisogno che puo' generare urgenza diretta.</item>
     ///   <item><b>RequiresBeliefTarget</b>: true se serve un target dal QuerySystem.</item>
     ///   <item><b>IsEmergencyIntent</b>: true se puo' essere favorita da bisogno critico.</item>
+    ///   <item><b>RequiresNormCheck</b>: true se l'intenzione attraversa il filtro norme/social risk.</item>
+    ///   <item><b>SocialRisk01</b>: rischio sociale statico iniziale, in attesa del Social Layer completo.</item>
     /// </list>
     /// </summary>
     public readonly struct DecisionIntentMetadata
@@ -82,6 +86,8 @@ namespace Arcontio.Core
         public readonly bool RequiresBeliefTarget;
         public readonly bool IsEmergencyIntent;
         public readonly bool IsMvpAvailable;
+        public readonly bool RequiresNormCheck;
+        public readonly float SocialRisk01;
         public readonly string DebugLabel;
 
         public DecisionIntentMetadata(
@@ -93,6 +99,31 @@ namespace Arcontio.Core
             bool isEmergencyIntent,
             bool isMvpAvailable,
             string debugLabel)
+            : this(
+                kind,
+                domain,
+                primaryNeed,
+                targetBeliefCategory,
+                requiresBeliefTarget,
+                isEmergencyIntent,
+                isMvpAvailable,
+                requiresNormCheck: false,
+                socialRisk01: 0f,
+                debugLabel: debugLabel)
+        {
+        }
+
+        public DecisionIntentMetadata(
+            DecisionIntentKind kind,
+            DomainKind domain,
+            NeedKind primaryNeed,
+            BeliefCategory targetBeliefCategory,
+            bool requiresBeliefTarget,
+            bool isEmergencyIntent,
+            bool isMvpAvailable,
+            bool requiresNormCheck,
+            float socialRisk01,
+            string debugLabel)
         {
             Kind = kind;
             Domain = domain;
@@ -101,7 +132,16 @@ namespace Arcontio.Core
             RequiresBeliefTarget = requiresBeliefTarget;
             IsEmergencyIntent = isEmergencyIntent;
             IsMvpAvailable = isMvpAvailable;
+            RequiresNormCheck = requiresNormCheck;
+            SocialRisk01 = Clamp01(socialRisk01);
             DebugLabel = debugLabel ?? string.Empty;
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value < 0f) return 0f;
+            if (value > 1f) return 1f;
+            return value;
         }
     }
 
@@ -137,6 +177,8 @@ namespace Arcontio.Core
             DecisionIntentKind.SearchWater,
             DecisionIntentKind.RestKnownPlace,
             DecisionIntentKind.SearchRestPlace,
+            DecisionIntentKind.TakeRestrictedFood,
+            DecisionIntentKind.UseRestrictedRestPlace,
             DecisionIntentKind.SeekSafety,
             DecisionIntentKind.MaintainStability,
             DecisionIntentKind.SeekSocialContact,
@@ -183,6 +225,10 @@ namespace Arcontio.Core
                     return new DecisionIntentMetadata(kind, DomainKind.Social, NeedKind.Rest, BeliefCategory.Rest, true, true, true, "RestKnownPlace");
                 case DecisionIntentKind.SearchRestPlace:
                     return new DecisionIntentMetadata(kind, DomainKind.Exploration, NeedKind.Rest, BeliefCategory.Rest, false, true, true, "SearchRestPlace");
+                case DecisionIntentKind.TakeRestrictedFood:
+                    return new DecisionIntentMetadata(kind, DomainKind.Social, NeedKind.Hunger, BeliefCategory.Food, true, true, true, true, 0.80f, "TakeRestrictedFood");
+                case DecisionIntentKind.UseRestrictedRestPlace:
+                    return new DecisionIntentMetadata(kind, DomainKind.Social, NeedKind.Rest, BeliefCategory.Rest, true, true, true, true, 0.55f, "UseRestrictedRestPlace");
                 case DecisionIntentKind.SeekSafety:
                     return new DecisionIntentMetadata(kind, DomainKind.Security, NeedKind.Security, BeliefCategory.Danger, false, true, false, "SeekSafety");
                 case DecisionIntentKind.MaintainStability:
