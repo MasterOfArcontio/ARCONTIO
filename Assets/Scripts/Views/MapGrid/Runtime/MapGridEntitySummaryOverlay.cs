@@ -193,7 +193,8 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbObjMem = new(1024);
         private readonly StringBuilder _sbComms = new(1024);
         private readonly StringBuilder _sbLandmarks = new(256);
-        private readonly StringBuilder _sbExplainabilityPanel = new(4096);
+        private readonly StringBuilder _sbExplainabilityIntentPlan = new(2048);
+        private readonly StringBuilder _sbExplainabilityEvents = new(4096);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
         private readonly MovementExplainabilityViewModel _movementExplainabilityViewModel = new();
@@ -1138,8 +1139,9 @@ namespace Arcontio.View.MapGrid
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>SelectedNpcId</b>: sorgente view-only dell'NPC attivo.</item>
-        ///   <item><b>_sbExplainabilityPanel</b>: buffer dedicato al pannello destro.</item>
-        ///   <item><b>BuildMovementExplainabilityText</b>: formatter condiviso con la card.</item>
+        ///   <item><b>_sbExplainabilityIntentPlan</b>: buffer dedicato al pannellino Intent/Plan.</item>
+        ///   <item><b>_sbExplainabilityEvents</b>: buffer dedicato all'area eventi espandibile.</item>
+        ///   <item><b>BuildMovementExplainabilityText</b>: formatter dedicato ai blocchi del pannello destro.</item>
         /// </list>
         /// </summary>
         private void RefreshMovementExplainabilityPanel(Arcontio.Core.World world)
@@ -1152,7 +1154,9 @@ namespace Arcontio.View.MapGrid
             {
                 _movementExplainabilityPanel.SetText(
                     "EL Pathfinding",
-                    "<color=#aaaaaa>Nessun NPC selezionato.\n\nClick sinistro su un NPC nella MapGrid per aprire la diagnostica EL.</color>");
+                    string.Empty,
+                    "<color=#888888>Nessun NPC selezionato.</color>",
+                    "<color=#888888>Click sinistro su un NPC nella MapGrid per aprire la diagnostica EL.</color>");
                 _movementExplainabilityPanel.SetVisible(true);
                 return;
             }
@@ -1161,13 +1165,15 @@ namespace Arcontio.View.MapGrid
             {
                 _movementExplainabilityPanel.SetText(
                     "EL Pathfinding",
+                    $"NPC #{selectedNpcId}",
+                    string.Empty,
                     "<color=#FF6666>L'NPC selezionato non esiste piu' nel World.</color>");
                 _movementExplainabilityPanel.SetVisible(true);
                 return;
             }
 
-            BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityPanel, maxEvents: 12);
-            _movementExplainabilityPanel.SetText($"EL Pathfinding - NPC #{selectedNpcId}", _sbExplainabilityPanel.ToString());
+            string headerMeta = BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityIntentPlan, _sbExplainabilityEvents, maxEvents: 32);
+            _movementExplainabilityPanel.SetText($"EL Pathfinding - NPC #{selectedNpcId}", headerMeta, _sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
             _movementExplainabilityPanel.SetVisible(true);
         }
 
@@ -1183,23 +1189,24 @@ namespace Arcontio.View.MapGrid
         ///
         /// <para><b>Uso della pipeline grafica esistente</b></para>
         /// <para>
-        /// La card NPC attuale e' una UI debug prefabless basata su sezioni testuali.
-        /// Questo metodo rispetta quel metodo operativo: legge uno snapshot ViewModel,
-        /// lo compatta in <see cref="StringBuilder"/> e lascia alla card il solo compito
-        /// di mostrare la stringa. Non crea Canvas, prefab o sistemi grafici paralleli.
+        /// La card NPC attuale e' una UI debug prefabless basata su sezioni testuali;
+        /// questo pannello segue lo stesso metodo operativo, ma separa header,
+        /// intent/plan ed eventi in tre buffer distinti. Non crea dati simulativi,
+        /// prefab o sistemi grafici paralleli.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>world/npcId</b>: contesto debug gia' usato dal SummaryOverlay.</item>
         ///   <item><b>_movementExplainabilityViewModel</b>: snapshot riutilizzato per ridurre allocazioni.</item>
-        ///   <item><b>output</b>: buffer testuale della sezione EL nella card NPC.</item>
+        ///   <item><b>intentPlanOutput</b>: buffer testuale del pannellino Intent/Plan.</item>
+        ///   <item><b>eventsOutput</b>: buffer testuale dell'area eventi espandibile.</item>
         /// </list>
         /// </summary>
-        private void BuildMovementExplainabilityText(Arcontio.Core.World world, int npcId, StringBuilder output, int maxEvents)
+        private string BuildMovementExplainabilityText(Arcontio.Core.World world, int npcId, StringBuilder intentPlanOutput, StringBuilder eventsOutput, int maxEvents)
         {
-            output.Clear();
-            output.Append("EL Pathfinding\n");
+            intentPlanOutput.Clear();
+            eventsOutput.Clear();
 
             // Il ViewModel e' la barriera di lettura: la debug UI non entra nei ring
             // buffer e non ricalcola il pathfinding. Se l'EL non ha ancora dati, la
@@ -1216,21 +1223,18 @@ namespace Arcontio.View.MapGrid
                     ? "EL pathfinding non disponibile per questo NPC"
                     : _movementExplainabilityViewModel.HeaderSubtitle;
 
-                output.Append("<color=#FF6666>").Append(message).Append("</color>");
-                return;
+                eventsOutput.Append("<color=#FF6666>").Append(message).Append("</color>");
+                return $"NPC #{npcId}";
             }
 
             var model = _movementExplainabilityViewModel;
-            output.Append("Tick = ").Append(model.Tick)
-                .Append("   Intent = ").Append(model.CurrentIntentId)
-                .Append("   Plan = ").Append(model.CurrentPlanId)
-                .Append('\n');
+            string headerMeta = $"Tick = {model.Tick}   Intent = {model.CurrentIntentId}   Plan = {model.CurrentPlanId}";
 
             if (model.Intent != null && model.Intent.HasIntent)
             {
                 // Intent: e' il "perche' sto andando li'". Rimane compatto per non
                 // far crescere troppo la card quando tutte le sezioni sono aperte.
-                output.Append('\n').Append("<color=#A8E6A1>[INTENT]</color>\n")
+                intentPlanOutput.Append("<color=#A8E6A1>[INTENT]</color>\n")
                     .Append("Purpose = ").Append(model.Intent.Purpose).Append('\n')
                     .Append("Target = ").Append(model.Intent.Target).Append('\n')
                     .Append("Belief = ").Append(model.Intent.Belief).Append('\n')
@@ -1240,12 +1244,12 @@ namespace Arcontio.View.MapGrid
             }
             else
             {
-                output.Append('\n').Append("<color=#aaaaaa>[INTENT] nessuna trace</color>\n");
+                intentPlanOutput.Append("<color=#888888>[INTENT] nessuna trace</color>\n");
             }
 
             if (model.Plan != null && model.Plan.HasPlan)
             {
-                output.Append('\n').Append("<color=#9FC5E8>[PLAN]</color>\n")
+                intentPlanOutput.Append('\n').Append("<color=#9FC5E8>[PLAN]</color>\n")
                     .Append("Mode = ").Append(model.Plan.SelectedMode)
                     .Append("   Why = ").Append(model.Plan.SelectionReason).Append('\n')
                     .Append("Route = ").Append(model.Plan.RouteSummary).Append('\n')
@@ -1255,28 +1259,28 @@ namespace Arcontio.View.MapGrid
 
                 if (model.Plan.Candidates != null && model.Plan.Candidates.Count > 0)
                 {
-                    output.Append("Candidates:\n");
+                    intentPlanOutput.Append("Candidates:\n");
                     int candidateCount = Mathf.Min(3, model.Plan.Candidates.Count);
 
                     // Limite intenzionale: la card resta leggibile. Il ViewModel conserva
                     // comunque tutti i candidati disponibili per una UI piu' ampia futura.
                     for (int i = 0; i < candidateCount; i++)
-                        output.Append("- ").Append(model.Plan.Candidates[i]).Append('\n');
+                        intentPlanOutput.Append("- ").Append(model.Plan.Candidates[i]).Append('\n');
 
                     if (model.Plan.Candidates.Count > candidateCount)
-                        output.Append("- ... altri ").Append(model.Plan.Candidates.Count - candidateCount).Append('\n');
+                        intentPlanOutput.Append("- ... altri ").Append(model.Plan.Candidates.Count - candidateCount).Append('\n');
                 }
             }
             else
             {
-                output.Append('\n').Append("<color=#aaaaaa>[PLAN] nessuna trace</color>\n");
+                intentPlanOutput.Append('\n').Append("<color=#888888>[PLAN] nessuna trace</color>\n");
             }
 
-            output.Append('\n').Append("<color=#FFD966>[EVENTS]</color>\n");
+            eventsOutput.Append("<color=#FFD966>[EVENTS]</color>\n");
             if (model.Events == null || model.Events.Count <= 0)
             {
-                output.Append("<color=#aaaaaa>(nessun evento runtime)</color>");
-                return;
+                eventsOutput.Append("<color=#888888>(nessun evento runtime)</color>");
+                return headerMeta;
             }
 
             // Timeline gia' limitata dal builder. Qui invertiamo l'ordine per mostrare
@@ -1288,28 +1292,30 @@ namespace Arcontio.View.MapGrid
                 var evt = model.Events[i];
                 string color = ResolveExplainabilityEventColor(evt, visibleIndex);
 
-                output.Append("<color=").Append(color).Append(">");
-                output.Append("- t").Append(evt.Tick)
+                eventsOutput.Append("<color=").Append(color).Append(">");
+                eventsOutput.Append("- t").Append(evt.Tick)
                     .Append(" ").Append(evt.EventType)
                     .Append("  mode=").Append(evt.ActiveMode)
                     .Append("  ").Append(evt.CurrentCell)
                     .Append(" -> ").Append(evt.TargetCell);
 
                 if (!string.IsNullOrWhiteSpace(evt.Summary))
-                    output.Append("  | ").Append(evt.Summary);
+                    eventsOutput.Append("  | ").Append(evt.Summary);
 
                 if (!string.IsNullOrWhiteSpace(evt.Detail))
-                    output.Append('\n').Append("  detail: ").Append(evt.Detail);
+                    eventsOutput.Append('\n').Append("  detail: ").Append(evt.Detail);
 
-                output.Append("</color>");
+                eventsOutput.Append("</color>");
 
                 if (i > 0)
-                    output.Append('\n').Append('\n');
+                    eventsOutput.Append('\n').Append('\n');
                 else
-                    output.Append('\n');
+                    eventsOutput.Append('\n');
 
                 visibleIndex++;
             }
+
+            return headerMeta;
         }
 
         // =============================================================================
@@ -1333,7 +1339,7 @@ namespace Arcontio.View.MapGrid
             if (IsExplainabilityErrorEvent(evt))
                 return "#FF6666";
 
-            return visibleIndex % 2 == 0 ? "#FFFFFF" : "#D8D8D8";
+            return visibleIndex % 2 == 0 ? "#FFFFFF" : "#ADADAD";
         }
 
         // =============================================================================

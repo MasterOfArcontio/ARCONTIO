@@ -27,7 +27,9 @@ namespace Arcontio.View.MapGrid
     ///   <item><b>_rootRt</b>: RectTransform ancorato al bordo destro del canvas.</item>
     ///   <item><b>_rootBg</b>: sfondo scuro raycast target per proteggere la mappa dietro.</item>
     ///   <item><b>_titleText</b>: intestazione sintetica del pannello.</item>
-    ///   <item><b>_bodyText</b>: testo rich text con intent, piano ed eventi EL.</item>
+    ///   <item><b>_headerMetaText</b>: riga compatta con tick, intent e plan.</item>
+    ///   <item><b>_intentPlanText</b>: pannellino separato con il dettaglio intent/plan.</item>
+    ///   <item><b>_eventsText</b>: area eventi espandibile fino al fondo del pannello.</item>
     /// </list>
     /// </summary>
     public sealed class MapGridMovementExplainabilityPanelView
@@ -42,7 +44,9 @@ namespace Arcontio.View.MapGrid
         private RectTransform _rootRt;
         private Image _rootBg;
         private Text _titleText;
-        private Text _bodyText;
+        private Text _headerMetaText;
+        private Text _intentPlanText;
+        private Text _eventsText;
 
         public RectTransform RootRectTransform => _rootRt;
 
@@ -91,13 +95,14 @@ namespace Arcontio.View.MapGrid
             var layout = _root.AddComponent<VerticalLayoutGroup>();
             layout.childControlHeight = true;
             layout.childControlWidth = true;
-            layout.childForceExpandHeight = true;
+            layout.childForceExpandHeight = false;
             layout.childForceExpandWidth = true;
             layout.spacing = 6;
             layout.padding = new RectOffset(8, 8, 8, 8);
 
             BuildHeader(_root.transform);
-            BuildBody(_root.transform);
+            BuildIntentPlanPanel(_root.transform);
+            BuildEventsPanel(_root.transform);
             _root.transform.SetAsLastSibling();
 
             SetVisible(false);
@@ -123,8 +128,8 @@ namespace Arcontio.View.MapGrid
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Aggiorna titolo e corpo del pannello. La view non formatta il ViewModel EL:
-        /// riceve testo gia' pronto dal controller overlay.
+        /// Aggiorna i tre blocchi testuali del pannello. La view non formatta il
+        /// ViewModel EL: riceve testo gia' pronto dal controller overlay.
         /// </para>
         ///
         /// <para><b>Separazione minima per debug UI</b></para>
@@ -133,13 +138,19 @@ namespace Arcontio.View.MapGrid
         /// il controller legge dati e prepara stringhe, questa classe mostra stringhe.
         /// </para>
         /// </summary>
-        public void SetText(string title, string body)
+        public void SetText(string title, string headerMeta, string intentPlan, string events)
         {
             if (_titleText != null)
                 _titleText.text = title ?? string.Empty;
 
-            if (_bodyText != null)
-                _bodyText.text = body ?? string.Empty;
+            if (_headerMetaText != null)
+                _headerMetaText.text = headerMeta ?? string.Empty;
+
+            if (_intentPlanText != null)
+                _intentPlanText.text = intentPlan ?? string.Empty;
+
+            if (_eventsText != null)
+                _eventsText.text = events ?? string.Empty;
         }
 
         // =============================================================================
@@ -164,9 +175,13 @@ namespace Arcontio.View.MapGrid
             headerLayout.childControlWidth = true;
             headerLayout.childForceExpandHeight = false;
             headerLayout.childForceExpandWidth = true;
-            headerLayout.padding = new RectOffset(6, 6, 5, 5);
+            headerLayout.spacing = 1;
+            headerLayout.padding = new RectOffset(6, 6, 3, 3);
 
-            headerGo.AddComponent<LayoutElement>().preferredHeight = 34f;
+            var headerLe = headerGo.AddComponent<LayoutElement>();
+            headerLe.minHeight = 26f;
+            headerLe.preferredHeight = 30f;
+            headerLe.flexibleHeight = 0f;
 
             var titleGo = new GameObject("Title");
             titleGo.transform.SetParent(headerGo.transform, false);
@@ -181,55 +196,115 @@ namespace Arcontio.View.MapGrid
             _titleText.verticalOverflow = VerticalWrapMode.Truncate;
             _titleText.color = new Color(0.92f, 1.00f, 0.94f, 1f);
             _titleText.text = "EL Pathfinding";
+
+            var metaGo = new GameObject("Meta");
+            metaGo.transform.SetParent(headerGo.transform, false);
+
+            _headerMetaText = metaGo.AddComponent<Text>();
+            _headerMetaText.raycastTarget = false;
+            _headerMetaText.font = GetUiFont();
+            _headerMetaText.fontSize = 10;
+            _headerMetaText.fontStyle = FontStyle.Normal;
+            _headerMetaText.alignment = TextAnchor.MiddleLeft;
+            _headerMetaText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _headerMetaText.verticalOverflow = VerticalWrapMode.Truncate;
+            _headerMetaText.color = new Color(0.82f, 0.90f, 0.84f, 1f);
+            _headerMetaText.text = string.Empty;
         }
 
         // =============================================================================
-        // BuildBody
+        // BuildIntentPlanPanel
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce il corpo testuale del pannello con la stessa tecnica semplice
-        /// delle card debug esistenti. In questa fase preferiamo una pipeline visiva
-        /// diretta e verificabile rispetto a uno ScrollRect piu' complesso: il pannello
-        /// deve prima garantire che il testo ricevuto dal controller venga mostrato.
+        /// Costruisce il pannellino separato con il dettaglio intent/plan. Resta
+        /// compatto e non espande verticalmente, per lasciare agli eventi tutto lo
+        /// spazio rimanente del pannello laterale.
         /// </para>
         /// </summary>
-        private void BuildBody(Transform parent)
+        private void BuildIntentPlanPanel(Transform parent)
         {
-            var bodyGo = new GameObject("Body");
-            bodyGo.transform.SetParent(parent, false);
+            var panelGo = new GameObject("IntentPlan");
+            panelGo.transform.SetParent(parent, false);
 
-            var bodyImage = bodyGo.AddComponent<Image>();
-            bodyImage.raycastTarget = false;
-            bodyImage.color = new Color(0.06f, 0.08f, 0.08f, 0.82f);
+            var panelImage = panelGo.AddComponent<Image>();
+            panelImage.raycastTarget = false;
+            panelImage.color = new Color(0.10f, 0.16f, 0.13f, 0.90f);
 
-            var bodyLayout = bodyGo.AddComponent<VerticalLayoutGroup>();
-            bodyLayout.childControlHeight = true;
-            bodyLayout.childControlWidth = true;
-            bodyLayout.childForceExpandHeight = true;
-            bodyLayout.childForceExpandWidth = true;
-            bodyLayout.padding = new RectOffset(6, 6, 6, 6);
+            var panelLayout = panelGo.AddComponent<VerticalLayoutGroup>();
+            panelLayout.childControlHeight = true;
+            panelLayout.childControlWidth = true;
+            panelLayout.childForceExpandHeight = false;
+            panelLayout.childForceExpandWidth = true;
+            panelLayout.padding = new RectOffset(6, 6, 5, 5);
 
-            var bodyLe = bodyGo.AddComponent<LayoutElement>();
-            bodyLe.flexibleHeight = 1f;
+            var panelLe = panelGo.AddComponent<LayoutElement>();
+            panelLe.minHeight = 108f;
+            panelLe.preferredHeight = 138f;
+            panelLe.flexibleHeight = 0f;
 
             var textGo = new GameObject("Text");
-            textGo.transform.SetParent(bodyGo.transform, false);
+            textGo.transform.SetParent(panelGo.transform, false);
 
-            _bodyText = textGo.AddComponent<Text>();
-            _bodyText.raycastTarget = false;
-            _bodyText.font = GetUiFont();
-            _bodyText.fontSize = DefaultBodyFont;
-            _bodyText.fontStyle = FontStyle.Normal;
-            _bodyText.alignment = TextAnchor.UpperLeft;
-            _bodyText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _bodyText.verticalOverflow = VerticalWrapMode.Overflow;
-            _bodyText.supportRichText = true;
-            _bodyText.color = Color.white;
-            _bodyText.text = string.Empty;
+            _intentPlanText = textGo.AddComponent<Text>();
+            _intentPlanText.raycastTarget = false;
+            _intentPlanText.font = GetUiFont();
+            _intentPlanText.fontSize = DefaultBodyFont;
+            _intentPlanText.fontStyle = FontStyle.Normal;
+            _intentPlanText.alignment = TextAnchor.UpperLeft;
+            _intentPlanText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _intentPlanText.verticalOverflow = VerticalWrapMode.Truncate;
+            _intentPlanText.supportRichText = true;
+            _intentPlanText.color = Color.white;
+            _intentPlanText.text = string.Empty;
+        }
+
+        // =============================================================================
+        // BuildEventsPanel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il pannello eventi. Questo e' l'unico blocco con altezza flessibile:
+        /// deve occupare tutta la parte libera sotto header e intent/plan, cosi' la
+        /// timeline arriva fino al fondo del pannello destro.
+        /// </para>
+        /// </summary>
+        private void BuildEventsPanel(Transform parent)
+        {
+            var panelGo = new GameObject("Events");
+            panelGo.transform.SetParent(parent, false);
+
+            var panelImage = panelGo.AddComponent<Image>();
+            panelImage.raycastTarget = false;
+            panelImage.color = new Color(0.06f, 0.08f, 0.08f, 0.82f);
+
+            var panelLayout = panelGo.AddComponent<VerticalLayoutGroup>();
+            panelLayout.childControlHeight = true;
+            panelLayout.childControlWidth = true;
+            panelLayout.childForceExpandHeight = true;
+            panelLayout.childForceExpandWidth = true;
+            panelLayout.padding = new RectOffset(6, 6, 6, 6);
+
+            var panelLe = panelGo.AddComponent<LayoutElement>();
+            panelLe.minHeight = 120f;
+            panelLe.flexibleHeight = 1f;
+
+            var textGo = new GameObject("Text");
+            textGo.transform.SetParent(panelGo.transform, false);
+
+            _eventsText = textGo.AddComponent<Text>();
+            _eventsText.raycastTarget = false;
+            _eventsText.font = GetUiFont();
+            _eventsText.fontSize = DefaultBodyFont;
+            _eventsText.fontStyle = FontStyle.Normal;
+            _eventsText.alignment = TextAnchor.UpperLeft;
+            _eventsText.horizontalOverflow = HorizontalWrapMode.Wrap;
+            _eventsText.verticalOverflow = VerticalWrapMode.Overflow;
+            _eventsText.supportRichText = true;
+            _eventsText.color = Color.white;
+            _eventsText.text = string.Empty;
 
             var textLe = textGo.AddComponent<LayoutElement>();
-            textLe.minHeight = 120f;
             textLe.flexibleHeight = 1f;
         }
 
