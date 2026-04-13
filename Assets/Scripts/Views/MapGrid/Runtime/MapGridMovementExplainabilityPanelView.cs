@@ -179,8 +179,8 @@ namespace Arcontio.View.MapGrid
             headerLayout.padding = new RectOffset(6, 6, 3, 3);
 
             var headerLe = headerGo.AddComponent<LayoutElement>();
-            headerLe.minHeight = 26f;
-            headerLe.preferredHeight = 30f;
+            headerLe.minHeight = 46f;
+            headerLe.preferredHeight = 50f;
             headerLe.flexibleHeight = 0f;
 
             var titleGo = new GameObject("Title");
@@ -197,6 +197,11 @@ namespace Arcontio.View.MapGrid
             _titleText.color = new Color(0.92f, 1.00f, 0.94f, 1f);
             _titleText.text = "EL Pathfinding";
 
+            var titleLe = titleGo.AddComponent<LayoutElement>();
+            titleLe.minHeight = 18f;
+            titleLe.preferredHeight = 20f;
+            titleLe.flexibleHeight = 0f;
+
             var metaGo = new GameObject("Meta");
             metaGo.transform.SetParent(headerGo.transform, false);
 
@@ -210,6 +215,11 @@ namespace Arcontio.View.MapGrid
             _headerMetaText.verticalOverflow = VerticalWrapMode.Truncate;
             _headerMetaText.color = new Color(0.82f, 0.90f, 0.84f, 1f);
             _headerMetaText.text = string.Empty;
+
+            var metaLe = metaGo.AddComponent<LayoutElement>();
+            metaLe.minHeight = 14f;
+            metaLe.preferredHeight = 16f;
+            metaLe.flexibleHeight = 0f;
         }
 
         // =============================================================================
@@ -283,7 +293,7 @@ namespace Arcontio.View.MapGrid
             panelLayout.childControlWidth = true;
             panelLayout.childForceExpandHeight = true;
             panelLayout.childForceExpandWidth = true;
-            panelLayout.padding = new RectOffset(6, 6, 6, 6);
+            panelLayout.padding = new RectOffset(6, 6, 6, 18);
 
             var panelLe = panelGo.AddComponent<LayoutElement>();
             panelLe.minHeight = 120f;
