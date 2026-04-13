@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 using Arcontio.Core;
 using SocialViewer.UI;
@@ -378,13 +379,23 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             }
 
             // ============================================================
+            // INPUT (debug): selezione NPC con click sinistro
+            // ============================================================
+            // Regola UX:
+            // - il click sinistro su uno sprite NPC aggiorna NPCSelection.SelectedNpcId;
+            // - il click sopra UI non seleziona, cosi' il drag delle card resta stabile;
+            // - se il click ha selezionato un NPC, non viene usato nello stesso frame
+            //   anche come ordine click-to-move, evitando doppi effetti ambigui.
+            bool selectedNpcThisFrame = TrySelectHoveredNpcFromLeftClick();
+
+            // ============================================================
             // INPUT (debug): Click-To-Move command emission
             // ============================================================
             // Regola:
             // - funziona solo se la modalita' e' attiva e abbiamo un NPC sticky valido.
             // - il click sinistro su una cella della mappa emette un SetMoveIntentCommand
             //   verso quella cella.
-            if (_debugClickMoveModeEnabled && _debugClickMoveNpcId > 0 && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+            if (!selectedNpcThisFrame && _debugClickMoveModeEnabled && _debugClickMoveNpcId > 0 && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
             {
                 TryIssueDebugClickMoveOrder(_debugClickMoveNpcId);
             }
@@ -578,6 +589,50 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
                 return -1;
 
             return FindNpcAtCell(_world, cellX, cellY);
+        }
+
+        // =============================================================================
+        // TrySelectHoveredNpcFromLeftClick
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Gestisce la selezione debug di un NPC tramite click sinistro nella MapGrid.
+        /// Il metodo usa la stessa risoluzione hover gia' presente per FOV, landmark
+        /// overlay e click-to-move, cosi' non introduce una seconda politica di picking.
+        /// </para>
+        ///
+        /// <para><b>Coerenza con la UI debug esistente</b></para>
+        /// <para>
+        /// La selezione aggiorna soltanto <see cref="NPCSelection"/>. Non modifica il
+        /// core, non emette comandi di simulazione e non crea nuove dipendenze dal
+        /// Decision Layer. Il controllo su <see cref="EventSystem"/> evita che un click
+        /// su card, foldout o drag venga interpretato come selezione dell'NPC sotto la UI.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Mouse.current</b>: sorgente input debug gia' usata dalla MapGrid.</item>
+        ///   <item><b>EventSystem.current</b>: filtro per non interferire con la UI.</item>
+        ///   <item><b>ResolveHoveredNpcId</b>: picking coerente con gli overlay esistenti.</item>
+        ///   <item><b>NPCSelection.Select</b>: aggiornamento dello stato condiviso view-only.</item>
+        /// </list>
+        /// </summary>
+        private bool TrySelectHoveredNpcFromLeftClick()
+        {
+            if (Mouse.current == null || !Mouse.current.leftButton.wasPressedThisFrame)
+                return false;
+
+            // Se il puntatore e' sopra un elemento UI, il click appartiene alla UI:
+            // bottoni foldout, drag card e scroll futuri devono restare prioritari.
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                return false;
+
+            int hoveredNpcId = ResolveHoveredNpcId();
+            if (hoveredNpcId <= 0)
+                return false;
+
+            NPCSelection.Select(hoveredNpcId);
+            return true;
         }
 
         private void TryIssueDebugClickMoveOrder(int npcId)

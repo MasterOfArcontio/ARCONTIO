@@ -631,7 +631,15 @@ namespace Arcontio.View.MapGrid
                 if (!string.IsNullOrEmpty(dna.Identity.Name))
                     _sbHeader.Append("  ").Append(dna.Identity.Name);
 
+                // Feedback UI della selezione debug:
+                // NPCSelection vive nello strato view condiviso e non nel core
+                // simulativo. Qui lo mostriamo soltanto per rendere verificabile
+                // il click sinistro introdotto nella sessione k.
+                bool isSelectedNpc = SocialViewer.UI.NPCSelection.SelectedNpcId == npcId;
+
                 _sbHeader.Append('\n')
+                    .Append("Selected = ").Append(isSelectedNpc ? "YES" : "NO")
+                    .Append('\n')
                     .Append("Pos = (").Append(pos.X).Append(',').Append(pos.Y).Append(")")
                     .Append("   Facing = ").Append(facing)
                     .Append('\n')
