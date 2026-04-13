@@ -13,7 +13,7 @@
 | v0.01 | Sistemi base: perception, memory, token | ✅ Completata | — |
 | v0.02 | Sistemi base 2 | ✅ Completata | — |
 | v0.03 | Pathfinding landmark + ComplexEdge + failure ladder | Aprile 2026 | ✅ Completata | — |
-| v0.04 | NpcDnaProfile · NpcProfile · Needs System · BeliefStore | Maggio–Giugno 2026 | ⏳ Pending |
+| v0.04 | NpcDnaProfile · NpcProfile · Needs System · BeliefStore | Maggio–Giugno 2026 | ⚠️ Parziale: BeliefStore completato, PhysicalProfile e Health/Comfort restano aperti |
 | v0.05 | Decision Layer completo | Giugno–Luglio 2026 | ⏳ Pending |
 | v0.06 | Job System + Step System | Luglio–Agosto 2026 | ⏳ Pending |
 | v0.07 | Role System + CognitiveModulators | Agosto 2026 | ⏳ Pending |
@@ -153,7 +153,7 @@
 |---|--------|---------|------|-------|
 | 1 | Lun | Catalogo | Intenzioni: struttura enum + metadati per dominio | ⏳ |
 | 2 | Mer | Fase 1 | Filtro ScheduleFrame + precondizioni fisiologiche | ⏳ |
-| 3 | Gio | Fase 1 | Filtro ObligationProfile + BeliefStore (confidence > 0) | ⏳ |
+| 3 | Gio | Fase 1 | Filtro ObligationProfile + QuerySystem/BeliefStore (confidence > 0) | ⏳ |
 | 4 | Lun | Fase 1 | Filtro norme attive + SocialRisk | ⏳ |
 | 5 | Mer | Fase 2 | Scoring: NeedUrgency continua (funzione lineare) | ⏳ |
 | 6 | Gio | Fase 2 | Scoring: CompetenceAffinity + PreferenceAffinity | ⏳ |
@@ -174,11 +174,11 @@
 | Floor obbligatorio per obligation alta e need critico | ⏳ |
 | Fase 3: weighted random con varianza modulata da DNA | ⏳ |
 | NPC diversi con DNA diverso mostrano comportamenti diversi | ⏳ |
-| Nessuna query diretta al MemoryStore dal Decision Layer | ⏳ |
+| Nessuna query diretta a MemoryStore o BeliefStore dal Decision Layer: accesso solo via QuerySystem | ⏳ |
 
 ---
 
-## v0.05 — Job System + Step System
+## v0.06 — Job System + Step System
 
 **Obiettivo:** Costruire il layer di esecuzione persistente. Ogni intenzione prodotta dal Decision Layer diventa un Job che sopravvive nel tempo, gestisce sequenze di Step e traccia fallimenti.
 
@@ -408,7 +408,7 @@
 | v0.10 | 4 | 12 | Ottobre–Novembre 2026 |
 | **Totale** | **31** | **93** | **Apr → Nov 2026** |
 
-> **Buffer consigliato:** +2–3 settimane. Le fasi v0.04 (Decision Layer) e v0.05 (Job System) sono le più a rischio di slittamento per bug subdoli legati all'omniscience constraint.
+> **Buffer consigliato:** +2–3 settimane. Le fasi v0.05 (Decision Layer) e v0.06 (Job System) sono le più a rischio di slittamento per bug subdoli legati all'omniscience constraint.
 
 ---
 
@@ -419,7 +419,7 @@ Queste regole non vanno mai violate indipendentemente dalla fase di sviluppo.
 | Regola | Motivazione |
 |--------|-------------|
 | Nessun NPC legge il world state globale direttamente | Omniscience constraint fondamentale |
-| Il Decision Layer consulta solo BeliefStore, mai MemoryStore | Disaccoppiamento memory/decision |
+| Il Decision Layer consulta solo il QuerySystem: non legge direttamente né MemoryStore né BeliefStore | Disaccoppiamento memory/decision e mantenimento del BeliefStore come contenitore passivo |
 | Nessuno Step modifica il world direttamente | Solo via Commands → World Systems |
 | Il DNA non contiene mai stato runtime | Se un valore cambia, appartiene a NpcProfile |
 | ExtensionData: non implementare senza caso d'uso concreto | Evita dump di stato nel DNA |
