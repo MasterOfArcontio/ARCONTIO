@@ -29,6 +29,7 @@ namespace Arcontio.Core
     {
         public int topN;
         public float noise01;
+        public float impulsivityNoiseBonus;
         public float minimumWeight;
 
         public static DecisionSelectionConfig Default()
@@ -37,6 +38,7 @@ namespace Arcontio.Core
             {
                 topN = 3,
                 noise01 = 0.15f,
+                impulsivityNoiseBonus = 0.35f,
                 minimumWeight = 0.001f
             };
         }
@@ -136,9 +138,42 @@ namespace Arcontio.Core
             DecisionSelectionConfig config,
             Random random)
         {
+            return Select(default, candidates, config, random);
+        }
+
+        // =============================================================================
+        // Select
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Seleziona un candidato usando anche l'impulsivita' del DNA per modulare il
+        /// rumore della roulette weighted random.
+        /// </para>
+        ///
+        /// <para><b>Impulsivita' come varianza, non come preferenza</b></para>
+        /// <para>
+        /// Un NPC impulsivo non dovrebbe "preferire" sempre una categoria specifica:
+        /// dovrebbe essere piu' incline a scegliere alternative vicine al top. Per
+        /// questo il valore modifica <c>noise01</c> e non i contributi della Fase 2.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Config effettiva</b>: copia locale con noise modulato.</item>
+        ///   <item><b>Rank</b>: riusa il flusso top-N della sessione 9.</item>
+        ///   <item><b>Random</b>: resta iniettato per test deterministici.</item>
+        /// </list>
+        /// </summary>
+        public DecisionSelectionResult Select(
+            in DecisionEvaluationContext context,
+            List<DecisionCandidate> candidates,
+            DecisionSelectionConfig config,
+            Random random)
+        {
             if (candidates == null || candidates.Count == 0)
                 return DecisionSelectionResult.Empty();
 
+            config = ResolveEffectiveConfig(context.Dna, config);
             random ??= new Random(0);
             RankAvailableCandidates(candidates);
 
@@ -170,6 +205,42 @@ namespace Arcontio.Core
 
             int fallbackIndex = _rankedIndexes[0];
             return new DecisionSelectionResult(false, fallbackIndex, candidates[fallbackIndex]);
+        }
+
+        // =============================================================================
+        // ResolveEffectiveConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola la configurazione effettiva della selezione aggiungendo il bonus di
+        /// rumore derivato dall'impulsivita' dell'NPC.
+        /// </para>
+        ///
+        /// <para><b>CognitiveModulator Impulsivity</b></para>
+        /// <para>
+        /// L'impulsivita' viene letta dal DNA immutabile per-NPC. Il risultato e'
+        /// clampato per evitare che configurazioni estreme rendano la selezione
+        /// completamente casuale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Base noise</b>: valore configurato dalla simulazione.</item>
+        ///   <item><b>Bonus</b>: <c>Impulsivity01 * impulsivityNoiseBonus</c>.</item>
+        ///   <item><b>Clamp</b>: mantiene <c>noise01</c> nel range 0-1.</item>
+        /// </list>
+        /// </summary>
+        private static DecisionSelectionConfig ResolveEffectiveConfig(NpcDnaProfile dna, DecisionSelectionConfig config)
+        {
+            if (dna == null)
+            {
+                config.noise01 = Clamp01(config.noise01);
+                return config;
+            }
+
+            float bonus = dna.CognitiveModulators.Impulsivity01 * config.impulsivityNoiseBonus;
+            config.noise01 = Clamp01(config.noise01 + bonus);
+            return config;
         }
 
         // =============================================================================
