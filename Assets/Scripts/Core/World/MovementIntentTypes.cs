@@ -40,6 +40,30 @@ namespace Arcontio.Core
         public int TargetObjectId;
 
         /// <summary>
+        /// Snapshot opzionale della belief che ha motivato il target.
+        ///
+        /// Principio architetturale:
+        /// - il MovementSystem NON usa questo dato per decidere path o fallback;
+        /// - l'EL lo legge soltanto per spiegare perche' il target sia stato scelto;
+        /// - la snapshot deve essere passata dal Decision Layer quando questo ha gia'
+        ///   usato una belief/query, non ricostruita a posteriori dal pathfinding.
+        /// </summary>
+        public bool HasBeliefBasis;
+
+        /// <summary>
+        /// Dato causale minimale per EL pathfinding. Non e' una reference live alla
+        /// belief nel BeliefStore: contiene solo categoria, id/confidence/freshness e
+        /// eta' diagnostica della credenza osservata dal Decision Layer.
+        /// </summary>
+        public BeliefEntryRef BeliefBasis;
+
+        /// <summary>
+        /// Urgenza normalizzata 0-1 nota al Decision Layer. Per ora e' opzionale:
+        /// se non valorizzata resta 0 e non guida la navigazione.
+        /// </summary>
+        public float Urgency01;
+
+        /// <summary>
         /// Contatore di tick consecutivi in cui il movimento è bloccato.
         /// Incrementato dal MovementSystem se in un tick l'NPC non riesce ad avanzare.
         /// Azzerato ogni volta che l'NPC fa almeno uno step.

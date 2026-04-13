@@ -333,8 +333,9 @@ namespace Arcontio.Core
                 TargetType = intent.TargetObjectId != 0 ? MovementTargetType.WorldObject : MovementTargetType.Cell,
                 TargetCell = new Vector2Int(intent.TargetX, intent.TargetY),
                 TargetObjectId = intent.TargetObjectId,
-                HasBeliefBasis = false,
-                Urgency = 0f,
+                HasBeliefBasis = intent.HasBeliefBasis,
+                BeliefBasis = intent.BeliefBasis,
+                Urgency = Mathf.Clamp01(intent.Urgency01),
                 VerbosityLevel = verbosity,
             };
         }

@@ -33,6 +33,7 @@ namespace Arcontio.Core
     public sealed class NeedsDecisionRule : IRule
     {
         private readonly BeliefUpdater _beliefUpdater = new();
+        private readonly BeliefQueryService _beliefQueryService = new();
 
         // Throttle: decidiamo ogni N tick-pulse (per log leggibile)
         private readonly int _decisionEveryTicks;
@@ -350,13 +351,29 @@ namespace Arcontio.Core
                     return true;
                 }
 
+                BeliefEntryRef beliefBasis = default;
+                bool hasBeliefBasis = foodTargetFromMemory
+                    && TryBuildFoodBeliefBasisForTarget(
+                        world,
+                        npcId,
+                        nx,
+                        ny,
+                        fx,
+                        fy,
+                        needs.GetValue(NeedKind.Hunger),
+                        nowTick,
+                        out beliefBasis);
+
                 cmd = new SetMoveIntentCommand(npcId, new MoveIntent
                 {
                     Active = true,
                     TargetX = fx,
                     TargetY = fy,
                     Reason = MoveIntentReason.SeekFood,
-                    TargetObjectId = foodTargetFromMemory ? 0 : foodObj
+                    TargetObjectId = foodTargetFromMemory ? 0 : foodObj,
+                    HasBeliefBasis = hasBeliefBasis,
+                    BeliefBasis = beliefBasis,
+                    Urgency01 = needs.GetValue(NeedKind.Hunger)
                 });
 
                 // Nota molto utile per la lettura futura di questo ramo:
@@ -459,6 +476,66 @@ if (stolenStockObj != 0)
 
     return false;
 }
+
+        // =============================================================================
+        // TryBuildFoodBeliefBasisForTarget
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una snapshot belief per l'EL pathfinding quando il Decision Layer
+        /// sta gia' pianificando un movimento verso una cella di cibo ricordata.
+        /// </para>
+        ///
+        /// <para><b>QuerySystem come causa esplicita</b></para>
+        /// <para>
+        /// Il metodo interroga il BeliefStore solo qui, nel livello decisionale, e solo
+        /// per ottenere una causa diagnostica coerente con il target gia' scelto. Se la
+        /// miglior belief Food non punta alla stessa cella, non forza alcuna causa:
+        /// restituisce false e il MoveIntent resta privo di BeliefBasis.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>BeliefStore</b>: letto dal per-NPC store, mai dal pathfinding.</item>
+        ///   <item><b>BeliefQueryService</b>: seleziona il miglior candidato Food.</item>
+        ///   <item><b>Target match</b>: richiede che la cella stimata coincida col target.</item>
+        ///   <item><b>BeliefEntryRef</b>: snapshot minimale passato al MoveIntent.</item>
+        /// </list>
+        /// </summary>
+        private bool TryBuildFoodBeliefBasisForTarget(
+            World world,
+            int npcId,
+            int npcX,
+            int npcY,
+            int targetX,
+            int targetY,
+            float urgency01,
+            int nowTick,
+            out BeliefEntryRef beliefBasis)
+        {
+            beliefBasis = default;
+
+            if (!world.Beliefs.TryGetValue(npcId, out var store) || store == null)
+                return false;
+
+            var queryResult = _beliefQueryService.GetBestKnownFoodSource(
+                store,
+                new Vector2Int(npcX, npcY),
+                urgency01,
+                world.Global.BeliefQuery);
+
+            if (queryResult.IsEmpty)
+                return false;
+
+            if (queryResult.Belief.EstimatedPosition.x != targetX
+                || queryResult.Belief.EstimatedPosition.y != targetY)
+                return false;
+
+            return MovementExplainabilityBeliefSnapshot.TryFromQueryResult(
+                queryResult,
+                nowTick,
+                out beliefBasis);
+        }
         /// <summary>
         /// FindRememberedCommunityFoodStock (0.02.05.2b):
         ///
