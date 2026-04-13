@@ -121,6 +121,13 @@ namespace Arcontio.Core
         /// </summary>
         public float ConfidenceDecayPerMaintenance;
 
+        /// <summary>
+        /// Periodo minimo tra due cicli di manutenzione, in tick.
+        /// </summary>
+        public int MaintenancePeriodTicks;
+
+        private long _lastMaintenanceTick;
+
         // =====================================================================
         // COSTRUTTORE
         // =====================================================================
@@ -134,6 +141,8 @@ namespace Arcontio.Core
             StaleTicksBeforeEviction = 60000;
             MinConfidenceToKeep    = 0.05f;
             ConfidenceDecayPerMaintenance = 0.02f;
+            MaintenancePeriodTicks = 300;
+            _lastMaintenanceTick = -1;
         }
 
         // =====================================================================
@@ -526,6 +535,17 @@ namespace Arcontio.Core
         public void TickMaintenance(long nowTick)
         {
             if (_edges.Count == 0) return;
+
+            if (_lastMaintenanceTick < 0)
+            {
+                _lastMaintenanceTick = nowTick;
+                return;
+            }
+
+            if (MaintenancePeriodTicks > 1 && nowTick - _lastMaintenanceTick < MaintenancePeriodTicks)
+                return;
+
+            _lastMaintenanceTick = nowTick;
 
             var toRemove = new List<NpcLandmarkMemory.EdgeKey>(4);
 

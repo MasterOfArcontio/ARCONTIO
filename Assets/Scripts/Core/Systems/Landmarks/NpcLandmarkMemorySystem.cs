@@ -45,6 +45,7 @@ namespace Arcontio.Core
 
             int totalKnownNodes = 0;
             int totalKnownEdges = 0;
+            int totalKnownComplexEdges = 0;
 
             for (int i = 0; i < _ids.Count; i++)
             {
@@ -59,9 +60,22 @@ namespace Arcontio.Core
                 totalKnownEdges += mem.KnownEdgesCount;
             }
 
-            // Telemetry (debug): utile per capire se stiamo accumulando troppo.
-            telemetry.Counter("NpcLandmarkMemorySystem.TotalKnownLandmarks", totalKnownNodes);
-            telemetry.Counter("NpcLandmarkMemorySystem.TotalKnownEdges", totalKnownEdges);
+            _ids.Clear();
+            _ids.AddRange(world.NpcComplexEdgeMemories.Keys);
+            for (int i = 0; i < _ids.Count; i++)
+            {
+                int npcId = _ids[i];
+                if (!world.NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMem) || complexMem == null)
+                    continue;
+
+                complexMem.TickMaintenance(now);
+                totalKnownComplexEdges += complexMem.Count;
+            }
+
+            // Telemetry (debug): questi sono valori istantanei, non contatori cumulativi.
+            telemetry.Gauge("NpcLandmarkMemorySystem.TotalKnownLandmarks", totalKnownNodes);
+            telemetry.Gauge("NpcLandmarkMemorySystem.TotalKnownEdges", totalKnownEdges);
+            telemetry.Gauge("NpcLandmarkMemorySystem.TotalKnownComplexEdges", totalKnownComplexEdges);
         }
     }
 }

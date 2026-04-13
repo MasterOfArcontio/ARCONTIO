@@ -17,6 +17,11 @@ namespace Arcontio.Core.Diagnostics
             else _counters[name] = delta;
         }
 
+        public void Gauge(string name, long value)
+        {
+            _counters[name] = value;
+        }
+
         public IReadOnlyDictionary<string, long> Counters => _counters;
 
         public void DumpToConsole()

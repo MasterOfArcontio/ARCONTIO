@@ -56,11 +56,7 @@ namespace Arcontio.Core
         private Scheduler _scheduler;
         private Telemetry _telemetry;
 
-        private TokenBus _tokenBusOut;                  // ?messaggi pronunciati? (non ancora consegnati)
-        private TokenBus _tokenBusIn;                   // ?messaggi ricevuti? (pronti per assimilation)
-        private TokenDeliveryPipeline _tokenDelivery;   // decide chi li sente davvero
-        private TokenEmissionPipeline _tokenEmission;   // Decide cosa dire
-        private TokenAssimilationPipeline _tokenAssim;  // Decide cosa entra in testa
+        private NpcCommunicationPipeline _npcCommunication;
         // MemoryTrace
         //     |
         //     V
@@ -103,9 +99,6 @@ namespace Arcontio.Core
         // - Questo NON sostituisce le Rule/Command flow.
         // - È un canale separato, esplicito e *solo* per debug tool / UI.
         private readonly List<ICommand> _externalCommands = new(128);
-
-        // buffer debug (drain token bus)
-        private readonly List<TokenEnvelope> _tokenBuffer = new(256);
 
         private readonly List<ISimEvent> _eventBuffer = new();
 
@@ -361,30 +354,11 @@ namespace Arcontio.Core
             // ******************************************************************************************************************************
 
             // ******************************************************************************************************************************
-            // 6.1) _tokenBusIn e _tokenBusOut
+            // 6.1) Pipeline comunicazione NPC
             // ******************************************************************************************************************************
-            // Separiamo token "pronunciati" da token "arrivati" (in e out)
-            _tokenBusIn = new TokenBus();
-            _tokenBusOut = new TokenBus();
-
-            // ******************************************************************************************************************************
-            // 6.2) _tokenEmission
-            // ******************************************************************************************************************************
-            // Token per trasformare le MemoryTrace (pensieri del NPC) in comunicazioni
-            _tokenEmission = new TokenEmissionPipeline(contactRadius: 2, topN: 6);
-
-            // ******************************************************************************************************************************
-            // 6.3) _tokenDelivery
-            // ******************************************************************************************************************************
-            // - applica range / LOS / falloff
-            // - trasferisce Out -> In
-            _tokenDelivery = new TokenDeliveryPipeline();
-
-            // ******************************************************************************************************************************
-            // 6.4) _tokenAssim
-            // ******************************************************************************************************************************
-            // Pipeline di assimilazione
-            _tokenAssim = new TokenAssimilationPipeline();
+            // Mantiene TokenBus separato da MessageBus e incapsula:
+            // emissione -> delivery -> assimilation.
+            _npcCommunication = new NpcCommunicationPipeline(contactRadius: 2, topN: 6);
 
             // ******************************************************************************************************************************
             // 7) INIZIALIZZO LA GESTIONE DELLA MEMORIA NPC
@@ -542,7 +516,7 @@ namespace Arcontio.Core
                     cellY: 0);
 
                 // Coppia A: 1 -> 2
-                _world.PublishTokenOut(_tokenBusOut, new TokenEnvelope(
+                _npcCommunication.PublishTokenOut(_world, new TokenEnvelope(
                     speakerId: 1,
                     listenerId: 2,
                     channel: TokenChannel.AlarmShout,
@@ -550,7 +524,7 @@ namespace Arcontio.Core
                     token: shout));
 
                 // Coppia B: 3 -> 4
-                _world.PublishTokenOut(_tokenBusOut, new TokenEnvelope(
+                _npcCommunication.PublishTokenOut(_world, new TokenEnvelope(
                     speakerId: 3,
                     listenerId: 4,
                     channel: TokenChannel.AlarmShout,
@@ -594,28 +568,12 @@ namespace Arcontio.Core
             // Nota: _memoryEncoding NON sta nello scheduler (per evitare problemi di sincronia).
             _memoryEncoding.Update(_world, tick, _bus, _telemetry);
 
-            // Patch 0.01P3 extension:
-            // Alcuni System (es. MemoryEncodingSystem) possono accodare token "event-driven" (es. report furto)
-            // in World.QueueTokenOut(...). Qui li flushiamo nel TokenBusOut tramite il punto canonico
-            // World.PublishTokenOut(...) (che fa anche log OUT + balloon).
-            _world.FlushQueuedTokenOut(_tokenBusOut);
-
-            // 3.15) Token emission (trace -> token) su pipe separata
-            // Trasformiamo alcune trace importanti in TokenEnvelope e le mettiamo nel TokenBus.
-            // Nota: questo NON tocca il MessageBus e NON influenza direttamente le Rule.
-            //
-            // Nota test:
-            // - Day7 inietta anche token manualmente su _tokenBusOut (AlarmShout) per testare BFS delivery.
-            _tokenEmission.Emit(_world, tick, _tokenBusOut, _telemetry);
-
-            // NEW Giorno 7:
-            // - Delivery: Out -> In (range / LOS / falloff)
-            // - Questo è il punto che evita "telepatia":
-            //   il token può NON arrivare, o arrivare degradato.
-            _tokenDelivery.Deliver(_world, tick, _tokenBusOut, _tokenBusIn, _telemetry);
-
-            // Assimilation legge SOLO IN (arrivati)
-            _tokenAssim.Assimilate(_world, tick, _tokenBusIn, _tokenBuffer, _telemetry);
+            // 3.15) Comunicazione NPC:
+            // - flush dei token event-driven accodati da MemoryEncodingSystem
+            // - emissione da MemoryTrace
+            // - delivery fisica
+            // - assimilation nel listener
+            _npcCommunication.ProcessAfterMemoryEncoding(_world, tick, _telemetry);
 
             // ******************************************************************************************************************************
             // 3.2) Ripubblichiamo gli eventi
@@ -661,15 +619,9 @@ namespace Arcontio.Core
                 // - vengano consegnate e assimilate nello stesso tick (per coerenza UX e debug)
                 // - e non "slittino" al tick successivo.
                 //
-                // Quindi:
-                // 1) flushiamo i token accodati
-                // 2) facciamo un giro aggiuntivo di Delivery + Assimilation
-                int flushed = _world.FlushQueuedTokenOut(_tokenBusOut);
-                if (flushed > 0)
-                {
-                    _tokenDelivery.Deliver(_world, tick, _tokenBusOut, _tokenBusIn, _telemetry);
-                    _tokenAssim.Assimilate(_world, tick, _tokenBusIn, _tokenBuffer, _telemetry);
-                }
+                // Quindi facciamo un giro aggiuntivo solo sui token accodati:
+                // delivery + assimilation, senza rieseguire emissione da memoria.
+                _npcCommunication.ProcessQueuedOnly(_world, tick, _telemetry);
 
                 // opzionale: se vuoi che le rules li vedano nello stesso tick, ripubblichi:
                 for (int i = 0; i < _eventBuffer.Count; i++)

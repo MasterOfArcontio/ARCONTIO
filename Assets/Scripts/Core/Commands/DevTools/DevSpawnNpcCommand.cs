@@ -1,4 +1,5 @@
 // Assets/Scripts/Core/Commands/DevTools/DevSpawnNpcCommand.cs
+using Arcontio.Core.Save;
 using UnityEngine;
 
 namespace Arcontio.Core.Commands.DevTools
@@ -52,22 +53,36 @@ namespace Arcontio.Core.Commands.DevTools
                 return;
             }
 
-            // Name deterministico e leggibile in debug.
-            // Nota: _nextNpcId è interno al world, quindi non possiamo usarlo qui senza creare una API;
-            // usiamo un nome "a coordinate" (univoco abbastanza per scenari di test).
-            var dna = NpcDnaProfile.CreateDefault($"DEV_NPC({_x},{_y})");
+            // Template dati: primo NPC di default_scenario, se disponibile.
+            // Fallback: valori deterministici locali per mantenere il DevTool usabile.
+            NpcSaveEntry template = null;
+            if (NpcScenarioLoader.TryLoadDefault(out var entries) && entries != null && entries.Count > 0)
+                template = entries[0];
 
-            // Needs "safe": nessuna emergenza iniziale.
-            var needs = NpcNeeds.Default();
+            // Runtime spawn usa il primo NPC di default_scenario come template dati.
+            // La posizione e il facing restano quelli scelti dal DevTool.
+            var dna = template?.dna != null
+                ? template.dna.To()
+                : NpcDnaProfile.CreateDefault($"DEV_NPC({_x},{_y})");
 
-            var social = new Social
-            {
-                LeadershipScore = 0.0f,
-                LoyaltyToLeader01 = 0.5f,
-                JusticePerception01 = 0.5f,
-            };
+            // Needs dal template; fallback "safe" se lo scenario non e disponibile.
+            var needs = template?.needs != null
+                ? template.needs.ToNpcNeeds()
+                : NpcNeeds.Default();
+
+            var social = template?.social != null
+                ? template.social.To()
+                : new Social
+                {
+                    LeadershipScore = 0.0f,
+                    LoyaltyToLeader01 = 0.5f,
+                    JusticePerception01 = 0.5f,
+                };
 
             int npcId = world.CreateNpc(dna, needs, social, _x, _y);
+            if (template?.profile != null)
+                world.NpcProfiles[npcId] = template.profile.ToProfile();
+
             world.SetFacing(npcId, _facing);
 
             // Nota:
