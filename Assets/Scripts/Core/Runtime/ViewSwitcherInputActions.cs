@@ -24,11 +24,12 @@ namespace Arcontio.Core
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "ViewSwitcher"),
                 new LogBlock(LogLevel.Debug, "log.viewswitcher.awake_start")
             );
-            _actions = new ArcontioInputActions();
+            EnsureActions();
         }
 
         private void OnEnable()
         {
+            EnsureActions();
             _actions.Enable();
 
             // 2) QUI: sostituisci "Global" e i nomi delle azioni se li hai chiamati diversamente
@@ -44,6 +45,39 @@ namespace Arcontio.Core
             _actions.Global.SwitchToMap.performed -= OnSwitchToMap;
 
             _actions.Disable();
+        }
+
+        // =============================================================================
+        // EnsureActions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Garantisce che il wrapper generato <see cref="ArcontioInputActions"/> esista
+        /// prima che il componente provi ad abilitarlo o a registrare callback.
+        /// </para>
+        ///
+        /// <para><b>Lifecycle difensivo Unity</b></para>
+        /// <para>
+        /// In condizioni normali <c>Awake</c> inizializza il campo prima di
+        /// <c>OnEnable</c>. Questo metodo rende pero' il componente robusto anche nei
+        /// casi in cui Unity riabilita lo script, il dominio viene ricaricato o il
+        /// campo torna null prima dell'abilitazione. La funzione non modifica lo stato
+        /// simulativo: prepara solo l'oggetto input della view/runtime.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>_actions</b>: wrapper New Input System generato dal progetto.</item>
+        ///   <item><b>Early return</b>: evita di ricreare input action gia' esistenti.</item>
+        ///   <item><b>new ArcontioInputActions</b>: fallback sicuro quando il campo e' null.</item>
+        /// </list>
+        /// </summary>
+        private void EnsureActions()
+        {
+            if (_actions != null)
+                return;
+
+            _actions = new ArcontioInputActions();
         }
 
         private void OnSwitchToAtomViewer(InputAction.CallbackContext ctx) => LoadIfNotActive(atomViewerSceneName);
