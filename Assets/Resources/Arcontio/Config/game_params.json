@@ -38,8 +38,8 @@
     "blacklist_penalty_stage2": 0.35
   },
   "explainability": {
-    "enabled": false,
-    "defaultVerbosity": 0,
+    "enabled": true,
+    "defaultVerbosity": 2,
     "maxTrackedNpcs": 3,
     "trackedNpcIds": [],
     "trackActiveNpcOnly": true,
