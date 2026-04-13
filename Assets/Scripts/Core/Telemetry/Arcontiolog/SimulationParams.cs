@@ -52,6 +52,12 @@ namespace Arcontio.Core.Config
         // ---------------- Movement (v0.02.05.B) ----------------
         public MovementParams movement = new MovementParams();
 
+        // ---------------- Movement Explainability Layer (v0.04.1.d) ----------------
+        // Parametri del livello EL pathfinding. La configurazione vive accanto ai
+        // parametri di simulazione, ma non attiva ancora emissione trace: le sessioni
+        // successive collegheranno questi valori agli emitter e agli adapter runtime.
+        public MovementExplainabilityParams explainability = new MovementExplainabilityParams();
+
         // ---------------- GVD-DIN (v0.03) ----------------
         // Sistema GVD dinamico condition-based + pruning.
         // Attivo quando gvd_din.enabled=true E hybrid_landmark.use_hybrid_extractor=false.
@@ -159,6 +165,89 @@ namespace Arcontio.Core.Config
         // La penalità viene applicata sia in NpcLandmarkMemory che in NpcComplexEdgeMemory.
         public float blacklist_penalty_stage1 = 0.12f;
         public float blacklist_penalty_stage2 = 0.35f;
+    }
+
+    // =============================================================================
+    // MovementExplainabilityParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile dei parametri dell'Explainability Layer dedicato al
+    /// pathfinding. Viene letto da <c>game_params.json</c> tramite
+    /// <c>JsonUtility</c> insieme agli altri parametri globali di simulazione.
+    /// </para>
+    ///
+    /// <para><b>Separazione configurazione / comportamento runtime</b></para>
+    /// <para>
+    /// Questa classe contiene solo dati di configurazione: non crea registry, non
+    /// apre file di log, non consulta NPC e non abilita da sola la UI. I sistemi
+    /// successivi useranno questi valori come input read-only per decidere quante
+    /// trace conservare, quanti NPC osservare e quanta verbosita' emettere.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>enabled</b>: master switch del livello EL pathfinding.</item>
+    ///   <item><b>defaultVerbosity</b>: livello di dettaglio iniziale delle trace.</item>
+    ///   <item><b>maxTrackedNpcs</b>: limite massimo di NPC osservati automaticamente.</item>
+    ///   <item><b>trackedNpcIds</b>: lista opzionale di NPC esplicitamente osservati.</item>
+    ///   <item><b>trackActiveNpcOnly</b>: filtro per privilegiare NPC con movimento attivo.</item>
+    ///   <item><b>ringBuffer_*</b>: capacita' bounded degli store EL in memoria.</item>
+    ///   <item><b>writeJsonLog</b>: abilita il futuro sink JSONL diagnostico.</item>
+    ///   <item><b>jsonLogFileNamePattern</b>: pattern nome file del futuro log JSONL.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class MovementExplainabilityParams
+    {
+        // Master switch difensivo: di default l'EL resta spento, cosi' la presenza
+        // della sezione JSON non cambia comportamento runtime finche' gli emitter non
+        // verranno collegati nelle sessioni successive.
+        public bool enabled = false;
+
+        // Livello base di dettaglio: 0 = off/minimo, 1 = eventi principali,
+        // 2 = eventi intermedi, 3 = eventi molto verbosi come step runtime.
+        public int defaultVerbosity = 0;
+
+        // Limite automatico per evitare che una scena con molti NPC generi troppi
+        // dati EL. Se trackedNpcIds contiene valori, quella lista avra' priorita'.
+        public int maxTrackedNpcs = 3;
+
+        // Lista esplicita di NPC da osservare. Array vuoto = nessun pin manuale;
+        // il futuro selector potra' allora usare maxTrackedNpcs e activeNpcOnly.
+        public int[] trackedNpcIds = Array.Empty<int>();
+
+        // Se true, la selezione automatica preferira' NPC con movimento/intento
+        // attivo. Il campo e' solo config: la policy concreta arrivera' con gli emitter.
+        public bool trackActiveNpcOnly = true;
+
+        // Numero di intent conservati per NPC. Gli intent sono rari, quindi un buffer
+        // piccolo e' sufficiente per capire la storia recente.
+        public int ringBuffer_intent = 10;
+
+        // Numero di plan trace conservate per NPC. Anche i piani sono eventi discreti,
+        // separati dagli eventi tick-by-tick dell'esecuzione.
+        public int ringBuffer_plan = 10;
+
+        // Capacita' eventi a verbosita' bassa/media. Mantiene la timeline recente
+        // senza trasformare il debug in una crescita non bounded.
+        public int ringBuffer_events_low = 60;
+
+        // Capacita' eventi a verbosita' alta. Serve quando si vogliono vedere piu'
+        // micro-eventi senza cambiare la struttura dello store.
+        public int ringBuffer_events_high = 200;
+
+        // Soglia da cui usare il buffer eventi alto. Con defaultVerbosity 3, per
+        // esempio, il futuro registry potra' scegliere eventCapacity = high.
+        public int verbosityHighThreshold = 3;
+
+        // Sink JSONL separato dalla fonte primaria in memoria. Anche quando sara'
+        // implementato, il file restera' export diagnostico e non dipendenza sim.
+        public bool writeJsonLog = false;
+
+        // Pattern del futuro file JSONL. Il suffisso .jsonl comunica che il formato
+        // sara' append-only, una trace JSON per riga.
+        public string jsonLogFileNamePattern = "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl";
     }
 
 

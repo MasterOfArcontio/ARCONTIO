@@ -37,6 +37,20 @@
     "blacklist_penalty_stage1": 0.12,
     "blacklist_penalty_stage2": 0.35
   },
+  "explainability": {
+    "enabled": false,
+    "defaultVerbosity": 0,
+    "maxTrackedNpcs": 3,
+    "trackedNpcIds": [],
+    "trackActiveNpcOnly": true,
+    "ringBuffer_intent": 10,
+    "ringBuffer_plan": 10,
+    "ringBuffer_events_low": 60,
+    "ringBuffer_events_high": 200,
+    "verbosityHighThreshold": 3,
+    "writeJsonLog": false,
+    "jsonLogFileNamePattern": "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl"
+  },
   "landmarks": {
     "enableLandmarkSystem": true,
     "maxLandmarksPerNpc": 64,
