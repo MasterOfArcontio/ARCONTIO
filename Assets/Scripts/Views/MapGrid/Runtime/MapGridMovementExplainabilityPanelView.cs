@@ -33,7 +33,8 @@ namespace Arcontio.View.MapGrid
     public sealed class MapGridMovementExplainabilityPanelView
     {
         private const int DefaultWidth = 430;
-        private const int DefaultHeight = 620;
+        private const int HorizontalMargin = 12;
+        private const int VerticalMargin = 10;
         private const int DefaultTitleFont = 14;
         private const int DefaultBodyFont = 12;
 
@@ -51,7 +52,8 @@ namespace Arcontio.View.MapGrid
         /// <summary>
         /// <para>
         /// Crea il pannello sotto il parent indicato e lo ancora al lato destro del
-        /// canvas. Il pannello parte nascosto e viene aggiornato dal SummaryOverlay.
+        /// canvas occupando tutta l'altezza disponibile. Il pannello parte nascosto e
+        /// viene aggiornato dal SummaryOverlay.
         /// </para>
         ///
         /// <para><b>UI debug stabile</b></para>
@@ -63,7 +65,7 @@ namespace Arcontio.View.MapGrid
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>parent</b>: canvas/root dell'overlay MapGrid.</item>
-        ///   <item><b>layout verticale</b>: header e body in colonna.</item>
+        ///   <item><b>layout verticale</b>: header fisso e body scrollabile in colonna.</item>
         ///   <item><b>raycast target</b>: evita click accidentali sulla mappa sotto il pannello.</item>
         /// </list>
         /// </summary>
@@ -76,11 +78,11 @@ namespace Arcontio.View.MapGrid
             _root.transform.SetParent(parent, false);
 
             _rootRt = _root.AddComponent<RectTransform>();
-            _rootRt.anchorMin = new Vector2(1f, 0.5f);
-            _rootRt.anchorMax = new Vector2(1f, 0.5f);
+            _rootRt.anchorMin = new Vector2(1f, 0f);
+            _rootRt.anchorMax = new Vector2(1f, 1f);
             _rootRt.pivot = new Vector2(1f, 0.5f);
-            _rootRt.anchoredPosition = new Vector2(-12f, 0f);
-            _rootRt.sizeDelta = new Vector2(DefaultWidth, DefaultHeight);
+            _rootRt.offsetMin = new Vector2(-DefaultWidth - HorizontalMargin, VerticalMargin);
+            _rootRt.offsetMax = new Vector2(-HorizontalMargin, -VerticalMargin);
 
             _rootBg = _root.AddComponent<Image>();
             _rootBg.raycastTarget = true;
@@ -184,8 +186,9 @@ namespace Arcontio.View.MapGrid
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce il corpo testuale del pannello. Il body usa rich text e wrap per
-        /// restare leggibile in una colonna laterale.
+        /// Costruisce il corpo testuale scrollabile del pannello. Header, intent e
+        /// plan restano nella parte alta della stringa, mentre gli eventi possono
+        /// accumularsi senza aumentare l'altezza del pannello.
         /// </para>
         /// </summary>
         private void BuildBody(Transform parent)
@@ -205,11 +208,61 @@ namespace Arcontio.View.MapGrid
             bodyLayout.padding = new RectOffset(6, 6, 6, 6);
 
             var bodyLe = bodyGo.AddComponent<LayoutElement>();
-            bodyLe.preferredHeight = DefaultHeight - 58f;
             bodyLe.flexibleHeight = 1f;
 
+            var scrollGo = new GameObject("Scroll");
+            scrollGo.transform.SetParent(bodyGo.transform, false);
+            var scrollRt = scrollGo.AddComponent<RectTransform>();
+            scrollRt.anchorMin = Vector2.zero;
+            scrollRt.anchorMax = Vector2.one;
+            scrollRt.offsetMin = Vector2.zero;
+            scrollRt.offsetMax = Vector2.zero;
+            scrollGo.AddComponent<LayoutElement>().flexibleHeight = 1f;
+
+            var scroll = scrollGo.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+
+            var viewportGo = new GameObject("Viewport");
+            viewportGo.transform.SetParent(scrollGo.transform, false);
+            var viewportRt = viewportGo.AddComponent<RectTransform>();
+            viewportRt.anchorMin = Vector2.zero;
+            viewportRt.anchorMax = Vector2.one;
+            viewportRt.offsetMin = Vector2.zero;
+            viewportRt.offsetMax = Vector2.zero;
+
+            var viewportImage = viewportGo.AddComponent<Image>();
+            viewportImage.raycastTarget = true;
+            viewportImage.color = new Color(0f, 0f, 0f, 0f);
+            viewportGo.AddComponent<Mask>().showMaskGraphic = false;
+
+            var contentGo = new GameObject("Content");
+            contentGo.transform.SetParent(viewportGo.transform, false);
+            var contentRt = contentGo.AddComponent<RectTransform>();
+            contentRt.anchorMin = new Vector2(0f, 1f);
+            contentRt.anchorMax = new Vector2(1f, 1f);
+            contentRt.pivot = new Vector2(0.5f, 1f);
+            contentRt.offsetMin = Vector2.zero;
+            contentRt.offsetMax = Vector2.zero;
+
+            var contentLayout = contentGo.AddComponent<VerticalLayoutGroup>();
+            contentLayout.childControlHeight = true;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childForceExpandWidth = true;
+
+            var contentFitter = contentGo.AddComponent<ContentSizeFitter>();
+            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
             var textGo = new GameObject("Text");
-            textGo.transform.SetParent(bodyGo.transform, false);
+            textGo.transform.SetParent(contentGo.transform, false);
+            var textRt = textGo.AddComponent<RectTransform>();
+            textRt.anchorMin = new Vector2(0f, 1f);
+            textRt.anchorMax = new Vector2(1f, 1f);
+            textRt.pivot = new Vector2(0.5f, 1f);
+            textRt.offsetMin = Vector2.zero;
+            textRt.offsetMax = Vector2.zero;
 
             _bodyText = textGo.AddComponent<Text>();
             _bodyText.raycastTarget = false;
@@ -221,6 +274,12 @@ namespace Arcontio.View.MapGrid
             _bodyText.verticalOverflow = VerticalWrapMode.Overflow;
             _bodyText.supportRichText = true;
             _bodyText.text = string.Empty;
+
+            var textFitter = textGo.AddComponent<ContentSizeFitter>();
+            textFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scroll.viewport = viewportRt;
+            scroll.content = contentRt;
         }
 
         // =============================================================================

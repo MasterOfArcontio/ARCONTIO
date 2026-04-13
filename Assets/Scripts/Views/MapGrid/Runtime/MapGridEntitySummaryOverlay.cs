@@ -1165,7 +1165,7 @@ namespace Arcontio.View.MapGrid
             {
                 _movementExplainabilityPanel.SetText(
                     "EL Pathfinding",
-                    "<color=#aaaaaa>L'NPC selezionato non esiste piu' nel World.</color>");
+                    "<color=#FF6666>L'NPC selezionato non esiste piu' nel World.</color>");
                 _movementExplainabilityPanel.SetVisible(true);
                 return;
             }
@@ -1220,7 +1220,7 @@ namespace Arcontio.View.MapGrid
                     ? "EL pathfinding non disponibile per questo NPC"
                     : _movementExplainabilityViewModel.HeaderSubtitle;
 
-                output.Append("<color=#aaaaaa>").Append(message).Append("</color>");
+                output.Append("<color=#FF6666>").Append(message).Append("</color>");
                 return;
             }
 
@@ -1283,11 +1283,16 @@ namespace Arcontio.View.MapGrid
                 return;
             }
 
-            // Timeline gia' limitata dal builder a 6 eventi recenti. Qui facciamo solo
-            // formattazione testuale nello stile compatto delle altre sezioni debug.
-            for (int i = 0; i < model.Events.Count; i++)
+            // Timeline gia' limitata dal builder. Qui invertiamo l'ordine per mostrare
+            // subito l'evento piu' recente, e alterniamo bianco/grigio chiaro per
+            // aumentare la separazione visiva tra righe consecutive.
+            int visibleIndex = 0;
+            for (int i = model.Events.Count - 1; i >= 0; i--)
             {
                 var evt = model.Events[i];
+                string color = ResolveExplainabilityEventColor(evt, visibleIndex);
+
+                output.Append("<color=").Append(color).Append(">");
                 output.Append("- t").Append(evt.Tick)
                     .Append(" ").Append(evt.EventType)
                     .Append("  mode=").Append(evt.ActiveMode)
@@ -1300,8 +1305,65 @@ namespace Arcontio.View.MapGrid
                 if (!string.IsNullOrWhiteSpace(evt.Detail))
                     output.Append('\n').Append("  detail: ").Append(evt.Detail);
 
-                output.Append('\n');
+                output.Append("</color>");
+
+                if (i > 0)
+                    output.Append('\n').Append('\n');
+                else
+                    output.Append('\n');
+
+                visibleIndex++;
             }
+        }
+
+        // =============================================================================
+        // ResolveExplainabilityEventColor
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Decide il colore rich text di una riga evento EL. Gli errori e i fallimenti
+        /// hanno priorita' e vengono mostrati in rosso; gli altri eventi alternano
+        /// bianco e grigio chiaro partendo dal piu' recente.
+        /// </para>
+        ///
+        /// <para><b>Leggibilita' timeline</b></para>
+        /// <para>
+        /// La funzione resta nel layer view/debug: non interpreta il pathfinding per
+        /// decidere comportamento, ma soltanto per rendere piu' leggibile la timeline.
+        /// </para>
+        /// </summary>
+        private static string ResolveExplainabilityEventColor(MovementExplainabilityEventView evt, int visibleIndex)
+        {
+            if (IsExplainabilityErrorEvent(evt))
+                return "#FF6666";
+
+            return visibleIndex % 2 == 0 ? "#FFFFFF" : "#D8D8D8";
+        }
+
+        // =============================================================================
+        // IsExplainabilityErrorEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riconosce gli eventi EL che devono essere evidenziati come errore o
+        /// fallimento nella UI debug. La classificazione usa solo dati gia' formattati
+        /// dal ViewModel, senza rileggere store o pathfinding.
+        /// </para>
+        /// </summary>
+        private static bool IsExplainabilityErrorEvent(MovementExplainabilityEventView evt)
+        {
+            if (evt == null)
+                return false;
+
+            if (string.Equals(evt.EventType, "Failed", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (!string.IsNullOrWhiteSpace(evt.Detail)
+                && evt.Detail.IndexOf("Failure", StringComparison.OrdinalIgnoreCase) >= 0)
+                return true;
+
+            return !string.IsNullOrWhiteSpace(evt.Summary)
+                   && evt.Summary.IndexOf("error", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         // ============================================================
