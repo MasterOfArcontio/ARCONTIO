@@ -96,7 +96,7 @@
 | 16 | Lun | BeliefStore | Decay confidence + trigger su soglia minima | ✅ |
 | 17 | Mer | BeliefStore | Invalidazione su job fallito | ✅ |
 | 18 | Gio | BeliefStore | Query API per il Decision Layer | ✅ |
-| 19 | Lun | QA | Test: BeliefStore vs MemoryStore, verifica omniscience | ⏳ |
+| 19 | Lun | QA | Test: BeliefStore vs MemoryStore, verifica omniscience | ✅ |
 
 ### Definition of Done v0.04
 
@@ -132,6 +132,8 @@
 > **Nota step 17 — completato come ponte MVP:** `BeliefFailureSignal` e `BeliefFailureKind` rendono esplicito il feedback operativo verso il Belief layer. `BeliefUpdater.UpdateFromOperationalFailure(...)` applica la policy minima documentata: smentita diretta locale -> `Discarded`, fallimento ambiguo -> `Weak`, contraddizione riportata -> `Conflicted`. `BeliefStore` resta passivo e offre solo mutazioni meccaniche per id oppure per fallback categoria + posizione. Il primo produttore concreto e' `NeedsDecisionRule`, che invia una smentita diretta quando l'NPC arriva sulla cella dove credeva di trovare cibo e scopre localmente che il target non e' piu' valido. Il pathfinding non viene ancora agganciato per evitare di trasformare un fallimento di percorso in falsa certezza sul contenuto del belief.
 
 > **Nota step 18 — completato come Query API MVP:** introdotto un `BeliefQueryService` separato dal `BeliefStore`, coerente con il modello Store + QueryService + Evaluators condivisi. Il BeliefStore resta passivo: non calcola ranking e non legge world state. La query riceve un `BeliefQueryContext` minimale (`GoalType`, `Urgency01`, `NpcPosition`, `MinConfidence`), filtra solo belief `Active`/`Weak` sopra soglia, applica gli evaluator MVP `ConfidenceBeliefEvaluator`, `FreshnessBeliefEvaluator` e `DistanceBeliefEvaluator`, quindi restituisce un `BeliefQueryResult` con `IsEmpty`, belief vincitore, score finale e breakdown `BeliefScoreContribution[]`. I pesi degli evaluator sono data-driven in `belief_query_config.json` tramite `BeliefQueryConfig`, rispettando la regola R9 del documento. Non sono stati implementati `RiskToleranceEvaluator`, ownership, social, norm o tuning offline: il documento cita RiskTolerance nella lista Fase 1, ma il piano di implementazione parla di tre evaluator MVP; per evitare overengineering lo si rimanda a quando il Decision Layer portera' realmente `RiskAversion` nel contesto. La sessione non sostituisce ancora `NeedsDecisionRule`: prepara l'API per il Decision Layer senza anticipare la migrazione delle rule legacy.
+
+> **Nota step 19 — completato come QA BeliefStore/MemoryStore senza UI:** aggiunti test EditMode mirati per validare il contratto `MemoryTrace -> MemoryStore -> BeliefUpdater -> BeliefStore`. I test verificano che `ObjectSpotted` con `SubjectDefId` alimentare produca belief `Food`, che `ObjectSpotted` con `SubjectDefId` letto produca belief `Rest`, che tracce di pericolo e NPC osservati producano rispettivamente `Danger` e `Social`, e soprattutto che una trace `Dropped` dal `MemoryStore` non aggiorni il `BeliefStore`. La verifica e' costruita senza creare un `World` e senza leggere `Objects`, `FoodStocks`, database oggetti o altri stati oggettivi: il Belief layer resta derivativo rispetto alla memoria soggettiva accettata. Per decisione di sessione, la card grafica fluttuante dell'NPC non e' stata modificata: la visualizzazione BeliefStore nella UI resta rimandata a una sessione debug/overlay dedicata, cosi il QA architetturale della v0.04 resta separato dalla progettazione grafica.
 
 ---
 
