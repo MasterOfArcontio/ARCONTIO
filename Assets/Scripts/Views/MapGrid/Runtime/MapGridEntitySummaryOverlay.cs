@@ -36,6 +36,7 @@ namespace Arcontio.View.MapGrid
     {
         private RectTransform _linesRoot;
         private RectTransform _cardsRoot;
+        private MapGridMovementExplainabilityPanelView _movementExplainabilityPanel;
 
         // ============================================================
         // PUBLIC API (lifecycle)
@@ -80,6 +81,12 @@ namespace Arcontio.View.MapGrid
             _cardsRoot.offsetMin = Vector2.zero;
             _cardsRoot.offsetMax = Vector2.zero;
 
+            // Pannello EL fisso a destra:
+            // resta nello stesso Canvas del SummaryOverlay, ma non segue le card e
+            // non viene collegato alle linee entity->card. E' una diagnostica laterale
+            // dedicata all'NPC selezionato tramite NPCSelection.
+            _movementExplainabilityPanel = new MapGridMovementExplainabilityPanelView();
+            _movementExplainabilityPanel.AttachTo(_root.transform);
 
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             _canvas.sortingOrder = 999; // sopra quasi tutto
@@ -148,6 +155,7 @@ namespace Arcontio.View.MapGrid
 
             RefreshNpcTexts(world);
             RefreshObjectTexts(world);
+            RefreshMovementExplainabilityPanel(world);
         }
 
         // ============================================================
@@ -186,6 +194,7 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbComms = new(1024);
         private readonly StringBuilder _sbLandmarks = new(256);
         private readonly StringBuilder _sbExplainability = new(2048);
+        private readonly StringBuilder _sbExplainabilityPanel = new(4096);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
         private readonly MovementExplainabilityViewModel _movementExplainabilityViewModel = new();
@@ -1001,7 +1010,7 @@ namespace Arcontio.View.MapGrid
                     _sbComms.Append("<color=#aaaaaa>(no token log)</color>\n");
                 }
 
-                BuildMovementExplainabilityText(world, npcId, _sbExplainability);
+                BuildMovementExplainabilityText(world, npcId, _sbExplainability, maxEvents: 6);
 
                 // Memory traces
                 _sbMem.Clear();
@@ -1115,6 +1124,58 @@ namespace Arcontio.View.MapGrid
         }
 
         // =============================================================================
+        // RefreshMovementExplainabilityPanel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna il pannello EL fisso a destra usando l'NPC selezionato nella view.
+        /// Il pannello non crea selezione propria: segue <see cref="SocialViewer.UI.NPCSelection"/>.
+        /// </para>
+        ///
+        /// <para><b>Debug panel separato dalla simulazione</b></para>
+        /// <para>
+        /// Questo metodo vive nello strato view/debug e legge lo stesso ViewModel EL
+        /// usato dalla card NPC. Non modifica intent, pathfinding o registry: produce
+        /// soltanto testo per il pannello laterale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>SelectedNpcId</b>: sorgente view-only dell'NPC attivo.</item>
+        ///   <item><b>_sbExplainabilityPanel</b>: buffer dedicato al pannello destro.</item>
+        ///   <item><b>BuildMovementExplainabilityText</b>: formatter condiviso con la card.</item>
+        /// </list>
+        /// </summary>
+        private void RefreshMovementExplainabilityPanel(Arcontio.Core.World world)
+        {
+            if (_movementExplainabilityPanel == null)
+                return;
+
+            int selectedNpcId = SocialViewer.UI.NPCSelection.SelectedNpcId;
+            if (selectedNpcId <= 0)
+            {
+                _movementExplainabilityPanel.SetText(
+                    "EL Pathfinding",
+                    "<color=#aaaaaa>Nessun NPC selezionato.\n\nClick sinistro su un NPC nella MapGrid per aprire la diagnostica EL.</color>");
+                _movementExplainabilityPanel.SetVisible(true);
+                return;
+            }
+
+            if (world == null || !world.NpcDna.ContainsKey(selectedNpcId))
+            {
+                _movementExplainabilityPanel.SetText(
+                    "EL Pathfinding",
+                    "<color=#aaaaaa>L'NPC selezionato non esiste piu' nel World.</color>");
+                _movementExplainabilityPanel.SetVisible(true);
+                return;
+            }
+
+            BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityPanel, maxEvents: 12);
+            _movementExplainabilityPanel.SetText($"EL Pathfinding - NPC #{selectedNpcId}", _sbExplainabilityPanel.ToString());
+            _movementExplainabilityPanel.SetVisible(true);
+        }
+
+        // =============================================================================
         // BuildMovementExplainabilityText
         // =============================================================================
         /// <summary>
@@ -1139,7 +1200,7 @@ namespace Arcontio.View.MapGrid
         ///   <item><b>output</b>: buffer testuale della sezione EL nella card NPC.</item>
         /// </list>
         /// </summary>
-        private void BuildMovementExplainabilityText(Arcontio.Core.World world, int npcId, StringBuilder output)
+        private void BuildMovementExplainabilityText(Arcontio.Core.World world, int npcId, StringBuilder output, int maxEvents)
         {
             output.Clear();
             output.Append("EL Pathfinding\n");
@@ -1151,7 +1212,7 @@ namespace Arcontio.View.MapGrid
                 world,
                 npcId,
                 _movementExplainabilityViewModel,
-                maxEvents: 6);
+                maxEvents: maxEvents);
 
             if (!hasModel)
             {
