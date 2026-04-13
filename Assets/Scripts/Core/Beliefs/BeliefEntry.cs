@@ -110,6 +110,95 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // BeliefFailureKind
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Tipo di smentita operativa che un sistema esterno al BeliefStore puo'
+    /// produrre quando una credenza usata come guida pratica non regge alla prova
+    /// dell'esecuzione.
+    /// </para>
+    ///
+    /// <para><b>Ponte provvisorio verso il Job System</b></para>
+    /// <para>
+    /// Il Job System generale non e' ancora presente: questa enum permette a rule,
+    /// command e system gia' esistenti di dichiarare il contesto del fallimento senza
+    /// mettere logica cognitiva dentro il BeliefStore. Quando il Job System arrivera',
+    /// sara' lui a produrre lo stesso tipo di segnale.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>DirectLocalContradiction</b>: l'NPC verifica localmente il target e scopre che la credenza e' falsa.</item>
+    ///   <item><b>AmbiguousExecutionFailure</b>: l'esecuzione fallisce, ma la causa potrebbe non essere il contenuto del belief.</item>
+    ///   <item><b>ReportedContradiction</b>: una fonte mediata contraddice la credenza senza prova diretta locale.</item>
+    /// </list>
+    /// </summary>
+    public enum BeliefFailureKind
+    {
+        DirectLocalContradiction,
+        AmbiguousExecutionFailure,
+        ReportedContradiction
+    }
+
+    // =============================================================================
+    // BeliefFailureSignal
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload esplicito che collega un fallimento operativo a una possibile
+    /// mutazione del BeliefStore.
+    /// </para>
+    ///
+    /// <para><b>Separazione execution / belief</b></para>
+    /// <para>
+    /// Il produttore del segnale conosce il contesto pratico del fallimento, per
+    /// esempio "sono arrivato nella cella ricordata e il cibo non c'e'". Il
+    /// BeliefUpdater riceve questo dato e decide la mutazione cognitiva, mentre il
+    /// BeliefStore resta un contenitore passivo.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>NpcId</b>: NPC proprietario del BeliefStore da aggiornare.</item>
+    ///   <item><b>BeliefId</b>: id della credenza, se il layer produttore lo conosce; 0 abilita il fallback per categoria/posizione.</item>
+    ///   <item><b>Category</b>: categoria minima del belief coinvolto.</item>
+    ///   <item><b>EstimatedPosition</b>: posizione soggettiva che ha guidato l'azione.</item>
+    ///   <item><b>FailureKind</b>: qualifica architetturale della smentita.</item>
+    ///   <item><b>Penalty01</b>: forza normalizzata dell'indebolimento quando il fallimento non e' una smentita definitiva.</item>
+    ///   <item><b>Tick</b>: tick in cui il feedback operativo viene prodotto.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct BeliefFailureSignal
+    {
+        public readonly int NpcId;
+        public readonly int BeliefId;
+        public readonly BeliefCategory Category;
+        public readonly Vector2Int EstimatedPosition;
+        public readonly BeliefFailureKind FailureKind;
+        public readonly float Penalty01;
+        public readonly int Tick;
+
+        public BeliefFailureSignal(
+            int npcId,
+            int beliefId,
+            BeliefCategory category,
+            Vector2Int estimatedPosition,
+            BeliefFailureKind failureKind,
+            float penalty01,
+            int tick)
+        {
+            NpcId = npcId;
+            BeliefId = beliefId;
+            Category = category;
+            EstimatedPosition = estimatedPosition;
+            FailureKind = failureKind;
+            Penalty01 = penalty01;
+            Tick = tick;
+        }
+    }
+
+    // =============================================================================
     // BeliefEntry
     // =============================================================================
     /// <summary>

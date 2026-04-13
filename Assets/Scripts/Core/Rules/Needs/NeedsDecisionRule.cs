@@ -32,6 +32,8 @@ namespace Arcontio.Core
     /// </summary>
     public sealed class NeedsDecisionRule : IRule
     {
+        private readonly BeliefUpdater _beliefUpdater = new();
+
         // Throttle: decidiamo ogni N tick-pulse (per log leggibile)
         private readonly int _decisionEveryTicks;
 
@@ -66,7 +68,7 @@ namespace Arcontio.Core
                 // --- MANGIA ---
                 if (needs.GetValue(NeedKind.Hunger) >= cfg.hungryThreshold)
                 {
-                    if (TryPlanEatOrMove(world, npcId, in needs, (int)pulse.TickIndex, out var cmd, out bool didSteal, out bool didMove))
+                    if (TryPlanEatOrMove(world, npcId, in needs, (int)pulse.TickIndex, telemetry, out var cmd, out bool didSteal, out bool didMove))
                     {
                         outCommands.Add(cmd);
                         if (didMove) moved++; else ate++;
@@ -159,6 +161,7 @@ namespace Arcontio.Core
             int npcId,
             in NpcNeeds needs,
             int nowTick,
+            Telemetry telemetry,
             out ICommand cmd,
             out bool didSteal,
             out bool didMove)
@@ -224,6 +227,7 @@ namespace Arcontio.Core
                     // Scoperta locale: lo stock non è dove doveva essere, o non è più mio.
                     // Aggiorniamo la belief pinned: da questo momento non lo considero più disponibile.
                     world.RemovePinnedFoodStockBelief(npcId, ownFoodObj);
+                    ApplyDirectFoodBeliefContradiction(world, npcId, ox, oy, nowTick, telemetry);
 
                     // Nota:
                     // - Qui NON creiamo ancora un evento di "furto sospettato": sarebbe un sistema separato.
@@ -319,6 +323,7 @@ namespace Arcontio.Core
 
                             // Balloon debug: cibo non trovato dove ricordato.
                             world.EmitNpcBalloon(npcId, NpcBalloonKind.FoodNotFound);
+                            ApplyDirectFoodBeliefContradiction(world, npcId, fx, fy, nowTick, telemetry);
                             return false;
                         }
                     }
@@ -710,6 +715,58 @@ if (stolenStockObj != 0)
             }
 
             return bestObj;
+        }
+
+        // =============================================================================
+        // ApplyDirectFoodBeliefContradiction
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce il feedback operativo esplicito per il caso in cui un NPC verifica
+        /// localmente una cella dove credeva di trovare cibo e scopre che la credenza
+        /// non e' piu' valida.
+        /// </para>
+        ///
+        /// <para><b>Ponte provvisorio Rule -> BeliefUpdater</b></para>
+        /// <para>
+        /// La rule e' il punto che osserva la smentita diretta in questa fase del
+        /// progetto, perche' il Job System non esiste ancora. La rule non modifica
+        /// direttamente le entry: costruisce un <c>BeliefFailureSignal</c> e delega al
+        /// <c>BeliefUpdater</c> la semantica cognitiva dell'invalidazione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Store lookup</b>: usa il BeliefStore per-NPC se gia' presente.</item>
+        ///   <item><b>Fallback key</b>: usa categoria <c>Food</c> e posizione stimata, perche' la rule non possiede ancora un <c>BeliefId</c>.</item>
+        ///   <item><b>Telemetry</b>: conta feedback applicati o senza match per debug progressivo.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyDirectFoodBeliefContradiction(
+            World world,
+            int npcId,
+            int cellX,
+            int cellY,
+            int nowTick,
+            Telemetry telemetry)
+        {
+            if (world == null)
+                return;
+
+            if (!world.Beliefs.TryGetValue(npcId, out var store) || store == null)
+                return;
+
+            var signal = new BeliefFailureSignal(
+                npcId: npcId,
+                beliefId: 0,
+                category: BeliefCategory.Food,
+                estimatedPosition: new Vector2Int(cellX, cellY),
+                failureKind: BeliefFailureKind.DirectLocalContradiction,
+                penalty01: 1f,
+                tick: nowTick);
+
+            bool updated = _beliefUpdater.UpdateFromOperationalFailure(signal, store);
+            telemetry?.Counter(updated ? "BeliefUpdater.JobFailureDiscarded" : "BeliefUpdater.JobFailureNoMatch", 1);
         }
 
 private static int FindRememberedOtherNpcFoodStock(

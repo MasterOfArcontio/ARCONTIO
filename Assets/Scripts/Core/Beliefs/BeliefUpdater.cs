@@ -106,6 +106,118 @@ namespace Arcontio.Core
 
             return false;
         }
+
+        // =============================================================================
+        // UpdateFromOperationalFailure
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica al BeliefStore un feedback operativo prodotto da rule, command o
+        /// system che hanno scoperto un fallimento durante l'esecuzione.
+        /// </para>
+        ///
+        /// <para><b>Ponte MVP verso job fallito</b></para>
+        /// <para>
+        /// Il Job System definitivo non esiste ancora, quindi questo metodo riceve un
+        /// payload provvisorio. La responsabilita' resta pero' quella definitiva: il
+        /// producer classifica il fallimento, il BeliefUpdater decide la mutazione
+        /// cognitiva, il BeliefStore applica solo modifiche passive.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>DirectLocalContradiction</b>: trasforma il belief in <c>Discarded</c>.</item>
+        ///   <item><b>AmbiguousExecutionFailure</b>: riduce confidence e marca <c>Weak</c>.</item>
+        ///   <item><b>ReportedContradiction</b>: riduce confidence e marca <c>Conflicted</c>.</item>
+        /// </list>
+        /// </summary>
+        public bool UpdateFromOperationalFailure(in BeliefFailureSignal signal, BeliefStore store)
+        {
+            if (store == null)
+                return false;
+
+            if (signal.BeliefId > 0)
+                return UpdateByBeliefId(signal, store);
+
+            return UpdateByCategoryAndPosition(signal, store);
+        }
+
+        // =============================================================================
+        // UpdateByBeliefId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica il feedback operativo usando l'identificatore diretto della
+        /// credenza, quando il layer chiamante lo possiede.
+        /// </para>
+        ///
+        /// <para><b>Percorso futuro preferito</b></para>
+        /// <para>
+        /// Quando QuerySystem e Job System saranno presenti, il job dovra' portare
+        /// con se' il <c>BeliefId</c> selezionato. Questo percorso evita ambiguita'
+        /// su categoria e posizione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Discard</b>: smentita diretta locale.</item>
+        ///   <item><b>Weak</b>: fallimento ambiguo.</item>
+        ///   <item><b>Conflicted</b>: contraddizione informativa.</item>
+        /// </list>
+        /// </summary>
+        private static bool UpdateByBeliefId(in BeliefFailureSignal signal, BeliefStore store)
+        {
+            switch (signal.FailureKind)
+            {
+                case BeliefFailureKind.DirectLocalContradiction:
+                    return store.TryDiscardBelief(signal.BeliefId, signal.Tick);
+                case BeliefFailureKind.AmbiguousExecutionFailure:
+                    return store.TryReduceConfidence(signal.BeliefId, signal.Penalty01, signal.Tick, BeliefStatus.Weak);
+                case BeliefFailureKind.ReportedContradiction:
+                    return store.TryReduceConfidence(signal.BeliefId, signal.Penalty01, signal.Tick, BeliefStatus.Conflicted);
+                default:
+                    return false;
+            }
+        }
+
+        // =============================================================================
+        // UpdateByCategoryAndPosition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica il feedback operativo usando la chiave provvisoria categoria +
+        /// posizione stimata.
+        /// </para>
+        ///
+        /// <para><b>Fallback per rule pre-JobSystem</b></para>
+        /// <para>
+        /// Le rule attuali non hanno ancora un riferimento esplicito al belief che
+        /// ha guidato l'azione. Usiamo quindi la stessa chiave minimale dello store,
+        /// sapendo che e' una soluzione transitoria da sostituire con <c>BeliefId</c>
+        /// quando il Job System trasportera' la provenienza decisionale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Category</b>: dominio del belief coinvolto.</item>
+        ///   <item><b>EstimatedPosition</b>: cella soggettiva verificata o coinvolta dal fallimento.</item>
+        ///   <item><b>FailureKind</b>: seleziona la mutazione cognitiva.</item>
+        /// </list>
+        /// </summary>
+        private static bool UpdateByCategoryAndPosition(in BeliefFailureSignal signal, BeliefStore store)
+        {
+            switch (signal.FailureKind)
+            {
+                case BeliefFailureKind.DirectLocalContradiction:
+                    return store.TryDiscardByCategoryAndPosition(signal.Category, signal.EstimatedPosition, signal.Tick);
+                case BeliefFailureKind.AmbiguousExecutionFailure:
+                    return store.TryReduceConfidenceByCategoryAndPosition(signal.Category, signal.EstimatedPosition, signal.Penalty01, signal.Tick, BeliefStatus.Weak);
+                case BeliefFailureKind.ReportedContradiction:
+                    return store.TryReduceConfidenceByCategoryAndPosition(signal.Category, signal.EstimatedPosition, signal.Penalty01, signal.Tick, BeliefStatus.Conflicted);
+                default:
+                    return false;
+            }
+        }
     }
 
     // =============================================================================

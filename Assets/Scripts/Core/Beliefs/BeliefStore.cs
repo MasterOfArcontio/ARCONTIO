@@ -165,6 +165,172 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // TryDiscardBelief
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca come scartata una credenza identificata dal suo id locale.
+        /// </para>
+        ///
+        /// <para><b>Invalidazione passiva</b></para>
+        /// <para>
+        /// Il metodo non stabilisce perche' la credenza sia falsa. Riceve gia' una
+        /// decisione dal BeliefUpdater e applica solo la mutazione dati minima:
+        /// confidence azzerata, freshness riportata a 1 per indicare una smentita
+        /// recente e status <c>Discarded</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>beliefId</b>: identificatore locale per-NPC della entry.</item>
+        ///   <item><b>currentTick</b>: tick della smentita operativa.</item>
+        ///   <item><b>return</b>: true se una entry e' stata trovata e modificata.</item>
+        /// </list>
+        /// </summary>
+        public bool TryDiscardBelief(int beliefId, int currentTick)
+        {
+            if (beliefId <= 0)
+                return false;
+
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (_entries[i].BeliefId != beliefId)
+                    continue;
+
+                var entry = _entries[i];
+                MarkDiscarded(ref entry, currentTick);
+                _entries[i] = entry;
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryDiscardByCategoryAndPosition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca come scartata una credenza usando il fallback categoria + posizione
+        /// stimata.
+        /// </para>
+        ///
+        /// <para><b>Fallback MVP senza QuerySystem</b></para>
+        /// <para>
+        /// Il flusso provvisorio delle rule non porta ancora sempre con se' il
+        /// <c>BeliefId</c> che ha guidato l'azione. Questo metodo permette allo step
+        /// 17 di invalidare comunque la credenza corrispondente alla stessa categoria
+        /// e cella, coerentemente con il merge minimale gia' usato dallo store.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>category</b>: dominio semantico della credenza da invalidare.</item>
+        ///   <item><b>estimatedPosition</b>: cella soggettiva verificata dall'NPC.</item>
+        ///   <item><b>currentTick</b>: tick della smentita operativa.</item>
+        /// </list>
+        /// </summary>
+        public bool TryDiscardByCategoryAndPosition(BeliefCategory category, Vector2Int estimatedPosition, int currentTick)
+        {
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                var entry = _entries[i];
+                if (entry.Category != category || entry.EstimatedPosition != estimatedPosition)
+                    continue;
+
+                MarkDiscarded(ref entry, currentTick);
+                _entries[i] = entry;
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryReduceConfidence
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riduce la confidence di una credenza identificata dal suo id locale.
+        /// </para>
+        ///
+        /// <para><b>Indebolimento operativo</b></para>
+        /// <para>
+        /// Un fallimento ambiguo non prova che il belief sia falso. Per questo la
+        /// mutazione abbassa la confidence e imposta uno status operativo ricevuto
+        /// dal BeliefUpdater, senza eliminare immediatamente la entry.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>beliefId</b>: identificatore locale per-NPC della entry.</item>
+        ///   <item><b>penalty01</b>: riduzione normalizzata della confidence.</item>
+        ///   <item><b>status</b>: nuovo status cognitivo da applicare.</item>
+        /// </list>
+        /// </summary>
+        public bool TryReduceConfidence(int beliefId, float penalty01, int currentTick, BeliefStatus status)
+        {
+            if (beliefId <= 0)
+                return false;
+
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                if (_entries[i].BeliefId != beliefId)
+                    continue;
+
+                var entry = _entries[i];
+                ReduceConfidence(ref entry, penalty01, currentTick, status);
+                _entries[i] = entry;
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryReduceConfidenceByCategoryAndPosition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riduce la confidence di una credenza tramite fallback categoria + posizione.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' con le rule provvisorie</b></para>
+        /// <para>
+        /// Finche' Decision Layer e Job System non propagano il <c>BeliefId</c>, le
+        /// rule possono produrre feedback usando la stessa chiave minima gia' usata
+        /// per aggregare i belief: categoria e cella stimata.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>category</b>: dominio semantico della credenza da indebolire.</item>
+        ///   <item><b>estimatedPosition</b>: cella associata al fallimento operativo.</item>
+        ///   <item><b>status</b>: status assegnato dal BeliefUpdater.</item>
+        /// </list>
+        /// </summary>
+        public bool TryReduceConfidenceByCategoryAndPosition(
+            BeliefCategory category,
+            Vector2Int estimatedPosition,
+            float penalty01,
+            int currentTick,
+            BeliefStatus status)
+        {
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                var entry = _entries[i];
+                if (entry.Category != category || entry.EstimatedPosition != estimatedPosition)
+                    continue;
+
+                ReduceConfidence(ref entry, penalty01, currentTick, status);
+                _entries[i] = entry;
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
         // TickDecay
         // =============================================================================
         /// <summary>
@@ -299,6 +465,67 @@ namespace Arcontio.Core
 
             if (weakestIndex >= 0)
                 _entries.RemoveAt(weakestIndex);
+        }
+
+        // =============================================================================
+        // MarkDiscarded
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica la mutazione dati comune per una credenza definitivamente smentita.
+        /// </para>
+        ///
+        /// <para><b>Mutazione locale senza ragionamento</b></para>
+        /// <para>
+        /// La funzione e' privata per mantenere nel BeliefStore solo operazioni
+        /// meccaniche. La scelta di usarla resta nel BeliefUpdater, che conosce il
+        /// tipo di feedback operativo ricevuto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Confidence</b>: portata a zero per impedire riuso operativo.</item>
+        ///   <item><b>Freshness</b>: portata a uno per indicare che la smentita e' recente.</item>
+        ///   <item><b>Status</b>: impostato a <c>Discarded</c>.</item>
+        /// </list>
+        /// </summary>
+        private static void MarkDiscarded(ref BeliefEntry entry, int currentTick)
+        {
+            entry.Confidence = 0f;
+            entry.Freshness = 1f;
+            entry.LastUpdatedTick = currentTick;
+            entry.Status = BeliefStatus.Discarded;
+        }
+
+        // =============================================================================
+        // ReduceConfidence
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica la mutazione dati comune per una credenza indebolita ma non
+        /// definitivamente smentita.
+        /// </para>
+        ///
+        /// <para><b>Fallimento non conclusivo</b></para>
+        /// <para>
+        /// Il metodo conserva la entry per permettere al futuro QuerySystem di
+        /// considerarla con peso minore o come credenza conflittuale. Non interroga
+        /// il mondo e non sceglie alternative.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Penalty</b>: valore normalizzato prima della sottrazione.</item>
+        ///   <item><b>Freshness</b>: aggiornata a uno per registrare feedback recente.</item>
+        ///   <item><b>Status</b>: assegnato dal BeliefUpdater in base al tipo di smentita.</item>
+        /// </list>
+        /// </summary>
+        private static void ReduceConfidence(ref BeliefEntry entry, float penalty01, int currentTick, BeliefStatus status)
+        {
+            entry.Confidence = Clamp01(entry.Confidence - Clamp01(penalty01));
+            entry.Freshness = 1f;
+            entry.LastUpdatedTick = currentTick;
+            entry.Status = status;
         }
 
         // =============================================================================
