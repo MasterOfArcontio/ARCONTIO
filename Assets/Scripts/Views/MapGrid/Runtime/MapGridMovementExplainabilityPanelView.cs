@@ -227,9 +227,9 @@ namespace Arcontio.View.MapGrid
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce il pannellino separato con il dettaglio intent/plan. Resta
-        /// compatto e non espande verticalmente, per lasciare agli eventi tutto lo
-        /// spazio rimanente del pannello laterale.
+        /// Costruisce il pannellino separato con il dettaglio intent/plan. Mantiene
+        /// un'altezza esplicita piu' ampia del solo header, perche' deve contenere
+        /// sia le righe Intent sia le righe Plan complete prodotte dal formatter.
         /// </para>
         /// </summary>
         private void BuildIntentPlanPanel(Transform parent)
@@ -249,8 +249,8 @@ namespace Arcontio.View.MapGrid
             panelLayout.padding = new RectOffset(6, 6, 5, 5);
 
             var panelLe = panelGo.AddComponent<LayoutElement>();
-            panelLe.minHeight = 108f;
-            panelLe.preferredHeight = 138f;
+            panelLe.minHeight = 230f;
+            panelLe.preferredHeight = 270f;
             panelLe.flexibleHeight = 0f;
 
             var textGo = new GameObject("Text");
@@ -263,7 +263,7 @@ namespace Arcontio.View.MapGrid
             _intentPlanText.fontStyle = FontStyle.Normal;
             _intentPlanText.alignment = TextAnchor.UpperLeft;
             _intentPlanText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _intentPlanText.verticalOverflow = VerticalWrapMode.Truncate;
+            _intentPlanText.verticalOverflow = VerticalWrapMode.Overflow;
             _intentPlanText.supportRichText = true;
             _intentPlanText.color = Color.white;
             _intentPlanText.text = string.Empty;
