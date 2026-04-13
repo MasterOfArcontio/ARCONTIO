@@ -61,7 +61,7 @@ namespace Arcontio.Core
             NpcMacroRoutePlan macroPlan,
             IReadOnlyList<Vector2Int> localPath)
         {
-            if (!ShouldEmitForNpc(world, npcId, out _, out int verbosity))
+            if (!ShouldEmitForNpc(world, npcId, out var config, out int verbosity))
                 return;
 
             var registry = world.MovementExplainability;
@@ -71,8 +71,8 @@ namespace Arcontio.Core
             int intentId = registry.AllocateIntentId();
             int planId = registry.AllocatePlanId();
 
-            registry.EmitIntent(BuildIntentTrace(npcId, intent, intentId, verbosity));
-            registry.EmitPlan(BuildPlanTrace(
+            var intentTrace = BuildIntentTrace(npcId, intent, intentId, verbosity);
+            var planTrace = BuildPlanTrace(
                 npcId,
                 intent,
                 intentId,
@@ -84,7 +84,13 @@ namespace Arcontio.Core
                 selectionReason,
                 macroPlan,
                 localPath,
-                verbosity));
+                verbosity);
+
+            registry.EmitIntent(intentTrace);
+            MovementExplainabilityJsonLogSink.TryWriteIntent(config, intentTrace);
+
+            registry.EmitPlan(planTrace);
+            MovementExplainabilityJsonLogSink.TryWritePlan(config, planTrace);
 
             TryEmitExecutionEvent(
                 world,
@@ -121,7 +127,7 @@ namespace Arcontio.Core
             int minVerbosity,
             string summary)
         {
-            if (!ShouldEmitForNpc(world, npcId, out _, out int verbosity) || verbosity < minVerbosity)
+            if (!ShouldEmitForNpc(world, npcId, out var config, out int verbosity) || verbosity < minVerbosity)
                 return;
 
             var registry = world.MovementExplainability;
@@ -136,7 +142,7 @@ namespace Arcontio.Core
                 planId = store.CurrentPlanId;
             }
 
-            registry.EmitExecutionEvent(new PathExecutionEvent
+            var evt = new PathExecutionEvent
             {
                 NpcId = npcId,
                 Tick = TickContext.CurrentTickIndex,
@@ -148,7 +154,10 @@ namespace Arcontio.Core
                 TargetCell = targetCell,
                 VerbosityLevel = verbosity,
                 Summary = summary ?? string.Empty,
-            });
+            };
+
+            registry.EmitExecutionEvent(evt);
+            MovementExplainabilityJsonLogSink.TryWriteExecutionEvent(config, evt);
         }
 
         // =============================================================================
@@ -171,7 +180,7 @@ namespace Arcontio.Core
             int backOffStage,
             string summary)
         {
-            if (!ShouldEmitForNpc(world, npcId, out _, out int verbosity) || verbosity < 1)
+            if (!ShouldEmitForNpc(world, npcId, out var config, out int verbosity) || verbosity < 1)
                 return;
 
             var registry = world.MovementExplainability;
@@ -187,7 +196,7 @@ namespace Arcontio.Core
             }
 
             string activeMode = ResolveActiveMode(world, npcId);
-            registry.EmitExecutionEvent(new PathExecutionEvent
+            var evt = new PathExecutionEvent
             {
                 NpcId = npcId,
                 Tick = TickContext.CurrentTickIndex,
@@ -207,7 +216,10 @@ namespace Arcontio.Core
                 },
                 VerbosityLevel = verbosity,
                 Summary = summary ?? string.Empty,
-            });
+            };
+
+            registry.EmitExecutionEvent(evt);
+            MovementExplainabilityJsonLogSink.TryWriteExecutionEvent(config, evt);
         }
 
         // =============================================================================
@@ -231,7 +243,7 @@ namespace Arcontio.Core
             bool accessGranted,
             string summary)
         {
-            if (!ShouldEmitForNpc(world, npcId, out _, out int verbosity) || verbosity < 1)
+            if (!ShouldEmitForNpc(world, npcId, out var config, out int verbosity) || verbosity < 1)
                 return;
 
             var registry = world.MovementExplainability;
@@ -247,7 +259,7 @@ namespace Arcontio.Core
             }
 
             GridPosition current = world.GridPos.TryGetValue(npcId, out var pos) ? pos : default;
-            registry.EmitExecutionEvent(new PathExecutionEvent
+            var evt = new PathExecutionEvent
             {
                 NpcId = npcId,
                 Tick = TickContext.CurrentTickIndex,
@@ -269,7 +281,10 @@ namespace Arcontio.Core
                 },
                 VerbosityLevel = verbosity,
                 Summary = summary ?? string.Empty,
-            });
+            };
+
+            registry.EmitExecutionEvent(evt);
+            MovementExplainabilityJsonLogSink.TryWriteExecutionEvent(config, evt);
         }
 
         // =============================================================================
