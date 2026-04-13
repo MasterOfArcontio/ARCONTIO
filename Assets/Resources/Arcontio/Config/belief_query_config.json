@@ -1,0 +1,10 @@
+{
+  "BeliefQuery": {
+    "confidenceWeight": 0.40,
+    "freshnessWeight": 0.20,
+    "distanceWeight": 0.30,
+    "maxDistanceCells": 24.0,
+    "highUrgencyDistancePenaltyMultiplier": 0.35,
+    "defaultMinConfidence": 0.05
+  }
+}
