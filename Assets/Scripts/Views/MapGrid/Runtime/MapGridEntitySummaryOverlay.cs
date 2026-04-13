@@ -193,7 +193,6 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbObjMem = new(1024);
         private readonly StringBuilder _sbComms = new(1024);
         private readonly StringBuilder _sbLandmarks = new(256);
-        private readonly StringBuilder _sbExplainability = new(2048);
         private readonly StringBuilder _sbExplainabilityPanel = new(4096);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
@@ -1010,8 +1009,6 @@ namespace Arcontio.View.MapGrid
                     _sbComms.Append("<color=#aaaaaa>(no token log)</color>\n");
                 }
 
-                BuildMovementExplainabilityText(world, npcId, _sbExplainability, maxEvents: 6);
-
                 // Memory traces
                 _sbMem.Clear();
                 _sbMem.Append("Memory traces:\n");
@@ -1102,7 +1099,6 @@ namespace Arcontio.View.MapGrid
                 card.SetActionText(actionRich);
                 card.SetInventoryText(invText);
                 card.SetCommsText(_sbComms.ToString());
-                card.SetExplainabilityText(_sbExplainability.ToString());
 
                 // Patch 0.02.03: landmark/edge conosciuti.
                 card.SetLandmarksText(_sbLandmarks.ToString());
@@ -1182,7 +1178,7 @@ namespace Arcontio.View.MapGrid
         /// <para>
         /// Costruisce il blocco testuale della sezione debug "EL Pathfinding" usando
         /// il <see cref="MovementExplainabilityViewModel"/> introdotto nella sessione H.
-        /// Il testo viene poi passato alla card NPC tramite <c>SetExplainabilityText</c>.
+        /// Il testo viene poi passato al pannello laterale EL della MapGrid.
         /// </para>
         ///
         /// <para><b>Uso della pipeline grafica esistente</b></para>
