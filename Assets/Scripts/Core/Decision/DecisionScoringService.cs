@@ -100,6 +100,8 @@ namespace Arcontio.Core
                 score += AddCompetenceContribution(context.Profile, candidate, config);
                 score += AddPreferenceContribution(context.Profile, candidate, config);
                 score += AddObligationContribution(context.Profile, candidate, config);
+                score += AddMemoryConfidenceContribution(candidate, config);
+                score += AddCognitiveModulatorContribution(context.Dna, candidate, config);
                 score = ApplyMandatoryFloors(context.Profile, candidate, config, score);
 
                 candidate.AttachScore(score, _contributions.ToArray());
@@ -291,6 +293,93 @@ namespace Arcontio.Core
             float delta = flooredScore - currentScore;
             _contributions.Add(new DecisionScoreContribution("MandatoryFloor", delta));
             return flooredScore;
+        }
+
+        // =============================================================================
+        // AddMemoryConfidenceContribution
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola il contributo della memoria/belief gia' selezionata dal QuerySystem.
+        /// </para>
+        ///
+        /// <para><b>MemoryConfidence via QuerySystem</b></para>
+        /// <para>
+        /// Il Decision Layer non legge il MemoryStore. Quando un candidato ha un target
+        /// belief, usa il risultato spiegabile gia' prodotto dal <c>BeliefQueryService</c>
+        /// e premia la confidence del belief vincitore.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>No target</b>: contributo zero per intenzioni senza belief richiesto.</item>
+        ///   <item><b>Confidence</b>: usa <c>BeliefResult.Belief.Confidence</c>.</item>
+        ///   <item><b>Weight</b>: peso <c>memoryConfidenceWeight</c>.</item>
+        /// </list>
+        /// </summary>
+        private float AddMemoryConfidenceContribution(DecisionCandidate candidate, DecisionScoringConfig config)
+        {
+            if (!candidate.Metadata.RequiresBeliefTarget || candidate.BeliefResult.IsEmpty)
+            {
+                _contributions.Add(new DecisionScoreContribution("MemoryConfidence", 0f));
+                return 0f;
+            }
+
+            float contribution = candidate.BeliefResult.Belief.Confidence * config.memoryConfidenceWeight;
+            _contributions.Add(new DecisionScoreContribution("MemoryConfidence", contribution));
+            return contribution;
+        }
+
+        // =============================================================================
+        // AddCognitiveModulatorContribution
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola un contributo cognitivo MVP usando modulatori stabili del DNA, con
+        /// esclusione intenzionale dell'impulsivita'.
+        /// </para>
+        ///
+        /// <para><b>CognitiveModulators senza anticipare la Fase 3</b></para>
+        /// <para>
+        /// La sessione 8 usa risk aversion, conformismo e ottimismo come piccoli bias
+        /// di scoring. L'impulsivita' viene lasciata alla selezione weighted random
+        /// della sessione 10, dove avra' un ruolo piu' coerente sul rumore.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Risk</b>: penalizza intenzioni con alto <c>SocialRisk01</c>.</item>
+        ///   <item><b>Conformism</b>: rafforza intenzioni soggette a norme se non rischiose.</item>
+        ///   <item><b>Optimism</b>: leggero bonus a ricerca/esplorazione.</item>
+        /// </list>
+        /// </summary>
+        private float AddCognitiveModulatorContribution(NpcDnaProfile dna, DecisionCandidate candidate, DecisionScoringConfig config)
+        {
+            if (dna == null)
+            {
+                _contributions.Add(new DecisionScoreContribution("CognitiveModulators", 0f));
+                return 0f;
+            }
+
+            var modulators = dna.CognitiveModulators;
+            float raw = 0f;
+
+            // Un NPC prudente pesa di piu' il rischio sociale delle azioni borderline.
+            raw -= candidate.Metadata.SocialRisk01 * modulators.RiskAversion01;
+
+            if (candidate.Metadata.RequiresNormCheck)
+                raw += (1f - candidate.Metadata.SocialRisk01) * modulators.Conformism01;
+
+            if (candidate.Kind == DecisionIntentKind.SearchFood
+                || candidate.Kind == DecisionIntentKind.SearchRestPlace
+                || candidate.Kind == DecisionIntentKind.ExploreArea)
+            {
+                raw += modulators.Optimism01 * 0.5f;
+            }
+
+            float contribution = raw * config.cognitiveModulatorWeight;
+            _contributions.Add(new DecisionScoreContribution("CognitiveModulators", contribution));
+            return contribution;
         }
     }
 }

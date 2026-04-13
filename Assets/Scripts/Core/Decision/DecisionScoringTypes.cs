@@ -76,8 +76,8 @@ namespace Arcontio.Core
                 competenceWeight = 0.20f,
                 preferenceWeight = 0.25f,
                 obligationWeight = 0.30f,
-                memoryConfidenceWeight = 0f,
-                cognitiveModulatorWeight = 0f,
+                memoryConfidenceWeight = 0.35f,
+                cognitiveModulatorWeight = 0.15f,
                 criticalNeedFloor = 1.25f,
                 highObligationFloor = 1.00f,
                 highObligationThreshold = 0.75f
