@@ -1487,6 +1487,21 @@ namespace Arcontio.Core
                         inPrefixCommitment: true, isInLastMile: false,
                         lastMileJustConverted: false, usingMacroImmediate: false,
                         extraKey: "directPathCount", extraValue: directPath.Count);
+
+                    // Sessione v0.04.1.e - EL Pathfinding:
+                    // il ramo direct ha gia' vinto nel planner reale; qui emettiamo
+                    // solo una trace passiva, senza restituire dati alla simulazione.
+                    MovementExplainabilityEmitter.TryEmitIntentAndPlan(
+                        world,
+                        npcId,
+                        in intent,
+                        pos,
+                        targetVisible,
+                        pathClear,
+                        PlannerMode.Direct,
+                        SelectionReason.DirectValid,
+                        macroPlan: null,
+                        localPath: directPath);
                 }
             }
             else
@@ -1496,6 +1511,7 @@ namespace Arcontio.Core
                 // ============================================================
                 // Avvia A* sul grafo soggettivo + inizializza stato esecutivo.
                 world.BeginMacroRouteExecutionForNpc(npcId, targetX, targetY);
+                world.NpcMacroRoutes.TryGetValue(npcId, out var elMacroPlan);
 
                 // Fallback: se la macro-route non è disponibile (NPC senza landmark),
                 // prepara un prefix path diretto come debug visivo per la card.
@@ -1513,6 +1529,21 @@ namespace Arcontio.Core
                             inPrefixCommitment: false, isInLastMile: false,
                             lastMileJustConverted: false, usingMacroImmediate: false,
                             extraKey: "visualPrefixCount", extraValue: directPrefix.Count);
+
+                        // Sessione v0.04.1.e - EL Pathfinding:
+                        // la macro-route e' stata tentata ma non ha attivato uno
+                        // stato esecutivo; registriamo il fallback direct/parziale.
+                        MovementExplainabilityEmitter.TryEmitIntentAndPlan(
+                            world,
+                            npcId,
+                            in intent,
+                            pos,
+                            targetVisible,
+                            pathClear,
+                            PlannerMode.DirectFallback,
+                            SelectionReason.NoLmFallbackDirect,
+                            elMacroPlan,
+                            directPrefix);
                     }
                     else
                     {
@@ -1521,6 +1552,21 @@ namespace Arcontio.Core
                             checkFov, targetVisible, pathClear, targetX, targetY,
                             inPrefixCommitment: false, isInLastMile: false,
                             lastMileJustConverted: false, usingMacroImmediate: false);
+
+                        // Sessione v0.04.1.e - EL Pathfinding:
+                        // nessun prefix visuale disponibile: la trace conserva comunque
+                        // il fatto che direct e macro non hanno prodotto un piano attivo.
+                        MovementExplainabilityEmitter.TryEmitIntentAndPlan(
+                            world,
+                            npcId,
+                            in intent,
+                            pos,
+                            targetVisible,
+                            pathClear,
+                            PlannerMode.DirectFallback,
+                            SelectionReason.NoLmFallbackDirect,
+                            elMacroPlan,
+                            localPath: null);
                     }
                 }
                 else
@@ -1531,6 +1577,22 @@ namespace Arcontio.Core
                         macroState.ImmediateTargetX, macroState.ImmediateTargetY,
                         inPrefixCommitment: false, isInLastMile: macroState.IsDoingLastMile,
                         lastMileJustConverted: false, usingMacroImmediate: true);
+
+                    // Sessione v0.04.1.e - EL Pathfinding:
+                    // direct e' stato scartato e la macro-route e' diventata la
+                    // modalita' iniziale. La trace conserva i node id se il piano
+                    // macro li ha prodotti, ma non guida l'esecuzione.
+                    MovementExplainabilityEmitter.TryEmitIntentAndPlan(
+                        world,
+                        npcId,
+                        in intent,
+                        pos,
+                        targetVisible,
+                        pathClear,
+                        PlannerMode.LandmarkAstar,
+                        SelectionReason.DirectInvalidLmChosen,
+                        elMacroPlan,
+                        localPath: null);
                 }
             }
         }

@@ -411,6 +411,8 @@ namespace Arcontio.Core
         private readonly int _intentCapacity;
         private readonly int _planCapacity;
         private readonly int _eventCapacity;
+        private int _nextIntentId;
+        private int _nextPlanId;
 
         public int StoreCount => _stores.Count;
 
@@ -433,6 +435,50 @@ namespace Arcontio.Core
             _planCapacity = Math.Max(1, planCapacity);
             _eventCapacity = Math.Max(1, eventCapacity);
             _stores = new Dictionary<int, MovementExplainabilityNpcStore>(64);
+            _nextIntentId = 1;
+            _nextPlanId = 1;
+        }
+
+        // =============================================================================
+        // AllocateIntentId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Genera un identificatore diagnostico progressivo per una nuova
+        /// <see cref="MovementIntentTrace"/>. L'id vive solo nello strato EL e non viene
+        /// scritto dentro <see cref="MoveIntent"/>, cosi' il contratto simulativo resta
+        /// invariato.
+        /// </para>
+        ///
+        /// <para><b>Mappa EL parallela</b></para>
+        /// <para>
+        /// La scelta di allocare l'id nel registry segue la raccomandazione della
+        /// sessione A: evitare modifiche invasive al dato simulativo finche' non serve
+        /// una correlazione piu' forte tra decision, job ed execution.
+        /// </para>
+        /// </summary>
+        public int AllocateIntentId()
+        {
+            int value = _nextIntentId;
+            _nextIntentId++;
+            return value;
+        }
+
+        // =============================================================================
+        // AllocatePlanId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Genera un identificatore diagnostico progressivo per una nuova
+        /// <see cref="PathPlanTrace"/>. Il plan id serve solo a collegare trace e futuri
+        /// eventi runtime dentro l'EL.
+        /// </para>
+        /// </summary>
+        public int AllocatePlanId()
+        {
+            int value = _nextPlanId;
+            _nextPlanId++;
+            return value;
         }
 
         // =============================================================================

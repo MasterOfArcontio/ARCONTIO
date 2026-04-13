@@ -586,6 +586,31 @@ namespace Arcontio.Core
         /// </summary>
         public readonly Dictionary<int, MoveIntent> NpcMoveIntents = new();
 
+        // =============================================================================
+        // MovementExplainability
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registry passivo dell'Explainability Layer dedicato al pathfinding. Conserva
+        /// trace bounded per NPC e viene scritto solo tramite emitter one-way.
+        /// </para>
+        ///
+        /// <para><b>Separazione simulazione / spiegazione</b></para>
+        /// <para>
+        /// Il World ospita questo store come dato runtime osservabile, ma i sistemi di
+        /// movimento non devono leggerlo per decidere path, fallback o blocchi. UI,
+        /// log e tooling potranno leggerlo nelle sessioni successive tramite adapter.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Ring buffer intent</b>: ultime trace di nascita intent per NPC.</item>
+        ///   <item><b>Ring buffer plan</b>: ultime trace di pianificazione per NPC.</item>
+        ///   <item><b>Ring buffer eventi</b>: futura timeline runtime per NPC.</item>
+        /// </list>
+        /// </summary>
+        public readonly MovementExplainabilityRegistry MovementExplainability;
+
         /// <summary>
         /// Stato di scan direzionale per NPC.
         /// <list type="bullet">
@@ -675,6 +700,23 @@ namespace Arcontio.Core
             // local search (commitMinSteps, failureLearning, ecc.) senza
             // dipendere da singleton statici.
             Pathfinding = new PathfindingState(config);
+
+            // ============================================================
+            // MOVEMENT EXPLAINABILITY REGISTRY (v0.04.1.e)
+            // ============================================================
+            // Lo store viene creato sempre, ma gli emitter lo popolano solo quando la
+            // sezione explainability lo abilita. Questo evita null-check nella futura
+            // UI e mantiene comunque zero side-effect se l'EL resta spento.
+            var el = Config?.Sim?.explainability;
+            int elVerbosity = el != null ? el.defaultVerbosity : 0;
+            int elEventCapacity = el != null && elVerbosity >= el.verbosityHighThreshold
+                ? el.ringBuffer_events_high
+                : (el?.ringBuffer_events_low ?? MovementExplainabilityRegistry.DefaultEventCapacity);
+
+            MovementExplainability = new MovementExplainabilityRegistry(
+                el?.ringBuffer_intent ?? MovementExplainabilityRegistry.DefaultIntentCapacity,
+                el?.ringBuffer_plan ?? MovementExplainabilityRegistry.DefaultPlanCapacity,
+                elEventCapacity);
 
             // ============================================================
             // DEBUG FOV TELEMETRY (config-driven)
