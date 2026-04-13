@@ -185,8 +185,10 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbObjMem = new(1024);
         private readonly StringBuilder _sbComms = new(1024);
         private readonly StringBuilder _sbLandmarks = new(256);
+        private readonly StringBuilder _sbExplainability = new(2048);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
+        private readonly MovementExplainabilityViewModel _movementExplainabilityViewModel = new();
 
         private bool _needsInitialLayout;
 
@@ -991,6 +993,8 @@ namespace Arcontio.View.MapGrid
                     _sbComms.Append("<color=#aaaaaa>(no token log)</color>\n");
                 }
 
+                BuildMovementExplainabilityText(world, npcId, _sbExplainability);
+
                 // Memory traces
                 _sbMem.Clear();
                 _sbMem.Append("Memory traces:\n");
@@ -1081,6 +1085,7 @@ namespace Arcontio.View.MapGrid
                 card.SetActionText(actionRich);
                 card.SetInventoryText(invText);
                 card.SetCommsText(_sbComms.ToString());
+                card.SetExplainabilityText(_sbExplainability.ToString());
 
                 // Patch 0.02.03: landmark/edge conosciuti.
                 card.SetLandmarksText(_sbLandmarks.ToString());
@@ -1098,6 +1103,135 @@ namespace Arcontio.View.MapGrid
                     var driftResult = NpcDnaDistance.Compute(dna, profile);
                     card.UpdateDnaDrift(dna, profile, driftResult);
                 }
+            }
+        }
+
+        // =============================================================================
+        // BuildMovementExplainabilityText
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il blocco testuale della sezione debug "EL Pathfinding" usando
+        /// il <see cref="MovementExplainabilityViewModel"/> introdotto nella sessione H.
+        /// Il testo viene poi passato alla card NPC tramite <c>SetExplainabilityText</c>.
+        /// </para>
+        ///
+        /// <para><b>Uso della pipeline grafica esistente</b></para>
+        /// <para>
+        /// La card NPC attuale e' una UI debug prefabless basata su sezioni testuali.
+        /// Questo metodo rispetta quel metodo operativo: legge uno snapshot ViewModel,
+        /// lo compatta in <see cref="StringBuilder"/> e lascia alla card il solo compito
+        /// di mostrare la stringa. Non crea Canvas, prefab o sistemi grafici paralleli.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>world/npcId</b>: contesto debug gia' usato dal SummaryOverlay.</item>
+        ///   <item><b>_movementExplainabilityViewModel</b>: snapshot riutilizzato per ridurre allocazioni.</item>
+        ///   <item><b>output</b>: buffer testuale della sezione EL nella card NPC.</item>
+        /// </list>
+        /// </summary>
+        private void BuildMovementExplainabilityText(Arcontio.Core.World world, int npcId, StringBuilder output)
+        {
+            output.Clear();
+            output.Append("EL Pathfinding\n");
+
+            // Il ViewModel e' la barriera di lettura: la debug UI non entra nei ring
+            // buffer e non ricalcola il pathfinding. Se l'EL non ha ancora dati, la
+            // sezione resta informativa e non produce eccezioni.
+            bool hasModel = MovementExplainabilityViewModelBuilder.BuildForNpc(
+                world,
+                npcId,
+                _movementExplainabilityViewModel,
+                maxEvents: 6);
+
+            if (!hasModel)
+            {
+                string message = string.IsNullOrWhiteSpace(_movementExplainabilityViewModel.HeaderSubtitle)
+                    ? "EL pathfinding non disponibile per questo NPC"
+                    : _movementExplainabilityViewModel.HeaderSubtitle;
+
+                output.Append("<color=#aaaaaa>").Append(message).Append("</color>");
+                return;
+            }
+
+            var model = _movementExplainabilityViewModel;
+            output.Append("Tick = ").Append(model.Tick)
+                .Append("   Intent = ").Append(model.CurrentIntentId)
+                .Append("   Plan = ").Append(model.CurrentPlanId)
+                .Append('\n');
+
+            if (model.Intent != null && model.Intent.HasIntent)
+            {
+                // Intent: e' il "perche' sto andando li'". Rimane compatto per non
+                // far crescere troppo la card quando tutte le sezioni sono aperte.
+                output.Append('\n').Append("<color=#A8E6A1>[INTENT]</color>\n")
+                    .Append("Purpose = ").Append(model.Intent.Purpose).Append('\n')
+                    .Append("Target = ").Append(model.Intent.Target).Append('\n')
+                    .Append("Belief = ").Append(model.Intent.Belief).Append('\n')
+                    .Append("Urgency = ").Append(model.Intent.Urgency01.ToString("0.00"))
+                    .Append("   Verbosity = ").Append(model.Intent.VerbosityLevel)
+                    .Append('\n');
+            }
+            else
+            {
+                output.Append('\n').Append("<color=#aaaaaa>[INTENT] nessuna trace</color>\n");
+            }
+
+            if (model.Plan != null && model.Plan.HasPlan)
+            {
+                output.Append('\n').Append("<color=#9FC5E8>[PLAN]</color>\n")
+                    .Append("Mode = ").Append(model.Plan.SelectedMode)
+                    .Append("   Why = ").Append(model.Plan.SelectionReason).Append('\n')
+                    .Append("Route = ").Append(model.Plan.RouteSummary).Append('\n')
+                    .Append("FirstStep = ").Append(model.Plan.FirstStep)
+                    .Append("   Verbosity = ").Append(model.Plan.VerbosityLevel)
+                    .Append('\n');
+
+                if (model.Plan.Candidates != null && model.Plan.Candidates.Count > 0)
+                {
+                    output.Append("Candidates:\n");
+                    int candidateCount = Mathf.Min(3, model.Plan.Candidates.Count);
+
+                    // Limite intenzionale: la card resta leggibile. Il ViewModel conserva
+                    // comunque tutti i candidati disponibili per una UI piu' ampia futura.
+                    for (int i = 0; i < candidateCount; i++)
+                        output.Append("- ").Append(model.Plan.Candidates[i]).Append('\n');
+
+                    if (model.Plan.Candidates.Count > candidateCount)
+                        output.Append("- ... altri ").Append(model.Plan.Candidates.Count - candidateCount).Append('\n');
+                }
+            }
+            else
+            {
+                output.Append('\n').Append("<color=#aaaaaa>[PLAN] nessuna trace</color>\n");
+            }
+
+            output.Append('\n').Append("<color=#FFD966>[EVENTS]</color>\n");
+            if (model.Events == null || model.Events.Count <= 0)
+            {
+                output.Append("<color=#aaaaaa>(nessun evento runtime)</color>");
+                return;
+            }
+
+            // Timeline gia' limitata dal builder a 6 eventi recenti. Qui facciamo solo
+            // formattazione testuale nello stile compatto delle altre sezioni debug.
+            for (int i = 0; i < model.Events.Count; i++)
+            {
+                var evt = model.Events[i];
+                output.Append("- t").Append(evt.Tick)
+                    .Append(" ").Append(evt.EventType)
+                    .Append("  mode=").Append(evt.ActiveMode)
+                    .Append("  ").Append(evt.CurrentCell)
+                    .Append(" -> ").Append(evt.TargetCell);
+
+                if (!string.IsNullOrWhiteSpace(evt.Summary))
+                    output.Append("  | ").Append(evt.Summary);
+
+                if (!string.IsNullOrWhiteSpace(evt.Detail))
+                    output.Append('\n').Append("  detail: ").Append(evt.Detail);
+
+                output.Append('\n');
             }
         }
 

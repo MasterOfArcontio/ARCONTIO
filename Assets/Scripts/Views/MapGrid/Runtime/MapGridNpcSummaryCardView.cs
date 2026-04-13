@@ -15,6 +15,7 @@ namespace Arcontio.View.MapGrid
     ///   - Inventory (collassabile)          : cibo trasportato e scorte private
     ///   - Comms (collassabile)              : token IN/OUT
     ///   - Landmarks (collassabile)          : contatori/indicatori landmark-edge conosciuti
+    ///   - EL Pathfinding (collassabile)     : trace debug spiegabili del movimento
     ///   - MemoryTraces (collassabile)       : tabella MemoryTrace
     ///   - KnownObjects (collassabile)       : tabella memoria oggetti/NPC osservati
     ///
@@ -53,6 +54,7 @@ namespace Arcontio.View.MapGrid
         private const string KeyInventory = "Inventory";
         private const string KeyComms = "Comms";
         private const string KeyLandmarks = "Landmarks";
+        private const string KeyExplainability = "Explainability";
         private const string KeyMemoryTraces = "MemoryTraces";
         private const string KeyKnownObjects = "KnownObjects";
         private const string KeyDnaDrift = "DnaDrift";
@@ -67,6 +69,7 @@ namespace Arcontio.View.MapGrid
         private SectionView _inventorySection;
         private SectionView _commsSection;
         private SectionView _landmarksSection;
+        private SectionView _explainabilitySection;
         private SectionView _memSection;
         private SectionView _objMemSection;
         private SectionView _dnaDriftSection;
@@ -172,6 +175,26 @@ namespace Arcontio.View.MapGrid
             _landmarksSection = BuildSection(_root.transform, KeyLandmarks, "Navigation / MacroRoute", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _landmarksSection.RootImage.color = new Color(0.12f, 0.18f, 0.28f, 0.72f);
 
+            // =============================================================================
+            // EL Pathfinding
+            // =============================================================================
+            // Sezione debug dedicata all'Explainability Layer del pathfinding.
+            // Viene costruita con la stessa pipeline prefabless della card NPC:
+            // sezione collassabile, testo uGUI e aggiornamento esterno tramite controller.
+            //
+            // Uniformita' con la card NPC esistente:
+            // Anche se questa visualizzazione e' debug e quindi legge dati osservativi
+            // dal World, la card non interroga direttamente i ring buffer EL: riceve
+            // solo testo gia' preparato da MapGridEntitySummaryOverlay.
+            //
+            // Struttura interna:
+            // - Root: sezione uGUI generata da BuildSection.
+            // - BodyText: blocco testuale con intent, piano ed eventi.
+            // - Collapse: stato condiviso tramite chiave stabile.
+            _explainabilitySection = BuildSection(_root.transform, KeyExplainability, "EL Pathfinding", DefaultBodyFont, FontStyle.Normal, collapsible: true);
+            _explainabilitySection.RootImage.color = new Color(0.16f, 0.22f, 0.18f, 0.78f);
+            if (_explainabilitySection.BodyText != null) _explainabilitySection.BodyText.supportRichText = true;
+
             // Memory traces (tabella A)
             _memSection = BuildSection(_root.transform, KeyMemoryTraces, "Memory Traces", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _memSection.RootImage.color = new Color(0.45f, 0.35f, 0.05f, 0.75f);
@@ -243,6 +266,35 @@ namespace Arcontio.View.MapGrid
         {
             if (_landmarksSection?.BodyText != null)
                 _landmarksSection.BodyText.text = text ?? string.Empty;
+        }
+
+        // =============================================================================
+        // SetExplainabilityText
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna la sezione EL Pathfinding della card NPC con testo gia' formattato
+        /// dal controller overlay. Il metodo replica il pattern di <see cref="SetLandmarksText"/>
+        /// e <see cref="SetCommsText"/>: la card resta una view prefabless con API minima.
+        /// </para>
+        ///
+        /// <para><b>Debug UI come lettura passiva</b></para>
+        /// <para>
+        /// Questa funzione non costruisce trace, non legge il World e non interroga il
+        /// pathfinding. Accetta soltanto una stringa pronta per essere mostrata, cosi'
+        /// l'integrazione grafica resta coerente con le metodologie gia' presenti.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>text</b>: contenuto rich text opzionale della sezione.</item>
+        ///   <item><b>_explainabilitySection</b>: sezione uGUI collassabile della card.</item>
+        /// </list>
+        /// </summary>
+        public void SetExplainabilityText(string text)
+        {
+            if (_explainabilitySection?.BodyText != null)
+                _explainabilitySection.BodyText.text = text ?? string.Empty;
         }
 
         // ── Nomi dominio (indici 1..8 di DomainKind) ─────────────────────────
