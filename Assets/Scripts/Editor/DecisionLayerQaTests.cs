@@ -67,7 +67,7 @@ namespace Arcontio.Tests
             // Act: pipeline completa Fase 1 -> Fase 2 -> Fase 3.
             generator.GeneratePhase1Candidates(context, candidates);
             scoring.ScoreCandidates(context, candidates, DecisionScoringConfig.Default());
-            var result = selection.Select(context, candidates, TopOneSelection(), new Random(7));
+            var result = selection.Select(context, candidates, TopOneSelection(), new System.Random(7));
 
             // Assert: il target conosciuto vince sul fallback SearchFood.
             Assert.That(result.IsEmpty, Is.False);
@@ -111,7 +111,7 @@ namespace Arcontio.Tests
             // Act: la pipeline deve produrre un'intenzione di ricerca, non un target inventato.
             generator.GeneratePhase1Candidates(context, candidates);
             scoring.ScoreCandidates(context, candidates, DecisionScoringConfig.Default());
-            var result = selection.Select(context, candidates, TopOneSelection(), new Random(3));
+            var result = selection.Select(context, candidates, TopOneSelection(), new System.Random(3));
 
             // Assert: SearchFood e' il comportamento conservativo quando la conoscenza manca.
             Assert.That(result.IsEmpty, Is.False);
