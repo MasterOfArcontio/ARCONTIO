@@ -72,7 +72,7 @@ namespace Arcontio.Core
             }
         }
 
-        private static bool TryBuildCandidate(
+        private bool TryBuildCandidate(
             in DecisionEvaluationContext context,
             DecisionIntentKind kind,
             out DecisionCandidate candidate)
