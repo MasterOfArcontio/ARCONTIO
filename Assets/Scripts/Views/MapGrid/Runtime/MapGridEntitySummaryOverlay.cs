@@ -37,7 +37,7 @@ namespace Arcontio.View.MapGrid
         private RectTransform _linesRoot;
         private RectTransform _cardsRoot;
         private MapGridMovementExplainabilityPanelView _movementExplainabilityPanel;
-        private const bool MovementExplainabilitySidePanelEnabled = false;
+        private const bool MovementExplainabilitySidePanelEnabled = true;
 
         // ============================================================
         // PUBLIC API (lifecycle)
