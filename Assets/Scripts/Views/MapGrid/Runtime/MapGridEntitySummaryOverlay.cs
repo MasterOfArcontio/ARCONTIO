@@ -37,6 +37,7 @@ namespace Arcontio.View.MapGrid
         private RectTransform _linesRoot;
         private RectTransform _cardsRoot;
         private MapGridMovementExplainabilityPanelView _movementExplainabilityPanel;
+        private const bool MovementExplainabilitySidePanelEnabled = false;
 
         // ============================================================
         // PUBLIC API (lifecycle)
@@ -93,12 +94,15 @@ namespace Arcontio.View.MapGrid
             _cardsRoot.offsetMin = Vector2.zero;
             _cardsRoot.offsetMax = Vector2.zero;
 
-            // Pannello EL fisso a destra:
-            // resta nello stesso Canvas del SummaryOverlay, ma non segue le card e
-            // non viene collegato alle linee entity->card. E' una diagnostica laterale
-            // dedicata all'NPC selezionato tramite NPCSelection.
-            _movementExplainabilityPanel = new MapGridMovementExplainabilityPanelView();
-            _movementExplainabilityPanel.AttachTo(_root.transform);
+            if (MovementExplainabilitySidePanelEnabled)
+            {
+                // Pannello EL fisso a destra:
+                // resta nello stesso Canvas del SummaryOverlay, ma non segue le card e
+                // non viene collegato alle linee entity->card. E' una diagnostica laterale
+                // dedicata all'NPC selezionato tramite NPCSelection.
+                _movementExplainabilityPanel = new MapGridMovementExplainabilityPanelView();
+                _movementExplainabilityPanel.AttachTo(_root.transform);
+            }
 
             _canvas.renderMode = RenderMode.ScreenSpaceOverlay;
             _canvas.sortingOrder = 999; // sopra quasi tutto
@@ -159,7 +163,8 @@ namespace Arcontio.View.MapGrid
 
             RefreshNpcTexts(world);
             RefreshObjectTexts(world);
-            RefreshMovementExplainabilityPanel(world);
+            if (MovementExplainabilitySidePanelEnabled)
+                RefreshMovementExplainabilityPanel(world);
         }
 
         // ============================================================
