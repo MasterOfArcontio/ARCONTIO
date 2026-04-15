@@ -48,7 +48,7 @@
     "ringBuffer_events_low": 60,
     "ringBuffer_events_high": 200,
     "verbosityHighThreshold": 3,
-    "writeJsonLog": false,
+    "writeJsonLog": true,
     "jsonLogFileNamePattern": "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl"
   },
   "landmarks": {
@@ -116,5 +116,22 @@
   },
   "memory": {
     "max_traces_per_npc": 128
+  },
+  "memory_belief_decision_explainability": {
+    "enabled": true,
+    "defaultVerbosity": 3,
+    "maxTrackedNpcs": 5,
+    "trackedNpcIds": [],
+    "trackActiveNpcOnly": false,
+    "writeJsonLog": true,
+    "jsonLogFileNamePattern": "arcontio_el_mbd_runtime.jsonl",
+    "logMemory": true,
+    "logBelief": true,
+    "logQuery": true,
+    "logDecision": true,
+    "logBridge": true,
+    "includeCandidates": true,
+    "includeScoreBreakdown": true,
+    "includeRejectedCandidates": false
   }
 }
