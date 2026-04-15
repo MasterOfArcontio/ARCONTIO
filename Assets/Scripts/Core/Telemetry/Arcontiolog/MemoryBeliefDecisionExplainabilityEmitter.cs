@@ -29,6 +29,47 @@ namespace Arcontio.Core
     public static class MemoryBeliefDecisionExplainabilityEmitter
     {
         // =============================================================================
+        // TryWriteTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inoltra una trace EL-MBQD verso le due destinazioni diagnostiche previste:
+        /// registry runtime UI-friendly e JSONL persistente.
+        /// </para>
+        ///
+        /// <para><b>Doppia uscita one-way</b></para>
+        /// <para>
+        /// La trace viene costruita una sola volta dal producer legittimo e poi copiata
+        /// verso destinazioni passive. Il registry serve alla UI live, il JSONL serve
+        /// all'analisi offline; nessuna delle due destinazioni ricalcola o arricchisce
+        /// i dati interrogando il mondo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Config guard</b>: config null disattiva entrambe le uscite.</item>
+        ///   <item><b>Registry</b>: conserva la trace bounded per NPC, se disponibile.</item>
+        ///   <item><b>JSONL</b>: mantiene il comportamento append-only esistente.</item>
+        /// </list>
+        /// </summary>
+        public static void TryWriteTrace(
+            MemoryBeliefDecisionExplainabilityParams config,
+            MemoryBeliefDecisionExplainabilityRegistry registry,
+            MemoryBeliefDecisionTrace trace)
+        {
+            if (config == null || trace == null)
+                return;
+
+            // Il registry applica gli stessi gate di abilitazione/kind della config,
+            // ma non apre file e non produce side-effect simulativi.
+            registry?.AddTrace(config, trace);
+
+            // Il sink conserva la semantica precedente: se writeJsonLog e' false o il
+            // kind e' disabilitato, la chiamata termina come no-op.
+            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, trace);
+        }
+
+        // =============================================================================
         // TryWriteMemoryTrace
         // =============================================================================
         /// <summary>
@@ -51,8 +92,29 @@ namespace Arcontio.Core
         ///   <item><b>StoreResult</b>: collega la trace all'esito del MemoryStore.</item>
         /// </list>
         /// </summary>
+        // =============================================================================
+        // TryWriteMemoryTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload storico che esporta una memory trace solo verso le destinazioni
+        /// disponibili prima del registry runtime.
+        /// </para>
+        /// </summary>
         public static void TryWriteMemoryTrace(
             MemoryBeliefDecisionExplainabilityParams config,
+            int npcId,
+            long tick,
+            in MemoryTrace trace,
+            AddOrMergeResult storeResult,
+            string eventType)
+        {
+            TryWriteMemoryTrace(config, null, npcId, tick, trace, storeResult, eventType);
+        }
+
+        public static void TryWriteMemoryTrace(
+            MemoryBeliefDecisionExplainabilityParams config,
+            MemoryBeliefDecisionExplainabilityRegistry registry,
             int npcId,
             long tick,
             in MemoryTrace trace,
@@ -62,7 +124,7 @@ namespace Arcontio.Core
             if (config == null)
                 return;
 
-            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, new MemoryBeliefDecisionTrace
+            TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
             {
                 Kind = MemoryBeliefDecisionTraceKind.Memory,
                 Tick = tick,
@@ -107,8 +169,30 @@ namespace Arcontio.Core
         ///   <item><b>Reason</b>: stringa breve per correlare regola o feedback operativo.</item>
         /// </list>
         /// </summary>
+        // =============================================================================
+        // TryWriteBeliefTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload storico che esporta una mutazione belief senza richiedere al
+        /// chiamante di possedere un registry runtime.
+        /// </para>
+        /// </summary>
         public static void TryWriteBeliefTrace(
             MemoryBeliefDecisionExplainabilityParams config,
+            int npcId,
+            long tick,
+            MemoryBeliefDecisionBeliefOperation operation,
+            in MemoryTrace sourceTrace,
+            BeliefEntry belief,
+            string reason)
+        {
+            TryWriteBeliefTrace(config, null, npcId, tick, operation, sourceTrace, belief, reason);
+        }
+
+        public static void TryWriteBeliefTrace(
+            MemoryBeliefDecisionExplainabilityParams config,
+            MemoryBeliefDecisionExplainabilityRegistry registry,
             int npcId,
             long tick,
             MemoryBeliefDecisionBeliefOperation operation,
@@ -119,7 +203,7 @@ namespace Arcontio.Core
             if (config == null)
                 return;
 
-            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, new MemoryBeliefDecisionTrace
+            TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
             {
                 Kind = MemoryBeliefDecisionTraceKind.Belief,
                 Tick = tick,

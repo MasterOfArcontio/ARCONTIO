@@ -73,6 +73,7 @@ namespace Arcontio.Core
                         var res = store.AddOrMerge(trace);
                         MemoryBeliefDecisionExplainabilityEmitter.TryWriteMemoryTrace(
                             world.Config?.Sim?.memory_belief_decision_explainability,
+                            world.MemoryBeliefDecisionExplainability,
                             env.ListenerId,
                             tick.Index,
                             trace,
@@ -99,6 +100,7 @@ namespace Arcontio.Core
                                 beliefStore,
                                 (int)tick.Index,
                                 world.Config?.Sim?.memory_belief_decision_explainability,
+                                world.MemoryBeliefDecisionExplainability,
                                 env.ListenerId);
                             telemetry.Counter(beliefUpdated ? "BeliefUpdater.TraceAggregated" : "BeliefUpdater.TraceIgnored", 1);
                         }

@@ -195,9 +195,19 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbLandmarks = new(256);
         private readonly StringBuilder _sbExplainabilityIntentPlan = new(2048);
         private readonly StringBuilder _sbExplainabilityEvents = new(4096);
+        private readonly StringBuilder _sbMbqdMemoryStore = new(1024);
+        private readonly StringBuilder _sbMbqdMemoryLatest = new(1536);
+        private readonly StringBuilder _sbMbqdMemoryTimeline = new(2048);
+        private readonly StringBuilder _sbMbqdBeliefEntries = new(2048);
+        private readonly StringBuilder _sbMbqdBeliefQuery = new(2048);
+        private readonly StringBuilder _sbMbqdBeliefMutation = new(1536);
+        private readonly StringBuilder _sbMbqdDecisionSelected = new(1536);
+        private readonly StringBuilder _sbMbqdDecisionCandidates = new(3072);
+        private readonly StringBuilder _sbMbqdDecisionBridge = new(1536);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
         private readonly MovementExplainabilityViewModel _movementExplainabilityViewModel = new();
+        private readonly MemoryBeliefDecisionExplainabilityViewModel _mbqdExplainabilityViewModel = new();
 
         private bool _needsInitialLayout;
 
@@ -1152,29 +1162,375 @@ namespace Arcontio.View.MapGrid
             int selectedNpcId = SocialViewer.UI.NPCSelection.SelectedNpcId;
             if (selectedNpcId <= 0)
             {
-                _movementExplainabilityPanel.SetText(
-                    "EL Pathfinding",
-                    string.Empty,
-                    "<color=#888888>Nessun NPC selezionato.</color>",
-                    "<color=#888888>Click sinistro su un NPC nella MapGrid per aprire la diagnostica EL.</color>");
+                _movementExplainabilityPanel.SetHeader("Explainability Layer", string.Empty);
+                _movementExplainabilityPanel.SetMemoryText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
+                _movementExplainabilityPanel.SetBeliefText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
+                _movementExplainabilityPanel.SetDecisionText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
+                _movementExplainabilityPanel.SetPathfindingText(
+                    "<color=#6E7681>Nessun NPC selezionato.</color>",
+                    "<color=#6E7681>Click sinistro su un NPC nella MapGrid per aprire la diagnostica EL.</color>");
                 _movementExplainabilityPanel.SetVisible(true);
                 return;
             }
 
             if (world == null || !world.NpcDna.ContainsKey(selectedNpcId))
             {
-                _movementExplainabilityPanel.SetText(
-                    "EL Pathfinding",
-                    $"NPC #{selectedNpcId}",
-                    string.Empty,
-                    "<color=#FF6666>L'NPC selezionato non esiste piu' nel World.</color>");
+                _movementExplainabilityPanel.SetHeader("Explainability Layer", $"NPC #{selectedNpcId}");
+                _movementExplainabilityPanel.SetMemoryText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
+                _movementExplainabilityPanel.SetBeliefText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
+                _movementExplainabilityPanel.SetDecisionText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
+                _movementExplainabilityPanel.SetPathfindingText(string.Empty, "<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>");
                 _movementExplainabilityPanel.SetVisible(true);
                 return;
             }
 
             string headerMeta = BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityIntentPlan, _sbExplainabilityEvents, maxEvents: 32);
-            _movementExplainabilityPanel.SetText($"EL Pathfinding - NPC #{selectedNpcId}", headerMeta, _sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
+            string mbqdHeaderMeta = BuildMemoryBeliefDecisionExplainabilityText(world, selectedNpcId);
+            _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", string.IsNullOrWhiteSpace(mbqdHeaderMeta) ? headerMeta : mbqdHeaderMeta);
+            _movementExplainabilityPanel.SetPathfindingText(_sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
+            _movementExplainabilityPanel.SetMemoryText(_sbMbqdMemoryStore.ToString(), _sbMbqdMemoryLatest.ToString(), _sbMbqdMemoryTimeline.ToString());
+            _movementExplainabilityPanel.SetBeliefText(_sbMbqdBeliefEntries.ToString(), _sbMbqdBeliefQuery.ToString(), _sbMbqdBeliefMutation.ToString());
+            _movementExplainabilityPanel.SetDecisionText(_sbMbqdDecisionSelected.ToString(), _sbMbqdDecisionCandidates.ToString(), _sbMbqdDecisionBridge.ToString());
             _movementExplainabilityPanel.SetVisible(true);
+        }
+
+        // =============================================================================
+        // BuildMemoryBeliefDecisionExplainabilityText
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce i blocchi testuali delle tab Memory, Belief e Decision usando
+        /// il ViewModel EL-MBQD runtime.
+        /// </para>
+        ///
+        /// <para><b>UI da registry, non da store live</b></para>
+        /// <para>
+        /// Il metodo non legge direttamente MemoryStore, BeliefStore o oggetti del
+        /// World. Tutte le righe derivano da trace gia' passate dal registry
+        /// UI-friendly, allineando pannello e JSONL.
+        /// </para>
+        /// </summary>
+        private string BuildMemoryBeliefDecisionExplainabilityText(Arcontio.Core.World world, int npcId)
+        {
+            ClearMbqdBuffers();
+
+            bool hasModel = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(
+                world,
+                npcId,
+                _mbqdExplainabilityViewModel,
+                maxTimelineRows: 48);
+
+            if (!hasModel)
+            {
+                string message = string.IsNullOrWhiteSpace(_mbqdExplainabilityViewModel.HeaderSubtitle)
+                    ? "EL-MBQD non disponibile per questo NPC"
+                    : _mbqdExplainabilityViewModel.HeaderSubtitle;
+
+                _sbMbqdMemoryStore.Append("<color=#6E7681>").Append(message).Append("</color>");
+                _sbMbqdBeliefEntries.Append("<color=#6E7681>").Append(message).Append("</color>");
+                _sbMbqdDecisionSelected.Append("<color=#6E7681>").Append(message).Append("</color>");
+                return $"NPC #{npcId}";
+            }
+
+            var model = _mbqdExplainabilityViewModel;
+            AppendMbqdMemory(model);
+            AppendMbqdBelief(model);
+            AppendMbqdDecision(model);
+            return model.HeaderSubtitle;
+        }
+
+        private void ClearMbqdBuffers()
+        {
+            _sbMbqdMemoryStore.Clear();
+            _sbMbqdMemoryLatest.Clear();
+            _sbMbqdMemoryTimeline.Clear();
+            _sbMbqdBeliefEntries.Clear();
+            _sbMbqdBeliefQuery.Clear();
+            _sbMbqdBeliefMutation.Clear();
+            _sbMbqdDecisionSelected.Clear();
+            _sbMbqdDecisionCandidates.Clear();
+            _sbMbqdDecisionBridge.Clear();
+        }
+
+        private void AppendMbqdMemory(MemoryBeliefDecisionExplainabilityViewModel model)
+        {
+            _sbMbqdMemoryStore.Append(Kv("trace totali", model.MemoryCount.ToString(), "#E6EDF3")).Append('\n');
+            if (model.MemoryBars.Count == 0)
+            {
+                _sbMbqdMemoryStore.Append("<color=#6E7681>(nessuna memory trace)</color>");
+            }
+            else
+            {
+                for (int i = 0; i < model.MemoryBars.Count; i++)
+                {
+                    var bar = model.MemoryBars[i];
+                    _sbMbqdMemoryStore
+                        .Append("<color=").Append(ColorFor(bar.ColorRole)).Append(">")
+                        .Append(bar.Label).Append("</color>")
+                        .Append("  count=").Append(bar.Count)
+                        .Append("  fill=").Append(bar.Fill01.ToString("0.00"))
+                        .Append('\n');
+                }
+            }
+
+            var memory = model.LatestMemory;
+            if (!memory.HasValue)
+            {
+                _sbMbqdMemoryLatest.Append("<color=#6E7681>(nessuna ultima trace)</color>");
+            }
+            else
+            {
+                _sbMbqdMemoryLatest
+                    .Append(Kv("tick", memory.Tick.ToString(), "#8B949E")).Append('\n')
+                    .Append(Kv("eventType", memory.EventType, "#58A6FF")).Append('\n')
+                    .Append(Kv("traceType", memory.TraceType, "#58A6FF")).Append('\n')
+                    .Append(Kv("subjectId", memory.SubjectId.ToString(), "#E6EDF3")).Append('\n')
+                    .Append(Kv("secondarySubjectId", memory.SecondarySubjectId.ToString(), "#8B949E")).Append('\n')
+                    .Append(Kv("subjectDefId", EmptyMuted(memory.SubjectDefId), "#E6EDF3")).Append('\n')
+                    .Append(Kv("cell", memory.Cell, "#E6EDF3")).Append('\n')
+                    .Append(Kv("intensity", memory.Intensity01.ToString("0.00"), "#3FB950")).Append('\n')
+                    .Append(Kv("reliability", memory.Reliability01.ToString("0.00"), "#3FB950")).Append('\n')
+                    .Append(Kv("isHeard", memory.IsHeard.ToString(), memory.IsHeard ? "#D29922" : "#6E7681")).Append('\n')
+                    .Append(Kv("heardKind", EmptyMuted(memory.HeardKind), "#8B949E")).Append('\n')
+                    .Append(Kv("sourceSpeakerId", memory.SourceSpeakerId.ToString(), "#8B949E")).Append('\n')
+                    .Append(Kv("storeResult", memory.StoreResult, ColorForResult(memory.StoreResult)));
+            }
+
+            AppendTimeline(_sbMbqdMemoryTimeline, model, onlyMemory: true);
+        }
+
+        private void AppendMbqdBelief(MemoryBeliefDecisionExplainabilityViewModel model)
+        {
+            if (model.BeliefRows.Count == 0)
+            {
+                _sbMbqdBeliefEntries.Append("<color=#6E7681>(nessuna belief mutation recente)</color>");
+            }
+            else
+            {
+                for (int i = 0; i < model.BeliefRows.Count; i++)
+                {
+                    var belief = model.BeliefRows[i];
+                    _sbMbqdBeliefEntries
+                        .Append("<color=").Append(ColorFor(belief.ColorRole)).Append(">")
+                        .Append('#').Append(belief.BeliefId).Append(' ')
+                        .Append(belief.Category).Append("  ").Append(belief.EstimatedCell)
+                        .Append("</color>")
+                        .Append("  conf=").Append(belief.Confidence.ToString("0.00"))
+                        .Append("  fresh=").Append(belief.Freshness.ToString("0.00"))
+                        .Append("  status=").Append(belief.Status)
+                        .Append("  source=").Append(belief.Source)
+                        .Append("  sources=").Append(belief.SourceCount)
+                        .Append('\n');
+                }
+            }
+
+            var query = model.LatestQuery;
+            if (!query.HasValue)
+            {
+                _sbMbqdBeliefQuery.Append("<color=#6E7681>(nessuna query)</color>");
+            }
+            else
+            {
+                _sbMbqdBeliefQuery
+                    .Append(Kv("tick", query.Tick.ToString(), "#8B949E")).Append('\n')
+                    .Append(Kv("goalType", query.GoalType, "#58A6FF")).Append('\n')
+                    .Append(Kv("urgency", query.Urgency01.ToString("0.00"), "#D29922")).Append('\n')
+                    .Append(Kv("npcCell", query.NpcCell, "#E6EDF3")).Append('\n')
+                    .Append(Kv("minConfidence", query.MinConfidence.ToString("0.00"), "#E6EDF3")).Append('\n')
+                    .Append(Kv("candidateCount", query.CandidateCount.ToString(), "#E6EDF3")).Append('\n')
+                    .Append(Kv("usableCandidateCount", query.UsableCandidateCount.ToString(), "#E6EDF3")).Append('\n')
+                    .Append(Kv("isEmpty", query.IsEmpty.ToString(), query.IsEmpty ? "#D29922" : "#3FB950")).Append('\n')
+                    .Append(Kv("emptyReason", EmptyMuted(query.EmptyReason), query.IsEmpty ? "#D29922" : "#6E7681")).Append('\n')
+                    .Append(Kv("winner", FormatBeliefInline(query.Winner), query.IsEmpty ? "#6E7681" : "#3FB950")).Append('\n')
+                    .Append(Kv("finalScore", query.FinalScore.ToString("0.00"), "#E6EDF3")).Append('\n');
+
+                AppendContributions(_sbMbqdBeliefQuery, query.Contributions);
+            }
+
+            var mutation = model.LatestBeliefMutation;
+            if (!mutation.HasValue)
+            {
+                _sbMbqdBeliefMutation.Append("<color=#6E7681>(nessuna mutazione belief)</color>");
+            }
+            else
+            {
+                _sbMbqdBeliefMutation
+                    .Append(Kv("tick", mutation.Tick.ToString(), "#8B949E")).Append('\n')
+                    .Append(Kv("operation", mutation.Operation, ColorForOperation(mutation.Operation))).Append('\n')
+                    .Append(Kv("hasSourceTrace", mutation.HasSourceTrace.ToString(), mutation.HasSourceTrace ? "#3FB950" : "#6E7681")).Append('\n')
+                    .Append(Kv("sourceTraceType", EmptyMuted(mutation.SourceTraceType), "#58A6FF")).Append('\n')
+                    .Append(Kv("belief", FormatBeliefInline(mutation.Belief), ColorFor(mutation.Belief.ColorRole))).Append('\n')
+                    .Append(Kv("reason", EmptyMuted(mutation.Reason), "#E6EDF3"));
+            }
+        }
+
+        private void AppendMbqdDecision(MemoryBeliefDecisionExplainabilityViewModel model)
+        {
+            var decision = model.LatestDecision;
+            if (!decision.HasValue)
+            {
+                _sbMbqdDecisionSelected.Append("<color=#6E7681>(nessuna decisione)</color>");
+            }
+            else
+            {
+                _sbMbqdDecisionSelected
+                    .Append("<color=#3FB950>").Append(decision.SelectedIntent).Append("</color>\n")
+                    .Append(Kv("tick", decision.Tick.ToString(), "#8B949E")).Append('\n')
+                    .Append(Kv("auditValid", decision.AuditValid.ToString(), decision.AuditValid ? "#3FB950" : "#F85149")).Append('\n')
+                    .Append(Kv("candidateCount", decision.CandidateCount.ToString(), "#E6EDF3")).Append('\n')
+                    .Append(Kv("selectedScore", decision.SelectedScore.ToString("0.00"), "#3FB950")).Append('\n')
+                    .Append(Kv("selectedIndex", decision.SelectedIndex.ToString(), "#E6EDF3")).Append('\n')
+                    .Append(Kv("selectionTopN", decision.SelectionTopN.ToString(), "#E6EDF3")).Append('\n')
+                    .Append(Kv("selectionNoise01", decision.SelectionNoise01.ToString("0.00"), "#D29922")).Append('\n')
+                    .Append(Kv("impulsivity01", decision.Impulsivity01.ToString("0.00"), "#D29922")).Append('\n')
+                    .Append(Kv("effectiveNoise01", decision.EffectiveNoise01.ToString("0.00"), "#D29922"));
+
+                for (int i = 0; i < decision.Candidates.Count; i++)
+                {
+                    var candidate = decision.Candidates[i];
+                    _sbMbqdDecisionCandidates
+                        .Append("<color=").Append(ColorFor(candidate.ColorRole)).Append(">")
+                        .Append(candidate.Intent).Append("</color>")
+                        .Append("  score=").Append(candidate.Score.ToString("0.00"))
+                        .Append("  available=").Append(candidate.Available)
+                        .Append("  need=").Append(candidate.Need)
+                        .Append("  urgency=").Append(candidate.NeedUrgency01.ToString("0.00"))
+                        .Append("  critical=").Append(candidate.IsCritical)
+                        .Append("  requiresBelief=").Append(candidate.RequiresBeliefTarget)
+                        .Append("  beliefEmpty=").Append(candidate.BeliefResultEmpty)
+                        .Append('\n');
+
+                    if (!string.IsNullOrWhiteSpace(candidate.FilteredReason))
+                        _sbMbqdDecisionCandidates.Append("  filteredReason=").Append(candidate.FilteredReason).Append('\n');
+
+                    if (candidate.RequiresBeliefTarget && !candidate.BeliefResultEmpty)
+                        _sbMbqdDecisionCandidates.Append("  belief=").Append(FormatBeliefInline(candidate.Belief)).Append('\n');
+
+                    AppendContributions(_sbMbqdDecisionCandidates, candidate.Contributions);
+                    _sbMbqdDecisionCandidates.Append('\n');
+                }
+            }
+
+            var bridge = model.LatestBridge;
+            if (!bridge.HasValue)
+            {
+                _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge)</color>");
+            }
+            else
+            {
+                _sbMbqdDecisionBridge
+                    .Append(Kv("tick", bridge.Tick.ToString(), "#8B949E")).Append('\n')
+                    .Append(Kv("selectedIntent", bridge.SelectedIntent, "#58A6FF")).Append('\n')
+                    .Append(Kv("commandName", EmptyMuted(bridge.CommandName), bridge.Handled ? "#3FB950" : "#6E7681")).Append('\n')
+                    .Append(Kv("handled", bridge.Handled.ToString(), bridge.Handled ? "#3FB950" : "#F85149")).Append('\n')
+                    .Append(Kv("didMove", bridge.DidMove.ToString(), bridge.DidMove ? "#58A6FF" : "#6E7681")).Append('\n')
+                    .Append(Kv("didSteal", bridge.DidSteal.ToString(), bridge.DidSteal ? "#D29922" : "#6E7681")).Append('\n')
+                    .Append(Kv("targetCell", bridge.TargetCell, "#E6EDF3")).Append('\n')
+                    .Append(Kv("targetSource", bridge.TargetSource, "#58A6FF")).Append('\n')
+                    .Append(Kv("legacyFallbackUsed", bridge.LegacyFallbackUsed.ToString(), bridge.LegacyFallbackUsed ? "#D29922" : "#3FB950")).Append('\n')
+                    .Append(Kv("reason", EmptyMuted(bridge.Reason), "#E6EDF3"));
+            }
+        }
+
+        private static void AppendTimeline(StringBuilder output, MemoryBeliefDecisionExplainabilityViewModel model, bool onlyMemory)
+        {
+            if (model.Timeline.Count == 0)
+            {
+                output.Append("<color=#6E7681>(nessuna timeline)</color>");
+                return;
+            }
+
+            for (int i = 0; i < model.Timeline.Count; i++)
+            {
+                var row = model.Timeline[i];
+                if (onlyMemory && !string.Equals(row.Kind, "Memory", StringComparison.Ordinal))
+                    continue;
+
+                output.Append("<color=").Append(ColorFor(row.ColorRole)).Append(">")
+                    .Append("t").Append(row.Tick)
+                    .Append("  ").Append(row.Kind)
+                    .Append("  ").Append(row.Summary)
+                    .Append("</color>\n");
+            }
+        }
+
+        private static void AppendContributions(StringBuilder output, List<MemoryBeliefDecisionContributionView> contributions)
+        {
+            if (contributions == null || contributions.Count == 0)
+                return;
+
+            output.Append("<color=#6E7681>-- score breakdown --</color>\n");
+            for (int i = 0; i < contributions.Count; i++)
+            {
+                var contribution = contributions[i];
+                string sign = contribution.Value >= 0f ? "+" : string.Empty;
+                output.Append("  ")
+                    .Append(contribution.Label)
+                    .Append(" = <color=").Append(ColorFor(contribution.ColorRole)).Append(">")
+                    .Append(sign).Append(contribution.Value.ToString("0.00"))
+                    .Append("</color>\n");
+            }
+        }
+
+        private static string Kv(string key, string value, string color)
+        {
+            return $"<color=#8B949E>{key}</color>  <color={color}>{value}</color>";
+        }
+
+        private static string FormatBeliefInline(MemoryBeliefDecisionBeliefView belief)
+        {
+            if (belief == null || belief.BeliefId == 0)
+                return "nessuna";
+
+            return $"#{belief.BeliefId} {belief.Category} {belief.EstimatedCell} conf={belief.Confidence:0.00} fresh={belief.Freshness:0.00} status={belief.Status} source={belief.Source} sources={belief.SourceCount}";
+        }
+
+        private static string EmptyMuted(string value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? "n/d" : value;
+        }
+
+        private static string ColorFor(MemoryBeliefDecisionColorRole role)
+        {
+            return role switch
+            {
+                MemoryBeliefDecisionColorRole.Ok => "#3FB950",
+                MemoryBeliefDecisionColorRole.Warning => "#D29922",
+                MemoryBeliefDecisionColorRole.Error => "#F85149",
+                MemoryBeliefDecisionColorRole.Info => "#58A6FF",
+                MemoryBeliefDecisionColorRole.Muted => "#6E7681",
+                _ => "#E6EDF3"
+            };
+        }
+
+        private static string ColorForResult(string result)
+        {
+            return result switch
+            {
+                "Inserted" => "#3FB950",
+                "Reinforced" => "#3FB950",
+                "Merged" => "#3FB950",
+                "Replaced" => "#D29922",
+                "Dropped" => "#F85149",
+                "Ignored" => "#6E7681",
+                _ => "#E6EDF3"
+            };
+        }
+
+        private static string ColorForOperation(string operation)
+        {
+            return operation switch
+            {
+                "Created" => "#3FB950",
+                "Merged" => "#3FB950",
+                "Reinforced" => "#3FB950",
+                "Weakened" => "#D29922",
+                "Stale" => "#D29922",
+                "Conflicted" => "#F85149",
+                "Discarded" => "#F85149",
+                "RemovedByDecay" => "#F85149",
+                _ => "#E6EDF3"
+            };
         }
 
         // =============================================================================

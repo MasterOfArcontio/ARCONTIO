@@ -4,32 +4,51 @@ using UnityEngine.UI;
 namespace Arcontio.View.MapGrid
 {
     // =============================================================================
+    // MapGridExplainabilityPanelPage
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Pagine disponibili nel pannello laterale dell'Explainability Layer.
+    /// </para>
+    ///
+    /// <para><b>Separazione visuale dei layer diagnostici</b></para>
+    /// <para>
+    /// Ogni pagina risponde a una domanda diversa: Memory mostra cosa entra nella
+    /// memoria, Belief mostra cosa diventa conoscenza soggettiva, Decision mostra la
+    /// scelta intenzionale e Pathfinding mostra l'esecuzione spaziale.
+    /// </para>
+    /// </summary>
+    public enum MapGridExplainabilityPanelPage
+    {
+        Memory = 0,
+        Belief = 1,
+        Decision = 2,
+        Pathfinding = 3
+    }
+
+    // =============================================================================
     // MapGridMovementExplainabilityPanelView
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Pannello debug prefabless per mostrare l'Explainability Layer del pathfinding
-    /// sul lato destro dello schermo della MapGrid. La classe costruisce soltanto UI
-    /// uGUI e riceve testo gia' formattato dal controller overlay.
+    /// Pannello debug prefabless fissato al lato destro della MapGrid. Il nome della
+    /// classe resta quello storico per non rompere gli agganci esistenti, ma la view
+    /// ora ospita l'intero pannello EL tabbed: Memory, Belief, Decision e Pathfinding.
     /// </para>
     ///
-    /// <para><b>Coerenza con le card NPC esistenti</b></para>
+    /// <para><b>UI diagnostica senza accesso al dominio</b></para>
     /// <para>
-    /// Il progetto usa gia' card runtime create da codice per la diagnostica. Questo
-    /// pannello segue la stessa metodologia: niente prefab, niente asset grafici nuovi,
-    /// niente letture dirette dal core simulativo. Il controller decide cosa mostrare,
-    /// questa view decide solo dove e come renderizzarlo.
+    /// La view non legge World, registry, BeliefStore o JSONL. Riceve solo stringhe
+    /// gia' formattate dal controller overlay e le distribuisce in sub-pannelli
+    /// scrollabili con colori rich text.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>_root</b>: GameObject principale del pannello.</item>
-    ///   <item><b>_rootRt</b>: RectTransform ancorato al bordo destro del canvas.</item>
-    ///   <item><b>_rootBg</b>: sfondo scuro raycast target per proteggere la mappa dietro.</item>
-    ///   <item><b>_titleText</b>: intestazione sintetica del pannello.</item>
-    ///   <item><b>_headerMetaText</b>: riga compatta con tick, intent e plan.</item>
-    ///   <item><b>_intentPlanText</b>: pannellino separato con il dettaglio intent/plan.</item>
-    ///   <item><b>_eventsText</b>: area eventi espandibile fino al fondo del pannello.</item>
+    ///   <item><b>Header</b>: titolo, metadati NPC/tick e tab cliccabili.</item>
+    ///   <item><b>ScrollRect</b>: body unico, con header fisso e contenuto scrollabile.</item>
+    ///   <item><b>Page roots</b>: contenitori separati per Memory, Belief, Decision e Pathfinding.</item>
+    ///   <item><b>Sub-pannelli</b>: cornice, titolo, pallino colorato e testo rich.</item>
     /// </list>
     /// </summary>
     public sealed class MapGridMovementExplainabilityPanelView
@@ -40,15 +59,33 @@ namespace Arcontio.View.MapGrid
         private const int DefaultTitleFont = 14;
         private const int DefaultBodyFont = 12;
 
+        private readonly Button[] _tabButtons = new Button[4];
+        private readonly Text[] _tabTexts = new Text[4];
+        private readonly GameObject[] _pageRoots = new GameObject[4];
+
         private GameObject _root;
         private RectTransform _rootRt;
-        private Image _rootBg;
         private Text _titleText;
         private Text _headerMetaText;
-        private Text _intentPlanText;
-        private Text _eventsText;
+        private ScrollRect _scrollRect;
+        private RectTransform _scrollContent;
+
+        private Text _memoryStoreText;
+        private Text _memoryLatestText;
+        private Text _memoryTimelineText;
+        private Text _beliefEntriesText;
+        private Text _beliefQueryText;
+        private Text _beliefMutationText;
+        private Text _decisionSelectedText;
+        private Text _decisionCandidatesText;
+        private Text _decisionBridgeText;
+        private Text _pathIntentPlanText;
+        private Text _pathEventsText;
+
+        private MapGridExplainabilityPanelPage _activePage = MapGridExplainabilityPanelPage.Memory;
 
         public RectTransform RootRectTransform => _rootRt;
+        public MapGridExplainabilityPanelPage ActivePage => _activePage;
 
         // =============================================================================
         // AttachTo
@@ -56,29 +93,15 @@ namespace Arcontio.View.MapGrid
         /// <summary>
         /// <para>
         /// Crea il pannello sotto il parent indicato e lo ancora al lato destro del
-        /// canvas occupando tutta l'altezza disponibile. Il pannello parte nascosto e
-        /// viene aggiornato dal SummaryOverlay.
+        /// canvas. Il pannello parte nascosto e viene popolato dal SummaryOverlay.
         /// </para>
-        ///
-        /// <para><b>UI debug stabile</b></para>
-        /// <para>
-        /// La posizione non segue l'NPC e non dipende dalla camera: resta fissa a destra
-        /// per diventare un riferimento stabile durante il debug del movimento.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>parent</b>: canvas/root dell'overlay MapGrid.</item>
-        ///   <item><b>layout verticale</b>: header fisso e body testuale in colonna.</item>
-        ///   <item><b>raycast target</b>: evita click accidentali sulla mappa sotto il pannello.</item>
-        /// </list>
         /// </summary>
         public void AttachTo(Transform parent)
         {
             if (_root != null)
                 return;
 
-            _root = new GameObject("MovementExplainabilityRightPanel");
+            _root = new GameObject("ExplainabilityRightPanel");
             _root.transform.SetParent(parent, false);
 
             _rootRt = _root.AddComponent<RectTransform>();
@@ -88,9 +111,9 @@ namespace Arcontio.View.MapGrid
             _rootRt.offsetMin = new Vector2(-DefaultWidth - HorizontalMargin, VerticalMargin);
             _rootRt.offsetMax = new Vector2(-HorizontalMargin, -VerticalMargin);
 
-            _rootBg = _root.AddComponent<Image>();
-            _rootBg.raycastTarget = true;
-            _rootBg.color = new Color(0.02f, 0.03f, 0.03f, 0.86f);
+            var rootBg = _root.AddComponent<Image>();
+            rootBg.raycastTarget = true;
+            rootBg.color = ColorFromHex("#0D1117", 0.92f);
 
             var layout = _root.AddComponent<VerticalLayoutGroup>();
             layout.childControlHeight = true;
@@ -101,10 +124,11 @@ namespace Arcontio.View.MapGrid
             layout.padding = new RectOffset(8, 8, 8, 8);
 
             BuildHeader(_root.transform);
-            BuildIntentPlanPanel(_root.transform);
-            BuildEventsPanel(_root.transform);
-            _root.transform.SetAsLastSibling();
+            BuildScrollBody(_root.transform);
+            BuildPages();
+            SetActivePage(MapGridExplainabilityPanelPage.Memory);
 
+            _root.transform.SetAsLastSibling();
             SetVisible(false);
         }
 
@@ -113,8 +137,7 @@ namespace Arcontio.View.MapGrid
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Mostra o nasconde il pannello senza distruggerlo. Il controller puo' quindi
-        /// aggiornarlo ogni frame senza ricreare gerarchie UI.
+        /// Mostra o nasconde il pannello senza distruggerne la gerarchia UI.
         /// </para>
         /// </summary>
         public void SetVisible(bool visible)
@@ -124,43 +147,93 @@ namespace Arcontio.View.MapGrid
         }
 
         // =============================================================================
-        // SetText
+        // SetHeader
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Aggiorna i tre blocchi testuali del pannello. La view non formatta il
-        /// ViewModel EL: riceve testo gia' pronto dal controller overlay.
-        /// </para>
-        ///
-        /// <para><b>Separazione minima per debug UI</b></para>
-        /// <para>
-        /// Anche se siamo in una UI diagnostica, manteniamo una divisione semplice:
-        /// il controller legge dati e prepara stringhe, questa classe mostra stringhe.
+        /// Aggiorna titolo e metadati comuni del pannello.
         /// </para>
         /// </summary>
-        public void SetText(string title, string headerMeta, string intentPlan, string events)
+        public void SetHeader(string title, string headerMeta)
         {
             if (_titleText != null)
                 _titleText.text = title ?? string.Empty;
 
             if (_headerMetaText != null)
                 _headerMetaText.text = headerMeta ?? string.Empty;
-
-            if (_intentPlanText != null)
-                _intentPlanText.text = intentPlan ?? string.Empty;
-
-            if (_eventsText != null)
-                _eventsText.text = events ?? string.Empty;
         }
 
         // =============================================================================
-        // BuildHeader
+        // SetText
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce la fascia superiore del pannello con il titolo della diagnostica.
+        /// Compatibilita' con la vecchia API pathfinding: aggiorna la pagina
+        /// Pathfinding usando i blocchi gia' formattati dall'overlay.
         /// </para>
         /// </summary>
+        public void SetText(string title, string headerMeta, string intentPlan, string events)
+        {
+            SetHeader(title, headerMeta);
+            SetPathfindingText(intentPlan, events);
+        }
+
+        public void SetMemoryText(string storeSummary, string latestTrace, string timeline)
+        {
+            SetTextIfReady(_memoryStoreText, storeSummary);
+            SetTextIfReady(_memoryLatestText, latestTrace);
+            SetTextIfReady(_memoryTimelineText, timeline);
+        }
+
+        public void SetBeliefText(string entries, string latestQuery, string latestMutation)
+        {
+            SetTextIfReady(_beliefEntriesText, entries);
+            SetTextIfReady(_beliefQueryText, latestQuery);
+            SetTextIfReady(_beliefMutationText, latestMutation);
+        }
+
+        public void SetDecisionText(string selectedDecision, string candidates, string bridge)
+        {
+            SetTextIfReady(_decisionSelectedText, selectedDecision);
+            SetTextIfReady(_decisionCandidatesText, candidates);
+            SetTextIfReady(_decisionBridgeText, bridge);
+        }
+
+        public void SetPathfindingText(string intentPlan, string events)
+        {
+            SetTextIfReady(_pathIntentPlanText, intentPlan);
+            SetTextIfReady(_pathEventsText, events);
+        }
+
+        // =============================================================================
+        // SetActivePage
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Attiva una pagina del pannello e aggiorna lo stato visuale delle tab.
+        /// </para>
+        /// </summary>
+        public void SetActivePage(MapGridExplainabilityPanelPage page)
+        {
+            _activePage = page;
+
+            for (int i = 0; i < _pageRoots.Length; i++)
+            {
+                bool active = i == (int)page;
+                if (_pageRoots[i] != null)
+                    _pageRoots[i].SetActive(active);
+
+                if (_tabTexts[i] != null)
+                    _tabTexts[i].color = active ? ColorFromHex("#C9D1D9", 1f) : ColorFromHex("#8B949E", 1f);
+            }
+
+            if (_scrollContent != null)
+                _scrollContent.anchoredPosition = Vector2.zero;
+
+            if (_scrollRect != null)
+                _scrollRect.verticalNormalizedPosition = 1f;
+        }
+
         private void BuildHeader(Transform parent)
         {
             var headerGo = new GameObject("Header");
@@ -168,164 +241,285 @@ namespace Arcontio.View.MapGrid
 
             var headerImage = headerGo.AddComponent<Image>();
             headerImage.raycastTarget = false;
-            headerImage.color = new Color(0.10f, 0.16f, 0.13f, 0.94f);
+            headerImage.color = ColorFromHex("#161B22", 0.98f);
 
             var headerLayout = headerGo.AddComponent<VerticalLayoutGroup>();
             headerLayout.childControlHeight = true;
             headerLayout.childControlWidth = true;
             headerLayout.childForceExpandHeight = false;
             headerLayout.childForceExpandWidth = true;
-            headerLayout.spacing = 1;
-            headerLayout.padding = new RectOffset(6, 6, 3, 3);
+            headerLayout.spacing = 4;
+            headerLayout.padding = new RectOffset(8, 8, 7, 0);
 
             var headerLe = headerGo.AddComponent<LayoutElement>();
-            headerLe.minHeight = 46f;
-            headerLe.preferredHeight = 50f;
+            headerLe.minHeight = 86f;
+            headerLe.preferredHeight = 92f;
             headerLe.flexibleHeight = 0f;
 
-            var titleGo = new GameObject("Title");
-            titleGo.transform.SetParent(headerGo.transform, false);
+            _titleText = CreateText("Title", headerGo.transform, DefaultTitleFont, FontStyle.Bold, ColorFromHex("#E6EDF3", 1f), TextAnchor.MiddleLeft);
+            _titleText.text = "Explainability Layer";
 
-            _titleText = titleGo.AddComponent<Text>();
-            _titleText.raycastTarget = false;
-            _titleText.font = GetUiFont();
-            _titleText.fontSize = DefaultTitleFont;
-            _titleText.fontStyle = FontStyle.Bold;
-            _titleText.alignment = TextAnchor.MiddleLeft;
-            _titleText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _titleText.verticalOverflow = VerticalWrapMode.Truncate;
-            _titleText.color = new Color(0.92f, 1.00f, 0.94f, 1f);
-            _titleText.text = "EL Pathfinding";
-
-            var titleLe = titleGo.AddComponent<LayoutElement>();
-            titleLe.minHeight = 18f;
-            titleLe.preferredHeight = 20f;
-            titleLe.flexibleHeight = 0f;
-
-            var metaGo = new GameObject("Meta");
-            metaGo.transform.SetParent(headerGo.transform, false);
-
-            _headerMetaText = metaGo.AddComponent<Text>();
-            _headerMetaText.raycastTarget = false;
-            _headerMetaText.font = GetUiFont();
-            _headerMetaText.fontSize = 10;
-            _headerMetaText.fontStyle = FontStyle.Normal;
-            _headerMetaText.alignment = TextAnchor.MiddleLeft;
-            _headerMetaText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _headerMetaText.verticalOverflow = VerticalWrapMode.Truncate;
-            _headerMetaText.color = new Color(0.82f, 0.90f, 0.84f, 1f);
+            _headerMetaText = CreateText("Meta", headerGo.transform, 10, FontStyle.Normal, ColorFromHex("#8B949E", 1f), TextAnchor.MiddleLeft);
             _headerMetaText.text = string.Empty;
 
-            var metaLe = metaGo.AddComponent<LayoutElement>();
-            metaLe.minHeight = 14f;
-            metaLe.preferredHeight = 16f;
-            metaLe.flexibleHeight = 0f;
+            BuildTabs(headerGo.transform);
         }
 
-        // =============================================================================
-        // BuildIntentPlanPanel
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce il pannellino separato con il dettaglio intent/plan. Mantiene
-        /// un'altezza esplicita piu' ampia del solo header, perche' deve contenere
-        /// sia le righe Intent sia le righe Plan complete prodotte dal formatter.
-        /// </para>
-        /// </summary>
-        private void BuildIntentPlanPanel(Transform parent)
+        private void BuildTabs(Transform parent)
         {
-            var panelGo = new GameObject("IntentPlan");
-            panelGo.transform.SetParent(parent, false);
+            var tabsGo = new GameObject("Tabs");
+            tabsGo.transform.SetParent(parent, false);
 
-            var panelImage = panelGo.AddComponent<Image>();
-            panelImage.raycastTarget = false;
-            panelImage.color = new Color(0.10f, 0.16f, 0.13f, 0.90f);
+            var tabsLayout = tabsGo.AddComponent<HorizontalLayoutGroup>();
+            tabsLayout.childControlHeight = true;
+            tabsLayout.childControlWidth = true;
+            tabsLayout.childForceExpandHeight = true;
+            tabsLayout.childForceExpandWidth = false;
+            tabsLayout.spacing = 2;
+            tabsLayout.padding = new RectOffset(0, 0, 2, 0);
 
-            var panelLayout = panelGo.AddComponent<VerticalLayoutGroup>();
-            panelLayout.childControlHeight = true;
-            panelLayout.childControlWidth = true;
-            panelLayout.childForceExpandHeight = false;
-            panelLayout.childForceExpandWidth = true;
-            panelLayout.padding = new RectOffset(6, 6, 5, 5);
+            var tabsLe = tabsGo.AddComponent<LayoutElement>();
+            tabsLe.minHeight = 26f;
+            tabsLe.preferredHeight = 28f;
+            tabsLe.flexibleHeight = 0f;
 
-            var panelLe = panelGo.AddComponent<LayoutElement>();
-            panelLe.minHeight = 230f;
-            panelLe.preferredHeight = 270f;
-            panelLe.flexibleHeight = 0f;
-
-            var textGo = new GameObject("Text");
-            textGo.transform.SetParent(panelGo.transform, false);
-
-            _intentPlanText = textGo.AddComponent<Text>();
-            _intentPlanText.raycastTarget = false;
-            _intentPlanText.font = GetUiFont();
-            _intentPlanText.fontSize = DefaultBodyFont;
-            _intentPlanText.fontStyle = FontStyle.Normal;
-            _intentPlanText.alignment = TextAnchor.UpperLeft;
-            _intentPlanText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _intentPlanText.verticalOverflow = VerticalWrapMode.Overflow;
-            _intentPlanText.supportRichText = true;
-            _intentPlanText.color = Color.white;
-            _intentPlanText.text = string.Empty;
+            CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Memory, "Memory");
+            CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Belief, "Belief");
+            CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Decision, "Decision");
+            CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Pathfinding, "Pathfinding");
         }
 
-        // =============================================================================
-        // BuildEventsPanel
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce il pannello eventi. Questo e' l'unico blocco con altezza flessibile:
-        /// deve occupare tutta la parte libera sotto header e intent/plan, cosi' la
-        /// timeline arriva fino al fondo del pannello destro.
-        /// </para>
-        /// </summary>
-        private void BuildEventsPanel(Transform parent)
+        private void CreateTab(Transform parent, MapGridExplainabilityPanelPage page, string label)
         {
-            var panelGo = new GameObject("Events");
-            panelGo.transform.SetParent(parent, false);
+            int index = (int)page;
+            var go = new GameObject(label);
+            go.transform.SetParent(parent, false);
 
-            var panelImage = panelGo.AddComponent<Image>();
-            panelImage.raycastTarget = false;
-            panelImage.color = new Color(0.06f, 0.08f, 0.08f, 0.82f);
+            var image = go.AddComponent<Image>();
+            image.color = ColorFromHex("#0D1117", 0.1f);
+            image.raycastTarget = true;
 
-            var panelLayout = panelGo.AddComponent<VerticalLayoutGroup>();
-            panelLayout.childControlHeight = true;
-            panelLayout.childControlWidth = true;
-            panelLayout.childForceExpandHeight = true;
-            panelLayout.childForceExpandWidth = true;
-            panelLayout.padding = new RectOffset(6, 6, 6, 18);
+            var button = go.AddComponent<Button>();
+            button.transition = Selectable.Transition.ColorTint;
+            button.targetGraphic = image;
+            button.onClick.AddListener(() => SetActivePage(page));
+            _tabButtons[index] = button;
 
-            var panelLe = panelGo.AddComponent<LayoutElement>();
-            panelLe.minHeight = 120f;
-            panelLe.flexibleHeight = 1f;
+            var le = go.AddComponent<LayoutElement>();
+            le.minWidth = page == MapGridExplainabilityPanelPage.Pathfinding ? 92f : 66f;
+            le.preferredHeight = 24f;
+            le.flexibleWidth = 0f;
 
-            var textGo = new GameObject("Text");
-            textGo.transform.SetParent(panelGo.transform, false);
-
-            _eventsText = textGo.AddComponent<Text>();
-            _eventsText.raycastTarget = false;
-            _eventsText.font = GetUiFont();
-            _eventsText.fontSize = DefaultBodyFont;
-            _eventsText.fontStyle = FontStyle.Normal;
-            _eventsText.alignment = TextAnchor.UpperLeft;
-            _eventsText.horizontalOverflow = HorizontalWrapMode.Wrap;
-            _eventsText.verticalOverflow = VerticalWrapMode.Overflow;
-            _eventsText.supportRichText = true;
-            _eventsText.color = Color.white;
-            _eventsText.text = string.Empty;
-
-            var textLe = textGo.AddComponent<LayoutElement>();
-            textLe.flexibleHeight = 1f;
+            var text = CreateText("Label", go.transform, 10, FontStyle.Normal, ColorFromHex("#8B949E", 1f), TextAnchor.MiddleCenter);
+            text.text = label;
+            _tabTexts[index] = text;
         }
 
-        // =============================================================================
-        // GetUiFont
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Recupera il font runtime usato anche dalle card debug esistenti.
-        /// </para>
-        /// </summary>
+        private void BuildScrollBody(Transform parent)
+        {
+            var scrollGo = new GameObject("ScrollBody");
+            scrollGo.transform.SetParent(parent, false);
+
+            _scrollRect = scrollGo.AddComponent<ScrollRect>();
+            _scrollRect.horizontal = false;
+            _scrollRect.vertical = true;
+            _scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            _scrollRect.scrollSensitivity = 26f;
+
+            var le = scrollGo.AddComponent<LayoutElement>();
+            le.minHeight = 120f;
+            le.flexibleHeight = 1f;
+
+            var viewportGo = new GameObject("Viewport");
+            viewportGo.transform.SetParent(scrollGo.transform, false);
+            var viewportRt = viewportGo.AddComponent<RectTransform>();
+            viewportRt.anchorMin = Vector2.zero;
+            viewportRt.anchorMax = Vector2.one;
+            viewportRt.offsetMin = Vector2.zero;
+            viewportRt.offsetMax = Vector2.zero;
+
+            var viewportImage = viewportGo.AddComponent<Image>();
+            viewportImage.color = new Color(0f, 0f, 0f, 0f);
+            viewportImage.raycastTarget = true;
+            viewportGo.AddComponent<Mask>().showMaskGraphic = false;
+
+            var contentGo = new GameObject("Content");
+            contentGo.transform.SetParent(viewportGo.transform, false);
+            _scrollContent = contentGo.AddComponent<RectTransform>();
+            _scrollContent.anchorMin = new Vector2(0f, 1f);
+            _scrollContent.anchorMax = new Vector2(1f, 1f);
+            _scrollContent.pivot = new Vector2(0.5f, 1f);
+            _scrollContent.offsetMin = Vector2.zero;
+            _scrollContent.offsetMax = Vector2.zero;
+
+            var contentLayout = contentGo.AddComponent<VerticalLayoutGroup>();
+            contentLayout.childControlHeight = true;
+            contentLayout.childControlWidth = true;
+            contentLayout.childForceExpandHeight = false;
+            contentLayout.childForceExpandWidth = true;
+            contentLayout.spacing = 8;
+            contentLayout.padding = new RectOffset(2, 2, 2, 18);
+
+            var fitter = contentGo.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            _scrollRect.viewport = viewportRt;
+            _scrollRect.content = _scrollContent;
+        }
+
+        private void BuildPages()
+        {
+            _pageRoots[(int)MapGridExplainabilityPanelPage.Memory] = CreatePage("MemoryPage");
+            _memoryStoreText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Memory].transform, "memory store", "#58A6FF");
+            _memoryLatestText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Memory].transform, "ultima traccia encodata", "#D29922");
+            _memoryTimelineText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Memory].transform, "timeline memory recente", "#6E7681");
+
+            _pageRoots[(int)MapGridExplainabilityPanelPage.Belief] = CreatePage("BeliefPage");
+            _beliefEntriesText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Belief].transform, "belief entries recenti", "#3FB950");
+            _beliefQueryText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Belief].transform, "ultima query eseguita", "#58A6FF");
+            _beliefMutationText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Belief].transform, "ultima mutazione belief", "#D29922");
+
+            _pageRoots[(int)MapGridExplainabilityPanelPage.Decision] = CreatePage("DecisionPage");
+            _decisionSelectedText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "intenzione selezionata", "#3FB950");
+            _decisionCandidatesText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "candidati e score breakdown", "#D29922");
+            _decisionBridgeText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "bridge decision -> command", "#58A6FF");
+
+            _pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding] = CreatePage("PathfindingPage");
+            _pathIntentPlanText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding].transform, "intent e plan", "#9FC5E8");
+            _pathEventsText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding].transform, "eventi pathfinding", "#FFD966");
+        }
+
+        private GameObject CreatePage(string name)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(_scrollContent, false);
+
+            var layout = go.AddComponent<VerticalLayoutGroup>();
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.spacing = 8;
+            layout.padding = new RectOffset(0, 0, 0, 0);
+
+            var fitter = go.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            return go;
+        }
+
+        private Text CreateSection(Transform parent, string title, string dotHex)
+        {
+            var sectionGo = new GameObject(title);
+            sectionGo.transform.SetParent(parent, false);
+
+            var image = sectionGo.AddComponent<Image>();
+            image.raycastTarget = false;
+            image.color = ColorFromHex("#0D1117", 0.72f);
+
+            var sectionLayout = sectionGo.AddComponent<VerticalLayoutGroup>();
+            sectionLayout.childControlHeight = true;
+            sectionLayout.childControlWidth = true;
+            sectionLayout.childForceExpandHeight = false;
+            sectionLayout.childForceExpandWidth = true;
+            sectionLayout.spacing = 0;
+            sectionLayout.padding = new RectOffset(0, 0, 0, 0);
+
+            var fitter = sectionGo.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var headerGo = new GameObject("Header");
+            headerGo.transform.SetParent(sectionGo.transform, false);
+            var headerImage = headerGo.AddComponent<Image>();
+            headerImage.raycastTarget = false;
+            headerImage.color = ColorFromHex("#161B22", 0.96f);
+
+            var headerLayout = headerGo.AddComponent<HorizontalLayoutGroup>();
+            headerLayout.childControlHeight = true;
+            headerLayout.childControlWidth = false;
+            headerLayout.childForceExpandHeight = true;
+            headerLayout.childForceExpandWidth = false;
+            headerLayout.spacing = 6;
+            headerLayout.padding = new RectOffset(7, 7, 4, 4);
+
+            var headerLe = headerGo.AddComponent<LayoutElement>();
+            headerLe.minHeight = 25f;
+            headerLe.preferredHeight = 27f;
+
+            var dotGo = new GameObject("Dot");
+            dotGo.transform.SetParent(headerGo.transform, false);
+            var dotImage = dotGo.AddComponent<Image>();
+            dotImage.raycastTarget = false;
+            dotImage.color = ColorFromHex(dotHex, 1f);
+            var dotLe = dotGo.AddComponent<LayoutElement>();
+            dotLe.minWidth = 6f;
+            dotLe.preferredWidth = 6f;
+            dotLe.minHeight = 6f;
+            dotLe.preferredHeight = 6f;
+
+            var headerText = CreateText("Title", headerGo.transform, 10, FontStyle.Normal, ColorFromHex("#8B949E", 1f), TextAnchor.MiddleLeft);
+            headerText.text = title;
+            var headerTextLe = headerText.gameObject.AddComponent<LayoutElement>();
+            headerTextLe.flexibleWidth = 1f;
+
+            var bodyGo = new GameObject("Body");
+            bodyGo.transform.SetParent(sectionGo.transform, false);
+            var bodyLayout = bodyGo.AddComponent<VerticalLayoutGroup>();
+            bodyLayout.childControlHeight = true;
+            bodyLayout.childControlWidth = true;
+            bodyLayout.childForceExpandHeight = false;
+            bodyLayout.childForceExpandWidth = true;
+            bodyLayout.padding = new RectOffset(8, 8, 7, 8);
+
+            var bodyFitter = bodyGo.AddComponent<ContentSizeFitter>();
+            bodyFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var text = CreateText("Text", bodyGo.transform, DefaultBodyFont, FontStyle.Normal, Color.white, TextAnchor.UpperLeft);
+            text.supportRichText = true;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Overflow;
+            text.text = string.Empty;
+            return text;
+        }
+
+        private static Text CreateText(string name, Transform parent, int fontSize, FontStyle style, Color color, TextAnchor alignment)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+
+            var text = go.AddComponent<Text>();
+            text.raycastTarget = false;
+            text.font = GetUiFont();
+            text.fontSize = fontSize;
+            text.fontStyle = style;
+            text.alignment = alignment;
+            text.horizontalOverflow = HorizontalWrapMode.Wrap;
+            text.verticalOverflow = VerticalWrapMode.Truncate;
+            text.supportRichText = true;
+            text.color = color;
+
+            var le = go.AddComponent<LayoutElement>();
+            le.minHeight = fontSize + 6f;
+            le.flexibleWidth = 1f;
+            return text;
+        }
+
+        private static void SetTextIfReady(Text text, string value)
+        {
+            if (text != null)
+                text.text = value ?? string.Empty;
+        }
+
+        private static Color ColorFromHex(string hex, float alpha)
+        {
+            if (ColorUtility.TryParseHtmlString(hex, out var color))
+            {
+                color.a = alpha;
+                return color;
+            }
+
+            return new Color(1f, 1f, 1f, alpha);
+        }
+
         private static Font GetUiFont()
         {
             var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");

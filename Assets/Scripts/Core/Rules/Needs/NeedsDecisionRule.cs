@@ -260,7 +260,7 @@ namespace Arcontio.Core
 
             handled = true;
             telemetry?.Counter("DecisionBridge.IntentSelected", 1);
-            TryEmitDecisionTrace(explainabilityConfig, context, true, _decisionCandidates, selection, selectionConfig);
+            TryEmitDecisionTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, context, true, _decisionCandidates, selection, selectionConfig);
 
             ArcontioLogger.Info(
                 new LogContext(tick: nowTick, channel: "DecisionBridge", npcId: npcId),
@@ -275,7 +275,7 @@ namespace Arcontio.Core
                 case DecisionIntentKind.TakeRestrictedFood:
                 {
                     bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
-                    TryEmitBridgeTrace(explainabilityConfig, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
                     return planned;
                 }
 
@@ -283,7 +283,7 @@ namespace Arcontio.Core
                 case DecisionIntentKind.UseRestrictedRestPlace:
                 {
                     bool planned = TryPlanSleep(world, npcId, needs, out cmd, out didSteal);
-                    TryEmitBridgeTrace(explainabilityConfig, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
                     return planned;
                 }
 
@@ -298,12 +298,12 @@ namespace Arcontio.Core
                     didSteal = false;
                     didMove = false;
                     handled = false;
-                    TryEmitBridgeTrace(explainabilityConfig, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "LegacyFallbackForNonExecutableIntent");
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "LegacyFallbackForNonExecutableIntent");
                     return false;
 
                 default:
                     handled = false;
-                    TryEmitBridgeTrace(explainabilityConfig, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "UnsupportedIntent");
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "UnsupportedIntent");
                     return false;
             }
         }
@@ -332,6 +332,7 @@ namespace Arcontio.Core
         /// </summary>
         private static void TryEmitDecisionTrace(
             MemoryBeliefDecisionExplainabilityParams config,
+            MemoryBeliefDecisionExplainabilityRegistry registry,
             in DecisionEvaluationContext context,
             bool auditValid,
             List<DecisionCandidate> candidates,
@@ -366,7 +367,7 @@ namespace Arcontio.Core
                 },
             };
 
-            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, trace);
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(config, registry, trace);
         }
 
         // =============================================================================
@@ -394,6 +395,7 @@ namespace Arcontio.Core
         /// </summary>
         private static void TryEmitBridgeTrace(
             MemoryBeliefDecisionExplainabilityParams config,
+            MemoryBeliefDecisionExplainabilityRegistry registry,
             int tick,
             int npcId,
             DecisionCandidate candidate,
@@ -421,7 +423,7 @@ namespace Arcontio.Core
                 targetSource = MemoryBeliefDecisionTargetSource.LegacyFallback;
             }
 
-            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, new MemoryBeliefDecisionTrace
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
             {
                 Kind = MemoryBeliefDecisionTraceKind.Bridge,
                 Tick = tick,
@@ -695,6 +697,7 @@ namespace Arcontio.Core
                 beliefs: beliefs,
                 beliefQueryConfig: world.Global.BeliefQuery,
                 explainabilityConfig: world.Config?.Sim?.memory_belief_decision_explainability,
+                explainabilityRegistry: world.MemoryBeliefDecisionExplainability,
                 scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
                 normContext: new DecisionNormContext(false, 1f, true));
 
@@ -1088,7 +1091,8 @@ if (stolenStockObj != 0)
                 world.Global.BeliefQuery,
                 world.Config?.Sim?.memory_belief_decision_explainability,
                 npcId,
-                nowTick);
+                nowTick,
+                world.MemoryBeliefDecisionExplainability);
 
             if (queryResult.IsEmpty)
                 return false;

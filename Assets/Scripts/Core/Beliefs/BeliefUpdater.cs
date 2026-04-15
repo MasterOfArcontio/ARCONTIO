@@ -92,7 +92,33 @@ namespace Arcontio.Core
         /// </summary>
         public bool UpdateFromTrace(in MemoryTrace trace, BeliefStore store, int currentTick)
         {
-            return UpdateFromTrace(trace, store, currentTick, null, 0);
+            return UpdateFromTrace(trace, store, currentTick, null, null, 0);
+        }
+
+        // =============================================================================
+        // UpdateFromTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload di compatibilita' per i chiamanti e i test che conoscono solo la
+        /// configurazione JSONL ma non il registry runtime UI-friendly.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' progressiva</b></para>
+        /// <para>
+        /// La nuova pipeline puo' scrivere anche nel registry, ma i call site storici
+        /// devono continuare a produrre la stessa diagnostica JSONL senza obbligare
+        /// ogni test a costruire un World.
+        /// </para>
+        /// </summary>
+        public bool UpdateFromTrace(
+            in MemoryTrace trace,
+            BeliefStore store,
+            int currentTick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            int npcId)
+        {
+            return UpdateFromTrace(trace, store, currentTick, explainabilityConfig, null, npcId);
         }
 
         // =============================================================================
@@ -123,6 +149,7 @@ namespace Arcontio.Core
             BeliefStore store,
             int currentTick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
             int npcId)
         {
             if (store == null)
@@ -150,6 +177,7 @@ namespace Arcontio.Core
 
                     MemoryBeliefDecisionExplainabilityEmitter.TryWriteBeliefTrace(
                         explainabilityConfig,
+                        explainabilityRegistry,
                         npcId,
                         currentTick,
                         operation,

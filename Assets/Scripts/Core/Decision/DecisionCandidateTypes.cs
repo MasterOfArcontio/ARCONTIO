@@ -158,6 +158,7 @@ namespace Arcontio.Core
         public readonly BeliefStore Beliefs;
         public readonly BeliefQueryConfig BeliefQueryConfig;
         public readonly MemoryBeliefDecisionExplainabilityParams ExplainabilityConfig;
+        public readonly MemoryBeliefDecisionExplainabilityRegistry ExplainabilityRegistry;
         public readonly DecisionScheduleFrame ScheduleFrame;
         public readonly DecisionNormContext NormContext;
 
@@ -182,6 +183,7 @@ namespace Arcontio.Core
                 beliefs,
                 beliefQueryConfig,
                 explainabilityConfig,
+                null,
                 scheduleFrame,
                 DecisionNormContext.Default())
         {
@@ -199,6 +201,35 @@ namespace Arcontio.Core
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             DecisionScheduleFrame scheduleFrame,
             DecisionNormContext normContext)
+            : this(
+                npcId,
+                tick,
+                needs,
+                dna,
+                profile,
+                npcPosition,
+                beliefs,
+                beliefQueryConfig,
+                explainabilityConfig,
+                null,
+                scheduleFrame,
+                normContext)
+        {
+        }
+
+        public DecisionEvaluationContext(
+            int npcId,
+            int tick,
+            NpcNeeds needs,
+            NpcDnaProfile dna,
+            NpcProfile profile,
+            Vector2Int npcPosition,
+            BeliefStore beliefs,
+            BeliefQueryConfig beliefQueryConfig,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            DecisionScheduleFrame scheduleFrame,
+            DecisionNormContext normContext)
         {
             NpcId = npcId;
             Tick = tick;
@@ -209,6 +240,7 @@ namespace Arcontio.Core
             Beliefs = beliefs;
             BeliefQueryConfig = beliefQueryConfig;
             ExplainabilityConfig = explainabilityConfig;
+            ExplainabilityRegistry = explainabilityRegistry;
             ScheduleFrame = scheduleFrame;
             NormContext = normContext;
         }

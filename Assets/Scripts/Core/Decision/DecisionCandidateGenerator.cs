@@ -162,7 +162,8 @@ namespace Arcontio.Core
                 context.BeliefQueryConfig,
                 context.ExplainabilityConfig,
                 context.NpcId,
-                context.Tick);
+                context.Tick,
+                context.ExplainabilityRegistry);
 
             if (result.IsEmpty)
                 return false;

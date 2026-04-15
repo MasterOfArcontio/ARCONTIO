@@ -611,6 +611,33 @@ namespace Arcontio.Core
         /// </summary>
         public readonly MovementExplainabilityRegistry MovementExplainability;
 
+        // =============================================================================
+        // MemoryBeliefDecisionExplainability
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registry passivo dell'Explainability Layer Memory/Belief/Query/Decision.
+        /// Conserva trace bounded per NPC e viene scritto solo da emitter one-way.
+        /// </para>
+        ///
+        /// <para><b>UI live senza JSONL come sorgente</b></para>
+        /// <para>
+        /// Il registry permette al pannello laterale di leggere snapshot runtime
+        /// senza aprire file e senza interrogare direttamente MemoryStore,
+        /// BeliefStore o store oggettivi del World.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Memory</b>: trace accettate, rinforzate o scartate dal MemoryStore.</item>
+        ///   <item><b>Belief</b>: mutazioni BeliefStore osservate dal BeliefUpdater.</item>
+        ///   <item><b>Query</b>: valutazioni del BeliefQueryService.</item>
+        ///   <item><b>Decision</b>: candidati, score e selezione intenzione.</item>
+        ///   <item><b>Bridge</b>: adattamento provvisorio Decision -> Command legacy.</item>
+        /// </list>
+        /// </summary>
+        public readonly MemoryBeliefDecisionExplainabilityRegistry MemoryBeliefDecisionExplainability;
+
         /// <summary>
         /// Stato di scan direzionale per NPC.
         /// <list type="bullet">
@@ -717,6 +744,20 @@ namespace Arcontio.Core
                 el?.ringBuffer_intent ?? MovementExplainabilityRegistry.DefaultIntentCapacity,
                 el?.ringBuffer_plan ?? MovementExplainabilityRegistry.DefaultPlanCapacity,
                 elEventCapacity);
+
+            // ============================================================
+            // MEMORY / BELIEF / QUERY / DECISION EXPLAINABILITY REGISTRY
+            // ============================================================
+            // Come per il pathfinding, lo store nasce sempre ma viene popolato solo
+            // quando la configurazione EL-MBQD e' abilitata. In questo modo la UI puo'
+            // chiedere snapshot in modo difensivo senza introdurre null-reference.
+            var mbqd = Config?.Sim?.memory_belief_decision_explainability;
+            MemoryBeliefDecisionExplainability = new MemoryBeliefDecisionExplainabilityRegistry(
+                mbqd?.ringBuffer_memory ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultMemoryCapacity,
+                mbqd?.ringBuffer_belief ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultBeliefCapacity,
+                mbqd?.ringBuffer_query ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultQueryCapacity,
+                mbqd?.ringBuffer_decision ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultDecisionCapacity,
+                mbqd?.ringBuffer_bridge ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultBridgeCapacity);
 
             // ============================================================
             // DEBUG FOV TELEMETRY (config-driven)

@@ -139,6 +139,11 @@
     "logBridge": true,
     "includeCandidates": true,
     "includeScoreBreakdown": true,
-    "includeRejectedCandidates": false
+    "includeRejectedCandidates": false,
+    "ringBuffer_memory": 80,
+    "ringBuffer_belief": 80,
+    "ringBuffer_query": 40,
+    "ringBuffer_decision": 24,
+    "ringBuffer_bridge": 24
   }
 }

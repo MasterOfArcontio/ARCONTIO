@@ -349,6 +349,12 @@ namespace Arcontio.Core.Config
         public bool includeCandidates = true;
         public bool includeScoreBreakdown = true;
         public bool includeRejectedCandidates = false;
+
+        public int ringBuffer_memory = 80;
+        public int ringBuffer_belief = 80;
+        public int ringBuffer_query = 40;
+        public int ringBuffer_decision = 24;
+        public int ringBuffer_bridge = 24;
     }
 
 

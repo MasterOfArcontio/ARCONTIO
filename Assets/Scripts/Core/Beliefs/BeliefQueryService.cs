@@ -171,7 +171,8 @@ namespace Arcontio.Core
             BeliefQueryConfig config,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             int npcId,
-            long tick)
+            long tick,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry = null)
         {
             var query = new BeliefQueryContext(
                 BeliefCategory.Food,
@@ -179,7 +180,7 @@ namespace Arcontio.Core
                 npcPosition,
                 config.defaultMinConfidence);
 
-            return QueryBest(store, query, config, explainabilityConfig, npcId, tick);
+            return QueryBest(store, query, config, explainabilityConfig, npcId, tick, explainabilityRegistry);
         }
 
         // =============================================================================
@@ -249,7 +250,8 @@ namespace Arcontio.Core
             BeliefQueryConfig config,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             int npcId,
-            long tick)
+            long tick,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry = null)
         {
             var query = new BeliefQueryContext(
                 BeliefCategory.Rest,
@@ -257,7 +259,7 @@ namespace Arcontio.Core
                 npcPosition,
                 config.defaultMinConfidence);
 
-            return QueryBest(store, query, config, explainabilityConfig, npcId, tick);
+            return QueryBest(store, query, config, explainabilityConfig, npcId, tick, explainabilityRegistry);
         }
 
         // =============================================================================
@@ -286,7 +288,7 @@ namespace Arcontio.Core
         /// </summary>
         public BeliefQueryResult QueryBest(BeliefStore store, BeliefQueryContext query, BeliefQueryConfig config)
         {
-            return QueryBest(store, query, config, null, 0, 0);
+            return QueryBest(store, query, config, null, 0, 0, null);
         }
 
         // =============================================================================
@@ -319,12 +321,13 @@ namespace Arcontio.Core
             BeliefQueryConfig config,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             int npcId,
-            long tick)
+            long tick,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry = null)
         {
             if (store == null)
             {
                 var emptyResult = BeliefQueryResult.Empty();
-                TryEmitQueryTrace(explainabilityConfig, npcId, tick, query, emptyResult, 0, 0, "MissingBeliefStore");
+                TryEmitQueryTrace(explainabilityConfig, explainabilityRegistry, npcId, tick, query, emptyResult, 0, 0, "MissingBeliefStore");
                 return BeliefQueryResult.Empty();
             }
 
@@ -350,7 +353,7 @@ namespace Arcontio.Core
             if (_candidates.Count == 0)
             {
                 var emptyResult = BeliefQueryResult.Empty();
-                TryEmitQueryTrace(explainabilityConfig, npcId, tick, query, emptyResult, matchingCategoryCount, 0, "NoUsableBelief");
+                TryEmitQueryTrace(explainabilityConfig, explainabilityRegistry, npcId, tick, query, emptyResult, matchingCategoryCount, 0, "NoUsableBelief");
                 return BeliefQueryResult.Empty();
             }
 
@@ -390,7 +393,7 @@ namespace Arcontio.Core
                 ? new BeliefQueryResult(false, bestBelief, bestScore, bestContributions)
                 : BeliefQueryResult.Empty();
 
-            TryEmitQueryTrace(explainabilityConfig, npcId, tick, query, result, matchingCategoryCount, _candidates.Count, string.Empty);
+            TryEmitQueryTrace(explainabilityConfig, explainabilityRegistry, npcId, tick, query, result, matchingCategoryCount, _candidates.Count, string.Empty);
             return result;
         }
 
@@ -419,6 +422,7 @@ namespace Arcontio.Core
         /// </summary>
         private static void TryEmitQueryTrace(
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
             int npcId,
             long tick,
             BeliefQueryContext query,
@@ -453,7 +457,7 @@ namespace Arcontio.Core
                 },
             };
 
-            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(explainabilityConfig, trace);
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(explainabilityConfig, explainabilityRegistry, trace);
         }
 
         // =============================================================================

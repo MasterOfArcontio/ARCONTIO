@@ -15,6 +15,7 @@
 | v0.03 | Pathfinding landmark + ComplexEdge + failure ladder | Aprile 2026 | ✅ Completata | — |
 | v0.04 | NpcDnaProfile · NpcProfile · Needs System · BeliefStore | Maggio–Giugno 2026 | ⚠️ Parziale: BeliefStore completato, PhysicalProfile e Health/Comfort restano aperti |
 | v0.05 | Decision Layer completo | Giugno–Luglio 2026 | ⏳ Pending |
+| v0.05.5 | EL-MBQD Runtime UI Registry + pannello laterale | Luglio 2026 | ✅ Completata |
 | v0.06 | Job System + Step System | Luglio–Agosto 2026 | ⏳ Pending |
 | v0.07 | Role System + CognitiveModulators | Agosto 2026 | ⏳ Pending |
 | v0.08 | Petition System + Mobilità Sociale | Settembre 2026 | ⏳ Pending |
@@ -175,6 +176,48 @@
 | Fase 3: weighted random con varianza modulata da DNA | ⏳ |
 | NPC diversi con DNA diverso mostrano comportamenti diversi | ⏳ |
 | Nessuna query diretta a MemoryStore o BeliefStore dal Decision Layer: accesso solo via QuerySystem | ⏳ |
+
+---
+
+## v0.05.5 — EL-MBQD Runtime UI Registry + pannello laterale
+
+**Obiettivo:** Rendere osservabile in runtime il ciclo Memory → Belief → Query → Decision senza leggere il JSONL dalla UI e senza introdurre accessi onniscienti. Questa fase trasforma l'EL-MBQD da strumento solo testuale/file-based a layer diagnostico live, usando lo stesso modello gia' validato per l'EL Pathfinding: trace diagnostica → registry runtime bounded → ViewModel UI-friendly → pannello laterale.
+
+**Sistemi introdotti:**
+- `MemoryBeliefDecisionExplainabilityRegistry` — registry runtime passivo per-NPC
+- Store bounded per trace `memory`, `belief`, `query`, `decision`, `bridge`
+- ViewModel UI-friendly per pannello laterale
+- Pannello EL tabbed: Memory · Belief · Decision · Pathfinding
+- Scroll verticale nei tab con contenuto lungo
+- Sub-pannelli con cornice, titolo, pallino colorato e righe key/value
+
+### Tabella sessioni v0.05.5
+
+| # | Giorno | Sistema | Task | Stato |
+|---|--------|---------|------|-------|
+| 1 | Lun | Registry | MemoryBeliefDecisionExplainabilityRegistry + store per-NPC bounded | ✅ |
+| 2 | Mer | Emitters | Doppia uscita trace: JSONL opzionale + registry runtime UI-friendly | ✅ |
+| 3 | Gio | ViewModel | Snapshot UI read-only con summary Memory, Belief, Query, Decision e Bridge | ✅ |
+| 4 | Lun | UI | Pannello laterale tabbed con Memory, Belief, Decision e Pathfinding | ✅ |
+| 5 | Mer | UI | ScrollRect, colori differenziati, sub-pannelli con cornice e pallini colorati | ✅ |
+| 6 | Gio | QA | Copertura campi JSONL → UI + test EditMode registry/ViewModel | ✅ |
+
+### Definition of Done v0.05.5
+
+| Criterio | Stato |
+|----------|-------|
+| Il registry runtime conserva trace EL-MBQD recenti per NPC senza leggere file JSONL | ✅ |
+| La UI legge solo ViewModel/snapshot, non MemoryStore, BeliefStore o world state oggettivo | ✅ |
+| I tab Memory, Belief, Decision e Pathfinding hanno scroll verticale indipendente | ✅ |
+| Colori diagnostici coerenti: verde ok, rosso errore/fallimento, ambra warning/fallback, blu informazione, bianco valore primario, grigio muted | ✅ |
+| Ogni sezione usa sub-pannello con cornice, titolo e pallino colorato come linguaggio visuale comune | ✅ |
+| Tutti i campi prodotti dal JSONL hanno una posizione UI o una motivazione esplicita di omissione | ✅ |
+| Bridge Decision → Command legacy visibile nel tab Decision | ✅ |
+| Nessun file `.meta`, `Library`, `Temp` o `Obj` viene modificato | ✅ |
+
+> **Nota architetturale v0.05.5:** questa fase non sostituisce il JSONL. Il JSONL resta il formato persistente append-only per analisi offline; il registry runtime serve soltanto alla UI live. Entrambi devono ricevere snapshot gia' prodotti dai punti legittimi della pipeline, evitando che il pannello diventi un lettore globale di `World`, `MemoryStore`, `BeliefStore`, `Objects` o `FoodStocks`.
+
+> **Numero step necessari:** 6 step/sessioni. Meno di 6 rischierebbe di mescolare registry, ViewModel, UI e QA nello stesso intervento; piu' di 6 sposterebbe lavoro che appartiene alla v0.10, dove il debug overlay completo verra' consolidato con il resto della simulazione.
 
 ---
 
@@ -401,12 +444,13 @@
 | v0.03 | 3 | 9 | Aprile 2026 |
 | v0.04 | 7 | 19 | Maggio–Giugno 2026 |
 | v0.05 | 4 | 12 | Giugno–Luglio 2026 |
+| v0.05.5 | 2 | 6 | Luglio 2026 |
 | v0.06 | 4 | 12 | Luglio–Agosto 2026 |
 | v0.07 | 3 | 9 | Agosto 2026 |
 | v0.08 | 4 | 12 | Settembre 2026 |
 | v0.09 | 3 | 9 | Ottobre 2026 |
 | v0.10 | 4 | 12 | Ottobre–Novembre 2026 |
-| **Totale** | **31** | **93** | **Apr → Nov 2026** |
+| **Totale** | **33** | **99** | **Apr → Nov 2026** |
 
 > **Buffer consigliato:** +2–3 settimane. Le fasi v0.05 (Decision Layer) e v0.06 (Job System) sono le più a rischio di slittamento per bug subdoli legati all'omniscience constraint.
 
