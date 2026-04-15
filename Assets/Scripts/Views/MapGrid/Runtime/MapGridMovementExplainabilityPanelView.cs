@@ -355,52 +355,25 @@ namespace Arcontio.View.MapGrid
 
         private void BuildScrollBody(Transform parent)
         {
-            var scrollGo = new GameObject("ScrollBody");
-            scrollGo.transform.SetParent(parent, false);
-            var scrollRt = scrollGo.AddComponent<RectTransform>();
-            scrollRt.anchorMin = new Vector2(0f, 0f);
-            scrollRt.anchorMax = new Vector2(1f, 1f);
-            scrollRt.pivot = new Vector2(0.5f, 0.5f);
-            scrollRt.offsetMin = Vector2.zero;
-            scrollRt.offsetMax = Vector2.zero;
-
-            var scrollImage = scrollGo.AddComponent<Image>();
-            scrollImage.raycastTarget = true;
-            scrollImage.color = ColorFromHex("#010409", 0.35f);
-
-            _scrollRect = scrollGo.AddComponent<ScrollRect>();
-            _scrollRect.horizontal = false;
-            _scrollRect.vertical = true;
-            _scrollRect.movementType = ScrollRect.MovementType.Clamped;
-            _scrollRect.scrollSensitivity = 26f;
-
-            var le = scrollGo.AddComponent<LayoutElement>();
-            le.minHeight = 360f;
-            le.preferredHeight = 620f;
-            le.flexibleHeight = 1f;
-
-            var viewportGo = new GameObject("Viewport");
-            viewportGo.transform.SetParent(scrollGo.transform, false);
-            var viewportRt = viewportGo.AddComponent<RectTransform>();
-            viewportRt.anchorMin = Vector2.zero;
-            viewportRt.anchorMax = Vector2.one;
-            viewportRt.offsetMin = Vector2.zero;
-            viewportRt.offsetMax = Vector2.zero;
-
-            var viewportImage = viewportGo.AddComponent<Image>();
-            viewportImage.color = new Color(0f, 0f, 0f, 0f);
-            viewportImage.raycastTarget = true;
-            viewportGo.AddComponent<Mask>().showMaskGraphic = false;
-
-            var contentGo = new GameObject("Content");
-            contentGo.transform.SetParent(viewportGo.transform, false);
+            var contentGo = new GameObject("BodyDirectNoScroll");
+            contentGo.transform.SetParent(parent, false);
             _scrollContent = contentGo.AddComponent<RectTransform>();
-            _scrollContent.anchorMin = new Vector2(0f, 1f);
+            _scrollContent.anchorMin = new Vector2(0f, 0f);
             _scrollContent.anchorMax = new Vector2(1f, 1f);
             _scrollContent.pivot = new Vector2(0.5f, 1f);
             _scrollContent.offsetMin = Vector2.zero;
             _scrollContent.offsetMax = Vector2.zero;
-            _scrollContent.sizeDelta = new Vector2(0f, 360f);
+            _scrollContent.sizeDelta = new Vector2(0f, 620f);
+
+            var bodyImage = contentGo.AddComponent<Image>();
+            bodyImage.raycastTarget = true;
+            bodyImage.color = ColorFromHex("#010409", 0.52f);
+
+            var bodyLe = contentGo.AddComponent<LayoutElement>();
+            bodyLe.minHeight = 360f;
+            bodyLe.preferredHeight = 620f;
+            bodyLe.flexibleHeight = 1f;
+            bodyLe.flexibleWidth = 1f;
 
             var contentLayout = contentGo.AddComponent<VerticalLayoutGroup>();
             contentLayout.childControlHeight = true;
@@ -412,9 +385,7 @@ namespace Arcontio.View.MapGrid
 
             var fitter = contentGo.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
-            _scrollRect.viewport = viewportRt;
-            _scrollRect.content = _scrollContent;
+            _scrollRect = null;
         }
 
         private void BuildPages()
