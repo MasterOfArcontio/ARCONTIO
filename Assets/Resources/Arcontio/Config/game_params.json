@@ -37,6 +37,13 @@
     "blacklist_penalty_stage1": 0.12,
     "blacklist_penalty_stage2": 0.35
   },
+  "decision": {
+    "selectionMode": "DeterministicTop1",
+    "topN": 1,
+    "noise01": 0.0,
+    "impulsivityNoiseBonus": 0.0,
+    "minimumWeight": 0.001
+  },
   "explainability": {
     "enabled": true,
     "defaultVerbosity": 2,

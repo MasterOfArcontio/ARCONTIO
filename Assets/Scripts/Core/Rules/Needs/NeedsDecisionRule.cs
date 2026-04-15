@@ -246,7 +246,7 @@ namespace Arcontio.Core
 
             _decisionCandidateGenerator.GeneratePhase1Candidates(context, _decisionCandidates);
             var scoringConfig = DecisionScoringConfig.Default();
-            var selectionConfig = DecisionSelectionConfig.Default();
+            var selectionConfig = ResolveDecisionSelectionConfig(world.Config?.Sim?.decision);
             _decisionScoringService.ScoreCandidates(context, _decisionCandidates, scoringConfig);
 
             var selection = _decisionSelectionService.Select(
@@ -592,6 +592,53 @@ namespace Arcontio.Core
             if (value < 0f) return 0f;
             if (value > 1f) return 1f;
             return value;
+        }
+
+        // =============================================================================
+        // ResolveDecisionSelectionConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte la configurazione JSON del Decision Layer nella struct usata dal
+        /// servizio di selezione.
+        /// </para>
+        ///
+        /// <para><b>QA deterministico senza cambiare il SelectionService</b></para>
+        /// <para>
+        /// La modalita' <c>DeterministicTop1</c> viene tradotta in <c>topN = 1</c>,
+        /// <c>noise01 = 0</c> e <c>impulsivityNoiseBonus = 0</c>. Il servizio weighted
+        /// random considera quindi un solo candidato: il migliore ordinato per score.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Defaults</b>: usa i valori storici quando la sezione manca.</item>
+        ///   <item><b>WeightedRandomTopN</b>: legge topN, noise e pesi minimi da JSON.</item>
+        ///   <item><b>DeterministicTop1</b>: forza una selezione ripetibile per test runtime.</item>
+        /// </list>
+        /// </summary>
+        private static DecisionSelectionConfig ResolveDecisionSelectionConfig(DecisionRuntimeParams runtimeConfig)
+        {
+            var config = DecisionSelectionConfig.Default();
+            if (runtimeConfig == null)
+                return config;
+
+            if (string.Equals(runtimeConfig.selectionMode, "DeterministicTop1", System.StringComparison.OrdinalIgnoreCase))
+            {
+                config.topN = 1;
+                config.noise01 = 0f;
+                config.impulsivityNoiseBonus = 0f;
+                config.minimumWeight = runtimeConfig.minimumWeight > 0f ? runtimeConfig.minimumWeight : config.minimumWeight;
+                return config;
+            }
+
+            // In modalita' standard manteniamo fallback conservativi: valori non
+            // positivi nel JSON non devono azzerare accidentalmente il selettore.
+            config.topN = runtimeConfig.topN > 0 ? runtimeConfig.topN : config.topN;
+            config.noise01 = Clamp01(runtimeConfig.noise01);
+            config.impulsivityNoiseBonus = Clamp01(runtimeConfig.impulsivityNoiseBonus);
+            config.minimumWeight = runtimeConfig.minimumWeight > 0f ? runtimeConfig.minimumWeight : config.minimumWeight;
+            return config;
         }
 
         // =============================================================================

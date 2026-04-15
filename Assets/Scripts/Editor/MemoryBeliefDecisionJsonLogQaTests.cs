@@ -87,6 +87,9 @@ namespace Arcontio.Tests
             Assert.That(jsonl, Does.Contain("\"label\":\"ConfidenceScore\""));
             Assert.That(jsonl, Does.Not.Contain("\"GoalType\":"));
             Assert.That(jsonl, Does.Not.Contain("\"BeliefCategory\":"));
+            Assert.That(jsonl, Does.Not.Contain("\"memory\":"));
+            Assert.That(jsonl, Does.Not.Contain("\"decision\":"));
+            Assert.That(jsonl, Does.Not.Contain("\"bridge\":"));
         }
 
         // =============================================================================
@@ -224,6 +227,9 @@ namespace Arcontio.Tests
             Assert.That(jsonl, Does.Contain("\"label\":\"NeedUrgency\""));
             Assert.That(jsonl, Does.Contain("\"label\":\"MemoryConfidence\""));
             Assert.That(jsonl, Does.Not.Contain("\"SelectedIntent\":"));
+            Assert.That(jsonl, Does.Not.Contain("\"memory\":"));
+            Assert.That(jsonl, Does.Not.Contain("\"query\":"));
+            Assert.That(jsonl, Does.Not.Contain("\"bridge\":"));
         }
 
         // =============================================================================
@@ -270,6 +276,9 @@ namespace Arcontio.Tests
             Assert.That(jsonl, Does.Contain("\"targetCellText\":\"(12, 8)\""));
             Assert.That(jsonl, Does.Contain("\"targetSource\":\"BeliefQuery\""));
             Assert.That(jsonl, Does.Contain("\"legacyFallbackUsed\":false"));
+            Assert.That(jsonl, Does.Not.Contain("\"memory\":"));
+            Assert.That(jsonl, Does.Not.Contain("\"query\":"));
+            Assert.That(jsonl, Does.Not.Contain("\"decision\":"));
         }
 
         // =============================================================================

@@ -68,36 +68,61 @@ namespace Arcontio.Core
             if (!IsKindEnabled(config, trace.Kind))
                 return;
 
-            var record = new MemoryBeliefDecisionJsonLogRecord
-            {
-                schema = SchemaVersion,
-                kind = ToKindString(trace.Kind),
-                tick = trace.Tick,
-                npcId = trace.NpcId,
-            };
-
             switch (trace.Kind)
             {
                 case MemoryBeliefDecisionTraceKind.Memory:
-                    record.memory = BuildMemory(trace.Memory);
+                    TryWriteRecord(config, new MemoryJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        memory = BuildMemory(trace.Memory),
+                    });
                     break;
                 case MemoryBeliefDecisionTraceKind.Belief:
-                    record.belief = BuildBeliefRecord(trace.Belief);
+                    TryWriteRecord(config, new BeliefJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        belief = BuildBeliefRecord(trace.Belief),
+                    });
                     break;
                 case MemoryBeliefDecisionTraceKind.Query:
-                    record.query = BuildQuery(trace.Query);
+                    TryWriteRecord(config, new QueryJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        query = BuildQuery(trace.Query),
+                    });
                     break;
                 case MemoryBeliefDecisionTraceKind.Decision:
-                    record.decision = BuildDecision(trace.Decision, config);
+                    TryWriteRecord(config, new DecisionJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        decision = BuildDecision(trace.Decision, config),
+                    });
                     break;
                 case MemoryBeliefDecisionTraceKind.Bridge:
-                    record.bridge = BuildBridge(trace.Bridge);
+                    TryWriteRecord(config, new BridgeJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        bridge = BuildBridge(trace.Bridge),
+                    });
                     break;
                 default:
                     return;
             }
-
-            TryWriteRecord(config, record);
         }
 
         private static bool IsKindEnabled(MemoryBeliefDecisionExplainabilityParams config, MemoryBeliefDecisionTraceKind kind)
@@ -113,7 +138,7 @@ namespace Arcontio.Core
             };
         }
 
-        private static void TryWriteRecord(MemoryBeliefDecisionExplainabilityParams config, MemoryBeliefDecisionJsonLogRecord record)
+        private static void TryWriteRecord(MemoryBeliefDecisionExplainabilityParams config, object record)
         {
             string path = ResolveLogPath(config);
             if (string.IsNullOrWhiteSpace(path))
@@ -352,17 +377,154 @@ namespace Arcontio.Core
             };
         }
 
+        // =============================================================================
+        // MemoryJsonLogRecord
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Record JSONL compatto per payload <c>memory</c>.
+        /// </para>
+        ///
+        /// <para><b>Payload singola</b></para>
+        /// <para>
+        /// La classe contiene solo il campo coerente con il kind, evitando che
+        /// <c>JsonUtility</c> serializzi payload vuoti per belief, query, decision e
+        /// bridge.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>schema/kind/tick/npcId</b>: envelope comune.</item>
+        ///   <item><b>memory</b>: payload della trace di memoria.</item>
+        /// </list>
+        /// </summary>
         [Serializable]
-        private sealed class MemoryBeliefDecisionJsonLogRecord
+        private sealed class MemoryJsonLogRecord
         {
             public string schema = string.Empty;
             public string kind = string.Empty;
             public long tick;
             public int npcId;
             public MemoryLogPayload memory;
+        }
+
+        // =============================================================================
+        // BeliefJsonLogRecord
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Record JSONL compatto per payload <c>belief</c>.
+        /// </para>
+        ///
+        /// <para><b>Payload singola</b></para>
+        /// <para>
+        /// Tiene separata la mutazione belief dagli altri payload EL-MBD, riducendo
+        /// rumore nel file e rendendo ogni riga piu' leggibile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>schema/kind/tick/npcId</b>: envelope comune.</item>
+        ///   <item><b>belief</b>: payload della mutazione belief.</item>
+        /// </list>
+        /// </summary>
+        [Serializable]
+        private sealed class BeliefJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
             public BeliefRecordLogPayload belief;
+        }
+
+        // =============================================================================
+        // QueryJsonLogRecord
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Record JSONL compatto per payload <c>query</c>.
+        /// </para>
+        ///
+        /// <para><b>Query isolata</b></para>
+        /// <para>
+        /// La riga contiene solo contesto, winner e breakdown della query, senza
+        /// oggetti vuoti riferiti a memory o decision.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>schema/kind/tick/npcId</b>: envelope comune.</item>
+        ///   <item><b>query</b>: payload del BeliefQueryService.</item>
+        /// </list>
+        /// </summary>
+        [Serializable]
+        private sealed class QueryJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
             public QueryLogPayload query;
+        }
+
+        // =============================================================================
+        // DecisionJsonLogRecord
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Record JSONL compatto per payload <c>decision</c>.
+        /// </para>
+        ///
+        /// <para><b>Decisione isolata</b></para>
+        /// <para>
+        /// Conserva solo selezione, candidati e score breakdown della decisione,
+        /// rendendo piu' semplice il confronto tra run deterministici.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>schema/kind/tick/npcId</b>: envelope comune.</item>
+        ///   <item><b>decision</b>: payload della selezione decisionale.</item>
+        /// </list>
+        /// </summary>
+        [Serializable]
+        private sealed class DecisionJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
             public DecisionLogPayload decision;
+        }
+
+        // =============================================================================
+        // BridgeJsonLogRecord
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Record JSONL compatto per payload <c>bridge</c>.
+        /// </para>
+        ///
+        /// <para><b>Bridge isolato</b></para>
+        /// <para>
+        /// La riga descrive solo la traduzione Decision -> Command legacy, senza
+        /// payload vuoti di memory, belief, query o decision.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>schema/kind/tick/npcId</b>: envelope comune.</item>
+        ///   <item><b>bridge</b>: payload del ponte provvisorio.</item>
+        /// </list>
+        /// </summary>
+        [Serializable]
+        private sealed class BridgeJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
             public BridgeLogPayload bridge;
         }
 

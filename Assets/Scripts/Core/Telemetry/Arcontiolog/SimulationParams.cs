@@ -66,6 +66,12 @@ namespace Arcontio.Core.Config
         public MemoryBeliefDecisionExplainabilityParams memory_belief_decision_explainability =
             new MemoryBeliefDecisionExplainabilityParams();
 
+        // ---------------- Decision Layer (v0.05.40) ----------------
+        // Parametri comportamentali minimi della selezione intenzioni. Separiamo
+        // questa sezione dall'EL: l'EL osserva, mentre "decision" puo' modificare la
+        // policy di scelta, per esempio rendendo i test runtime deterministici.
+        public DecisionRuntimeParams decision = new DecisionRuntimeParams();
+
         // ---------------- GVD-DIN (v0.03) ----------------
         // Sistema GVD dinamico condition-based + pruning.
         // Attivo quando gvd_din.enabled=true E hybrid_landmark.use_hybrid_extractor=false.
@@ -87,6 +93,40 @@ namespace Arcontio.Core.Config
         // Parametri globali del sistema di memoria NPC.
         // I tratti individuali (Resilience, Rumination, ecc.) vengono letti dal DNA.
         public MemorySystemParams memory = new MemorySystemParams();
+    }
+
+    // =============================================================================
+    // DecisionRuntimeParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile dei parametri runtime minimi del Decision Layer.
+    /// </para>
+    ///
+    /// <para><b>Selezione controllabile da scenario</b></para>
+    /// <para>
+    /// La simulazione normale puo' usare una selezione weighted random top-N, mentre
+    /// i test QA possono impostare <c>selectionMode</c> a <c>DeterministicTop1</c>
+    /// per scegliere sempre il candidato disponibile con score piu' alto.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>selectionMode</b>: <c>WeightedRandomTopN</c> oppure <c>DeterministicTop1</c>.</item>
+    ///   <item><b>topN</b>: numero massimo di candidati ammessi alla selezione probabilistica.</item>
+    ///   <item><b>noise01</b>: rumore base della roulette weighted random.</item>
+    ///   <item><b>impulsivityNoiseBonus</b>: bonus di rumore derivato dal DNA dell'NPC.</item>
+    ///   <item><b>minimumWeight</b>: peso minimo per evitare roulette con peso zero.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class DecisionRuntimeParams
+    {
+        public string selectionMode = "WeightedRandomTopN";
+        public int topN = 3;
+        public float noise01 = 0.15f;
+        public float impulsivityNoiseBonus = 0.35f;
+        public float minimumWeight = 0.001f;
     }
 
     // ============================================================
