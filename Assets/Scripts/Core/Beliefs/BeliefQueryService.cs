@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Arcontio.Core.Config;
 
 namespace Arcontio.Core
 {
@@ -141,6 +142,47 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // GetBestKnownFoodSource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una query di comodo per la migliore fonte di cibo conosciuta e,
+        /// quando richiesto dal chiamante, registra anche il record EL della query.
+        /// </para>
+        ///
+        /// <para><b>Explainability passiva del QuerySystem</b></para>
+        /// <para>
+        /// L'overload mantiene separata la diagnostica dalla logica decisionale: il
+        /// risultato della query resta identico, mentre il sink JSONL riceve solo uno
+        /// snapshot dei dati gia' attraversati dal servizio.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Query Food</b>: riusa la stessa costruzione del metodo base.</item>
+        ///   <item><b>Config EL</b>: abilita o disabilita l'export senza cambiare i chiamanti esistenti.</item>
+        ///   <item><b>Identita' runtime</b>: associa tick e NPC al record diagnostico.</item>
+        /// </list>
+        /// </summary>
+        public BeliefQueryResult GetBestKnownFoodSource(
+            BeliefStore store,
+            UnityEngine.Vector2Int npcPosition,
+            float urgency01,
+            BeliefQueryConfig config,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            int npcId,
+            long tick)
+        {
+            var query = new BeliefQueryContext(
+                BeliefCategory.Food,
+                urgency01,
+                npcPosition,
+                config.defaultMinConfidence);
+
+            return QueryBest(store, query, config, explainabilityConfig, npcId, tick);
+        }
+
+        // =============================================================================
         // GetBestKnownRestPlace
         // =============================================================================
         /// <summary>
@@ -179,6 +221,46 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // GetBestKnownRestPlace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una query di comodo per il miglior luogo di riposo conosciuto e,
+        /// se la diagnostica e' attiva, esporta il record EL corrispondente.
+        /// </para>
+        ///
+        /// <para><b>Adapter progressivo verso Decision Layer</b></para>
+        /// <para>
+        /// L'overload permette alle regole migrate di produrre una traccia leggibile
+        /// senza esporre BeliefStore, MemoryStore o world state al sink JSONL.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Query Rest</b>: riusa il contesto standard per luoghi di riposo.</item>
+        ///   <item><b>Snapshot</b>: la diagnostica riceve solo il risultato gia' calcolato.</item>
+        ///   <item><b>Compatibilita'</b>: il metodo originale resta invariato.</item>
+        /// </list>
+        /// </summary>
+        public BeliefQueryResult GetBestKnownRestPlace(
+            BeliefStore store,
+            UnityEngine.Vector2Int npcPosition,
+            float urgency01,
+            BeliefQueryConfig config,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            int npcId,
+            long tick)
+        {
+            var query = new BeliefQueryContext(
+                BeliefCategory.Rest,
+                urgency01,
+                npcPosition,
+                config.defaultMinConfidence);
+
+            return QueryBest(store, query, config, explainabilityConfig, npcId, tick);
+        }
+
+        // =============================================================================
         // QueryBest
         // =============================================================================
         /// <summary>
@@ -204,23 +286,73 @@ namespace Arcontio.Core
         /// </summary>
         public BeliefQueryResult QueryBest(BeliefStore store, BeliefQueryContext query, BeliefQueryConfig config)
         {
+            return QueryBest(store, query, config, null, 0, 0);
+        }
+
+        // =============================================================================
+        // QueryBest
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue la pipeline comune di filtro, scoring e selezione del miglior belief
+        /// e, se configurato, registra uno snapshot EL della query.
+        /// </para>
+        ///
+        /// <para><b>Diagnostica senza onniscienza</b></para>
+        /// <para>
+        /// Il record JSONL viene costruito usando solo lo store soggettivo gia'
+        /// passato al servizio, il contesto di query e il risultato appena prodotto.
+        /// Non vengono introdotte letture dirette del mondo, di MemoryStore o di
+        /// singleton globali.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Null/empty tracing</b>: esporta anche query senza store o senza candidati.</item>
+        ///   <item><b>Candidate count</b>: distingue entry della categoria e candidati realmente usabili.</item>
+        ///   <item><b>Winner snapshot</b>: serializza belief e contributi senza trattenere riferimenti mutabili.</item>
+        /// </list>
+        /// </summary>
+        public BeliefQueryResult QueryBest(
+            BeliefStore store,
+            BeliefQueryContext query,
+            BeliefQueryConfig config,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            int npcId,
+            long tick)
+        {
             if (store == null)
+            {
+                var emptyResult = BeliefQueryResult.Empty();
+                TryEmitQueryTrace(explainabilityConfig, npcId, tick, query, emptyResult, 0, 0, "MissingBeliefStore");
                 return BeliefQueryResult.Empty();
+            }
 
             _candidates.Clear();
 
             var entries = store.Entries;
+            int matchingCategoryCount = 0;
             for (int i = 0; i < entries.Count; i++)
             {
                 // Primo passaggio intenzionalmente semplice: raccogliamo solo credenze
                 // soggettive coerenti con la richiesta, senza consultare dati oggettivi.
                 var belief = entries[i];
+
+                // Il conteggio di categoria e' diagnostico: aiuta a distinguere tra
+                // "non conosco nulla di Food" e "conosco Food ma nessuna entry supera i gate".
+                if (belief.Category == query.GoalType)
+                    matchingCategoryCount++;
+
                 if (IsUsableCandidate(belief, query))
                     _candidates.Add(belief);
             }
 
             if (_candidates.Count == 0)
+            {
+                var emptyResult = BeliefQueryResult.Empty();
+                TryEmitQueryTrace(explainabilityConfig, npcId, tick, query, emptyResult, matchingCategoryCount, 0, "NoUsableBelief");
                 return BeliefQueryResult.Empty();
+            }
 
             bool hasBest = false;
             float bestScore = float.NegativeInfinity;
@@ -254,9 +386,149 @@ namespace Arcontio.Core
                 }
             }
 
-            return hasBest
+            var result = hasBest
                 ? new BeliefQueryResult(false, bestBelief, bestScore, bestContributions)
                 : BeliefQueryResult.Empty();
+
+            TryEmitQueryTrace(explainabilityConfig, npcId, tick, query, result, matchingCategoryCount, _candidates.Count, string.Empty);
+            return result;
+        }
+
+        // =============================================================================
+        // TryEmitQueryTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte il risultato di una query belief in un record EL JSONL, lasciando
+        /// al sink la decisione finale su abilitazione, filtri e scrittura fisica.
+        /// </para>
+        ///
+        /// <para><b>Snapshot one-way</b></para>
+        /// <para>
+        /// La funzione non ricalcola la query e non legge altri sistemi: impacchetta
+        /// soltanto contesto, conteggi, winner e breakdown gia' disponibili nello
+        /// stack corrente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Guard config</b>: evita lavoro quando la diagnostica non e' stata richiesta.</item>
+        ///   <item><b>Belief ref</b>: copia campi primitivi del winner selezionato.</item>
+        ///   <item><b>Contributions</b>: preserva le etichette degli evaluator per analisi successive.</item>
+        /// </list>
+        /// </summary>
+        private static void TryEmitQueryTrace(
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            int npcId,
+            long tick,
+            BeliefQueryContext query,
+            BeliefQueryResult result,
+            int candidateCount,
+            int usableCandidateCount,
+            string emptyReason)
+        {
+            if (explainabilityConfig == null)
+                return;
+
+            // La normalizzazione in strutture EL avviene qui, vicino al QuerySystem,
+            // per evitare che il sink conosca BeliefQueryResult o logica di dominio.
+            var trace = new MemoryBeliefDecisionTrace
+            {
+                Kind = MemoryBeliefDecisionTraceKind.Query,
+                Tick = tick,
+                NpcId = npcId,
+                Query = new MemoryBeliefDecisionQueryRecord
+                {
+                    GoalType = query.GoalType,
+                    Urgency01 = query.Urgency01,
+                    NpcPosition = query.NpcPosition,
+                    MinConfidence = query.MinConfidence,
+                    CandidateCount = candidateCount,
+                    UsableCandidateCount = usableCandidateCount,
+                    IsEmpty = result.IsEmpty,
+                    EmptyReason = emptyReason ?? string.Empty,
+                    Winner = result.IsEmpty ? default : ToBeliefRef(result.Belief),
+                    FinalScore = result.FinalScore,
+                    Contributions = ToContributionRefs(result.Contributions),
+                },
+            };
+
+            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(explainabilityConfig, trace);
+        }
+
+        // =============================================================================
+        // ToBeliefRef
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una copia diagnostica minimale di una <c>BeliefEntry</c> selezionata.
+        /// </para>
+        ///
+        /// <para><b>Isolamento dai dati mutabili</b></para>
+        /// <para>
+        /// Il record EL non trattiene la entry originale del BeliefStore: copia i soli
+        /// campi necessari a capire quale credenza ha guidato la query.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Identita'</b>: id locale del belief e categoria.</item>
+        ///   <item><b>Qualita'</b>: confidence, freshness, source count e status.</item>
+        ///   <item><b>Target</b>: posizione stimata soggettiva.</item>
+        /// </list>
+        /// </summary>
+        private static MemoryBeliefDecisionBeliefRef ToBeliefRef(BeliefEntry belief)
+        {
+            return new MemoryBeliefDecisionBeliefRef
+            {
+                Category = belief.Category,
+                Status = belief.Status,
+                Source = belief.Source,
+                BeliefId = belief.BeliefId,
+                EstimatedPosition = belief.EstimatedPosition,
+                Confidence = belief.Confidence,
+                Freshness = belief.Freshness,
+                SourceCount = belief.SourceCount,
+            };
+        }
+
+        // =============================================================================
+        // ToContributionRefs
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia il breakdown dello score in un array adatto al layer EL.
+        /// </para>
+        ///
+        /// <para><b>Breakdown stabile</b></para>
+        /// <para>
+        /// Gli evaluator producono etichette e valori nel QuerySystem; questa funzione
+        /// conserva quelle coppie senza esporre il contesto di scoring riusabile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Null/empty guard</b>: restituisce un array vuoto condivisibile.</item>
+        ///   <item><b>Loop esplicito</b>: copia label e value uno a uno.</item>
+        ///   <item><b>Output</b>: payload passivo serializzabile dal sink JSONL.</item>
+        /// </list>
+        /// </summary>
+        private static MemoryBeliefDecisionScoreContributionRef[] ToContributionRefs(BeliefScoreContribution[] contributions)
+        {
+            if (contributions == null || contributions.Length == 0)
+                return System.Array.Empty<MemoryBeliefDecisionScoreContributionRef>();
+
+            var refs = new MemoryBeliefDecisionScoreContributionRef[contributions.Length];
+            for (int i = 0; i < contributions.Length; i++)
+            {
+                refs[i] = new MemoryBeliefDecisionScoreContributionRef
+                {
+                    Label = contributions[i].Label,
+                    Value = contributions[i].Value,
+                };
+            }
+
+            return refs;
         }
 
         private static bool IsUsableCandidate(BeliefEntry belief, BeliefQueryContext query)

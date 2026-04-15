@@ -90,6 +90,76 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // BeliefQueryServiceWritesQueryExplainabilityRecord
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica l'integrazione reale tra <c>BeliefQueryService</c> e sink JSONL:
+        /// una query su un <c>BeliefStore</c> soggettivo deve produrre un record EL
+        /// senza leggere world state o MemoryStore.
+        /// </para>
+        ///
+        /// <para><b>QuerySystem explainable</b></para>
+        /// <para>
+        /// Il test protegge il contratto introdotto nella sessione 34: il layer di
+        /// query puo' raccontare goal, NPC, candidati e winner usando solo dati gia'
+        /// presenti nel BeliefStore.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>BeliefStore</b>: contiene una fonte Food soggettiva.</item>
+        ///   <item><b>QueryService</b>: calcola winner e breakdown degli evaluator.</item>
+        ///   <item><b>JSONL</b>: conserva record query con npcId, tick, winner e contributi.</item>
+        /// </list>
+        /// </summary>
+        [Test]
+        public void BeliefQueryServiceWritesQueryExplainabilityRecord()
+        {
+            string fileName = "qa_el_mbd_query_service.jsonl";
+            string path = ResetLogFile(fileName);
+            var explainability = MakeConfig(fileName);
+            var store = new BeliefStore();
+            var service = new BeliefQueryService();
+            var queryConfig = BeliefQueryConfig.Default();
+
+            // Arrange: inseriamo una credenza Food gia' soggettiva. Il test non crea
+            // oggetti mondo e non consulta database globali, rispettando il vincolo EL.
+            store.AddOrMergeByCategoryAndPosition(
+                BeliefCategory.Food,
+                new Vector2Int(14, 9),
+                confidence: 0.82f,
+                freshness: 0.76f,
+                currentTick: 77,
+                BeliefSource.Seen);
+
+            // Act: usiamo l'overload diagnostico con identificativi runtime espliciti.
+            var result = service.GetBestKnownFoodSource(
+                store,
+                new Vector2Int(10, 8),
+                0.88f,
+                queryConfig,
+                explainability,
+                9,
+                222);
+
+            string jsonl = File.ReadAllText(path);
+
+            // Assert: il risultato resta quello normale del QuerySystem e il file
+            // contiene il payload EL necessario per analizzare la scelta.
+            Assert.That(result.IsEmpty, Is.False);
+            Assert.That(result.Belief.Category, Is.EqualTo(BeliefCategory.Food));
+            Assert.That(jsonl, Does.Contain("\"kind\":\"query\""));
+            Assert.That(jsonl, Does.Contain("\"npcId\":9"));
+            Assert.That(jsonl, Does.Contain("\"tick\":222"));
+            Assert.That(jsonl, Does.Contain("\"goalType\":\"Food\""));
+            Assert.That(jsonl, Does.Contain("\"candidateCount\":1"));
+            Assert.That(jsonl, Does.Contain("\"usableCandidateCount\":1"));
+            Assert.That(jsonl, Does.Contain("\"estimatedCellText\":\"(14, 9)\""));
+            Assert.That(jsonl, Does.Contain("\"label\":\"ConfidenceScore\""));
+        }
+
+        // =============================================================================
         // DecisionJsonlWritesSelectedIntentCandidatesAndScoreBreakdown
         // =============================================================================
         /// <summary>
