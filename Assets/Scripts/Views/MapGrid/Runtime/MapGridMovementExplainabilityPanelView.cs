@@ -67,6 +67,7 @@ namespace Arcontio.View.MapGrid
         private RectTransform _rootRt;
         private Text _titleText;
         private Text _headerMetaText;
+        private Text _diagnosticText;
         private ScrollRect _scrollRect;
         private RectTransform _scrollContent;
 
@@ -83,6 +84,10 @@ namespace Arcontio.View.MapGrid
         private Text _pathEventsText;
 
         private MapGridExplainabilityPanelPage _activePage = MapGridExplainabilityPanelPage.Memory;
+
+        private const int MaxSectionTextChars = 6000;
+        private const int EstimatedCharsPerLine = 52;
+        private const float MaxSectionTextHeight = 900f;
 
         public RectTransform RootRectTransform => _rootRt;
         public MapGridExplainabilityPanelPage ActivePage => _activePage;
@@ -161,6 +166,36 @@ namespace Arcontio.View.MapGrid
 
             if (_headerMetaText != null)
                 _headerMetaText.text = headerMeta ?? string.Empty;
+        }
+
+        // =============================================================================
+        // SetDiagnostics
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna la riga diagnostica sempre visibile sotto l'header. Questa riga
+        /// serve a distinguere rapidamente tre casi: nessuna selezione, NPC selezionato
+        /// ma senza registry, NPC selezionato con dati EL-MBQD presenti.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: osservabilita' del boundary UI</b></para>
+        /// <para>
+        /// La riga non legge dati dal dominio: riceve solo testo dal controller overlay.
+        /// In questo modo rende visibile lo stato del collegamento UI senza introdurre
+        /// accessi globali o dipendenze dirette da World, registry o JSONL.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>diagnosticText</b>: testo sintetico gia' formattato dal chiamante.</item>
+        ///   <item><b>SetTextIfReady</b>: stesso percorso bounded usato dalle sezioni scrollabili.</item>
+        /// </list>
+        /// </summary>
+        public void SetDiagnostics(string diagnosticText)
+        {
+            SetTextIfReady(_diagnosticText, string.IsNullOrWhiteSpace(diagnosticText)
+                ? "<color=#6E7681>diagnostica UI non disponibile</color>"
+                : $"<color=#6E7681>{diagnosticText}</color>");
         }
 
         // =============================================================================
@@ -252,8 +287,8 @@ namespace Arcontio.View.MapGrid
             headerLayout.padding = new RectOffset(8, 8, 7, 0);
 
             var headerLe = headerGo.AddComponent<LayoutElement>();
-            headerLe.minHeight = 86f;
-            headerLe.preferredHeight = 92f;
+            headerLe.minHeight = 108f;
+            headerLe.preferredHeight = 114f;
             headerLe.flexibleHeight = 0f;
 
             _titleText = CreateText("Title", headerGo.transform, DefaultTitleFont, FontStyle.Bold, ColorFromHex("#E6EDF3", 1f), TextAnchor.MiddleLeft);
@@ -261,6 +296,9 @@ namespace Arcontio.View.MapGrid
 
             _headerMetaText = CreateText("Meta", headerGo.transform, 10, FontStyle.Normal, ColorFromHex("#8B949E", 1f), TextAnchor.MiddleLeft);
             _headerMetaText.text = string.Empty;
+
+            _diagnosticText = CreateText("Diagnostics", headerGo.transform, 10, FontStyle.Normal, ColorFromHex("#6E7681", 1f), TextAnchor.MiddleLeft);
+            _diagnosticText.text = "<color=#6E7681>diagnostica UI in attesa</color>";
 
             BuildTabs(headerGo.transform);
         }
@@ -505,8 +543,107 @@ namespace Arcontio.View.MapGrid
 
         private static void SetTextIfReady(Text text, string value)
         {
-            if (text != null)
-                text.text = value ?? string.Empty;
+            if (text == null)
+                return;
+
+            string boundedValue = BoundText(value);
+            if (string.Equals(text.text, boundedValue, System.StringComparison.Ordinal))
+                return;
+
+            text.text = boundedValue;
+
+            var layoutElement = text.GetComponent<LayoutElement>();
+            if (layoutElement != null)
+                layoutElement.preferredHeight = EstimatePreferredTextHeight(boundedValue, text.fontSize);
+        }
+
+        // =============================================================================
+        // BoundText
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un limite difensivo alle sezioni testuali del pannello. Lo scopo non
+        /// e' nascondere dati diagnostici, ma impedire che una singola sezione produca
+        /// una stringa abbastanza lunga da far crescere indefinitamente layout e mesh UI.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug bounded</b></para>
+        /// <para>
+        /// Il registry resta la fonte completa della finestra runtime recente, mentre
+        /// la view sceglie quanto testo mostrare in un frame. La UI quindi rimane uno
+        /// strumento di osservazione progressiva e non diventa una seconda memoria.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Input null</b>: convertito a stringa vuota.</item>
+        ///   <item><b>Limite caratteri</b>: tronca solo quando necessario.</item>
+        ///   <item><b>Avviso finale</b>: segnala chiaramente che la UI ha ridotto l'output.</item>
+        /// </list>
+        /// </summary>
+        private static string BoundText(string value)
+        {
+            if (string.IsNullOrEmpty(value))
+                return string.Empty;
+
+            if (value.Length <= MaxSectionTextChars)
+                return value;
+
+            return value.Substring(0, MaxSectionTextChars)
+                + "\n<color=#D29922>Output troncato per stabilita UI.</color>";
+        }
+
+        // =============================================================================
+        // EstimatePreferredTextHeight
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Stima un'altezza preferita stabile per i blocchi <c>Text</c> legacy. Unity
+        /// puo' calcolare preferred size in modo costoso quando molti fitters annidati
+        /// cambiano testo ogni frame; questa stima fornisce al layout un limite chiaro.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: layout UI deterministico</b></para>
+        /// <para>
+        /// Il pannello non deve dipendere da una crescita implicita infinita del testo.
+        /// Ogni aggiornamento dichiara una dimensione ragionevole e capped, lasciando
+        /// allo <c>ScrollRect</c> il compito di navigare il contenuto visibile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Righe esplicite</b>: conta i newline prodotti dai formatter.</item>
+        ///   <item><b>Wrap stimato</b>: aggiunge righe virtuali per stringhe lunghe.</item>
+        ///   <item><b>Clamp finale</b>: impedisce al singolo blocco di diventare enorme.</item>
+        /// </list>
+        /// </summary>
+        private static float EstimatePreferredTextHeight(string value, int fontSize)
+        {
+            if (string.IsNullOrEmpty(value))
+                return fontSize + 8f;
+
+            int lines = 1;
+            int currentLineChars = 0;
+
+            for (int i = 0; i < value.Length; i++)
+            {
+                if (value[i] == '\n')
+                {
+                    lines++;
+                    currentLineChars = 0;
+                    continue;
+                }
+
+                currentLineChars++;
+                if (currentLineChars >= EstimatedCharsPerLine)
+                {
+                    lines++;
+                    currentLineChars = 0;
+                }
+            }
+
+            float lineHeight = fontSize + 5f;
+            return Mathf.Clamp((lines * lineHeight) + 8f, fontSize + 8f, MaxSectionTextHeight);
         }
 
         private static Color ColorFromHex(string hex, float alpha)

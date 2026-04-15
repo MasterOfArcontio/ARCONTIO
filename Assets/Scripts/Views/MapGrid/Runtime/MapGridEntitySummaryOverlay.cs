@@ -53,6 +53,18 @@ namespace Arcontio.View.MapGrid
             _root = new GameObject("MapGridEntitySummaryOverlay");
             _root.transform.SetParent(parent, false);
 
+            _rootRt = _root.GetComponent<RectTransform>();
+            if (_rootRt == null)
+                _rootRt = _root.AddComponent<RectTransform>();
+
+            _rootRt.anchorMin = new Vector2(0f, 0f);
+            _rootRt.anchorMax = new Vector2(1f, 1f);
+            _rootRt.pivot = new Vector2(0.5f, 0.5f);
+            _rootRt.anchoredPosition = Vector2.zero;
+            _rootRt.sizeDelta = Vector2.zero;
+            _rootRt.offsetMin = Vector2.zero;
+            _rootRt.offsetMax = Vector2.zero;
+
             // Canvas root (ScreenSpaceOverlay) per debug overlay.
             _canvas = _root.AddComponent<Canvas>();
 
@@ -93,14 +105,6 @@ namespace Arcontio.View.MapGrid
 
             _root.AddComponent<CanvasScaler>();
             _root.AddComponent<GraphicRaycaster>();
-
-            _rootRt = _root.GetComponent<RectTransform>();
-            if (_rootRt == null) _rootRt = _root.AddComponent<RectTransform>();
-
-            _rootRt.anchorMin = new Vector2(0f, 0f);
-            _rootRt.anchorMax = new Vector2(1f, 1f);
-            _rootRt.pivot = new Vector2(0.5f, 0.5f);
-            _rootRt.sizeDelta = Vector2.zero;
 
             _root.SetActive(false);
             _enabled = false;
@@ -210,6 +214,11 @@ namespace Arcontio.View.MapGrid
         private readonly MemoryBeliefDecisionExplainabilityViewModel _mbqdExplainabilityViewModel = new();
 
         private bool _needsInitialLayout;
+        private float _lastMovementPanelRefreshRealtime = -999f;
+        private int _lastMovementPanelSelectedNpcId = int.MinValue;
+        private long _lastMovementPanelWorldTick = long.MinValue;
+
+        private const float MovementPanelRefreshIntervalSeconds = 0.25f;
 
         // ============================================================
         // SYNC (create/destroy cards)
@@ -1160,9 +1169,22 @@ namespace Arcontio.View.MapGrid
                 return;
 
             int selectedNpcId = SocialViewer.UI.NPCSelection.SelectedNpcId;
+            long worldTick = world != null ? Arcontio.Core.TickContext.CurrentTickIndex : -1;
+            bool selectionChanged = selectedNpcId != _lastMovementPanelSelectedNpcId;
+            bool tickChanged = worldTick != _lastMovementPanelWorldTick;
+            bool refreshWindowExpired = Time.unscaledTime - _lastMovementPanelRefreshRealtime >= MovementPanelRefreshIntervalSeconds;
+
+            if (!selectionChanged && (!tickChanged || !refreshWindowExpired))
+                return;
+
+            _lastMovementPanelSelectedNpcId = selectedNpcId;
+            _lastMovementPanelWorldTick = worldTick;
+            _lastMovementPanelRefreshRealtime = Time.unscaledTime;
+
             if (selectedNpcId <= 0)
             {
                 _movementExplainabilityPanel.SetHeader("Explainability Layer", string.Empty);
+                _movementExplainabilityPanel.SetDiagnostics("selectedNpc=-1 | nessuna selezione");
                 _movementExplainabilityPanel.SetMemoryText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetBeliefText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetDecisionText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
@@ -1176,6 +1198,7 @@ namespace Arcontio.View.MapGrid
             if (world == null || !world.NpcDna.ContainsKey(selectedNpcId))
             {
                 _movementExplainabilityPanel.SetHeader("Explainability Layer", $"NPC #{selectedNpcId}");
+                _movementExplainabilityPanel.SetDiagnostics($"selectedNpc={selectedNpcId} | world/npc non valido");
                 _movementExplainabilityPanel.SetMemoryText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetBeliefText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetDecisionText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
@@ -1187,6 +1210,8 @@ namespace Arcontio.View.MapGrid
             string headerMeta = BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityIntentPlan, _sbExplainabilityEvents, maxEvents: 32);
             string mbqdHeaderMeta = BuildMemoryBeliefDecisionExplainabilityText(world, selectedNpcId);
             _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", string.IsNullOrWhiteSpace(mbqdHeaderMeta) ? headerMeta : mbqdHeaderMeta);
+            _movementExplainabilityPanel.SetDiagnostics(
+                $"selectedNpc={selectedNpcId} | worldTick={worldTick} | registryNpc={_mbqdExplainabilityViewModel.HasNpc} | MBQD M{_mbqdExplainabilityViewModel.MemoryCount} B{_mbqdExplainabilityViewModel.BeliefCount} Q{_mbqdExplainabilityViewModel.QueryCount} D{_mbqdExplainabilityViewModel.DecisionCount}");
             _movementExplainabilityPanel.SetPathfindingText(_sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
             _movementExplainabilityPanel.SetMemoryText(_sbMbqdMemoryStore.ToString(), _sbMbqdMemoryLatest.ToString(), _sbMbqdMemoryTimeline.ToString());
             _movementExplainabilityPanel.SetBeliefText(_sbMbqdBeliefEntries.ToString(), _sbMbqdBeliefQuery.ToString(), _sbMbqdBeliefMutation.ToString());
