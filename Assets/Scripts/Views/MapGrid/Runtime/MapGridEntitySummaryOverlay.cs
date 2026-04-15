@@ -1257,8 +1257,14 @@ namespace Arcontio.View.MapGrid
                     : _mbqdExplainabilityViewModel.HeaderSubtitle;
 
                 _sbMbqdMemoryStore.Append("<color=#6E7681>").Append(message).Append("</color>");
+                _sbMbqdMemoryLatest.Append("<color=#6E7681>(nessuna ultima memory trace)</color>");
+                _sbMbqdMemoryTimeline.Append("<color=#6E7681>(nessuna timeline memory)</color>");
                 _sbMbqdBeliefEntries.Append("<color=#6E7681>").Append(message).Append("</color>");
+                _sbMbqdBeliefQuery.Append("<color=#6E7681>(nessuna query belief)</color>");
+                _sbMbqdBeliefMutation.Append("<color=#6E7681>(nessuna mutazione belief)</color>");
                 _sbMbqdDecisionSelected.Append("<color=#6E7681>").Append(message).Append("</color>");
+                _sbMbqdDecisionCandidates.Append("<color=#6E7681>(nessun candidato decisionale)</color>");
+                _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge decisione-comando)</color>");
                 return $"NPC #{npcId}";
             }
 

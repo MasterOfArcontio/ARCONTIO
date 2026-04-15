@@ -357,6 +357,16 @@ namespace Arcontio.View.MapGrid
         {
             var scrollGo = new GameObject("ScrollBody");
             scrollGo.transform.SetParent(parent, false);
+            var scrollRt = scrollGo.AddComponent<RectTransform>();
+            scrollRt.anchorMin = new Vector2(0f, 0f);
+            scrollRt.anchorMax = new Vector2(1f, 1f);
+            scrollRt.pivot = new Vector2(0.5f, 0.5f);
+            scrollRt.offsetMin = Vector2.zero;
+            scrollRt.offsetMax = Vector2.zero;
+
+            var scrollImage = scrollGo.AddComponent<Image>();
+            scrollImage.raycastTarget = true;
+            scrollImage.color = ColorFromHex("#010409", 0.35f);
 
             _scrollRect = scrollGo.AddComponent<ScrollRect>();
             _scrollRect.horizontal = false;
@@ -365,7 +375,8 @@ namespace Arcontio.View.MapGrid
             _scrollRect.scrollSensitivity = 26f;
 
             var le = scrollGo.AddComponent<LayoutElement>();
-            le.minHeight = 120f;
+            le.minHeight = 360f;
+            le.preferredHeight = 620f;
             le.flexibleHeight = 1f;
 
             var viewportGo = new GameObject("Viewport");
@@ -389,6 +400,7 @@ namespace Arcontio.View.MapGrid
             _scrollContent.pivot = new Vector2(0.5f, 1f);
             _scrollContent.offsetMin = Vector2.zero;
             _scrollContent.offsetMax = Vector2.zero;
+            _scrollContent.sizeDelta = new Vector2(0f, 360f);
 
             var contentLayout = contentGo.AddComponent<VerticalLayoutGroup>();
             contentLayout.childControlHeight = true;
@@ -431,6 +443,12 @@ namespace Arcontio.View.MapGrid
         {
             var go = new GameObject(name);
             go.transform.SetParent(_scrollContent, false);
+            var rectTransform = go.AddComponent<RectTransform>();
+            rectTransform.anchorMin = new Vector2(0f, 1f);
+            rectTransform.anchorMax = new Vector2(1f, 1f);
+            rectTransform.pivot = new Vector2(0.5f, 1f);
+            rectTransform.offsetMin = Vector2.zero;
+            rectTransform.offsetMax = Vector2.zero;
 
             var layout = go.AddComponent<VerticalLayoutGroup>();
             layout.childControlHeight = true;
@@ -442,6 +460,11 @@ namespace Arcontio.View.MapGrid
 
             var fitter = go.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var layoutElement = go.AddComponent<LayoutElement>();
+            layoutElement.minHeight = 300f;
+            layoutElement.preferredHeight = 420f;
+            layoutElement.flexibleWidth = 1f;
             return go;
         }
 
@@ -449,6 +472,12 @@ namespace Arcontio.View.MapGrid
         {
             var sectionGo = new GameObject(title);
             sectionGo.transform.SetParent(parent, false);
+            var sectionRt = sectionGo.AddComponent<RectTransform>();
+            sectionRt.anchorMin = new Vector2(0f, 1f);
+            sectionRt.anchorMax = new Vector2(1f, 1f);
+            sectionRt.pivot = new Vector2(0.5f, 1f);
+            sectionRt.offsetMin = Vector2.zero;
+            sectionRt.offsetMax = Vector2.zero;
 
             var image = sectionGo.AddComponent<Image>();
             image.raycastTarget = false;
@@ -464,6 +493,11 @@ namespace Arcontio.View.MapGrid
 
             var fitter = sectionGo.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var sectionLe = sectionGo.AddComponent<LayoutElement>();
+            sectionLe.minHeight = 96f;
+            sectionLe.preferredHeight = 150f;
+            sectionLe.flexibleWidth = 1f;
 
             var headerGo = new GameObject("Header");
             headerGo.transform.SetParent(sectionGo.transform, false);
@@ -496,11 +530,18 @@ namespace Arcontio.View.MapGrid
 
             var headerText = CreateText("Title", headerGo.transform, 10, FontStyle.Normal, ColorFromHex("#8B949E", 1f), TextAnchor.MiddleLeft);
             headerText.text = title;
-            var headerTextLe = headerText.gameObject.AddComponent<LayoutElement>();
+            var headerTextLe = headerText.gameObject.GetComponent<LayoutElement>();
             headerTextLe.flexibleWidth = 1f;
 
             var bodyGo = new GameObject("Body");
             bodyGo.transform.SetParent(sectionGo.transform, false);
+            var bodyRt = bodyGo.AddComponent<RectTransform>();
+            bodyRt.anchorMin = new Vector2(0f, 1f);
+            bodyRt.anchorMax = new Vector2(1f, 1f);
+            bodyRt.pivot = new Vector2(0.5f, 1f);
+            bodyRt.offsetMin = Vector2.zero;
+            bodyRt.offsetMax = Vector2.zero;
+
             var bodyLayout = bodyGo.AddComponent<VerticalLayoutGroup>();
             bodyLayout.childControlHeight = true;
             bodyLayout.childControlWidth = true;
@@ -511,11 +552,16 @@ namespace Arcontio.View.MapGrid
             var bodyFitter = bodyGo.AddComponent<ContentSizeFitter>();
             bodyFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
+            var bodyLe = bodyGo.AddComponent<LayoutElement>();
+            bodyLe.minHeight = 58f;
+            bodyLe.preferredHeight = 96f;
+            bodyLe.flexibleWidth = 1f;
+
             var text = CreateText("Text", bodyGo.transform, DefaultBodyFont, FontStyle.Normal, Color.white, TextAnchor.UpperLeft);
             text.supportRichText = true;
             text.horizontalOverflow = HorizontalWrapMode.Wrap;
             text.verticalOverflow = VerticalWrapMode.Overflow;
-            text.text = string.Empty;
+            text.text = "<color=#6E7681>(in attesa dati)</color>";
             return text;
         }
 
