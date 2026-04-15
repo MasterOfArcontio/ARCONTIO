@@ -477,7 +477,7 @@ namespace Arcontio.View.MapGrid
 
             var image = sectionGo.AddComponent<Image>();
             image.raycastTarget = false;
-            image.color = ColorFromHex("#0D1117", 0.72f);
+            image.color = ColorFromHex("#0D1117", 0.46f);
 
             var sectionLayout = sectionGo.AddComponent<VerticalLayoutGroup>();
             sectionLayout.childControlHeight = true;
@@ -499,7 +499,7 @@ namespace Arcontio.View.MapGrid
             headerGo.transform.SetParent(sectionGo.transform, false);
             var headerImage = headerGo.AddComponent<Image>();
             headerImage.raycastTarget = false;
-            headerImage.color = ColorFromHex("#161B22", 0.96f);
+            headerImage.color = ColorFromHex("#161B22", 0.72f);
 
             var headerLayout = headerGo.AddComponent<HorizontalLayoutGroup>();
             headerLayout.childControlHeight = true;
@@ -515,14 +515,34 @@ namespace Arcontio.View.MapGrid
 
             var dotGo = new GameObject("Dot");
             dotGo.transform.SetParent(headerGo.transform, false);
-            var dotImage = dotGo.AddComponent<Image>();
-            dotImage.raycastTarget = false;
-            dotImage.color = ColorFromHex(dotHex, 1f);
             var dotLe = dotGo.AddComponent<LayoutElement>();
-            dotLe.minWidth = 6f;
-            dotLe.preferredWidth = 6f;
-            dotLe.minHeight = 6f;
-            dotLe.preferredHeight = 6f;
+            dotLe.minWidth = 12f;
+            dotLe.preferredWidth = 12f;
+            dotLe.minHeight = 18f;
+            dotLe.preferredHeight = 18f;
+            dotLe.flexibleWidth = 0f;
+            dotLe.flexibleHeight = 0f;
+
+            var dotGroup = dotGo.AddComponent<HorizontalLayoutGroup>();
+            dotGroup.childControlWidth = false;
+            dotGroup.childControlHeight = false;
+            dotGroup.childForceExpandWidth = false;
+            dotGroup.childForceExpandHeight = false;
+            dotGroup.childAlignment = TextAnchor.MiddleCenter;
+            dotGroup.padding = new RectOffset(3, 3, 4, 4);
+
+            var markerGo = new GameObject("Marker");
+            markerGo.transform.SetParent(dotGo.transform, false);
+            var markerImage = markerGo.AddComponent<Image>();
+            markerImage.raycastTarget = false;
+            markerImage.color = ColorFromHex(dotHex, 0.95f);
+            var markerLe = markerGo.AddComponent<LayoutElement>();
+            markerLe.minWidth = 4f;
+            markerLe.preferredWidth = 4f;
+            markerLe.minHeight = 10f;
+            markerLe.preferredHeight = 10f;
+            markerLe.flexibleWidth = 0f;
+            markerLe.flexibleHeight = 0f;
 
             var headerText = CreateText("Title", headerGo.transform, 10, FontStyle.Normal, ColorFromHex("#8B949E", 1f), TextAnchor.MiddleLeft);
             headerText.text = title;
