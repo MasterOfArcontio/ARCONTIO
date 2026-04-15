@@ -169,8 +169,8 @@ namespace Arcontio.View.MapGrid
         /// <summary>
         /// <para>
         /// Attiva o disattiva il pannello DevTools direttamente dalla barra comandi
-        /// MapGrid, selezionando lo strumento di spawn NPC quando il pannello viene
-        /// aperto da quel pulsante.
+        /// MapGrid. Quando apre il pannello seleziona lo strumento di spawn NPC; quando
+        /// il pannello e' gia' visibile lo chiude senza cambiare tool.
         /// </para>
         ///
         /// <para><b>Principio architetturale: UI come richiesta, non mutazione diretta</b></para>
@@ -189,11 +189,37 @@ namespace Arcontio.View.MapGrid
         /// </summary>
         public void ToggleSpawnToolOverlay()
         {
-            bool shouldEnable = !_enabled || _tool != Tool.SpawnNpc;
-            _enabled = shouldEnable;
-
             if (_enabled)
-                _tool = Tool.SpawnNpc;
+            {
+                _enabled = false;
+                ResetTransientInputState();
+                return;
+            }
+
+            OpenSpawnToolOverlay();
+        }
+
+        // =============================================================================
+        // OpenSpawnToolOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Apre esplicitamente i DevTools in modalita' spawn NPC. Questo percorso viene
+        /// usato dal tasto F3, che storicamente e' un accesso rapido allo spawn e non
+        /// solo un toggle cieco della finestra.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: intenzioni UI distinte</b></para>
+        /// <para>
+        /// Il pulsante top bar e il tasto rapido possono esprimere intenzioni diverse:
+        /// il pulsante chiude se vede gia' il menu, mentre F3 garantisce l'ingresso in
+        /// modalita' spawn. Entrambe restano view-side e non mutano direttamente il World.
+        /// </para>
+        /// </summary>
+        public void OpenSpawnToolOverlay()
+        {
+            _enabled = true;
+            _tool = Tool.SpawnNpc;
 
             if (_enabled && string.IsNullOrWhiteSpace(_selectedDefId))
                 _selectedDefId = ResolveFirstPlaceableDefId();
@@ -249,7 +275,7 @@ namespace Arcontio.View.MapGrid
             // ============================================================
             if (Keyboard.current != null && Keyboard.current[toggleKey].wasPressedThisFrame)
             {
-                ToggleSpawnToolOverlay();
+                OpenSpawnToolOverlay();
             }
 
             if (!_enabled)

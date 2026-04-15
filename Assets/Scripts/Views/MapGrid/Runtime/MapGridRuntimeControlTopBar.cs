@@ -89,7 +89,7 @@ namespace Arcontio.View.MapGrid
             panelRt.pivot = new Vector2(0.5f, 1f);
             panelRt.anchoredPosition = Vector2.zero;
             panelRt.sizeDelta = new Vector2(0f, 32f);
-            panelRt.offsetMin = new Vector2(0f, -32f);
+            panelRt.offsetMin = new Vector2(244f, -32f);
             panelRt.offsetMax = Vector2.zero;
 
             var layout = panelGo.AddComponent<HorizontalLayoutGroup>();
