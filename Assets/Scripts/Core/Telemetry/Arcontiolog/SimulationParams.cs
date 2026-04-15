@@ -58,6 +58,14 @@ namespace Arcontio.Core.Config
         // successive collegheranno questi valori agli emitter e agli adapter runtime.
         public MovementExplainabilityParams explainability = new MovementExplainabilityParams();
 
+        // ---------------- Memory/Belief/Decision Explainability Layer (v0.05.32) ----------------
+        // Parametri del livello EL dedicato al ciclo cognitivo MemoryStore ->
+        // BeliefStore -> BeliefQuery -> Decision. Come per l'EL pathfinding, questa
+        // sezione contiene solo configurazione read-only: l'emissione concreta viene
+        // agganciata nelle sessioni successive.
+        public MemoryBeliefDecisionExplainabilityParams memory_belief_decision_explainability =
+            new MemoryBeliefDecisionExplainabilityParams();
+
         // ---------------- GVD-DIN (v0.03) ----------------
         // Sistema GVD dinamico condition-based + pruning.
         // Attivo quando gvd_din.enabled=true E hybrid_landmark.use_hybrid_extractor=false.
@@ -248,6 +256,59 @@ namespace Arcontio.Core.Config
         // Pattern del futuro file JSONL. Il suffisso .jsonl comunica che il formato
         // sara' append-only, una trace JSON per riga.
         public string jsonLogFileNamePattern = "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl";
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionExplainabilityParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile dei parametri dell'Explainability Layer dedicato al ciclo
+    /// cognitivo MemoryStore, BeliefStore, BeliefQuery e Decision Layer.
+    /// </para>
+    ///
+    /// <para><b>Configurazione diagnostica non comportamentale</b></para>
+    /// <para>
+    /// Questa classe non apre file, non crea registry, non legge NPC e non attiva da
+    /// sola emissioni runtime. I futuri emitter useranno questi valori come input
+    /// read-only per decidere se produrre trace JSONL, quali famiglie registrare e
+    /// quanto dettaglio includere.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>enabled</b>: master switch dell'EL-MBD.</item>
+    ///   <item><b>defaultVerbosity</b>: livello di dettaglio predefinito.</item>
+    ///   <item><b>maxTrackedNpcs</b>: limite automatico degli NPC osservati.</item>
+    ///   <item><b>trackedNpcIds</b>: lista opzionale di NPC osservati esplicitamente.</item>
+    ///   <item><b>trackActiveNpcOnly</b>: filtro futuro per ridurre rumore diagnostico.</item>
+    ///   <item><b>writeJsonLog</b>: abilita il futuro sink JSONL append-only.</item>
+    ///   <item><b>jsonLogFileNamePattern</b>: pattern del file JSONL diagnostico.</item>
+    ///   <item><b>log*</b>: switch granulari per famiglie memory, belief, query, decision e bridge.</item>
+    ///   <item><b>include*</b>: policy di dettaglio per candidati e breakdown.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionExplainabilityParams
+    {
+        public bool enabled = false;
+        public int defaultVerbosity = 0;
+        public int maxTrackedNpcs = 5;
+        public int[] trackedNpcIds = Array.Empty<int>();
+        public bool trackActiveNpcOnly = false;
+
+        public bool writeJsonLog = false;
+        public string jsonLogFileNamePattern = "arcontio_el_mbd_{yyyyMMdd_HHmmss}.jsonl";
+
+        public bool logMemory = true;
+        public bool logBelief = true;
+        public bool logQuery = true;
+        public bool logDecision = true;
+        public bool logBridge = true;
+
+        public bool includeCandidates = true;
+        public bool includeScoreBreakdown = true;
+        public bool includeRejectedCandidates = false;
     }
 
 
