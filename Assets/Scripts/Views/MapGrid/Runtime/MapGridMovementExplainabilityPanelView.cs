@@ -88,6 +88,9 @@ namespace Arcontio.View.MapGrid
         private const int MaxSectionTextChars = 6000;
         private const int EstimatedCharsPerLine = 52;
         private const float MaxSectionTextHeight = 900f;
+        private const float SectionHeaderHeight = 27f;
+        private const float SectionBodyVerticalPadding = 15f;
+        private const float SectionVerticalPadding = 4f;
 
         public RectTransform RootRectTransform => _rootRt;
         public MapGridExplainabilityPanelPage ActivePage => _activePage;
@@ -596,7 +599,72 @@ namespace Arcontio.View.MapGrid
 
             var layoutElement = text.GetComponent<LayoutElement>();
             if (layoutElement != null)
-                layoutElement.preferredHeight = EstimatePreferredTextHeight(boundedValue, text.fontSize);
+            {
+                float preferredTextHeight = EstimatePreferredTextHeight(boundedValue, text.fontSize);
+                layoutElement.preferredHeight = preferredTextHeight;
+                UpdateOwningSectionHeight(text, preferredTextHeight);
+            }
+        }
+
+        // =============================================================================
+        // UpdateOwningSectionHeight
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Propaga l'altezza stimata del testo ai <c>LayoutElement</c> del body e del
+        /// sub-pannello che lo contiene. Senza questa propagazione Unity puo' conoscere
+        /// l'altezza del testo ma continuare a disporre le sezioni usando il vecchio
+        /// <c>preferredHeight</c> fisso del contenitore, causando sovrapposizioni.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI bounded ma non compressa</b></para>
+        /// <para>
+        /// Il testo resta limitato da <c>MaxSectionTextHeight</c>, quindi la view non
+        /// cresce senza controllo; allo stesso tempo ogni sub-pannello dichiara al
+        /// layout l'altezza necessaria per il contenuto effettivamente visibile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Body</b>: riceve altezza testo piu' padding interno.</item>
+        ///   <item><b>Section</b>: riceve header, body e margine minimo.</item>
+        ///   <item><b>Rebuild</b>: forza il ricalcolo immediato della gerarchia scrollabile.</item>
+        /// </list>
+        /// </summary>
+        private static void UpdateOwningSectionHeight(Text text, float preferredTextHeight)
+        {
+            if (text == null || text.transform == null || text.transform.parent == null)
+                return;
+
+            var body = text.transform.parent;
+            if (body.name != "Body")
+                return;
+
+            var section = body.parent;
+            if (section == null)
+                return;
+
+            float bodyHeight = Mathf.Max(58f, preferredTextHeight + SectionBodyVerticalPadding);
+            var bodyLayoutElement = body.GetComponent<LayoutElement>();
+            if (bodyLayoutElement != null)
+                bodyLayoutElement.preferredHeight = bodyHeight;
+
+            float sectionHeight = Mathf.Max(96f, SectionHeaderHeight + bodyHeight + SectionVerticalPadding);
+            var sectionLayoutElement = section.GetComponent<LayoutElement>();
+            if (sectionLayoutElement != null)
+                sectionLayoutElement.preferredHeight = sectionHeight;
+
+            var sectionRect = section as RectTransform;
+            if (sectionRect != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(sectionRect);
+
+            var pageRect = section.parent as RectTransform;
+            if (pageRect != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(pageRect);
+
+            var contentRect = pageRect != null ? pageRect.parent as RectTransform : null;
+            if (contentRect != null)
+                LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
         }
 
         // =============================================================================
