@@ -128,6 +128,7 @@ namespace Arcontio.View.MapGrid
         // - quando disattivo: schede spariscono e torna tooltip.
         private MapGridEntitySummaryOverlay _summaryOverlay;
         private bool _summaryOverlayEnabled;
+        private MapGridRuntimeControlTopBar _runtimeControlTopBar;
 
         // ============================================================
         // Debug click-to-move (runtime test tool)
@@ -257,11 +258,24 @@ namespace Arcontio.View.MapGrid
             // Card overlay attiva di default all'avvio.
             _summaryOverlay.SetEnabled(true);
             _summaryOverlayEnabled = true;
+
+            // Barra comandi runtime superiore:
+            // - resta view-side e non sostituisce gli input diretti P/O/I/F3;
+            // - offre pero' un riferimento visibile ai comandi principali quando la
+            //   simulazione parte direttamente nella MapGrid.
+            var devToolsOverlay = GetComponent<MapGridRuntimeDevToolsOverlay>();
+            if (devToolsOverlay == null)
+                devToolsOverlay = gameObject.AddComponent<MapGridRuntimeDevToolsOverlay>();
+
+            _runtimeControlTopBar = new MapGridRuntimeControlTopBar();
+            _runtimeControlTopBar.AttachTo(transform, devToolsOverlay);
         }
 
         private void Update()
         {
             if (cfg == null) return;
+
+            _runtimeControlTopBar?.Tick();
 
             // Bind al world (ritenta finché non c'è)
             _world ??= MapGridWorldProvider.TryGetWorld();

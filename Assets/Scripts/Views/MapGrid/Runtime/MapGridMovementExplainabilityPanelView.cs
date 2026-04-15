@@ -48,7 +48,7 @@ namespace Arcontio.View.MapGrid
     ///   <item><b>Header</b>: titolo, metadati NPC/tick e tab cliccabili.</item>
     ///   <item><b>ScrollRect</b>: body unico, con header fisso e contenuto scrollabile.</item>
     ///   <item><b>Page roots</b>: contenitori separati per Memory, Belief, Decision e Pathfinding.</item>
-    ///   <item><b>Sub-pannelli</b>: cornice, titolo, pallino colorato e testo rich.</item>
+    ///   <item><b>Sub-pannelli</b>: fondo neutro, titolo, indicatore testuale colorato e testo rich.</item>
     /// </list>
     /// </summary>
     public sealed class MapGridMovementExplainabilityPanelView
@@ -513,36 +513,16 @@ namespace Arcontio.View.MapGrid
             headerLe.minHeight = 25f;
             headerLe.preferredHeight = 27f;
 
-            var dotGo = new GameObject("Dot");
-            dotGo.transform.SetParent(headerGo.transform, false);
-            var dotLe = dotGo.AddComponent<LayoutElement>();
-            dotLe.minWidth = 12f;
-            dotLe.preferredWidth = 12f;
-            dotLe.minHeight = 18f;
-            dotLe.preferredHeight = 18f;
-            dotLe.flexibleWidth = 0f;
-            dotLe.flexibleHeight = 0f;
-
-            var dotGroup = dotGo.AddComponent<HorizontalLayoutGroup>();
-            dotGroup.childControlWidth = false;
-            dotGroup.childControlHeight = false;
-            dotGroup.childForceExpandWidth = false;
-            dotGroup.childForceExpandHeight = false;
-            dotGroup.childAlignment = TextAnchor.MiddleCenter;
-            dotGroup.padding = new RectOffset(3, 3, 4, 4);
-
-            var markerGo = new GameObject("Marker");
-            markerGo.transform.SetParent(dotGo.transform, false);
-            var markerImage = markerGo.AddComponent<Image>();
-            markerImage.raycastTarget = false;
-            markerImage.color = ColorFromHex(dotHex, 0.95f);
-            var markerLe = markerGo.AddComponent<LayoutElement>();
-            markerLe.minWidth = 4f;
-            markerLe.preferredWidth = 4f;
-            markerLe.minHeight = 10f;
-            markerLe.preferredHeight = 10f;
-            markerLe.flexibleWidth = 0f;
-            markerLe.flexibleHeight = 0f;
+            // L'indicatore colore resta volutamente un Text e non un Image:
+            // un Image dentro un LayoutGroup puo' ereditare una sizeDelta ampia e
+            // trasformarsi nel rettangolo pieno verde/azzurro/arancio visto nei
+            // subpannelli. Un glifo testuale a larghezza fissa non puo' coprire il body.
+            var markerText = CreateText("Marker", headerGo.transform, 12, FontStyle.Bold, ColorFromHex(dotHex, 1f), TextAnchor.MiddleCenter);
+            markerText.text = "|";
+            var markerTextLe = markerText.gameObject.GetComponent<LayoutElement>();
+            markerTextLe.minWidth = 10f;
+            markerTextLe.preferredWidth = 10f;
+            markerTextLe.flexibleWidth = 0f;
 
             var headerText = CreateText("Title", headerGo.transform, 10, FontStyle.Normal, ColorFromHex("#8B949E", 1f), TextAnchor.MiddleLeft);
             headerText.text = title;

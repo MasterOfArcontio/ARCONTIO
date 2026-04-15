@@ -161,6 +161,46 @@ namespace Arcontio.View.MapGrid
         // teniamo una flag aggiornata ogni frame che indica se il mouse sta "sopra" la finestra IMGUI.
         private bool _isPointerOverUiWindow;
 
+        public bool IsDevModeEnabled => _enabled;
+
+        // =============================================================================
+        // ToggleSpawnToolOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Attiva o disattiva il pannello DevTools direttamente dalla barra comandi
+        /// MapGrid, selezionando lo strumento di spawn NPC quando il pannello viene
+        /// aperto da quel pulsante.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI come richiesta, non mutazione diretta</b></para>
+        /// <para>
+        /// La top bar non crea NPC e non modifica il World. Si limita a cambiare lo
+        /// stato dello strumento view-side; il click successivo sulla mappa produrra'
+        /// ancora un comando esplicito, accodato al <c>SimulationHost</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>_enabled</b>: visibilita' e operativita' del pannello DevTools.</item>
+        ///   <item><b>_tool</b>: forzato a <c>SpawnNpc</c> quando la barra apre il pannello.</item>
+        ///   <item><b>ResetTransientInputState</b>: pulisce cache brush/rectangle tra un toggle e l'altro.</item>
+        /// </list>
+        /// </summary>
+        public void ToggleSpawnToolOverlay()
+        {
+            bool shouldEnable = !_enabled || _tool != Tool.SpawnNpc;
+            _enabled = shouldEnable;
+
+            if (_enabled)
+                _tool = Tool.SpawnNpc;
+
+            if (_enabled && string.IsNullOrWhiteSpace(_selectedDefId))
+                _selectedDefId = ResolveFirstPlaceableDefId();
+
+            ResetTransientInputState();
+        }
+
         private void Awake()
         {
             _mapName = defaultMapName;
@@ -209,19 +249,7 @@ namespace Arcontio.View.MapGrid
             // ============================================================
             if (Keyboard.current != null && Keyboard.current[toggleKey].wasPressedThisFrame)
             {
-                _enabled = !_enabled;
-
-                // UX: quando entri in DevMode e non hai ancora selezione,
-                // scegliamo la prima definizione disponibile.
-                if (_enabled && string.IsNullOrWhiteSpace(_selectedDefId))
-                    _selectedDefId = ResolveFirstPlaceableDefId();
-
-                // Reset "paint cache" quando entri/esci: evita edge-case dove il primo brush non scrive.
-                _lastPaintX = int.MinValue;
-                _lastPaintY = int.MinValue;
-
-                // Reset rect
-                _rectDragging = false;
+                ToggleSpawnToolOverlay();
             }
 
             if (!_enabled)
@@ -1108,6 +1136,16 @@ namespace Arcontio.View.MapGrid
             }
 
             return null;
+        }
+
+        private void ResetTransientInputState()
+        {
+            // Reset "paint cache" quando entri/esci: evita edge-case dove il primo brush non scrive.
+            _lastPaintX = int.MinValue;
+            _lastPaintY = int.MinValue;
+
+            // Reset rect: la preview rettangolare non deve sopravvivere al cambio modalita'.
+            _rectDragging = false;
         }
     }
 }

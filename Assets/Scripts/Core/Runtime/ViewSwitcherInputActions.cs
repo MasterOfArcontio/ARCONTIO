@@ -7,13 +7,16 @@ namespace Arcontio.Core
 {
     /// <summary>
     /// ViewSwitcher basato su InputActions asset (New Input System).
-    /// Va messo su ArcontioRuntime (DontDestroyOnLoad), così funziona in qualunque scena.
+    /// Va messo su ArcontioRuntime (DontDestroyOnLoad), cosÃ¬ funziona in qualunque scena.
     /// </summary>
     public sealed class ViewSwitcherInputActions : MonoBehaviour
     {
         [Header("Scene names (devono essere in Build Settings)")]
         [SerializeField] private string atomViewerSceneName = "Scene_AtomViewer";
         [SerializeField] private string mapGridName = "Scene_MapGrid";
+
+        [Header("Startup View")]
+        [SerializeField] private bool loadMapGridOnStart = true;
 
         // 1) QUI: sostituisci con il nome della classe generata dal tuo .inputactions
         private ArcontioInputActions _actions;
@@ -25,6 +28,38 @@ namespace Arcontio.Core
                 new LogBlock(LogLevel.Debug, "log.viewswitcher.awake_start")
             );
             EnsureActions();
+        }
+
+
+        // =============================================================================
+        // Start
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Porta automaticamente la sessione runtime sulla scena MapGrid quando il
+        /// bootstrap ha terminato l'inizializzazione iniziale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bootstrap della vista senza scelta manuale</b></para>
+        /// <para>
+        /// Il simulatore continua a nascere nel runtime persistente, ma la vista
+        /// operativa di default diventa MapGrid. L'utente conserva comunque gli input
+        /// di switch scena esistenti: questo metodo esegue solo la scelta iniziale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>loadMapGridOnStart</b>: flag ispettore per disattivare il comportamento in debug speciali.</item>
+        ///   <item><b>mapGridName</b>: nome scena gia' usato dal comando F2/F-map esistente.</item>
+        ///   <item><b>LoadIfNotActive</b>: percorso comune con validazione Build Settings.</item>
+        /// </list>
+        /// </summary>
+        private void Start()
+        {
+            if (!loadMapGridOnStart)
+                return;
+
+            LoadIfNotActive(mapGridName);
         }
 
         private void OnEnable()
