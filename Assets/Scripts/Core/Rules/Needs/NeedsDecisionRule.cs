@@ -34,6 +34,11 @@ namespace Arcontio.Core
     {
         private readonly BeliefUpdater _beliefUpdater = new();
         private readonly BeliefQueryService _beliefQueryService = new();
+        private readonly DecisionCandidateGenerator _decisionCandidateGenerator = new();
+        private readonly DecisionScoringService _decisionScoringService = new();
+        private readonly DecisionSelectionService _decisionSelectionService = new();
+        private readonly List<DecisionCandidate> _decisionCandidates = new(16);
+        private readonly System.Random _decisionRandom = new(1505);
 
         // Throttle: decidiamo ogni N tick-pulse (per log leggibile)
         private readonly int _decisionEveryTicks;
@@ -65,6 +70,35 @@ namespace Arcontio.Core
             foreach (var npcId in world.NpcDna.Keys)
             {
                 if (!world.Needs.TryGetValue(npcId, out var needs)) continue;
+
+                if (TryPlanFromDecisionLayer(
+                    world,
+                    npcId,
+                    in needs,
+                    (int)pulse.TickIndex,
+                    telemetry,
+                    out var decisionCmd,
+                    out bool decisionDidSteal,
+                    out bool decisionDidMove,
+                    out bool decisionHandled))
+                {
+                    if (decisionCmd != null)
+                    {
+                        outCommands.Add(decisionCmd);
+                        if (decisionDidMove) moved++; else if (decisionCmd is SleepInBedCommand) slept++; else ate++;
+                        if (decisionDidSteal) antisocial++;
+
+                        ArcontioLogger.Info(
+                            new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "DecisionBridge"),
+                            new LogBlock(LogLevel.Info, "log.decision.bridge.command")
+                                .AddField("tick", pulse.TickIndex)
+                                .AddField("npcId", npcId)
+                                .AddField("Command", decisionCmd.Name));
+                    }
+
+                    if (decisionHandled)
+                        continue;
+                }
 
                 // --- MANGIA ---
                 if (needs.GetValue(NeedKind.Hunger) >= cfg.hungryThreshold)
@@ -136,6 +170,185 @@ namespace Arcontio.Core
                     .AddField("moved==", moved)
                     .AddField("antisocial==", antisocial));
             }
+        }
+
+        // =============================================================================
+        // TryPlanFromDecisionLayer
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ponte provvisorio tra il nuovo Decision Layer v0.05 e la rule legacy dei
+        /// bisogni.
+        /// </para>
+        ///
+        /// <para><b>Integrazione progressiva Decision -> Command</b></para>
+        /// <para>
+        /// Il metodo usa il nuovo Decision Layer per scegliere un'intenzione, ma lascia
+        /// ancora alla rule legacy la traduzione concreta verso i command esistenti.
+        /// Questo evita di introdurre il Job System in anticipo e riduce il rischio di
+        /// rompere fame/riposo mentre il layer di esecuzione non e' ancora pronto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate</b>: attiva il ponte solo per fame/riposo, non per sete ancora priva di command.</item>
+        ///   <item><b>Context</b>: costruisce un <c>DecisionEvaluationContext</c> con input per-NPC e belief soggettivi.</item>
+        ///   <item><b>Pipeline</b>: genera candidati, calcola score e seleziona weighted random.</item>
+        ///   <item><b>Adapter</b>: traduce solo intenzioni MVP in command legacy o in attesa/ricerca.</item>
+        /// </list>
+        /// </summary>
+        private bool TryPlanFromDecisionLayer(
+            World world,
+            int npcId,
+            in NpcNeeds needs,
+            int nowTick,
+            Telemetry telemetry,
+            out ICommand cmd,
+            out bool didSteal,
+            out bool didMove,
+            out bool handled)
+        {
+            cmd = null;
+            didSteal = false;
+            didMove = false;
+            handled = false;
+
+            if (world == null)
+                return false;
+
+            bool hungerAlert = needs.IsAlert(NeedKind.Hunger) || needs.GetValue(NeedKind.Hunger) >= world.Global.Needs.hungryThreshold;
+            bool restAlert = needs.IsAlert(NeedKind.Rest) || needs.GetValue(NeedKind.Rest) >= world.Global.Needs.tiredThreshold;
+            if (!hungerAlert && !restAlert)
+                return false;
+
+            if (!TryBuildDecisionContext(world, npcId, in needs, nowTick, out var context))
+                return false;
+
+            var audit = DecisionInputAudit.Audit(context);
+            if (!audit.IsValid)
+            {
+                telemetry?.Counter("DecisionBridge.AuditInvalid", 1);
+                return false;
+            }
+
+            // Il cibo portato addosso e' uno stato locale dell'NPC, non una query sul
+            // mondo: lo manteniamo come shortcut operativo finche' il catalogo non
+            // avra' una intenzione dedicata EatCarriedFood.
+            if (hungerAlert && world.NpcPrivateFood.TryGetValue(npcId, out int privateFood) && privateFood > 0)
+            {
+                cmd = new EatPrivateFoodCommand(npcId);
+                handled = true;
+                return true;
+            }
+
+            _decisionCandidateGenerator.GeneratePhase1Candidates(context, _decisionCandidates);
+            _decisionScoringService.ScoreCandidates(context, _decisionCandidates, DecisionScoringConfig.Default());
+
+            var selection = _decisionSelectionService.Select(
+                context,
+                _decisionCandidates,
+                DecisionSelectionConfig.Default(),
+                _decisionRandom);
+
+            if (selection.IsEmpty)
+                return false;
+
+            handled = true;
+            telemetry?.Counter("DecisionBridge.IntentSelected", 1);
+
+            ArcontioLogger.Info(
+                new LogContext(tick: nowTick, channel: "DecisionBridge", npcId: npcId),
+                new LogBlock(LogLevel.Info, "log.decision.bridge.intent")
+                    .AddField("intent", selection.Candidate.Kind.ToString())
+                    .AddField("score", selection.Candidate.FinalScore.ToString("0.000"))
+                    .AddField("candidateCount", _decisionCandidates.Count));
+
+            switch (selection.Candidate.Kind)
+            {
+                case DecisionIntentKind.EatKnownFood:
+                case DecisionIntentKind.TakeRestrictedFood:
+                    return TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
+
+                case DecisionIntentKind.RestKnownPlace:
+                case DecisionIntentKind.UseRestrictedRestPlace:
+                    return TryPlanSleep(world, npcId, needs, out cmd, out didSteal);
+
+                case DecisionIntentKind.SearchFood:
+                case DecisionIntentKind.SearchRestPlace:
+                case DecisionIntentKind.WaitAndObserve:
+                    // Ricerca/attesa non hanno ancora un Job/Step dedicato. Il ponte
+                    // registra comunque l'intenzione scelta dal Decision Layer, ma
+                    // lascia proseguire la logica legacy: cosi' evitiamo che un
+                    // intento non eseguibile trasformi fame/riposo in un no-op.
+                    cmd = null;
+                    didSteal = false;
+                    didMove = false;
+                    handled = false;
+                    return false;
+
+                default:
+                    handled = false;
+                    return false;
+            }
+        }
+
+        // =============================================================================
+        // TryBuildDecisionContext
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il contesto minimo ammesso dal Decision Layer per un singolo NPC.
+        /// </para>
+        ///
+        /// <para><b>Whitelist input Decision Layer</b></para>
+        /// <para>
+        /// Anche se questa rule legacy riceve ancora <c>World</c>, il contesto passato
+        /// al Decision Layer contiene solo componenti per-NPC gia' risolti e il
+        /// <c>BeliefStore</c> soggettivo. Il Decision Layer non riceve mai il World.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Dna/Profile</b>: identita' cognitiva e profilo runtime dell'NPC.</item>
+        ///   <item><b>Position</b>: posizione necessaria al QuerySystem per la distanza.</item>
+        ///   <item><b>Beliefs</b>: store soggettivo usato solo via BeliefQueryService.</item>
+        ///   <item><b>Schedule/Norm</b>: contesti MVP inattivi o permissivi in questa integrazione.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryBuildDecisionContext(
+            World world,
+            int npcId,
+            in NpcNeeds needs,
+            int nowTick,
+            out DecisionEvaluationContext context)
+        {
+            context = default;
+
+            if (!world.NpcDna.TryGetValue(npcId, out var dna) || dna == null)
+                return false;
+
+            if (!world.NpcProfiles.TryGetValue(npcId, out var profile) || profile == null)
+                return false;
+
+            if (!world.GridPos.TryGetValue(npcId, out var position))
+                return false;
+
+            if (!world.Beliefs.TryGetValue(npcId, out var beliefs) || beliefs == null)
+                return false;
+
+            context = new DecisionEvaluationContext(
+                npcId: npcId,
+                tick: nowTick,
+                needs: needs,
+                dna: dna,
+                profile: profile,
+                npcPosition: new Vector2Int(position.X, position.Y),
+                beliefs: beliefs,
+                beliefQueryConfig: world.Global.BeliefQuery,
+                scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
+                normContext: new DecisionNormContext(false, 1f, true));
+
+            return true;
         }
 
         // ============================================================
