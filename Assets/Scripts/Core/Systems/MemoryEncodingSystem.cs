@@ -216,6 +216,13 @@ namespace Arcontio.Core
                         if (rule.TryEncode(world, npcId, e, quality, out var trace))
                         {
                             var res = world.Memory[npcId].AddOrMerge(trace);
+                            MemoryBeliefDecisionExplainabilityEmitter.TryWriteMemoryTrace(
+                                world.Config?.Sim?.memory_belief_decision_explainability,
+                                npcId,
+                                tick.Index,
+                                trace,
+                                res,
+                                e.GetType().Name);
 
                             switch (res)
                             {
@@ -246,7 +253,12 @@ namespace Arcontio.Core
                                     world.Beliefs[npcId] = beliefStore;
                                 }
 
-                                bool beliefUpdated = _beliefUpdater.UpdateFromTrace(trace, beliefStore, (int)tick.Index);
+                                bool beliefUpdated = _beliefUpdater.UpdateFromTrace(
+                                    trace,
+                                    beliefStore,
+                                    (int)tick.Index,
+                                    world.Config?.Sim?.memory_belief_decision_explainability,
+                                    npcId);
                                 telemetry.Counter(beliefUpdated ? "BeliefUpdater.TraceAggregated" : "BeliefUpdater.TraceIgnored", 1);
                             }
 

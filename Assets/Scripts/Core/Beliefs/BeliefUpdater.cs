@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Arcontio.Core.Config;
 using UnityEngine;
 
 namespace Arcontio.Core
@@ -91,6 +92,39 @@ namespace Arcontio.Core
         /// </summary>
         public bool UpdateFromTrace(in MemoryTrace trace, BeliefStore store, int currentTick)
         {
+            return UpdateFromTrace(trace, store, currentTick, null, 0);
+        }
+
+        // =============================================================================
+        // UpdateFromTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica l'aggregazione lazy di una trace e registra, quando richiesto, il
+        /// record EL del belief risultante.
+        /// </para>
+        ///
+        /// <para><b>BeliefUpdater come confine Memory -> Belief</b></para>
+        /// <para>
+        /// Questo overload non cambia la semantica dell'aggregazione: aggiunge solo
+        /// uno snapshot diagnostico dopo che la regola compatibile ha aggiornato lo
+        /// store. Il log non decide, non filtra e non consulta il mondo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Resolve category</b>: deduce la categoria dalla stessa trace usata dalla regola.</item>
+        ///   <item><b>Existing check</b>: distingue creazione e merge prima dell'apply.</item>
+        ///   <item><b>Emit</b>: copia il belief risultante solo se la mutazione e' avvenuta.</item>
+        /// </list>
+        /// </summary>
+        public bool UpdateFromTrace(
+            in MemoryTrace trace,
+            BeliefStore store,
+            int currentTick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            int npcId)
+        {
             if (store == null)
                 return false;
 
@@ -100,7 +134,127 @@ namespace Arcontio.Core
                 if (!rule.Matches(trace))
                     continue;
 
+                bool hasCategory = TryResolveBeliefCategory(trace, out var category);
+                var estimatedPosition = new Vector2Int(trace.CellX, trace.CellY);
+                bool hadExisting = hasCategory && TryFindBelief(store, category, estimatedPosition, out _);
+
                 rule.Apply(trace, store, currentTick);
+                if (hasCategory && TryFindBelief(store, category, estimatedPosition, out var updatedBelief))
+                {
+                    // L'operazione e' diagnostica: AddOrMergeByCategoryAndPosition
+                    // nasconde giustamente i dettagli interni, quindi qui distinguiamo
+                    // solo tra prima creazione e merge su entry gia' esistente.
+                    var operation = hadExisting
+                        ? MemoryBeliefDecisionBeliefOperation.Merged
+                        : MemoryBeliefDecisionBeliefOperation.Created;
+
+                    MemoryBeliefDecisionExplainabilityEmitter.TryWriteBeliefTrace(
+                        explainabilityConfig,
+                        npcId,
+                        currentTick,
+                        operation,
+                        trace,
+                        updatedBelief,
+                        rule.GetType().Name);
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryResolveBeliefCategory
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la categoria belief prodotta da una trace usando la stessa mappatura
+        /// minimale delle regole di aggregazione MVP.
+        /// </para>
+        ///
+        /// <para><b>Diagnostica allineata all'aggregazione</b></para>
+        /// <para>
+        /// Il metodo serve solo a ritrovare il belief dopo l'apply per esportarlo nel
+        /// log. Non introduce una seconda pipeline cognitiva e non legge database o
+        /// stato oggettivo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Danger</b>: tracce di minaccia note alle rule.</item>
+        ///   <item><b>Object</b>: classificazione conservativa da SubjectDefId.</item>
+        ///   <item><b>Social</b>: NPC osservati come belief sociali minimi.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryResolveBeliefCategory(MemoryTrace trace, out BeliefCategory category)
+        {
+            if (trace.Type == MemoryType.PredatorSpotted
+                || trace.Type == MemoryType.PredatorRumor
+                || trace.Type == MemoryType.AttackSuffered
+                || trace.Type == MemoryType.AttackWitnessed
+                || trace.Type == MemoryType.NearDeathExperience
+                || trace.Type == MemoryType.DeathWitnessed)
+            {
+                category = BeliefCategory.Danger;
+                return true;
+            }
+
+            if (trace.Type == MemoryType.ObjectSpotted)
+            {
+                category = BeliefAggregationRuleCommon.ClassifyObjectDefId(trace.SubjectDefId);
+                return true;
+            }
+
+            if (trace.Type == MemoryType.NpcSpotted)
+            {
+                category = BeliefCategory.Social;
+                return true;
+            }
+
+            category = default;
+            return false;
+        }
+
+        // =============================================================================
+        // TryFindBelief
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca nello store la credenza corrispondente alla categoria e posizione
+        /// prodotte dalla trace appena aggregata.
+        /// </para>
+        ///
+        /// <para><b>Lookup diagnostico passivo</b></para>
+        /// <para>
+        /// La ricerca non ordina, non valuta e non sceglie target decisionali. Replica
+        /// soltanto la chiave minimale usata da <c>AddOrMergeByCategoryAndPosition</c>
+        /// per poter copiare il belief risultante nel log.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Category</b>: dominio belief risolto dalla trace.</item>
+        ///   <item><b>Position</b>: cella stimata usata dal merge.</item>
+        ///   <item><b>Output</b>: entry copiata dallo store, se trovata.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryFindBelief(
+            BeliefStore store,
+            BeliefCategory category,
+            Vector2Int position,
+            out BeliefEntry belief)
+        {
+            belief = default;
+
+            var entries = store.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                if (entry.Category != category || entry.EstimatedPosition != position)
+                    continue;
+
+                belief = entry;
                 return true;
             }
 

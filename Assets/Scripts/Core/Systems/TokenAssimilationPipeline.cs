@@ -71,6 +71,13 @@ namespace Arcontio.Core
                     if (rule.TryAssimilate(world, env, out var trace))
                     {
                         var res = store.AddOrMerge(trace);
+                        MemoryBeliefDecisionExplainabilityEmitter.TryWriteMemoryTrace(
+                            world.Config?.Sim?.memory_belief_decision_explainability,
+                            env.ListenerId,
+                            tick.Index,
+                            trace,
+                            res,
+                            env.Token.Type.ToString());
                         tracesAdded++;
 
                         // Aggregazione lazy BeliefStore per memorie "sentite":
@@ -87,7 +94,12 @@ namespace Arcontio.Core
                                 world.Beliefs[env.ListenerId] = beliefStore;
                             }
 
-                            bool beliefUpdated = _beliefUpdater.UpdateFromTrace(trace, beliefStore, (int)tick.Index);
+                            bool beliefUpdated = _beliefUpdater.UpdateFromTrace(
+                                trace,
+                                beliefStore,
+                                (int)tick.Index,
+                                world.Config?.Sim?.memory_belief_decision_explainability,
+                                env.ListenerId);
                             telemetry.Counter(beliefUpdated ? "BeliefUpdater.TraceAggregated" : "BeliefUpdater.TraceIgnored", 1);
                         }
                         

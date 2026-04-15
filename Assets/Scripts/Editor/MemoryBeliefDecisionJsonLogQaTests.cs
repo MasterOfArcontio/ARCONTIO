@@ -332,6 +332,68 @@ namespace Arcontio.Tests
             Assert.That(jsonl, Does.Contain("\"reason\":\"ObjectDefIdClassifiedAsFood\""));
         }
 
+        // =============================================================================
+        // MemoryStoreAndBeliefUpdaterWriteExplainabilityRecords
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica l'integrazione reale di MemoryStore, emitter EL e BeliefUpdater:
+        /// una trace accettata deve produrre un record memory e un record belief.
+        /// </para>
+        ///
+        /// <para><b>Ciclo Memory -> Belief auditabile</b></para>
+        /// <para>
+        /// Il test non costruisce un World e non consulta oggetti globali. La trace
+        /// contiene gia' il <c>SubjectDefId</c> percepito, quindi il BeliefUpdater puo'
+        /// aggregare conoscenza soggettiva e il log puo' raccontarla.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>MemoryStore</b>: accetta la trace ObjectSpotted.</item>
+        ///   <item><b>Emitter</b>: scrive storeResult e campi della trace.</item>
+        ///   <item><b>BeliefUpdater</b>: crea un belief Food e lo esporta come snapshot.</item>
+        /// </list>
+        /// </summary>
+        [Test]
+        public void MemoryStoreAndBeliefUpdaterWriteExplainabilityRecords()
+        {
+            string fileName = "qa_el_mbd_memory_belief_integration.jsonl";
+            string path = ResetLogFile(fileName);
+            var config = MakeConfig(fileName);
+            var memoryStore = new MemoryStore();
+            var beliefStore = new BeliefStore();
+            var updater = new BeliefUpdater();
+            var trace = new MemoryTrace
+            {
+                Type = MemoryType.ObjectSpotted,
+                SubjectId = 707,
+                SubjectDefId = "food_stock_small",
+                CellX = 6,
+                CellY = 4,
+                Intensity01 = 0.83f,
+                Reliability01 = 0.79f,
+                DecayPerTick01 = 0.01f,
+            };
+
+            // Act: il flusso riproduce i due passaggi runtime senza passare da World.
+            var result = memoryStore.AddOrMerge(trace);
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteMemoryTrace(config, 12, 333, trace, result, "ObjectSpottedEvent");
+            bool updated = updater.UpdateFromTrace(trace, beliefStore, 333, config, 12);
+
+            string jsonl = File.ReadAllText(path);
+
+            Assert.That(result, Is.EqualTo(AddOrMergeResult.Inserted));
+            Assert.That(updated, Is.True);
+            Assert.That(jsonl, Does.Contain("\"kind\":\"memory\""));
+            Assert.That(jsonl, Does.Contain("\"storeResult\":\"Inserted\""));
+            Assert.That(jsonl, Does.Contain("\"kind\":\"belief\""));
+            Assert.That(jsonl, Does.Contain("\"operation\":\"Created\""));
+            Assert.That(jsonl, Does.Contain("\"category\":\"Food\""));
+            Assert.That(jsonl, Does.Contain("\"estimatedCellText\":\"(6, 4)\""));
+            Assert.That(jsonl, Does.Contain("\"reason\":\"ObjectBeliefAggregationRule\""));
+        }
+
         private static MemoryBeliefDecisionBeliefRef MakeFoodBelief()
         {
             return new MemoryBeliefDecisionBeliefRef
