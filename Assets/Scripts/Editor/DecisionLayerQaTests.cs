@@ -210,6 +210,7 @@ namespace Arcontio.Tests
                 npcPosition: new Vector2Int(2, 2),
                 beliefs: beliefs,
                 beliefQueryConfig: BeliefQueryConfig.Default(),
+                explainabilityConfig: null,
                 scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
                 normContext: new DecisionNormContext(true, 0.50f, false));
         }

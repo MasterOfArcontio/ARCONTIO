@@ -159,7 +159,10 @@ namespace Arcontio.Core
             var result = _beliefQueryService.QueryBest(
                 context.Beliefs,
                 query,
-                context.BeliefQueryConfig);
+                context.BeliefQueryConfig,
+                context.ExplainabilityConfig,
+                context.NpcId,
+                context.Tick);
 
             if (result.IsEmpty)
                 return false;

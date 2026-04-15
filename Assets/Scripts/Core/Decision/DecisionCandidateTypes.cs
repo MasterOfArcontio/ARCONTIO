@@ -1,4 +1,5 @@
 using UnityEngine;
+using Arcontio.Core.Config;
 
 namespace Arcontio.Core
 {
@@ -142,6 +143,7 @@ namespace Arcontio.Core
     ///   <item><b>Needs/Dna/Profile</b>: stato individuale ammesso.</item>
     ///   <item><b>NpcPosition</b>: posizione necessaria alle query belief.</item>
     ///   <item><b>Beliefs</b>: store soggettivo per-NPC, letto solo via QuerySystem nelle sessioni successive.</item>
+    ///   <item><b>ExplainabilityConfig</b>: configurazione diagnostica opzionale, senza effetto sul ranking.</item>
     ///   <item><b>NormContext</b>: filtro esplicito per rischio sociale e norme MVP.</item>
     /// </list>
     /// </summary>
@@ -155,6 +157,7 @@ namespace Arcontio.Core
         public readonly Vector2Int NpcPosition;
         public readonly BeliefStore Beliefs;
         public readonly BeliefQueryConfig BeliefQueryConfig;
+        public readonly MemoryBeliefDecisionExplainabilityParams ExplainabilityConfig;
         public readonly DecisionScheduleFrame ScheduleFrame;
         public readonly DecisionNormContext NormContext;
 
@@ -167,6 +170,7 @@ namespace Arcontio.Core
             Vector2Int npcPosition,
             BeliefStore beliefs,
             BeliefQueryConfig beliefQueryConfig,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             DecisionScheduleFrame scheduleFrame)
             : this(
                 npcId,
@@ -177,6 +181,7 @@ namespace Arcontio.Core
                 npcPosition,
                 beliefs,
                 beliefQueryConfig,
+                explainabilityConfig,
                 scheduleFrame,
                 DecisionNormContext.Default())
         {
@@ -191,6 +196,7 @@ namespace Arcontio.Core
             Vector2Int npcPosition,
             BeliefStore beliefs,
             BeliefQueryConfig beliefQueryConfig,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             DecisionScheduleFrame scheduleFrame,
             DecisionNormContext normContext)
         {
@@ -202,6 +208,7 @@ namespace Arcontio.Core
             NpcPosition = npcPosition;
             Beliefs = beliefs;
             BeliefQueryConfig = beliefQueryConfig;
+            ExplainabilityConfig = explainabilityConfig;
             ScheduleFrame = scheduleFrame;
             NormContext = normContext;
         }

@@ -1,4 +1,5 @@
 using Arcontio.Core.Diagnostics;
+using Arcontio.Core.Config;
 using Arcontio.Core.Logging;
 using System.Collections.Generic;
 using UnityEngine;
@@ -221,6 +222,8 @@ namespace Arcontio.Core
             if (!hungerAlert && !restAlert)
                 return false;
 
+            var explainabilityConfig = world.Config?.Sim?.memory_belief_decision_explainability;
+
             if (!TryBuildDecisionContext(world, npcId, in needs, nowTick, out var context))
                 return false;
 
@@ -242,12 +245,14 @@ namespace Arcontio.Core
             }
 
             _decisionCandidateGenerator.GeneratePhase1Candidates(context, _decisionCandidates);
-            _decisionScoringService.ScoreCandidates(context, _decisionCandidates, DecisionScoringConfig.Default());
+            var scoringConfig = DecisionScoringConfig.Default();
+            var selectionConfig = DecisionSelectionConfig.Default();
+            _decisionScoringService.ScoreCandidates(context, _decisionCandidates, scoringConfig);
 
             var selection = _decisionSelectionService.Select(
                 context,
                 _decisionCandidates,
-                DecisionSelectionConfig.Default(),
+                selectionConfig,
                 _decisionRandom);
 
             if (selection.IsEmpty)
@@ -255,6 +260,7 @@ namespace Arcontio.Core
 
             handled = true;
             telemetry?.Counter("DecisionBridge.IntentSelected", 1);
+            TryEmitDecisionTrace(explainabilityConfig, context, true, _decisionCandidates, selection, selectionConfig);
 
             ArcontioLogger.Info(
                 new LogContext(tick: nowTick, channel: "DecisionBridge", npcId: npcId),
@@ -267,11 +273,19 @@ namespace Arcontio.Core
             {
                 case DecisionIntentKind.EatKnownFood:
                 case DecisionIntentKind.TakeRestrictedFood:
-                    return TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
+                {
+                    bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
+                    TryEmitBridgeTrace(explainabilityConfig, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    return planned;
+                }
 
                 case DecisionIntentKind.RestKnownPlace:
                 case DecisionIntentKind.UseRestrictedRestPlace:
-                    return TryPlanSleep(world, npcId, needs, out cmd, out didSteal);
+                {
+                    bool planned = TryPlanSleep(world, npcId, needs, out cmd, out didSteal);
+                    TryEmitBridgeTrace(explainabilityConfig, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    return planned;
+                }
 
                 case DecisionIntentKind.SearchFood:
                 case DecisionIntentKind.SearchRestPlace:
@@ -284,12 +298,300 @@ namespace Arcontio.Core
                     didSteal = false;
                     didMove = false;
                     handled = false;
+                    TryEmitBridgeTrace(explainabilityConfig, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "LegacyFallbackForNonExecutableIntent");
                     return false;
 
                 default:
                     handled = false;
+                    TryEmitBridgeTrace(explainabilityConfig, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "UnsupportedIntent");
                     return false;
             }
+        }
+
+        // =============================================================================
+        // TryEmitDecisionTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esporta uno snapshot EL della selezione del Decision Layer appena calcolata.
+        /// </para>
+        ///
+        /// <para><b>Decision Layer auditabile</b></para>
+        /// <para>
+        /// Il metodo non rigenera candidati, non ricalcola score e non interroga il
+        /// World. Riceve context, candidati e selezione dal punto della pipeline che
+        /// li possiede gia', poi li copia in record passivi per il sink JSONL.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Guard config</b>: se EL e' spento il sink fara' comunque no-op.</item>
+        ///   <item><b>Selection</b>: salva intenzione, score e indice selezionato.</item>
+        ///   <item><b>Candidates</b>: copia i candidati gia' score-ati con breakdown.</item>
+        /// </list>
+        /// </summary>
+        private static void TryEmitDecisionTrace(
+            MemoryBeliefDecisionExplainabilityParams config,
+            in DecisionEvaluationContext context,
+            bool auditValid,
+            List<DecisionCandidate> candidates,
+            DecisionSelectionResult selection,
+            DecisionSelectionConfig selectionConfig)
+        {
+            if (config == null)
+                return;
+
+            // L'effettivo rumore di selezione e' calcolato nello stesso modo del
+            // SelectionService, ma senza rieseguire la roulette o riordinare candidati.
+            float impulsivity01 = context.Dna != null ? context.Dna.CognitiveModulators.Impulsivity01 : 0f;
+            float effectiveNoise01 = Clamp01(selectionConfig.noise01 + (impulsivity01 * selectionConfig.impulsivityNoiseBonus));
+
+            var trace = new MemoryBeliefDecisionTrace
+            {
+                Kind = MemoryBeliefDecisionTraceKind.Decision,
+                Tick = context.Tick,
+                NpcId = context.NpcId,
+                Decision = new MemoryBeliefDecisionDecisionRecord
+                {
+                    AuditValid = auditValid,
+                    CandidateCount = candidates != null ? candidates.Count : 0,
+                    SelectedIntent = selection.IsEmpty ? DecisionIntentKind.None : selection.Candidate.Kind,
+                    SelectedScore = selection.IsEmpty ? 0f : selection.Candidate.FinalScore,
+                    SelectedIndex = selection.SelectedIndex,
+                    SelectionTopN = selectionConfig.topN,
+                    SelectionNoise01 = selectionConfig.noise01,
+                    Impulsivity01 = impulsivity01,
+                    EffectiveNoise01 = effectiveNoise01,
+                    Candidates = ToDecisionCandidateRecords(candidates),
+                },
+            };
+
+            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, trace);
+        }
+
+        // =============================================================================
+        // TryEmitBridgeTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esporta il record EL del ponte provvisorio tra intenzione decisionale e
+        /// command legacy.
+        /// </para>
+        ///
+        /// <para><b>Decision / Execution Bridge</b></para>
+        /// <para>
+        /// La funzione rende visibile se l'intenzione selezionata e' diventata un
+        /// command, se ha richiesto movimento o furto, oppure se la rule legacy deve
+        /// ancora proseguire perche' l'intenzione non ha Job eseguibile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Command</b>: nome del command prodotto, se esiste.</item>
+        ///   <item><b>Target</b>: cella del belief vincitore quando disponibile.</item>
+        ///   <item><b>Fallback</b>: flag esplicito per intenzioni non ancora eseguibili.</item>
+        /// </list>
+        /// </summary>
+        private static void TryEmitBridgeTrace(
+            MemoryBeliefDecisionExplainabilityParams config,
+            int tick,
+            int npcId,
+            DecisionCandidate candidate,
+            ICommand command,
+            bool didSteal,
+            bool didMove,
+            bool handled,
+            bool legacyFallbackUsed,
+            string reason)
+        {
+            if (config == null)
+                return;
+
+            var targetCell = Vector2Int.zero;
+            var targetSource = MemoryBeliefDecisionTargetSource.None;
+            if (candidate.Metadata.RequiresBeliefTarget && !candidate.BeliefResult.IsEmpty)
+            {
+                // Il bridge non cerca un nuovo target: copia quello gia' scelto dal
+                // QuerySystem per il candidato decisionale.
+                targetCell = candidate.BeliefResult.Belief.EstimatedPosition;
+                targetSource = MemoryBeliefDecisionTargetSource.BeliefQuery;
+            }
+            else if (command != null)
+            {
+                targetSource = MemoryBeliefDecisionTargetSource.LegacyFallback;
+            }
+
+            MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, new MemoryBeliefDecisionTrace
+            {
+                Kind = MemoryBeliefDecisionTraceKind.Bridge,
+                Tick = tick,
+                NpcId = npcId,
+                Bridge = new MemoryBeliefDecisionBridgeRecord
+                {
+                    SelectedIntent = candidate.Kind,
+                    CommandName = command != null ? command.Name : string.Empty,
+                    Handled = handled,
+                    DidMove = didMove,
+                    DidSteal = didSteal,
+                    TargetCell = targetCell,
+                    TargetSource = targetSource,
+                    LegacyFallbackUsed = legacyFallbackUsed,
+                    Reason = reason ?? string.Empty,
+                },
+            });
+        }
+
+        // =============================================================================
+        // ToDecisionCandidateRecords
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia i candidati decisionali in record EL serializzabili.
+        /// </para>
+        ///
+        /// <para><b>Candidati come snapshot</b></para>
+        /// <para>
+        /// La conversione non cambia disponibilita', score o belief target. Serve solo
+        /// a rendere analizzabile dopo il tick l'insieme che ha partecipato alla
+        /// selezione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Null guard</b>: array vuoto quando non esistono candidati.</item>
+        ///   <item><b>Belief</b>: snapshot del target scelto dal QuerySystem, se presente.</item>
+        ///   <item><b>Score</b>: breakdown decisionale copiato voce per voce.</item>
+        /// </list>
+        /// </summary>
+        private static MemoryBeliefDecisionCandidateRecord[] ToDecisionCandidateRecords(List<DecisionCandidate> candidates)
+        {
+            if (candidates == null || candidates.Count == 0)
+                return System.Array.Empty<MemoryBeliefDecisionCandidateRecord>();
+
+            var records = new MemoryBeliefDecisionCandidateRecord[candidates.Count];
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var candidate = candidates[i];
+                records[i] = new MemoryBeliefDecisionCandidateRecord
+                {
+                    Intent = candidate.Kind,
+                    Available = candidate.IsAvailable,
+                    Need = candidate.Metadata.PrimaryNeed,
+                    NeedUrgency01 = candidate.NeedUrgency01,
+                    IsCritical = candidate.IsCritical,
+                    RequiresBeliefTarget = candidate.Metadata.RequiresBeliefTarget,
+                    BeliefResultEmpty = candidate.BeliefResult.IsEmpty,
+                    Belief = candidate.BeliefResult.IsEmpty ? default : ToBeliefRef(candidate.BeliefResult.Belief),
+                    Score = candidate.FinalScore,
+                    FilteredReason = candidate.FilteredReason ?? string.Empty,
+                    ScoreContributions = ToScoreContributionRefs(candidate.ScoreContributions),
+                };
+            }
+
+            return records;
+        }
+
+        // =============================================================================
+        // ToBeliefRef
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia una credenza selezionata in un riferimento EL minimale.
+        /// </para>
+        ///
+        /// <para><b>Belief soggettivo senza store live</b></para>
+        /// <para>
+        /// Il record contiene solo valori primitivi del belief vincitore. Non espone
+        /// la lista del BeliefStore e non permette al log di mutare conoscenza NPC.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Identita'</b>: categoria e id locale per-NPC.</item>
+        ///   <item><b>Qualita'</b>: confidence, freshness, status e source.</item>
+        ///   <item><b>Target</b>: posizione stimata usata dalla decisione.</item>
+        /// </list>
+        /// </summary>
+        private static MemoryBeliefDecisionBeliefRef ToBeliefRef(BeliefEntry belief)
+        {
+            return new MemoryBeliefDecisionBeliefRef
+            {
+                Category = belief.Category,
+                Status = belief.Status,
+                Source = belief.Source,
+                BeliefId = belief.BeliefId,
+                EstimatedPosition = belief.EstimatedPosition,
+                Confidence = belief.Confidence,
+                Freshness = belief.Freshness,
+                SourceCount = belief.SourceCount,
+            };
+        }
+
+        // =============================================================================
+        // ToScoreContributionRefs
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte i contributi dello scoring decisionale in payload EL.
+        /// </para>
+        ///
+        /// <para><b>Breakdown esplicito</b></para>
+        /// <para>
+        /// Le label prodotte da <c>DecisionScoringService</c> restano inalterate, in
+        /// modo che il file JSONL possa spiegare il ranking senza log testuali fragili.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Guard</b>: array vuoto per candidati non score-ati.</item>
+        ///   <item><b>Copia</b>: ogni contributo mantiene label e valore.</item>
+        ///   <item><b>Output</b>: array passivo pronto per il sink.</item>
+        /// </list>
+        /// </summary>
+        private static MemoryBeliefDecisionScoreContributionRef[] ToScoreContributionRefs(DecisionScoreContribution[] contributions)
+        {
+            if (contributions == null || contributions.Length == 0)
+                return System.Array.Empty<MemoryBeliefDecisionScoreContributionRef>();
+
+            var records = new MemoryBeliefDecisionScoreContributionRef[contributions.Length];
+            for (int i = 0; i < contributions.Length; i++)
+            {
+                records[i] = new MemoryBeliefDecisionScoreContributionRef
+                {
+                    Label = contributions[i].Label,
+                    Value = contributions[i].Value,
+                };
+            }
+
+            return records;
+        }
+
+        // =============================================================================
+        // Clamp01
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza un valore nel range 0-1 usato dai parametri EL del bridge.
+        /// </para>
+        ///
+        /// <para><b>Validazione numerica locale</b></para>
+        /// <para>
+        /// Il calcolo dell'effective noise replica una formula diagnostica: il clamp
+        /// evita valori fuori range senza dipendere da helper esterni.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Lower bound</b>: valori negativi diventano 0.</item>
+        ///   <item><b>Upper bound</b>: valori sopra 1 diventano 1.</item>
+        ///   <item><b>Return</b>: valore sicuro per JSONL e UI futura.</item>
+        /// </list>
+        /// </summary>
+        private static float Clamp01(float value)
+        {
+            if (value < 0f) return 0f;
+            if (value > 1f) return 1f;
+            return value;
         }
 
         // =============================================================================
@@ -345,6 +647,7 @@ namespace Arcontio.Core
                 npcPosition: new Vector2Int(position.X, position.Y),
                 beliefs: beliefs,
                 beliefQueryConfig: world.Global.BeliefQuery,
+                explainabilityConfig: world.Config?.Sim?.memory_belief_decision_explainability,
                 scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
                 normContext: new DecisionNormContext(false, 1f, true));
 
@@ -735,7 +1038,10 @@ if (stolenStockObj != 0)
                 store,
                 new Vector2Int(npcX, npcY),
                 urgency01,
-                world.Global.BeliefQuery);
+                world.Global.BeliefQuery,
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                npcId,
+                nowTick);
 
             if (queryResult.IsEmpty)
                 return false;
