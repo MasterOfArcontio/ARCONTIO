@@ -78,7 +78,7 @@ namespace Arcontio.Core
                     Intensity01 = trace.Intensity01,
                     Reliability01 = trace.Reliability01,
                     IsHeard = trace.IsHeard,
-                    HeardKind = trace.HeardKind,
+                    HeardKind = trace.HeardKind.ToString(),
                     SourceSpeakerId = trace.SourceSpeakerId,
                     StoreResult = storeResult,
                 },
