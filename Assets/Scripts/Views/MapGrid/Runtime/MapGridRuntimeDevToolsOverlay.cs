@@ -1,6 +1,7 @@
 // Assets/Scripts/Views/MapGrid/Runtime/MapGridRuntimeDevToolsOverlay.cs
 using Arcontio.Core;
 using Arcontio.Core.Commands.DevTools;
+using SocialViewer.UI;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -40,6 +41,8 @@ namespace Arcontio.View.MapGrid
             SpawnNpc = 2,
             OrientNpc = 3,
             EraseNpc = 4,
+            PlaceDoor = 5,
+            PlaceFoodStock = 6,
         }
 
         /// <summary>
@@ -53,6 +56,37 @@ namespace Arcontio.View.MapGrid
             Click = 0,
             Brush = 1,
             Rectangle = 2,
+        }
+
+        // =============================================================================
+        // DoorPlacementState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Stato iniziale richiesto dalla UI per una porta piazzata tramite DevTools.
+        /// La scelta resta view-side fino alla creazione del comando; la validazione
+        /// effettiva del lock avviene nel core, dove e' disponibile la <c>ObjectDef</c>.
+        /// </para>
+        ///
+        /// <para><b>UI dichiarativa / Core validante</b></para>
+        /// <para>
+        /// L'overlay esprime l'intenzione dell'utente, ma non forza direttamente
+        /// <c>WorldObjectInstance</c>. Il comando traduce questo stato in flag runtime
+        /// e usa <c>World.SetDoorOpen</c> per tenere coerenti le cache.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Open</b>: porta inizialmente aperta.</item>
+        ///   <item><b>Closed</b>: porta chiusa ma non bloccata.</item>
+        ///   <item><b>Locked</b>: porta chiusa a chiave, valido solo se la porta e' lockable.</item>
+        /// </list>
+        /// </summary>
+        private enum DoorPlacementState
+        {
+            Open = 0,
+            Closed = 1,
+            Locked = 2,
         }
 
         [Header("References")]
@@ -73,7 +107,7 @@ namespace Arcontio.View.MapGrid
 
         [Header("DevMode")]
         [Tooltip("Tasto per toggle DevMode. In origine era F2 (documento), ma qui è rimappabile perché F2 può essere già occupato.")]
-        [SerializeField] private Key toggleKey = Key.F2;
+        [SerializeField] private Key toggleKey = Key.F3;
 
         [Tooltip("Nome default del file per Save/Load (senza estensione).")]
         [SerializeField] private string defaultMapName = "devmap";
@@ -96,6 +130,18 @@ namespace Arcontio.View.MapGrid
         // NPC: facing selezionato (usato sia per spawn che per orient).
         private CardinalDirection _npcFacing = CardinalDirection.North;
 
+        // Porte: stato richiesto dal pannello dedicato "Inserisci porta".
+        private bool _doorWithLock;
+        private DoorPlacementState _doorPlacementState = DoorPlacementState.Closed;
+
+        // Cibo a terra: stock piazzato sulla mappa con proprieta' comunitaria o NPC.
+        private int _foodStockUnits = 1;
+        private bool _foodStockOwnedByNpc;
+        private int _foodStockOwnerNpcId = -1;
+
+        // Cibo addosso: incremento del cibo privato trasportato dall'NPC selezionato.
+        private int _carriedFoodUnits = 1;
+
         // Brush: cache dell'ultima cella "dipinta" per evitare spam sullo stesso tile.
         private int _lastPaintX = int.MinValue;
         private int _lastPaintY = int.MinValue;
@@ -109,7 +155,7 @@ namespace Arcontio.View.MapGrid
 
         // Cache UI
         private Vector2 _scroll;
-        private Rect _windowRect = new Rect(16, 16, 420, 560);
+        private Rect _windowRect = new Rect(16, 16, 460, 720);
 
         // Per evitare "click-through" (il problema riportato: clicco un bottone e contemporaneamente piazzo sulla mappa),
         // teniamo una flag aggiornata ogni frame che indica se il mouse sta "sopra" la finestra IMGUI.
@@ -228,6 +274,16 @@ namespace Arcontio.View.MapGrid
                 case Tool.EraseNpc:
                     if (mouse.leftButton.wasPressedThisFrame)
                         Enqueue(new DevEraseNpcAtCellCommand(cx, cy));
+                    break;
+
+                case Tool.PlaceDoor:
+                    if (mouse.leftButton.wasPressedThisFrame)
+                        Enqueue(BuildDoorPlacementCommand(cx, cy));
+                    break;
+
+                case Tool.PlaceFoodStock:
+                    if (mouse.leftButton.wasPressedThisFrame)
+                        Enqueue(BuildFoodStockPlacementCommand(MapGridWorldProvider.TryGetWorld(), cx, cy));
                     break;
             }
         }
@@ -389,6 +445,11 @@ namespace Arcontio.View.MapGrid
             if (GUILayout.Toggle(_tool == Tool.EraseNpc, "Erase NPC", "Button")) _tool = Tool.EraseNpc;
             GUILayout.EndHorizontal();
 
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Toggle(_tool == Tool.PlaceDoor, "Inserisci porta", "Button")) _tool = Tool.PlaceDoor;
+            if (GUILayout.Toggle(_tool == Tool.PlaceFoodStock, "Inserisci cibo", "Button")) _tool = Tool.PlaceFoodStock;
+            GUILayout.EndHorizontal();
+
             // ------------------------------------------------------------
             // Shape selection (only relevant for Place/Erase)
             // ------------------------------------------------------------
@@ -428,6 +489,10 @@ namespace Arcontio.View.MapGrid
                 GUILayout.Label("Erase NPC: click on a cell containing an NPC");
             }
 
+            DrawNpcCarriedFoodControls(world);
+            DrawDoorPlacementControls();
+            DrawFoodStockPlacementControls(world);
+
             GUILayout.Space(8);
 
             // ------------------------------------------------------------
@@ -463,6 +528,7 @@ namespace Arcontio.View.MapGrid
                     // Evitiamo definizioni interne/non piazzabili.
                     if (string.IsNullOrWhiteSpace(def.Id)) continue;
                     if (def.Id == "_runtime_occluder") continue;
+                    if (IsDedicatedDevToolObject(def)) continue;
 
                     bool isSel = (_selectedDefId == def.Id);
 
@@ -490,6 +556,213 @@ namespace Arcontio.View.MapGrid
 
             // Drag handle (top bar only)
             GUI.DragWindow(new Rect(0, 0, 10000, 20));
+        }
+
+        // =============================================================================
+        // DrawNpcCarriedFoodControls
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna il blocco UI che permette di aggiungere cibo direttamente addosso
+        /// all'NPC selezionato. Il blocco legge la selezione view-only, ma non modifica
+        /// direttamente il mondo: al click produce un <c>DevAddNpcPrivateFoodCommand</c>.
+        /// </para>
+        ///
+        /// <para><b>Separazione tra selezione View e mutazione Core</b></para>
+        /// <para>
+        /// <c>NPCSelection</c> e' uno stato condiviso della View, utile per sapere quale
+        /// NPC l'utente sta osservando. Il fatto simulativo "questo NPC trasporta cibo"
+        /// resta pero' nel <c>World</c> e viene scritto solo dal comando core-side.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>SelectedNpcId</b>: identifica il destinatario del cibo addosso.</item>
+        ///   <item><b>Quantita'</b>: campo numerico clampato a valori positivi.</item>
+        ///   <item><b>Bottone comando</b>: accoda il comando solo se l'NPC esiste ancora.</item>
+        /// </list>
+        /// </summary>
+        private void DrawNpcCarriedFoodControls(World world)
+        {
+            GUILayout.Space(8);
+            GUILayout.Label("Cibo addosso a NPC selezionato");
+
+            int selectedNpcId = NPCSelection.SelectedNpcId;
+            bool hasSelectedNpc = selectedNpcId > 0 && world.ExistsNpc(selectedNpcId);
+
+            if (hasSelectedNpc)
+            {
+                string npcName = world.NpcDna.TryGetValue(selectedNpcId, out var dna) && dna != null ? dna.Identity.Name : "<unnamed>";
+                world.NpcPrivateFood.TryGetValue(selectedNpcId, out int currentFood);
+                int freeCapacity = world.GetInventoryFreeCapacity(selectedNpcId);
+
+                GUILayout.Label($"NPC: {selectedNpcId} '{npcName}'");
+                GUILayout.Label($"Cibo trasportato: {currentFood} | Spazio libero: {freeCapacity}");
+            }
+            else
+            {
+                GUILayout.Label("NPC: nessun NPC selezionato");
+            }
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Unita'", GUILayout.Width(54));
+            _carriedFoodUnits = DrawPositiveIntField(_carriedFoodUnits, GUILayout.Width(70));
+
+            bool previousEnabled = GUI.enabled;
+            GUI.enabled = previousEnabled && hasSelectedNpc;
+            if (GUILayout.Button("Aggiungi addosso", GUILayout.Width(140)))
+                Enqueue(new DevAddNpcPrivateFoodCommand(selectedNpcId, _carriedFoodUnits));
+            GUI.enabled = previousEnabled;
+            GUILayout.EndHorizontal();
+        }
+
+        // =============================================================================
+        // DrawDoorPlacementControls
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna il blocco UI dedicato all'inserimento porte. L'utente non sceglie
+        /// piu' tra piu' voci grezze di palette: sceglie una porta e ne configura lo
+        /// stato tramite opzioni esplicite.
+        /// </para>
+        ///
+        /// <para><b>Astrazione UI sopra ObjectDef tecnici</b></para>
+        /// <para>
+        /// La distinzione tra <c>door_wood_good</c> e <c>door_wood_locked</c> resta un
+        /// dettaglio dati. La UI espone invece la domanda sistemica: "la porta supporta
+        /// serratura?" e "qual e' il suo stato iniziale?".
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Tool dedicato</b>: il click mappa piazza una porta solo quando e' selezionato <c>PlaceDoor</c>.</item>
+        ///   <item><b>Serratura</b>: abilita la scelta "chiusa a chiave".</item>
+        ///   <item><b>Stato</b>: aperta, chiusa o locked, con locked disabilitato su porte non lockable.</item>
+        /// </list>
+        /// </summary>
+        private void DrawDoorPlacementControls()
+        {
+            GUILayout.Space(8);
+            GUILayout.Label("Porta");
+
+            _doorWithLock = GUILayout.Toggle(_doorWithLock, "Con serratura a chiave");
+            if (!_doorWithLock && _doorPlacementState == DoorPlacementState.Locked)
+                _doorPlacementState = DoorPlacementState.Closed;
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Toggle(_doorPlacementState == DoorPlacementState.Open, "Aperta", "Button"))
+                _doorPlacementState = DoorPlacementState.Open;
+            if (GUILayout.Toggle(_doorPlacementState == DoorPlacementState.Closed, "Chiusa", "Button"))
+                _doorPlacementState = DoorPlacementState.Closed;
+
+            bool previousEnabled = GUI.enabled;
+            GUI.enabled = previousEnabled && _doorWithLock;
+            if (GUILayout.Toggle(_doorPlacementState == DoorPlacementState.Locked, "Chiusa a chiave", "Button"))
+                _doorPlacementState = DoorPlacementState.Locked;
+            GUI.enabled = previousEnabled;
+            GUILayout.EndHorizontal();
+
+            if (_tool == Tool.PlaceDoor)
+                GUILayout.Label("Click mappa: inserisce porta con queste opzioni");
+        }
+
+        // =============================================================================
+        // DrawFoodStockPlacementControls
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna il blocco UI dedicato al cibo a terra. L'utente sceglie se lo stock
+        /// e' comunitario oppure privato di un NPC selezionato dalla lista degli NPC
+        /// presenti nel mondo runtime.
+        /// </para>
+        ///
+        /// <para><b>Proprieta' come fatto del mondo</b></para>
+        /// <para>
+        /// La scelta comunitario/NPC diventa <c>OwnerKind</c>/<c>OwnerId</c> dentro il
+        /// <c>FoodStockComponent</c>. Questo consente alle regole di bisogno e furto di
+        /// ragionare sul cibo senza dipendere dalla UI.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Unita'</b>: quantita' iniziale dello stock piazzato.</item>
+        ///   <item><b>Community/NPC</b>: selettore proprieta' dello stock.</item>
+        ///   <item><b>Lista NPC</b>: scelta del proprietario quando il cibo e' privato.</item>
+        /// </list>
+        /// </summary>
+        private void DrawFoodStockPlacementControls(World world)
+        {
+            GUILayout.Space(8);
+            GUILayout.Label("Cibo a terra");
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Unita'", GUILayout.Width(54));
+            _foodStockUnits = DrawPositiveIntField(_foodStockUnits, GUILayout.Width(70));
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Toggle(!_foodStockOwnedByNpc, "Comunitario", "Button"))
+                _foodStockOwnedByNpc = false;
+            if (GUILayout.Toggle(_foodStockOwnedByNpc, "Di un NPC", "Button"))
+            {
+                _foodStockOwnedByNpc = true;
+                EnsureFoodOwnerNpcSelection(world);
+            }
+            GUILayout.EndHorizontal();
+
+            if (_foodStockOwnedByNpc)
+                DrawFoodOwnerNpcList(world);
+
+            if (_tool == Tool.PlaceFoodStock)
+                GUILayout.Label("Click mappa: inserisce cibo con queste proprieta'");
+        }
+
+        // =============================================================================
+        // DrawFoodOwnerNpcList
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna la lista compatta degli NPC disponibili come proprietari dello stock
+        /// di cibo a terra. La lista e' letta dal <c>World</c> ma produce solo uno stato
+        /// temporaneo della UI, usato poi per costruire il comando di placement.
+        /// </para>
+        ///
+        /// <para><b>Accesso read-only dalla View</b></para>
+        /// <para>
+        /// Leggere gli NPC per popolare una scelta debug e' accettabile lato View; la
+        /// mutazione della proprieta' dello stock resta comunque demandata al comando.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Fallback</b>: se il proprietario selezionato sparisce, viene scelto il primo NPC valido.</item>
+        ///   <item><b>Toggle</b>: ogni NPC e' una scelta mutuamente esclusiva.</item>
+        ///   <item><b>Nome</b>: mostra id e nome per evitare ambiguita' durante il debug.</item>
+        /// </list>
+        /// </summary>
+        private void DrawFoodOwnerNpcList(World world)
+        {
+            EnsureFoodOwnerNpcSelection(world);
+
+            if (_foodStockOwnerNpcId <= 0)
+            {
+                GUILayout.Label("Nessun NPC disponibile come proprietario");
+                return;
+            }
+
+            foreach (var kv in world.NpcDna)
+            {
+                int npcId = kv.Key;
+                if (npcId <= 0)
+                    continue;
+
+                string npcName = kv.Value != null ? kv.Value.Identity.Name : "<unnamed>";
+                bool isSelected = _foodStockOwnerNpcId == npcId;
+                string label = $"{npcId} '{npcName}'";
+
+                if (GUILayout.Toggle(isSelected, label, "Button"))
+                    _foodStockOwnerNpcId = npcId;
+            }
         }
 
         private void DrawCellInfo(World world)
@@ -545,6 +818,202 @@ namespace Arcontio.View.MapGrid
             GUILayout.Label($"Landmarks here: {lmCount}");
         }
 
+        // =============================================================================
+        // BuildDoorPlacementCommand
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce lo stato UI del pannello porta in un comando di piazzamento oggetto.
+        /// La UI espone una sola azione "Inserisci porta", mentre qui scegliamo il defId
+        /// tecnico coerente con la presenza o meno della serratura.
+        /// </para>
+        ///
+        /// <para><b>Mappatura UI -> ObjectDef</b></para>
+        /// <para>
+        /// La porta senza serratura usa <c>door_wood_good</c>; la porta con serratura
+        /// usa <c>door_wood_locked</c>. La possibilita' di lock reale viene comunque
+        /// rivalidata da <c>DevPlaceObjectCommand</c> tramite la <c>ObjectDef</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>defId</b>: selezionato in base alla checkbox serratura.</item>
+        ///   <item><b>doorOpen</b>: true solo per stato aperta.</item>
+        ///   <item><b>doorLocked</b>: true solo per stato locked e porta con serratura.</item>
+        /// </list>
+        /// </summary>
+        private ICommand BuildDoorPlacementCommand(int cellX, int cellY)
+        {
+            string defId = _doorWithLock ? "door_wood_locked" : "door_wood_good";
+            bool isOpen = _doorPlacementState == DoorPlacementState.Open;
+            bool isLocked = _doorWithLock && _doorPlacementState == DoorPlacementState.Locked;
+
+            return new DevPlaceObjectCommand(
+                defId,
+                cellX,
+                cellY,
+                ownerKind: OwnerKind.Community,
+                ownerId: 0,
+                doorOpen: isOpen,
+                doorLocked: isLocked);
+        }
+
+        // =============================================================================
+        // BuildFoodStockPlacementCommand
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce lo stato UI del pannello cibo in un comando di piazzamento
+        /// <c>food_stock</c>, includendo quantita' e proprietario logico.
+        /// </para>
+        ///
+        /// <para><b>Proprieta' sistemica del cibo</b></para>
+        /// <para>
+        /// Un cibo comunitario rimane accessibile come risorsa condivisa. Un cibo di
+        /// un NPC diventa invece stock privato a terra e alimenta le regole di furto,
+        /// memoria e pinned belief gia' presenti nel core.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>OwnerKind.Community</b>: default quando la checkbox NPC non e' attiva.</item>
+        ///   <item><b>OwnerKind.Npc</b>: usato solo se esiste un proprietario valido.</item>
+        ///   <item><b>foodUnits</b>: quantita' iniziale normalizzata a valori positivi.</item>
+        /// </list>
+        /// </summary>
+        private ICommand BuildFoodStockPlacementCommand(World world, int cellX, int cellY)
+        {
+            OwnerKind ownerKind = OwnerKind.Community;
+            int ownerId = 0;
+
+            if (_foodStockOwnedByNpc)
+            {
+                EnsureFoodOwnerNpcSelection(world);
+                if (_foodStockOwnerNpcId > 0 && world != null && world.ExistsNpc(_foodStockOwnerNpcId))
+                {
+                    ownerKind = OwnerKind.Npc;
+                    ownerId = _foodStockOwnerNpcId;
+                }
+            }
+
+            return new DevPlaceObjectCommand(
+                "food_stock",
+                cellX,
+                cellY,
+                ownerKind,
+                ownerId,
+                foodUnits: Mathf.Max(1, _foodStockUnits));
+        }
+
+        // =============================================================================
+        // EnsureFoodOwnerNpcSelection
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Garantisce che la selezione del proprietario del cibo punti a un NPC ancora
+        /// presente. Se il valore corrente e' vuoto o obsoleto, sceglie il primo NPC
+        /// disponibile nel mondo.
+        /// </para>
+        ///
+        /// <para><b>Robustezza della UI runtime</b></para>
+        /// <para>
+        /// Gli NPC possono essere creati o cancellati mentre la finestra resta aperta.
+        /// Questo helper evita che la UI conservi un proprietario morto e produca cibo
+        /// privato di un id non valido.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione corrente</b>: mantiene la scelta se l'NPC esiste.</item>
+        ///   <item><b>Fallback deterministico</b>: usa il primo id positivo disponibile.</item>
+        ///   <item><b>Sentinella</b>: usa -1 quando non ci sono NPC.</item>
+        /// </list>
+        /// </summary>
+        private void EnsureFoodOwnerNpcSelection(World world)
+        {
+            if (world != null && _foodStockOwnerNpcId > 0 && world.ExistsNpc(_foodStockOwnerNpcId))
+                return;
+
+            _foodStockOwnerNpcId = -1;
+            if (world == null)
+                return;
+
+            foreach (var kv in world.NpcDna)
+            {
+                if (kv.Key <= 0)
+                    continue;
+
+                _foodStockOwnerNpcId = kv.Key;
+                return;
+            }
+        }
+
+        // =============================================================================
+        // DrawPositiveIntField
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna un campo numerico IMGUI per valori interi positivi. Se l'utente
+        /// inserisce testo non valido, conserva il valore precedente normalizzato.
+        /// </para>
+        ///
+        /// <para><b>Input debug tollerante</b></para>
+        /// <para>
+        /// La finestra DevTools deve restare usabile anche durante editing parziale del
+        /// testo. Questo helper evita eccezioni e impedisce quantita' zero o negative.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>TextField</b>: input IMGUI semplice.</item>
+        ///   <item><b>TryParse</b>: validazione senza eccezioni.</item>
+        ///   <item><b>Mathf.Max</b>: clamp finale a minimo 1.</item>
+        /// </list>
+        /// </summary>
+        private static int DrawPositiveIntField(int currentValue, params GUILayoutOption[] options)
+        {
+            int safeCurrent = Mathf.Max(1, currentValue);
+            string text = GUILayout.TextField(safeCurrent.ToString(), options);
+
+            if (int.TryParse(text, out int parsed))
+                return Mathf.Max(1, parsed);
+
+            return safeCurrent;
+        }
+
+        // =============================================================================
+        // IsDedicatedDevToolObject
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se una definizione oggetto e' gestita da un pannello dedicato della
+        /// finestra DevTools invece che dalla palette generica.
+        /// </para>
+        ///
+        /// <para><b>UI semantica sopra palette tecnica</b></para>
+        /// <para>
+        /// Porte e cibo hanno opzioni sistemiche proprie. Nasconderli dalla palette
+        /// generica riduce ambiguita': l'utente non sceglie piu' "porta/porta locked",
+        /// ma usa un unico inserimento porta con stato esplicito.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>IsDoor</b>: tutte le porte passano dal pannello porta.</item>
+        ///   <item><b>food_stock</b>: il cibo passa dal pannello proprieta' cibo.</item>
+        /// </list>
+        /// </summary>
+        private static bool IsDedicatedDevToolObject(ObjectDef def)
+        {
+            if (def == null)
+                return false;
+
+            if (def.IsDoor)
+                return true;
+
+            return def.Id == "food_stock";
+        }
+
         private static CardinalDirection NextFacing(CardinalDirection dir)
         {
             // Ordine deterministico: N -> E -> S -> W -> N
@@ -562,6 +1031,7 @@ namespace Arcontio.View.MapGrid
             // Nota:
             // - Se non esiste SimulationHost, siamo in una scena non runtime.
             // - In quel caso non facciamo nulla.
+            if (cmd == null) return;
             if (SimulationHost.Instance == null) return;
             SimulationHost.Instance.EnqueueExternalCommand(cmd);
         }
