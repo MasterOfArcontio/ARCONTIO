@@ -139,6 +139,40 @@ namespace Arcontio.Core
         [SerializeField] private InputActionReference stepOneTickAction;
         [SerializeField] private InputActionReference stepTenTicksAction;
 
+        // =============================================================================
+        // DirectKeyboardTickControl
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita il controllo diretto da tastiera dei comandi globali di tick:
+        /// <c>P</c> per pausa/unpausa, <c>O</c> per un singolo tick mentre il
+        /// simulatore e' in pausa, <c>I</c> per dieci tick mentre il simulatore e'
+        /// in pausa.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: Input globale del simulatore fuori dalla UI</b></para>
+        /// <para>
+        /// Il pannello laterale e gli elementi UI possono usare EventSystem, Button e
+        /// ScrollRect, ma non devono diventare il punto di verita' per il ciclo del
+        /// simulatore. Questo fallback mantiene il controllo temporale nel
+        /// <c>SimulationHost</c>, cioe' nello strato che gia' possiede pausa,
+        /// accumulatore e avanzamento deterministico dei tick.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>directKeyboardTickControlEnabled</b>: abilita il percorso diretto e impedisce doppi trigger dagli InputActionReference legacy.</item>
+        ///   <item><b>directTogglePauseKey</b>: tasto globale per pausa/unpausa.</item>
+        ///   <item><b>directStepOneTickKey</b>: tasto globale per avanzamento singolo in pausa.</item>
+        ///   <item><b>directStepTenTicksKey</b>: tasto globale per avanzamento multiplo in pausa.</item>
+        /// </list>
+        /// </summary>
+        [Header("Tick Control (Direct Keyboard Fallback)")]
+        [SerializeField] private bool directKeyboardTickControlEnabled = true;
+        [SerializeField] private Key directTogglePauseKey = Key.P;
+        [SerializeField] private Key directStepOneTickKey = Key.O;
+        [SerializeField] private Key directStepTenTicksKey = Key.I;
+
         public bool IsPaused { get; private set; }
 
         public void SetPaused(bool paused)
@@ -165,6 +199,9 @@ namespace Arcontio.Core
         }
         private void OnEnable()
         {
+            if (directKeyboardTickControlEnabled)
+                return;
+
             // Toggle pause
             if (togglePauseAction != null && togglePauseAction.action != null)
             {
@@ -423,6 +460,8 @@ namespace Arcontio.Core
 
         private void Update()
         {
+            HandleDirectKeyboardTickControl();
+
             // ============================================================
             // DEVTOOLS / VIEW COMMANDS (always pumped)
             // ============================================================
@@ -444,6 +483,82 @@ namespace Arcontio.Core
                 _accum -= tickInterval;
                 StepOneTick();
             }
+        }
+
+        // =============================================================================
+        // HandleDirectKeyboardTickControl
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Legge i tasti globali del controllo temporale direttamente dal New Input
+        /// System e li traduce nelle API gia' esistenti di pausa e step.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: comando temporale centralizzato</b></para>
+        /// <para>
+        /// L'input viene letto qui, ma l'effetto non viene duplicato: <c>P</c> chiama
+        /// <c>TogglePause</c>, <c>O</c> chiama <c>StepOneTickPaused</c> e <c>I</c>
+        /// chiama <c>StepManyTicksPaused</c>. In questo modo la semantica resta una
+        /// sola e il fallback non crea una seconda implementazione dello scheduler.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Guardia configurabile</b>: se il fallback e' disabilitato, restano attivi gli InputActionReference serializzati.</item>
+        ///   <item><b>Guardia device</b>: se non esiste una tastiera corrente, il metodo esce senza effetti.</item>
+        ///   <item><b>Press singola</b>: ogni comando usa <c>wasPressedThisFrame</c> per evitare ripetizioni da tasto tenuto premuto.</item>
+        /// </list>
+        /// </summary>
+        private void HandleDirectKeyboardTickControl()
+        {
+            if (!directKeyboardTickControlEnabled)
+                return;
+
+            var keyboard = Keyboard.current;
+            if (keyboard == null)
+                return;
+
+            if (WasKeyPressedThisFrame(keyboard, directTogglePauseKey))
+                TogglePause();
+
+            if (WasKeyPressedThisFrame(keyboard, directStepOneTickKey))
+                StepOneTickPaused();
+
+            if (WasKeyPressedThisFrame(keyboard, directStepTenTicksKey))
+                StepManyTicksPaused(10);
+        }
+
+        // =============================================================================
+        // WasKeyPressedThisFrame
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Incapsula l'accesso indicizzato alla tastiera del New Input System per
+        /// mantenere il polling dei tasti leggibile e tollerante verso tasti non
+        /// assegnati.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: boundary piccolo verso API esterna</b></para>
+        /// <para>
+        /// Il resto del <c>SimulationHost</c> non dipende dai dettagli di
+        /// <c>Keyboard</c> e <c>KeyControl</c>. Se in futuro i tasti diventano
+        /// configurabili da file o da profilo, la modifica resta localizzata qui.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: rifiuta <c>Key.None</c>.</item>
+        ///   <item><b>Lettura controllo</b>: recupera il controllo fisico corrispondente al tasto richiesto.</item>
+        ///   <item><b>Esito</b>: restituisce true solo nel frame della pressione.</item>
+        /// </list>
+        /// </summary>
+        private static bool WasKeyPressedThisFrame(Keyboard keyboard, Key key)
+        {
+            if (key == Key.None)
+                return false;
+
+            var control = keyboard[key];
+            return control != null && control.wasPressedThisFrame;
         }
         /// <summary>
         /// Esegue e svuota la coda di comandi esterni (view -> core).
