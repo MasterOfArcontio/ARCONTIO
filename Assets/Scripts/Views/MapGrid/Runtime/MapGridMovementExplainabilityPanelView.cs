@@ -654,6 +654,31 @@ namespace Arcontio.View.MapGrid
             if (sectionLayoutElement != null)
                 sectionLayoutElement.preferredHeight = sectionHeight;
 
+            // Propaga l'altezza totale aggiornata alla Page.
+            // Il VLG del _scrollContent (childControlHeight=true) usa LayoutElement.preferredHeight
+            // della Page per allocarle spazio. Se non viene aggiornato, la Page rimane a 420px
+            // iniziali e le sezioni traboccano visivamente quando crescono oltre quella soglia.
+            var page = section.parent;
+            if (page != null)
+            {
+                var pageVlg = page.GetComponent<VerticalLayoutGroup>();
+                var pageLe = page.GetComponent<LayoutElement>();
+                if (pageLe != null && pageVlg != null)
+                {
+                    float totalPageHeight = pageVlg.padding.top + pageVlg.padding.bottom;
+                    int childCount = page.childCount;
+                    for (int i = 0; i < childCount; i++)
+                    {
+                        var childLe = page.GetChild(i).GetComponent<LayoutElement>();
+                        if (childLe != null)
+                            totalPageHeight += childLe.preferredHeight;
+                        if (i < childCount - 1)
+                            totalPageHeight += pageVlg.spacing;
+                    }
+                    pageLe.preferredHeight = Mathf.Max(300f, totalPageHeight);
+                }
+            }
+
             var sectionRect = section as RectTransform;
             if (sectionRect != null)
                 LayoutRebuilder.ForceRebuildLayoutImmediate(sectionRect);

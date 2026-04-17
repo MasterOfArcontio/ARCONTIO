@@ -117,6 +117,10 @@ namespace Arcontio.View.MapGrid
         // RUNTIME STATE
         // ============================================================
 
+        // Guard contro istanze duplicate: può accadere se il componente è già nell'Inspector
+        // della scena E MapGridWorldView ne aggiunge un secondo via AddComponent.
+        private static MapGridRuntimeDevToolsOverlay _instance;
+
         private bool _enabled;
 
         private Tool _tool = Tool.Place;
@@ -230,6 +234,16 @@ namespace Arcontio.View.MapGrid
 
         private void Awake()
         {
+            // Se esiste già un'altra istanza attiva, questa è un duplicato: si autodistrugge.
+            // Il duplicato nasce quando il componente è già nell'Inspector della scena
+            // E MapGridWorldView ne aggiunge un secondo tramite AddComponent.
+            if (_instance != null && _instance != this)
+            {
+                Destroy(this);
+                return;
+            }
+            _instance = this;
+
             _mapName = defaultMapName;
 
             // ============================================================
@@ -238,6 +252,12 @@ namespace Arcontio.View.MapGrid
             // - Usiamo la config reale caricata dal JSON ufficiale.
             // ============================================================
             AutoBindIfNeeded();
+        }
+
+        private void OnDestroy()
+        {
+            if (_instance == this)
+                _instance = null;
         }
 
         private void AutoBindIfNeeded()
