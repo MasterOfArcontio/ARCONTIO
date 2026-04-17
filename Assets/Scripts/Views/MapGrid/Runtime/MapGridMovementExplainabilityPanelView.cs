@@ -457,9 +457,10 @@ namespace Arcontio.View.MapGrid
             layout.spacing = 8;
             layout.padding = new RectOffset(0, 0, 0, 0);
 
-            var fitter = go.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
+            // ContentSizeFitter rimosso dalla Page: il parent _scrollContent ha VLG.childControlHeight=true
+            // che controlla già l'altezza della Page usando LayoutElement.preferredHeight.
+            // ContentSizeFitter e VLG.childControlHeight=true del parent si contendono la stessa
+            // proprietà ogni rebuild, annullando gli aggiornamenti dinamici di UpdateOwningSectionHeight.
             var layoutElement = go.AddComponent<LayoutElement>();
             layoutElement.minHeight = 300f;
             layoutElement.preferredHeight = 420f;
