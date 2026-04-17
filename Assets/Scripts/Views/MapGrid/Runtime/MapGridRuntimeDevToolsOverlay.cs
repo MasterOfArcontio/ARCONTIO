@@ -3,6 +3,7 @@ using Arcontio.Core;
 using Arcontio.Core.Commands.DevTools;
 using SocialViewer.UI;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
 
 namespace Arcontio.View.MapGrid
@@ -275,7 +276,10 @@ namespace Arcontio.View.MapGrid
             // ============================================================
             if (Keyboard.current != null && Keyboard.current[toggleKey].wasPressedThisFrame)
             {
-                OpenSpawnToolOverlay();
+                // F3 ora è un vero toggle: apre se chiuso, chiude se aperto.
+                // Prima chiamava OpenSpawnToolOverlay() che impostava sempre _enabled=true,
+                // impedendo la chiusura tramite tastiera.
+                ToggleSpawnToolOverlay();
             }
 
             if (!_enabled)
@@ -1107,10 +1111,20 @@ namespace Arcontio.View.MapGrid
             // Screen-space mouse (origin bottom-left)
             var sp = mouse.position.ReadValue();
 
-            // Convert to IMGUI coords (origin top-left)
+            // Controllo 1: finestra IMGUI DevTools (coordinate top-left)
             var guiPos = new Vector2(sp.x, Screen.height - sp.y);
+            if (_windowRect.Contains(guiPos))
+            {
+                _isPointerOverUiWindow = true;
+                return;
+            }
 
-            _isPointerOverUiWindow = _windowRect.Contains(guiPos);
+            // Controllo 2: qualsiasi elemento Canvas UI (TopBar, pannello EL, ecc.).
+            // EventSystem.IsPointerOverGameObject restituisce true se il cursore è sopra
+            // un Graphic con raycastTarget=true — cattura TopBar e pannello EL senza
+            // bisogno di conoscerne i RectTransform esplicitamente.
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                _isPointerOverUiWindow = true;
         }
 
         private bool TryGetPointerCell(out int cellX, out int cellY, out bool inBounds)

@@ -490,9 +490,9 @@ namespace Arcontio.View.MapGrid
             sectionLayout.spacing = 0;
             sectionLayout.padding = new RectOffset(0, 0, 0, 0);
 
-            var fitter = sectionGo.AddComponent<ContentSizeFitter>();
-            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
+            // ContentSizeFitter rimosso intenzionalmente: conflittava con childControlHeight=true
+            // del VLG genitore (CreatePage). UpdateOwningSectionHeight() gestisce l'altezza
+            // tramite LayoutElement.preferredHeight + ForceRebuildLayoutImmediate.
             var sectionLe = sectionGo.AddComponent<LayoutElement>();
             sectionLe.minHeight = 96f;
             sectionLe.preferredHeight = 150f;
@@ -548,9 +548,9 @@ namespace Arcontio.View.MapGrid
             bodyLayout.childForceExpandWidth = true;
             bodyLayout.padding = new RectOffset(8, 8, 7, 8);
 
-            var bodyFitter = bodyGo.AddComponent<ContentSizeFitter>();
-            bodyFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-
+            // ContentSizeFitter rimosso: stessa ragione del sectionGo.
+            // L'altezza del body è determinata da bodyLe.preferredHeight
+            // aggiornato da UpdateOwningSectionHeight().
             var bodyLe = bodyGo.AddComponent<LayoutElement>();
             bodyLe.minHeight = 58f;
             bodyLe.preferredHeight = 96f;
