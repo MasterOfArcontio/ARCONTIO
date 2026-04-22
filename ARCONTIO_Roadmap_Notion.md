@@ -16,7 +16,7 @@
 | v0.04 | NpcDnaProfile · NpcProfile · Needs System · BeliefStore | Maggio–Giugno 2026 | ⚠️ Parziale: BeliefStore completato, PhysicalProfile e Health/Comfort restano aperti |
 | v0.05 | Decision Layer completo | Giugno–Luglio 2026 | ⏳ Pending |
 | v0.05.5 | EL-MBQD Runtime UI Registry + pannello laterale | Luglio 2026 | ✅ Completata |
-| v0.06 | Job System + Step System | Luglio–Agosto 2026 | ⏳ Pending |
+| v0.06 | Job System + Step System | Luglio–Agosto 2026 | ✅ Completata |
 | v0.07 | Role System + CognitiveModulators | Agosto 2026 | ⏳ Pending |
 | v0.08 | Petition System + Mobilità Sociale | Settembre 2026 | ⏳ Pending |
 | v0.09 | ScheduleFrame + Planner Istituzionale | Ottobre 2026 | ⏳ Pending |
@@ -237,30 +237,30 @@
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
-| 1 | Lun | Job | JobRequest + Job + JobPlan: strutture C# | ⏳ |
-| 2 | Mer | Job | NpcJobState: ActiveJob + Suspended + Queued | ⏳ |
-| 3 | Gio | Job | JobArbiter: accettazione JobRequest + preemption base | ⏳ |
-| 4 | Lun | Job | Macchina a stati: Pending→Running→Completed/Failed/Aborted | ⏳ |
-| 5 | Mer | Job | ReservationRecord: lock risorse condivise | ⏳ |
-| 6 | Gio | Step | MoveTo · Reserve · Release · Wait | ⏳ |
-| 7 | Lun | Step | Observe · Search · PickUp · Drop | ⏳ |
-| 8 | Mer | Step | Consume · Communicate · Evaluate | ⏳ |
-| 9 | Gio | Pipeline | CommandBuffer: integrazione step→command→system | ⏳ |
-| 10 | Lun | Job | Preemption ladder completa (emergenziale / prioritario / normale) | ⏳ |
-| 11 | Mer | Job | Failure learning: (npcId, targetCell) → failureTick | ⏳ |
-| 12 | Gio | QA | Test end-to-end: Intenzione → Job → Step → Command → World | ⏳ |
+| 1 | Lun | Job | JobRequest + Job + JobPlan: strutture C# | ✅ |
+| 2 | Mer | Job | NpcJobState: ActiveJob + Suspended + Queued | ✅ |
+| 3 | Gio | Job | JobArbiter: accettazione JobRequest + preemption base | ✅ |
+| 4 | Lun | Job | Macchina a stati: Pending→Running→Completed/Failed/Aborted | ✅ |
+| 5 | Mer | Job | ReservationRecord: lock risorse condivise | ✅ |
+| 6 | Gio | Step | MoveTo · Reserve · Release · Wait | ✅ |
+| 7 | Lun | Step | Observe · Search · PickUp · Drop | ✅ |
+| 8 | Mer | Step | Consume · Communicate · Evaluate | ✅ |
+| 9 | Gio | Pipeline | CommandBuffer: integrazione step→command→system | ✅ |
+| 10 | Lun | Job | Preemption ladder completa (emergenziale / prioritario / normale) | ✅ |
+| 11 | Mer | Job | Failure learning: (npcId, targetCell) → failureTick | ✅ |
+| 12 | Gio | QA | Test end-to-end: Intenzione → Job → Step → Command → World | ✅ |
 
 ### Definition of Done v0.06
 
 | Criterio | Stato |
 |----------|-------|
-| Job: tutti gli stati implementati e transitabili correttamente | ⏳ |
-| NpcJobState: 1 ActiveJob + N Suspended + N Queued | ⏳ |
-| Preemption ladder funzionante | ⏳ |
-| ReservationRecord: nessun conflitto su risorse condivise | ⏳ |
-| Step base (~10): tutti con output Running/Success/Blocked/Failed/Cancelled | ⏳ |
-| Nessuno Step modifica il world direttamente | ⏳ |
-| Failure learning attivo senza violare omniscience | ⏳ |
+| Job: tutti gli stati implementati e transitabili correttamente | ✅ |
+| NpcJobState: 1 ActiveJob + N Suspended + N Queued | ✅ |
+| Preemption ladder funzionante | ✅ |
+| ReservationRecord: nessun conflitto su risorse condivise | ✅ |
+| Step base (~10): tutti con output Running/Success/Blocked/Failed/Cancelled | ✅ |
+| Nessuno Step modifica il world direttamente | ✅ |
+| Failure learning attivo senza violare omniscience | ✅ |
 
 ---
 
@@ -283,27 +283,27 @@ Sequenza di lavoro aggiornata:
 
 | # | Sistema | Task aggiornato | Stato |
 |---|---------|-----------------|-------|
-| 1 | Job | `JobRequest` + `Job` + `JobPlan` + `JobPhase`: contratti dati C# puri | ⏳ |
-| 2 | Job | `JobAction` + `StepResult`: tipi atomici, stati e failure reason | ⏳ |
-| 3 | Job | `NpcJobState`: `ActiveJob` + `Suspended` + `Queued` | ⏳ |
-| 4 | Job | `JobArbiter`: accettazione `JobRequest` + preemption base | ⏳ |
-| 5 | Job | Macchina a stati: `Pending` → `Running` → `Completed` / `Failed` / `Aborted` | ⏳ |
-| 6 | Job | `ReservationRecord`: lock risorse condivise | ⏳ |
-| 7 | Step | Step base: `MoveTo` · `Reserve` · `Release` · `Wait` | ⏳ |
-| 8 | Step | Step base: `Observe` · `Search` · `PickUp` · `Drop` | ⏳ |
-| 9 | Step | Step base: `Consume` · `Communicate` · `Evaluate` | ⏳ |
-| 10 | Pipeline | `CommandBuffer`: integrazione `Step` → `Command` → `World System` | ⏳ |
-| 11 | Job | Preemption ladder completa: emergenziale / prioritario / normale | ⏳ |
-| 12 | Job | Failure learning: `(npcId, targetCell) → failureTick` | ⏳ |
-| 13 | QA | Test end-to-end: Intenzione → Job → JobPhase → Step → Command → World | ⏳ |
+| 1 | Job | `JobRequest` + `Job` + `JobPlan` + `JobPhase`: contratti dati C# puri | ✅ |
+| 2 | Job | `JobAction` + `StepResult`: tipi atomici, stati e failure reason | ✅ |
+| 3 | Job | `NpcJobState`: `ActiveJob` + `Suspended` + `Queued` | ✅ |
+| 4 | Job | `JobArbiter`: accettazione `JobRequest` + preemption base | ✅ |
+| 5 | Job | Macchina a stati: `Pending` → `Running` → `Completed` / `Failed` / `Aborted` | ✅ |
+| 6 | Job | `ReservationRecord`: lock risorse condivise | ✅ |
+| 7 | Step | Step base: `MoveTo` · `Reserve` · `Release` · `Wait` | ✅ |
+| 8 | Step | Step base: `Observe` · `Search` · `PickUp` · `Drop` | ✅ |
+| 9 | Step | Step base: `Consume` · `Communicate` · `Evaluate` | ✅ |
+| 10 | Pipeline | `CommandBuffer`: integrazione `Step` → `Command` → `World System` | ✅ |
+| 11 | Job | Preemption ladder completa: emergenziale / prioritario / normale | ✅ |
+| 12 | Job | Failure learning: `(npcId, targetCell) → failureTick` | ✅ |
+| 13 | QA | Test end-to-end: Intenzione → Job → JobPhase → Step → Command → World | ✅ |
 
 Definition of Done aggiuntiva:
 
 | Criterio | Stato |
 |----------|-------|
-| `JobPlan` contiene `JobPhase` ordinate | ⏳ |
-| `JobPhase` non è preemptabile separatamente dal `Job` | ⏳ |
-| I job complessi possono esprimere sotto-obiettivi locali senza creare job ricorsivi | ⏳ |
+| `JobPlan` contiene `JobPhase` ordinate | ✅ |
+| `JobPhase` non è preemptabile separatamente dal `Job` | ✅ |
+| I job complessi possono esprimere sotto-obiettivi locali senza creare job ricorsivi | ✅ |
 
 ## v0.07 — Role System + CognitiveModulators
 
