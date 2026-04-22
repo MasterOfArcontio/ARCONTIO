@@ -23,6 +23,7 @@ namespace Arcontio.Core
     ///   <item><b>Tick</b>: tempo corrente per attese e scadenze.</item>
     ///   <item><b>NpcCell</b>: posizione gia' risolta dal chiamante.</item>
     ///   <item><b>Reservations</b>: store di contesa, opzionale per step che non prenotano.</item>
+    ///   <item><b>CommandBuffer</b>: buffer opzionale per comandi prodotti ma non eseguiti.</item>
     /// </list>
     /// </summary>
     public readonly struct JobActionExecutionContext
@@ -32,14 +33,27 @@ namespace Arcontio.Core
         public readonly int Tick;
         public readonly Vector2Int NpcCell;
         public readonly ReservationStore Reservations;
+        public readonly JobCommandBuffer CommandBuffer;
 
         public JobActionExecutionContext(int npcId, string jobId, int tick, Vector2Int npcCell, ReservationStore reservations)
+            : this(npcId, jobId, tick, npcCell, reservations, null)
+        {
+        }
+
+        public JobActionExecutionContext(
+            int npcId,
+            string jobId,
+            int tick,
+            Vector2Int npcCell,
+            ReservationStore reservations,
+            JobCommandBuffer commandBuffer)
         {
             NpcId = npcId;
             JobId = jobId ?? string.Empty;
             Tick = tick;
             NpcCell = npcCell;
             Reservations = reservations;
+            CommandBuffer = commandBuffer;
         }
     }
 
