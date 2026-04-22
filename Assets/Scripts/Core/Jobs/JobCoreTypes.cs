@@ -306,6 +306,7 @@ namespace Arcontio.Core
     ///   <item><b>DisplayName</b>: nome leggibile per log e debug.</item>
     ///   <item><b>ExpectedStepCount</b>: promessa diagnostica in attesa degli step concreti.</item>
     ///   <item><b>IsInterruptible</b>: suggerimento per la futura preemption ladder.</item>
+    ///   <item><b>Actions</b>: copia difensiva degli step atomici ordinati.</item>
     /// </list>
     /// </summary>
     public readonly struct JobPhase
@@ -315,14 +316,46 @@ namespace Arcontio.Core
         public readonly string DisplayName;
         public readonly int ExpectedStepCount;
         public readonly bool IsInterruptible;
+        public readonly JobAction[] Actions;
 
         public JobPhase(string phaseId, JobPhaseKind kind, string displayName, int expectedStepCount, bool isInterruptible)
+            : this(phaseId, kind, displayName, expectedStepCount, isInterruptible, Array.Empty<JobAction>())
+        {
+        }
+
+        public JobPhase(
+            string phaseId,
+            JobPhaseKind kind,
+            string displayName,
+            int expectedStepCount,
+            bool isInterruptible,
+            JobAction[] actions)
         {
             PhaseId = string.IsNullOrWhiteSpace(phaseId) ? kind.ToString() : phaseId;
             Kind = kind;
             DisplayName = displayName ?? string.Empty;
-            ExpectedStepCount = Math.Max(0, expectedStepCount);
             IsInterruptible = isInterruptible;
+            Actions = actions == null || actions.Length == 0
+                ? Array.Empty<JobAction>()
+                : (JobAction[])actions.Clone();
+
+            // Se il chiamante fornisce azioni concrete, il conteggio atteso deve
+            // riflettere il contratto reale; altrimenti resta la promessa diagnostica.
+            ExpectedStepCount = Actions.Length > 0 ? Actions.Length : Math.Max(0, expectedStepCount);
+        }
+
+        public bool TryGetAction(int actionIndex, out JobAction action)
+        {
+            // Le fasi appena introdotte nello step 01 possono essere ancora prive di
+            // azioni. Il metodo rende questo stato esplicito senza eccezioni runtime.
+            if (actionIndex < 0 || actionIndex >= Actions.Length)
+            {
+                action = default;
+                return false;
+            }
+
+            action = Actions[actionIndex];
+            return true;
         }
     }
 
