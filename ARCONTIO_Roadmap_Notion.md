@@ -264,6 +264,47 @@
 
 ---
 
+### Aggiornamento operativo v0.06 — JobPhase
+
+Decisione architetturale aggiornata: la v0.06 introduce `JobPhase` come livello intermedio tra `JobPlan` e `Step`.
+
+Gerarchia operativa:
+```text
+Job
+  -> JobPlan
+     -> JobPhase
+        -> Step
+           -> Command
+```
+
+`JobPhase` rappresenta il "mini job" interno necessario per job complessi come `WorkAtAssignedPost` o `DefendCastleGate`. Non è però un job autonomo: non possiede priorità globale propria, non entra nella coda globale e non viene preemptato separatamente dal `Job`.
+
+Sequenza di lavoro aggiornata:
+
+| # | Sistema | Task aggiornato | Stato |
+|---|---------|-----------------|-------|
+| 1 | Job | `JobRequest` + `Job` + `JobPlan` + `JobPhase`: contratti dati C# puri | ⏳ |
+| 2 | Job | `JobAction` + `StepResult`: tipi atomici, stati e failure reason | ⏳ |
+| 3 | Job | `NpcJobState`: `ActiveJob` + `Suspended` + `Queued` | ⏳ |
+| 4 | Job | `JobArbiter`: accettazione `JobRequest` + preemption base | ⏳ |
+| 5 | Job | Macchina a stati: `Pending` → `Running` → `Completed` / `Failed` / `Aborted` | ⏳ |
+| 6 | Job | `ReservationRecord`: lock risorse condivise | ⏳ |
+| 7 | Step | Step base: `MoveTo` · `Reserve` · `Release` · `Wait` | ⏳ |
+| 8 | Step | Step base: `Observe` · `Search` · `PickUp` · `Drop` | ⏳ |
+| 9 | Step | Step base: `Consume` · `Communicate` · `Evaluate` | ⏳ |
+| 10 | Pipeline | `CommandBuffer`: integrazione `Step` → `Command` → `World System` | ⏳ |
+| 11 | Job | Preemption ladder completa: emergenziale / prioritario / normale | ⏳ |
+| 12 | Job | Failure learning: `(npcId, targetCell) → failureTick` | ⏳ |
+| 13 | QA | Test end-to-end: Intenzione → Job → JobPhase → Step → Command → World | ⏳ |
+
+Definition of Done aggiuntiva:
+
+| Criterio | Stato |
+|----------|-------|
+| `JobPlan` contiene `JobPhase` ordinate | ⏳ |
+| `JobPhase` non è preemptabile separatamente dal `Job` | ⏳ |
+| I job complessi possono esprimere sotto-obiettivi locali senza creare job ricorsivi | ⏳ |
+
 ## v0.07 — Role System + CognitiveModulators
 
 **Obiettivo:** Dare a ogni NPC un carattere cognitivo e un'identità professionale che influenzi concretamente le sue decisioni. Prima versione di comportamento emergente differenziato per ruolo.

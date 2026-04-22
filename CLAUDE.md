@@ -67,6 +67,36 @@ WORLD
          └── OTHER CONSUMERS (Reputazione, Comunicazione, ecc.)
 ```
 
+### 4.1 Job System v0.06 — gerarchia persistente
+
+Decisione architetturale per la v0.06: i job complessi richiedono un livello
+intermedio tra `JobPlan` e `Step`, equivalente al concetto progettuale di "mini
+job", ma il nome stabile da usare nel codice e nei documenti è `JobPhase`.
+
+Gerarchia approvata:
+```
+Job
+  -> JobPlan
+     -> JobPhase
+        -> Step
+           -> Command
+```
+
+Significato dei livelli:
+- `Job`: contratto persistente dell'NPC, con owner, priorità, origine
+  decisionale, stato globale e vita autonoma.
+- `JobPlan`: piano corrente del job, composto da fasi ordinate.
+- `JobPhase`: sotto-obiettivo locale interno al piano. Può avere stato,
+  condizioni di completamento, fallback locale e loop controllati, ma non è un
+  job autonomo.
+- `Step`: unità atomica eseguibile; non modifica mai il World direttamente.
+- `Command`: richiesta esplicita di mutazione world-safe.
+
+Regola critica: `JobPhase` non possiede priorità globale propria, non entra nella
+coda globale dei job e non viene preemptata separatamente dal `Job`. Serve a
+modellare job lunghi come `WorkAtAssignedPost` o `DefendCastleGate` senza creare
+ricorsione tra job.
+
 ---
 
 ## 5. Sistemi principali — descrizione
