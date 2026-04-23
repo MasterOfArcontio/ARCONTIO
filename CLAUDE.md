@@ -97,6 +97,24 @@ coda globale dei job e non viene preemptata separatamente dal `Job`. Serve a
 modellare job lunghi come `WorkAtAssignedPost` o `DefendCastleGate` senza creare
 ricorsione tra job.
 
+Formalizzazione degli step: ogni `Step` deve essere modellabile come una coppia
+`verbo + complemento`, dove il verbo descrive l'azione atomica e il complemento
+descrive il target operativo dello step. Esempi: `MoveTo + Cell`,
+`Reserve + Resource`, `Observe + Area`, `Search + Food`, `PickUp + Item`,
+`Consume + Food`, `Communicate + Danger`, `Evaluate + Condition`,
+`Wait + Duration`.
+
+Questa regola separa la semantica dell'azione dal dominio del target. Lo stesso
+verbo puo' quindi avere specializzazioni diverse in base al complemento:
+`Search + Food` non equivale a `Search + SafePlace`, e `Consume + Food` non
+equivale a `Consume + Medicine`. Se un'operazione richiede piu' verbi, non e' uno
+step atomico: deve diventare una `JobPhase` composta da piu' step.
+
+Regola pratica: uno step e' atomico se puo' produrre un singolo esito
+`Running` / `Success` / `Blocked` / `Failed` a partire da una sola coppia
+`verbo + complemento`, senza modificare direttamente il `World`. Gli effetti
+concreti restano mediati da `Command` e `World Systems`.
+
 ---
 
 ## 5. Sistemi principali — descrizione
