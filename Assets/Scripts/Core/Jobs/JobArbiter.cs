@@ -1,3 +1,5 @@
+using Arcontio.Core.Config;
+
 namespace Arcontio.Core
 {
     // =============================================================================
@@ -97,6 +99,41 @@ namespace Arcontio.Core
     public sealed class JobArbiter
     {
         private const float SamePriorityUrgencyMargin = 0.15f;
+
+        // =============================================================================
+        // Evaluate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che emette una trace dell'arbitraggio senza rendere
+        /// obbligatoria la dipendenza dal layer diagnostico.
+        /// </para>
+        /// </summary>
+        public JobArbitrationResult Evaluate(
+            NpcJobState npcState,
+            Job currentJob,
+            Job newJob,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick)
+        {
+            var result = Evaluate(npcState, currentJob, newJob);
+
+            if (explainabilityConfig != null)
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobArbitrationTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    currentJob,
+                    newJob,
+                    result);
+            }
+
+            return result;
+        }
 
         public JobArbitrationResult Evaluate(NpcJobState npcState, Job currentJob, Job newJob)
         {

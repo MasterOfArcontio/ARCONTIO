@@ -1,3 +1,5 @@
+using Arcontio.Core.Config;
+
 namespace Arcontio.Core
 {
     // =============================================================================
@@ -26,6 +28,41 @@ namespace Arcontio.Core
     public sealed class JobPreemptionLadder
     {
         private const float SameClassMargin = 0.20f;
+
+        // =============================================================================
+        // Evaluate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che rende osservabile la ladder di preemption senza
+        /// introdurre dipendenze obbligatorie dal layer diagnostico.
+        /// </para>
+        /// </summary>
+        public JobArbitrationResult Evaluate(
+            NpcJobState npcState,
+            Job currentJob,
+            Job newJob,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick)
+        {
+            var result = Evaluate(npcState, currentJob, newJob);
+
+            if (explainabilityConfig != null)
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobArbitrationTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    currentJob,
+                    newJob,
+                    result);
+            }
+
+            return result;
+        }
 
         public JobArbitrationResult Evaluate(NpcJobState npcState, Job currentJob, Job newJob)
         {
