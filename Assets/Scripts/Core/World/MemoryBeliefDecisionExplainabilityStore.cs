@@ -185,6 +185,15 @@ namespace Arcontio.Core
         private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _queryTraces;
         private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _decisionTraces;
         private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _bridgeTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _jobRequestTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _jobLifecycleTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _jobPhaseTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _stepTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _jobStateTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _jobArbitrationTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _reservationTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _commandTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _failureLearningTraces;
 
         public int NpcId { get; }
         public long LatestTick { get; private set; }
@@ -193,6 +202,15 @@ namespace Arcontio.Core
         public int QueryTraceCount => _queryTraces.Count;
         public int DecisionTraceCount => _decisionTraces.Count;
         public int BridgeTraceCount => _bridgeTraces.Count;
+        public int JobRequestTraceCount => _jobRequestTraces.Count;
+        public int JobLifecycleTraceCount => _jobLifecycleTraces.Count;
+        public int JobPhaseTraceCount => _jobPhaseTraces.Count;
+        public int StepTraceCount => _stepTraces.Count;
+        public int JobStateTraceCount => _jobStateTraces.Count;
+        public int JobArbitrationTraceCount => _jobArbitrationTraces.Count;
+        public int ReservationTraceCount => _reservationTraces.Count;
+        public int CommandTraceCount => _commandTraces.Count;
+        public int FailureLearningTraceCount => _failureLearningTraces.Count;
 
         // =============================================================================
         // MemoryBeliefDecisionExplainabilityNpcStore
@@ -208,7 +226,16 @@ namespace Arcontio.Core
             int beliefCapacity,
             int queryCapacity,
             int decisionCapacity,
-            int bridgeCapacity)
+            int bridgeCapacity,
+            int jobRequestCapacity,
+            int jobLifecycleCapacity,
+            int jobPhaseCapacity,
+            int stepCapacity,
+            int jobStateCapacity,
+            int jobArbitrationCapacity,
+            int reservationCapacity,
+            int commandCapacity,
+            int failureLearningCapacity)
         {
             NpcId = npcId;
             LatestTick = 0;
@@ -218,6 +245,15 @@ namespace Arcontio.Core
             _queryTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(queryCapacity);
             _decisionTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(decisionCapacity);
             _bridgeTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(bridgeCapacity);
+            _jobRequestTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(jobRequestCapacity);
+            _jobLifecycleTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(jobLifecycleCapacity);
+            _jobPhaseTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(jobPhaseCapacity);
+            _stepTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(stepCapacity);
+            _jobStateTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(jobStateCapacity);
+            _jobArbitrationTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(jobArbitrationCapacity);
+            _reservationTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(reservationCapacity);
+            _commandTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(commandCapacity);
+            _failureLearningTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(failureLearningCapacity);
         }
 
         // =============================================================================
@@ -254,6 +290,33 @@ namespace Arcontio.Core
                 case MemoryBeliefDecisionTraceKind.Bridge:
                     _bridgeTraces.Add(trace);
                     break;
+                case MemoryBeliefDecisionTraceKind.JobRequest:
+                    _jobRequestTraces.Add(trace);
+                    break;
+                case MemoryBeliefDecisionTraceKind.JobLifecycle:
+                    _jobLifecycleTraces.Add(trace);
+                    break;
+                case MemoryBeliefDecisionTraceKind.JobPhase:
+                    _jobPhaseTraces.Add(trace);
+                    break;
+                case MemoryBeliefDecisionTraceKind.Step:
+                    _stepTraces.Add(trace);
+                    break;
+                case MemoryBeliefDecisionTraceKind.JobState:
+                    _jobStateTraces.Add(trace);
+                    break;
+                case MemoryBeliefDecisionTraceKind.JobArbitration:
+                    _jobArbitrationTraces.Add(trace);
+                    break;
+                case MemoryBeliefDecisionTraceKind.Reservation:
+                    _reservationTraces.Add(trace);
+                    break;
+                case MemoryBeliefDecisionTraceKind.Command:
+                    _commandTraces.Add(trace);
+                    break;
+                case MemoryBeliefDecisionTraceKind.FailureLearning:
+                    _failureLearningTraces.Add(trace);
+                    break;
             }
         }
 
@@ -272,6 +335,33 @@ namespace Arcontio.Core
         public void CopyBridgeTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
             => _bridgeTraces.CopyTo(output, clearOutput);
 
+        public void CopyJobRequestTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _jobRequestTraces.CopyTo(output, clearOutput);
+
+        public void CopyJobLifecycleTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _jobLifecycleTraces.CopyTo(output, clearOutput);
+
+        public void CopyJobPhaseTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _jobPhaseTraces.CopyTo(output, clearOutput);
+
+        public void CopyStepTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _stepTraces.CopyTo(output, clearOutput);
+
+        public void CopyJobStateTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _jobStateTraces.CopyTo(output, clearOutput);
+
+        public void CopyJobArbitrationTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _jobArbitrationTraces.CopyTo(output, clearOutput);
+
+        public void CopyReservationTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _reservationTraces.CopyTo(output, clearOutput);
+
+        public void CopyCommandTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _commandTraces.CopyTo(output, clearOutput);
+
+        public void CopyFailureLearningTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _failureLearningTraces.CopyTo(output, clearOutput);
+
         public bool TryGetLatestMemoryTrace(out MemoryBeliefDecisionTrace trace)
             => _memoryTraces.TryGetNewest(out trace);
 
@@ -286,6 +376,33 @@ namespace Arcontio.Core
 
         public bool TryGetLatestBridgeTrace(out MemoryBeliefDecisionTrace trace)
             => _bridgeTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestJobRequestTrace(out MemoryBeliefDecisionTrace trace)
+            => _jobRequestTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestJobLifecycleTrace(out MemoryBeliefDecisionTrace trace)
+            => _jobLifecycleTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestJobPhaseTrace(out MemoryBeliefDecisionTrace trace)
+            => _jobPhaseTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestStepTrace(out MemoryBeliefDecisionTrace trace)
+            => _stepTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestJobStateTrace(out MemoryBeliefDecisionTrace trace)
+            => _jobStateTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestJobArbitrationTrace(out MemoryBeliefDecisionTrace trace)
+            => _jobArbitrationTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestReservationTrace(out MemoryBeliefDecisionTrace trace)
+            => _reservationTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestCommandTrace(out MemoryBeliefDecisionTrace trace)
+            => _commandTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestFailureLearningTrace(out MemoryBeliefDecisionTrace trace)
+            => _failureLearningTraces.TryGetNewest(out trace);
     }
 
     // =============================================================================
@@ -318,6 +435,15 @@ namespace Arcontio.Core
         public const int DefaultQueryCapacity = 40;
         public const int DefaultDecisionCapacity = 24;
         public const int DefaultBridgeCapacity = 24;
+        public const int DefaultJobRequestCapacity = 24;
+        public const int DefaultJobLifecycleCapacity = 32;
+        public const int DefaultJobPhaseCapacity = 32;
+        public const int DefaultStepCapacity = 64;
+        public const int DefaultJobStateCapacity = 24;
+        public const int DefaultJobArbitrationCapacity = 24;
+        public const int DefaultReservationCapacity = 32;
+        public const int DefaultCommandCapacity = 32;
+        public const int DefaultFailureLearningCapacity = 24;
 
         private readonly Dictionary<int, MemoryBeliefDecisionExplainabilityNpcStore> _stores;
         private readonly int _memoryCapacity;
@@ -325,6 +451,15 @@ namespace Arcontio.Core
         private readonly int _queryCapacity;
         private readonly int _decisionCapacity;
         private readonly int _bridgeCapacity;
+        private readonly int _jobRequestCapacity;
+        private readonly int _jobLifecycleCapacity;
+        private readonly int _jobPhaseCapacity;
+        private readonly int _stepCapacity;
+        private readonly int _jobStateCapacity;
+        private readonly int _jobArbitrationCapacity;
+        private readonly int _reservationCapacity;
+        private readonly int _commandCapacity;
+        private readonly int _failureLearningCapacity;
 
         public int StoreCount => _stores.Count;
 
@@ -341,13 +476,31 @@ namespace Arcontio.Core
             int beliefCapacity = DefaultBeliefCapacity,
             int queryCapacity = DefaultQueryCapacity,
             int decisionCapacity = DefaultDecisionCapacity,
-            int bridgeCapacity = DefaultBridgeCapacity)
+            int bridgeCapacity = DefaultBridgeCapacity,
+            int jobRequestCapacity = DefaultJobRequestCapacity,
+            int jobLifecycleCapacity = DefaultJobLifecycleCapacity,
+            int jobPhaseCapacity = DefaultJobPhaseCapacity,
+            int stepCapacity = DefaultStepCapacity,
+            int jobStateCapacity = DefaultJobStateCapacity,
+            int jobArbitrationCapacity = DefaultJobArbitrationCapacity,
+            int reservationCapacity = DefaultReservationCapacity,
+            int commandCapacity = DefaultCommandCapacity,
+            int failureLearningCapacity = DefaultFailureLearningCapacity)
         {
             _memoryCapacity = Math.Max(1, memoryCapacity);
             _beliefCapacity = Math.Max(1, beliefCapacity);
             _queryCapacity = Math.Max(1, queryCapacity);
             _decisionCapacity = Math.Max(1, decisionCapacity);
             _bridgeCapacity = Math.Max(1, bridgeCapacity);
+            _jobRequestCapacity = Math.Max(1, jobRequestCapacity);
+            _jobLifecycleCapacity = Math.Max(1, jobLifecycleCapacity);
+            _jobPhaseCapacity = Math.Max(1, jobPhaseCapacity);
+            _stepCapacity = Math.Max(1, stepCapacity);
+            _jobStateCapacity = Math.Max(1, jobStateCapacity);
+            _jobArbitrationCapacity = Math.Max(1, jobArbitrationCapacity);
+            _reservationCapacity = Math.Max(1, reservationCapacity);
+            _commandCapacity = Math.Max(1, commandCapacity);
+            _failureLearningCapacity = Math.Max(1, failureLearningCapacity);
             _stores = new Dictionary<int, MemoryBeliefDecisionExplainabilityNpcStore>(64);
         }
 
@@ -427,7 +580,16 @@ namespace Arcontio.Core
                 _beliefCapacity,
                 _queryCapacity,
                 _decisionCapacity,
-                _bridgeCapacity);
+                _bridgeCapacity,
+                _jobRequestCapacity,
+                _jobLifecycleCapacity,
+                _jobPhaseCapacity,
+                _stepCapacity,
+                _jobStateCapacity,
+                _jobArbitrationCapacity,
+                _reservationCapacity,
+                _commandCapacity,
+                _failureLearningCapacity);
 
             _stores[npcId] = store;
             return store;
@@ -442,6 +604,15 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Query => config.logQuery,
                 MemoryBeliefDecisionTraceKind.Decision => config.logDecision,
                 MemoryBeliefDecisionTraceKind.Bridge => config.logBridge,
+                MemoryBeliefDecisionTraceKind.JobRequest => config.logJobRequest,
+                MemoryBeliefDecisionTraceKind.JobLifecycle => config.logJobLifecycle,
+                MemoryBeliefDecisionTraceKind.JobPhase => config.logJobPhase,
+                MemoryBeliefDecisionTraceKind.Step => config.logStep,
+                MemoryBeliefDecisionTraceKind.JobState => config.logJobState,
+                MemoryBeliefDecisionTraceKind.JobArbitration => config.logJobArbitration,
+                MemoryBeliefDecisionTraceKind.Reservation => config.logReservation,
+                MemoryBeliefDecisionTraceKind.Command => config.logCommand,
+                MemoryBeliefDecisionTraceKind.FailureLearning => config.logFailureLearning,
                 _ => false
             };
         }
