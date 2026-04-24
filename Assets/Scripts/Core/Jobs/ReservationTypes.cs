@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Arcontio.Core.Config;
 using UnityEngine;
 
 namespace Arcontio.Core
@@ -146,6 +147,41 @@ namespace Arcontio.Core
 
         public int Count => _records.Count;
 
+        // =============================================================================
+        // TryReserve
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che rende osservabile l'esito della reservation senza
+        /// cambiare il contratto base dello store.
+        /// </para>
+        /// </summary>
+        public bool TryReserve(
+            ReservationRecord record,
+            out ReservationRecord existing,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int tick,
+            int npcId)
+        {
+            bool accepted = TryReserve(record, out existing);
+
+            if (explainabilityConfig != null)
+            {
+                var traceRecord = accepted ? record : existing;
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteReservationTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    accepted ? MemoryBeliefDecisionReservationOperation.Accepted : MemoryBeliefDecisionReservationOperation.Denied,
+                    in traceRecord,
+                    accepted ? "ReservationAccepted" : "ReservationDenied");
+            }
+
+            return accepted;
+        }
+
         public bool TryReserve(ReservationRecord record, out ReservationRecord existing)
         {
             // Prima cerchiamo una contesa sullo stesso target logico, non solo sulla
@@ -195,6 +231,49 @@ namespace Arcontio.Core
             return keys.Count;
         }
 
+        // =============================================================================
+        // ReleaseByJob
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che emette una trace per ogni reservation rilasciata dal
+        /// job indicato.
+        /// </para>
+        /// </summary>
+        public int ReleaseByJob(
+            string jobId,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int tick,
+            int npcId)
+        {
+            var released = new List<ReservationRecord>();
+            foreach (var pair in _records)
+            {
+                if (pair.Value.JobId == jobId)
+                    released.Add(pair.Value);
+            }
+
+            int count = ReleaseByJob(jobId);
+            if (explainabilityConfig == null)
+                return count;
+
+            for (int i = 0; i < released.Count; i++)
+            {
+                var reservation = released[i];
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteReservationTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionReservationOperation.Released,
+                    in reservation,
+                    "ReservationReleased");
+            }
+
+            return count;
+        }
+
         public int PruneExpired(int tick)
         {
             // La pulizia per tick mantiene lo store piccolo e rende le scadenze
@@ -210,6 +289,46 @@ namespace Arcontio.Core
                 _records.Remove(keys[i]);
 
             return keys.Count;
+        }
+
+        // =============================================================================
+        // PruneExpired
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che emette una trace per ogni reservation scaduta.
+        /// </para>
+        /// </summary>
+        public int PruneExpired(
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            var expired = new List<ReservationRecord>();
+            foreach (var pair in _records)
+            {
+                if (pair.Value.IsExpiredAt(tick))
+                    expired.Add(pair.Value);
+            }
+
+            int count = PruneExpired(tick);
+            if (explainabilityConfig == null)
+                return count;
+
+            for (int i = 0; i < expired.Count; i++)
+            {
+                var reservation = expired[i];
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteReservationTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    reservation.NpcId,
+                    tick,
+                    MemoryBeliefDecisionReservationOperation.Expired,
+                    in reservation,
+                    "ReservationExpired");
+            }
+
+            return count;
         }
     }
 }
