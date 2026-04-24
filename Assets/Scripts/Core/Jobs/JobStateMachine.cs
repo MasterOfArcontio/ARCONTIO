@@ -171,6 +171,14 @@ namespace Arcontio.Core
                 previousPhaseIndex,
                 result);
 
+            TryEmitJobStateTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                npcState,
+                result.Message);
+
             return result;
         }
 
@@ -448,6 +456,42 @@ namespace Arcontio.Core
                 previousAction,
                 previousActionIndex,
                 stepResult,
+                reason);
+        }
+
+        // =============================================================================
+        // TryEmitJobStateTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esporta la snapshot runtime di <c>NpcJobState</c> dopo l'applicazione del
+        /// risultato dello step.
+        /// </para>
+        ///
+        /// <para><b>State snapshot post-mutation</b></para>
+        /// <para>
+        /// La UI futura deve vedere il cursore effettivamente risultante dal tick,
+        /// non una stima pre-transizione. La trace viene quindi emessa solo dopo che
+        /// la state machine ha applicato tutte le mutazioni su wait, phase e action.
+        /// </para>
+        /// </summary>
+        private static void TryEmitJobStateTrace(
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick,
+            in NpcJobState jobState,
+            string reason)
+        {
+            if (explainabilityConfig == null)
+                return;
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobStateTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                in jobState,
                 reason);
         }
     }
