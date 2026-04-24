@@ -52,7 +52,122 @@ namespace Arcontio.Core
         Belief = 2,
         Query = 3,
         Decision = 4,
-        Bridge = 5
+        Bridge = 5,
+        JobRequest = 6,
+        JobLifecycle = 7,
+        JobPhase = 8,
+        Step = 9,
+        JobState = 10,
+        JobArbitration = 11,
+        Reservation = 12,
+        Command = 13,
+        FailureLearning = 14
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionJobLifecycleOperation
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Operazione diagnostica osservata sul ciclo di vita complessivo di un job.
+    /// </para>
+    ///
+    /// <para><b>Vocabolario runtime stabile per la v0.07</b></para>
+    /// <para>
+    /// L'Explainability Layer deve poter distinguere creazione, attivazione,
+    /// sospensione e chiusura di un job senza affidarsi a stringhe libere emesse da
+    /// punti diversi della pipeline.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Created</b>: job istanziato ma non ancora eseguito.</item>
+    ///   <item><b>Activated</b>: job diventato attivo sull'NPC.</item>
+    ///   <item><b>Suspended</b>: job parcheggiato da preemption o policy.</item>
+    ///   <item><b>Resumed</b>: job precedentemente sospeso tornato attivo.</item>
+    ///   <item><b>Completed</b>: job terminato con successo.</item>
+    ///   <item><b>Failed</b>: job terminato con errore.</item>
+    ///   <item><b>Cancelled</b>: job annullato da policy.</item>
+    /// </list>
+    /// </summary>
+    public enum MemoryBeliefDecisionJobLifecycleOperation
+    {
+        Unknown = 0,
+        Created = 1,
+        Activated = 2,
+        Suspended = 3,
+        Resumed = 4,
+        Completed = 5,
+        Failed = 6,
+        Cancelled = 7
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionJobPhaseOperation
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Operazione diagnostica osservata sul cursore di fase del job.
+    /// </para>
+    ///
+    /// <para><b>Fase come boundary intermedio</b></para>
+    /// <para>
+    /// L'EL v0.07 deve rendere visibile il salto fra fasi senza costringere UI e
+    /// log JSONL a ricostruirlo indirettamente dal solo indice corrente.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Entered</b>: fase appena entrata.</item>
+    ///   <item><b>Completed</b>: fase conclusa con successo.</item>
+    ///   <item><b>Interrupted</b>: fase interrotta da preemption o errore.</item>
+    /// </list>
+    /// </summary>
+    public enum MemoryBeliefDecisionJobPhaseOperation
+    {
+        Unknown = 0,
+        Entered = 1,
+        Completed = 2,
+        Interrupted = 3
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionReservationOperation
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Operazione diagnostica osservata sul Reservation layer.
+    /// </para>
+    ///
+    /// <para><b>Contesa leggibile in runtime</b></para>
+    /// <para>
+    /// Il layer diagnostico deve chiarire se una reservation e' stata accettata,
+    /// negata, rilasciata o scaduta, senza che la UI debba leggere lo store live.
+    /// </para>
+    /// </summary>
+    public enum MemoryBeliefDecisionReservationOperation
+    {
+        Unknown = 0,
+        Accepted = 1,
+        Denied = 2,
+        Released = 3,
+        Expired = 4
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionCommandOperation
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Operazione diagnostica osservata sul JobCommandBuffer o sul confine step ->
+    /// command.
+    /// </para>
+    /// </summary>
+    public enum MemoryBeliefDecisionCommandOperation
+    {
+        Unknown = 0,
+        Enqueued = 1,
+        Snapshot = 2
     }
 
     // =============================================================================
@@ -432,6 +547,288 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // MemoryBeliefDecisionJobRequestRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica del passaggio Decision -> JobRequest.
+    /// </para>
+    ///
+    /// <para><b>Bridge esplicito senza rompere il legacy path</b></para>
+    /// <para>
+    /// Questo record separa il nuovo confine verso il Job System dal bridge legacy
+    /// Decision -> Command, cosi' la UI puo' mostrare entrambi in modo distinto.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>RequestId/JobId</b>: identificatori diagnostici della richiesta.</item>
+    ///   <item><b>Intent/Priority/Urgency</b>: motivazione della richiesta.</item>
+    ///   <item><b>Target*</b>: target soggettivo gia' risolto dal chiamante.</item>
+    ///   <item><b>BeliefKey</b>: riferimento opzionale alla belief motivante.</item>
+    ///   <item><b>Reason</b>: spiegazione breve del producer.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobRequestRecord
+    {
+        public string RequestId = string.Empty;
+        public string JobId = string.Empty;
+        public DecisionIntentKind Intent;
+        public JobPriorityClass PriorityClass;
+        public float Urgency01;
+        public bool HasTargetCell;
+        public Vector2Int TargetCell;
+        public int TargetObjectId;
+        public string BeliefKey = string.Empty;
+        public string DebugLabel = string.Empty;
+        public string Reason = string.Empty;
+        public bool LegacyBridgeStillUsed;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionJobRef
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot minimo e serializzabile di un job osservato dall'EL.
+    /// </para>
+    ///
+    /// <para><b>Riferimento passivo al runtime job</b></para>
+    /// <para>
+    /// La UI non deve leggere direttamente <c>Job</c> o <c>NpcJobState</c>, quindi
+    /// i campi essenziali vengono copiati qui come fotografia read-only.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobRef
+    {
+        public string JobId = string.Empty;
+        public string RequestId = string.Empty;
+        public DecisionIntentKind Intent;
+        public JobPriorityClass PriorityClass;
+        public float Urgency01;
+        public JobStatus Status;
+        public JobFailureReason FailureReason;
+        public int CreatedTick;
+        public int UpdatedTick;
+        public int ActivePhaseIndex;
+        public bool HasTargetCell;
+        public Vector2Int TargetCell;
+        public int TargetObjectId;
+        public string DebugLabel = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionJobPhaseRef
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot serializzabile della fase osservata nel momento della trace.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobPhaseRef
+    {
+        public string PhaseId = string.Empty;
+        public JobPhaseKind Kind;
+        public string DisplayName = string.Empty;
+        public int PhaseIndex;
+        public int ExpectedStepCount;
+        public bool IsInterruptible;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionStepRef
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot serializzabile di uno step atomico di job.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionStepRef
+    {
+        public string ActionId = string.Empty;
+        public JobActionKind Kind;
+        public string Label = string.Empty;
+        public int ActionIndex;
+        public bool HasTargetCell;
+        public Vector2Int TargetCell;
+        public int TargetObjectId;
+        public int DurationTicks;
+        public string PayloadKey = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionStepResultRef
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot serializzabile dell'ultimo StepResult osservato.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionStepResultRef
+    {
+        public StepResultStatus Status;
+        public JobFailureReason FailureReason;
+        public int SuggestedWaitTicks;
+        public string DiagnosticMessage = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionJobLifecycleRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica del ciclo di vita di un job.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobLifecycleRecord
+    {
+        public MemoryBeliefDecisionJobLifecycleOperation Operation;
+        public MemoryBeliefDecisionJobRef Job = new();
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionJobPhaseRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica di una transizione o osservazione di fase.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobPhaseRecord
+    {
+        public MemoryBeliefDecisionJobPhaseOperation Operation;
+        public MemoryBeliefDecisionJobRef Job = new();
+        public MemoryBeliefDecisionJobPhaseRef Phase = new();
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionStepRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica per step e StepResult del job.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionStepRecord
+    {
+        public MemoryBeliefDecisionJobRef Job = new();
+        public MemoryBeliefDecisionJobPhaseRef Phase = new();
+        public MemoryBeliefDecisionStepRef Step = new();
+        public MemoryBeliefDecisionStepResultRef Result = new();
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionJobStateRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica dello snapshot runtime di <c>NpcJobState</c>.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobStateRecord
+    {
+        public bool HasActiveJob;
+        public string ActiveJobId = string.Empty;
+        public int ActivePhaseIndex;
+        public int ActiveActionIndex;
+        public int WaitUntilTick;
+        public string SuspendedJobId = string.Empty;
+        public JobFailureReason LastFailureReason;
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionJobArbitrationRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica della decisione dell'arbitro tra job corrente e nuova
+    /// richiesta.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobArbitrationRecord
+    {
+        public MemoryBeliefDecisionJobRef CurrentJob = new();
+        public MemoryBeliefDecisionJobRef ProposedJob = new();
+        public JobArbitrationDecision Decision;
+        public string AcceptedJobId = string.Empty;
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionReservationRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica di una operazione di reservation.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionReservationRecord
+    {
+        public MemoryBeliefDecisionReservationOperation Operation;
+        public string ReservationId = string.Empty;
+        public string JobId = string.Empty;
+        public int OwnerNpcId;
+        public ReservationTargetKind TargetKind;
+        public Vector2Int TargetCell;
+        public int TargetObjectId;
+        public int CreatedTick;
+        public int ExpiresTick;
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionCommandRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica del confine step -> command buffer.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionCommandRecord
+    {
+        public MemoryBeliefDecisionCommandOperation Operation;
+        public string JobId = string.Empty;
+        public string CommandName = string.Empty;
+        public int QueueCount;
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionFailureLearningRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica del failure learning per target cella.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionFailureLearningRecord
+    {
+        public string JobId = string.Empty;
+        public Vector2Int TargetCell;
+        public JobFailureReason FailureReason;
+        public int FailureTick;
+        public float Penalty01;
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
     // MemoryBeliefDecisionTrace
     // =============================================================================
     /// <summary>
@@ -465,5 +862,14 @@ namespace Arcontio.Core
         public MemoryBeliefDecisionQueryRecord Query;
         public MemoryBeliefDecisionDecisionRecord Decision;
         public MemoryBeliefDecisionBridgeRecord Bridge;
+        public MemoryBeliefDecisionJobRequestRecord JobRequest;
+        public MemoryBeliefDecisionJobLifecycleRecord JobLifecycle;
+        public MemoryBeliefDecisionJobPhaseRecord JobPhase;
+        public MemoryBeliefDecisionStepRecord Step;
+        public MemoryBeliefDecisionJobStateRecord JobState;
+        public MemoryBeliefDecisionJobArbitrationRecord JobArbitration;
+        public MemoryBeliefDecisionReservationRecord Reservation;
+        public MemoryBeliefDecisionCommandRecord Command;
+        public MemoryBeliefDecisionFailureLearningRecord FailureLearning;
     }
 }
