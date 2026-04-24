@@ -1,4 +1,6 @@
 using System.Collections.Generic;
+using Arcontio.Core.Config;
+using UnityEngine;
 
 namespace Arcontio.Core
 {
@@ -33,8 +35,23 @@ namespace Arcontio.Core
         public readonly JobFailureReason Reason;
         public readonly int Tick;
         public readonly string DiagnosticKey;
+        public readonly bool HasTargetCell;
+        public readonly Vector2Int TargetCell;
 
         public JobFailureObservation(int npcId, string jobId, DecisionIntentKind intentKind, JobFailureReason reason, int tick, string diagnosticKey)
+            : this(npcId, jobId, intentKind, reason, tick, diagnosticKey, false, Vector2Int.zero)
+        {
+        }
+
+        public JobFailureObservation(
+            int npcId,
+            string jobId,
+            DecisionIntentKind intentKind,
+            JobFailureReason reason,
+            int tick,
+            string diagnosticKey,
+            bool hasTargetCell,
+            Vector2Int targetCell)
         {
             NpcId = npcId;
             JobId = jobId ?? string.Empty;
@@ -42,6 +59,8 @@ namespace Arcontio.Core
             Reason = reason == JobFailureReason.None ? JobFailureReason.Unknown : reason;
             Tick = tick;
             DiagnosticKey = diagnosticKey ?? string.Empty;
+            HasTargetCell = hasTargetCell;
+            TargetCell = targetCell;
         }
     }
 
@@ -71,6 +90,39 @@ namespace Arcontio.Core
     public sealed class JobFailureLearningStore
     {
         private readonly Dictionary<string, int> _counts = new();
+
+        // =============================================================================
+        // Record
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che registra il fallimento e ne esporta la penalita'
+        /// aggiornata come trace diagnostica.
+        /// </para>
+        /// </summary>
+        public void Record(
+            JobFailureObservation observation,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            Record(observation);
+
+            if (explainabilityConfig == null)
+                return;
+
+            Vector2Int targetCell = observation.HasTargetCell ? observation.TargetCell : Vector2Int.zero;
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteFailureLearningTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                observation.NpcId,
+                observation.Tick,
+                observation.JobId,
+                targetCell,
+                observation.Reason,
+                observation.Tick,
+                GetPenalty01(observation.NpcId, observation.IntentKind, observation.Reason),
+                observation.DiagnosticKey);
+        }
 
         public void Record(JobFailureObservation observation)
         {
