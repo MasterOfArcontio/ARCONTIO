@@ -23,7 +23,8 @@ namespace Arcontio.View.MapGrid
         Memory = 0,
         Belief = 1,
         Decision = 2,
-        Pathfinding = 3
+        Job = 3,
+        Pathfinding = 4
     }
 
     // =============================================================================
@@ -33,7 +34,8 @@ namespace Arcontio.View.MapGrid
     /// <para>
     /// Pannello debug prefabless fissato al lato destro della MapGrid. Il nome della
     /// classe resta quello storico per non rompere gli agganci esistenti, ma la view
-    /// ora ospita l'intero pannello EL tabbed: Memory, Belief, Decision e Pathfinding.
+    /// ora ospita l'intero pannello EL tabbed: Memory, Belief, Decision, Job e
+    /// Pathfinding.
     /// </para>
     ///
     /// <para><b>UI diagnostica senza accesso al dominio</b></para>
@@ -47,7 +49,7 @@ namespace Arcontio.View.MapGrid
     /// <list type="bullet">
     ///   <item><b>Header</b>: titolo, metadati NPC/tick e tab cliccabili.</item>
     ///   <item><b>ScrollRect</b>: body unico, con header fisso e contenuto scrollabile.</item>
-    ///   <item><b>Page roots</b>: contenitori separati per Memory, Belief, Decision e Pathfinding.</item>
+    ///   <item><b>Page roots</b>: contenitori separati per Memory, Belief, Decision, Job e Pathfinding.</item>
     ///   <item><b>Sub-pannelli</b>: fondo neutro, titolo, indicatore testuale colorato e testo rich.</item>
     /// </list>
     /// </summary>
@@ -59,9 +61,9 @@ namespace Arcontio.View.MapGrid
         private const int DefaultTitleFont = 14;
         private const int DefaultBodyFont = 12;
 
-        private readonly Button[] _tabButtons = new Button[4];
-        private readonly Text[] _tabTexts = new Text[4];
-        private readonly GameObject[] _pageRoots = new GameObject[4];
+        private readonly Button[] _tabButtons = new Button[5];
+        private readonly Text[] _tabTexts = new Text[5];
+        private readonly GameObject[] _pageRoots = new GameObject[5];
 
         private GameObject _root;
         private RectTransform _rootRt;
@@ -80,6 +82,9 @@ namespace Arcontio.View.MapGrid
         private Text _decisionSelectedText;
         private Text _decisionCandidatesText;
         private Text _decisionBridgeText;
+        private Text _jobCurrentText;
+        private Text _jobPhaseStepText;
+        private Text _jobRuntimeText;
         private Text _pathIntentPlanText;
         private Text _pathEventsText;
 
@@ -237,6 +242,13 @@ namespace Arcontio.View.MapGrid
             SetTextIfReady(_decisionBridgeText, bridge);
         }
 
+        public void SetJobText(string currentJob, string phaseAndStep, string runtimeSignals)
+        {
+            SetTextIfReady(_jobCurrentText, currentJob);
+            SetTextIfReady(_jobPhaseStepText, phaseAndStep);
+            SetTextIfReady(_jobRuntimeText, runtimeSignals);
+        }
+
         public void SetPathfindingText(string intentPlan, string events)
         {
             SetTextIfReady(_pathIntentPlanText, intentPlan);
@@ -330,6 +342,7 @@ namespace Arcontio.View.MapGrid
             CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Memory, "Memory");
             CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Belief, "Belief");
             CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Decision, "Decision");
+            CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Job, "Job");
             CreateTab(tabsGo.transform, MapGridExplainabilityPanelPage.Pathfinding, "Pathfinding");
         }
 
@@ -432,6 +445,11 @@ namespace Arcontio.View.MapGrid
             _decisionSelectedText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "intenzione selezionata", "#3FB950");
             _decisionCandidatesText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "candidati e score breakdown", "#D29922");
             _decisionBridgeText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "bridge decision -> command", "#58A6FF");
+
+            _pageRoots[(int)MapGridExplainabilityPanelPage.Job] = CreatePage("JobPage");
+            _jobCurrentText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Job].transform, "job corrente e request", "#3FB950");
+            _jobPhaseStepText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Job].transform, "phase e step", "#58A6FF");
+            _jobRuntimeText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Job].transform, "state, arbitration, reservation, command, failure", "#D29922");
 
             _pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding] = CreatePage("PathfindingPage");
             _pathIntentPlanText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding].transform, "intent e plan", "#9FC5E8");

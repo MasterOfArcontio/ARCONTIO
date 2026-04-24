@@ -213,6 +213,9 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbMbqdDecisionSelected = new(1536);
         private readonly StringBuilder _sbMbqdDecisionCandidates = new(3072);
         private readonly StringBuilder _sbMbqdDecisionBridge = new(1536);
+        private readonly StringBuilder _sbMbqdJobCurrent = new(2048);
+        private readonly StringBuilder _sbMbqdJobPhaseStep = new(2048);
+        private readonly StringBuilder _sbMbqdJobRuntime = new(3072);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
         private readonly MovementExplainabilityViewModel _movementExplainabilityViewModel = new();
@@ -1193,6 +1196,7 @@ namespace Arcontio.View.MapGrid
                 _movementExplainabilityPanel.SetMemoryText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetBeliefText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetDecisionText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
+                _movementExplainabilityPanel.SetJobText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetPathfindingText(
                     "<color=#6E7681>Nessun NPC selezionato.</color>",
                     "<color=#6E7681>Click sinistro su un NPC nella MapGrid per aprire la diagnostica EL.</color>");
@@ -1207,6 +1211,7 @@ namespace Arcontio.View.MapGrid
                 _movementExplainabilityPanel.SetMemoryText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetBeliefText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetDecisionText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
+                _movementExplainabilityPanel.SetJobText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
                 _movementExplainabilityPanel.SetPathfindingText(string.Empty, "<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>");
                 _movementExplainabilityPanel.SetVisible(true);
                 return;
@@ -1216,11 +1221,12 @@ namespace Arcontio.View.MapGrid
             string mbqdHeaderMeta = BuildMemoryBeliefDecisionExplainabilityText(world, selectedNpcId);
             _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", string.IsNullOrWhiteSpace(mbqdHeaderMeta) ? headerMeta : mbqdHeaderMeta);
             _movementExplainabilityPanel.SetDiagnostics(
-                $"selectedNpc={selectedNpcId} | worldTick={worldTick} | registryNpc={_mbqdExplainabilityViewModel.HasNpc} | MBQD M{_mbqdExplainabilityViewModel.MemoryCount} B{_mbqdExplainabilityViewModel.BeliefCount} Q{_mbqdExplainabilityViewModel.QueryCount} D{_mbqdExplainabilityViewModel.DecisionCount}");
+                $"selectedNpc={selectedNpcId} | worldTick={worldTick} | registryNpc={_mbqdExplainabilityViewModel.HasNpc} | MBQD M{_mbqdExplainabilityViewModel.MemoryCount} B{_mbqdExplainabilityViewModel.BeliefCount} Q{_mbqdExplainabilityViewModel.QueryCount} D{_mbqdExplainabilityViewModel.DecisionCount} J{_mbqdExplainabilityViewModel.JobRequestCount}/{_mbqdExplainabilityViewModel.JobLifecycleCount}/{_mbqdExplainabilityViewModel.StepCount}");
             _movementExplainabilityPanel.SetPathfindingText(_sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
             _movementExplainabilityPanel.SetMemoryText(_sbMbqdMemoryStore.ToString(), _sbMbqdMemoryLatest.ToString(), _sbMbqdMemoryTimeline.ToString());
             _movementExplainabilityPanel.SetBeliefText(_sbMbqdBeliefEntries.ToString(), _sbMbqdBeliefQuery.ToString(), _sbMbqdBeliefMutation.ToString());
             _movementExplainabilityPanel.SetDecisionText(_sbMbqdDecisionSelected.ToString(), _sbMbqdDecisionCandidates.ToString(), _sbMbqdDecisionBridge.ToString());
+            _movementExplainabilityPanel.SetJobText(_sbMbqdJobCurrent.ToString(), _sbMbqdJobPhaseStep.ToString(), _sbMbqdJobRuntime.ToString());
             _movementExplainabilityPanel.SetVisible(true);
         }
 
@@ -1229,8 +1235,8 @@ namespace Arcontio.View.MapGrid
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce i blocchi testuali delle tab Memory, Belief e Decision usando
-        /// il ViewModel EL-MBQD runtime.
+        /// Costruisce i blocchi testuali delle tab Memory, Belief, Decision e Job
+        /// usando il ViewModel EL-MBQD runtime.
         /// </para>
         ///
         /// <para><b>UI da registry, non da store live</b></para>
@@ -1265,6 +1271,9 @@ namespace Arcontio.View.MapGrid
                 _sbMbqdDecisionSelected.Append("<color=#6E7681>").Append(message).Append("</color>");
                 _sbMbqdDecisionCandidates.Append("<color=#6E7681>(nessun candidato decisionale)</color>");
                 _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge decisione-comando)</color>");
+                _sbMbqdJobCurrent.Append("<color=#6E7681>").Append(message).Append("</color>");
+                _sbMbqdJobPhaseStep.Append("<color=#6E7681>(nessuna phase/step trace)</color>");
+                _sbMbqdJobRuntime.Append("<color=#6E7681>(nessuna runtime job trace)</color>");
                 return $"NPC #{npcId}";
             }
 
@@ -1272,6 +1281,7 @@ namespace Arcontio.View.MapGrid
             AppendMbqdMemory(model);
             AppendMbqdBelief(model);
             AppendMbqdDecision(model);
+            AppendMbqdJob(model);
             return model.HeaderSubtitle;
         }
 
@@ -1286,6 +1296,9 @@ namespace Arcontio.View.MapGrid
             _sbMbqdDecisionSelected.Clear();
             _sbMbqdDecisionCandidates.Clear();
             _sbMbqdDecisionBridge.Clear();
+            _sbMbqdJobCurrent.Clear();
+            _sbMbqdJobPhaseStep.Clear();
+            _sbMbqdJobRuntime.Clear();
         }
 
         private void AppendMbqdMemory(MemoryBeliefDecisionExplainabilityViewModel model)
@@ -1465,6 +1478,144 @@ namespace Arcontio.View.MapGrid
                     .Append(Kv("targetSource", bridge.TargetSource, "#58A6FF")).Append('\n')
                     .Append(Kv("legacyFallbackUsed", bridge.LegacyFallbackUsed.ToString(), bridge.LegacyFallbackUsed ? "#D29922" : "#3FB950")).Append('\n')
                     .Append(Kv("reason", EmptyMuted(bridge.Reason), "#E6EDF3"));
+            }
+        }
+
+        private void AppendMbqdJob(MemoryBeliefDecisionExplainabilityViewModel model)
+        {
+            // Il tab Job espone il nuovo boundary Decision -> JobRequest separato dal
+            // bridge legacy. Per questo la prima sezione mescola solo request e
+            // lifecycle del job, mentre il bridge legacy resta nel tab Decision.
+            var request = model.LatestJobRequest;
+            var lifecycle = model.LatestJobLifecycle;
+            if (!request.HasValue && !lifecycle.HasValue)
+            {
+                _sbMbqdJobCurrent.Append("<color=#6E7681>(nessun job corrente / request)</color>");
+            }
+            else
+            {
+                if (request.HasValue)
+                {
+                    _sbMbqdJobCurrent
+                        .Append(Kv("requestTick", request.Tick.ToString(), "#8B949E")).Append('\n')
+                        .Append(Kv("requestId", request.RequestId, "#58A6FF")).Append('\n')
+                        .Append(Kv("intent", request.Intent, "#3FB950")).Append('\n')
+                        .Append(Kv("priority", request.PriorityClass, "#D29922")).Append('\n')
+                        .Append(Kv("urgency", request.Urgency01.ToString("0.00"), "#D29922")).Append('\n')
+                        .Append(Kv("targetCell", request.TargetCell, "#E6EDF3")).Append('\n')
+                        .Append(Kv("beliefKey", EmptyMuted(request.BeliefKey), "#E6EDF3")).Append('\n')
+                        .Append(Kv("legacyBridgeStillUsed", request.LegacyBridgeStillUsed.ToString(), request.LegacyBridgeStillUsed ? "#D29922" : "#3FB950")).Append('\n');
+                }
+
+                if (lifecycle.HasValue)
+                {
+                    if (request.HasValue)
+                        _sbMbqdJobCurrent.Append('\n');
+
+                    _sbMbqdJobCurrent
+                        .Append(Kv("lifecycleTick", lifecycle.Tick.ToString(), "#8B949E")).Append('\n')
+                        .Append(Kv("operation", lifecycle.Operation, "#3FB950")).Append('\n')
+                        .Append(Kv("job", FormatJobInline(lifecycle.Job), "#58A6FF")).Append('\n')
+                        .Append(Kv("reason", EmptyMuted(lifecycle.Reason), "#E6EDF3"));
+                }
+            }
+
+            var jobPhase = model.LatestJobPhase;
+            var step = model.LatestStep;
+            if (!jobPhase.HasValue && !step.HasValue)
+            {
+                _sbMbqdJobPhaseStep.Append("<color=#6E7681>(nessuna phase/step trace)</color>");
+            }
+            else
+            {
+                if (jobPhase.HasValue)
+                {
+                    _sbMbqdJobPhaseStep
+                        .Append(Kv("phaseTick", jobPhase.Tick.ToString(), "#8B949E")).Append('\n')
+                        .Append(Kv("phaseOperation", jobPhase.Operation, "#58A6FF")).Append('\n')
+                        .Append(Kv("phase", FormatPhaseInline(jobPhase.Phase), "#58A6FF")).Append('\n')
+                        .Append(Kv("job", FormatJobInline(jobPhase.Job), "#E6EDF3")).Append('\n')
+                        .Append(Kv("reason", EmptyMuted(jobPhase.Reason), "#E6EDF3")).Append('\n');
+                }
+
+                if (step.HasValue)
+                {
+                    if (jobPhase.HasValue)
+                        _sbMbqdJobPhaseStep.Append('\n');
+
+                    _sbMbqdJobPhaseStep
+                        .Append(Kv("stepTick", step.Tick.ToString(), "#8B949E")).Append('\n')
+                        .Append(Kv("step", FormatStepInline(step.Step), "#3FB950")).Append('\n')
+                        .Append(Kv("result", FormatStepResultInline(step.Result), "#D29922")).Append('\n')
+                        .Append(Kv("reason", EmptyMuted(step.Reason), "#E6EDF3"));
+                }
+            }
+
+            bool hasRuntimeSignals = model.CurrentNpcJobState.HasValue
+                || model.LatestJobArbitration.HasValue
+                || model.LatestReservation.HasValue
+                || model.LatestCommand.HasValue
+                || model.LatestFailureLearning.HasValue;
+
+            if (!hasRuntimeSignals)
+            {
+                _sbMbqdJobRuntime.Append("<color=#6E7681>(nessun segnale runtime job)</color>");
+                return;
+            }
+
+            if (model.CurrentNpcJobState.HasValue)
+            {
+                var jobState = model.CurrentNpcJobState;
+                _sbMbqdJobRuntime
+                    .Append(Kv("stateTick", jobState.Tick.ToString(), "#8B949E")).Append('\n')
+                    .Append(Kv("hasActiveJob", jobState.HasActiveJob.ToString(), jobState.HasActiveJob ? "#3FB950" : "#6E7681")).Append('\n')
+                    .Append(Kv("activeJobId", EmptyMuted(jobState.ActiveJobId), "#58A6FF")).Append('\n')
+                    .Append(Kv("phase/action", $"{jobState.ActivePhaseIndex}/{jobState.ActiveActionIndex}", "#E6EDF3")).Append('\n')
+                    .Append(Kv("waitUntil", jobState.WaitUntilTick.ToString(), "#D29922")).Append('\n')
+                    .Append(Kv("suspendedJobId", EmptyMuted(jobState.SuspendedJobId), "#E6EDF3")).Append('\n')
+                    .Append(Kv("lastFailureReason", EmptyMuted(jobState.LastFailureReason), "#E6EDF3")).Append('\n');
+            }
+
+            if (model.LatestJobArbitration.HasValue)
+            {
+                var arbitration = model.LatestJobArbitration;
+                if (_sbMbqdJobRuntime.Length > 0)
+                    _sbMbqdJobRuntime.Append('\n');
+
+                _sbMbqdJobRuntime
+                    .Append(Kv("arbitration", arbitration.Decision, "#58A6FF")).Append('\n')
+                    .Append(Kv("acceptedJobId", EmptyMuted(arbitration.AcceptedJobId), "#3FB950")).Append('\n');
+            }
+
+            if (model.LatestReservation.HasValue)
+            {
+                var reservation = model.LatestReservation;
+                if (_sbMbqdJobRuntime.Length > 0)
+                    _sbMbqdJobRuntime.Append('\n');
+
+                _sbMbqdJobRuntime
+                    .Append(Kv("reservation", $"{reservation.Operation} {reservation.TargetKind} {reservation.TargetCell}", "#D29922")).Append('\n');
+            }
+
+            if (model.LatestCommand.HasValue)
+            {
+                var command = model.LatestCommand;
+                if (_sbMbqdJobRuntime.Length > 0)
+                    _sbMbqdJobRuntime.Append('\n');
+
+                _sbMbqdJobRuntime
+                    .Append(Kv("command", $"{command.Operation} {command.CommandName} q={command.QueueCount}", "#58A6FF")).Append('\n');
+            }
+
+            if (model.LatestFailureLearning.HasValue)
+            {
+                var failure = model.LatestFailureLearning;
+                if (_sbMbqdJobRuntime.Length > 0)
+                    _sbMbqdJobRuntime.Append('\n');
+
+                _sbMbqdJobRuntime
+                    .Append(Kv("failure", $"{failure.FailureReason} penalty={failure.Penalty01:0.00}", "#F85149")).Append('\n')
+                    .Append(Kv("failureTarget", failure.TargetCell, "#E6EDF3"));
             }
         }
 
