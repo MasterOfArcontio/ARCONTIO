@@ -50,6 +50,15 @@ namespace Arcontio.Core
         public int QueryCount;
         public int DecisionCount;
         public int BridgeCount;
+        public int JobRequestCount;
+        public int JobLifecycleCount;
+        public int JobPhaseCount;
+        public int StepCount;
+        public int JobStateCount;
+        public int JobArbitrationCount;
+        public int ReservationCount;
+        public int CommandCount;
+        public int FailureLearningCount;
         public string HeaderTitle = string.Empty;
         public string HeaderSubtitle = string.Empty;
         public readonly List<MemoryBeliefDecisionMetricView> MemoryBars = new(12);
@@ -59,6 +68,15 @@ namespace Arcontio.Core
         public readonly MemoryBeliefDecisionQueryView LatestQuery = new();
         public readonly MemoryBeliefDecisionDecisionView LatestDecision = new();
         public readonly MemoryBeliefDecisionBridgeView LatestBridge = new();
+        public readonly MemoryBeliefDecisionJobRequestView LatestJobRequest = new();
+        public readonly MemoryBeliefDecisionJobLifecycleView LatestJobLifecycle = new();
+        public readonly MemoryBeliefDecisionJobPhaseView LatestJobPhase = new();
+        public readonly MemoryBeliefDecisionStepView LatestStep = new();
+        public readonly MemoryBeliefDecisionJobStateView CurrentNpcJobState = new();
+        public readonly MemoryBeliefDecisionJobArbitrationView LatestJobArbitration = new();
+        public readonly MemoryBeliefDecisionReservationView LatestReservation = new();
+        public readonly MemoryBeliefDecisionCommandView LatestCommand = new();
+        public readonly MemoryBeliefDecisionFailureLearningView LatestFailureLearning = new();
         public readonly List<MemoryBeliefDecisionTimelineView> Timeline = new(48);
     }
 
@@ -226,6 +244,176 @@ namespace Arcontio.Core
         public MemoryBeliefDecisionColorRole ColorRole;
     }
 
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobRefView
+    {
+        public string JobId = string.Empty;
+        public string RequestId = string.Empty;
+        public string Intent = string.Empty;
+        public string PriorityClass = string.Empty;
+        public float Urgency01;
+        public string Status = string.Empty;
+        public string FailureReason = string.Empty;
+        public int CreatedTick;
+        public int UpdatedTick;
+        public int ActivePhaseIndex;
+        public string TargetCell = string.Empty;
+        public int TargetObjectId;
+        public string DebugLabel = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobPhaseRefView
+    {
+        public string PhaseId = string.Empty;
+        public string Kind = string.Empty;
+        public string DisplayName = string.Empty;
+        public int PhaseIndex;
+        public int ExpectedStepCount;
+        public bool IsInterruptible;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionStepRefView
+    {
+        public string ActionId = string.Empty;
+        public string Kind = string.Empty;
+        public string Label = string.Empty;
+        public int ActionIndex;
+        public string TargetCell = string.Empty;
+        public int TargetObjectId;
+        public int DurationTicks;
+        public string PayloadKey = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionStepResultView
+    {
+        public string Status = string.Empty;
+        public string FailureReason = string.Empty;
+        public int SuggestedWaitTicks;
+        public string DiagnosticMessage = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobRequestView
+    {
+        public bool HasValue;
+        public long Tick;
+        public string RequestId = string.Empty;
+        public string Intent = string.Empty;
+        public string PriorityClass = string.Empty;
+        public float Urgency01;
+        public string TargetCell = string.Empty;
+        public int TargetObjectId;
+        public string BeliefKey = string.Empty;
+        public string DebugLabel = string.Empty;
+        public bool LegacyBridgeStillUsed;
+        public string Reason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobLifecycleView
+    {
+        public bool HasValue;
+        public long Tick;
+        public string Operation = string.Empty;
+        public readonly MemoryBeliefDecisionJobRefView Job = new();
+        public string Reason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobPhaseView
+    {
+        public bool HasValue;
+        public long Tick;
+        public string Operation = string.Empty;
+        public readonly MemoryBeliefDecisionJobRefView Job = new();
+        public readonly MemoryBeliefDecisionJobPhaseRefView Phase = new();
+        public string Reason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionStepView
+    {
+        public bool HasValue;
+        public long Tick;
+        public readonly MemoryBeliefDecisionJobRefView Job = new();
+        public readonly MemoryBeliefDecisionJobPhaseRefView Phase = new();
+        public readonly MemoryBeliefDecisionStepRefView Step = new();
+        public readonly MemoryBeliefDecisionStepResultView Result = new();
+        public string Reason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobStateView
+    {
+        public bool HasValue;
+        public long Tick;
+        public bool HasActiveJob;
+        public string ActiveJobId = string.Empty;
+        public int ActivePhaseIndex;
+        public int ActiveActionIndex;
+        public int WaitUntilTick;
+        public string SuspendedJobId = string.Empty;
+        public string LastFailureReason = string.Empty;
+        public string Reason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionJobArbitrationView
+    {
+        public bool HasValue;
+        public long Tick;
+        public readonly MemoryBeliefDecisionJobRefView CurrentJob = new();
+        public readonly MemoryBeliefDecisionJobRefView ProposedJob = new();
+        public string Decision = string.Empty;
+        public string AcceptedJobId = string.Empty;
+        public string Reason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionReservationView
+    {
+        public bool HasValue;
+        public long Tick;
+        public string Operation = string.Empty;
+        public string ReservationId = string.Empty;
+        public string JobId = string.Empty;
+        public int OwnerNpcId;
+        public string TargetKind = string.Empty;
+        public string TargetCell = string.Empty;
+        public int TargetObjectId;
+        public int CreatedTick;
+        public int ExpiresTick;
+        public string Reason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionCommandView
+    {
+        public bool HasValue;
+        public long Tick;
+        public string Operation = string.Empty;
+        public string JobId = string.Empty;
+        public string CommandName = string.Empty;
+        public int QueueCount;
+        public string Reason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MemoryBeliefDecisionFailureLearningView
+    {
+        public bool HasValue;
+        public long Tick;
+        public string JobId = string.Empty;
+        public string TargetCell = string.Empty;
+        public string FailureReason = string.Empty;
+        public int FailureTick;
+        public float Penalty01;
+        public string Reason = string.Empty;
+    }
+
     // =============================================================================
     // MemoryBeliefDecisionExplainabilityViewModelBuilder
     // =============================================================================
@@ -284,8 +472,17 @@ namespace Arcontio.Core
             output.QueryCount = store.QueryTraceCount;
             output.DecisionCount = store.DecisionTraceCount;
             output.BridgeCount = store.BridgeTraceCount;
+            output.JobRequestCount = store.JobRequestTraceCount;
+            output.JobLifecycleCount = store.JobLifecycleTraceCount;
+            output.JobPhaseCount = store.JobPhaseTraceCount;
+            output.StepCount = store.StepTraceCount;
+            output.JobStateCount = store.JobStateTraceCount;
+            output.JobArbitrationCount = store.JobArbitrationTraceCount;
+            output.ReservationCount = store.ReservationTraceCount;
+            output.CommandCount = store.CommandTraceCount;
+            output.FailureLearningCount = store.FailureLearningTraceCount;
             output.HeaderTitle = $"NPC #{npcId}";
-            output.HeaderSubtitle = $"tick {store.LatestTick} | M {store.MemoryTraceCount} | B {store.BeliefTraceCount} | Q {store.QueryTraceCount} | D {store.DecisionTraceCount} | bridge {store.BridgeTraceCount}";
+            output.HeaderSubtitle = $"tick {store.LatestTick} | M {store.MemoryTraceCount} | B {store.BeliefTraceCount} | Q {store.QueryTraceCount} | D {store.DecisionTraceCount} | bridge {store.BridgeTraceCount} | J {store.JobLifecycleTraceCount} | step {store.StepTraceCount}";
 
             if (store.TryGetLatestMemoryTrace(out var memoryTrace))
                 FillMemory(output.LatestMemory, memoryTrace);
@@ -301,6 +498,33 @@ namespace Arcontio.Core
 
             if (store.TryGetLatestBridgeTrace(out var bridgeTrace))
                 FillBridge(output.LatestBridge, bridgeTrace);
+
+            if (store.TryGetLatestJobRequestTrace(out var jobRequestTrace))
+                FillJobRequest(output.LatestJobRequest, jobRequestTrace);
+
+            if (store.TryGetLatestJobLifecycleTrace(out var jobLifecycleTrace))
+                FillJobLifecycle(output.LatestJobLifecycle, jobLifecycleTrace);
+
+            if (store.TryGetLatestJobPhaseTrace(out var jobPhaseTrace))
+                FillJobPhase(output.LatestJobPhase, jobPhaseTrace);
+
+            if (store.TryGetLatestStepTrace(out var stepTrace))
+                FillStep(output.LatestStep, stepTrace);
+
+            if (store.TryGetLatestJobStateTrace(out var jobStateTrace))
+                FillJobState(output.CurrentNpcJobState, jobStateTrace);
+
+            if (store.TryGetLatestJobArbitrationTrace(out var arbitrationTrace))
+                FillJobArbitration(output.LatestJobArbitration, arbitrationTrace);
+
+            if (store.TryGetLatestReservationTrace(out var reservationTrace))
+                FillReservation(output.LatestReservation, reservationTrace);
+
+            if (store.TryGetLatestCommandTrace(out var commandTrace))
+                FillCommand(output.LatestCommand, commandTrace);
+
+            if (store.TryGetLatestFailureLearningTrace(out var failureTrace))
+                FillFailureLearning(output.LatestFailureLearning, failureTrace);
 
             BuildMemoryBars(store, output.MemoryBars);
             BuildBeliefRows(store, output.BeliefRows);
@@ -318,6 +542,15 @@ namespace Arcontio.Core
             output.QueryCount = 0;
             output.DecisionCount = 0;
             output.BridgeCount = 0;
+            output.JobRequestCount = 0;
+            output.JobLifecycleCount = 0;
+            output.JobPhaseCount = 0;
+            output.StepCount = 0;
+            output.JobStateCount = 0;
+            output.JobArbitrationCount = 0;
+            output.ReservationCount = 0;
+            output.CommandCount = 0;
+            output.FailureLearningCount = 0;
             output.HeaderTitle = string.Empty;
             output.HeaderSubtitle = string.Empty;
             output.MemoryBars.Clear();
@@ -328,6 +561,15 @@ namespace Arcontio.Core
             ResetQuery(output.LatestQuery);
             ResetDecision(output.LatestDecision);
             ResetBridge(output.LatestBridge);
+            ResetJobRequest(output.LatestJobRequest);
+            ResetJobLifecycle(output.LatestJobLifecycle);
+            ResetJobPhase(output.LatestJobPhase);
+            ResetStep(output.LatestStep);
+            ResetJobState(output.CurrentNpcJobState);
+            ResetJobArbitration(output.LatestJobArbitration);
+            ResetReservation(output.LatestReservation);
+            ResetCommand(output.LatestCommand);
+            ResetFailureLearning(output.LatestFailureLearning);
         }
 
         private static void FillMemory(MemoryBeliefDecisionMemoryView view, MemoryBeliefDecisionTrace trace)
@@ -459,6 +701,161 @@ namespace Arcontio.Core
                 : (bridge.Handled ? MemoryBeliefDecisionColorRole.Ok : MemoryBeliefDecisionColorRole.Error);
         }
 
+        private static void FillJobRequest(MemoryBeliefDecisionJobRequestView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetJobRequest(view);
+            if (trace?.JobRequest == null)
+                return;
+
+            var jobRequest = trace.JobRequest;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            view.RequestId = jobRequest.RequestId ?? string.Empty;
+            view.Intent = jobRequest.Intent.ToString();
+            view.PriorityClass = jobRequest.PriorityClass.ToString();
+            view.Urgency01 = jobRequest.Urgency01;
+            view.TargetCell = FormatCell(jobRequest.TargetCell);
+            view.TargetObjectId = jobRequest.TargetObjectId;
+            view.BeliefKey = jobRequest.BeliefKey ?? string.Empty;
+            view.DebugLabel = jobRequest.DebugLabel ?? string.Empty;
+            view.LegacyBridgeStillUsed = jobRequest.LegacyBridgeStillUsed;
+            view.Reason = jobRequest.Reason ?? string.Empty;
+        }
+
+        private static void FillJobLifecycle(MemoryBeliefDecisionJobLifecycleView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetJobLifecycle(view);
+            if (trace?.JobLifecycle == null)
+                return;
+
+            var lifecycle = trace.JobLifecycle;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            view.Operation = lifecycle.Operation.ToString();
+            FillJobRef(view.Job, lifecycle.Job);
+            view.Reason = lifecycle.Reason ?? string.Empty;
+        }
+
+        private static void FillJobPhase(MemoryBeliefDecisionJobPhaseView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetJobPhase(view);
+            if (trace?.JobPhase == null)
+                return;
+
+            var phase = trace.JobPhase;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            view.Operation = phase.Operation.ToString();
+            FillJobRef(view.Job, phase.Job);
+            FillJobPhaseRef(view.Phase, phase.Phase);
+            view.Reason = phase.Reason ?? string.Empty;
+        }
+
+        private static void FillStep(MemoryBeliefDecisionStepView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetStep(view);
+            if (trace?.Step == null)
+                return;
+
+            var step = trace.Step;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            FillJobRef(view.Job, step.Job);
+            FillJobPhaseRef(view.Phase, step.Phase);
+            FillStepRef(view.Step, step.Step);
+            FillStepResult(view.Result, step.Result);
+            view.Reason = step.Reason ?? string.Empty;
+        }
+
+        private static void FillJobState(MemoryBeliefDecisionJobStateView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetJobState(view);
+            if (trace?.JobState == null)
+                return;
+
+            var jobState = trace.JobState;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            view.HasActiveJob = jobState.HasActiveJob;
+            view.ActiveJobId = jobState.ActiveJobId ?? string.Empty;
+            view.ActivePhaseIndex = jobState.ActivePhaseIndex;
+            view.ActiveActionIndex = jobState.ActiveActionIndex;
+            view.WaitUntilTick = jobState.WaitUntilTick;
+            view.SuspendedJobId = jobState.SuspendedJobId ?? string.Empty;
+            view.LastFailureReason = jobState.LastFailureReason.ToString();
+            view.Reason = jobState.Reason ?? string.Empty;
+        }
+
+        private static void FillJobArbitration(MemoryBeliefDecisionJobArbitrationView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetJobArbitration(view);
+            if (trace?.JobArbitration == null)
+                return;
+
+            var arbitration = trace.JobArbitration;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            FillJobRef(view.CurrentJob, arbitration.CurrentJob);
+            FillJobRef(view.ProposedJob, arbitration.ProposedJob);
+            view.Decision = arbitration.Decision.ToString();
+            view.AcceptedJobId = arbitration.AcceptedJobId ?? string.Empty;
+            view.Reason = arbitration.Reason ?? string.Empty;
+        }
+
+        private static void FillReservation(MemoryBeliefDecisionReservationView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetReservation(view);
+            if (trace?.Reservation == null)
+                return;
+
+            var reservation = trace.Reservation;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            view.Operation = reservation.Operation.ToString();
+            view.ReservationId = reservation.ReservationId ?? string.Empty;
+            view.JobId = reservation.JobId ?? string.Empty;
+            view.OwnerNpcId = reservation.OwnerNpcId;
+            view.TargetKind = reservation.TargetKind.ToString();
+            view.TargetCell = FormatCell(reservation.TargetCell);
+            view.TargetObjectId = reservation.TargetObjectId;
+            view.CreatedTick = reservation.CreatedTick;
+            view.ExpiresTick = reservation.ExpiresTick;
+            view.Reason = reservation.Reason ?? string.Empty;
+        }
+
+        private static void FillCommand(MemoryBeliefDecisionCommandView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetCommand(view);
+            if (trace?.Command == null)
+                return;
+
+            var command = trace.Command;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            view.Operation = command.Operation.ToString();
+            view.JobId = command.JobId ?? string.Empty;
+            view.CommandName = command.CommandName ?? string.Empty;
+            view.QueueCount = command.QueueCount;
+            view.Reason = command.Reason ?? string.Empty;
+        }
+
+        private static void FillFailureLearning(MemoryBeliefDecisionFailureLearningView view, MemoryBeliefDecisionTrace trace)
+        {
+            ResetFailureLearning(view);
+            if (trace?.FailureLearning == null)
+                return;
+
+            var failure = trace.FailureLearning;
+            view.HasValue = true;
+            view.Tick = trace.Tick;
+            view.JobId = failure.JobId ?? string.Empty;
+            view.TargetCell = FormatCell(failure.TargetCell);
+            view.FailureReason = failure.FailureReason.ToString();
+            view.FailureTick = failure.FailureTick;
+            view.Penalty01 = failure.Penalty01;
+            view.Reason = failure.Reason ?? string.Empty;
+        }
+
         private static void BuildMemoryBars(MemoryBeliefDecisionExplainabilityNpcStore store, List<MemoryBeliefDecisionMetricView> output)
         {
             output.Clear();
@@ -565,6 +962,53 @@ namespace Arcontio.Core
                     ColorRole = value < 0f ? MemoryBeliefDecisionColorRole.Error : MemoryBeliefDecisionColorRole.Primary,
                 });
             }
+        }
+
+        private static void FillJobRef(MemoryBeliefDecisionJobRefView view, MemoryBeliefDecisionJobRef job)
+        {
+            view.JobId = job?.JobId ?? string.Empty;
+            view.RequestId = job?.RequestId ?? string.Empty;
+            view.Intent = job != null ? job.Intent.ToString() : string.Empty;
+            view.PriorityClass = job != null ? job.PriorityClass.ToString() : string.Empty;
+            view.Urgency01 = job != null ? job.Urgency01 : 0f;
+            view.Status = job != null ? job.Status.ToString() : string.Empty;
+            view.FailureReason = job != null ? job.FailureReason.ToString() : string.Empty;
+            view.CreatedTick = job != null ? job.CreatedTick : 0;
+            view.UpdatedTick = job != null ? job.UpdatedTick : 0;
+            view.ActivePhaseIndex = job != null ? job.ActivePhaseIndex : 0;
+            view.TargetCell = job != null ? FormatCell(job.TargetCell) : string.Empty;
+            view.TargetObjectId = job != null ? job.TargetObjectId : 0;
+            view.DebugLabel = job?.DebugLabel ?? string.Empty;
+        }
+
+        private static void FillJobPhaseRef(MemoryBeliefDecisionJobPhaseRefView view, MemoryBeliefDecisionJobPhaseRef phase)
+        {
+            view.PhaseId = phase?.PhaseId ?? string.Empty;
+            view.Kind = phase != null ? phase.Kind.ToString() : string.Empty;
+            view.DisplayName = phase?.DisplayName ?? string.Empty;
+            view.PhaseIndex = phase != null ? phase.PhaseIndex : 0;
+            view.ExpectedStepCount = phase != null ? phase.ExpectedStepCount : 0;
+            view.IsInterruptible = phase != null && phase.IsInterruptible;
+        }
+
+        private static void FillStepRef(MemoryBeliefDecisionStepRefView view, MemoryBeliefDecisionStepRef step)
+        {
+            view.ActionId = step?.ActionId ?? string.Empty;
+            view.Kind = step != null ? step.Kind.ToString() : string.Empty;
+            view.Label = step?.Label ?? string.Empty;
+            view.ActionIndex = step != null ? step.ActionIndex : 0;
+            view.TargetCell = step != null ? FormatCell(step.TargetCell) : string.Empty;
+            view.TargetObjectId = step != null ? step.TargetObjectId : 0;
+            view.DurationTicks = step != null ? step.DurationTicks : 0;
+            view.PayloadKey = step?.PayloadKey ?? string.Empty;
+        }
+
+        private static void FillStepResult(MemoryBeliefDecisionStepResultView view, MemoryBeliefDecisionStepResultRef result)
+        {
+            view.Status = result != null ? result.Status.ToString() : string.Empty;
+            view.FailureReason = result != null ? result.FailureReason.ToString() : string.Empty;
+            view.SuggestedWaitTicks = result != null ? result.SuggestedWaitTicks : 0;
+            view.DiagnosticMessage = result?.DiagnosticMessage ?? string.Empty;
         }
 
         private static bool ContainsBelief(List<MemoryBeliefDecisionBeliefView> rows, int beliefId, BeliefCategory category)
@@ -734,6 +1178,116 @@ namespace Arcontio.Core
             view.LegacyFallbackUsed = false;
             view.Reason = string.Empty;
             view.ColorRole = MemoryBeliefDecisionColorRole.Muted;
+        }
+
+        private static void ResetJobRequest(MemoryBeliefDecisionJobRequestView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            view.RequestId = string.Empty;
+            view.Intent = string.Empty;
+            view.PriorityClass = string.Empty;
+            view.Urgency01 = 0f;
+            view.TargetCell = string.Empty;
+            view.TargetObjectId = 0;
+            view.BeliefKey = string.Empty;
+            view.DebugLabel = string.Empty;
+            view.LegacyBridgeStillUsed = false;
+            view.Reason = string.Empty;
+        }
+
+        private static void ResetJobLifecycle(MemoryBeliefDecisionJobLifecycleView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            view.Operation = string.Empty;
+            FillJobRef(view.Job, null);
+            view.Reason = string.Empty;
+        }
+
+        private static void ResetJobPhase(MemoryBeliefDecisionJobPhaseView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            view.Operation = string.Empty;
+            FillJobRef(view.Job, null);
+            FillJobPhaseRef(view.Phase, null);
+            view.Reason = string.Empty;
+        }
+
+        private static void ResetStep(MemoryBeliefDecisionStepView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            FillJobRef(view.Job, null);
+            FillJobPhaseRef(view.Phase, null);
+            FillStepRef(view.Step, null);
+            FillStepResult(view.Result, null);
+            view.Reason = string.Empty;
+        }
+
+        private static void ResetJobState(MemoryBeliefDecisionJobStateView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            view.HasActiveJob = false;
+            view.ActiveJobId = string.Empty;
+            view.ActivePhaseIndex = 0;
+            view.ActiveActionIndex = 0;
+            view.WaitUntilTick = 0;
+            view.SuspendedJobId = string.Empty;
+            view.LastFailureReason = string.Empty;
+            view.Reason = string.Empty;
+        }
+
+        private static void ResetJobArbitration(MemoryBeliefDecisionJobArbitrationView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            FillJobRef(view.CurrentJob, null);
+            FillJobRef(view.ProposedJob, null);
+            view.Decision = string.Empty;
+            view.AcceptedJobId = string.Empty;
+            view.Reason = string.Empty;
+        }
+
+        private static void ResetReservation(MemoryBeliefDecisionReservationView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            view.Operation = string.Empty;
+            view.ReservationId = string.Empty;
+            view.JobId = string.Empty;
+            view.OwnerNpcId = 0;
+            view.TargetKind = string.Empty;
+            view.TargetCell = string.Empty;
+            view.TargetObjectId = 0;
+            view.CreatedTick = 0;
+            view.ExpiresTick = 0;
+            view.Reason = string.Empty;
+        }
+
+        private static void ResetCommand(MemoryBeliefDecisionCommandView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            view.Operation = string.Empty;
+            view.JobId = string.Empty;
+            view.CommandName = string.Empty;
+            view.QueueCount = 0;
+            view.Reason = string.Empty;
+        }
+
+        private static void ResetFailureLearning(MemoryBeliefDecisionFailureLearningView view)
+        {
+            view.HasValue = false;
+            view.Tick = 0;
+            view.JobId = string.Empty;
+            view.TargetCell = string.Empty;
+            view.FailureReason = string.Empty;
+            view.FailureTick = 0;
+            view.Penalty01 = 0f;
+            view.Reason = string.Empty;
         }
     }
 }
