@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Arcontio.Core.Config;
 
 namespace Arcontio.Core
 {
@@ -32,6 +33,43 @@ namespace Arcontio.Core
 
         public int Count => _commands.Count;
 
+        // =============================================================================
+        // Enqueue
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che rende osservabile l'accodamento dei command senza
+        /// imporre dipendenze diagnostiche al path base.
+        /// </para>
+        /// </summary>
+        public bool Enqueue(
+            ICommand command,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick,
+            string jobId,
+            string reason)
+        {
+            bool accepted = Enqueue(command);
+
+            if (explainabilityConfig != null && accepted)
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteCommandTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionCommandOperation.Enqueued,
+                    jobId,
+                    command != null ? command.Name : string.Empty,
+                    _commands.Count,
+                    reason ?? "CommandEnqueued");
+            }
+
+            return accepted;
+        }
+
         public bool Enqueue(ICommand command)
         {
             // Accodare null sarebbe un bug silenzioso difficile da diagnosticare:
@@ -41,6 +79,43 @@ namespace Arcontio.Core
 
             _commands.Add(command);
             return true;
+        }
+
+        // =============================================================================
+        // Snapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che esporta una trace diagnostica dello snapshot del
+        /// buffer comandi.
+        /// </para>
+        /// </summary>
+        public ICommand[] Snapshot(
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick,
+            string jobId,
+            string reason)
+        {
+            var snapshot = Snapshot();
+
+            if (explainabilityConfig != null)
+            {
+                string commandName = snapshot.Length > 0 ? snapshot[snapshot.Length - 1].Name : string.Empty;
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteCommandTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionCommandOperation.Snapshot,
+                    jobId,
+                    commandName,
+                    snapshot.Length,
+                    reason ?? "CommandBufferSnapshot");
+            }
+
+            return snapshot;
         }
 
         public ICommand[] Snapshot()
