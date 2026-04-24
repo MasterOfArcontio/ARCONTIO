@@ -1422,6 +1422,9 @@ namespace Arcontio.View.MapGrid
             }
             else
             {
+                // La decisione racconta solo la scelta intenzionale e il relativo
+                // breakdown. Il passaggio Decision -> JobRequest e' stato spostato
+                // nel tab Job per evitare che il tab Decision mescoli due boundary.
                 _sbMbqdDecisionSelected
                     .Append("<color=#3FB950>").Append(decision.SelectedIntent).Append("</color>\n")
                     .Append(Kv("tick", decision.Tick.ToString(), "#8B949E")).Append('\n')
@@ -1467,7 +1470,11 @@ namespace Arcontio.View.MapGrid
             }
             else
             {
+                // Questa sezione resta dedicata al bridge legacy verso Command.
+                // Non mostra il JobRequest, che ora appartiene esplicitamente al
+                // layer Job e viene visualizzato nel tab dedicato.
                 _sbMbqdDecisionBridge
+                    .Append(Kv("jobRequestShownInJobTab", "true", "#58A6FF")).Append('\n')
                     .Append(Kv("tick", bridge.Tick.ToString(), "#8B949E")).Append('\n')
                     .Append(Kv("selectedIntent", bridge.SelectedIntent, "#58A6FF")).Append('\n')
                     .Append(Kv("commandName", EmptyMuted(bridge.CommandName), bridge.Handled ? "#3FB950" : "#6E7681")).Append('\n')
