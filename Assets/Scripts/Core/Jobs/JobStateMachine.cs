@@ -1,3 +1,5 @@
+using Arcontio.Core.Config;
+
 namespace Arcontio.Core
 {
     // =============================================================================
@@ -98,6 +100,53 @@ namespace Arcontio.Core
     /// </summary>
     public sealed class JobStateMachine
     {
+        // =============================================================================
+        // ApplyStepResult
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware che applica il risultato dello step e, quando possibile,
+        /// emette trace diagnostiche del ciclo di vita del job.
+        /// </para>
+        ///
+        /// <para><b>Strumentazione opzionale e non invasiva</b></para>
+        /// <para>
+        /// Il Job System non dipende dall'Explainability Layer: il vecchio overload
+        /// resta disponibile e questo percorso aggiunge solo emissione one-way verso
+        /// registry e JSONL quando il chiamante possiede gia' config e registry.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Status before</b>: cattura lo stato pre-mutation del job.</item>
+        ///   <item><b>Base apply</b>: delega all'overload storico.</item>
+        ///   <item><b>Lifecycle emit</b>: emette trace solo se la transizione lo richiede.</item>
+        /// </list>
+        /// </summary>
+        public JobStateMachineResult ApplyStepResult(
+            ref NpcJobState npcState,
+            Job job,
+            StepResult stepResult,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId)
+        {
+            var previousStatus = job != null ? job.Status : JobStatus.Cancelled;
+            var result = ApplyStepResult(ref npcState, job, stepResult, tick);
+
+            TryEmitLifecycleTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job,
+                previousStatus,
+                result);
+
+            return result;
+        }
+
         public JobStateMachineResult ApplyStepResult(ref NpcJobState npcState, Job job, StepResult stepResult, int tick)
         {
             // Senza job attivo non c'e' nulla da avanzare: restituiamo un esito
@@ -171,6 +220,74 @@ namespace Arcontio.Core
             job.MarkCompleted(tick);
             npcState.Clear(JobFailureReason.None);
             return new JobStateMachineResult(JobStateMachineTickResult.JobCompleted, message, JobFailureReason.None);
+        }
+
+        // =============================================================================
+        // TryEmitLifecycleTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce il risultato della state machine in una trace lifecycle EL quando
+        /// osserva una transizione semanticamente rilevante.
+        /// </para>
+        ///
+        /// <para><b>Lifecycle derivato dal punto di ownership</b></para>
+        /// <para>
+        /// La state machine e' il punto che conosce davvero la transizione di stato,
+        /// quindi e' qui che l'EL deve leggere created/running/completed/failed senza
+        /// ricostruire la sequenza da cambiamenti sparsi nel runtime.
+        /// </para>
+        /// </summary>
+        private static void TryEmitLifecycleTrace(
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick,
+            Job job,
+            JobStatus previousStatus,
+            JobStateMachineResult result)
+        {
+            if (explainabilityConfig == null || job == null)
+                return;
+
+            var operation = ResolveLifecycleOperation(previousStatus, job.Status, result.TickResult);
+            if (operation == MemoryBeliefDecisionJobLifecycleOperation.Unknown)
+                return;
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobLifecycleTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                operation,
+                job,
+                result.Message);
+        }
+
+        // =============================================================================
+        // ResolveLifecycleOperation
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mappa stato precedente, stato attuale ed esito della state machine in una
+        /// operazione lifecycle EL stabile.
+        /// </para>
+        /// </summary>
+        private static MemoryBeliefDecisionJobLifecycleOperation ResolveLifecycleOperation(
+            JobStatus previousStatus,
+            JobStatus currentStatus,
+            JobStateMachineTickResult tickResult)
+        {
+            if (previousStatus == JobStatus.Created && currentStatus == JobStatus.Running)
+                return MemoryBeliefDecisionJobLifecycleOperation.Activated;
+
+            if (tickResult == JobStateMachineTickResult.JobCompleted && currentStatus == JobStatus.Completed)
+                return MemoryBeliefDecisionJobLifecycleOperation.Completed;
+
+            if (tickResult == JobStateMachineTickResult.JobFailed && currentStatus == JobStatus.Failed)
+                return MemoryBeliefDecisionJobLifecycleOperation.Failed;
+
+            return MemoryBeliefDecisionJobLifecycleOperation.Unknown;
         }
     }
 }
