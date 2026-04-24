@@ -269,6 +269,13 @@ namespace Arcontio.Core
                     .AddField("score", selection.Candidate.FinalScore.ToString("0.000"))
                     .AddField("candidateCount", _decisionCandidates.Count));
 
+            TryEmitJobRequestTrace(
+                explainabilityConfig,
+                world.MemoryBeliefDecisionExplainability,
+                nowTick,
+                npcId,
+                selection.Candidate);
+
             switch (selection.Candidate.Kind)
             {
                 case DecisionIntentKind.EatKnownFood:
@@ -306,6 +313,160 @@ namespace Arcontio.Core
                     TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "UnsupportedIntent");
                     return false;
             }
+        }
+
+        // =============================================================================
+        // TryEmitJobRequestTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esporta il nuovo boundary diagnostico `Decision -> JobRequest` senza
+        /// modificare il comportamento legacy della rule.
+        /// </para>
+        ///
+        /// <para><b>Nuovo path osservabile, esecuzione invariata</b></para>
+        /// <para>
+        /// La v0.07 richiede di distinguere il futuro path verso il Job System dal
+        /// bridge provvisorio Decision -> Command. In questa fase la rule continua a
+        /// produrre command legacy, ma emette anche una richiesta job passiva e
+        /// spiegabile, cosi' registry e JSONL possono mostrare entrambi i confini.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>JobRequest</b>: creato localmente dal candidato gia' selezionato.</item>
+        ///   <item><b>Target</b>: usa il belief target gia' scelto, se presente.</item>
+        ///   <item><b>Legacy flag</b>: resta true perche' il path esecutivo reale e' ancora il bridge legacy.</item>
+        /// </list>
+        /// </summary>
+        private static void TryEmitJobRequestTrace(
+            MemoryBeliefDecisionExplainabilityParams config,
+            MemoryBeliefDecisionExplainabilityRegistry registry,
+            int tick,
+            int npcId,
+            DecisionCandidate candidate)
+        {
+            if (config == null)
+                return;
+
+            var request = BuildDiagnosticJobRequest(tick, npcId, candidate);
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobRequestTrace(
+                config,
+                registry,
+                npcId,
+                tick,
+                request,
+                string.Empty,
+                "DecisionCandidateProjectedToJobRequest",
+                legacyBridgeStillUsed: true);
+        }
+
+        // =============================================================================
+        // BuildDiagnosticJobRequest
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una <c>JobRequest</c> puramente diagnostica a partire dal
+        /// candidato selezionato dal Decision Layer.
+        /// </para>
+        ///
+        /// <para><b>Contratto dati senza side effect</b></para>
+        /// <para>
+        /// La funzione non iscrive job, non consulta il World e non lancia alcuna
+        /// esecuzione. Traduce soltanto il candidato in un formato compatibile con il
+        /// futuro Job System, usando il target belief gia' determinato dal QuerySystem
+        /// quando disponibile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Priority</b>: mappa minima intent/criticita' -> classe job.</item>
+        ///   <item><b>Target</b>: presente solo quando il candidato possiede un belief target valido.</item>
+        ///   <item><b>BeliefKey</b>: chiave diagnostica stabile per correlare decisione e richiesta.</item>
+        /// </list>
+        /// </summary>
+        private static JobRequest BuildDiagnosticJobRequest(int tick, int npcId, DecisionCandidate candidate)
+        {
+            string beliefKey = string.Empty;
+            bool hasTargetCell = false;
+            Vector2Int targetCell = Vector2Int.zero;
+
+            if (candidate.Metadata.RequiresBeliefTarget && !candidate.BeliefResult.IsEmpty)
+            {
+                hasTargetCell = true;
+                targetCell = candidate.BeliefResult.Belief.EstimatedPosition;
+                beliefKey = BuildBeliefKey(candidate.BeliefResult.Belief);
+            }
+
+            string requestId = $"jobreq_{npcId}_{tick}_{candidate.Kind}";
+            string debugLabel = $"EL:{candidate.Kind}";
+            var priorityClass = ResolveJobPriorityClass(candidate);
+
+            if (hasTargetCell)
+            {
+                return JobRequest.FromDecision(
+                    requestId,
+                    npcId,
+                    candidate.Kind,
+                    priorityClass,
+                    candidate.NeedUrgency01,
+                    tick,
+                    targetCell,
+                    beliefKey,
+                    debugLabel);
+            }
+
+            return JobRequest.WithoutTarget(
+                requestId,
+                npcId,
+                candidate.Kind,
+                priorityClass,
+                candidate.NeedUrgency01,
+                tick,
+                debugLabel);
+        }
+
+        // =============================================================================
+        // ResolveJobPriorityClass
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mappa il candidato decisionale in una classe di priorita' minima per la
+        /// trace diagnostica del Job System.
+        /// </para>
+        ///
+        /// <para><b>Mappatura conservativa e leggibile</b></para>
+        /// <para>
+        /// La policy completa appartiene al futuro boundary Decision -> Job. Qui ci
+        /// serve solo una classificazione coerente e spiegabile per il log runtime.
+        /// </para>
+        /// </summary>
+        private static JobPriorityClass ResolveJobPriorityClass(DecisionCandidate candidate)
+        {
+            if (candidate.IsCritical)
+                return JobPriorityClass.Critical;
+
+            if (candidate.NeedUrgency01 >= 0.8f)
+                return JobPriorityClass.Important;
+
+            if (candidate.Kind == DecisionIntentKind.WaitAndObserve)
+                return JobPriorityClass.Idle;
+
+            return JobPriorityClass.Normal;
+        }
+
+        // =============================================================================
+        // BuildBeliefKey
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una chiave diagnostica compatta per correlare la richiesta job
+        /// alla belief che l'ha motivata.
+        /// </para>
+        /// </summary>
+        private static string BuildBeliefKey(BeliefEntry belief)
+        {
+            return $"{belief.Category}:{belief.BeliefId}@{belief.EstimatedPosition.x},{belief.EstimatedPosition.y}";
         }
 
         // =============================================================================
