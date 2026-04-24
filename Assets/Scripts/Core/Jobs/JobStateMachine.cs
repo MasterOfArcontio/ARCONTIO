@@ -133,6 +133,8 @@ namespace Arcontio.Core
             int npcId)
         {
             var previousStatus = job != null ? job.Status : JobStatus.Cancelled;
+            var previousPhaseIndex = npcState.ActivePhaseIndex;
+            var hadPreviousPhase = job != null && job.Plan.TryGetPhase(previousPhaseIndex, out var previousPhase);
             var result = ApplyStepResult(ref npcState, job, stepResult, tick);
 
             TryEmitLifecycleTrace(
@@ -142,6 +144,16 @@ namespace Arcontio.Core
                 tick,
                 job,
                 previousStatus,
+                result);
+
+            TryEmitPhaseTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job,
+                hadPreviousPhase ? previousPhase : default,
+                previousPhaseIndex,
                 result);
 
             return result;
@@ -288,6 +300,94 @@ namespace Arcontio.Core
                 return MemoryBeliefDecisionJobLifecycleOperation.Failed;
 
             return MemoryBeliefDecisionJobLifecycleOperation.Unknown;
+        }
+
+        // =============================================================================
+        // TryEmitPhaseTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce l'avanzamento della state machine in trace di fase EL.
+        /// </para>
+        ///
+        /// <para><b>Fase letta nel punto di transizione reale</b></para>
+        /// <para>
+        /// La state machine conosce se una fase e' stata conclusa, interrotta oppure
+        /// se il cursore e' appena entrato nella successiva. E' quindi il punto
+        /// corretto per produrre trace di fase senza ricostruzioni ex-post.
+        /// </para>
+        /// </summary>
+        private static void TryEmitPhaseTrace(
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick,
+            Job job,
+            JobPhase previousPhase,
+            int previousPhaseIndex,
+            JobStateMachineResult result)
+        {
+            if (explainabilityConfig == null || job == null)
+                return;
+
+            if (result.TickResult == JobStateMachineTickResult.PhaseAdvanced)
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobPhaseTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionJobPhaseOperation.Completed,
+                    job,
+                    previousPhase,
+                    previousPhaseIndex,
+                    result.Message);
+
+                if (job.Plan.TryGetPhase(job.ActivePhaseIndex, out var enteredPhase))
+                {
+                    MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobPhaseTrace(
+                        explainabilityConfig,
+                        explainabilityRegistry,
+                        npcId,
+                        tick,
+                        MemoryBeliefDecisionJobPhaseOperation.Entered,
+                        job,
+                        enteredPhase,
+                        job.ActivePhaseIndex,
+                        "EnteredNextPhase");
+                }
+
+                return;
+            }
+
+            if (result.TickResult == JobStateMachineTickResult.JobCompleted)
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobPhaseTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionJobPhaseOperation.Completed,
+                    job,
+                    previousPhase,
+                    previousPhaseIndex,
+                    result.Message);
+                return;
+            }
+
+            if (result.TickResult == JobStateMachineTickResult.JobFailed)
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobPhaseTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionJobPhaseOperation.Interrupted,
+                    job,
+                    previousPhase,
+                    previousPhaseIndex,
+                    result.Message);
+            }
         }
     }
 }
