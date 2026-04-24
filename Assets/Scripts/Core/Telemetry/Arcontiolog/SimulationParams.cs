@@ -345,6 +345,15 @@ namespace Arcontio.Core.Config
         public bool logQuery = true;
         public bool logDecision = true;
         public bool logBridge = true;
+        public bool logJobRequest = true;
+        public bool logJobLifecycle = true;
+        public bool logJobPhase = true;
+        public bool logStep = true;
+        public bool logJobState = true;
+        public bool logJobArbitration = true;
+        public bool logReservation = true;
+        public bool logCommand = true;
+        public bool logFailureLearning = true;
 
         public bool includeCandidates = true;
         public bool includeScoreBreakdown = true;
@@ -355,6 +364,15 @@ namespace Arcontio.Core.Config
         public int ringBuffer_query = 40;
         public int ringBuffer_decision = 24;
         public int ringBuffer_bridge = 24;
+        public int ringBuffer_jobRequest = 24;
+        public int ringBuffer_jobLifecycle = 32;
+        public int ringBuffer_jobPhase = 32;
+        public int ringBuffer_step = 64;
+        public int ringBuffer_jobState = 24;
+        public int ringBuffer_jobArbitration = 24;
+        public int ringBuffer_reservation = 32;
+        public int ringBuffer_command = 32;
+        public int ringBuffer_failureLearning = 24;
     }
 
 

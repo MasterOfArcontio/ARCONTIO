@@ -120,6 +120,96 @@ namespace Arcontio.Core
                         bridge = BuildBridge(trace.Bridge),
                     });
                     break;
+                case MemoryBeliefDecisionTraceKind.JobRequest:
+                    TryWriteRecord(config, new JobRequestJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        jobRequest = BuildJobRequest(trace.JobRequest),
+                    });
+                    break;
+                case MemoryBeliefDecisionTraceKind.JobLifecycle:
+                    TryWriteRecord(config, new JobLifecycleJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        jobLifecycle = BuildJobLifecycle(trace.JobLifecycle),
+                    });
+                    break;
+                case MemoryBeliefDecisionTraceKind.JobPhase:
+                    TryWriteRecord(config, new JobPhaseJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        jobPhase = BuildJobPhase(trace.JobPhase),
+                    });
+                    break;
+                case MemoryBeliefDecisionTraceKind.Step:
+                    TryWriteRecord(config, new StepJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        step = BuildStep(trace.Step),
+                    });
+                    break;
+                case MemoryBeliefDecisionTraceKind.JobState:
+                    TryWriteRecord(config, new JobStateJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        jobState = BuildJobState(trace.JobState),
+                    });
+                    break;
+                case MemoryBeliefDecisionTraceKind.JobArbitration:
+                    TryWriteRecord(config, new JobArbitrationJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        jobArbitration = BuildJobArbitration(trace.JobArbitration),
+                    });
+                    break;
+                case MemoryBeliefDecisionTraceKind.Reservation:
+                    TryWriteRecord(config, new ReservationJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        reservation = BuildReservation(trace.Reservation),
+                    });
+                    break;
+                case MemoryBeliefDecisionTraceKind.Command:
+                    TryWriteRecord(config, new CommandJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        command = BuildCommand(trace.Command),
+                    });
+                    break;
+                case MemoryBeliefDecisionTraceKind.FailureLearning:
+                    TryWriteRecord(config, new FailureLearningJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        failureLearning = BuildFailureLearning(trace.FailureLearning),
+                    });
+                    break;
                 default:
                     return;
             }
@@ -134,6 +224,15 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Query => config.logQuery,
                 MemoryBeliefDecisionTraceKind.Decision => config.logDecision,
                 MemoryBeliefDecisionTraceKind.Bridge => config.logBridge,
+                MemoryBeliefDecisionTraceKind.JobRequest => config.logJobRequest,
+                MemoryBeliefDecisionTraceKind.JobLifecycle => config.logJobLifecycle,
+                MemoryBeliefDecisionTraceKind.JobPhase => config.logJobPhase,
+                MemoryBeliefDecisionTraceKind.Step => config.logStep,
+                MemoryBeliefDecisionTraceKind.JobState => config.logJobState,
+                MemoryBeliefDecisionTraceKind.JobArbitration => config.logJobArbitration,
+                MemoryBeliefDecisionTraceKind.Reservation => config.logReservation,
+                MemoryBeliefDecisionTraceKind.Command => config.logCommand,
+                MemoryBeliefDecisionTraceKind.FailureLearning => config.logFailureLearning,
                 _ => false
             };
         }
@@ -300,6 +399,232 @@ namespace Arcontio.Core
             };
         }
 
+        private static JobRequestLogPayload BuildJobRequest(MemoryBeliefDecisionJobRequestRecord jobRequest)
+        {
+            if (jobRequest == null)
+                return null;
+
+            return new JobRequestLogPayload
+            {
+                requestId = jobRequest.RequestId ?? string.Empty,
+                jobId = jobRequest.JobId ?? string.Empty,
+                intent = jobRequest.Intent.ToString(),
+                priorityClass = jobRequest.PriorityClass.ToString(),
+                urgency01 = jobRequest.Urgency01,
+                hasTargetCell = jobRequest.HasTargetCell,
+                targetCell = BuildCell(jobRequest.TargetCell),
+                targetCellText = FormatCell(jobRequest.TargetCell),
+                targetObjectId = jobRequest.TargetObjectId,
+                beliefKey = jobRequest.BeliefKey ?? string.Empty,
+                debugLabel = jobRequest.DebugLabel ?? string.Empty,
+                reason = jobRequest.Reason ?? string.Empty,
+                legacyBridgeStillUsed = jobRequest.LegacyBridgeStillUsed,
+            };
+        }
+
+        private static JobLifecycleLogPayload BuildJobLifecycle(MemoryBeliefDecisionJobLifecycleRecord lifecycle)
+        {
+            if (lifecycle == null)
+                return null;
+
+            return new JobLifecycleLogPayload
+            {
+                operation = lifecycle.Operation.ToString(),
+                job = BuildJobRef(lifecycle.Job),
+                reason = lifecycle.Reason ?? string.Empty,
+            };
+        }
+
+        private static JobPhaseLogPayload BuildJobPhase(MemoryBeliefDecisionJobPhaseRecord phase)
+        {
+            if (phase == null)
+                return null;
+
+            return new JobPhaseLogPayload
+            {
+                operation = phase.Operation.ToString(),
+                job = BuildJobRef(phase.Job),
+                phase = BuildJobPhaseRef(phase.Phase),
+                reason = phase.Reason ?? string.Empty,
+            };
+        }
+
+        private static StepLogPayload BuildStep(MemoryBeliefDecisionStepRecord step)
+        {
+            if (step == null)
+                return null;
+
+            return new StepLogPayload
+            {
+                job = BuildJobRef(step.Job),
+                phase = BuildJobPhaseRef(step.Phase),
+                step = BuildStepRef(step.Step),
+                result = BuildStepResult(step.Result),
+                reason = step.Reason ?? string.Empty,
+            };
+        }
+
+        private static JobStateLogPayload BuildJobState(MemoryBeliefDecisionJobStateRecord jobState)
+        {
+            if (jobState == null)
+                return null;
+
+            return new JobStateLogPayload
+            {
+                hasActiveJob = jobState.HasActiveJob,
+                activeJobId = jobState.ActiveJobId ?? string.Empty,
+                activePhaseIndex = jobState.ActivePhaseIndex,
+                activeActionIndex = jobState.ActiveActionIndex,
+                waitUntilTick = jobState.WaitUntilTick,
+                suspendedJobId = jobState.SuspendedJobId ?? string.Empty,
+                lastFailureReason = jobState.LastFailureReason.ToString(),
+                reason = jobState.Reason ?? string.Empty,
+            };
+        }
+
+        private static JobArbitrationLogPayload BuildJobArbitration(MemoryBeliefDecisionJobArbitrationRecord arbitration)
+        {
+            if (arbitration == null)
+                return null;
+
+            return new JobArbitrationLogPayload
+            {
+                currentJob = BuildJobRef(arbitration.CurrentJob),
+                proposedJob = BuildJobRef(arbitration.ProposedJob),
+                decision = arbitration.Decision.ToString(),
+                acceptedJobId = arbitration.AcceptedJobId ?? string.Empty,
+                reason = arbitration.Reason ?? string.Empty,
+            };
+        }
+
+        private static ReservationLogPayload BuildReservation(MemoryBeliefDecisionReservationRecord reservation)
+        {
+            if (reservation == null)
+                return null;
+
+            return new ReservationLogPayload
+            {
+                operation = reservation.Operation.ToString(),
+                reservationId = reservation.ReservationId ?? string.Empty,
+                jobId = reservation.JobId ?? string.Empty,
+                ownerNpcId = reservation.OwnerNpcId,
+                targetKind = reservation.TargetKind.ToString(),
+                targetCell = BuildCell(reservation.TargetCell),
+                targetCellText = FormatCell(reservation.TargetCell),
+                targetObjectId = reservation.TargetObjectId,
+                createdTick = reservation.CreatedTick,
+                expiresTick = reservation.ExpiresTick,
+                reason = reservation.Reason ?? string.Empty,
+            };
+        }
+
+        private static CommandLogPayload BuildCommand(MemoryBeliefDecisionCommandRecord command)
+        {
+            if (command == null)
+                return null;
+
+            return new CommandLogPayload
+            {
+                operation = command.Operation.ToString(),
+                jobId = command.JobId ?? string.Empty,
+                commandName = command.CommandName ?? string.Empty,
+                queueCount = command.QueueCount,
+                reason = command.Reason ?? string.Empty,
+            };
+        }
+
+        private static FailureLearningLogPayload BuildFailureLearning(MemoryBeliefDecisionFailureLearningRecord failure)
+        {
+            if (failure == null)
+                return null;
+
+            return new FailureLearningLogPayload
+            {
+                jobId = failure.JobId ?? string.Empty,
+                targetCell = BuildCell(failure.TargetCell),
+                targetCellText = FormatCell(failure.TargetCell),
+                failureReason = failure.FailureReason.ToString(),
+                failureTick = failure.FailureTick,
+                penalty01 = failure.Penalty01,
+                reason = failure.Reason ?? string.Empty,
+            };
+        }
+
+        private static JobRefLogPayload BuildJobRef(MemoryBeliefDecisionJobRef job)
+        {
+            if (job == null)
+                return null;
+
+            return new JobRefLogPayload
+            {
+                jobId = job.JobId ?? string.Empty,
+                requestId = job.RequestId ?? string.Empty,
+                intent = job.Intent.ToString(),
+                priorityClass = job.PriorityClass.ToString(),
+                urgency01 = job.Urgency01,
+                status = job.Status.ToString(),
+                failureReason = job.FailureReason.ToString(),
+                createdTick = job.CreatedTick,
+                updatedTick = job.UpdatedTick,
+                activePhaseIndex = job.ActivePhaseIndex,
+                hasTargetCell = job.HasTargetCell,
+                targetCell = BuildCell(job.TargetCell),
+                targetCellText = FormatCell(job.TargetCell),
+                targetObjectId = job.TargetObjectId,
+                debugLabel = job.DebugLabel ?? string.Empty,
+            };
+        }
+
+        private static JobPhaseRefLogPayload BuildJobPhaseRef(MemoryBeliefDecisionJobPhaseRef phase)
+        {
+            if (phase == null)
+                return null;
+
+            return new JobPhaseRefLogPayload
+            {
+                phaseId = phase.PhaseId ?? string.Empty,
+                kind = phase.Kind.ToString(),
+                displayName = phase.DisplayName ?? string.Empty,
+                phaseIndex = phase.PhaseIndex,
+                expectedStepCount = phase.ExpectedStepCount,
+                isInterruptible = phase.IsInterruptible,
+            };
+        }
+
+        private static StepRefLogPayload BuildStepRef(MemoryBeliefDecisionStepRef step)
+        {
+            if (step == null)
+                return null;
+
+            return new StepRefLogPayload
+            {
+                actionId = step.ActionId ?? string.Empty,
+                kind = step.Kind.ToString(),
+                label = step.Label ?? string.Empty,
+                actionIndex = step.ActionIndex,
+                hasTargetCell = step.HasTargetCell,
+                targetCell = BuildCell(step.TargetCell),
+                targetCellText = FormatCell(step.TargetCell),
+                targetObjectId = step.TargetObjectId,
+                durationTicks = step.DurationTicks,
+                payloadKey = step.PayloadKey ?? string.Empty,
+            };
+        }
+
+        private static StepResultLogPayload BuildStepResult(MemoryBeliefDecisionStepResultRef result)
+        {
+            if (result == null)
+                return null;
+
+            return new StepResultLogPayload
+            {
+                status = result.Status.ToString(),
+                failureReason = result.FailureReason.ToString(),
+                suggestedWaitTicks = result.SuggestedWaitTicks,
+                diagnosticMessage = result.DiagnosticMessage ?? string.Empty,
+            };
+        }
+
         private static CandidateLogPayload[] BuildCandidates(
             MemoryBeliefDecisionCandidateRecord[] candidates,
             MemoryBeliefDecisionExplainabilityParams config)
@@ -373,6 +698,15 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Query => "query",
                 MemoryBeliefDecisionTraceKind.Decision => "decision",
                 MemoryBeliefDecisionTraceKind.Bridge => "bridge",
+                MemoryBeliefDecisionTraceKind.JobRequest => "job_request",
+                MemoryBeliefDecisionTraceKind.JobLifecycle => "job_lifecycle",
+                MemoryBeliefDecisionTraceKind.JobPhase => "job_phase",
+                MemoryBeliefDecisionTraceKind.Step => "step",
+                MemoryBeliefDecisionTraceKind.JobState => "job_state",
+                MemoryBeliefDecisionTraceKind.JobArbitration => "job_arbitration",
+                MemoryBeliefDecisionTraceKind.Reservation => "reservation",
+                MemoryBeliefDecisionTraceKind.Command => "command",
+                MemoryBeliefDecisionTraceKind.FailureLearning => "failure_learning",
                 _ => "unknown"
             };
         }
@@ -529,6 +863,96 @@ namespace Arcontio.Core
         }
 
         [Serializable]
+        private sealed class JobRequestJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public JobRequestLogPayload jobRequest;
+        }
+
+        [Serializable]
+        private sealed class JobLifecycleJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public JobLifecycleLogPayload jobLifecycle;
+        }
+
+        [Serializable]
+        private sealed class JobPhaseJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public JobPhaseLogPayload jobPhase;
+        }
+
+        [Serializable]
+        private sealed class StepJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public StepLogPayload step;
+        }
+
+        [Serializable]
+        private sealed class JobStateJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public JobStateLogPayload jobState;
+        }
+
+        [Serializable]
+        private sealed class JobArbitrationJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public JobArbitrationLogPayload jobArbitration;
+        }
+
+        [Serializable]
+        private sealed class ReservationJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public ReservationLogPayload reservation;
+        }
+
+        [Serializable]
+        private sealed class CommandJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public CommandLogPayload command;
+        }
+
+        [Serializable]
+        private sealed class FailureLearningJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public FailureLearningLogPayload failureLearning;
+        }
+
+        [Serializable]
         private sealed class MemoryLogPayload
         {
             public string eventType = string.Empty;
@@ -601,6 +1025,167 @@ namespace Arcontio.Core
             public string targetSource = string.Empty;
             public bool legacyFallbackUsed;
             public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class JobRequestLogPayload
+        {
+            public string requestId = string.Empty;
+            public string jobId = string.Empty;
+            public string intent = string.Empty;
+            public string priorityClass = string.Empty;
+            public float urgency01;
+            public bool hasTargetCell;
+            public CellLogPayload targetCell;
+            public string targetCellText = string.Empty;
+            public int targetObjectId;
+            public string beliefKey = string.Empty;
+            public string debugLabel = string.Empty;
+            public string reason = string.Empty;
+            public bool legacyBridgeStillUsed;
+        }
+
+        [Serializable]
+        private sealed class JobLifecycleLogPayload
+        {
+            public string operation = string.Empty;
+            public JobRefLogPayload job;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class JobPhaseLogPayload
+        {
+            public string operation = string.Empty;
+            public JobRefLogPayload job;
+            public JobPhaseRefLogPayload phase;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class StepLogPayload
+        {
+            public JobRefLogPayload job;
+            public JobPhaseRefLogPayload phase;
+            public StepRefLogPayload step;
+            public StepResultLogPayload result;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class JobStateLogPayload
+        {
+            public bool hasActiveJob;
+            public string activeJobId = string.Empty;
+            public int activePhaseIndex;
+            public int activeActionIndex;
+            public int waitUntilTick;
+            public string suspendedJobId = string.Empty;
+            public string lastFailureReason = string.Empty;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class JobArbitrationLogPayload
+        {
+            public JobRefLogPayload currentJob;
+            public JobRefLogPayload proposedJob;
+            public string decision = string.Empty;
+            public string acceptedJobId = string.Empty;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class ReservationLogPayload
+        {
+            public string operation = string.Empty;
+            public string reservationId = string.Empty;
+            public string jobId = string.Empty;
+            public int ownerNpcId;
+            public string targetKind = string.Empty;
+            public CellLogPayload targetCell;
+            public string targetCellText = string.Empty;
+            public int targetObjectId;
+            public int createdTick;
+            public int expiresTick;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class CommandLogPayload
+        {
+            public string operation = string.Empty;
+            public string jobId = string.Empty;
+            public string commandName = string.Empty;
+            public int queueCount;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class FailureLearningLogPayload
+        {
+            public string jobId = string.Empty;
+            public CellLogPayload targetCell;
+            public string targetCellText = string.Empty;
+            public string failureReason = string.Empty;
+            public int failureTick;
+            public float penalty01;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class JobRefLogPayload
+        {
+            public string jobId = string.Empty;
+            public string requestId = string.Empty;
+            public string intent = string.Empty;
+            public string priorityClass = string.Empty;
+            public float urgency01;
+            public string status = string.Empty;
+            public string failureReason = string.Empty;
+            public int createdTick;
+            public int updatedTick;
+            public int activePhaseIndex;
+            public bool hasTargetCell;
+            public CellLogPayload targetCell;
+            public string targetCellText = string.Empty;
+            public int targetObjectId;
+            public string debugLabel = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class JobPhaseRefLogPayload
+        {
+            public string phaseId = string.Empty;
+            public string kind = string.Empty;
+            public string displayName = string.Empty;
+            public int phaseIndex;
+            public int expectedStepCount;
+            public bool isInterruptible;
+        }
+
+        [Serializable]
+        private sealed class StepRefLogPayload
+        {
+            public string actionId = string.Empty;
+            public string kind = string.Empty;
+            public string label = string.Empty;
+            public int actionIndex;
+            public bool hasTargetCell;
+            public CellLogPayload targetCell;
+            public string targetCellText = string.Empty;
+            public int targetObjectId;
+            public int durationTicks;
+            public string payloadKey = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class StepResultLogPayload
+        {
+            public string status = string.Empty;
+            public string failureReason = string.Empty;
+            public int suggestedWaitTicks;
+            public string diagnosticMessage = string.Empty;
         }
 
         [Serializable]
