@@ -135,7 +135,22 @@ namespace Arcontio.Core
             var previousStatus = job != null ? job.Status : JobStatus.Cancelled;
             var previousPhaseIndex = npcState.ActivePhaseIndex;
             var hadPreviousPhase = job != null && job.Plan.TryGetPhase(previousPhaseIndex, out var previousPhase);
+            var previousActionIndex = npcState.ActiveActionIndex;
+            var hadPreviousAction = hadPreviousPhase && previousPhase.TryGetAction(previousActionIndex, out var previousAction);
             var result = ApplyStepResult(ref npcState, job, stepResult, tick);
+
+            TryEmitStepTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job,
+                hadPreviousPhase ? previousPhase : default,
+                previousPhaseIndex,
+                hadPreviousAction ? previousAction : default,
+                previousActionIndex,
+                stepResult,
+                result.Message);
 
             TryEmitLifecycleTrace(
                 explainabilityConfig,
@@ -388,6 +403,52 @@ namespace Arcontio.Core
                     previousPhaseIndex,
                     result.Message);
             }
+        }
+
+        // =============================================================================
+        // TryEmitStepTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esporta una trace EL dello step consumato dalla state machine e del suo
+        /// risultato normalizzato.
+        /// </para>
+        ///
+        /// <para><b>Step osservato nel punto di consumo</b></para>
+        /// <para>
+        /// L'executor produce uno <c>StepResult</c>, ma e' la state machine che lo
+        /// interpreta davvero. L'EL registra quindi lo step qui, dove il risultato e'
+        /// stato effettivamente accettato dal runtime job.
+        /// </para>
+        /// </summary>
+        private static void TryEmitStepTrace(
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick,
+            Job job,
+            JobPhase previousPhase,
+            int previousPhaseIndex,
+            JobAction previousAction,
+            int previousActionIndex,
+            StepResult stepResult,
+            string reason)
+        {
+            if (explainabilityConfig == null || job == null)
+                return;
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteStepTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job,
+                previousPhase,
+                previousPhaseIndex,
+                previousAction,
+                previousActionIndex,
+                stepResult,
+                reason);
         }
     }
 }
