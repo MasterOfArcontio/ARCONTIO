@@ -916,6 +916,15 @@ namespace Arcontio.Core
             store.CopyQueryTracesTo(TimelineBuffer, clearOutput: false);
             store.CopyDecisionTracesTo(TimelineBuffer, clearOutput: false);
             store.CopyBridgeTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyJobRequestTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyJobLifecycleTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyJobPhaseTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyStepTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyJobStateTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyJobArbitrationTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyReservationTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyCommandTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyFailureLearningTracesTo(TimelineBuffer, clearOutput: false);
             TimelineBuffer.Sort((a, b) => a.Tick.CompareTo(b.Tick));
 
             int safeMax = Math.Max(0, maxTimelineRows);
@@ -1032,6 +1041,15 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Query => trace.Query == null ? "query vuota" : $"{trace.Query.GoalType} usable={trace.Query.UsableCandidateCount}/{trace.Query.CandidateCount} score={trace.Query.FinalScore:0.00}",
                 MemoryBeliefDecisionTraceKind.Decision => trace.Decision == null ? "decision vuota" : $"{trace.Decision.SelectedIntent} score={trace.Decision.SelectedScore:0.00}",
                 MemoryBeliefDecisionTraceKind.Bridge => trace.Bridge == null ? "bridge vuoto" : $"{trace.Bridge.SelectedIntent} -> {trace.Bridge.CommandName} source={trace.Bridge.TargetSource}",
+                MemoryBeliefDecisionTraceKind.JobRequest => trace.JobRequest == null ? "job request vuota" : $"{trace.JobRequest.Intent} priority={trace.JobRequest.PriorityClass} target={FormatCell(trace.JobRequest.TargetCell)}",
+                MemoryBeliefDecisionTraceKind.JobLifecycle => trace.JobLifecycle == null ? "job lifecycle vuota" : $"{trace.JobLifecycle.Operation} job={trace.JobLifecycle.Job.JobId}",
+                MemoryBeliefDecisionTraceKind.JobPhase => trace.JobPhase == null ? "job phase vuota" : $"{trace.JobPhase.Operation} phase={trace.JobPhase.Phase.DisplayName}",
+                MemoryBeliefDecisionTraceKind.Step => trace.Step == null ? "step vuota" : $"{trace.Step.Step.Kind} result={trace.Step.Result.Status}",
+                MemoryBeliefDecisionTraceKind.JobState => trace.JobState == null ? "job state vuota" : $"active={trace.JobState.HasActiveJob} phase={trace.JobState.ActivePhaseIndex} action={trace.JobState.ActiveActionIndex}",
+                MemoryBeliefDecisionTraceKind.JobArbitration => trace.JobArbitration == null ? "arbitration vuota" : $"{trace.JobArbitration.Decision} accepted={trace.JobArbitration.AcceptedJobId}",
+                MemoryBeliefDecisionTraceKind.Reservation => trace.Reservation == null ? "reservation vuota" : $"{trace.Reservation.Operation} {trace.Reservation.TargetKind} {FormatCell(trace.Reservation.TargetCell)}",
+                MemoryBeliefDecisionTraceKind.Command => trace.Command == null ? "command vuoto" : $"{trace.Command.Operation} {trace.Command.CommandName} queue={trace.Command.QueueCount}",
+                MemoryBeliefDecisionTraceKind.FailureLearning => trace.FailureLearning == null ? "failure vuoto" : $"{trace.FailureLearning.FailureReason} penalty={trace.FailureLearning.Penalty01:0.00}",
                 _ => "unknown"
             };
         }
@@ -1048,6 +1066,15 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Query => trace.Query != null && trace.Query.IsEmpty ? MemoryBeliefDecisionColorRole.Warning : MemoryBeliefDecisionColorRole.Info,
                 MemoryBeliefDecisionTraceKind.Decision => MemoryBeliefDecisionColorRole.Ok,
                 MemoryBeliefDecisionTraceKind.Bridge => trace.Bridge != null && trace.Bridge.LegacyFallbackUsed ? MemoryBeliefDecisionColorRole.Warning : MemoryBeliefDecisionColorRole.Ok,
+                MemoryBeliefDecisionTraceKind.JobRequest => trace.JobRequest != null && trace.JobRequest.LegacyBridgeStillUsed ? MemoryBeliefDecisionColorRole.Warning : MemoryBeliefDecisionColorRole.Info,
+                MemoryBeliefDecisionTraceKind.JobLifecycle => trace.JobLifecycle != null && trace.JobLifecycle.Operation == MemoryBeliefDecisionJobLifecycleOperation.Failed ? MemoryBeliefDecisionColorRole.Error : MemoryBeliefDecisionColorRole.Ok,
+                MemoryBeliefDecisionTraceKind.JobPhase => trace.JobPhase != null && trace.JobPhase.Operation == MemoryBeliefDecisionJobPhaseOperation.Interrupted ? MemoryBeliefDecisionColorRole.Warning : MemoryBeliefDecisionColorRole.Info,
+                MemoryBeliefDecisionTraceKind.Step => trace.Step != null ? ResolveStepStatusColor(trace.Step.Result.Status.ToString()) : MemoryBeliefDecisionColorRole.Muted,
+                MemoryBeliefDecisionTraceKind.JobState => MemoryBeliefDecisionColorRole.Info,
+                MemoryBeliefDecisionTraceKind.JobArbitration => trace.JobArbitration != null && string.Equals(trace.JobArbitration.Decision.ToString(), "KeepCurrent", StringComparison.Ordinal) ? MemoryBeliefDecisionColorRole.Warning : MemoryBeliefDecisionColorRole.Info,
+                MemoryBeliefDecisionTraceKind.Reservation => trace.Reservation != null ? ResolveReservationColor(trace.Reservation.Operation.ToString()) : MemoryBeliefDecisionColorRole.Muted,
+                MemoryBeliefDecisionTraceKind.Command => MemoryBeliefDecisionColorRole.Info,
+                MemoryBeliefDecisionTraceKind.FailureLearning => MemoryBeliefDecisionColorRole.Warning,
                 _ => MemoryBeliefDecisionColorRole.Muted
             };
         }
@@ -1093,6 +1120,31 @@ namespace Arcontio.Core
                 "Conflicted" => MemoryBeliefDecisionColorRole.Error,
                 "Discarded" => MemoryBeliefDecisionColorRole.Error,
                 "RemovedByDecay" => MemoryBeliefDecisionColorRole.Error,
+                _ => MemoryBeliefDecisionColorRole.Muted
+            };
+        }
+
+        private static MemoryBeliefDecisionColorRole ResolveStepStatusColor(string status)
+        {
+            return status switch
+            {
+                "Succeeded" => MemoryBeliefDecisionColorRole.Ok,
+                "Running" => MemoryBeliefDecisionColorRole.Info,
+                "Waiting" => MemoryBeliefDecisionColorRole.Warning,
+                "Blocked" => MemoryBeliefDecisionColorRole.Warning,
+                "Failed" => MemoryBeliefDecisionColorRole.Error,
+                _ => MemoryBeliefDecisionColorRole.Muted
+            };
+        }
+
+        private static MemoryBeliefDecisionColorRole ResolveReservationColor(string operation)
+        {
+            return operation switch
+            {
+                "Accepted" => MemoryBeliefDecisionColorRole.Ok,
+                "Denied" => MemoryBeliefDecisionColorRole.Error,
+                "Released" => MemoryBeliefDecisionColorRole.Info,
+                "Expired" => MemoryBeliefDecisionColorRole.Warning,
                 _ => MemoryBeliefDecisionColorRole.Muted
             };
         }
