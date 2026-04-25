@@ -1,119 +1,113 @@
 # TASKBOARD_CODEX.md — ARCONTIO Active Engineering Board
 
----
+This file is the persistent active-task console for Codex.
 
-## CURRENT ENGINEERING PRIORITY ORDER
+Codex must read this file before starting any implementation.
 
-Priority A -> repository consolidation and architectural cleanup  
-Priority C -> job/pathfinding intelligence expansion  
-Priority B -> subjective cognition/social propagation second wave
-
-Codex should always privilege unresolved Priority A tasks before broad speculative feature growth.
+Do not assume old conversations as valid state memory.
+Use this file as the current operational truth.
 
 ---
 
-## PRIORITY A — CONSOLIDATION / CLEANUP / ARCHITECTURAL STABILITY
+# 1. Current macro campaign in progress
 
-### A1. Repository architectural audit
-Need a continuous mapping of:
-- central dependencies
-- overcoupled files
-- hidden god objects
-- duplicate responsibilities
-- legacy naming inconsistencies
+## ACTIVE MACRO JOB
+`v0.08 — Repository Stabilization + Codex Workflow Hardening`
 
-### A2. Core contracts validation
-Continuously inspect:
-- event contracts
-- job contracts
-- decision contracts
-- reservation/ownership contracts
-- belief query contracts
+Goal:
+stabilize repository governance, remove workflow ambiguity, prepare deterministic AI-assisted development pipeline.
 
-Goal: identify fragile interfaces before adding more systems.
-
-### A3. Legacy cleanup without broad refactor
-Detect:
-- obsolete bridges
-- stale debug hooks
-- duplicate utility logic
-- partial transitional code
-- dead integration remnants
-
-Apply only surgical cleanup.
-
-### A4. Repository readability hardening
-Improve:
-- code comments,
-- file responsibility clarity,
-- architectural readability,
-- human maintainability.
+This macro job is infrastructure-only.
+It is not a gameplay/system implementation campaign.
 
 ---
 
-## PRIORITY C — JOB / PATHFINDING INTELLIGENCE EXPANSION
+# 2. Active current step
 
-### C1. Subjective movement reasoning expansion
-Current pathfinding exists but subjective navigation reasoning is not fully mature.
+## ACTIVE STEP
+`v0.08.01 — Codex repository governance installation`
 
-Investigate:
-- remembered destinations
-- confidence degraded targets
-- invalid remembered landmarks
-- path replanning under uncertainty
+Status: IN PROGRESS
 
-### C2. Job planner robustness
-Strengthen:
-- preemption behavior,
-- fallback selection,
-- interrupted task recovery,
-- reservation conflicts,
-- multi-step intent continuity.
+Objective:
+- stabilize AGENTS / CODEX protocol files,
+- validate ai/codex-main workflow,
+- validate Codex cloud GitHub publishing discipline,
+- clean historical branch clutter.
 
-### C3. Failure learning integration
-Expand learning from:
-- failed movement,
-- inaccessible targets,
-- unavailable resources,
-- blocked ownership interactions.
-
-### C4. Decision -> Job coherence audit
-Continuously inspect whether generated intents map coherently into executable jobs without semantic leakage.
+Codex should assume repository workflow hardening is still the current priority
+until operator marks this step as DONE.
 
 ---
 
-## PRIORITY B — SUBJECTIVE SOCIAL SYSTEM SECOND WAVE
+# 3. Next queued steps (do not jump ahead unless requested)
 
-### B1. Crime event propagation refinement
-### B2. Communication distortion growth
-### B3. Obligation/social pressure expansion
-### B4. Normative judgment foundations
-
-These systems are important but should grow after current architectural stability is safer.
+- `v0.08.02` — historical branch cleanup verification
+- `v0.08.03` — first controlled Codex implementation task validation
+- `v0.08.04` — documentation synchronization protocol with ARCONTIO_docs
 
 ---
 
-## ALWAYS VALID TRANSVERSAL RULES
+# 4. Frozen implementation campaigns
 
-For every task:
+The following macro jobs are intentionally paused until repository stabilization is complete:
 
-1. inspect touched files before editing,
-2. identify nearby dependencies,
-3. explain patch perimeter,
-4. implement in small coherent commits.
+- Job System expansions
+- Memory architecture expansions
+- Social communication expansions
+- Explainability UI expansions
+- Runtime feature additions
 
-Never propose broad uncontrolled rewrites.
-
-Never prioritize feature quantity over architectural coherence.
+Codex must not proactively resume these unless explicitly requested.
 
 ---
 
-## REQUESTED DEFAULT FIRST ANALYSIS ON NEW SESSIONS
+# 5. Repository workflow truth
 
-When no specific coding task is provided, Codex should preferentially:
+Stable branch:
+`main`
 
-- inspect unresolved architectural debt,
-- inspect code clarity hotspots,
-- inspect contract fragility,
-- inspect path/job weak points,
-- propose next highest value small patch.
+AI integration branch:
+`ai/codex-main`
+
+Default Codex task branch pattern:
+`ai-task/v0.xx.yy-short-description`
+
+Default PR target:
+`ai/codex-main`
+
+Never assume direct implementation on `main`.
+
+---
+
+# 6. Current repository known state
+
+Confirmed:
+- GitHub connector operational
+- Codex cloud write capability verified
+- AGENTS workflow instructions installed
+- CODEX protocol installed
+
+Still under verification:
+- first full AI task branch -> PR -> merge cycle
+- historical branch final normalization
+
+---
+
+# 7. Codex mandatory behavior during this macro job
+
+During v0.08 Codex should:
+
+- prefer audit/verification tasks,
+- avoid broad gameplay coding,
+- avoid opportunistic refactors,
+- help normalize workflow,
+- report any repository inconsistency discovered.
+
+---
+
+# 8. Operator reminder hook
+
+If Codex completes a step in v0.08, explicitly state:
+
+`TASKBOARD update recommended.`
