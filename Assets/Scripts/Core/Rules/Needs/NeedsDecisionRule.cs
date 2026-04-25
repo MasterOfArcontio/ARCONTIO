@@ -645,7 +645,6 @@ if (stolenStockObj != 0)
         /// - Memory-driven: nessuna scansione globale del mondo per scegliere "che cosa c'è in giro".
         /// - Validazione runtime: anche se la memoria è stale, in execution i comandi verificano lo stato reale.
         /// </summary>
-        private static 
         /// <summary>
         /// FindPinnedBelievedOwnNpcFoodStock (Patch 5.1 - revised):
         ///
@@ -664,7 +663,7 @@ if (stolenStockObj != 0)
         ///   con le alternative (community / furto).
         /// - Se NON è ancora arrivato, pianifichiamo MoveIntent verso quella cella per ispezione.
         /// </summary>
-        int FindPinnedBelievedOwnNpcFoodStock(
+        private static int FindPinnedBelievedOwnNpcFoodStock(
             World world,
             int npcId,
             int maxRangeCells,
