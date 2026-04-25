@@ -113,3 +113,52 @@ When implementation affects architecture or project conventions,
 Codex should explicitly notify:
 
 "ARCONTIO_docs alignment recommended."
+
+---
+
+# 7. Private Notion bridge
+
+A private Notion bridge exists outside this repository at:
+
+`C:\Users\oldkn\Documents\ARCONTIO_private_tools\notion_bridge`
+
+It is used to read and append notes to the ARCONTIO Notion workspace.
+
+Codex may use this bridge only when explicitly requested by the operator.
+
+## Allowed operations
+
+Codex may run:
+
+```powershell
+.\notion_bridge.ps1 -Action search
+.\notion_bridge.ps1 -Action findtitle -Title "..."
+.\notion_bridge.ps1 -Action children -PageId "..."
+.\notion_bridge.ps1 -Action readpage -PageId "..."
+.\notion_bridge.ps1 -Action append -PageId "..." -Text "..."
+.\notion_bridge.ps1 -Action logstep -PageId "..." -Step "..." -Status "..." -Text "..."
+```
+
+## Security rules
+
+Codex must never:
+
+- read, print, copy, expose or commit `.env`
+- display the Notion token
+- move the bridge into the repository
+- modify Notion unless explicitly requested
+- write large documentation changes without operator confirmation
+- use the bridge proactively during normal coding tasks unless the operator explicitly asks for Notion interaction
+
+## Intended use
+
+The bridge may be used for:
+- reading ARCONTIO Notion hierarchy
+- finding roadmap or diary pages
+- appending step completion notes
+- appending engineering log summaries
+- synchronizing implementation outcomes with Notion
+
+## Default behavior
+
+Codex should remind the operator when Notion documentation should be updated, but should not update it automatically unless requested.
