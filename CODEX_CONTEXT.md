@@ -137,6 +137,9 @@ not hidden simulation authorities.
 Resources may contain some legacy assets intentionally named with _old suffix.
 These are not necessarily removable and should not be modified unless explicitly requested.
 
+Extended design documentation, constitutional documents, functional documents, engineering logs, prompt templates and reference tables may live in the separate GitHub repository `ARCONTIO_docs`.
+
+This code repository should contain only documentation directly useful for code navigation, agent behavior and implementation safety.
 ---
 
 ## 5. AGENT WORKING RULES
