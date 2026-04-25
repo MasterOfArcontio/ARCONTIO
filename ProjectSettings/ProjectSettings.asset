@@ -13,7 +13,7 @@ PlayerSettings:
   useOnDemandResources: 0
   accelerometerFrequency: 60
   companyName: DefaultCompany
-  productName: Faster Than Rim MVP 0.01
+  productName: Arcontio
   defaultCursor: {fileID: 0}
   cursorHotspot: {x: 0, y: 0}
   m_SplashScreenBackgroundColor: {r: 0.13725491, g: 0.12156863, b: 0.1254902, a: 1}
@@ -639,14 +639,14 @@ PlayerSettings:
   editorAssembliesCompatibilityLevel: 1
   m_RenderingPath: 1
   m_MobileRenderingPath: 1
-  metroPackageName: Faster Than Rim MVP 0.01
+  metroPackageName: Arcontio
   metroPackageVersion: 
   metroCertificatePath: 
   metroCertificatePassword: 
   metroCertificateSubject: 
   metroCertificateIssuer: 
   metroCertificateNotAfter: 0000000000000000
-  metroApplicationDescription: Faster Than Rim MVP 0.01
+  metroApplicationDescription: Arcontio
   wsaImages: {}
   metroTileShortName: 
   metroTileShowName: 0
@@ -720,7 +720,7 @@ PlayerSettings:
   cloudProjectId: 15cc9bd4-6ca5-4121-9422-20fd95ac310b
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: Faster Than Rim MVP 0.01
+  projectName: Arcontio
   organizationId: lokitorino
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
