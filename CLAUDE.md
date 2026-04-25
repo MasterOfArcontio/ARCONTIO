@@ -1,4 +1,4 @@
-# CLAUDE.md — Arcontio (faster-than-rim-mvp)
+# CLAUDE.md — Arcontio
 
 > Questo file viene letto automaticamente da Claude Code all'avvio di ogni sessione.
 > Aggiornalo ogni volta che aggiungi un sistema nuovo o cambi un pattern architetturale.
@@ -17,7 +17,7 @@
 non sullo stato reale del mondo. Un NPC può andare verso un oggetto che non c'è più
 perché lo ricorda lì.
 
-**Repository GitHub:** https://github.com/MasterOfArcontio/faster-than-rim-mvp
+**Repository GitHub:** https://github.com/MasterOfArcontio/ARCONTIO
 **Script Core:** Assets/Scripts/Core
 
 ---
