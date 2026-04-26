@@ -1,67 +1,67 @@
-# CODEX_CONTEXT.md — ARCONTIO Repository Canonical Context
+# CODEX_CONTEXT.md — Contesto Canonico Repository ARCONTIO
 
 ---
 
-## 1. PROJECT IDENTITY
+## 1. IDENTITÀ DEL PROGETTO
 
-Arcontio is a systemic social simulation project developed in Unity/C#.
+Arcontio è un progetto di simulazione sociale sistemica sviluppato in Unity/C#.
 
-This is not a conventional Unity management prototype and must not be treated as a generic colony sandbox.
+Non è un prototipo gestionale Unity convenzionale e non deve essere trattato come un generico colony sandbox.
 
-The simulation is built around the following causal principle:
+La simulazione è costruita attorno al seguente principio causale:
 
-ENVIRONMENTAL PRESSURE -> NPC NEED INSTABILITY -> INDIVIDUAL ACTION -> SOCIAL CONSEQUENCE -> EMERGENT STRUCTURE
+PRESSIONE AMBIENTALE -> INSTABILITÀ DEI BISOGNI NPC -> AZIONE INDIVIDUALE -> CONSEGUENZA SOCIALE -> STRUTTURA EMERGENTE
 
-NPCs are not omniscient agents acting on objective world truth.
-NPCs act on subjective internalized representations generated through perception, memory, communication and belief confidence.
+Gli NPC non sono agenti onniscienti che agiscono sulla verità oggettiva del mondo.
+Gli NPC agiscono su rappresentazioni soggettive interiorizzate, generate tramite percezione, memoria, comunicazione e confidence delle credenze.
 
-Therefore every implementation must preserve:
+Pertanto ogni implementazione deve preservare:
 
-- subjective knowledge
-- delayed information propagation
-- uncertainty
-- memory persistence
-- communication distortion
-- deterministic causal chains
+- conoscenza soggettiva
+- propagazione ritardata delle informazioni
+- incertezza
+- persistenza della memoria
+- distorsione della comunicazione
+- catene causali deterministiche
 
-The long-term goal of the project is the emergence of social, normative and institutional behavior from low-level systemic interactions.
+L'obiettivo a lungo termine del progetto è l'emersione di comportamento sociale, normativo e istituzionale da interazioni sistemiche di basso livello.
 
 ---
 
-## 2. NON NEGOTIABLE ARCHITECTURAL RULES
+## 2. REGOLE ARCHITETTURALI NON NEGOZIABILI
 
 ### 2.1 No God Managers
-Avoid monolithic all-in-one managers.
-Prefer granular systems with narrow responsibility.
+Evitare manager monolitici tutto-in-uno.
+Preferire sistemi granulari con responsabilità stretta.
 
-### 2.2 Event Driven Causality
-World changes generate canonical IWorldEvent records.
-Subsystems should react to event consequences instead of polling arbitrary world truth whenever reasonably possible.
+### 2.2 Causalità Event Driven
+I cambiamenti del mondo generano record canonici `IWorldEvent`.
+I sottosistemi dovrebbero reagire alle conseguenze degli eventi invece di interrogare arbitrariamente la verità del mondo quando ragionevolmente possibile.
 
-### 2.3 Subjective NPC Cognition
-NPC decisions must rely on:
+### 2.3 Cognizione NPC Soggettiva
+Le decisioni NPC devono basarsi su:
 - memory traces
 - belief confidence
 - communicated tokens
-- local perception
+- percezione locale
 
-Never silently reintroduce omniscient shortcuts.
+Non reintrodurre mai scorciatoie onniscienti in modo silenzioso.
 
-### 2.4 Deterministic Tick Discipline
-Simulation execution order matters.
-Do not introduce uncontrolled async behavior, hidden updates or non deterministic state mutations.
+### 2.4 Disciplina Deterministica a Tick
+L'ordine di esecuzione della simulazione conta.
+Non introdurre comportamento async incontrollato, update nascosti o mutazioni di stato non deterministiche.
 
-### 2.5 Additive Rule Expansion
-Prefer registries, rule files, typed contracts and additive evaluators over giant switch statements.
+### 2.5 Espansione Additiva tramite Rules
+Preferire registries, file rule, contratti tipizzati ed evaluator additivi rispetto a giant switch statements.
 
-### 2.6 Surgical Editing Preferred
-When modifying code:
-- preserve naming conventions,
-- avoid unnecessary rewrites,
-- avoid replacing working architecture with unrelated abstractions.
+### 2.6 Editing Chirurgico Preferito
+Quando si modifica codice:
+- preservare le convenzioni di naming,
+- evitare rewrite non necessari,
+- evitare di sostituire architettura funzionante con astrazioni non correlate.
 
-### 2.7 Layer Separation Must Be Preserved
-Maintain distinction between:
+### 2.7 La Separazione dei Layer Deve Essere Preservata
+Mantenere distinzione tra:
 - decision layer
 - job execution layer
 - world simulation systems
@@ -69,18 +69,18 @@ Maintain distinction between:
 - memory/perception/belief layers
 - UI/debug bridges
 
-Do not collapse responsibilities across layers without explicit request.
+Non collassare responsabilità tra layer senza richiesta esplicita.
 
-### 2.8 Avoid Unnecessary Global Access
-Do not introduce broad direct global reads if local modular integration is possible.
+### 2.8 Evitare Accesso Globale Non Necessario
+Non introdurre ampie letture globali dirette se è possibile un'integrazione modulare locale.
 
-Prefer dependency coherence over shortcut convenience.
+Preferire coerenza delle dipendenze rispetto alla comodità delle scorciatoie.
 
 ---
 
-## 3. CURRENT IMPLEMENTED MACRO SYSTEMS
+## 3. MACRO SISTEMI ATTUALMENTE IMPLEMENTATI
 
-Implemented or substantially implemented:
+Implementati o sostanzialmente implementati:
 
 - physiological needs decay
 - comfort and environmental pressure base
@@ -93,7 +93,7 @@ Implemented or substantially implemented:
 - explainability layer runtime panels
 - EL tracing infrastructure
 
-Partially implemented / under evolution:
+Parzialmente implementati / in evoluzione:
 
 - advanced pathfinding subjective reasoning
 - normative judgment
@@ -101,7 +101,7 @@ Partially implemented / under evolution:
 - communication distortion expansion
 - social obligation systems
 
-Future planned:
+Pianificati per il futuro:
 
 - institutional judiciary
 - economy depth
@@ -111,13 +111,13 @@ Future planned:
 
 ---
 
-## 4. REPOSITORY STRUCTURAL NOTES
+## 4. NOTE STRUTTURALI REPOSITORY
 
-Main gameplay logic resides primarily under:
+La logica principale gameplay risiede principalmente sotto:
 
-Assets/Scripts/Core
+`Assets/Scripts/Core`
 
-Important recurring architectural families include:
+Famiglie architetturali ricorrenti importanti includono:
 
 - Commands
 - Components
@@ -131,70 +131,71 @@ Important recurring architectural families include:
 - Explainability
 - ViewModels
 
-UI and debug panels must remain consumers of simulation state,
-not hidden simulation authorities.
+UI e pannelli debug devono rimanere consumer dello stato di simulazione,
+non autorità nascoste della simulazione.
 
-Resources may contain some legacy assets intentionally named with _old suffix.
-These are not necessarily removable and should not be modified unless explicitly requested.
+Le Resources possono contenere alcuni asset legacy intenzionalmente nominati con suffisso `_old`.
+Questi non sono necessariamente removibili e non devono essere modificati salvo richiesta esplicita.
 
-Extended design documentation, constitutional documents, functional documents, engineering logs, prompt templates and reference tables may live in the separate GitHub repository `ARCONTIO_docs`.
+La documentazione di design estesa, i documenti costituzionali, i documenti funzionali, gli engineering logs, i prompt templates e le tabelle reference possono vivere nella repository GitHub separata `ARCONTIO_docs`.
 
-This code repository should contain only documentation directly useful for code navigation, agent behavior and implementation safety.
----
-
-## 5. AGENT WORKING RULES
-
-Never work on main branch.
-Repository AI work is assumed to happen on ai/codex-main unless explicitly changed.
-
-Never modify or commit:
-- .meta files unless strictly generated by Unity necessity
-- Library
-- Temp
-- Obj
-- other generated cache folders
-
-Before any non-trivial implementation:
-
-1. inspect touched dependencies,
-2. inspect neighboring systems,
-3. explain intended touched files,
-4. propose patch plan,
-5. then implement.
-
-Prefer minimal coherent commits.
-
-Do not perform broad speculative refactors without explicit request.
-
-Architecture consistency has priority over implementation speed.
+Questa repository codice deve contenere solo documentazione direttamente utile per navigazione codice, comportamento agente e sicurezza implementativa.
 
 ---
 
-## 6. CODE COMMENTING RULES
+## 5. REGOLE DI LAVORO AGENTE
 
-All newly introduced or substantially modified important classes, structs or major functions should receive verbose architectural comments in Italian whenever appropriate.
+Non lavorare mai sul branch `main`.
+Il lavoro AI repository si assume su `ai/codex-main` salvo modifica esplicita.
 
-Use highly readable explanatory comments for:
+Non modificare o committare:
+- file `.meta` salvo necessità strettamente generata da Unity
+- `Library`
+- `Temp`
+- `Obj`
+- altre cartelle cache generate
 
-- architectural purpose,
-- internal flow,
-- critical assumptions,
-- delicate integration points.
+Prima di ogni implementazione non banale:
 
-Important internal logic should not remain opaque.
+1. ispezionare dipendenze toccate,
+2. ispezionare sistemi vicini,
+3. spiegare i file che si intende toccare,
+4. proporre piano patch,
+5. poi implementare.
 
-Code should remain understandable to future human inspection.
+Preferire commit minimi e coerenti.
+
+Non eseguire refactor ampi e speculativi senza richiesta esplicita.
+
+La coerenza architetturale ha priorità sulla velocità implementativa.
 
 ---
 
-## 7. MANDATORY FIRST SESSION BEHAVIOR
+## 6. REGOLE COMMENTI CODICE
 
-On first repository read:
+Tutte le nuove classi, struct o funzioni principali introdotte o modificate in modo sostanziale dovrebbero ricevere commenti architetturali verbosi in italiano quando appropriato.
 
-- inspect architecture before editing,
-- identify implemented vs partial modules,
-- identify legacy inconsistencies,
-- identify technical debt hotspots,
-- propose safest next implementation sequence.
+Usare commenti esplicativi molto leggibili per:
 
-Do not begin by coding blind features.
+- scopo architetturale,
+- flusso interno,
+- assunzioni critiche,
+- punti delicati di integrazione.
+
+La logica interna importante non deve restare opaca.
+
+Il codice deve rimanere comprensibile per futura ispezione umana.
+
+---
+
+## 7. COMPORTAMENTO OBBLIGATORIO ALLA PRIMA SESSIONE
+
+Alla prima lettura della repository:
+
+- ispezionare l'architettura prima di modificare,
+- identificare moduli implementati vs parziali,
+- identificare inconsistenze legacy,
+- identificare hotspot di technical debt,
+- proporre la sequenza implementativa più sicura.
+
+Non iniziare codificando feature alla cieca.

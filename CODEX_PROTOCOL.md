@@ -1,67 +1,68 @@
-# CODEX_PROTOCOL.md — ARCONTIO AI Workflow Protocol
+# CODEX_PROTOCOL.md — Protocollo Workflow AI ARCONTIO
 
-This file defines the permanent workflow discipline for Codex operations inside ARCONTIO.
+Questo file definisce la disciplina permanente di workflow per le operazioni Codex dentro ARCONTIO.
 
 ---
 
-# 1. Branch workflow discipline
+# 1. Disciplina workflow branch
 
-Stable branch:
+Branch stabile:
 `main`
 
-AI integration branch:
+Branch di integrazione AI:
 `ai/codex-main`
 
-Temporary Codex task branches:
+Branch task temporanei Codex:
 `ai-task/v0.xx.yy-short-description`
 
-Lifecycle:
+Ciclo di vita:
 
-1. read task context
-2. inspect involved files
-3. patch on temporary ai-task branch
-4. show diff
-5. create PR into ai/codex-main
-6. operator reviews/merges
-7. temporary branch can be deleted
+1. leggere il contesto del task
+2. ispezionare i file coinvolti
+3. patchare su branch temporaneo `ai-task`
+4. mostrare il diff
+5. creare PR verso `ai/codex-main`
+6. l'operatore revisiona/mergea
+7. il branch temporaneo può essere eliminato
 
-Codex should not accumulate historical long-lived task branches.
+Codex non deve accumulare branch task storici long-lived.
 
 ---
 
-# 2. Mandatory pre-read files before implementation
+# 2. File obbligatori da leggere prima dell'implementazione
 
-Codex must inspect:
+Codex deve ispezionare:
 
+- AI_SESSION_BOOT.md
 - CODEX_CONTEXT.md
 - TASKBOARD_CODEX.md
 - REPO_MAP.md
 
-before starting any non-trivial implementation.
+prima di iniziare ogni implementazione non banale.
 
-If task is architectural, audit-first mode is mandatory.
-
----
-
-# 3. Patch discipline
-
-Codex must prefer:
-
-- smallest viable safe patch,
-- minimum touched files,
-- no opportunistic cleanup,
-- no encoding rewrites,
-- no formatting churn,
-- no line ending churn,
-- no comment rewriting unless necessary.
-
-When moving code blocks, preserve original comments exactly when possible.
+Se il task è architetturale, la modalità audit-first è obbligatoria.
 
 ---
 
-# 4. Audit-first rule
+# 3. Disciplina patch
 
-For these tasks Codex should audit before coding:
+Codex deve preferire:
+
+- patch più piccola praticabile e sicura,
+- minimo numero di file toccati,
+- nessuna pulizia opportunistica,
+- nessuna riscrittura encoding,
+- nessun formatting churn,
+- nessun line ending churn,
+- nessuna riscrittura commenti se non necessaria.
+
+Quando sposta blocchi di codice, deve preservare i commenti originali esattamente quando possibile.
+
+---
+
+# 4. Regola audit-first
+
+Per questi task Codex deve fare audit prima di codificare:
 
 - runtime architecture
 - scheduler ordering
@@ -73,62 +74,62 @@ For these tasks Codex should audit before coding:
 - world contracts
 - telemetry/explainability
 
-Audit output should identify:
+L'output audit deve identificare:
 
-- files,
-- current contracts,
-- coupling points,
-- safest patch candidate.
+- file,
+- contratti correnti,
+- punti di accoppiamento,
+- candidato patch più sicuro.
 
-Only then patch.
-
----
-
-# 5. Output reporting contract
-
-After each implementation Codex must report:
-
-## Modified files
-exact list
-
-## What changed
-surgical summary
-
-## Runtime behavior impact
-what changes / what is preserved
-
-## Risks
-possible side effects
-
-## Git readiness
-diff / PR status
+Solo dopo può patchare.
 
 ---
 
-# 6. Documentation awareness
+# 5. Contratto output/reporting
 
-ARCONTIO_docs is the external project memory repository.
+Dopo ogni implementazione Codex deve riportare:
 
-When implementation affects architecture or project conventions,
-Codex should explicitly notify:
+## File modificati
+elenco esatto
+
+## Cosa è cambiato
+sintesi chirurgica
+
+## Impatto runtime
+cosa cambia / cosa è preservato
+
+## Rischi
+possibili effetti collaterali
+
+## Stato Git
+diff / stato PR
+
+---
+
+# 6. Consapevolezza documentale
+
+`ARCONTIO_docs` è la repository esterna di memoria del progetto.
+
+Quando l'implementazione modifica architettura o convenzioni di progetto,
+Codex deve notificare esplicitamente:
 
 "ARCONTIO_docs alignment recommended."
 
 ---
 
-# 7. Private Notion bridge
+# 7. Bridge Notion privato
 
-A private Notion bridge exists outside this repository at:
+Esiste un bridge Notion privato fuori da questa repository in:
 
 `C:\Users\oldkn\Documents\ARCONTIO_private_tools\notion_bridge`
 
-It is used to read and append notes to the ARCONTIO Notion workspace.
+È usato per leggere e appendere note al workspace Notion ARCONTIO.
 
-Codex may use this bridge only when explicitly requested by the operator.
+Codex può usare questo bridge solo quando richiesto esplicitamente dall'operatore.
 
-## Allowed operations
+## Operazioni consentite
 
-Codex may run:
+Codex può eseguire:
 
 ```powershell
 .\notion_bridge.ps1 -Action search
@@ -139,26 +140,27 @@ Codex may run:
 .\notion_bridge.ps1 -Action logstep -PageId "..." -Step "..." -Status "..." -Text "..."
 ```
 
-## Security rules
+## Regole di sicurezza
 
-Codex must never:
+Codex non deve mai:
 
-- read, print, copy, expose or commit `.env`
-- display the Notion token
-- move the bridge into the repository
-- modify Notion unless explicitly requested
-- write large documentation changes without operator confirmation
-- use the bridge proactively during normal coding tasks unless the operator explicitly asks for Notion interaction
+- leggere, stampare, copiare, esporre o committare `.env`
+- mostrare il token Notion
+- spostare il bridge nella repository
+- modificare Notion salvo richiesta esplicita
+- scrivere grandi cambiamenti documentali senza conferma dell'operatore
+- usare il bridge proattivamente durante task di coding normali salvo richiesta esplicita dell'operatore
 
-## Intended use
+## Uso previsto
 
-The bridge may be used for:
-- reading ARCONTIO Notion hierarchy
-- finding roadmap or diary pages
-- appending step completion notes
-- appending engineering log summaries
-- synchronizing implementation outcomes with Notion
+Il bridge può essere usato per:
 
-## Default behavior
+- leggere la gerarchia Notion ARCONTIO
+- trovare pagine roadmap o diario
+- appendere note di completamento step
+- appendere sintesi engineering log
+- sincronizzare esiti implementativi con Notion
 
-Codex should remind the operator when Notion documentation should be updated, but should not update it automatically unless requested.
+## Comportamento predefinito
+
+Codex deve ricordare all'operatore quando la documentazione Notion dovrebbe essere aggiornata, ma non deve aggiornarla automaticamente salvo richiesta.
