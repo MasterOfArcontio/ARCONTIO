@@ -1,113 +1,113 @@
-# TASKBOARD_CODEX.md — ARCONTIO Active Engineering Board
+# TASKBOARD_CODEX.md — Lavagna Operativa Attiva ARCONTIO
 
-This file is the persistent active-task console for Codex.
+Questo file è la console persistente dei task attivi per Codex.
 
-Codex must read this file before starting any implementation.
+Codex deve leggere questo file prima di iniziare ogni implementazione.
 
-Do not assume old conversations as valid state memory.
-Use this file as the current operational truth.
+Non assumere vecchie conversazioni come memoria di stato valida.
+Usa questo file come verità operativa corrente.
 
 ---
 
-# 1. Current macro campaign in progress
+# 1. Macro campagna corrente in corso
 
-## ACTIVE MACRO JOB
+## MACRO JOB ATTIVO
 `v0.08 — Repository Stabilization + Codex Workflow Hardening`
 
-Goal:
-stabilize repository governance, remove workflow ambiguity, prepare deterministic AI-assisted development pipeline.
+Obiettivo:
+stabilizzare la governance repository, rimuovere ambiguità di workflow, preparare una pipeline deterministica di sviluppo assistito da AI.
 
-This macro job is infrastructure-only.
-It is not a gameplay/system implementation campaign.
+Questo macro job è solo infrastrutturale.
+Non è una campagna di implementazione gameplay/sistemi.
 
 ---
 
-# 2. Active current step
+# 2. Step corrente attivo
 
-## ACTIVE STEP
+## STEP ATTIVO
 `v0.08.01 — Codex repository governance installation`
 
 Status: IN PROGRESS
 
-Objective:
-- stabilize AGENTS / CODEX protocol files,
-- validate ai/codex-main workflow,
-- validate Codex cloud GitHub publishing discipline,
-- clean historical branch clutter.
+Obiettivo:
+- stabilizzare AGENTS / file protocollo CODEX,
+- validare workflow `ai/codex-main`,
+- validare disciplina di pubblicazione GitHub Codex cloud,
+- pulire branch storici.
 
-Codex should assume repository workflow hardening is still the current priority
-until operator marks this step as DONE.
-
----
-
-# 3. Next queued steps (do not jump ahead unless requested)
-
-- `v0.08.02` — historical branch cleanup verification
-- `v0.08.03` — first controlled Codex implementation task validation
-- `v0.08.04` — documentation synchronization protocol with ARCONTIO_docs
+Codex deve assumere che l'hardening del workflow repository sia ancora la priorità corrente
+finché l'operatore non marca questo step come DONE.
 
 ---
 
-# 4. Frozen implementation campaigns
+# 3. Prossimi step in coda (non saltare avanti salvo richiesta)
 
-The following macro jobs are intentionally paused until repository stabilization is complete:
-
-- Job System expansions
-- Memory architecture expansions
-- Social communication expansions
-- Explainability UI expansions
-- Runtime feature additions
-
-Codex must not proactively resume these unless explicitly requested.
+- `v0.08.02` — verifica cleanup branch storici
+- `v0.08.03` — validazione primo task Codex controllato
+- `v0.08.04` — protocollo sincronizzazione documentale con ARCONTIO_docs
 
 ---
 
-# 5. Repository workflow truth
+# 4. Campagne implementative congelate
 
-Stable branch:
+I seguenti macro job sono intenzionalmente in pausa finché la stabilizzazione repository non è completa:
+
+- espansioni Job System
+- espansioni architettura Memory
+- espansioni Social communication
+- espansioni Explainability UI
+- aggiunte feature runtime
+
+Codex non deve riprenderle proattivamente salvo richiesta esplicita.
+
+---
+
+# 5. Verità workflow repository
+
+Branch stabile:
 `main`
 
-AI integration branch:
+Branch integrazione AI:
 `ai/codex-main`
 
-Default Codex task branch pattern:
+Pattern predefinito branch task Codex:
 `ai-task/v0.xx.yy-short-description`
 
-Default PR target:
+Target PR predefinito:
 `ai/codex-main`
 
-Never assume direct implementation on `main`.
+Non assumere mai implementazione diretta su `main`.
 
 ---
 
-# 6. Current repository known state
+# 6. Stato repository attualmente noto
 
-Confirmed:
-- GitHub connector operational
-- Codex cloud write capability verified
-- AGENTS workflow instructions installed
-- CODEX protocol installed
+Confermato:
+- GitHub connector operativo
+- capacità scrittura Codex cloud verificata
+- istruzioni workflow AGENTS installate
+- protocollo CODEX installato
 
-Still under verification:
-- first full AI task branch -> PR -> merge cycle
-- historical branch final normalization
-
----
-
-# 7. Codex mandatory behavior during this macro job
-
-During v0.08 Codex should:
-
-- prefer audit/verification tasks,
-- avoid broad gameplay coding,
-- avoid opportunistic refactors,
-- help normalize workflow,
-- report any repository inconsistency discovered.
+Ancora in verifica:
+- primo ciclo completo branch task AI -> PR -> merge
+- normalizzazione finale branch storici
 
 ---
 
-# 8. Operator reminder hook
+# 7. Comportamento obbligatorio Codex durante questo macro job
 
-If Codex completes a step in v0.08, explicitly state:
+Durante v0.08 Codex deve:
+
+- preferire task di audit/verifica,
+- evitare broad gameplay coding,
+- evitare refactor opportunistici,
+- aiutare a normalizzare il workflow,
+- segnalare ogni incoerenza repository scoperta.
+
+---
+
+# 8. Reminder hook operatore
+
+Se Codex completa uno step in v0.08, deve dichiarare esplicitamente:
 
 `TASKBOARD update recommended.`
