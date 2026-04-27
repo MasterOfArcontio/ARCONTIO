@@ -14,7 +14,7 @@ namespace Arcontio.Core
     /// units: quante unità
     /// cellX/cellY: dove è avvenuto (per percezione/LOS/range)
     /// </summary>
-    public readonly struct FoodStolenEvent : ISimEvent
+    public readonly struct FoodStolenEvent : IWorldEvent
     {
         public readonly int VictimNpcId;
         public readonly int ThiefNpcId;

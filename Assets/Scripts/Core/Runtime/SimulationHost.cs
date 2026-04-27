@@ -28,26 +28,7 @@ namespace Arcontio.Core
         [SerializeField] private float tickDeltaTime = 1f; // tempo simulato per tick (es. 1 = 1 minuto)
         [SerializeField] private int ticksPerSecond = 10;  // velocità simulazione (tick/secondo reali)
 
-        [Header("Debug Scenarios")]
-        [SerializeField] private DebugScenario debugScenario = DebugScenario.Day7_Delivery;
-
-        private enum DebugScenario
-        {
-            Day6_Assimilation = 6,
-            Day7_Delivery = 7,
-            Day8_ObjectPerception = 8,
-            Day9_NeedsOwnership = 9,
-            Day10_Move_Memory_Theft = 10,
-            P0_02_Landmark_PathFinding = 11,
-            /// <summary>
-            /// Carica NPC da Resources/Arcontio/Scenarios/default_scenario.json.
-            /// Se il file non esiste, fa fallback a P0_02_Landmark_PathFinding.
-            /// </summary>
-            FromScenarioFile = 99,
-        }
-
-        // Log sintetico per tick (solo per questo scenario)
-        [SerializeField] private int day8LogEveryTicks = 10;
+        private const string MinimalBootstrapLabel = "MinimalRuntimeBootstrap";
 
 
         // Core state
@@ -426,7 +407,7 @@ namespace Arcontio.Core
             ArcontioLogger.Debug(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Test"),
                 new LogBlock(LogLevel.Debug, "log.test.scenario")
-                    .AddField("scenario", debugScenario)
+                    .AddField("scenario", MinimalBootstrapLabel)
             );
         }
 
@@ -458,6 +439,8 @@ namespace Arcontio.Core
         /// Esegue e svuota la coda di comandi esterni (view -> core).
         ///
         /// Questo è un "mini command buffer" dedicato ai tool runtime (DevMode).
+        /// Costituzionalmente NON appartiene al tick simulativo:
+        /// è una External DevCommand Phase eseguita fuori tick, anche in pausa.
         /// </summary>
         private void PumpExternalCommands()
         {
@@ -473,10 +456,44 @@ namespace Arcontio.Core
             _externalCommands.Clear();
         }
 
+        // =============================================================================
+        // StepOneTick
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue un tick simulativo completo mantenendo immutato l'ordine reale della backbone runtime.
+        /// Questo metodo è il punto canonico in cui viene formalizzata la Tick Phase Constitution implementativa.
+        /// </para>
+        ///
+        /// <para><b>Tick Phase Constitution</b></para>
+        /// <para>
+        /// L'ordine reale delle fasi è il seguente:
+        /// 1) Tick Begin
+        /// 2) Scheduled Systems
+        /// 3) TickPulse
+        /// 4) Event Drain pre-rule
+        /// 5) Memory Encoding pre-rule
+        /// 6) Flush token queued + token emission/delivery/assimilation
+        /// 7) Event republish per Rule Phase
+        /// 8) Rule Phase
+        /// 9) Command Phase
+        /// 10) Event Drain post-command
+        /// 11) Memory/communication pass post-command
+        /// 12) Debug telemetry / tick-end bookkeeping
+        /// 13) Tick Commit
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale affrontato</b></para>
+        /// <para>
+        /// Tick discreto e deterministico: l'host può orchestrare le fasi, ma non ne altera l'ordine implicito
+        /// senza una decisione costituzionale esplicita.
+        /// </para>
+        /// </summary>
         private void StepOneTick()
         {
             // Rende il tick disponibile globalmente per logging in comandi ecc.
             TickContext.BeginTick(_tickIndex);
+            _world.Global.CurrentTickIndex = _tickIndex;
 
             var tick = new Tick(_tickIndex, tickDeltaTime);
 
@@ -494,77 +511,6 @@ namespace Arcontio.Core
 
             // Pulse "clock" per rules: DEVE essere regolare e frequente.
             _bus.Publish(new TickPulseEvent(_tickIndex));
-
-            // ******************************************************************************************************************************
-            // TEST STIMULI (Day6 / Day7 / Day8)
-            // Inseriamo SOLO ciò che serve a generare segnali chiari.
-            // ******************************************************************************************************************************
-            // Day6: generiamo un evento "oggettivo" che finisce in memoria, poi token, poi assimilation.
-            if (debugScenario == DebugScenario.Day6_Assimilation && ((_tickIndex % 50) == 0))
-            {
-                ArcontioLogger.Debug(
-                    new LogContext(tick: _tickIndex, channel: "T6"),
-                    new LogBlock(LogLevel.Debug, "log.t6.predator_injected")
-                );
-                _bus.Publish(new PredatorSpottedEvent(
-                    spotterNpcId: 1,
-                    predatorId: 999,
-                    cellX: 0,
-                    cellY: 0,
-                    distanceCells: 1,
-                    spotQuality01: 1f));
-            }
-
-            // Day7: iniettiamo DIRETTAMENTE un AlarmShout in TokenBusOut
-            // (così testiamo Delivery BFS anche se le emission rule di default parlano ?ProximityTalk?).
-            if (debugScenario == DebugScenario.Day7_Delivery && ((_tickIndex % 50) == 0))
-            {
-                var shout = new SymbolicToken(
-                    type: TokenType.PredatorAlert,
-                    subjectId: 999,
-                    intensity01: 1.0f,
-                    reliability01: 1.0f,
-                    chainDepth: 0,
-                    hasCell: true,
-                    cellX: 0,
-                    cellY: 0);
-
-                // Coppia A: 1 -> 2
-                _world.PublishTokenOut(_tokenBusOut, new TokenEnvelope(
-                    speakerId: 1,
-                    listenerId: 2,
-                    channel: TokenChannel.AlarmShout,
-                    tickIndex: _tickIndex,
-                    token: shout));
-
-                // Coppia B: 3 -> 4
-                _world.PublishTokenOut(_tokenBusOut, new TokenEnvelope(
-                    speakerId: 3,
-                    listenerId: 4,
-                    channel: TokenChannel.AlarmShout,
-                    tickIndex: _tickIndex,
-                    token: shout));
-
-                ArcontioLogger.Debug(
-                    new LogContext(tick: _tickIndex, channel: "T7"),
-                    new LogBlock(LogLevel.Debug, "log.t7.alarmshout.published")
-                        .AddField("routes", "1->2, 3->4")
-                );
-            }
-
-            // Day8: non serve iniettare eventi a mano: ObjectPerceptionSystem li produce da solo.
-            // Qui lasciamo che i log siano:
-            // - Telemetry.ObjectPerception.SpottedEvents
-            // - (se vuoi) un tuo log aggiuntivo ogni 50 tick
-            if (debugScenario == DebugScenario.Day8_ObjectPerception && ((_tickIndex % 50) == 0))
-            {
-                ArcontioLogger.Debug(
-                    new LogContext(tick: _tickIndex, channel: "T8"),
-                    new LogBlock(LogLevel.Debug, "log.t8.info")
-                        .AddField("objects", _world.Objects.Count)
-                        .AddField("vision", _world.Global.NpcVisionRangeCells)
-                );
-            }
 
             // ******************************************************************************************************************************
             // 3) Drain eventi in buffer (così possiamo farci sopra encoding memoria)
@@ -592,8 +538,8 @@ namespace Arcontio.Core
             // Trasformiamo alcune trace importanti in TokenEnvelope e le mettiamo nel TokenBus.
             // Nota: questo NON tocca il MessageBus e NON influenza direttamente le Rule.
             //
-            // Nota test:
-            // - Day7 inietta anche token manualmente su _tokenBusOut (AlarmShout) per testare BFS delivery.
+            // Nota:
+            // - questo passaggio gestisce anche eventuali token runtime già accodati prima dell'emissione standard.
             _tokenEmission.Emit(_world, tick, _tokenBusOut, _telemetry);
 
             // NEW Giorno 7:
@@ -693,21 +639,6 @@ namespace Arcontio.Core
             }
 
             // ============================================================
-            // Day8: log sintetico per tick (solo qui)
-            // - Non vogliamo spam in Day6/Day7.
-            // - In Day8 vogliamo vedere "quali oggetti" vengono visti.
-            // ============================================================
-            if (debugScenario == DebugScenario.Day8_ObjectPerception)
-            {
-                if (day8LogEveryTicks <= 0) day8LogEveryTicks = 10;
-
-                if ((_tickIndex % day8LogEveryTicks) == 0)
-                {
-                    LogDay8Snapshot(tick);
-                }
-            }
-
-            // ============================================================
             // DEBUG FOV TELEMETRY:
             // Avanzamento finestra (1 volta per tick).
             //
@@ -753,727 +684,45 @@ namespace Arcontio.Core
             // - Qui, a seeding completato, ricostruiamo il registry oggettivo dei landmark.
             _world?.RebuildLandmarksBootstrap();
         }
-
         private void SeedTestWorld()
         {
-            // Seed multiplo: scegliamo UNO scenario per volta,
-            // così i log sono chiari e non si sovrappongono.
-            switch (debugScenario)
-            {
-                case DebugScenario.Day6_Assimilation:
-                    Seed_Day6();
-                    break;
+            int centerX = Mathf.Max(0, _world.MapWidth / 2);
+            int centerY = Mathf.Max(0, _world.MapHeight / 2);
 
-                case DebugScenario.Day7_Delivery:
-                    Seed_Day7();
-                    break;
+            var needs = NpcNeeds.Default();
+            needs.SetValue(NeedKind.Hunger, 0.10f);
+            needs.SetValue(NeedKind.Rest, 0.10f);
 
-                case DebugScenario.Day8_ObjectPerception:
-                    Seed_Day8();
-                    break;
-
-                case DebugScenario.Day9_NeedsOwnership:
-                    Seed_Day9();
-                    break;
-
-                case DebugScenario.Day10_Move_Memory_Theft:
-                    Seed_Day10();
-                    break;
-                
-                case DebugScenario.P0_02_Landmark_PathFinding:
-                    Seed_P0_02_Landmark_PathFinding();
-                    break;
-
-                case DebugScenario.FromScenarioFile:
-                    Seed_FromScenarioFile();
-                    break;
-
-                default:
-                    Seed_Day7();
-                    break;
-            }
-        }
-
-        // ============================================================
-        // DAY 6: Assimilation test (token -> trace heard/rumor)
-        // ============================================================
-        private void Seed_Day6()
-        {
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T6"),
-                new LogBlock(LogLevel.Info, "log.seed.name")
-                    .AddField("seed", "Day6_Assimilation")
+            int npcId = _world.CreateNpc(
+                NpcDnaProfile.CreateDefault("NPC_Runtime_1"),
+                needs,
+                new Social
+                {
+                    LeadershipScore = 0.2f,
+                    LoyaltyToLeader01 = 0.5f,
+                    JusticePerception01 = 0.5f
+                },
+                centerX,
+                centerY
             );
 
-            // Per ora la gestione delle regioni come memoria spaziale è inserita come progetto ma non implementata
-            _world.Global.EnableMemorySpatialFusion = false;
-            _world.Global.MemoryRegionSizeCells = 4;
-
-            // Token budget alto per test
-            _world.Global.MaxTokensPerEncounter = 2;
-            _world.Global.MaxTokensPerNpcPerDay = 50;
-            _world.Global.RepeatShareCooldownTicks = 0;
-
-            // Delivery ?neutro?: nessun muro, LOS off (così non blocchi per caso)
-            _world.Global.TokenDeliveryMaxRangeCells = 10;
-            _world.Global.EnableTokenLOS = false;
-
-            // Falloff quasi nullo per rendere i valori leggibili e stabili
-            _world.Global.TokenReliabilityFalloffPerCell = 0.00f;
-            _world.Global.TokenIntensityFalloffPerCell = 0.00f;
-
-            // 2 NPC vicini così emission trova contatto facilmente
-            int a = CreateNpcAt(0, 0, "NPC_T6_A");
-            int b = CreateNpcAt(1, 0, "NPC_T6_B");
-
-            _world.SetFacing(a, CardinalDirection.East);
-            _world.SetFacing(b, CardinalDirection.West);
+            _world.SetFacing(npcId, CardinalDirection.North);
 
             ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T6"),
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Bootstrap"),
+                new LogBlock(LogLevel.Info, "log.seed.name")
+                    .AddField("seed", MinimalBootstrapLabel)
+            );
+
+            ArcontioLogger.Info(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Bootstrap"),
                 new LogBlock(LogLevel.Info, "log.seed.expectation")
-                    .AddField("expectation", "tick%50 PredatorSpotted -> memory -> token -> assimilation (heard trace on listener).")
-            );
-
-            int CreateNpcAt(int x, int y, string name)
-            {
-                var _n = NpcNeeds.Default();
-                _n.SetValue(NeedKind.Hunger, 0.1f);
-                _n.SetValue(NeedKind.Rest,   0.1f);
-                return _world.CreateNpc(NpcDnaProfile.CreateDefault(name),
-                    _n,
-                    new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
-                    x, y
-                );
-            }
-        }
-
-        // ============================================================
-        // DAY 7: Delivery test (range/LOS + BFS shout detour)
-        // ============================================================
-        private void Seed_Day7()
-        {
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T7"),
-                new LogBlock(LogLevel.Info, "log.seed.name")
-                    .AddField("seed", "Day7_Delivery")
-            );
-
-            // Token params (Giorno 5/6/7)
-            _world.Global.MaxTokensPerEncounter = 2;
-            _world.Global.MaxTokensPerNpcPerDay = 50;
-            _world.Global.RepeatShareCooldownTicks = 0;
-
-            // Delivery params (Giorno 7)
-            _world.Global.TokenDeliveryMaxRangeCells = 10;
-            _world.Global.EnableTokenLOS = true;
-            _world.Global.TokenReliabilityFalloffPerCell = 0.06f;
-            _world.Global.TokenIntensityFalloffPerCell = 0.04f;
-
-            // ============================================================
-            // SCENARIO GUIDATO: 2 coppie separate da muri diversi
-            //
-            // Coppia A (muro corto, 1 blocco):
-            //   NPC_A1 (0,0)  | muro (1,0) | NPC_A2 (2,0)
-            //
-            // Coppia B (muro lungo, più blocchi):
-            //   NPC_B1 (0,5)  | muro lungo su x=1 da y=4..6 | NPC_B2 (2,5)
-            //
-            // In entrambi i casi:
-            // - ProximityTalk (LOS) -> bloccato dal muro pieno.
-            // - AlarmShout (BFS) -> aggira muri; muro lungo = detour maggiore => più degrado.
-            // ============================================================
-
-            // Muro corto (SetOccluder obsoleto, usa create object)
-            _world.CreateObject(defId: "wall_stone", x: 11, y: 10);
-            //_world.SetOccluder(1, 0, new Occluder { BlocksVision = true, BlocksMovement = true, VisionCost = 1.0f });
-
-            // Muro lungo
-            _world.CreateObject(defId: "wall_stone", x: 11, y: 14);
-            _world.CreateObject(defId: "wall_stone", x: 11, y: 15);
-            _world.CreateObject(defId: "wall_stone", x: 11, y: 16);
-            //_world.SetOccluder(1, 4, new Occluder { BlocksVision = true, BlocksMovement = true, VisionCost = 1.0f });
-            //_world.SetOccluder(1, 5, new Occluder { BlocksVision = true, BlocksMovement = true, VisionCost = 1.0f });
-            //_world.SetOccluder(1, 6, new Occluder { BlocksVision = true, BlocksMovement = true, VisionCost = 1.0f });
-
-
-            // 4 NPC: uno "low law" che tenderà a rubare, altri più legali.
-            int a1 = CreateNpcAt(10, 10, "NPC_A1");
-            int a2 = CreateNpcAt(12, 10, "NPC_A2");
-            int b1 = CreateNpcAt(10, 15, "NPC_B1");
-            int b2 = CreateNpcAt(12, 15, "NPC_B2");
-
-            _world.SetFacing(a1, CardinalDirection.East);
-            _world.SetFacing(a2, CardinalDirection.West);
-            _world.SetFacing(b1, CardinalDirection.West);
-            _world.SetFacing(b2, CardinalDirection.West);
-
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T7"),
-                new LogBlock(LogLevel.Info, "log.seed.expectation")
-                    .AddField("expectation", "every 50 ticks inject AlarmShout (1->2 and 3->4). Delivery logs show different dist/deg for short vs long wall.")
-            );
-
-            int CreateNpcAt(int x, int y, string name)
-            {
-                var _n = NpcNeeds.Default();
-                _n.SetValue(NeedKind.Hunger, 0.1f);
-                _n.SetValue(NeedKind.Rest,   0.1f);
-                return _world.CreateNpc(NpcDnaProfile.CreateDefault(name),
-                    _n,
-                    new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
-                    x, y
-                );
-            }
-        }
-
-        // ============================================================
-        // Object perception test (cone FOV + ObjectSpottedEvent -> memory)
-        // ============================================================
-        private void Seed_Day8()
-        {
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T8"),
-                new LogBlock(LogLevel.Info, "log.seed.name")
-                    .AddField("seed", "Day8_ObjectPerception")
-            );
-
-            // Token systems possono restare attivi, ma qui il focus è:
-            // ObjectPerceptionSystem -> ObjectSpottedEvent -> ObjectSpottedMemoryRule
-            _world.Global.MaxTokensPerEncounter = 0; // opzionale: ?spengo? token per non inquinare log
-            _world.Global.MaxTokensPerNpcPerDay = 0;
-            _world.Global.RepeatShareCooldownTicks = 0;
-
-            // 1 NPC che guarda a Est
-            int npc = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC_T8"),
-                NpcNeeds.Make(0.1f, 0.1f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
-                0, 0
-            );
-
-            _world.SetFacing(npc, CardinalDirection.East);
-
-            // Piazziamo oggetti nel cono:
-            // - davanti (2,0) -> deve essere visto
-            // - diagonale davanti (2,1) -> deve essere visto (cono)
-            // - dietro ( -2,0 ) -> NON deve essere visto
-            _world.CreateObject(defId: "bed_wood_poor", x: 2, y: 0, ownerKind: OwnerKind.Npc, ownerId: npc);
-            _world.CreateObject(defId: "workbench_basic", x: 2, y: 1, ownerKind: OwnerKind.Community, ownerId: 0);
-            _world.CreateObject(defId: "chair_basic", x: -2, y: 0, ownerKind: OwnerKind.Community, ownerId: 0);
-
-            ArcontioLogger.Debug(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T8"),
-                new LogBlock(LogLevel.Debug, "log.t8.info0")
-                    .AddField("objects", _world.Objects.Count)
-                    .AddField("vision", _world.Global.NpcVisionRangeCells)
-                    .AddField("cone", _world.Global.NpcVisionConeHalfWidthPerStep.ToString("0.00"))
+                    .AddField("expectation", "world initialized + single NPC at map center for tick, needs, perception and runtime dev tools.")
+                    .AddField("npcId", npcId)
+                    .AddField("pos", $"({centerX},{centerY})")
             );
         }
 
-        /// <summary>
-        /// LogDay8Snapshot:
-        /// Log sintetico solo nel seed Day8:
-        /// - elenca gli oggetti visibili per NPC_1 in questo momento (cone + range)
-        /// - ti permette di validare rapidamente ?bed/workbench sì, chair dietro no?.
-        ///
-        /// Nota:
-        /// qui NON usiamo eventi: è una "sonda" di debug.
-        /// Serve a capire se la geometria di FOV è corretta senza rincorrere 100 eventi.
-        /// </summary>
-        private void LogDay8Snapshot(Tick tick)
-        {
-            // Assunzione test: esiste almeno npcId=1
-            int npcId = 1;
-            if (!_world.GridPos.TryGetValue(npcId, out var np))
-            {
-                ArcontioLogger.Warn(
-                    new LogContext(tick: tick.Index, channel: "T8"),
-                    new LogBlock(LogLevel.Warn, "log.t8.snap.missing_pos")
-                        .AddField("npc", "npc1")
-                );
-                return;
-            }
-
-            if (!_world.NpcFacing.TryGetValue(npcId, out var facing))
-                facing = CardinalDirection.North;
-
-            int vision = _world.Global.NpcVisionRangeCells <= 0 ? 6 : _world.Global.NpcVisionRangeCells;
-            float cone = _world.Global.NpcVisionConeHalfWidthPerStep;
-            if (cone < 0f) cone = 0f;
-
-            // raccogli defId in set (no duplicati)
-            var seen = new HashSet<string>();
-
-            foreach (var kv in _world.Objects)
-            {
-                var obj = kv.Value;
-                if (obj == null) continue;
-
-                int dist = Mathf.Abs(obj.CellX - np.X) + Mathf.Abs(obj.CellY - np.Y);
-                if (dist > vision) continue;
-
-                // Riusa la stessa logica del sistema (replicata qui per debug)
-                // Patch 0.02.5A: IsInCone_Debug rimosso — delega a FovUtils.IsInCone.
-                // FovUtils è la fonte canonica unica del cono in tutto il progetto.
-                if (!FovUtils.IsInCone(np.X, np.Y, facing, obj.CellX, obj.CellY, cone))
-                    continue;
-
-                seen.Add(obj.DefId);
-            }
-
-            string list = (seen.Count == 0) ? "<none>" : string.Join(", ", seen);
-            ArcontioLogger.Trace(
-                new LogContext(tick: tick.Index, channel: "T8"),
-                new LogBlock(LogLevel.Trace, "log.t8.snap.details")
-                    .AddField("npc", "npc1")
-                    .AddField("pos", $"({np.X},{np.Y})")
-                    .AddField("facing", facing)
-                    .AddField("vision", vision)
-                    .AddField("cone", cone.ToString("0.00"))
-                    .AddField("seesCount", seen.Count)
-                    .AddField("list", list)
-            );
-        }
-
-        private void Seed_Day9()
-        {
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T9"),
-                new LogBlock(LogLevel.Info, "log.seed.name")
-                    .AddField("seed", "Day9_Needs_Food_Beds_Theft")
-            );
-
-            // --- Needs config già caricata da JSON ---
-            // Se vuoi forzare per test (override):
-            // _world.Global.Needs = NeedsConfig.Default();
-
-            // Disattivo token per non inquinare log del day9
-            _world.Global.MaxTokensPerEncounter = 0;
-            _world.Global.MaxTokensPerNpcPerDay = 0;
-            _world.Global.RepeatShareCooldownTicks = 0;
-
-            // ============================================================
-            // SCENARIO:
-            // - NPC1 (id=1) e NPC2 (id=2)
-            // - 2 letti (1 community, 1 owned da NPC2)
-            // - 1 stock cibo libero visibile
-            // - 4 cibo privato di NPC2
-            // - 1 stock cibo libero nascosto da occluder (non visibile a NPC1)
-            //
-            // Aspettative:
-            // - NPC1 vede e ricorda i letti (nel cono).
-            // - NPC2 consuma prima cibo privato.
-            // - NPC1 consuma stock libero; finito, può rubare da NPC2 se lawfulness basso
-            // - NPC1 sceglie letto community se libero.
-            // ============================================================
-
-            // Occluder per ?nascondere? stock libero #2 a NPC1 (blocca LOS percezione)
-            // Nota: questo funziona solo se in ObjectPerceptionSystem hai check LOS sugli occluder.
-            //_world.SetOccluder(2, 1, new Occluder { BlocksVision = true, BlocksMovement = true, VisionCost = 1f });
-
-            int wall = _world.CreateObject(defId: "wall_stone", x: 22, y: 23);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 22, y: 22);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 22, y: 21);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 22, y: 20);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 22, y: 19);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 22, y: 18);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 22, y: 17);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 23, y: 17);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 24, y: 17);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 25, y: 17);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-            wall = _world.CreateObject(defId: "wall_stone", x: 26, y: 17);
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                                 new LogBlock(LogLevel.Debug, "object.spawn")
-                                 .AddField("obj", "wall_stone")
-                                 .AddField("id", wall));
-
-            // NPC1: basso rispetto legge (ruberà ?facile?)
-            int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC1"),
-                NpcNeeds.Make(0.85f, 0.85f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
-                x: 20, y: 20
-            );
-
-            // NPC2: alto rispetto legge (non ruba; ha cibo privato)
-            int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC2"),
-                NpcNeeds.Make(0.80f, 0.40f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
-                x: 20, y: 22
-            );
-
-            // NPC3: alto rispetto legge (non ruba; ha cibo privato)
-            int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC3"),
-                NpcNeeds.Make(0.80f, 0.40f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
-                x: 28, y: 19
-            );
-            // Facing: NPC1 guarda verso "su" dove mettiamo letti/food
-            _world.SetFacing(npc1, CardinalDirection.North);
-            _world.SetFacing(npc2, CardinalDirection.North);
-            _world.SetFacing(npc3, CardinalDirection.West);
-
-            // --- Oggetti: letti ---
-            int bedCommunity = _world.CreateObject(defId: "bed_wood_poor", x: 20, y: 23, ownerKind: OwnerKind.Community, ownerId: 0);
-            _world.ObjectUse[bedCommunity] = ObjectUseState.Free();
-
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-               new LogBlock(LogLevel.Debug, "object.spawn")
-                  .AddField("obj", "bed_wood_poor")
-                  .AddField("units", 1));
-
-            int bedNpc2 = _world.CreateObject(defId: "bed_wood_good", x: 21, y: 23, ownerKind: OwnerKind.Npc, ownerId: npc2);
-            _world.ObjectUse[bedNpc2] = ObjectUseState.Free();
-
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-               new LogBlock(LogLevel.Debug, "object.spawn")
-                  .AddField("obj", "bed_wood_good")
-                  .AddField("units", 1));
-
-            // --- Cibo: stock libero visibile (davanti a NPC1) ---
-            int foodFreeVisible = _world.CreateObject(defId: "food_stock", x: 20, y: 21, ownerKind: OwnerKind.Community, ownerId: 0);
-            _world.SetFoodStock(foodFreeVisible, new FoodStockComponent { Units = 5, OwnerKind = OwnerKind.Community, OwnerId = 0 });
-
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-               new LogBlock(LogLevel.Debug, "object.spawn")
-                  .AddField("obj", "food_stock visible")
-                  .AddField("units", 5));
-
-            // --- Cibo: stock libero nascosto (dietro muro/occluder) ---
-            int foodFreeHidden = _world.CreateObject(defId: "food_stock", x: 23, y: 22, ownerKind: OwnerKind.Community, ownerId: 0);
-            _world.SetFoodStock(foodFreeHidden, new FoodStockComponent { Units = 3, OwnerKind = OwnerKind.Community, OwnerId = 0 });
-
-            ArcontioLogger.Debug(new LogContext(0, "T9"),
-                new LogBlock(LogLevel.Debug, "object.spawn")
-                   .AddField("obj", "food_stock hidden")
-                   .AddField("units", 3));
-
-            // --- Cibo privato NPC2 ---
-            _world.NpcPrivateFood[npc2] = 4;
-
-            // --- Cibo privato NPC3 ---
-            _world.NpcPrivateFood[npc3] = 4;
-
-            ArcontioLogger.Info(new LogContext(0, "T9"),
-                new LogBlock(LogLevel.Info, "log.t9.seed.setup_done"));
-
-            ArcontioLogger.Info(new LogContext(0, "T9"),
-                new LogBlock(LogLevel.Info, "log.t9.seed.npc1")
-                    .AddField("id", npc1)
-                    .AddField("pos", "(0,0)")
-                    .AddField("law", _world.Social[npc1].JusticePerception01.ToString("0.00"))
-                    .AddField("hunger", _world.Needs[npc1].GetValue(NeedKind.Hunger).ToString("0.00"))
-                    .AddField("rest",   _world.Needs[npc1].GetValue(NeedKind.Rest).ToString("0.00"))
-            );
-
-            ArcontioLogger.Info(new LogContext(0, "T9"),
-                new LogBlock(LogLevel.Info, "log.t9.seed.npc2")
-                    .AddField("id", npc2)
-                    .AddField("pos", "(0,2)")
-                    .AddField("law", _world.Social[npc2].JusticePerception01.ToString("0.00"))
-                    .AddField("privateFood", _world.NpcPrivateFood[npc2])
-                    .AddField("hunger", _world.Needs[npc2].GetValue(NeedKind.Hunger).ToString("0.00"))
-            );
-
-            ArcontioLogger.Info(new LogContext(0, "T9"),
-                new LogBlock(LogLevel.Info, "log.t9.seed.objects")
-                    .AddField("bedCommunity", bedCommunity)
-                    .AddField("bedNpc2", bedNpc2)
-                    .AddField("foodFreeVisible", foodFreeVisible)
-                    .AddField("foodFreeHidden", foodFreeHidden)
-            );
-        }
-
-        // ============================================================
-        // DAY 10: Movement + Theft from Stock + Witness (LOS)
-        // ============================================================
-        private void Seed_Day10()
-        {
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T10"),
-                new LogBlock(LogLevel.Info, "log.seed.name")
-                    .AddField("seed", "Day10_Move_Memory_Theft")
-            );
-
-            // Disattivo token: qui testiamo movement/LOS/furti, non comunicazione.
-            /*_world.Global.MaxTokensPerEncounter = 0;
-            _world.Global.MaxTokensPerNpcPerDay = 0;
-            _world.Global.RepeatShareCooldownTicks = 0;*/
-
-            // ============================================================
-            // Scenario richiesto:
-            // A) almeno 5 NPC
-            // B) cibo community + cibo privato a terra (non addosso)
-            // C) muri sparsi per furti senza sospetti / cibo non visto
-            // ============================================================
-
-            // Muri sparsi (occluder) - piccoli "blocchi" che spezzano LOS.
-            _world.CreateObject(defId: "wall_stone", x: 10, y: 10);
-            _world.CreateObject(defId: "wall_stone", x: 11, y: 10);
-            _world.CreateObject(defId: "wall_stone", x: 12, y: 10);
-            _world.CreateObject(defId: "wall_stone", x: 12, y: 11);
-
-            _world.CreateObject(defId: "wall_stone", x: 16, y: 14);
-            _world.CreateObject(defId: "wall_stone", x: 16, y: 15);
-
-            // 5 NPC: uno "low law" che tenderà a rubare, altri più legali.
-            int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC1_Thief"),
-                NpcNeeds.Make(0.90f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
-                x: 5, y: 5
-            );
-
-            int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC2_Owner"),
-                NpcNeeds.Make(0.40f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
-                x: 18, y: 12
-            );
-
-            int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC3_Witness"),
-                NpcNeeds.Make(0.30f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.70f },
-                x: 14, y: 12
-            );
-
-            int npc4 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC4"),
-                NpcNeeds.Make(0.60f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
-                x: 22, y: 16
-            );
-
-            int npc5 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC5"),
-                NpcNeeds.Make(0.55f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
-                x: 6, y: 16
-            );
-
-            _world.SetFacing(npc1, CardinalDirection.East);
-            _world.SetFacing(npc2, CardinalDirection.West);
-            _world.SetFacing(npc3, CardinalDirection.West);
-            _world.SetFacing(npc4, CardinalDirection.West);
-            _world.SetFacing(npc5, CardinalDirection.East);
-
-            // Cibo community "in chiaro" (legale)
-            int foodCommunity = _world.CreateObject(defId: "food_stock", x: 9, y: 8, ownerKind: OwnerKind.Community, ownerId: 0);
-            _world.SetFoodStock(foodCommunity, new FoodStockComponent { Units = 3, OwnerKind = OwnerKind.Community, OwnerId = 0 });
-
-            // Cibo privato a terra (il caso nuovo Day10)
-            // - uno visibile con potenziale witness
-            // - uno "dietro muro" per testare furto senza sospetti
-            int foodPrivateVisible = _world.CreateObject(defId: "food_stock", x: 17, y: 12, ownerKind: OwnerKind.Npc, ownerId: npc2);
-            _world.SetFoodStock(foodPrivateVisible, new FoodStockComponent { Units = 4, OwnerKind = OwnerKind.Npc, OwnerId = npc2 });
-
-            int foodPrivateHidden = _world.CreateObject(defId: "food_stock", x: 12, y: 9, ownerKind: OwnerKind.Npc, ownerId: npc2);
-            _world.SetFoodStock(foodPrivateHidden, new FoodStockComponent { Units = 2, OwnerKind = OwnerKind.Npc, OwnerId = npc2 });
-           
-            // --- Cibo privato NPC5 ---
-            _world.NpcPrivateFood[npc5] = _world.Global.InventoryMaxUnits;
-
-
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T10"),
-                new LogBlock(LogLevel.Info, "log.seed.expectation")
-                    .AddField("expectation", "NPC1 cerca cibo community; esaurito -> può rubare stock privato a terra. Se NPC3 ha LOS dovrebbe generare TheftWitnessed."));
-
- /*           ArcontioLogger.Info(new LogContext(0, "T10"),
-                new LogBlock(LogLevel.Info, "log.seed.expectatio")
-                    .AddField("foodCommunity", foodCommunity)
-                    .AddField("foodPrivateVisible ", foodPrivateVisible)
-                    .AddField("foodPrivateHidden ", foodPrivateHidden));*/
-
-        }
-        // ============================================================
-        // SCENARIO DA FILE (v0.04.07.b)
-        // ============================================================
-        // Legge gli NPC da Resources/Arcontio/Scenarios/default_scenario.json.
-        // Se il file non esiste o è vuoto, fa fallback a Seed_P0_02_Landmark_PathFinding.
-        // Il file di scenario non contiene oggetti/muri: quelli restano hardcoded
-        // oppure verranno spostati in un formato separato in una sessione futura.
-        private void Seed_FromScenarioFile()
-        {
-            ArcontioLogger.Info(
-                new LogContext(tick: 0, channel: "ScenarioLoader"),
-                new LogBlock(LogLevel.Info, "log.seed.name")
-                    .AddField("seed", "Seed_FromScenarioFile")
-                    .AddField("path", "Resources/Arcontio/Scenarios/default_scenario")
-            );
-
-            bool loaded = NpcScenarioLoader.TryLoadDefaultAndSpawn(_world);
-
-            if (!loaded)
-            {
-                ArcontioLogger.Info(
-                    new LogContext(tick: 0, channel: "ScenarioLoader"),
-                    new LogBlock(LogLevel.Info, "log.scenario.fallback")
-                        .AddField("reason", "default_scenario.json non trovato — fallback a P0_02")
-                );
-                Seed_P0_02_Landmark_PathFinding();
-            }
-        }
-
-        // ============================================================
-        // 0.02 LANDMARK PATHFINDING SCENARIO
-        // ============================================================
-        private void Seed_P0_02_Landmark_PathFinding()
-        {
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "P0_02"),
-                new LogBlock(LogLevel.Info, "log.seed.name")
-                    .AddField("seed", "Seed_P0_02_Landmark_PathFinding")
-            );
-
-            // Disattivo token: qui testiamo movement/LOS/furti, non comunicazione.
-            /*_world.Global.MaxTokensPerEncounter = 0;
-            _world.Global.MaxTokensPerNpcPerDay = 0;
-            _world.Global.RepeatShareCooldownTicks = 0;*/
-
-            // ============================================================
-            // Scenario richiesto:
-            //#########
-            //#       #
-            //#   #   #
-            //#   #   #
-            //#---+---#
-            //#   #   #
-            //#   #   #
-            //#       #
-            //#########
-            // Legenda:
-            //    # = muro
-            //    spazio = cella navigabile
-            //    + = junction(4 uscite)
-            //    - = corridoio
-            //    porta su uno dei corridoi
-            // ============================================================
-
-            // Muri sparsi (occluder) - piccoli "blocchi" che spezzano LOS.
-            _world.CreateObject(defId: "wall_stone", x: 31, y: 20);
-            _world.CreateObject(defId: "wall_stone", x: 31, y: 21);
-            //_world.CreateObject(defId: "wall_stone", x: 31, y: 22);
-            _world.CreateObject(defId: "wall_stone", x: 31, y: 23);
-            _world.CreateObject(defId: "wall_stone", x: 31, y: 24);
-    
-            _world.CreateObject(defId: "wall_stone", x: 33, y: 20);
-            _world.CreateObject(defId: "wall_stone", x: 33, y: 21);
-            //_world.CreateObject(defId: "wall_stone", x: 33, y: 22);
-            _world.CreateObject(defId: "wall_stone", x: 33, y: 23);
-            _world.CreateObject(defId: "wall_stone", x: 33, y: 24);
-
-            _world.CreateObject(defId: "wall_stone", x: 30, y: 21);
-            //_world.CreateObject(defId: "wall_stone", x: 32, y: 21);
-            _world.CreateObject(defId: "wall_stone", x: 34, y: 21);
-
-            _world.CreateObject(defId: "wall_stone", x: 30, y: 23);
-            //_world.CreateObject(defId: "wall_stone", x: 32, y: 23);
-            _world.CreateObject(defId: "wall_stone", x: 34, y: 23);
-
-            _world.CreateObject(defId: "door_wood_good", x: 32, y: 24, ownerKind: OwnerKind.Community, ownerId: 0);
-
-            // 5 NPC: uno "low law" che tenderà a rubare, altri più legali.
-            int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC1_Thief"),
-                NpcNeeds.Make(0.00f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.20f },
-                x: 15, y: 15
-            );
-            /*
-            int npc2 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC2_Owner"),
-                NpcNeeds.Make(0.40f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.90f },
-                x: 18, y: 12
-            );
-
-            int npc3 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC3_Witness"),
-                NpcNeeds.Make(0.30f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.70f },
-                x: 14, y: 12
-            );
-
-            int npc4 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC4"),
-                NpcNeeds.Make(0.60f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
-                x: 22, y: 16
-            );
-
-            int npc5 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC5"),
-                NpcNeeds.Make(0.55f, 0.20f),
-                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.60f },
-                x: 6, y: 16
-            );
-
-            _world.SetFacing(npc1, CardinalDirection.East);
-            _world.SetFacing(npc2, CardinalDirection.West);
-            _world.SetFacing(npc3, CardinalDirection.West);
-            _world.SetFacing(npc4, CardinalDirection.West);
-            _world.SetFacing(npc5, CardinalDirection.East);
-*/
-   /*         // Cibo community "in chiaro" (legale)
-            int foodCommunity = _world.CreateObject(defId: "food_stock", x: 9, y: 8, ownerKind: OwnerKind.Community, ownerId: 0);
-            _world.SetFoodStock(foodCommunity, new FoodStockComponent { Units = 3, OwnerKind = OwnerKind.Community, OwnerId = 0 });
-
-            // Cibo privato a terra (il caso nuovo Day10)
-            // - uno visibile con potenziale witness
-            // - uno "dietro muro" per testare furto senza sospetti
-            int foodPrivateVisible = _world.CreateObject(defId: "food_stock", x: 17, y: 12, ownerKind: OwnerKind.Npc, ownerId: npc2);
-            _world.SetFoodStock(foodPrivateVisible, new FoodStockComponent { Units = 4, OwnerKind = OwnerKind.Npc, OwnerId = npc2 });
-
-            int foodPrivateHidden = _world.CreateObject(defId: "food_stock", x: 12, y: 9, ownerKind: OwnerKind.Npc, ownerId: npc2);
-            _world.SetFoodStock(foodPrivateHidden, new FoodStockComponent { Units = 2, OwnerKind = OwnerKind.Npc, OwnerId = npc2 });
-
-            // --- Cibo privato NPC5 ---
-            _world.NpcPrivateFood[npc5] = _world.Global.InventoryMaxUnits;
-   */
-
-     /*       ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T10"),
-                new LogBlock(LogLevel.Info, "log.seed.expectation")
-                    .AddField("expectation", "NPC1 cerca cibo community; esaurito -> può rubare stock privato a terra. Se NPC3 ha LOS dovrebbe generare TheftWitnessed."));
-     */
-            /*           ArcontioLogger.Info(new LogContext(0, "T10"),
-                           new LogBlock(LogLevel.Info, "log.seed.expectatio")
-                               .AddField("foodCommunity", foodCommunity)
-                               .AddField("foodPrivateVisible ", foodPrivateVisible)
-                               .AddField("foodPrivateHidden ", foodPrivateHidden));*/
-
-        }
 
         // Patch 0.02.5A: IsInCone_Debug rimosso.
         // Usava Mathf.FloorToInt invece di (int)Math.Floor — semantica equivalente
@@ -1491,3 +740,5 @@ namespace Arcontio.Core
         }
     }
 }
+
+

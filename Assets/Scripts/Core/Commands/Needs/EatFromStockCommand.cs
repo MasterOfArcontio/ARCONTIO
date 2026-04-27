@@ -61,10 +61,9 @@ namespace Arcontio.Core
                     stockY = stockInst.CellY;
                 }
 
-                // Rimuovi l'istanza dal mondo + componenti collegati.
-                world.FoodStocks.Remove(_foodObjId);
-                world.ObjectUse.Remove(_foodObjId);
-                world.Objects.Remove(_foodObjId);
+                // Usiamo la mutation authority canonica dell'object lifecycle
+                // cosi cache e store collegati restano coerenti in un solo punto.
+                world.DestroyObject(_foodObjId);
 
                 // Invalida lo slot in memoria per ogni NPC che in questo momento
                 // sta osservando lo stock (Range + Cone + LOS).
