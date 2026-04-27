@@ -1,0 +1,19 @@
+{
+  "Needs": {
+    "satietyDecayPerTick":  0.0025,
+    "eatSatietyGain":       0.45,
+    "hungryThreshold":      0.70,
+
+    "thirstDecayPerTick":   0.0035,
+    "drinkThirstGain":      0.60,
+    "thirstyThreshold":     0.70,
+
+    "restDecayPerTick":     0.0020,
+    "sleepRestGainPerTick": 0.030,
+    "tiredThreshold":       0.70,
+
+    "securityDecayPerTick":  0.0007,
+    "stabilityDecayPerTick": 0.0005,
+    "socialityDecayPerTick": 0.0006
+  }
+}

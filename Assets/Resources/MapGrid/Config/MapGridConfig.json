@@ -1,0 +1,54 @@
+{
+  "mapWidth": 128,
+  "mapHeight": 128,
+
+  "tileSizeWorld": 1.0,
+  "tilePixels": 32,
+
+  "chunkSize": 16,
+
+  "terrainAtlasResourcePath": "MapGrid/Atlas/TerrainAtlas",
+  "tileDefs": [
+    {
+      "id": 0,
+      "name": "iron_barren",
+      "uvX": 0,
+      "uvY": 0
+    },
+    {
+      "id": 1,
+      "name": "rocky",
+      "uvX": 1,
+      "uvY": 0
+    }
+  ],
+
+  "layoutResourcePath": "MapGrid/Layouts/Layout_Default",
+
+  "camera": {
+    "startZoom": 18.0,
+    "minZoom": 6.0,
+    "maxZoom": 40.0,
+    "zoomSpeed": 5.0,
+
+    "pixelPerfectZoom": {
+      "enabled": true,
+      "minAssetsPpu": 16,
+      "maxAssetsPpu": 128,
+      "stepAssetsPpu": 2
+    },
+
+    "panSmoothTime": 0.3,
+    "panMaxSpeed": 550.0,
+    "rightMouseDragPan": true,
+
+
+    "edgePanBorderPx": 18,
+    "edgePanSpeedWorld": 18.0
+  },
+
+  "npc": {
+    "spriteResourcePath": "MapGrid/Sprites/NPC_01",
+    "spawnCount": 12
+  }
+}

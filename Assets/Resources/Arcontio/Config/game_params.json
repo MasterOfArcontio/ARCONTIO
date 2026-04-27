@@ -1,0 +1,149 @@
+{
+  "worldWidth": 64,
+  "worldHeight": 64,
+  "Language": "it",
+  "npcVisionRangeCells": 17,
+  "npcOperationalRangeCells": 20,
+  "npcVisionUseCone": true,
+  "npcVisionConeSlope": 1.0,
+  "npcVisionFovDegrees": 90,
+  "debug_fov": {
+    "enabled": true,
+    "window_ticks": 8,
+    "use_los": true,
+    "activeNpcOnly": true
+  },
+  "Logging": {
+    "MinLevel": "Trace",
+    "WriteUnityConsole": true,
+    "WriteFile": true,
+    "FileFormat": "html",
+    "FileNamePattern": "arcontio_{yyyyMMdd_HHmmss}.html",
+    "IncludeTimestamp": true,
+    "IncludeTick": true
+  },
+  "inventory": {
+    "inventory_max_units": 30
+  },
+  "movement": {
+    "intentStuckTicksDefault": 12,
+    "intentStuckTicksLastMile": 8,
+    "intentStuckTicksBlocked": 6,
+    "directPrefixCells": 3,
+    "directCheckFovOnAcquisition": true,
+    "backoff_stage1_ticks": 24,
+    "backoff_stage2_ticks": 60,
+    "backoff_max_stages": 2,
+    "blacklist_penalty_stage1": 0.12,
+    "blacklist_penalty_stage2": 0.35
+  },
+  "decision": {
+    "selectionMode": "DeterministicTop1",
+    "topN": 1,
+    "noise01": 0.0,
+    "impulsivityNoiseBonus": 0.0,
+    "minimumWeight": 0.001
+  },
+  "explainability": {
+    "enabled": true,
+    "defaultVerbosity": 2,
+    "maxTrackedNpcs": 3,
+    "trackedNpcIds": [],
+    "trackActiveNpcOnly": true,
+    "ringBuffer_intent": 10,
+    "ringBuffer_plan": 10,
+    "ringBuffer_events_low": 60,
+    "ringBuffer_events_high": 200,
+    "verbosityHighThreshold": 3,
+    "writeJsonLog": true,
+    "jsonLogFileNamePattern": "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl"
+  },
+  "landmarks": {
+    "enableLandmarkSystem": true,
+    "maxLandmarksPerNpc": 64,
+    "maxEdgesPerNpc": 128,
+    "maxPoiAnchorsPerNpc": 32,
+    "maxWorldLandmarks": 512,
+    "maxEdgesPerLandmark": 8,
+    "merge_radius": 1,
+    "door_prune_radius": 2.0,
+    "waypoint_min_distance": 17,
+    "waypoint_min_dt": 3,
+    "eviction": {
+      "eviction_stale_ticks": 60000,
+      "eviction_cooldown_ticks": 120
+    },
+    "retry": {
+      "retry_backoff_min_ticks": 10,
+      "retry_backoff_max_ticks": 80
+    },
+    "debug": {
+      "enabled": true,
+      "activeNpcOnly": true
+    },
+    "localSearch": {
+      "enabled": true,
+      "useJumpPointSearch": true,
+      "maxExpandedNodes": 128,
+      "maxIterations": 128,
+      "maxSearchRadius": 10,
+      "maxJumpDistance": 12,
+      "heuristicWeight": 1.0,
+      "recentVisitedMemory": 16,
+      "debugLog": false,
+      "commitMinSteps": 3,
+      "preventImmediateBacktrack": true
+    }
+  },
+  "gvd_din": {
+    "enabled": true,
+    "pruning_min_branch_length": 3,
+    "area_center_min_dt_value": 4,
+    "area_center_min_spacing_cells": 5,
+    "merge_radius_gvd": 2.5,
+    "debug": {
+      "show_dt_heatmap": false,
+      "show_gvd_raw": false,
+      "show_gvd_nodes": true
+    }
+  },
+  "hybrid_landmark": {
+    "use_hybrid_extractor": false,
+    "dt_open_threshold": 3,
+    "merge_radius": 2.5,
+    "min_region_area": 4,
+    "median_tolerance": 1
+  },
+  "landmark_perception": {
+    "enabled": true,
+    "period": 1,
+    "subjective_edges_enabled": true,
+    "subjective_edge_max_dist": 8,
+    "subjective_edge_base_reliability": 0.15
+  },
+  "memory": {
+    "max_traces_per_npc": 128
+  },
+  "memory_belief_decision_explainability": {
+    "enabled": true,
+    "defaultVerbosity": 3,
+    "maxTrackedNpcs": 5,
+    "trackedNpcIds": [],
+    "trackActiveNpcOnly": false,
+    "writeJsonLog": true,
+    "jsonLogFileNamePattern": "arcontio_el_mbd_runtime.jsonl",
+    "logMemory": true,
+    "logBelief": true,
+    "logQuery": true,
+    "logDecision": true,
+    "logBridge": true,
+    "includeCandidates": true,
+    "includeScoreBreakdown": true,
+    "includeRejectedCandidates": true,
+    "ringBuffer_memory": 80,
+    "ringBuffer_belief": 80,
+    "ringBuffer_query": 40,
+    "ringBuffer_decision": 24,
+    "ringBuffer_bridge": 24
+  }
+}

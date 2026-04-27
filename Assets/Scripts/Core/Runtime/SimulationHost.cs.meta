@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: bf07004ad7000ce488cf39bd1ef897a6
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - togglePauseAction: {fileID: -5880669337971614090, guid: 3f24997ecb1dd23489c2ec4adc434fc9, type: 3}
+  - stepOneTickAction: {fileID: -5527416214569420043, guid: 3f24997ecb1dd23489c2ec4adc434fc9, type: 3}
+  - stepTenTicksAction: {fileID: -3793814015695664784, guid: 3f24997ecb1dd23489c2ec4adc434fc9, type: 3}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
