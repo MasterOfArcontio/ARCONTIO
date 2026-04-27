@@ -1,0 +1,729 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>GESTIONE NPC SIGHT</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+/* Override strong tags inside headings to maintain consistent weight */
+h1 strong,
+h2 strong,
+h3 strong {
+	font-weight: 600;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	justify-content: space-between;
+}
+
+.column {
+	padding: 0 1em;
+}
+
+.column:first-child {
+	padding-left: 0;
+}
+
+.column:last-child {
+	padding-right: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="3089c167-6366-808c-a64d-fd60595398a5" class="page sans"><header><h1 class="page-title" dir="auto">GESTIONE NPC SIGHT</h1><p class="page-description" dir="auto"></p></header><div class="page-body"><div style="display:contents" dir="auto"><h1 id="3089c167-6366-8005-94c7-ec9273b536a8" class="">Nuovi processi (overview architetturale)</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8090-8eac-dfc991926779" class="">1) Oggetti: interagibili vs non-interagibili</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-808c-86c5-f262c7685e10" class=""><strong>Idea:</strong> un <em>WorldObjectInstance</em> è sempre “un oggetto nel mondo” (verità).</p></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80da-87ac-c40195f58941" class="">Poi distinguiamo l’oggetto per <strong>capabilities</strong> (data-driven da <code>ObjectDef</code>), non per classi.</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8059-b793-d3d55ea6494e" class="bulleted-list"><li style="list-style-type:disc"><strong>Occluder</strong> (muro/porta): oggetto che contribuisce alla <em>occlusion cache</em> e (opzionale) ha <em>health/hardness</em>.</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80d5-b621-c34dbfe00b1e" class="bulleted-list"><li style="list-style-type:disc"><strong>Interactable</strong> (letto, workbench, food stock): oggetto che entra nella “memoria oggetti” degli NPC e abilita comandi.</li></ul></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8000-ac1f-dce6b20884e3" class="">Quindi: una <code>ObjectDef</code> avrà flags/proprietà tipo:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8015-9c1a-ec0579fcb517" class="bulleted-list"><li style="list-style-type:disc"><code>BlocksVision</code>, <code>BlocksMovement</code>, <code>VisionCost</code> (per occlusione/LOS)</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8090-9ce8-c22d4050f0da" class="bulleted-list"><li style="list-style-type:disc"><code>IsInteractable</code> (entra in memoria)</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80ba-895b-d9945912e577" class="bulleted-list"><li style="list-style-type:disc"><code>HasHealth</code>, <code>MaxHp</code>, <code>Hardness</code> (distruzione)</li></ul></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-80d7-8e27-f7a3ca291f28" class="">2) Occluder come WorldObjectInstance + OcclusionMap cache derivata</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8001-adf6-efebbded64b2" class=""><strong>Fonte di verità:</strong> <code>World.Objects</code> (come già fai).</p></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8045-a793-fe742ae37edd" class=""><strong>Cache derivata:</strong> <code>World.OcclusionMap</code> (grid) per query veloci:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80c8-8ff4-e0be0b50df51" class="bulleted-list"><li style="list-style-type:disc">Quando crei/distruggi/sposti un oggetto che blocca, aggiorni la cache.</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80b1-8917-e9739f22d8eb" class="bulleted-list"><li style="list-style-type:disc"><code>TryGetOccluder(x,y)</code> diventa “consulta la cache” (O(1)) e, se vuoi, ritorna anche l’<code>objectId</code> occludente.</li></ul></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80d1-aa7e-c6ac6be50702" class="">Questo risolve il problema: oggi si <strong>nasconde con </strong><code><strong>_world.SetOccluder(...)</strong></code>, ma poi l’NPC mangia lo stesso perché la “conoscenza/decisione” sta usando <code>FoodStocks</code>/oggetti senza considerare LOS sugli occluder <em>coerentemente</em>. Se tutto passa dalla stessa <code>OcclusionMap</code>, LOS e FOV diventano consistenti.</p></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-80e8-a56e-d72919043392" class="">3) Rendering</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-801b-8e03-ca9397807c3a" class="">Le viste non devono conoscere “Occluder vs altro”.</p></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8017-a16b-cfb3f99d8a77" class="">Leggono <code>World.Objects</code> e risolvono <code>SpriteKey</code> da <code>ObjectDef</code>.</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80f3-80de-f2de9719128f" class="bulleted-list"><li style="list-style-type:disc">Walls/doors sono come gli altri: hanno <code>SpriteKey</code> (tile key).</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80a0-8dc6-c028363c5a5a" class="bulleted-list"><li style="list-style-type:disc">Se si vuole “tile png prelevata da atlas”: la view fa mapping <code>SpriteKey → sprite</code>.</li></ul></div><div style="display:contents" dir="auto"><h3 id="3089c167-6366-805d-b5a1-e68a63daff51" class="">4) Distruzione: Health + Hardness</h3></div><div style="display:contents" dir="auto"><p id="3089c167-6366-804e-ae5b-e7dcf79bd515" class="">Si aggiunge un componente (store) tipo:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8090-bc06-fd6cae159b56" class="bulleted-list"><li style="list-style-type:disc"><code>World.ObjectHealth[objectId] = new HealthComponent{ Hp, MaxHp, Hardness }</code></li></ul></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80bc-94ee-fb6e85c0af7a" class="">Un <code>DamageSystem</code>:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80b3-8bc1-ec5fcd91c6dc" class="bulleted-list"><li style="list-style-type:disc">riceve eventi/comandi di danno (es. <code>ApplyDamageCommand</code>)</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8090-8578-c7a57cb668c1" class="bulleted-list"><li style="list-style-type:disc">applica: se <code>damage &lt;= hardness</code> → niente; altrimenti <code>hp -= (damage - hardness)</code></li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80c1-b27e-e55f8621db3c" class="bulleted-list"><li style="list-style-type:disc">a <code>hp &lt;= 0</code>: rimuove <code>World.Objects[objectId]</code> e <strong>aggiorna OcclusionMap</strong> liberando la cella.</li></ul></div><div style="display:contents" dir="auto"><h3 id="3089c167-6366-803f-9ea6-c257b1270fbb" class="">5) Memoria oggetti “sparsa” per NPC con capacità fissa</h3></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8036-a7a8-cd2cce505882" class="">Questo è il modo “cheap” per fare <em>conoscenza</em> di risorse/oggetti.</p></div><div style="display:contents" dir="auto"><p id="3089c167-6366-807d-889d-c27c780964b4" class="">Struttura per NPC:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8036-af31-cf7445fdb978" class="bulleted-list"><li style="list-style-type:disc">array fisso di slot <code>KnownObjectSlot[]</code> di dimensione <code>N</code> (da config)</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-800f-b7fd-f12f5b94a369" class="bulleted-list"><li style="list-style-type:disc">ogni slot ha: <code>ObjectId</code> (o <code>DefId</code> + cella), <code>CellX/Y</code>, <code>LastSeenTick</code>, <code>Confidence01</code>, <code>OwnerKind/OwnerId</code> (se noto), <code>InteractableMask</code></li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80e2-a463-dd40cc6bf139" class="bulleted-list"><li style="list-style-type:disc">indicizzazione: <strong>lineare</strong> (N è piccolo) + merge per chiave (defId+cella oppure objectId se stabile)</li></ul></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8022-8c88-eb7a4b806b3f" class=""><strong>Encoding:</strong> <code>ObjectPerceptionSystem</code> produce <code>ObjectSpottedEvent</code> → <code>MemoryEncodingSystem</code> (o un <code>KnownObjectsEncodingSystem</code>) aggiorna <code>KnownObjectsStore</code> dell’NPC.</p></div><div style="display:contents" dir="auto"><h3 id="3089c167-6366-8011-b70f-e98fe4583bf7" class="">6) Pulizia memoria oggetti (v1)</h3></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80d7-ad02-f63b1e1d506a" class="">Politica:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-806c-a9b2-d009673a3697" class="bulleted-list"><li style="list-style-type:disc"><strong>mai eliminare</strong> oggetti posseduti dall’NPC (owner = npcId)</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8004-85e5-c77b3a1d439d" class="bulleted-list"><li style="list-style-type:disc">tenere sempre “top-K utili” in base a:<div style="display:contents" dir="auto"><ul id="3089c167-6366-80fc-a42e-eaed995907ff" class="bulleted-list"><li style="list-style-type:circle">recency (LastSeenTick)</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80bc-80fb-e79070ef97eb" class="bulleted-list"><li style="list-style-type:circle">utility (letto/food/workbench &gt; chair)</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8077-84d2-fcc972f7e658" class="bulleted-list"><li style="list-style-type:circle">distance (opzionale)</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80e5-a972-d83769d39993" class="bulleted-list"><li style="list-style-type:circle">confidence</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8049-afb7-c7ef40837335" class="">Un <code>KnownObjectsMaintenanceSystem</code> gira ogni X tick e:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8063-bfdd-dd6cda6753ab" class="bulleted-list"><li style="list-style-type:disc">compatta slot vuoti</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80d1-88d3-c06723867176" class="bulleted-list"><li style="list-style-type:disc">se over-capacity (o per mantenere qualità): rimuove i peggiori non-owned</li></ul></div><div style="display:contents" dir="auto"><p id="3089c167-6366-806b-8fb9-c9e344cb059d" class="">
+</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-80e2-b70f-e56cbb03556b" class="code code-wrap"><code class="language-Markdown" style="white-space:pre-wrap;word-break:break-all"># 📘 ARCONTIO — Core Architecture Standard v1.0**Status:** Frozen Baseline**Scope:** World simulation, visibility, occupancy, doors, perception
+
+---# 1️⃣ World Model## 1.1 Cell Occupancy Rules### Invarianti fondamentali-**1 WorldObjectInstance per cella**-**1 NPC per cella**- Gli NPC sono entità separate dagli oggetti- Oggetti attraversabili possono condividere la cella con un NPC- Oggetti bloccanti impediscono l’accesso alla cella
+
+---## 1.2 Strutture dati nel World### Canonical State
+
+```csharp
+Dictionary&lt;int, WorldObjectInstance&gt; Objects;
+Dictionary&lt;long, int&gt; ObjectAtCell;   // cellKey → objId
+Dictionary&lt;long, int&gt; NpcAtCell;      // cellKey → npcId</code></pre></div><div style="display:contents" dir="auto"><h3 id="3089c167-6366-8026-ac68-f689c1deb8a8" class="">Cache Derivata</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-8046-9c4f-e21646529323" class="code code-wrap"><code class="language-C#" style="white-space:pre-wrap;word-break:break-all">struct OcclusionCell {bool BlocksMovement;bool BlocksVision;float VisionCost;
+}
+
+OcclusionCell[,] OcclusionMap;// oppure Dictionary&lt;long, OcclusionCell&gt;</code></pre></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-8034-ae01-d3389cdda3ef"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-8043-8548-f36ca8786e45" class="">2️⃣ Object Categories &amp; Flags</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8066-ba39-e3fa302ddcfd" class="">2.1 ObjectKind</h2></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-806c-b889-c662b6e72d2d" class="bulleted-list"><li style="list-style-type:disc">Occluder</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80d5-90fb-cd3dc1735519" class="bulleted-list"><li style="list-style-type:disc">Interactable-Structure</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-801f-8ccd-dc5605349a48" class="bulleted-list"><li style="list-style-type:disc">ResourceStack</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80d2-8c7a-e2851abe3973" class="bulleted-list"><li style="list-style-type:disc">Decoration</li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80c5-98f0-c769885d3c6b"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8067-b5b2-fefac5e9b0ee" class="">2.2 Default Behaviour Table</h2></div><div style="display:contents" dir="ltr"><table id="3089c167-6366-80d5-903c-e2ec68e45a57" class="simple-table"><thead class="simple-table-header"><div style="display:contents" dir="ltr"><tr id="3089c167-6366-8038-8a55-d34278850b9f"><th id="=K[^" class="simple-table-header-color simple-table-header">Tipo</th><th id="jxJE" class="simple-table-header-color simple-table-header">BlocksMovement</th><th id="QUr&gt;" class="simple-table-header-color simple-table-header">BlocksVision</th><th id="d&gt;P~" class="simple-table-header-color simple-table-header">Interazione</th></tr></div></thead><tbody><div style="display:contents" dir="ltr"><tr id="3089c167-6366-807f-b417-d5b7213177c8"><td id="=K[^" class="">Wall</td><td id="jxJE" class="">true</td><td id="QUr&gt;" class="">true</td><td id="d&gt;P~" class="">No</td></tr></div><div style="display:contents" dir="ltr"><tr id="3089c167-6366-800b-a20e-fdd31fc82c3f"><td id="=K[^" class="">Door (closed)</td><td id="jxJE" class="">true</td><td id="QUr&gt;" class="">true</td><td id="d&gt;P~" class="">Toggle</td></tr></div><div style="display:contents" dir="ltr"><tr id="3089c167-6366-80cd-9674-e820c54d7396"><td id="=K[^" class="">Door (open)</td><td id="jxJE" class="">false</td><td id="QUr&gt;" class="">false</td><td id="d&gt;P~" class="">Passabile</td></tr></div><div style="display:contents" dir="ltr"><tr id="3089c167-6366-802a-b270-ffc8e84534fc"><td id="=K[^" class="">Bed</td><td id="jxJE" class="">false</td><td id="QUr&gt;" class="">false</td><td id="d&gt;P~" class="">Uso su cella</td></tr></div><div style="display:contents" dir="ltr"><tr id="3089c167-6366-801a-a0cf-e713c5cfb70f"><td id="=K[^" class="">Workbench</td><td id="jxJE" class="">false</td><td id="QUr&gt;" class="">false</td><td id="d&gt;P~" class="">Uso su cella</td></tr></div><div style="display:contents" dir="ltr"><tr id="3089c167-6366-80d7-bc97-d94379c9a566"><td id="=K[^" class="">Resource Stack</td><td id="jxJE" class="">false</td><td id="QUr&gt;" class="">false</td><td id="d&gt;P~" class="">Consumo su cella</td></tr></div><div style="display:contents" dir="ltr"><tr id="3089c167-6366-8063-9228-ea3ba52ebb2a"><td id="=K[^" class="">Decoration</td><td id="jxJE" class="">false</td><td id="QUr&gt;" class="">false</td><td id="d&gt;P~" class="">Nessuna</td></tr></div></tbody></table></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80d3-8048-fb49ce998511"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-80c4-b05b-cfd580b8c7f0" class="">3️⃣ Occlusion Map</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-804e-b5ae-d35886940e78" class="">3.1 Definizione</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-804f-bb44-e63f457a3161" class="">La <strong>OcclusionMap</strong> è una cache derivata da <code>World.Objects</code>.</p></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80d7-9b4f-c76fdcd915c4" class="">Non è sorgente di verità.</p></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8084-9310-d4d78630ae5d" class="">Contiene solo informazioni necessarie a:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80de-9999-dcf60958ebb4" class="bulleted-list"><li style="list-style-type:disc">Pathfinding</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8058-b5cf-e2244e3f45d4" class="bulleted-list"><li style="list-style-type:disc">Line of Sight</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80d4-8d06-c8dc44093664" class="bulleted-list"><li style="list-style-type:disc">Vision attenuation</li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80ea-a16b-c3a242fe696e"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8065-9083-d07f7e7d90f4" class="">3.2 Invariante</h2></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-80de-a492-d003dcb32e2c" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">World.Objects → aggiorna → OcclusionMap
+Mai il contrario.</code></pre></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-804f-9bd5-eeb84cdb0388"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8066-b832-db4b13174f8b" class="">3.3 Aggiornamento</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-804c-869a-c60caf96176c" class="">Ogni volta che:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8002-9358-cb8ad49d6d55" class="bulleted-list"><li style="list-style-type:disc">Spawn object</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-806d-9b5a-cbec3c5e8470" class="bulleted-list"><li style="list-style-type:disc">Remove object</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-803e-aa30-c5413a678bbd" class="bulleted-list"><li style="list-style-type:disc">Door cambia stato</li></ul></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80fd-8aa6-d013199e1019" class="">Si chiama:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-8084-9a27-dade5ac801e8" class="code code-wrap"><code class="language-C#" style="white-space:pre-wrap;word-break:break-all">RebuildOcclusionAtCell(x,y)</code></pre></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80f7-bc2e-fb8a05f79d8b"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-809c-92c1-f50f66618a2a" class="">4️⃣ Doors (Runtime State)</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-80a0-b12c-cadd18afc70d" class="">4.1 DoorStateComponent</h2></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-80ea-9a4e-e631cebeab23" class="code code-wrap"><code class="language-C#" style="white-space:pre-wrap;word-break:break-all">enum DoorState { Closed, Open }</code></pre></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-806f-9856-deadb13e9f19" class="">4.2 Regole</h2></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8052-9a15-e5f53664beae" class="bulleted-list"><li style="list-style-type:disc">Closed:<div style="display:contents" dir="auto"><ul id="3089c167-6366-8032-98c0-f025e29bf2d1" class="bulleted-list"><li style="list-style-type:circle">BlocksMovement = true</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80f7-9e6e-d8a680ddf3c3" class="bulleted-list"><li style="list-style-type:circle">BlocksVision = true</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8076-ba1f-f7ff3eea2975" class="bulleted-list"><li style="list-style-type:disc">Open:<div style="display:contents" dir="auto"><ul id="3089c167-6366-80ad-9d2b-fd6f575bf9c1" class="bulleted-list"><li style="list-style-type:circle">BlocksMovement = false</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8006-8be1-dd96c19bc513" class="bulleted-list"><li style="list-style-type:circle">BlocksVision = false</li></ul></div></li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-8025-b329-ee339c71cd0e"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-80e0-9b9a-d1031a18587a" class="">4.3 Interazione</h2></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-809a-b7f3-f87603a29f3c" class="bulleted-list"><li style="list-style-type:disc">Toggle solo se NPC ortogonalmente adiacente</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80f5-a0a0-f6eb37ba4b62" class="bulleted-list"><li style="list-style-type:disc">Auto-open durante <code>MoveTo</code></li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8083-95fc-c08f5173d25f" class="bulleted-list"><li style="list-style-type:disc">Apertura costa 1 tick</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80f5-aa14-e2038435ecd4" class="bulleted-list"><li style="list-style-type:disc">No auto-close</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80c9-bff4-fed5b8f78eea" class="bulleted-list"><li style="list-style-type:disc">Non si chiude se cella occupata</li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-8023-b3a2-ec407cfcad29"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-80f2-8ea1-dba35c418238" class="">5️⃣ Vision System</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8005-98ee-e849cbe08df6" class="">5.1 FOV Standard</h2></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80c3-a325-c50814695176" class="bulleted-list"><li style="list-style-type:disc">4 orientamenti: N/E/S/W</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8077-b24c-daf8a70f5bb3" class="bulleted-list"><li style="list-style-type:disc">Cono di 90° (±45°)</li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-8068-b155-ecf5ff6aac21"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8034-b463-c61f248e85f4" class="">5.2 Cone Check Formule</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80ff-a725-ee48af434bfb" class="">Con:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-8082-bd2e-cd8572cddb92" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">dx = targetX - npcXdy = targetY - npcY</code></pre></div><div style="display:contents" dir="auto"><h3 id="3089c167-6366-80b5-931e-df45beedf616" class="">Facing North</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-803d-87c9-f8db83ac6073" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">dy &gt;0 &amp;&amp;abs(dx) &lt;= dy</code></pre></div><div style="display:contents" dir="auto"><h3 id="3089c167-6366-80c8-890d-c47099b1b73e" class="">Facing South</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-803a-a998-ca2f6193e5eb" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">dy &lt;0 &amp;&amp;abs(dx) &lt;= -dy</code></pre></div><div style="display:contents" dir="auto"><h3 id="3089c167-6366-804d-9c41-f16e59210aed" class="">Facing East</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-803d-a50b-edd2760f64cc" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">dx &gt;0 &amp;&amp;abs(dy) &lt;= dx</code></pre></div><div style="display:contents" dir="auto"><h3 id="3089c167-6366-8051-baaf-c905d6fb753b" class="">Facing West</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-805a-9875-d9894f554579" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">dx &lt;0 &amp;&amp;abs(dy) &lt;= -dx</code></pre></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80b9-9a7d-d252462f16da"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-80ff-b84b-d9262eaf1722" class="">5.3 Pipeline Unica di Visibilità</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-8090-871d-f61720460df6" class="">Ogni “vedo X” passa da:</p></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-807f-95a5-e10f64dbbbb1" class="numbered-list" start="1"><li>Range Check</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-8064-b65f-f5c3f95dc057" class="numbered-list" start="2"><li>Cone Check</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-807f-8d5e-db704242dbf0" class="numbered-list" start="3"><li>LOS (Bresenham → OcclusionMap)</li></ol></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80b5-8991-fe84ab415475" class="">API canonica:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-80a2-95ba-e5de4e718928" class="code code-wrap"><code class="language-C#" style="white-space:pre-wrap;word-break:break-all">boolCanSee(int npcId,int targetX,int targetY);</code></pre></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-808f-8604-d23c9f1e59cf"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-80a8-87c3-d02e3085c270" class="">6️⃣ NPC Orientation</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-805c-8c62-c95a36547688" class="">6.1 Facing</h2></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-8069-bd1a-d79b1018384b" class="code code-wrap"><code class="language-C#" style="white-space:pre-wrap;word-break:break-all">enum Facing { North, East, South, West }</code></pre></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8067-af6f-cfbf68e7149d" class="">6.2 Regole</h2></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80de-87b3-ccd678af3e98" class="bulleted-list"><li style="list-style-type:disc">MoveTo aggiorna Facing</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80b3-9e82-d4736a044f5a" class="bulleted-list"><li style="list-style-type:disc">Turn90 costa 1 tick</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8047-a7aa-d6bc68a3fe41" class="bulleted-list"><li style="list-style-type:disc">Scan = 4 rotazioni consecutive</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80f8-85b4-f11eefc98618" class="bulleted-list"><li style="list-style-type:disc">Nessuna visione a 360° gratuita</li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-8084-90a8-e19fc5e57728"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-80f6-89c6-de78e214bfc6" class="">7️⃣ Perception System</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8096-a635-d42767312eeb" class="">7.1 Trigger</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80d2-9bda-edab941fa378" class="">Percezione avviene:</p></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80a4-9037-d168875506ec" class="bulleted-list"><li style="list-style-type:disc">Dopo movimento</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80be-b3ef-ef5d63701d32" class="bulleted-list"><li style="list-style-type:disc">Dopo rotazione</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8035-8585-e0360c7ed004" class="bulleted-list"><li style="list-style-type:disc">Se <code>PerceptionDirty</code> (evento locale)</li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80e8-9301-dd9576a4e513"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-806b-b882-cb202f76614a" class="">7.2 Cooldown</h2></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80a1-869c-fde56aa74087" class="bulleted-list"><li style="list-style-type:disc">Max 1 percezione per NPC per tick</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80c2-b1a3-dcdb646082e7" class="bulleted-list"><li style="list-style-type:disc">Cooldown minimo: 1 tick</li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80f3-a911-fa73831093a3"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8072-8455-e21a5fe93db8" class="">7.3 Eventi che “svegliano”</h2></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80c6-b592-fdbee25b3cd0" class="bulleted-list"><li style="list-style-type:disc">NpcMoved</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80ab-9795-db8f7814f7a4" class="bulleted-list"><li style="list-style-type:disc">PredatorMoved / Spawned</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80e5-b424-ce9c5360abc2" class="bulleted-list"><li style="list-style-type:disc">DoorStateChanged</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80eb-9985-cfbd0376c249" class="bulleted-list"><li style="list-style-type:disc">ObjectDestroyed</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80a5-b689-c805aaa4dfe5" class="bulleted-list"><li style="list-style-type:disc">ObjectSpawned (rilevanti)</li></ul></div><div style="display:contents" dir="auto"><blockquote id="3089c167-6366-8079-94e0-f24c9b9a9907" class="">Wake ≠ visibilità.<div style="display:contents" dir="auto"><p id="3089c167-6366-809b-b9d1-fa9de9d16d9e" class="">La visibilità passa sempre da <code>CanSee()</code>.</p></div></blockquote></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-8012-9a6b-d98409762da5"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-8003-a5d7-cab3a4870010" class="">8️⃣ Resource Stack</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-80db-b9c6-d01ba66b15e2" class="">8.1 Struttura</h2></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-806f-8568-d9db19c16a12" class="code code-wrap"><code class="language-C#" style="white-space:pre-wrap;word-break:break-all">struct StackComponent {int ItemDefId;int Quantity;int MaxQuantity;
+}</code></pre></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-8007-a327-db4bb4222d81" class="">8.2 Regole</h2></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-809d-bc99-ef532c8f22e8" class="bulleted-list"><li style="list-style-type:disc">Attraversabile</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80b2-b90d-e85fe2a5d082" class="bulleted-list"><li style="list-style-type:disc">Consumo su stessa cella</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80ee-a08a-efa07bd07eb0" class="bulleted-list"><li style="list-style-type:disc">Merge automatico stesso tipo</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-807a-9ff6-c4b0431afa12" class="bulleted-list"><li style="list-style-type:disc">Non blocca LOS</li></ul></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-8066-9dbd-cae9509e6dc2"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-802c-8dbe-ca2449a06109" class="">9️⃣ Movement Rules</h1></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-800c-8747-e9a7a676aa51" class="">9.1 Walkable</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80bc-83a2-ce3612f06210" class="">Una cella è walkable se:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="3089c167-6366-805a-ad28-ce3976c9fac5" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">!OcclusionMap.BlocksMovement
+AND!NpcAtCell</code></pre></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-8009-a70a-d958e69d9e91"/></div><div style="display:contents" dir="auto"><h2 id="3089c167-6366-80c4-a62d-d7bbdf225bb1" class="">9.2 Door During Move</h2></div><div style="display:contents" dir="auto"><p id="3089c167-6366-80d1-9dbf-ff285a591d88" class="">Se nextCell è door chiusa:</p></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-8039-b60d-c12377051edd" class="numbered-list" start="1"><li>Open door (1 tick)</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-8068-8a4e-fecb1d139271" class="numbered-list" start="2"><li>Non avanzare in questo tick</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-80ad-9bb8-f1534225a0ed" class="numbered-list" start="3"><li>Tick successivo entra</li></ol></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80c4-aa15-ee172de6f8fe"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-80dc-b7f5-deefbc454887" class="">🔟 Architectural Principles</h1></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-8052-81f7-c2494e407fb3" class="numbered-list" start="1"><li>Una sola verità: <code>World.Objects</code></li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-8039-86ad-f18a18b8fd84" class="numbered-list" start="2"><li>Una sola pipeline visione</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-80fa-845c-f2344f692b7f" class="numbered-list" start="3"><li>Cache solo per performance</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-80b3-8164-e1c8a0a98a90" class="numbered-list" start="4"><li>Percezione situata e direzionale</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-8097-bc0b-e190e83afefa" class="numbered-list" start="5"><li>Determinismo prima della complessità</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="3089c167-6366-80e6-b963-dae36a10fc8c" class="numbered-list" start="6"><li>Nessuna telepatia sistemica</li></ol></div><div style="display:contents" dir="auto"><hr id="3089c167-6366-80d2-8c3e-d7818b21f5f7"/></div><div style="display:contents" dir="auto"><h1 id="3089c167-6366-800a-9c8f-e6df236e2d9f" class="">📌 Performance Philosophy</h1></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8072-a55e-c0fadb393dd7" class="bulleted-list"><li style="list-style-type:disc">Event-driven perception</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-8083-9bee-ec90b6e82b00" class="bulleted-list"><li style="list-style-type:disc">No polling continuo</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-80d2-90c5-f0dc89b20c45" class="bulleted-list"><li style="list-style-type:disc">No doppie sorgenti di visibilità</li></ul></div><div style="display:contents" dir="auto"><ul id="3089c167-6366-806f-9c8f-c48ed1a8572f" class="bulleted-list"><li style="list-style-type:disc">No scanning globale del mondo per decisioni</li></ul></div></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ARCONTIO — Sistema Pathfinding Ibrido v0.04</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #37352f;
+    --text-secondary: #787774;
+    --border: #e3e2e0;
+    --code-bg: #f1f1ef;
+    --accent: #2eaadc;
+    --accent-light: #e8f4f9;
+    --green: #0f7b6c;
+    --green-light: #e6f4f1;
+    --orange: #d9730d;
+    --orange-light: #faebdd;
+    --red: #e03e3e;
+    --red-light: #fbe4e4;
+    --yellow: #dfab01;
+    --yellow-light: #fbf3db;
+    --purple: #6940a5;
+    --purple-light: #eee8f5;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--text);
+    background: var(--bg);
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 60px 40px 120px;
+  }
+  h1 { font-size: 2.4em; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.5em; font-weight: 600; margin: 48px 0 16px; padding-top: 8px; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.15em; font-weight: 600; margin: 32px 0 10px; color: var(--text); }
+  h4 { font-size: 1em; font-weight: 600; margin: 20px 0 8px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; font-size: 0.8em; }
+  p { margin-bottom: 12px; }
+  ul, ol { margin: 8px 0 16px 24px; }
+  li { margin-bottom: 6px; }
+  code {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--red);
+  }
+  pre {
+    background: #1e1e1e;
+    color: #d4d4d4;
+    padding: 20px 24px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 16px 0 24px;
+    font-size: 0.83em;
+    line-height: 1.6;
+    font-family: "SFMono-Regular", Consolas, monospace;
+  }
+  pre .kw { color: #569cd6; }
+  pre .cm { color: #6a9955; }
+  pre .st { color: #ce9178; }
+  pre .nm { color: #9cdcfe; }
+  pre .tp { color: #4ec9b0; }
+  pre .num { color: #b5cea8; }
+
+  .subtitle {
+    color: var(--text-secondary);
+    font-size: 1.1em;
+    margin-bottom: 32px;
+  }
+  .meta {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 40px;
+    flex-wrap: wrap;
+  }
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 0.82em;
+    font-weight: 500;
+  }
+  .tag-blue { background: var(--accent-light); color: var(--accent); }
+  .tag-green { background: var(--green-light); color: var(--green); }
+  .tag-orange { background: var(--orange-light); color: var(--orange); }
+
+  .callout {
+    display: flex;
+    gap: 12px;
+    padding: 14px 18px;
+    border-radius: 6px;
+    margin: 16px 0;
+    font-size: 0.95em;
+  }
+  .callout-icon { font-size: 1.2em; flex-shrink: 0; }
+  .callout-blue { background: var(--accent-light); }
+  .callout-green { background: var(--green-light); }
+  .callout-orange { background: var(--orange-light); }
+  .callout-red { background: var(--red-light); }
+  .callout-yellow { background: var(--yellow-light); }
+  .callout-purple { background: var(--purple-light); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 24px;
+    font-size: 0.92em;
+  }
+  th {
+    background: var(--code-bg);
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+  }
+  td {
+    padding: 10px 14px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #fafafa; }
+
+  .status { display: inline-flex; align-items: center; gap: 5px; font-size: 0.85em; font-weight: 500; }
+  .status::before { content: "●"; }
+  .status-ok { color: var(--green); }
+  .status-warn { color: var(--orange); }
+  .status-err { color: var(--red); }
+  .status-info { color: var(--accent); }
+
+  .step-box {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin: 20px 0;
+    overflow: hidden;
+  }
+  .step-header {
+    background: var(--code-bg);
+    padding: 12px 20px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.95em;
+  }
+  .step-num {
+    background: var(--accent);
+    color: white;
+    width: 26px; height: 26px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.82em;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .step-body { padding: 16px 20px; }
+
+  .ascii-grid {
+    background: #0d1117;
+    color: #79c0ff;
+    padding: 16px 20px;
+    border-radius: 6px;
+    font-family: "SFMono-Regular", Consolas, monospace;
+    font-size: 0.82em;
+    line-height: 1.5;
+    margin: 12px 0;
+    overflow-x: auto;
+  }
+  .ascii-grid .wall { color: #f85149; }
+  .ascii-grid .lm { color: #ffa657; font-weight: bold; }
+  .ascii-grid .dt { color: #7ee787; }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  .toc {
+    background: var(--code-bg);
+    border-radius: 8px;
+    padding: 20px 28px;
+    margin: 32px 0;
+  }
+  .toc h4 { margin-top: 0; margin-bottom: 12px; }
+  .toc ol { margin: 0 0 0 18px; }
+  .toc li { margin-bottom: 4px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+
+<h1>🗺️ ARCONTIO — Sistema Pathfinding Ibrido</h1>
+<p class="subtitle">Specifica tecnica completa del nuovo sistema di generazione landmark per NPC — v0.04</p>
+
+<div class="meta">
+  <span class="tag tag-blue">📐 Versione 0.04</span>
+  <span class="tag tag-green">✅ Specifica approvata</span>
+  <span class="tag tag-orange">⚙️ Pronto per implementazione</span>
+</div>
+
+<div class="toc">
+  <h4>📋 Indice</h4>
+  <ol>
+    <li><a href="#principio">Principio guida</a></li>
+    <li><a href="#pipeline">Pipeline completa</a></li>
+    <li><a href="#passo1">Passo 1 — Distance Transform (DT)</a></li>
+    <li><a href="#passo2">Passo 2 — Bridge Detection (Tarjan)</a></li>
+    <li><a href="#passo3">Passo 3 — Flood Fill per regioni</a></li>
+    <li><a href="#passo4">Passo 4 — Landmark per stanza (DT + Mediana)</a></li>
+    <li><a href="#passo5">Passo 5 — Landmark per strozzatura</a></li>
+    <li><a href="#passo6">Passo 6 — Pruning</a></li>
+    <li><a href="#casi">Copertura dei casi critici</a></li>
+    <li><a href="#integrazione">Integrazione con sistema esistente</a></li>
+    <li><a href="#parametri">Parametri configurabili</a></li>
+  </ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="principio">1. Principio guida</h2>
+
+<div class="callout callout-blue">
+  <span class="callout-icon">💡</span>
+  <div>Il sistema esistente (GVD-DIN) genera troppi landmark nei corridoi perché lavora su tutta la griglia uniformemente. Il nuovo sistema lavora in due fasi: prima <strong>segmenta</strong> la mappa in regioni semantiche (stanze vs strozzature), poi genera <strong>esattamente un landmark per regione</strong>.</div>
+</div>
+
+<p>Il ragionamento umano nel riconoscere una strozzatura non misura distanze — riconosce prima le regioni, poi la strozzatura emerge automaticamente come confine tra due regioni. Questo sistema replica quel processo.</p>
+
+<div class="callout callout-green">
+  <span class="callout-icon">🔒</span>
+  <div><strong>Invariante ARCONTIO rispettata:</strong> il sistema è un preprocessing statico a map-load. Non dà agli NPC accesso a informazioni che non hanno percepito — produce solo i landmark candidati. L'apprendimento degli NPC rimane soggettivo e via LOS/contatto come da architettura v0.03.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="pipeline">2. Pipeline completa</h2>
+
+<pre>
+<span class="cm">// Ordine di esecuzione a map-load</span>
+
+<span class="num">1.</span> Distance Transform (DT)          <span class="cm">→ valore per ogni cella walkable</span>
+<span class="num">2.</span> Bridge Detection (Tarjan)         <span class="cm">→ celle strozzatura marcate</span>
+<span class="num">3.</span> Flood Fill sulle regioni          <span class="cm">→ ogni stanza isolata identificata</span>
+<span class="num">4.</span> Landmark per stanza              <span class="cm">→ DT massimo + mediana ortogonale</span>
+<span class="num">5.</span> Landmark per strozzatura         <span class="cm">→ centroide del gruppo bridge</span>
+<span class="num">6.</span> Pruning                          <span class="cm">→ merge landmark troppo vicini</span>
+</pre>
+
+<div class="callout callout-yellow">
+  <span class="callout-icon">⚠️</span>
+  <div>L'intero calcolo avviene <strong>una sola volta</strong> al caricamento della mappa e produce una lista statica di <code>LandmarkCandidate</code>. Il costo runtime è zero. Gli NPC apprendono questi candidati durante l'esplorazione come già avviene.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="passo1">3. Passo 1 — Distance Transform</h2>
+
+<p>BFS multi-sorgente da tutti i muri simultaneamente. Ogni cella walkable riceve il valore della distanza minima dal muro più vicino.</p>
+
+<pre>
+<span class="kw">public static</span> <span class="tp">int</span>[,] <span class="nm">ComputeDistanceTransform</span>(<span class="tp">bool</span>[,] walkable, <span class="tp">int</span> width, <span class="tp">int</span> height)
+{
+    <span class="kw">var</span> dt = <span class="kw">new</span> <span class="tp">int</span>[width, height];
+    <span class="kw">var</span> queue = <span class="kw">new</span> <span class="tp">Queue</span>&lt;<span class="tp">Vector2Int</span>&gt;();
+
+    <span class="cm">// Inizializza: muri = 0, celle walkable = -1 (non visitato)</span>
+    <span class="kw">for</span> (<span class="tp">int</span> x = <span class="num">0</span>; x &lt; width; x++)
+    <span class="kw">for</span> (<span class="tp">int</span> y = <span class="num">0</span>; y &lt; height; y++)
+    {
+        <span class="kw">if</span> (!walkable[x, y]) {
+            dt[x, y] = <span class="num">0</span>;
+            queue.Enqueue(<span class="kw">new</span> <span class="tp">Vector2Int</span>(x, y));
+        } <span class="kw">else</span> {
+            dt[x, y] = -<span class="num">1</span>;
+        }
+    }
+
+    <span class="cm">// BFS espansione da tutti i muri</span>
+    <span class="tp">int</span>[] dx = { <span class="num">0</span>, <span class="num">0</span>, <span class="num">1</span>, -<span class="num">1</span> };
+    <span class="tp">int</span>[] dy = { <span class="num">1</span>, -<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span> };
+
+    <span class="kw">while</span> (queue.Count &gt; <span class="num">0</span>)
+    {
+        <span class="kw">var</span> cell = queue.Dequeue();
+        <span class="kw">for</span> (<span class="tp">int</span> d = <span class="num">0</span>; d &lt; <span class="num">4</span>; d++)
+        {
+            <span class="tp">int</span> nx = cell.x + dx[d], ny = cell.y + dy[d];
+            <span class="kw">if</span> (nx &lt; <span class="num">0</span> || nx &gt;= width || ny &lt; <span class="num">0</span> || ny &gt;= height) <span class="kw">continue</span>;
+            <span class="kw">if</span> (dt[nx, ny] != -<span class="num">1</span>) <span class="kw">continue</span>;
+            dt[nx, ny] = dt[cell.x, cell.y] + <span class="num">1</span>;
+            queue.Enqueue(<span class="kw">new</span> <span class="tp">Vector2Int</span>(nx, ny));
+        }
+    }
+    <span class="kw">return</span> dt;
+}
+</pre>
+
+<div class="callout callout-blue">
+  <span class="callout-icon">📊</span>
+  <div><strong>Output:</strong> griglia <code>int[width, height]</code> dove ogni valore rappresenta la distanza dal muro. Valore 1 = adiacente al muro (corridoio stretto), valore 4+ = centro di stanza ampia.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="passo2">4. Passo 2 — Bridge Detection con Tarjan</h2>
+
+<p>Invece di cercare articulation points su singole celle (che produce falsi positivi nei corridoi lunghi), si costruisce prima un <strong>grafo contratto</strong> dove le regioni a DT alta sono super-nodi e i corridoi a DT bassa sono archi. Tarjan viene eseguito su questo grafo per trovare i bridge.</p>
+
+<h3>4.1 Grafo contratto</h3>
+
+<pre>
+<span class="cm">// Soglia: celle con DT &lt; soglia sono "corridoio", DT &gt;= soglia sono "stanza"</span>
+<span class="cm">// La soglia è adattiva: percentile 40 della distribuzione DT della mappa</span>
+<span class="kw">public static</span> <span class="tp">int</span> <span class="nm">ComputeAdaptiveThreshold</span>(<span class="tp">int</span>[,] dt, <span class="tp">int</span> width, <span class="tp">int</span> height)
+{
+    <span class="kw">var</span> values = <span class="kw">new</span> <span class="tp">List</span>&lt;<span class="tp">int</span>&gt;();
+    <span class="kw">for</span> (<span class="tp">int</span> x = <span class="num">0</span>; x &lt; width; x++)
+    <span class="kw">for</span> (<span class="tp">int</span> y = <span class="num">0</span>; y &lt; height; y++)
+        <span class="kw">if</span> (dt[x, y] &gt; <span class="num">0</span>) values.Add(dt[x, y]);
+
+    values.Sort();
+    <span class="cm">// Percentile 40: separa corridoi (basso DT) da stanze (alto DT)</span>
+    <span class="kw">return</span> values[(int)(values.Count * <span class="num">0.4f</span>)];
+}
+</pre>
+
+<h3>4.2 Bridge detection</h3>
+
+<pre>
+<span class="cm">// Algoritmo di Tarjan adattato per trovare bridge (archi critici)</span>
+<span class="cm">// Un bridge è un arco la cui rimozione disconnette il grafo</span>
+<span class="cm">// → corrisponde a una strozzatura nella mappa</span>
+
+<span class="kw">private static</span> <span class="tp">int</span> _timer;
+<span class="kw">private static</span> <span class="tp">int</span>[,] _disc, _low;
+<span class="kw">private static</span> <span class="tp">bool</span>[,] _isBridge;
+
+<span class="kw">public static</span> <span class="tp">bool</span>[,] <span class="nm">FindBridgeCells</span>(
+    <span class="tp">bool</span>[,] walkable, <span class="tp">int</span>[,] dt, <span class="tp">int</span> width, <span class="tp">int</span> height, <span class="tp">int</span> threshold)
+{
+    _timer = <span class="num">0</span>;
+    _disc = <span class="kw">new</span> <span class="tp">int</span>[width, height];
+    _low  = <span class="kw">new</span> <span class="tp">int</span>[width, height];
+    _isBridge = <span class="kw">new</span> <span class="tp">bool</span>[width, height];
+
+    <span class="cm">// Inizializza a -1 (non visitato)</span>
+    <span class="kw">for</span> (<span class="tp">int</span> x = <span class="num">0</span>; x &lt; width; x++)
+    <span class="kw">for</span> (<span class="tp">int</span> y = <span class="num">0</span>; y &lt; height; y++)
+        _disc[x, y] = -<span class="num">1</span>;
+
+    <span class="cm">// Avvia DFS da prima cella walkable a DT bassa (corridoio)</span>
+    <span class="kw">for</span> (<span class="tp">int</span> x = <span class="num">0</span>; x &lt; width; x++)
+    <span class="kw">for</span> (<span class="tp">int</span> y = <span class="num">0</span>; y &lt; height; y++)
+        <span class="kw">if</span> (walkable[x, y] &amp;&amp; _disc[x, y] == -<span class="num">1</span>)
+            DfsBridge(x, y, -<span class="num">1</span>, -<span class="num">1</span>, walkable, dt, width, height, threshold);
+
+    <span class="kw">return</span> _isBridge;
+}
+
+<span class="kw">private static void</span> <span class="nm">DfsBridge</span>(
+    <span class="tp">int</span> x, <span class="tp">int</span> y, <span class="tp">int</span> px, <span class="tp">int</span> py,
+    <span class="tp">bool</span>[,] walkable, <span class="tp">int</span>[,] dt,
+    <span class="tp">int</span> width, <span class="tp">int</span> height, <span class="tp">int</span> threshold)
+{
+    _disc[x, y] = _low[x, y] = _timer++;
+    <span class="tp">int</span>[] dx = { <span class="num">0</span>, <span class="num">0</span>, <span class="num">1</span>, -<span class="num">1</span> };
+    <span class="tp">int</span>[] dy = { <span class="num">1</span>, -<span class="num">1</span>, <span class="num">0</span>, <span class="num">0</span> };
+
+    <span class="kw">foreach</span> (<span class="kw">var</span> (nx, ny) <span class="kw">in</span> Neighbors(x, y, dx, dy, width, height))
+    {
+        <span class="kw">if</span> (!walkable[nx, ny]) <span class="kw">continue</span>;
+        <span class="kw">if</span> (nx == px &amp;&amp; ny == py) <span class="kw">continue</span>; <span class="cm">// ignora parent</span>
+
+        <span class="kw">if</span> (_disc[nx, ny] == -<span class="num">1</span>)
+        {
+            DfsBridge(nx, ny, x, y, walkable, dt, width, height, threshold);
+            _low[x, y] = Mathf.Min(_low[x, y], _low[nx, ny]);
+
+            <span class="cm">// Bridge trovato: arco (x,y)→(nx,ny) è critico</span>
+            <span class="kw">if</span> (_low[nx, ny] &gt; _disc[x, y])
+            {
+                <span class="cm">// Marca le celle bridge solo se a DT bassa (corridoio)</span>
+                <span class="kw">if</span> (dt[x, y] &lt; threshold)  _isBridge[x, y]  = <span class="kw">true</span>;
+                <span class="kw">if</span> (dt[nx, ny] &lt; threshold) _isBridge[nx, ny] = <span class="kw">true</span>;
+            }
+        }
+        <span class="kw">else</span>
+        {
+            _low[x, y] = Mathf.Min(_low[x, y], _disc[nx, ny]);
+        }
+    }
+}
+</pre>
+
+<div class="callout callout-orange">
+  <span class="callout-icon">⚠️</span>
+  <div><strong>Nota implementativa:</strong> la DFS ricorsiva può causare stack overflow su mappe grandi. Convertire in DFS iterativa con stack esplicito per mappe oltre 200x200 celle.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="passo3">5. Passo 3 — Flood Fill per regioni</h2>
+
+<p>Le celle bridge vengono trattate come muri virtuali. Il flood fill isola ogni regione connessa che risulta dalla separazione.</p>
+
+<pre>
+<span class="kw">public static</span> <span class="tp">int</span>[,] <span class="nm">FloodFillRegions</span>(
+    <span class="tp">bool</span>[,] walkable, <span class="tp">bool</span>[,] isBridge, <span class="tp">int</span> width, <span class="tp">int</span> height)
+{
+    <span class="kw">var</span> regionId = <span class="kw">new</span> <span class="tp">int</span>[width, height];
+    <span class="kw">for</span> (<span class="tp">int</span> x = <span class="num">0</span>; x &lt; width; x++)
+    <span class="kw">for</span> (<span class="tp">int</span> y = <span class="num">0</span>; y &lt; height; y++)
+        regionId[x, y] = -<span class="num">1</span>;
+
+    <span class="tp">int</span> currentRegion = <span class="num">0</span>;
+    <span class="kw">for</span> (<span class="tp">int</span> x = <span class="num">0</span>; x &lt; width; x++)
+    <span class="kw">for</span> (<span class="tp">int</span> y = <span class="num">0</span>; y &lt; height; y++)
+    {
+        <span class="cm">// Salta muri, bridge già visitati</span>
+        <span class="kw">if</span> (!walkable[x, y] || isBridge[x, y] || regionId[x, y] != -<span class="num">1</span>) <span class="kw">continue</span>;
+
+        <span class="cm">// BFS per riempire la regione</span>
+        <span class="kw">var</span> queue = <span class="kw">new</span> <span class="tp">Queue</span>&lt;<span class="tp">Vector2Int</span>&gt;();
+        queue.Enqueue(<span class="kw">new</span> <span class="tp">Vector2Int</span>(x, y));
+        regionId[x, y] = currentRegion;
+
+        <span class="kw">while</span> (queue.Count &gt; <span class="num">0</span>)
+        {
+            <span class="kw">var</span> cell = queue.Dequeue();
+            <span class="kw">foreach</span> (<span class="kw">var</span> n <span class="kw">in</span> Neighbors4(cell, width, height))
+            {
+                <span class="kw">if</span> (!walkable[n.x, n.y]) <span class="kw">continue</span>;
+                <span class="kw">if</span> (isBridge[n.x, n.y]) <span class="kw">continue</span>; <span class="cm">// ← muro virtuale</span>
+                <span class="kw">if</span> (regionId[n.x, n.y] != -<span class="num">1</span>) <span class="kw">continue</span>;
+                regionId[n.x, n.y] = currentRegion;
+                queue.Enqueue(n);
+            }
+        }
+        currentRegion++;
+    }
+    <span class="kw">return</span> regionId; <span class="cm">// ogni cella ha un ID regione, -1 = muro/bridge</span>
+}
+</pre>
+
+<!-- ============================================================ -->
+<h2 id="passo4">6. Passo 4 — Landmark per stanza</h2>
+
+<p>Per ogni regione identificata dal flood fill vengono applicate due tecniche complementari. I risultati vengono poi uniti.</p>
+
+<h3>6.1 Tecnica A — Massimo DT con regola segmento</h3>
+
+<pre>
+<span class="cm">// Trova il massimo DT per ogni regione</span>
+<span class="cm">// Se il massimo è un blob quadrato (es. 2x2) → collassa in un punto</span>
+<span class="cm">// Se il massimo è un segmento lungo → prendi la cella centrale</span>
+
+<span class="kw">public static</span> <span class="tp">List</span>&lt;<span class="tp">Vector2Int</span>&gt; <span class="nm">FindDtMaximaForRegion</span>(
+    <span class="tp">List</span>&lt;<span class="tp">Vector2Int</span>&gt; regionCells, <span class="tp">int</span>[,] dt)
+{
+    <span class="tp">int</span> maxDt = <span class="num">0</span>;
+    <span class="kw">foreach</span> (<span class="kw">var</span> c <span class="kw">in</span> regionCells)
+        maxDt = Mathf.Max(maxDt, dt[c.x, c.y]);
+
+    <span class="cm">// Raccoglie tutte le celle con il valore massimo</span>
+    <span class="kw">var</span> maxCells = regionCells.Where(c =&gt; dt[c.x, c.y] == maxDt).ToList();
+
+    <span class="cm">// Raggruppa i massimi in segmenti connessi</span>
+    <span class="kw">var</span> segments = <span class="nm">GroupConnected</span>(maxCells);
+    <span class="kw">var</span> result = <span class="kw">new</span> <span class="tp">List</span>&lt;<span class="tp">Vector2Int</span>&gt;();
+
+    <span class="kw">foreach</span> (<span class="kw">var</span> segment <span class="kw">in</span> segments)
+    {
+        <span class="kw">if</span> (<span class="nm">IsBlob</span>(segment)) {
+            <span class="cm">// Blob quadrato (es 2x2): prendi il centroide</span>
+            result.Add(<span class="nm">Centroid</span>(segment));
+        } <span class="kw">else</span> {
+            <span class="cm">// Segmento lineare: prendi la cella centrale</span>
+            result.Add(segment[segment.Count / <span class="num">2</span>]);
+        }
+    }
+    <span class="kw">return</span> result;
+}
+
+<span class="cm">// Un blob è un gruppo dove larghezza E altezza sono entrambe > 1</span>
+<span class="kw">private static bool</span> <span class="nm">IsBlob</span>(<span class="tp">List</span>&lt;<span class="tp">Vector2Int</span>&gt; cells)
+{
+    <span class="tp">int</span> minX = cells.Min(c =&gt; c.x), maxX = cells.Max(c =&gt; c.x);
+    <span class="tp">int</span> minY = cells.Min(c =&gt; c.y), maxY = cells.Max(c =&gt; c.y);
+    <span class="kw">return</span> (maxX - minX) &gt; <span class="num">0</span> &amp;&amp; (maxY - minY) &gt; <span class="num">0</span>;
+}
+</pre>
+
+<h3>6.2 Tecnica B — Mediana ortogonale</h3>
+
+<pre>
+<span class="cm">// Per ogni cella walkable di una regione:</span>
+<span class="cm">// lancia raggi nelle 4 direzioni cardinali fino al muro</span>
+<span class="cm">// la cella è mediana se dist_sinistra ≈ dist_destra (asse H)</span>
+<span class="cm">// e/o dist_su ≈ dist_giù (asse V)</span>
+
+<span class="kw">public static</span> <span class="tp">List</span>&lt;<span class="tp">Vector2Int</span>&gt; <span class="nm">FindMedianCells</span>(
+    <span class="tp">List</span>&lt;<span class="tp">Vector2Int</span>&gt; regionCells,
+    <span class="tp">bool</span>[,] walkable, <span class="tp">int</span> width, <span class="tp">int</span> height)
+{
+    <span class="kw">var</span> medians = <span class="kw">new</span> <span class="tp">List</span>&lt;<span class="tp">Vector2Int</span>&gt;();
+    <span class="kw">var</span> cellSet = <span class="kw">new</span> <span class="tp">HashSet</span>&lt;<span class="tp">Vector2Int</span>&gt;(regionCells);
+
+    <span class="kw">foreach</span> (<span class="kw">var</span> cell <span class="kw">in</span> regionCells)
+    {
+        <span class="tp">int</span> left  = <span class="nm">RayToWall</span>(cell, -<span class="num">1</span>,  <span class="num">0</span>, walkable, width, height);
+        <span class="tp">int</span> right = <span class="nm">RayToWall</span>(cell, +<span class="num">1</span>,  <span class="num">0</span>, walkable, width, height);
+        <span class="tp">int</span> up    = <span class="nm">RayToWall</span>(cell,  <span class="num">0</span>, +<span class="num">1</span>, walkable, width, height);
+        <span class="tp">int</span> down  = <span class="nm">RayToWall</span>(cell,  <span class="num">0</span>, -<span class="num">1</span>, walkable, width, height);
+
+        <span class="tp">bool</span> isHMedian = Mathf.Abs(left - right) &lt;= <span class="num">1</span>;
+        <span class="tp">bool</span> isVMedian = Mathf.Abs(up - down)    &lt;= <span class="num">1</span>;
+
+        <span class="kw">if</span> (isHMedian || isVMedian)
+            medians.Add(cell);
+    }
+
+    <span class="cm">// Raggruppa mediane vicine e prende il centroide di ogni gruppo</span>
+    <span class="kw">return</span> <span class="nm">ClusterAndCentroid</span>(medians, clusterRadius: <span class="num">2</span>);
+}
+
+<span class="cm">// Conta celle walkable dal punto fino al muro in una direzione</span>
+<span class="kw">private static int</span> <span class="nm">RayToWall</span>(
+    <span class="tp">Vector2Int</span> start, <span class="tp">int</span> dx, <span class="tp">int</span> dy,
+    <span class="tp">bool</span>[,] walkable, <span class="tp">int</span> width, <span class="tp">int</span> height)
+{
+    <span class="tp">int</span> dist = <span class="num">0</span>;
+    <span class="tp">int</span> x = start.x + dx, y = start.y + dy;
+    <span class="kw">while</span> (x &gt;= <span class="num">0</span> &amp;&amp; x &lt; width &amp;&amp; y &gt;= <span class="num">0</span> &amp;&amp; y &lt; height &amp;&amp; walkable[x, y])
+    {
+        dist++;
+        x += dx; y += dy;
+    }
+    <span class="kw">return</span> dist;
+}
+</pre>
+
+<div class="callout callout-green">
+  <span class="callout-icon">✅</span>
+  <div><strong>Le due tecniche si coprono a vicenda:</strong> la Tecnica A è forte dove la DT ha picchi netti (stanze regolari). La Tecnica B è forte dove la geometria ha simmetria ortogonale (corridoi, stanze irregolari). Casi dove una fallisce, l'altra compensa.</div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="passo5">7. Passo 5 — Landmark per strozzatura</h2>
+
+<pre>
+<span class="cm">// I gruppi di celle bridge connesse diventano ciascuno un landmark</span>
+<span class="cm">// Il landmark è il centroide del gruppo, scelto tra le celle walkable</span>
+
+<span class="kw">public static</span> <span class="tp">List</span>&lt;<span class="tp">LandmarkCandidate</span>&gt; <span class="nm">ExtractChokePointLandmarks</span>(
+    <span class="tp">bool</span>[,] isBridge, <span class="tp">bool</span>[,] walkable, <span class="tp">int</span> width, <span class="tp">int</span> height)
+{
+    <span class="kw">var</span> visited = <span class="kw">new</span> <span class="tp">bool</span>[width, height];
+    <span class="kw">var</span> landmarks = <span class="kw">new</span> <span class="tp">List</span>&lt;<span class="tp">LandmarkCandidate</span>&gt;();
+
+    <span class="kw">for</span> (<span class="tp">int</span> x = <span class="num">0</span>; x &lt; width; x++)
+    <span class="kw">for</span> (<span class="tp">int</span> y = <span class="num">0</span>; y &lt; height; y++)
+    {
+        <span class="kw">if</span> (!isBridge[x, y] || visited[x, y]) <span class="kw">continue</span>;
+
+        <span class="cm">// BFS per raccogliere il gruppo bridge connesso</span>
+        <span class="kw">var</span> group = <span class="kw">new</span> <span class="tp">List</span>&lt;<span class="tp">Vector2Int</span>&gt;();
+        <span class="kw">var</span> queue = <span class="kw">new</span> <span class="tp">Queue</span>&lt;<span class="tp">Vector2Int</span>&gt;();
+        queue.Enqueue(<span class="kw">new</span> <span class="tp">Vector2Int</span>(x, y));
+        visited[x, y] = <span class="kw">true</span>;
+
+        <span class="kw">while</span> (queue.Count &gt; <span class="num">0</span>)
+        {
+            <span class="kw">var</span> c = queue.Dequeue();
+            group.Add(c);
+            <span class="kw">foreach</span> (<span class="kw">var</span> n <span class="kw">in</span> Neighbors4(c, width, height))
+            {
+                <span class="kw">if</span> (!isBridge[n.x, n.y] || visited[n.x, n.y]) <span class="kw">continue</span>;
+                visited[n.x, n.y] = <span class="kw">true</span>;
+                queue.Enqueue(n);
+            }
+        }
+
+        <span class="cm">// Centroide del gruppo come posizione del landmark strozzatura</span>
+        <span class="kw">var</span> centroid = <span class="nm">NearestWalkable</span>(<span class="nm">Centroid</span>(group), walkable, width, height);
+        landmarks.Add(<span class="kw">new</span> <span class="tp">LandmarkCandidate</span> {
+            Position = centroid,
+            Type = <span class="tp">LandmarkType</span>.ChokePoint
+        });
+    }
+    <span class="kw">return</span> landmarks;
+}
+</pre>
+
+<!-- ============================================================ -->
+<h2 id="passo6">8. Passo 6 — Pruning</h2>
+
+<pre>
+<span class="cm">// Regole di pruning in ordine di priorità:
+//
+// 1. BLOB: gruppo di massimi DT a forma quadrata (2x2 o più) → un solo landmark
+// 2. VICINANZA: due landmark entro merge_radius celle → tieni quello con DT più alta
+// 3. TIPO: non eliminare mai un ChokePoint a favore di un RoomCenter
+//          (le strozzature hanno priorità topologica)</span>
+
+<span class="kw">public static</span> <span class="tp">List</span>&lt;<span class="tp">LandmarkCandidate</span>&gt; <span class="nm">Prune</span>(
+    <span class="tp">List</span>&lt;<span class="tp">LandmarkCandidate</span>&gt; candidates,
+    <span class="tp">int</span>[,] dt,
+    <span class="tp">float</span> mergeRadius = <span class="num">2.5f</span>)
+{
+    <span class="kw">var</span> result = <span class="kw">new</span> <span class="tp">List</span>&lt;<span class="tp">LandmarkCandidate</span>&gt;(candidates);
+    <span class="tp">bool</span> changed = <span class="kw">true</span>;
+
+    <span class="kw">while</span> (changed)
+    {
+        changed = <span class="kw">false</span>;
+        <span class="kw">for</span> (<span class="tp">int</span> i = <span class="num">0</span>; i &lt; result.Count; i++)
+        <span class="kw">for</span> (<span class="tp">int</span> j = i + <span class="num">1</span>; j &lt; result.Count; j++)
+        {
+            <span class="tp">float</span> dist = <span class="tp">Vector2Int</span>.Distance(result[i].Position, result[j].Position);
+            <span class="kw">if</span> (dist &gt; mergeRadius) <span class="kw">continue</span>;
+
+            <span class="cm">// ChokePoint vince sempre su RoomCenter</span>
+            <span class="kw">if</span> (result[i].Type == <span class="tp">LandmarkType</span>.ChokePoint &amp;&amp;
+                result[j].Type == <span class="tp">LandmarkType</span>.RoomCenter)
+            {
+                result.RemoveAt(j); changed = <span class="kw">true</span>; <span class="kw">break</span>;
+            }
+            <span class="kw">if</span> (result[j].Type == <span class="tp">LandmarkType</span>.ChokePoint &amp;&amp;
+                result[i].Type == <span class="tp">LandmarkType</span>.RoomCenter)
+            {
+                result.RemoveAt(i); changed = <span class="kw">true</span>; <span class="kw">break</span>;
+            }
+
+            <span class="cm">// Stesso tipo: tieni quello con DT più alta (più centrale)</span>
+            <span class="tp">int</span> dtI = dt[result[i].Position.x, result[i].Position.y];
+            <span class="tp">int</span> dtJ = dt[result[j].Position.x, result[j].Position.y];
+            <span class="kw">if</span> (dtI &gt;= dtJ) result.RemoveAt(j);
+            <span class="kw">else</span>           result.RemoveAt(i);
+            changed = <span class="kw">true</span>; <span class="kw">break</span>;
+        }
+    }
+    <span class="kw">return</span> result;
+}
+</pre>
+
+<!-- ============================================================ -->
+<h2 id="casi">9. Copertura dei casi critici</h2>
+
+<table>
+  <tr>
+    <th>Caso</th>
+    <th>Tecnica che lo risolve</th>
+    <th>Stato</th>
+  </tr>
+  <tr>
+    <td>Stanza regolare</td>
+    <td>DT massimo</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Stanza a C / irregolare</td>
+    <td>Mediana ortogonale → 2 landmark corretti</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Corridoio stretto lungo</td>
+    <td>Regola segmento centrale sul DT</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Corridoio a L</td>
+    <td>Bridge ai due estremi + mediana nel gomito</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Strozzatura singola (porta)</td>
+    <td>Bridge detection</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Strozzatura larga (3+ celle)</td>
+    <td>Mediana ortogonale nel buco</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Stanze con passaggio largo</td>
+    <td>DT trova 2 picchi + mediana nel mezzo</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Stanza circolare / blob massimo 2x2</td>
+    <td>Pruning blob → collassa in centroide</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Corridoio diagonale a gradini</td>
+    <td>Landmark ridondanti ma tutti corretti</td>
+    <td><span class="status status-warn">Accettabile</span></td>
+  </tr>
+  <tr>
+    <td>Stanza con colonne interne</td>
+    <td>Landmark multipli corretti</td>
+    <td><span class="status status-warn">Accettabile</span></td>
+  </tr>
+  <tr>
+    <td>Imbuto graduale</td>
+    <td>Mediana al centro = visibilità totale dall'NPC</td>
+    <td><span class="status status-ok">Risolto</span></td>
+  </tr>
+  <tr>
+    <td>Labirinto puro</td>
+    <td>Mediana per ogni corridoio + regola segmento</td>
+    <td><span class="status status-warn">Gestibile</span></td>
+  </tr>
+  <tr>
+    <td>Alcova profonda</td>
+    <td>Generazione corretta, ottimizzazione A* separata</td>
+    <td><span class="status status-info">Fuori scope</span></td>
+  </tr>
+</table>
+
+<!-- ============================================================ -->
+<h2 id="integrazione">10. Integrazione con sistema esistente</h2>
+
+<div class="callout callout-purple">
+  <span class="callout-icon">🔌</span>
+  <div>Il nuovo sistema sostituisce la generazione GVD-DIN ma non tocca il layer di apprendimento degli NPC. <code>NpcLandmarkMemory</code>, <code>LandmarkPathfinder</code> e <code>LandmarkPerceptionSystem</code> rimangono invariati. Cambia solo la sorgente dei candidati.</div>
+</div>
+
+<div class="step-box">
+  <div class="step-header"><div class="step-num">1</div>Nuovo file: <code>HybridLandmarkExtractor.cs</code></div>
+  <div class="step-body">
+    <p>Classe statica chiamata da <code>World.cs</code> a map-load. Contiene tutta la pipeline. Produce <code>List&lt;LandmarkCandidate&gt;</code>.</p>
+  </div>
+</div>
+
+<div class="step-box">
+  <div class="step-header"><div class="step-num">2</div>Modifica: <code>World.cs</code></div>
+  <div class="step-body">
+    <p>Sostituire la chiamata al generatore GVD-DIN con <code>HybridLandmarkExtractor.Extract(grid)</code>. Controllato da flag <code>use_hybrid_extractor</code> in <code>game_params.json</code> per backward compatibility.</p>
+  </div>
+</div>
+
+<div class="step-box">
+  <div class="step-header"><div class="step-num">3</div>Modifica: <code>game_params.json</code></div>
+  <div class="step-body">
+    <p>Aggiungere sezione <code>"hybrid_landmark"</code> con i parametri configurabili.</p>
+  </div>
+</div>
+
+<div class="step-box">
+  <div class="step-header"><div class="step-num">4</div>Modifica: <code>MapGridLandmarkLabelOverlay.cs</code></div>
+  <div class="step-body">
+    <p>Aggiungere colore distinto per <code>LandmarkType.ChokePoint</code> (es. rosso) vs <code>LandmarkType.RoomCenter</code> (es. azzurro) nel debug overlay.</p>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="parametri">11. Parametri configurabili</h2>
+
+<table>
+  <tr>
+    <th>Parametro</th>
+    <th>Default</th>
+    <th>Descrizione</th>
+  </tr>
+  <tr>
+    <td><code>use_hybrid_extractor</code></td>
+    <td><code>false</code></td>
+    <td>Abilita il nuovo sistema. Se false, usa GVD-DIN esistente.</td>
+  </tr>
+  <tr>
+    <td><code>dt_threshold_percentile</code></td>
+    <td><code>0.4</code></td>
+    <td>Percentile della distribuzione DT per separare stanza/corridoio.</td>
+  </tr>
+  <tr>
+    <td><code>merge_radius</code></td>
+    <td><code>2.5</code></td>
+    <td>Distanza sotto cui due landmark vengono collassati in uno.</td>
+  </tr>
+  <tr>
+    <td><code>min_region_area</code></td>
+    <td><code>4</code></td>
+    <td>Regioni con meno di N celle walkable vengono ignorate.</td>
+  </tr>
+  <tr>
+    <td><code>median_tolerance</code></td>
+    <td><code>1</code></td>
+    <td>Tolleranza in celle per considerare una cella "mediana" (|left-right| ≤ N).</td>
+  </tr>
+</table>
+
+<hr>
+
+<p style="color: var(--text-secondary); font-size: 0.85em; text-align: center; margin-top: 40px;">
+  ARCONTIO — Sistema Pathfinding Ibrido v0.04 — Documento vivo, aggiornato dopo ogni sessione di implementazione
+</p>
+
+</body>
+</html>

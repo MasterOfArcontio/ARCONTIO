@@ -1,0 +1,714 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>MANIFESTO</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+/* Override strong tags inside headings to maintain consistent weight */
+h1 strong,
+h2 strong,
+h3 strong {
+	font-weight: 600;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	gap: 46px;
+}
+
+.column {
+	min-width: 0;
+	overflow: hidden;
+}
+
+.column > *:first-child {
+	margin-top: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="3059c167-6366-80ad-9dd4-c54edf9c4746" class="page sans"><header><h1 class="page-title" dir="auto">MANIFESTO</h1><p class="page-description" dir="auto"></p></header><div class="page-body"><div style="display:contents" dir="auto"><h2 id="32b9c167-6366-80af-bce7-c23981819e64" class="">MANIFESTO — ITCH.IO</h2></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8024-b8a6-e2ff8be80b81" class=""><strong>ARCONTIO</strong><em>A social simulation where NPCs act on what they know and remember, not on what is actually happening</em></p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-8095-9ea9-e4ee2cc82e97"/></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80cf-8b52-e23f50c119a0" class="">Most colony simulators offer a god&#x27;s-eye view of the world. You see everything. You know everything. Your colonists, your citizens — they are extensions of your will, executing plans handed down from above.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8002-b7e7-c76dc19325c9" class="">In ARCONTIO that perspective is removed entirely.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80ae-9f31-f8179a9b4e5d" class="">The world in ARCONTIO exists independently of anyone who observes it. Events happen — an attack, a killing, a theft, a sighting — and they are objective facts. But no character in the simulation has direct access to those facts. Every NPC builds their own version of reality from what they have personally seen, from what they remember, and from what others have told them.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-800a-83b6-c6541d7eedb7" class="">Memory is not a simple log. It is a trace with weight, intensity, and decay. What an NPC knew three days ago may no longer be true. What they heard from a neighbor may already be distorted. What they believe about the world drives every decision they make — and their beliefs are rarely one hundred percent correct.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8038-b82c-dfc5f478dcba" class="">This is not a bug. It is the system.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8096-bf05-ccf6d786a25b" class=""><strong>What this means in practice:</strong></p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80b9-b092-dfe60f281b1f" class="">An NPC walks toward food they remember seeing in a certain place. In the meantime it was moved. They arrive, search, find nothing, and update their map of the world. Confidence in that memory drops. They look for an alternative.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-806e-94a7-fdb5cd40312b" class="">Two NPCs head toward the same resource. Neither knows the other is coming. One arrives first and reserves it. The other is blocked — not by a scripted event, but by the collision of two independent mental models of the same world. The NPC adapts. Remembers.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80e1-87a6-f9a387ae41f6" class="">Information spreads between NPCs, but it degrades. A rumor is not a fact. A warning passed through three people is not the same warning that was originally issued. A crime can remain invisible. An unfounded suspicion can spread as if it were truth.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8066-8469-e3653c459ef5" class="">Social structures — alliances, tensions, informal hierarchies — emerge from this fog of partial knowledge. Not because a designer scripted them, but because characters with different information, acting rationally on what they know, keep colliding with each other.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80c4-9030-fb07c7f1df22" class="">Between the goals of individual NPCs and their social aggregation there are institutions — justice, trade, city planning — also run by characters with their own biases, experiences, and memories.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8012-8e9d-dbba48ec1f06" class=""><strong>The player&#x27;s role:</strong></p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80c8-8260-ef8dd846d41b" class="">You do not control from above. You can inhabit any NPC in the simulation and experience the world through their knowledge, their relationships, their position in society. You might play as a guard who knows only what their patrols have shown them. A merchant with a mental map built from a hundred transactions. An adventurer who knows almost nothing.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8061-8af3-fd0aff312dae" class="">You can switch perspectives during the same playthrough. The same event looks different depending on who you are.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80d3-89d1-eecbd163a399" class="">ARCONTIO is not built purely to be won. It is built to be observed, influenced — and, with care, shaped: through one absolute heroic protagonist or through a thousand different lives lived to produce your own specific idea of a world.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8093-91db-f6de8614feb3" class=""><em>Prototype in development. Active systems: subjective perception, NPC memory with decay, landmark-based pathfinding, resource reservation, token-based communication.</em></p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-80b6-85ba-c83be824cd16"/></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-80a4-a838-e2efce92c6a6"/></div><div style="display:contents" dir="auto"><h2 id="32b9c167-6366-800c-840b-f219e35e64de" class="">MANIFESTO — SUBSTACK</h2></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-806a-9184-f08d0ab6b4ed" class=""><strong>Why I&#x27;m building a simulation where nobody really knows what&#x27;s happening</strong></p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-803a-a013-f109a3fe998d"/></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-800a-baed-f4ede1bfcdd7" class="">There is a moment in almost every colony sim where everything makes sense from above but nothing makes sense from the inside.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8017-bc12-e607d5398e04" class="">You see the entire map. You know where every resource is. Your colonists execute the tasks you assign them with perfect knowledge of the world you can see but they cannot. The interesting stories — the dwarf who went mad, the colonist who kept wandering into danger — happen <em>despite</em> the system, not because of it. They happen when the designer deliberately introduced some imperfection into an otherwise omniscient simulation.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-800f-842b-f228d3ba2a81" class="">I kept asking myself: what if the imperfection were not deliberate? What if it were structural?</p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-8057-b67a-ded1aa6ddaaf"/></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80cf-9347-feaeb0d3aecf" class=""><strong>The premise</strong></p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8046-afaa-f4f583098fa0" class="">ARCONTIO is built on a single idea: events in the world are objective, but the knowledge each character has of those events is not.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-808f-afb5-fed26247dac5" class="">An attack happens. It is an objective fact — something that occurred at a specific place, at a specific time, involving specific entities. It carries no moral weight, no emotional content, no built-in interpretation. It is simply what happened.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8093-bc5b-c2d5afb8e5f5" class="">But no NPC in ARCONTIO has direct access to that fact. What they have is: what they personally witnessed (constrained by line of sight and direction of attention), what they remember of what they witnessed (which fades, distorts, and competes with other memories), and what other NPCs have communicated to them (already filtered through those NPCs&#x27; own subjective experience and memory limitations).</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8015-8022-cea1a8d1a1cd" class="">The world exists in itself. The mind is subjective. Information is imperfect.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-802d-9ab5-ff2781e3d36b" class="">These are the three axioms the simulation runs on.</p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-8059-8af1-ca1ba40537c5"/></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8065-8e03-c2efcd52724c" class=""><strong>What changes</strong></p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-806f-8f92-d374e439da0b" class="">In most simulations, the gap between &quot;what is true&quot; and &quot;what characters know&quot; is either zero or carefully scripted. A character does not know about the monster because the designer has not revealed it yet. A colonist receives a negative mood because they witnessed an event the game decided was traumatic.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8024-876d-fffbfd114e1b" class="">In ARCONTIO the gap is structural and emergent. Two NPCs can hold conflicting beliefs about the same event not because the designer built a puzzle, but because they were standing in different places when it happened, talked to different people afterward, and carry memories of different ages and different confidence levels.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80af-8bc0-cdf1d1dedddd" class="">This means the simulation can generate genuine disagreements about what is true — not only about what is desirable.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8095-9ddf-e63b1481c36d" class="">I find this more interesting than psychological trait systems, not because psychology is not interesting, but because information asymmetry is a more fundamental source of conflict. You can negotiate with someone who wants different things than you do. It is much harder to negotiate with someone who is operating on a different version of reality.</p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-80ac-9d60-ee4fa047a298"/></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-800a-955e-c5ff3cb690f7" class=""><strong>The technical problem this creates</strong></p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8011-b270-cc5768234972" class="">Everything in the game has to be built twice: once as objective world state, and once as each NPC&#x27;s subjective model of that state.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80b6-bc95-c32c2a8670ba" class="">Every NPC maintains a personal store of known objects — where they last saw food, where they remember a door being, which path worked last time. Each entry has a confidence level that decays over time and a last-seen timestamp that indicates how stale the memory is. When the world changes and an NPC has not observed the change, their model drifts from reality.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80da-8684-f7a451f2ba4a" class="">Pathfinding works the same way. NPCs do not navigate on a perfect grid. They navigate on a landmark graph they have built themselves through movement — a compressed mental map of significant points (doorways, junctions) and the connections between them. Two NPCs who have explored different areas have different mental maps of the same space. An NPC who has always worked in one section of the city has no knowledge of shortcuts on the other side.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80a7-858f-c06d4ce0aa71" class="">Communication is also imperfect by design. Information travels between NPCs as symbolic tokens — structured messages carrying intensity, reliability, and a provenance chain. Each time a token passes from one NPC to another it degrades slightly. The further a piece of information travels from its source, the less reliable it becomes. A firsthand account and a third-hand rumor are structurally different objects in this system.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80aa-8027-c790ff711cb5" class="">None of this is simple to build. I have rewritten the pathfinding system three times. I am still calibrating the confidence decay rates. The job system has more edge cases than I initially expected. But I keep coming back to these constraints because I think they are the right constraints — they produce behavior that feels genuinely emergent rather than scripted.</p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-8092-91ca-fca6c2160949"/></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-806d-b1fc-eb3c71ac3a1e" class=""><strong>What I am trying to observe</strong></p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80c2-b1f7-c74ccbf24ed6" class="">ARCONTIO is not built to be won in the classical sense of growing the most prosperous society possible. Beyond the pure sandbox mode — which I call sandbox² because it is a fully open scenario where you can play as any available character — I plan to build structured missions with specific objectives: playing as only a limited set of characters, supporting the growth of a particular faction, or managing a specific institution in a specific way.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80a9-9615-ef71105b01c4" class="">All of it is built to observe how social structures emerge from information asymmetry. How informal groups form when multiple NPCs share similar incomplete knowledge. How institutions are managed when individual NPCs cannot resolve conflicts on their own and need coordinating structures. How norms emerge not as preset rules but as patterns reinforced by repeated events and collective memory.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8033-80f1-f4543fc53694" class="">The player does not have god mode. They can inhabit any NPC in the simulation and experience the world through that character&#x27;s knowledge and relationships. They can switch perspectives — play as the governor, then as a rival candidate (there are elections for that), then as a guild outlaw — and see how the same events look different depending on what you know and who you are.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-800e-943a-c28bbdc2b8d4" class="">The society is not the player&#x27;s interface. It is a system. The player is inside it.</p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-80ff-b7af-cbacee951d06"/></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8077-b712-e4b341815f43" class=""><strong>Why I am writing about this</strong></p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80cf-87cd-e5d015d43573" class="">I am building this alone, which means the technical decisions and the design decisions are the same decisions, made by the same person, often at the same time. Writing about them forces me to separate them — to say clearly what I am trying to build and why, before getting too deep into how.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80ce-88e5-f4ccb992af76" class="">This newsletter is that process made public. Every two weeks or so I will share a technical note on one system in ARCONTIO — how it is designed, what it does, what breaks when it fails. The goal is not documentation. It is thinking in public, which is the only way I know how to think clearly.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80ae-bc12-c975fd2b94c5" class="">If you are interested in simulation design, emergent systems, or what happens when you try to build a society from imperfect information — you are in the right place.</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-808c-91e9-d6343b010fb9" class="">Next issue: why I do not want NPCs to have perfect maps, and what landmark graphs have to do with how people actually remember spaces.</p></div><div style="display:contents" dir="auto"><hr id="32b9c167-6366-80bc-a79d-ef42645b17ef"/></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-8053-816d-f3ebf1b9e152" class=""><em>ARCONTIO is a social simulation in development. Active systems currently include: subjective NPC perception, memory with confidence decay, landmark-based pathfinding, resource reservation, and token-based communication. Everything is subject to change. Follow the project on itch.io.</em></p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80f3-b257-d087d3c6d221" class="">
+</p></div><div style="display:contents" dir="auto"><p id="32b9c167-6366-80a7-b6e9-ee613fc691f1" class="">
+</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-8054-ab77-d804022e7e72" class=""><strong>1. Il mondo esiste in sé?</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-805c-ae45-c9fbb233bffe" class="">In Arcontio, il mondo esiste prima e a prescindere dei personaggi che lo animano.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80d1-8f19-fd37f555193a" class="">Un evento accade indipendentemente dal fatto che qualcuno lo veda.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80bf-9e25-e264381dc9b2" class="">Un attacco. Una morte. Un furto. Un avvistamento.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80db-9cd1-dab0de1fdf1a" class="">Gli eventi sono fatti oggettivi.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80f3-b78c-c588b9347c87" class="">Non contengono:</p></div><div style="display:contents" dir="auto"><ul id="3059c167-6366-8092-8a8d-ef69e7592fc1" class="bulleted-list"><li style="list-style-type:disc">giudizi morali</li></ul></div><div style="display:contents" dir="auto"><ul id="3059c167-6366-80ae-8fd0-f37296a7dd99" class="bulleted-list"><li style="list-style-type:disc">emozioni</li></ul></div><div style="display:contents" dir="auto"><ul id="3059c167-6366-80af-956e-d758ea1d84ee" class="bulleted-list"><li style="list-style-type:disc">intenzioni</li></ul></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8044-a9e7-e7fb91e2e4b6" class="">Sono solo ciò che è accaduto.</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-803e-b100-c620b2b74aec" class=""><strong>2. La mente è soggettiva</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80a3-adf7-f82da3de538a" class="">I personaggi non possono accedere alla verità globale. Possono costruire una loro percezione della realtà a partire da ciò che la loro vista rileva, la loro memoria ricorda e da ciò che altri personaggi comunicano a lui.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-802c-a553-d1e3fe1eac33" class="">La memoria, però, non è un log.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8092-8bf4-d21d35364fb2" class="">È una traccia con peso, intensità e decadimento.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80a8-9c0d-fc1b14870605" class="">La realtà sociale nasce da molte verità parziali.</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-806c-bebc-ce5d896a1072" class=""><strong>3. L’informazione è imperfetta</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-803f-bcd7-c92ddca0d21d" class="">In Arcontio non esiste la telepatia.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8070-9afe-cc78d416e56d" class="">Ogni informazione è sempre locale, tende a degradarsi, si può distorcere, ma non si propaga da sola.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8075-a54f-e0ce406af477" class="">Un crimine può quindi restare invisibile, mentre un sospetto può diffondersi senza prove.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-806c-bb06-d6a1023b0c83" class="">La società creata in Arcontio non è onnisciente.</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-8047-a15a-ff9fe9fda057" class=""><strong>4. L’ambiente è un macchina sotto pressione</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80fa-ab8b-fa5ef2b2fbba" class="">L’ambiente non è un puzzle che si può ordinare in maniera definitiva. Non è mai completamente controllabile. È una forza dinamica che rompe equilibri, genera scarsità e impone, quindi, delle scelte a volte difficili. La società dei personaggi di Arcontio emerge come risposta alla pressione.</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-8036-9975-c747f772b762" class=""><strong>5. Nessuna variabile è puramente positiva</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-807d-b429-f9b2d70b081e" class="">Ogni progresso ha un costo.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8049-91d7-c7b47401a76b" class="">Più produzione → più stress.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8018-beed-f5421823445a" class="">Più comfort → nuove tensioni.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8067-880c-f5d293ffbcfe" class="">Più efficienza → nuovi conflitti.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80d1-8358-cb8dd95b5fa6" class="">Non esiste equilibrio stabile permanente.</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-8089-acbc-e13a773f855d" class=""><strong>6. Le norme non sono scriptate</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80c2-bbe1-f8ae8482e22e" class="">Le regole sociali non sono preimpostate come morale universale.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8086-b541-d04a6385e9c5" class="">Emergono attraverso una memoria collettiva e un continuo rinforzo determinato dalla ripetizione di eventi. La distribuzione del potere e l’effetto della comunicazione tra personaggi modifica continuamente questa struttura. Un atto può essere tollerato oggi e punito domani.</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-80cb-99e7-faef8e3eee24" class=""><strong>7. Il giocatore non possiede la verità</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80eb-9c22-fe9d3a4ef9d3" class="">Il giocatore non controlla ciò che i personaggi conoscono. Può solo tentare di influenzare alcune condizioni, gli accessi alle risorse e il corpus normativo. Ma non può imporre percezioni.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80ef-84f8-f96c29711128" class="">La società non è la sua interfaccia, è un sistema.</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-80da-ab58-dd1f6be55936" class=""><strong>8. Arcontio è un esperimento sistemico</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-80b4-a586-fcfbc5399577" class="">Arcontio non è costruito per ottimizzare punteggi. È costruito per osservare come nascono i conflitti, come si generano i sospetti, come si stabilizzano o si fanno collassare comunità.</p></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8040-971c-e87bf2f373b1" class="">È un simulatore di dinamiche sociali.</p></div><div style="display:contents" dir="auto"><h1 id="3059c167-6366-80d3-a022-e99e265622bb" class=""><strong>Versione sintetica (per homepage)</strong></h1></div><div style="display:contents" dir="auto"><p id="3059c167-6366-8082-a7c7-c537166597b8" class="">Arcontio è un simulatore sociale rules-driven.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-808f-b139-ecbc3ec540c4" class="">Il mondo produce eventi, e gli eventi vengono vissuti diversamente da ogni personaggio.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80c2-a41d-ecbdba874474" class="">Il loro vissuto crea memorie, credenze, sentimenti ed emozioni personali. Questo caleidoscopio contribuisce a stimolare aggregazioni e attriti sociali. </p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8031-9715-f84e27d4d716" class="">Questa pressione trova una mediazione tramite le istituzioni politiche. Istituzioni che possono essere modulate per risolvere o esacerbare i conflitti.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8071-8fec-c225a243601c" class="">Il sistema non è isolato: dal singolo alla politica e viceversa, tutto è connesso.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8097-9cd9-cc22b2b01393" class="">
+</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-8018-a984-d675cdc8f8f4"/></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80b1-9a62-ea084b45c46f" class="">
+</p></div><div style="display:contents" dir="auto"><h2 id="3069c167-6366-8032-92ba-f333babda94f" class=""><strong>The Manifesto of Arcontio</strong></h2></div><div style="display:contents" dir="auto"><h3 id="3069c167-6366-8023-af6a-e8b3a30700ea" class="">1. Does the world exist in itself?</h3></div><div style="display:contents" dir="auto"><p id="3069c167-6366-808a-ab3a-d2359113b165" class="">In Arcontio, the world exists prior to and independently of the characters who inhabit it.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80bb-b814-e02a2880672b" class="">An event occurs whether or not anyone witnesses it.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8088-9f8f-f07f746d82ce" class="">An attack. A death. A theft. A sighting.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80a4-878e-f91d6e0cac2f" class="">Events are objective facts.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80fc-a08a-f208d58506d8" class="">They contain no:</p></div><div style="display:contents" dir="auto"><ul id="3069c167-6366-80f7-8cd5-de6b28c4dd5d" class="bulleted-list"><li style="list-style-type:disc">moral judgment</li></ul></div><div style="display:contents" dir="auto"><ul id="3069c167-6366-8058-a9cd-fbd554fc48cf" class="bulleted-list"><li style="list-style-type:disc">emotion</li></ul></div><div style="display:contents" dir="auto"><ul id="3069c167-6366-8017-8d5a-dfa8517455be" class="bulleted-list"><li style="list-style-type:disc">intention</li></ul></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80dd-b092-c58b4d3a8270" class="">They are simply what has happened.</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-80a6-b969-dc813f6085b9"/></div><div style="display:contents" dir="auto"><h3 id="3069c167-6366-80ab-9f13-cdf8799200f7" class="">2. The mind is subjective</h3></div><div style="display:contents" dir="auto"><p id="3069c167-6366-803d-b861-e016850d372c" class="">Characters cannot access global truth.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8091-b0bc-cd5664feaff4" class="">They construct their own perception of reality from what they see, what they remember, and what others communicate to them.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80b6-917a-d3045fdce605" class="">Memory is not a log.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8020-9b72-d5630db65cd6" class="">It is a trace with weight, intensity, and decay.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80c9-8603-f02392f81967" class="">Social reality emerges from multiple partial truths.</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-80f3-ad35-eb4f75112391"/></div><div style="display:contents" dir="auto"><h3 id="3069c167-6366-80a0-996a-cae0c0de64cf" class="">3. Information is imperfect</h3></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8071-b5fe-f438a9129725" class="">There is no telepathy in Arcontio.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-805d-a5ac-f9dcae42c366" class="">All information is local. It degrades. It may distort. It does not propagate by itself.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8009-b6d2-e0ec52509249" class="">A crime may remain invisible, while suspicion may spread without evidence.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-804d-acaf-cae5eb88f6d0" class="">The society simulated in Arcontio is not omniscient.</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-8009-b639-d339cd68cee2"/></div><div style="display:contents" dir="auto"><h3 id="3069c167-6366-8029-8653-c234b6e2d9b9" class="">4. The environment is a machine under pressure</h3></div><div style="display:contents" dir="auto"><p id="3069c167-6366-809a-baab-eef6d9ccd476" class="">The environment is not a puzzle to be permanently solved.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8073-bcac-d94724abd685" class="">It is never fully controllable.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8061-876c-fe206cd099cf" class="">It is a dynamic force that disrupts equilibria, generates scarcity, and compels difficult choices.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8087-999d-e8b83df320ea" class="">The society of Arcontio’s characters emerges as a response to pressure.</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-80fc-9e4a-c22c5bc8a6db"/></div><div style="display:contents" dir="auto"><h3 id="3069c167-6366-8016-9733-f577f03008bb" class="">5. No variable is purely positive</h3></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8069-b82d-d3ff4ff39fe9" class="">Every advance has a cost.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80ef-8f3d-cb535f77073e" class="">More production → more stress.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8075-a3c5-da4af7683aaf" class="">More comfort → new tensions.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-809b-929e-d5d66e0309ee" class="">More efficiency → new conflicts.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8037-8c44-e3b739a04836" class="">There is no permanent stable equilibrium.</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-807d-9ac4-dd0ca24ce193"/></div><div style="display:contents" dir="auto"><h3 id="3069c167-6366-8024-9dbf-c16c73d1b2d8" class="">6. Norms are not scripted</h3></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80bd-9465-c79db7ebd7b1" class="">Social rules are not pre-written as universal morality.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-805b-8745-c4bb42393179" class="">They emerge through collective memory and are continuously reinforced by the repetition of events.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-805a-a0c9-ec881a38c6cd" class="">The distribution of power and the flow of communication constantly reshape this structure.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80e6-b531-f174a8ee477d" class="">An act tolerated today may be punished tomorrow.</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-8024-ba29-c06c1262289e"/></div><div style="display:contents" dir="auto"><h3 id="3069c167-6366-8018-a1fa-c7cfbe0865fd" class="">7. The player does not possess the truth</h3></div><div style="display:contents" dir="auto"><p id="3069c167-6366-808f-a41e-d2c2d52fbbb9" class="">The player does not control what characters know.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80b0-bf35-f0eab4268b47" class="">They may influence conditions, access to resources, and the normative framework — but they cannot impose perception.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8019-91ec-dc2e6eb1d2de" class="">Society is not the interface. It is a system.</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-8069-83ab-e9249a48669e"/></div><div style="display:contents" dir="auto"><h3 id="3069c167-6366-80d1-aea7-d77c4d96c980" class="">8. Arcontio is a systemic experiment</h3></div><div style="display:contents" dir="auto"><p id="3069c167-6366-800a-a918-f20981f01640" class="">Arcontio is not built to optimize scores.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8091-aabf-ebb94a897d58" class="">It is built to observe how conflicts arise, how suspicion spreads, and how communities stabilize or collapse.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80d5-81cd-e26a005f86b6" class="">It is a simulator of social dynamics.</p></div><div style="display:contents" dir="auto"><hr id="3069c167-6366-80e0-86d0-dbd2533e931a"/></div><div style="display:contents" dir="auto"><h2 id="3069c167-6366-808a-ae37-e518ecebd6e6" class="">Short Version (Homepage)</h2></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80d3-a251-ec19bd8aa8bd" class="">Arcontio is a rules-driven social simulator.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8034-b487-f4701706cf1f" class="">The world generates events, and each character experiences them differently.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8042-b5b8-eef26a1d2be9" class="">Their lived experiences generate memories, beliefs, emotions, and sentiments.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-8096-acb8-eb6aeae3e759" class="">This kaleidoscope produces social aggregation and friction.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80e5-9d79-d3a1d69faafa" class="">That pressure is mediated through political institutions — institutions that may be adjusted to resolve or exacerbate conflict.</p></div><div style="display:contents" dir="auto"><p id="3069c167-6366-80d6-88b6-daffeb6c07f7" class="">The system is not isolated: from the individual to politics and back again, everything is connected.</p></div></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>

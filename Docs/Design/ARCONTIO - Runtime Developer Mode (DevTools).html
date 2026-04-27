@@ -1,0 +1,723 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>Runtime Developer Mode (DevTools)</title><style>
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(55, 53, 47);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+/* Override strong tags inside headings to maintain consistent weight */
+h1 strong,
+h2 strong,
+h3 strong {
+	font-weight: 600;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #ddd;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 10px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.collection-content td {
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.column-list {
+	display: flex;
+	justify-content: space-between;
+}
+
+.column {
+	padding: 0 1em;
+}
+
+.column:first-child {
+	padding-left: 0;
+}
+
+.column:last-child {
+	padding-right: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+	margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.callout img.notion-static-icon {
+	width: 1em;
+	height: 1em;
+}
+
+.callout p {
+	margin: 0;
+}
+
+.callout h1,
+.callout h2,
+.callout h3 {
+	margin: 0 0 0.6rem;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+blockquote.quote-large {
+	font-size: 1.25em;
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Display", "Segoe UI", Helvetica, "Apple Color Emoji", "Noto Sans Arabic", "Noto Sans Hebrew", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.highlight-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.highlight-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.highlight-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.highlight-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.highlight-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.highlight-default_background {
+	color: rgba(44, 44, 43, 1);
+}
+.highlight-gray_background {
+	background: rgba(42, 28, 0, 0.07);
+}
+.highlight-brown_background {
+	background: rgba(139, 46, 0, 0.086);
+}
+.highlight-orange_background {
+	background: rgba(224, 101, 1, 0.129);
+}
+.highlight-yellow_background {
+	background: rgba(211, 168, 0, 0.137);
+}
+.highlight-teal_background {
+	background: rgba(0, 100, 45, 0.09);
+}
+.highlight-blue_background {
+	background: rgba(0, 124, 215, 0.094);
+}
+.highlight-purple_background {
+	background: rgba(102, 0, 178, 0.078);
+}
+.highlight-pink_background {
+	background: rgba(197, 0, 93, 0.086);
+}
+.highlight-red_background {
+	background: rgba(223, 22, 0, 0.094);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(125, 122, 117, 1);
+	fill: rgba(125, 122, 117, 1);
+}
+.block-color-brown {
+	color: rgba(159, 118, 90, 1);
+	fill: rgba(159, 118, 90, 1);
+}
+.block-color-orange {
+	color: rgba(210, 123, 45, 1);
+	fill: rgba(210, 123, 45, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 148, 52, 1);
+	fill: rgba(203, 148, 52, 1);
+}
+.block-color-teal {
+	color: rgba(80, 148, 110, 1);
+	fill: rgba(80, 148, 110, 1);
+}
+.block-color-blue {
+	color: rgba(56, 125, 201, 1);
+	fill: rgba(56, 125, 201, 1);
+}
+.block-color-purple {
+	color: rgba(154, 107, 180, 1);
+	fill: rgba(154, 107, 180, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(207, 81, 72, 1);
+	fill: rgba(207, 81, 72, 1);
+}
+.block-color-default_background {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray_background {
+	background: rgba(240, 239, 237, 1);
+}
+.block-color-brown_background {
+	background: rgba(245, 237, 233, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 235, 222, 1);
+}
+.block-color-yellow_background {
+	background: rgba(249, 243, 220, 1);
+}
+.block-color-teal_background {
+	background: rgba(232, 241, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(229, 242, 252, 1);
+}
+.block-color-purple_background {
+	background: rgba(243, 235, 249, 1);
+}
+.block-color-pink_background {
+	background: rgba(250, 233, 241, 1);
+}
+.block-color-red_background {
+	background: rgba(252, 233, 231, 1);
+}
+.select-value-color-default { background-color: rgba(42, 28, 0, 0.07); }
+.select-value-color-gray { background-color: rgba(28, 19, 1, 0.11); }
+.select-value-color-brown { background-color: rgba(127, 51, 0, 0.156); }
+.select-value-color-orange { background-color: rgba(196, 88, 0, 0.203); }
+.select-value-color-yellow { background-color: rgba(209, 156, 0, 0.282); }
+.select-value-color-green { background-color: rgba(0, 96, 38, 0.156); }
+.select-value-color-blue { background-color: rgba(0, 118, 217, 0.203); }
+.select-value-color-purple { background-color: rgba(92, 0, 163, 0.141); }
+.select-value-color-pink { background-color: rgba(183, 0, 78, 0.152); }
+.select-value-color-red { background-color: rgba(206, 24, 0, 0.164); }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="31a9c167-6366-8034-a884-d8c4aaba35c8" class="page sans"><header><h1 class="page-title" dir="auto">Runtime Developer Mode (DevTools)</h1><p class="page-description" dir="auto"></p></header><div class="page-body"><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-807a-b5f3-cab640a0c93f" class="">Scopo</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80fe-b336-c01d4924f850" class="">Introdurre una <strong>modalità sviluppatore attivabile in runtime</strong> che permetta di costruire e modificare rapidamente scenari di gioco direttamente nella simulazione.</p></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8059-a982-ec149d72cce4" class="">Questo strumento serve principalmente per:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80cc-9925-d557aa9f09df" class="bulleted-list"><li style="list-style-type:disc">debug del pathfinding</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80f7-a226-f853cc1449e5" class="bulleted-list"><li style="list-style-type:disc">test delle meccaniche sociali (furto, fame, sonno, ecc.)</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-804f-81b7-fe486967f180" class="bulleted-list"><li style="list-style-type:disc">costruzione veloce di scenari ripetibili</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-809a-be99-c3378fc5892c" class="bulleted-list"><li style="list-style-type:disc">creazione di mappe di test senza ricompilare o modificare codice</li></ul></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-802f-83cd-d456ec24458c" class="">La modalità Developer non deve alterare il gameplay normale e deve poter essere <strong>attivata/disattivata con un tasto</strong>.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-8078-b5e0-d1bbefea9ecf"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-8005-a8d3-d7dc6d4751c8" class="">Principi architetturali</h1></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-802e-a36a-ee8d3efc276c" class="">Separazione View / World</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-805f-9a01-f0aafb23121d" class="">Il sistema DevTools deve rispettare la separazione già esistente in ARCONTIO:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-808e-a7c0-f772b41e4966" class="bulleted-list"><li style="list-style-type:disc"><strong>World</strong> = stato reale della simulazione</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-806a-b1c9-de25d823ddf3" class="bulleted-list"><li style="list-style-type:disc"><strong>View/UI</strong> = strumenti di editing e debug</li></ul></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8034-90cc-c2e09bf1c954" class="">La UI <strong>non modifica direttamente il World</strong>.</p></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80f3-b8fe-fdaf64cfcd2a" class="">Le modifiche devono passare tramite <strong>CommandBuffer</strong>.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-8017-861b-f6e22613fd81"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-805f-aba5-ee74368779ab" class="">Modifica coerente dello stato</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-804a-a18e-d25966c4bb82" class="">Quando un oggetto viene aggiunto o rimosso devono essere aggiornate tutte le strutture derivate:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8071-888d-ef63bf7f5828" class="bulleted-list"><li style="list-style-type:disc"><code>OcclusionMap</code></li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8082-9df0-d336c220706f" class="bulleted-list"><li style="list-style-type:disc"><code>LandmarkRegistry</code></li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-809f-aa7f-e03dbde96c3b" class="bulleted-list"><li style="list-style-type:disc">walkability cache</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8014-b788-ed66e048658d" class="bulleted-list"><li style="list-style-type:disc">eventuali altri sistemi derivati</li></ul></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-807d-8f00-f53e2461dcf0" class="">Nella prima versione è accettabile un <strong>rebuild globale</strong>.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-808a-913c-e5b2140cacfa"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-80f6-a13b-ca34b8f3d05e" class="">Attivazione della modalità Developer</h1></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-8050-a0b4-d20f6fdd4dfd" class="">Toggle modalità</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80fe-b6a4-fb4fd8b15073" class="">Hotkey principale:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-8079-97ea-d879eba5298c" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">F2 → Toggle Developer Mode</code></pre></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8020-9ee5-d336679cf1f2" class="">Quando la modalità è attiva:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8057-8d9a-ffeb5f733ba3" class="bulleted-list"><li style="list-style-type:disc">compare un overlay di editing</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80d0-a8a0-fca2b1e4f41d" class="bulleted-list"><li style="list-style-type:disc">gli input gameplay vengono sospesi o intercettati</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80c4-b314-d4db292692f3" class="bulleted-list"><li style="list-style-type:disc">la UI mostra strumenti e palette oggetti</li></ul></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80b7-b2e8-d43e1738d02b"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-80b9-9e30-e2efc542c8b0" class="">Interfaccia Developer</h1></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-802d-b56d-d27659117848" class="">Palette oggetti</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8022-86f6-c0e309875d4e" class="">La UI mostra una palette con oggetti posizionabili.</p></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80a4-bd00-ed90df1b04d0" class="">Esempi iniziali:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8065-bad0-e5e303fad037" class="bulleted-list"><li style="list-style-type:disc">muro</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80a7-be36-e70094319657" class="bulleted-list"><li style="list-style-type:disc">porta</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8055-b155-e56cbaadcafa" class="bulleted-list"><li style="list-style-type:disc">cibo</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80a0-84b9-cf2f2e8cdc59" class="bulleted-list"><li style="list-style-type:disc">letto</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8032-b540-cf418bd96321" class="bulleted-list"><li style="list-style-type:disc">NPC</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8023-ba07-e5b4a4c3c72e" class="bulleted-list"><li style="list-style-type:disc">altri oggetti test</li></ul></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8082-b6fd-fde595cf963b" class="">In futuro la palette potrà essere generata automaticamente leggendo <code>object_defs.json</code>.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80b4-8a68-cc12af0df4e3"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-808b-9930-f5d740f159e8" class="">Tool di editing</h2></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-8027-8866-e176e631c66e" class="">Place Tool</h3></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80e0-83b9-e2faf3b543ec" class="">Piazza un oggetto sulla cella sotto il mouse.</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-80e3-98e1-cc50eaf45695" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">Click sinistro → piazza oggetto</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-8006-9582-c9e3d1384015"/></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-80ab-83b1-f8b55b8ce9ca" class="">Erase Tool</h3></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80a8-a5ac-fe03bf2fda4b" class="">Rimuove l’oggetto dalla cella.</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-80f9-a833-d91d4ff7804c" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">Click destro → rimuove oggetto</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80bb-8c09-dcae25355cc6"/></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-80ac-a943-d36216f21266" class="">Brush continuo</h3></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8086-96f8-c8c5e95405e7" class="">Permette di disegnare rapidamente.</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-808d-9aa8-f511121e9d47" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">Shift + drag → piazza oggetti in continuo</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80b5-8745-cec83db62c6a"/></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-8044-9d20-d2eacffa826d" class="">Rectangle Tool (opzionale)</h3></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8066-9e6f-ff9d2598bc59" class="">Permette di disegnare muri o oggetti in area.</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-8070-b863-e13d89272b9f" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">Click + drag → riempie un rettangolo</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-8081-9985-fb7cf05e472f"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-8017-a8e7-eee72c259560" class="">Spawn di entità</h1></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-80f6-bb06-d82806b96331" class="">Spawn oggetti</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80f6-b5ab-cf83eb33ee0c" class="">Gli oggetti vengono creati tramite comando:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-80c8-a49e-ed15e424d44e" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">PlaceObjectCommand(cell, objectDefId)</code></pre></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8001-8f4f-e5033493a109" class="">Esempio:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-801e-9f59-d7eebdd6d16e" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">PlaceObjectCommand(32,22,&quot;door_wood_good&quot;)</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-802c-85da-d40b38c8ed5e"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-80fd-8e38-fbe9774e8bc7" class="">Spawn NPC</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8056-acdc-c23f851c8bc3" class="">Permette di creare NPC di test.</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-800b-977c-ec2f3131930d" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">SpawnNpcCommand(cell, npcTemplateId)</code></pre></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80a6-b1da-ea53d6220bfc" class="">Esempio:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-80f9-8755-d1c34b27ab88" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">SpawnNpcCommand(20,20,&quot;citizen_basic&quot;)</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80d5-a55f-c6ff077cdc3b"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-805c-b6fc-fb54ede6c347" class="">CommandBuffer</h1></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-8062-b8b1-cdb375b5b995" class="">Motivazione</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8019-9eed-d3c408d8ec77" class="">La UI non deve scrivere direttamente nello stato World.</p></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8035-a984-c5de990f279e" class="">Tutte le operazioni devono passare tramite comandi applicati al tick successivo.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80c3-8b6d-cf3985c30d89"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-800f-b5c7-fa8aab54f173" class="">Comandi previsti</h2></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-806c-bef7-cd6eea9d5f88" class="">PlaceObjectCommand</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-80dd-823b-fa697746b7e2" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">(cellX, cellY, objectId)</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80c1-a42e-cbc0aea9e450"/></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-80ec-8f08-d97f719d135f" class="">RemoveObjectCommand</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-80ff-8f6b-d074b316be33" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">(cellX, cellY)</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-8062-a262-c2e0cdf729c3"/></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-8038-b167-c777cbf121b8" class="">SpawnNpcCommand</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-801a-9d8a-e1a216300888" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">(cellX, cellY, npcTemplate)</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-8069-9c2e-f2b56b08e7ba"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-8093-8e56-d865ab3847b2" class="">Aggiornamento delle cache</h1></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80ca-895a-da61a18441be" class="">Dopo ogni modifica è necessario aggiornare:</p></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-8071-b6dc-e0736afd9ed9" class="">OcclusionMap</h3></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8013-a413-e3742d627a77" class="">Per mantenere corretta la visione NPC.</p></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-8074-9a4d-e49450cb2d2b" class="">LandmarkRegistry</h3></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80fd-919a-ccc16ec43767" class="">Per mantenere coerente il grafo di navigazione.</p></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-807b-b742-f2ded677ca99" class="">Walkability</h3></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80bd-a84e-e59923e499a7" class="">Per mantenere coerente il pathfinding.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80ad-b1c6-ddfa0f6fcce0"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-8011-811c-d5cd4b00fd6f" class="">Strategia iniziale (MVP)</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-807e-bdba-d0ed49fb54eb" class="">Per semplicità:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-807a-96b1-c3b2949fcf16" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">World.RebuildDerivedCaches()</code></pre></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80f6-8351-f17f9049fa44" class="">dopo ogni modifica.</p></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8007-b3be-f2d96bac9d6b" class="">Su mappe piccole è accettabile.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-807f-ae7e-e163be83c9aa"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-808d-b98a-e2c47013c6fc" class="">Salvataggio della mappa</h1></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80fe-bdf4-f9e7cedcbacf" class="">La modalità developer deve permettere di salvare la configurazione corrente.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80ac-8940-f7182c117eb0"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-8065-9dcc-f4a3c18a3948" class="">Formato consigliato</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80bb-a1ee-e32584144291" class="">JSON semplice.</p></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8018-93b3-fbc992f1ab90" class="">Esempio:</p></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-806f-bf9e-edfec5cbae59" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">{
+  &quot;width&quot;:64,
+  &quot;height&quot;:64,
+  &quot;objects&quot;: [
+    { &quot;id&quot;:&quot;wall_stone&quot;, &quot;x&quot;:10, &quot;y&quot;:10 },
+    { &quot;id&quot;:&quot;door_wood_good&quot;, &quot;x&quot;:12, &quot;y&quot;:10 }
+  ],
+  &quot;npcs&quot;: [
+    { &quot;template&quot;:&quot;citizen_basic&quot;, &quot;x&quot;:20, &quot;y&quot;:20, &quot;dir&quot;:&quot;E&quot; }
+  ]
+}</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-802e-a3a1-e9734be0fab8"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-8009-83df-cc1023368e21" class="">Funzioni previste</h2></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-8050-883a-c8bfcd05d920" class="">SaveMap</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-8045-b7a4-c9242d3aa6e5" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">SaveDevMap(path)</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-8059-86ff-e6fbbfd4eeb7"/></div><div style="display:contents" dir="auto"><h3 id="31a9c167-6366-80cd-81e9-d788ba68b2a7" class="">LoadMap</h3></div><div style="display:contents" dir="auto"><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js" integrity="sha512-7Z9J3l1+EYfeaPKcGXu3MS/7T+w19WtKQY/n+xzmw4hZhJ9tyYmcUS+4QqAlzhicE5LAfMQSF3iFTK9bQdTxXg==" crossorigin="anonymous" referrerPolicy="no-referrer"></script><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css" integrity="sha512-tN7Ec6zAFaVSG3TpNAKtk4DOHNpSwKHxxrsiw4GHKESGPs5njn/0sMCUMl2svV4wo4BK/rCP7juYz+zx+l6oeQ==" crossorigin="anonymous" referrerPolicy="no-referrer"/><pre id="31a9c167-6366-803b-9582-c4e3d1466475" class="code code-wrap"><code class="language-Plain Text" style="white-space:pre-wrap;word-break:break-all">LoadDevMap(path)</code></pre></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80d1-9446-e7a9b3707a64"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-80c3-b6cc-fb8635bea72c" class="">Drag and Drop (opzionale)</h1></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-809d-8c77-d99fcb16903e" class="">Possibile miglioramento dell’interfaccia:</p></div><div style="display:contents" dir="auto"><ol type="1" id="31a9c167-6366-80dd-8462-f7b487c17a70" class="numbered-list" start="1"><li>oggetto trascinabile dalla palette</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="31a9c167-6366-802e-8215-f3a3f970644a" class="numbered-list" start="2"><li>preview ghost sulla griglia</li></ol></div><div style="display:contents" dir="auto"><ol type="1" id="31a9c167-6366-80e4-9c26-c2c1d5f0da0e" class="numbered-list" start="3"><li>rilascio → spawn oggetto</li></ol></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8059-b64f-d3e0b14ab339" class="">Non necessario nella prima versione.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-8017-b35f-c8cfaa814c49"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-80da-994b-d506541bfe00" class="">Overlay di debug (facoltativo)</h1></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80ee-aece-c8ce22c12196" class="">Durante Dev Mode può essere utile mostrare informazioni della cella sotto il mouse:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-809b-839d-f90c196a12d4" class="bulleted-list"><li style="list-style-type:disc">coordinate</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-803b-a8d7-e5c6a45d60ac" class="bulleted-list"><li style="list-style-type:disc">oggetto presente</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-805e-8456-e59b34980153" class="bulleted-list"><li style="list-style-type:disc">walkable</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8029-8d3e-e01e766e4709" class="bulleted-list"><li style="list-style-type:disc">blocks vision</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8028-abe6-e262595d5049" class="bulleted-list"><li style="list-style-type:disc">landmark presenti</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80ee-b65c-c559537c30c8" class="bulleted-list"><li style="list-style-type:disc">NPC presenti</li></ul></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80b4-a923-f23458a35b37"/></div><div style="display:contents" dir="auto"><h1 id="31a9c167-6366-8079-b38c-fff6d0cc4224" class="">Roadmap di implementazione</h1></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-804e-8615-fa7979ea8526" class="">DevMode v0 (MVP)</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8056-9e1c-ebc2e804e83d" class="">Features:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8097-94e6-efcd07cef25b" class="bulleted-list"><li style="list-style-type:disc">toggle modalità (F2)</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8061-93a3-fc2aa0605e79" class="bulleted-list"><li style="list-style-type:disc">palette oggetti semplice</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8044-afee-d6c448ed4eb9" class="bulleted-list"><li style="list-style-type:disc">place tool</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8059-a9a9-c02bbb46e8e4" class="bulleted-list"><li style="list-style-type:disc">erase tool</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80e8-bd97-c539ca0a9df7" class="bulleted-list"><li style="list-style-type:disc">rebuild globale cache</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8011-a46a-c5d38742cd1a" class="bulleted-list"><li style="list-style-type:disc">save/load JSON</li></ul></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8000-a132-ebe33daa5351" class="">Obiettivo:</p></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-8013-9cf4-c045a18dae9a" class="">avere un <strong>map editor runtime minimo ma funzionale</strong>.</p></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-805e-9eec-f72f24737f14"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-804f-880a-ee22fbb77931" class="">DevMode v1</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80f5-953f-d059cb96d2fd" class="">Miglioramenti:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80bd-8ff1-cf2cb6f7b033" class="bulleted-list"><li style="list-style-type:disc">brush continuo</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-803c-a615-d44799fef437" class="bulleted-list"><li style="list-style-type:disc">rectangle tool</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80f8-8877-cceb0ed8187b" class="bulleted-list"><li style="list-style-type:disc">spawn NPC</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8030-93fd-c5c2f763b961" class="bulleted-list"><li style="list-style-type:disc">orientamento NPC</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80bb-9ff2-e9ea77088a5d" class="bulleted-list"><li style="list-style-type:disc">overlay info cella</li></ul></div><div style="display:contents" dir="auto"><hr id="31a9c167-6366-80bc-b5cb-e37b0aa1d533"/></div><div style="display:contents" dir="auto"><h2 id="31a9c167-6366-80cc-b1cc-eea4ce667683" class="">DevMode v2</h2></div><div style="display:contents" dir="auto"><p id="31a9c167-6366-80ee-bccf-d545c0945fa4" class="">Strumenti avanzati:</p></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80ff-ac5b-c98adc5f48ed" class="bulleted-list"><li style="list-style-type:disc">scenari preset</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-80d0-b970-dbc39b71d709" class="bulleted-list"><li style="list-style-type:disc">invalidazione locale cache</li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8073-b7af-ef4e19d9a92f" class="bulleted-list"><li style="list-style-type:disc">palette generata da <code>object_defs.json</code></li></ul></div><div style="display:contents" dir="auto"><ul id="31a9c167-6366-8094-beb0-edfcf8187196" class="bulleted-list"><li style="list-style-type:disc">libreria mappe test</li></ul></div></div></article><span class="sans" style="font-size:14px;padding-top:2em"></span></body></html>

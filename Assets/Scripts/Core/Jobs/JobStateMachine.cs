@@ -134,9 +134,11 @@ namespace Arcontio.Core
         {
             var previousStatus = job != null ? job.Status : JobStatus.Cancelled;
             var previousPhaseIndex = npcState.ActivePhaseIndex;
-            var hadPreviousPhase = job != null && job.Plan.TryGetPhase(previousPhaseIndex, out var previousPhase);
+            JobPhase previousPhase = default;
+            var hadPreviousPhase = job != null && job.Plan.TryGetPhase(previousPhaseIndex, out previousPhase);
             var previousActionIndex = npcState.ActiveActionIndex;
-            var hadPreviousAction = hadPreviousPhase && previousPhase.TryGetAction(previousActionIndex, out var previousAction);
+            JobAction previousAction = default;
+            var hadPreviousAction = hadPreviousPhase && previousPhase.TryGetAction(previousActionIndex, out previousAction);
             var result = ApplyStepResult(ref npcState, job, stepResult, tick);
 
             TryEmitStepTrace(

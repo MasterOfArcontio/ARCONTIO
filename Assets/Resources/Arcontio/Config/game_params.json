@@ -130,7 +130,7 @@
     "maxTrackedNpcs": 5,
     "trackedNpcIds": [],
     "trackActiveNpcOnly": false,
-    "writeJsonLog": false,
+    "writeJsonLog": true,
     "jsonLogFileNamePattern": "arcontio_el_mbd_runtime.jsonl",
     "logMemory": true,
     "logBelief": true,

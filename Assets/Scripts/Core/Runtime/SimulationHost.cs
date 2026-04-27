@@ -285,7 +285,7 @@ namespace Arcontio.Core
             );
 
             // Creo la finestra per visualizzare il log personalizzato a schermo
-            if (FindObjectOfType<Arcontio.View.ArcontioLogOverlay>() == null)
+            if (FindFirstObjectByType<Arcontio.View.ArcontioLogOverlay>() == null)
             {
                 new GameObject("ArcontioLogOverlay")
                     .AddComponent<Arcontio.View.ArcontioLogOverlay>();

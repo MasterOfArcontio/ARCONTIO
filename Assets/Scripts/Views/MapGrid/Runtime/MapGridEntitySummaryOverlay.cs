@@ -1679,6 +1679,87 @@ namespace Arcontio.View.MapGrid
             return $"#{belief.BeliefId} {belief.Category} {belief.EstimatedCell} conf={belief.Confidence:0.00} fresh={belief.Freshness:0.00} status={belief.Status} source={belief.Source} sources={belief.SourceCount}";
         }
 
+        // =============================================================================
+        // FormatJobInline
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Compatta un riferimento job del ViewModel in una singola riga leggibile
+        /// per il pannello EL.
+        /// </para>
+        ///
+        /// <para><b>Formattazione view-only</b></para>
+        /// <para>
+        /// Questo helper non arricchisce il dato e non consulta il runtime. Si limita
+        /// a condensare il payload gia' preparato dal ViewModel in una stringa breve,
+        /// cosi' il pannello resta passivo e coerente con l'architettura bounded.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>jobId</b>: identificatore principale del job.</item>
+        ///   <item><b>intent/status</b>: semantica utile per la diagnosi rapida.</item>
+        ///   <item><b>target/debug</b>: dettagli secondari mostrati solo se presenti.</item>
+        /// </list>
+        /// </summary>
+        private static string FormatJobInline(MemoryBeliefDecisionJobRefView job)
+        {
+            if (job == null || string.IsNullOrWhiteSpace(job.JobId))
+                return "nessun job";
+
+            return $"job={job.JobId} intent={EmptyMuted(job.Intent)} status={EmptyMuted(job.Status)} phase={job.ActivePhaseIndex} target={EmptyMuted(job.TargetCell)} debug={EmptyMuted(job.DebugLabel)}";
+        }
+
+        // =============================================================================
+        // FormatPhaseInline
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Compatta una fase job del ViewModel in una stringa breve per la UI
+        /// explainability.
+        /// </para>
+        /// </summary>
+        private static string FormatPhaseInline(MemoryBeliefDecisionJobPhaseRefView phase)
+        {
+            if (phase == null || string.IsNullOrWhiteSpace(phase.PhaseId))
+                return "nessuna fase";
+
+            return $"#{phase.PhaseIndex} {EmptyMuted(phase.DisplayName)} kind={EmptyMuted(phase.Kind)} steps={phase.ExpectedStepCount} interruptible={phase.IsInterruptible}";
+        }
+
+        // =============================================================================
+        // FormatStepInline
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Compatta uno step del ViewModel in una riga leggibile per il tab Job.
+        /// </para>
+        /// </summary>
+        private static string FormatStepInline(MemoryBeliefDecisionStepRefView step)
+        {
+            if (step == null || string.IsNullOrWhiteSpace(step.ActionId))
+                return "nessuno step";
+
+            return $"#{step.ActionIndex} {EmptyMuted(step.Label)} kind={EmptyMuted(step.Kind)} target={EmptyMuted(step.TargetCell)} payload={EmptyMuted(step.PayloadKey)}";
+        }
+
+        // =============================================================================
+        // FormatStepResultInline
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Compatta il risultato di uno step in forma sintetica per la sezione
+        /// phase/step del pannello.
+        /// </para>
+        /// </summary>
+        private static string FormatStepResultInline(MemoryBeliefDecisionStepResultView result)
+        {
+            if (result == null || string.IsNullOrWhiteSpace(result.Status))
+                return "nessun risultato";
+
+            return $"status={EmptyMuted(result.Status)} failure={EmptyMuted(result.FailureReason)} wait={result.SuggestedWaitTicks} msg={EmptyMuted(result.DiagnosticMessage)}";
+        }
+
         private static string EmptyMuted(string value)
         {
             return string.IsNullOrWhiteSpace(value) ? "n/d" : value;
