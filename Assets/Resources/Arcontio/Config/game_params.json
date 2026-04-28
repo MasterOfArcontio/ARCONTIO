@@ -125,7 +125,7 @@
     "max_traces_per_npc": 128
   },
   "memory_belief_decision_explainability": {
-    "enabled": true,
+    "enabled": false,
     "defaultVerbosity": 3,
     "maxTrackedNpcs": 5,
     "trackedNpcIds": [],

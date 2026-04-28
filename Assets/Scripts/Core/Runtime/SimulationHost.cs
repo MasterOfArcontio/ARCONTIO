@@ -29,10 +29,12 @@ namespace Arcontio.Core
         [SerializeField] private int ticksPerSecond = 10;  // velocità simulazione (tick/secondo reali)
 
         [Header("Debug Scenarios")]
-        [SerializeField] private DebugScenario debugScenario = DebugScenario.Day7_Delivery;
+        [SerializeField] private bool enableLegacyDebugScenarioBootstrap = false;
+        [SerializeField] private DebugScenario debugScenario = DebugScenario.None;
 
         private enum DebugScenario
         {
+            None = 0,
             Day6_Assimilation = 6,
             Day7_Delivery = 7,
             Day8_ObjectPerception = 8,
@@ -606,7 +608,7 @@ namespace Arcontio.Core
             // Inseriamo SOLO ciò che serve a generare segnali chiari.
             // ******************************************************************************************************************************
             // Day6: generiamo un evento "oggettivo" che finisce in memoria, poi token, poi assimilation.
-            if (debugScenario == DebugScenario.Day6_Assimilation && ((_tickIndex % 50) == 0))
+            if (enableLegacyDebugScenarioBootstrap && debugScenario == DebugScenario.Day6_Assimilation && ((_tickIndex % 50) == 0))
             {
                 ArcontioLogger.Debug(
                     new LogContext(tick: _tickIndex, channel: "T6"),
@@ -623,7 +625,7 @@ namespace Arcontio.Core
 
             // Day7: iniettiamo DIRETTAMENTE un AlarmShout in TokenBusOut
             // (così testiamo Delivery BFS anche se le emission rule di default parlano ?ProximityTalk?).
-            if (debugScenario == DebugScenario.Day7_Delivery && ((_tickIndex % 50) == 0))
+            if (enableLegacyDebugScenarioBootstrap && debugScenario == DebugScenario.Day7_Delivery && ((_tickIndex % 50) == 0))
             {
                 var shout = new SymbolicToken(
                     type: TokenType.PredatorAlert,
@@ -662,7 +664,7 @@ namespace Arcontio.Core
             // Qui lasciamo che i log siano:
             // - Telemetry.ObjectPerception.SpottedEvents
             // - (se vuoi) un tuo log aggiuntivo ogni 50 tick
-            if (debugScenario == DebugScenario.Day8_ObjectPerception && ((_tickIndex % 50) == 0))
+            if (enableLegacyDebugScenarioBootstrap && debugScenario == DebugScenario.Day8_ObjectPerception && ((_tickIndex % 50) == 0))
             {
                 ArcontioLogger.Debug(
                     new LogContext(tick: _tickIndex, channel: "T8"),
@@ -743,9 +745,14 @@ namespace Arcontio.Core
                 // delivery + assimilation, senza rieseguire emissione da memoria.
                 _npcCommunication.ProcessQueuedOnly(_world, tick, _telemetry);
 
-                // opzionale: se vuoi che le rules li vedano nello stesso tick, ripubblichi:
-                for (int i = 0; i < _eventBuffer.Count; i++)
-                    _bus.Publish(_eventBuffer[i]);
+                // IMPORTANTISSIMO:
+                // - Nel primo pass pre-command ripubblichiamo gli eventi perche' le rules devono ancora
+                //   consumarli nel medesimo tick.
+                // - Nel secondo pass post-command NON esiste una seconda rule-phase nello stesso tick.
+                // - Qui _eventBuffer resta quindi solo una snapshot locale per memory encoding e queued-only
+                //   communication.
+                // - Ripubblicare questi eventi nel MessageBus li farebbe rientrare nel drain del tick
+                //   successivo, causando re-processing di fatti gia' processati.
             }
 
             // DEBUG
@@ -781,7 +788,7 @@ namespace Arcontio.Core
             // - Non vogliamo spam in Day6/Day7.
             // - In Day8 vogliamo vedere "quali oggetti" vengono visti.
             // ============================================================
-            if (debugScenario == DebugScenario.Day8_ObjectPerception)
+            if (enableLegacyDebugScenarioBootstrap && debugScenario == DebugScenario.Day8_ObjectPerception)
             {
                 if (day8LogEveryTicks <= 0) day8LogEveryTicks = 10;
 
@@ -840,10 +847,20 @@ namespace Arcontio.Core
 
         private void SeedTestWorld()
         {
-            // Seed multiplo: scegliamo UNO scenario per volta,
-            // così i log sono chiari e non si sovrappongono.
-            switch (debugScenario)
+            // IMPORTANTISSIMO:
+            // - La baseline runtime costituzionale NON deve partire con uno scenario legacy implicito.
+            // - enableLegacyDebugScenarioBootstrap e' il gate esplicito che autorizza i bootstrap legacy.
+            // - debugScenario da solo NON basta, cosi' eventuali valori serializzati vecchi non riattivano
+            //   automaticamente un DayX in startup.
+            // - Se il gate non e' attivo, il runtime standard parte con un seed neutro minimo.
+            DebugScenario selectedScenario = enableLegacyDebugScenarioBootstrap ? debugScenario : DebugScenario.None;
+
+            switch (selectedScenario)
             {
+                case DebugScenario.None:
+                    Seed_BaselineNeutral();
+                    break;
+
                 case DebugScenario.Day6_Assimilation:
                     Seed_Day6();
                     break;
@@ -873,21 +890,43 @@ namespace Arcontio.Core
                     break;
 
                 default:
-                    Seed_Day7();
+                    Seed_BaselineNeutral();
                     break;
             }
         }
 
         // ============================================================
-        // DAY 6: Assimilation test (token -> trace heard/rumor)
+        // BASELINE RUNTIME NEUTRA (CONSTITUTIONAL PATH)
         // ============================================================
+        // IMPORTANTISSIMO:
+        // - Questo e' l'unico bootstrap implicito consentito per il runtime standard.
+        // - Non introduce scenari DayX, debug stimulus o setup test-driven.
+        // - Serve solo a garantire un mondo avviabile con un NPC minimale per tick, bisogni,
+        //   percezione, pannelli runtime e devtools.
+        // - Lo spawn neutro NON deve stare su un bordo: il centro mappa riduce edge effects
+        //   su percezione, debug visuale e pannelli runtime.
+        // - Resta un seed minimale costituzionale, non uno scenario debug.
+        private void Seed_BaselineNeutral()
+        {
+            var needs = NpcNeeds.Default();
+            needs.SetValue(NeedKind.Hunger, 0.1f);
+            needs.SetValue(NeedKind.Rest, 0.1f);
+
+            int spawnX = _world.MapWidth / 2;
+            int spawnY = _world.MapHeight / 2;
+
+            int npcId = _world.CreateNpc(
+                NpcDnaProfile.CreateDefault("NPC_Runtime"),
+                needs,
+                new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
+                spawnX,
+                spawnY);
+
+            _world.SetFacing(npcId, CardinalDirection.North);
+        }
+
         private void Seed_Day6()
         {
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T6"),
-                new LogBlock(LogLevel.Info, "log.seed.name")
-                    .AddField("seed", "Day6_Assimilation")
-            );
 
             // Per ora la gestione delle regioni come memoria spaziale è inserita come progetto ma non implementata
             _world.Global.EnableMemorySpatialFusion = false;
@@ -1032,7 +1071,7 @@ namespace Arcontio.Core
             int npc = _world.CreateNpc(NpcDnaProfile.CreateDefault("NPC_T8"),
                 NpcNeeds.Make(0.1f, 0.1f),
                 new Social { LeadershipScore = 0.2f, LoyaltyToLeader01 = 0.5f, JusticePerception01 = 0.5f },
-                0, 0
+                32, 0
             );
 
             _world.SetFacing(npc, CardinalDirection.East);
@@ -1406,7 +1445,7 @@ namespace Arcontio.Core
 
         }
         // ============================================================
-        // SCENARIO DA FILE (v0.04.07.b)
+        // LEGACY DEBUG / NON CONSTITUTIONAL RUNTIME PATH - SCENARIO DA FILE (v0.04.07.b)
         // ============================================================
         // Legge gli NPC da Resources/Arcontio/Scenarios/default_scenario.json.
         // Se il file non esiste o è vuoto, fa fallback a Seed_P0_02_Landmark_PathFinding.
@@ -1435,7 +1474,7 @@ namespace Arcontio.Core
         }
 
         // ============================================================
-        // 0.02 LANDMARK PATHFINDING SCENARIO
+        // LEGACY DEBUG / NON CONSTITUTIONAL RUNTIME PATH - 0.02 LANDMARK PATHFINDING SCENARIO
         // ============================================================
         private void Seed_P0_02_Landmark_PathFinding()
         {

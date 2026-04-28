@@ -28,19 +28,20 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.09 — Simulation Backbone Hardening & Constitutional Alignment
 
 CHECKPOINT CORRENTE:
-v0.09.01 — World Mutation Authority Audit & Seal
+v0.09 — Hardening package completato e validato
 
 STATUS:
-IN PROGRESS
+COMPLETATO TECNICAMENTE — IN ATTESA DI COMMIT / MERGE
 
 BRANCH TASK PREVISTO:
-ai-task/v0.09.01-world-mutation-audit
+work/v0.09-simulation-backbone-hardening
 
 OUTPUT ATTESO:
-mappa completa mutazioni world state + candidate sealing points
+chiusura del pacchetto backbone con hardening runtime minimo, smoke test positivo
+e preparazione della transizione verso `v0.10`
 
 DOC SYNC:
-pending after audit checkpoint
+roadmap locale aggiornata; sync documentale estesa ancora separata se richiesta
 
 OBIETTIVO:
 Irrigidire la backbone simulativa esistente una volta chiusa la fase documentale v0.08.
@@ -49,6 +50,15 @@ Questo macro job resta infrastrutturale.
 Non è ancora una campagna di implementazione gameplay/sistemi ampia.
 Si tratta di un consolidamento strutturale del codice con enfasi nell'allineamento costituzionale
 e nella stabilizzazione della memoria architetturale prima di nuove feature.
+
+Esito tecnico del checkpoint v0.09:
+
+* `FoodStolenEvent` riallineato a `IWorldEvent`
+* `EatFromStockCommand` riallineato a `World.DestroyObject(...)`
+* `SimulationHost` corretto sul ciclo eventi post-command
+* baseline neutral bootstrap introdotta e validata
+* legacy debug scenarios resi opt-in gated
+* smoke test manuale PlayMode completato con esito positivo
 
 ---
 
@@ -115,22 +125,27 @@ Confermato:
 * costituzione ARCONTIO avviata
 * primi Decision Records formalizzati
 * roadmap v0.09 definita
+* checkpoint tecnico v0.09 completato e validato
+* roadmap locale aggiornata sullo stato v0.09
 
 Ancora in verifica / completamento:
 
-* Pending delle feature precedenti congelate
+* eventuale commit tecnico del branch corrente
+* eventuale sync estesa `ARCONTIO_docs`
+* pending delle feature precedenti congelate
 
 ---
 
 # 6. Comportamento obbligatorio Codex durante questo macro job
 
-Durante la chiusura v0.09 Codex deve:
+Durante la finalizzazione v0.09 Codex deve:
 
 * preferire task di audit, verifica, consolidamento e root alignment,
 * evitare broad gameplay coding,
 * evitare refactor opportunistici,
 * aiutare a normalizzare la memoria cognitiva repository,
 * segnalare ogni incoerenza tra file root, roadmap e documentazione costituzionale,
+* chiudere il branch corrente in modo pulito,
 * preparare il terreno per World Persistence Closure & Save/Load Completion `v0.10`.
 
 Ogni richiesta locale deve essere letta sotto:

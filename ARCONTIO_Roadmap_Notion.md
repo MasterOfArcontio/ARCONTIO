@@ -19,7 +19,7 @@
 | v0.06 | Job System + Step System | Aprile 2026 | Completata ma da reintegrare |
 | v0.07 | Explainability Layer v0.06: Job / Phase / Step / Command | Posticipata |
 | v0.08 | Repository Stabilization + Constitutional Documentation Bootstrap | Aprile 2026 | IN CORSO |
-| v0.09 | Simulation Backbone Hardening & Constitutional Alignment | Maggio 2026 | Pending |
+| v0.09 | Simulation Backbone Hardening & Constitutional Alignment | Maggio 2026 | Completata |
 | v0.10 | World Persistence Closure & Save/Load Completion | Maggio-Giugno 2026 | Pending |
 | v0.11 | Domain Reintegration: Jobs · Work · Social · Dormant Systems | Giugno 2026 | Pending |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
@@ -278,28 +278,30 @@ necessario per l'apertura della campagna tecnica v0.09.
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
-| 1 | Lun | Audit | World Mutation Authority Audit & Seal | IN CORSO |
-| 2 | Mer | Runtime | SimulationHost Decompression audit | Pending |
-| 3 | Gio | Runtime | Tick Phase Constitution formale | Pending |
-| 4 | Lun | Events | Audit totale ISimEvent / IWorldEvent | Pending |
-| 5 | Mer | Systems | Dormant/placeholder systems classification | Pending |
-| 6 | Gio | Patch | Prime sealing patch mutation authority | Pending |
-| 7 | Lun | Patch | Prime extraction helper da SimulationHost | Pending |
-| 8 | Mer | QA | Re-audit backbone post patch | Pending |
-| 9 | Gio | Docs | ARC-CON-011 + sync documentale | Pending |
+| 1 | Lun | Audit | World Mutation Authority Audit & Seal | ✅ |
+| 2 | Mer | Runtime | SimulationHost Decompression audit | ✅ |
+| 3 | Gio | Runtime | Tick Phase Constitution formale | ✅ |
+| 4 | Lun | Events | Audit totale ISimEvent / IWorldEvent | ✅ |
+| 5 | Mer | Systems | Dormant/placeholder systems classification | ✅ |
+| 6 | Gio | Patch | Prime sealing patch mutation authority | ✅ |
+| 7 | Lun | Patch | SimulationHost legacy governance cleanup + neutral bootstrap | ✅ |
+| 8 | Mer | QA | Re-audit backbone post patch + smoke test manuale | ✅ |
+| 9 | Gio | Docs | ARC-CON-011 + sync documentale | ✅ |
 
 ### Definition of Done v0.09
 
 | Criterio | Stato |
 |----------|-------|
-| Mutation authority mappata e parzialmente sigillata | Pending |
-| SimulationHost alleggerito | Pending |
-| Tick phases formalizzate | Pending |
-| Event architecture riallineata | Pending |
-| Dormant systems classificati | Pending |
+| Mutation authority mappata e parzialmente sigillata | ✅ |
+| SimulationHost alleggerito | ✅ |
+| Tick phases formalizzate | ✅ |
+| Event architecture riallineata | ✅ |
+| Dormant systems classificati | ✅ |
 
 > **Nota architetturale v0.09:** questa è la prima vera campagna tecnica post-documentale. Non aggiunge feature gameplay; irrigidisce il nucleo causale già esistente per evitare che le fasi successive costruiscano su contratti molli.
 
+>
+> **Esito checkpoint:** completato l'hardening minimo della backbone con riallineamento dei world facts (`IWorldEvent`), ripristino della object lifecycle authority su depletion, correzione del ciclo eventi post-command in `SimulationHost`, introduzione del neutral bootstrap costituzionale e segregazione opt-in dei legacy debug scenarios. La sync documentale estesa resta separata dal completamento tecnico del checkpoint.
 ---
 
 ## v0.10 — World Persistence Closure & Save/Load Completion
