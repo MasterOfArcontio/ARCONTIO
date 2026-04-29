@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Arcontio.Core
 {
@@ -73,6 +74,63 @@ namespace Arcontio.Core
             Capacity = capacity < 1 ? 1 : capacity;
             Slots = new Entry[Capacity];
             Count = 0;
+        }
+
+        // =============================================================================
+        // TryReplaceAllForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce integralmente gli slot della memoria pratica durante un restore
+        /// da snapshot canonico. Questa API appartiene soltanto alla save/load
+        /// authority: non deve essere usata da perception, decision layer o sistemi
+        /// gameplay ordinari.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: memoria soggettiva senza ricostruzione onnisciente</b></para>
+        /// <para>
+        /// Il metodo non consulta il <c>World</c>, non verifica se gli oggetti esistono
+        /// ancora e non corregge coordinate o ownership. Uno slot puo' essere vecchio,
+        /// falso o riferito a qualcosa che l'NPC non ha piu' davanti: e' precisamente
+        /// questo il senso della memoria soggettiva.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: rifiuta null e snapshot oltre capacity.</item>
+        ///   <item><b>Clear</b>: azzera tutti gli slot prima del restore.</item>
+        ///   <item><b>Copy</b>: copia solo entry marcate valide e riallinea <c>Count</c>.</item>
+        /// </list>
+        /// </summary>
+        public bool TryReplaceAllForSaveLoad(IReadOnlyList<Entry> entries, out string error)
+        {
+            if (entries == null)
+            {
+                error = "NpcObjectMemoryStore.TryReplaceAllForSaveLoad: entries nullo.";
+                return false;
+            }
+
+            if (entries.Count > Capacity)
+            {
+                error = $"NpcObjectMemoryStore.TryReplaceAllForSaveLoad: entries={entries.Count} supera Capacity={Capacity}.";
+                return false;
+            }
+
+            for (int i = 0; i < Slots.Length; i++)
+                Slots[i] = default;
+
+            Count = 0;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                Slots[i] = entry;
+
+                if (entry.IsValid)
+                    Count++;
+            }
+
+            error = string.Empty;
+            return true;
         }
 
         public struct Entry

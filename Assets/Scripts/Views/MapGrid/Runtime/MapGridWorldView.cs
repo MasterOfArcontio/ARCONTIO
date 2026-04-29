@@ -278,7 +278,10 @@ namespace Arcontio.View.MapGrid
             _runtimeControlTopBar?.Tick();
 
             // Bind al world (ritenta finché non c'è)
-            _world ??= MapGridWorldProvider.TryGetWorld();
+            // v0.10.15e: il load snapshot sostituisce SimulationHost.World.
+            // La view deve quindi rileggere il provider anche quando _world e'
+            // gia' valorizzato, altrimenti resta agganciata alla vecchia istanza.
+            RebindToCurrentWorldIfNeeded();
             if (_world == null) return;
 
             // ============================================================
@@ -844,6 +847,95 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             }
 
             ListPool.Release(objToRemove);
+        }
+
+        // =============================================================================
+        // RebindToCurrentWorldIfNeeded
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggancia la view all'istanza <see cref="World"/> attualmente esposta da
+        /// <see cref="SimulationHost"/> e rileva gli swap causati dal load snapshot.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: View cache rinnovabile dopo world swap</b></para>
+        /// <para>
+        /// La MapGrid mantiene dizionari di <see cref="SpriteRenderer"/> per NPC e
+        /// oggetti, ma non possiede il <c>World</c>. Quando il core sostituisce il
+        /// mondo tramite <c>LoadWorldSnapshot</c>, la view deve abbandonare il vecchio
+        /// riferimento e ricostruire i renderer dal nuovo stato, altrimenti il load
+        /// riesce nel core ma lo schermo continua a mostrare la simulazione precedente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Provider</b>: legge sempre il world corrente dal provider view-side.</item>
+        ///   <item><b>Reference check</b>: distingue un vero swap da un normale frame.</item>
+        ///   <item><b>Clear visual cache</b>: distrugge renderer NPC/oggetti obsoleti.</item>
+        ///   <item><b>Log diagnostico</b>: espone hash istanza e conteggi pre/post.</item>
+        /// </list>
+        /// </summary>
+        private void RebindToCurrentWorldIfNeeded()
+        {
+            var currentWorld = MapGridWorldProvider.TryGetWorld();
+            if (ReferenceEquals(_world, currentWorld))
+                return;
+
+            int oldWorldHash = _world != null ? _world.GetHashCode() : 0;
+            int newWorldHash = currentWorld != null ? currentWorld.GetHashCode() : 0;
+            int oldNpcCount = _world?.NpcDna != null ? _world.NpcDna.Count : 0;
+            int oldObjectCount = _world?.Objects != null ? _world.Objects.Count : 0;
+            int newNpcCount = currentWorld?.NpcDna != null ? currentWorld.NpcDna.Count : 0;
+            int newObjectCount = currentWorld?.Objects != null ? currentWorld.Objects.Count : 0;
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][MapGridWorldView] World reference changed " +
+                $"oldWorldHash={oldWorldHash} newWorldHash={newWorldHash} " +
+                $"oldNpcCount={oldNpcCount} oldObjectCount={oldObjectCount} " +
+                $"newNpcCount={newNpcCount} newObjectCount={newObjectCount}");
+
+            ClearEntityRenderersForWorldRebind();
+            _summaryOverlay?.ClearOffsetsAndRequestRelayout();
+            _world = currentWorld;
+        }
+
+        // =============================================================================
+        // ClearEntityRenderersForWorldRebind
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Elimina le view sprite di NPC e oggetti quando cambia l'istanza
+        /// <see cref="World"/>.
+        /// </para>
+        ///
+        /// <para><b>Renderer derivati, non stato simulativo</b></para>
+        /// <para>
+        /// I <see cref="SpriteRenderer"/> sono cache visuali derivate. Dopo un load
+        /// snapshot possono avere gli stessi ID numerici ma contenuto diverso
+        /// rispetto al vecchio mondo; rigenerarli evita sprite, label stock,
+        /// collider e balloon agganciati a entita' obsolete.
+        /// </para>
+        /// </summary>
+        private void ClearEntityRenderersForWorldRebind()
+        {
+            foreach (var kv in _npcViews)
+            {
+                if (kv.Value != null)
+                    Destroy(kv.Value.gameObject);
+            }
+
+            foreach (var kv in _objectViews)
+            {
+                if (kv.Value != null)
+                    Destroy(kv.Value.gameObject);
+            }
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][MapGridWorldView] Cleared visual renderer cache " +
+                $"npcRenderers={_npcViews.Count} objectRenderers={_objectViews.Count}");
+
+            _npcViews.Clear();
+            _objectViews.Clear();
         }
 
         private Vector3 CellCenterWorld(int cellX, int cellY)

@@ -113,6 +113,9 @@ namespace Arcontio.View.MapGrid
         [Tooltip("Nome default del file per Save/Load (senza estensione).")]
         [SerializeField] private string defaultMapName = "devmap";
 
+        [Tooltip("Slot default DEV per WorldSaveData canonico v0.10.")]
+        [SerializeField] private string defaultWorldSnapshotSlotName = "default";
+
         // ============================================================
         // RUNTIME STATE
         // ============================================================
@@ -131,6 +134,9 @@ namespace Arcontio.View.MapGrid
 
         // Save/Load: name editabile.
         private string _mapName;
+
+        // World Snapshot v0.10: slot tecnico/dev separato dai DevMap layout.
+        private string _worldSnapshotSlotName;
 
         // NPC: facing selezionato (usato sia per spawn che per orient).
         private CardinalDirection _npcFacing = CardinalDirection.North;
@@ -245,6 +251,7 @@ namespace Arcontio.View.MapGrid
             _instance = this;
 
             _mapName = defaultMapName;
+            _worldSnapshotSlotName = defaultWorldSnapshotSlotName;
 
             // ============================================================
             // Auto-bind (plug-and-play):
@@ -574,9 +581,9 @@ namespace Arcontio.View.MapGrid
             GUILayout.Space(8);
 
             // ------------------------------------------------------------
-            // Save / Load (JSON)
+            // DevMap layout Save / Load (JSON)
             // ------------------------------------------------------------
-            GUILayout.Label("Save / Load (JSON)");
+            GUILayout.Label("DevMap Layout (JSON, solo mappa/debug)");
             GUILayout.BeginHorizontal();
             GUILayout.Label("Name", GUILayout.Width(42));
             _mapName = GUILayout.TextField(_mapName ?? "", GUILayout.Width(170));
@@ -585,6 +592,8 @@ namespace Arcontio.View.MapGrid
             if (GUILayout.Button("Load", GUILayout.Width(70)))
                 Enqueue(new DevLoadMapCommand(_mapName, clearObjects: true));
             GUILayout.EndHorizontal();
+
+            DrawWorldSnapshotControls();
 
             GUILayout.Space(10);
 
@@ -634,6 +643,138 @@ namespace Arcontio.View.MapGrid
 
             // Drag handle (top bar only)
             GUI.DragWindow(new Rect(0, 0, 10000, 20));
+        }
+
+        // =============================================================================
+        // DrawWorldSnapshotControls
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna i controlli DEV/DEBUG per salvare e caricare il formato canonico
+        /// world-level <c>WorldSaveData</c> introdotto nella campagna v0.10.
+        /// </para>
+        ///
+        /// <para><b>Separazione semantica: DevMap != World Snapshot</b></para>
+        /// <para>
+        /// La DevMap resta un formato di layout/debug mappa e passa da
+        /// <c>DevMapIO</c>. Il World Snapshot e' invece il candidato savegame
+        /// tecnico canonico: include NPC, oggetti, tick, ownership e stato
+        /// soggettivo persistito dal builder/loader v0.10. Per evitare ambiguita',
+        /// il pannello usa una sezione separata, uno slot separato e invoca
+        /// direttamente gli entry point tecnici del <c>SimulationHost</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Slot</b>: campo testo minimale, default <c>default</c>.</item>
+        ///   <item><b>Save World Snapshot</b>: chiama <c>SimulationHost.Instance.SaveCurrentWorldSnapshot</c>.</item>
+        ///   <item><b>Load World Snapshot</b>: chiama <c>SimulationHost.Instance.LoadWorldSnapshot</c>.</item>
+        ///   <item><b>Log</b>: scrive in console il risultato per smoke test manuale.</item>
+        /// </list>
+        /// </summary>
+        private void DrawWorldSnapshotControls()
+        {
+            GUILayout.Space(8);
+            GUILayout.Label("DEV World Snapshot v0.10 (savegame tecnico)");
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Slot", GUILayout.Width(42));
+            _worldSnapshotSlotName = GUILayout.TextField(_worldSnapshotSlotName ?? "default", GUILayout.Width(170));
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Save World Snapshot", GUILayout.Width(180)))
+                ExecuteWorldSnapshotSave();
+
+            if (GUILayout.Button("Load World Snapshot", GUILayout.Width(180)))
+                ExecuteWorldSnapshotLoad();
+
+            GUILayout.EndHorizontal();
+
+            GUILayout.Label("Separato da DevMap: salva/carica WorldSaveData canonico.");
+        }
+
+        // =============================================================================
+        // ResolveWorldSnapshotSlotName
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza lo slot World Snapshot usato dai controlli DEV.
+        /// </para>
+        ///
+        /// <para><b>Slot esplicito ma tollerante</b></para>
+        /// <para>
+        /// La UI e' volutamente minimale: se il campo viene svuotato durante il test,
+        /// il percorso torna allo slot <c>default</c> invece di produrre path vuoti o
+        /// salvataggi difficili da ritrovare.
+        /// </para>
+        /// </summary>
+        private string ResolveWorldSnapshotSlotName()
+        {
+            return string.IsNullOrWhiteSpace(_worldSnapshotSlotName) ? "default" : _worldSnapshotSlotName;
+        }
+
+        // =============================================================================
+        // ExecuteWorldSnapshotSave
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue il salvataggio World Snapshot tramite <see cref="SimulationHost"/>.
+        /// </para>
+        ///
+        /// <para><b>DEV smoke test entry point</b></para>
+        /// <para>
+        /// Questo non e' autosave e non e' UI finale: e' un bottone manuale per
+        /// validare il roundtrip v0.10 in PlayMode.
+        /// </para>
+        /// </summary>
+        private void ExecuteWorldSnapshotSave()
+        {
+            string slot = ResolveWorldSnapshotSlotName();
+            var host = SimulationHost.Instance;
+            if (host == null)
+            {
+                Debug.LogError($"[DevTools][WorldSnapshot] Save failed: SimulationHost.Instance nullo. slot='{slot}'");
+                return;
+            }
+
+            bool ok = host.SaveCurrentWorldSnapshot(slot);
+            if (ok)
+                Debug.Log($"[DevTools][WorldSnapshot] Save OK. slot='{slot}'");
+            else
+                Debug.LogError($"[DevTools][WorldSnapshot] Save FAILED. slot='{slot}'");
+        }
+
+        // =============================================================================
+        // ExecuteWorldSnapshotLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue il load World Snapshot tramite <see cref="SimulationHost"/>.
+        /// </para>
+        ///
+        /// <para><b>DEV smoke test entry point</b></para>
+        /// <para>
+        /// Il load sostituisce il <c>World</c> corrente tramite l'entry point tecnico
+        /// v0.10 e lascia la simulazione in pausa. Il pannello resta un aiuto di test,
+        /// non una UX definitiva di salvataggio.
+        /// </para>
+        /// </summary>
+        private void ExecuteWorldSnapshotLoad()
+        {
+            string slot = ResolveWorldSnapshotSlotName();
+            var host = SimulationHost.Instance;
+            if (host == null)
+            {
+                Debug.LogError($"[DevTools][WorldSnapshot] Load failed: SimulationHost.Instance nullo. slot='{slot}'");
+                return;
+            }
+
+            bool ok = host.LoadWorldSnapshot(slot);
+            if (ok)
+                Debug.Log($"[DevTools][WorldSnapshot] Load OK. slot='{slot}'");
+            else
+                Debug.LogError($"[DevTools][WorldSnapshot] Load FAILED. slot='{slot}'");
         }
 
         // =============================================================================

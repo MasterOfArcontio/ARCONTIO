@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -48,10 +49,151 @@ namespace Arcontio.Core
 
         public IReadOnlyList<BeliefEntry> Entries => _entries;
 
+        // =============================================================================
+        // NextBeliefId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone in sola lettura il prossimo identificativo locale che verra'
+        /// assegnato a una nuova credenza del singolo NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: authority locale del BeliefStore</b></para>
+        /// <para>
+        /// Il contatore non e' globale e non autorizza alcuna query sul mondo:
+        /// serve solo a preservare continuita' interna dello store dopo un load
+        /// canonico. La mutazione resta limitata alle API save/load dedicate.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Getter</b>: restituisce il campo privato <c>_nextBeliefId</c>.</item>
+        /// </list>
+        /// </summary>
+        public int NextBeliefId => _nextBeliefId;
+
         public BeliefStore(int maxEntries = DefaultMaxEntries)
         {
             MaxEntries = maxEntries > 0 ? maxEntries : DefaultMaxEntries;
             _entries = new List<BeliefEntry>(MaxEntries);
+        }
+
+        // =============================================================================
+        // TryReplaceAllForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce integralmente il contenuto dello store durante un restore
+        /// canonico da snapshot, preservando <c>BeliefId</c> e il prossimo ID
+        /// locale salvato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: restore cognitivo senza rebuild speculativo</b></para>
+        /// <para>
+        /// Questa API appartiene solo alla save/load authority. Non ricostruisce
+        /// belief da MemoryTrace, non interroga il World e non applica ranking:
+        /// ripristina esattamente credenze soggettive gia' aggregate in passato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: rifiuta null, duplicati, ID invalidi e valori fuori range.</item>
+        ///   <item><b>Cap</b>: ripristina <c>MaxEntries</c> e rifiuta snapshot oltre cap.</item>
+        ///   <item><b>Counter</b>: impone <c>nextBeliefId</c> solo se supera tutti gli ID presenti.</item>
+        /// </list>
+        /// </summary>
+        public bool TryReplaceAllForSaveLoad(
+            IReadOnlyList<BeliefEntry> entries,
+            int maxEntries,
+            int nextBeliefId,
+            out string error)
+        {
+            if (entries == null)
+            {
+                error = "BeliefStore.TryReplaceAllForSaveLoad: entries nullo.";
+                return false;
+            }
+
+            if (maxEntries <= 0)
+            {
+                error = "BeliefStore.TryReplaceAllForSaveLoad: maxEntries deve essere > 0.";
+                return false;
+            }
+
+            if (entries.Count > maxEntries)
+            {
+                error = $"BeliefStore.TryReplaceAllForSaveLoad: entries={entries.Count} supera maxEntries={maxEntries}.";
+                return false;
+            }
+
+            int maxBeliefId = 0;
+            var seenIds = new HashSet<int>();
+
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+
+                if (entry.BeliefId <= 0)
+                {
+                    error = $"BeliefStore.TryReplaceAllForSaveLoad: BeliefId invalido {entry.BeliefId}.";
+                    return false;
+                }
+
+                if (!seenIds.Add(entry.BeliefId))
+                {
+                    error = $"BeliefStore.TryReplaceAllForSaveLoad: BeliefId duplicato {entry.BeliefId}.";
+                    return false;
+                }
+
+                if (!Enum.IsDefined(typeof(BeliefCategory), entry.Category))
+                {
+                    error = $"BeliefStore.TryReplaceAllForSaveLoad: categoria belief invalida {entry.Category}.";
+                    return false;
+                }
+
+                if (!Enum.IsDefined(typeof(BeliefSource), entry.Source))
+                {
+                    error = $"BeliefStore.TryReplaceAllForSaveLoad: source belief invalida {entry.Source}.";
+                    return false;
+                }
+
+                if (!Enum.IsDefined(typeof(BeliefStatus), entry.Status))
+                {
+                    error = $"BeliefStore.TryReplaceAllForSaveLoad: status belief invalido {entry.Status}.";
+                    return false;
+                }
+
+                if (entry.Confidence < 0f || entry.Confidence > 1f || entry.Freshness < 0f || entry.Freshness > 1f)
+                {
+                    error = $"BeliefStore.TryReplaceAllForSaveLoad: confidence/freshness fuori range per BeliefId {entry.BeliefId}.";
+                    return false;
+                }
+
+                if (entry.SourceCount < 0)
+                {
+                    error = $"BeliefStore.TryReplaceAllForSaveLoad: SourceCount negativo per BeliefId {entry.BeliefId}.";
+                    return false;
+                }
+
+                if (entry.BeliefId > maxBeliefId)
+                    maxBeliefId = entry.BeliefId;
+            }
+
+            if (nextBeliefId <= maxBeliefId)
+            {
+                error = $"BeliefStore.TryReplaceAllForSaveLoad: nextBeliefId={nextBeliefId} non supera maxBeliefId={maxBeliefId}.";
+                return false;
+            }
+
+            MaxEntries = maxEntries;
+            _entries.Clear();
+
+            for (int i = 0; i < entries.Count; i++)
+                _entries.Add(entries[i]);
+
+            _nextBeliefId = nextBeliefId;
+            error = string.Empty;
+            return true;
         }
 
         // =============================================================================

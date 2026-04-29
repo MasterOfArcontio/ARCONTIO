@@ -151,6 +151,8 @@ namespace Arcontio.Core
 
         /// <summary>Numero di edge complessi attualmente memorizzati.</summary>
         public int Count => _edges.Count;
+        public int MaxEdgesForSaveLoad => _maxEdges;
+        public long LastMaintenanceTickForSaveLoad => _lastMaintenanceTick;
 
         /// <summary>True se è attivo un recording di percorso.</summary>
         public bool IsRecording => _activeRecording != null;
@@ -173,6 +175,78 @@ namespace Arcontio.Core
         /// Accesso in lettura agli edge complessi (per l'overlay e il planner).
         /// </summary>
         public IReadOnlyDictionary<NpcLandmarkMemory.EdgeKey, ComplexEdge> Edges => _edges;
+
+        // =============================================================================
+        // TryReplaceAllForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce integralmente gli edge complessi soggettivi durante un restore
+        /// da snapshot canonico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: percorso appreso, non pathfinding ricostruito</b></para>
+        /// <para>
+        /// Il metodo non invoca recording, planner o LandmarkRegistry. Copia soltanto
+        /// edge gia' presenti nello snapshot del singolo NPC, preservando confidence,
+        /// costo, flags e segmenti conosciuti. Il recording attivo resta escluso perche'
+        /// e' stato transitorio di esecuzione, non memoria stabile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: rifiuta null e snapshot oltre cap.</item>
+        ///   <item><b>Clear</b>: cancella edge e recording transitorio.</item>
+        ///   <item><b>Copy</b>: inserisce edge gia' costruiti dal loader.</item>
+        /// </list>
+        /// </summary>
+        public bool TryReplaceAllForSaveLoad(
+            IReadOnlyList<ComplexEdge> edges,
+            long lastMaintenanceTick,
+            int maxStepsPerRecording,
+            int staleTicksBeforeEviction,
+            float minConfidenceToKeep,
+            float confidenceDecayPerMaintenance,
+            int maintenancePeriodTicks,
+            out string error)
+        {
+            if (edges == null)
+            {
+                error = "NpcComplexEdgeMemory.TryReplaceAllForSaveLoad: edges nullo.";
+                return false;
+            }
+
+            if (edges.Count > _maxEdges)
+            {
+                error = $"NpcComplexEdgeMemory.TryReplaceAllForSaveLoad: edges={edges.Count} supera maxEdges={_maxEdges}.";
+                return false;
+            }
+
+            _edges.Clear();
+            _activeRecording = null;
+
+            MaxStepsPerRecording = maxStepsPerRecording > 0 ? maxStepsPerRecording : MaxStepsPerRecording;
+            StaleTicksBeforeEviction = staleTicksBeforeEviction > 0 ? staleTicksBeforeEviction : StaleTicksBeforeEviction;
+            MinConfidenceToKeep = minConfidenceToKeep >= 0f ? minConfidenceToKeep : MinConfidenceToKeep;
+            ConfidenceDecayPerMaintenance = confidenceDecayPerMaintenance >= 0f ? confidenceDecayPerMaintenance : ConfidenceDecayPerMaintenance;
+            MaintenancePeriodTicks = maintenancePeriodTicks > 0 ? maintenancePeriodTicks : MaintenancePeriodTicks;
+            _lastMaintenanceTick = lastMaintenanceTick;
+
+            for (int i = 0; i < edges.Count; i++)
+            {
+                var edge = edges[i];
+                if (edge == null)
+                {
+                    error = $"NpcComplexEdgeMemory.TryReplaceAllForSaveLoad: edge nullo all'indice {i}.";
+                    return false;
+                }
+
+                _edges[edge.Key] = edge;
+            }
+
+            error = string.Empty;
+            return true;
+        }
 
         // =====================================================================
         // API DI RECORDING
