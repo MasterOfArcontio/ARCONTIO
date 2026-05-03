@@ -177,6 +177,7 @@ namespace Arcontio.View.MapGrid
 
         // Cache UI
         private Vector2 _scroll;
+        private Vector2 _windowScroll;
         private Rect _windowRect = new Rect(16, 16, 460, 720);
 
         // Per evitare "click-through" (il problema riportato: clicco un bottone e contemporaneamente piazzo sulla mappa),
@@ -526,6 +527,10 @@ namespace Arcontio.View.MapGrid
         {
             if (!_enabled) return;
 
+            float maxWindowHeight = Mathf.Max(240f, Screen.height - 32f);
+            if (_windowRect.height > maxWindowHeight)
+                _windowRect.height = maxWindowHeight;
+
             // Finestra IMGUI minimalista.
             _windowRect = GUI.Window(GetInstanceID(), _windowRect, DrawWindow, "ARCONTIO DevMode v1");
         }
@@ -541,6 +546,13 @@ namespace Arcontio.View.MapGrid
             }
 
             GUILayout.Label($"World: {world.MapWidth}x{world.MapHeight}");
+
+            // Il pannello DevTools cresce spesso durante i micro-cantieri debug:
+            // nuove sezioni e nuovi pulsanti non devono finire fuori dalla finestra.
+            // Manteniamo quindi una scroll view interna, lasciando la title bar
+            // libera per il drag e senza cambiare il comportamento dei tool.
+            float scrollHeight = Mathf.Max(120f, _windowRect.height - 54f);
+            _windowScroll = GUILayout.BeginScrollView(_windowScroll, false, true, GUILayout.Height(scrollHeight));
 
             GUILayout.Space(8);
 
@@ -674,6 +686,8 @@ namespace Arcontio.View.MapGrid
 
             GUILayout.Space(10);
             GUILayout.Label($"Controls: {toggleKey} toggle | RMB erase always");
+
+            GUILayout.EndScrollView();
 
             // Drag handle (top bar only)
             GUI.DragWindow(new Rect(0, 0, 10000, 20));
