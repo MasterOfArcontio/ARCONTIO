@@ -160,6 +160,68 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void JobRuntimeStateIdleNpcAcceptsJobThroughArbiter()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+            var job = CreateMoveJob(npcId, 4, 6, urgency01: 0.25f);
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(npcId, job, 0, out var reason);
+
+            Assert.That(assigned, Is.True, reason);
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var activeJob), Is.True);
+            Assert.That(activeJob.JobId, Is.EqualTo(job.JobId));
+        }
+
+        [Test]
+        public void JobRuntimeStateRejectsSameOrLowerPriorityJobAndKeepsCurrent()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+            var current = AssignMoveJob(world, npcId, 4, 6, urgency01: 0.40f);
+            var lower = CreateMoveJob(npcId, 7, 8, urgency01: 0.35f);
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(npcId, lower, 1, out var reason);
+
+            Assert.That(assigned, Is.False, reason);
+            Assert.That(reason, Is.EqualTo("CurrentStillPreferred"));
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var activeJob), Is.True);
+            Assert.That(activeJob.JobId, Is.EqualTo(current.JobId));
+            Assert.That(current.Status, Is.Not.EqualTo(JobStatus.Failed));
+        }
+
+        [Test]
+        public void JobRuntimeStatePreemptsCurrentJobWhenNewJobHasHigherPriority()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+            var current = AssignMoveJob(world, npcId, 4, 6, urgency01: 0.25f);
+            var urgentFood = CreateFoodJob(npcId, foodId: 77, foodX: 5, foodY: 5, urgency01: 0.95f);
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(npcId, urgentFood, 1, out var reason);
+
+            Assert.That(assigned, Is.True, reason);
+            Assert.That(reason, Is.EqualTo("HigherPriorityClass"));
+            Assert.That(current.Status, Is.EqualTo(JobStatus.Failed));
+            Assert.That(current.FailureReason, Is.EqualTo(JobFailureReason.Preempted));
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var activeJob), Is.True);
+            Assert.That(activeJob.JobId, Is.EqualTo(urgentFood.JobId));
+        }
+
+        [Test]
+        public void NeedsDecisionRuleFallsBackToLegacyWhenJobArbiterRejectsFoodRoute()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out _);
+            AddFoodBelief(world, npcId, 5, 5);
+            AssignFoodJob(world, npcId, 77, 5, 5, urgency01: 0.90f);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
+        }
+
+        [Test]
         public void JobExecutionWhenOnFoodTargetEnqueuesEatFromStockCommand()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
@@ -268,35 +330,61 @@ namespace Arcontio.Tests
 
         private static void AssignFoodJob(World world, int npcId, int foodId, int foodX, int foodY)
         {
-            bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
-                MakeRegistry(),
-                npcId,
-                foodId,
-                new Vector2Int(foodX, foodY),
-                0,
-                0.95f,
-                "Food:1",
-                out var job,
-                out var reason);
+            AssignFoodJob(world, npcId, foodId, foodX, foodY, urgency01: 0.95f);
+        }
 
-            Assert.That(created, Is.True, reason);
+        private static Job AssignFoodJob(World world, int npcId, int foodId, int foodX, int foodY, float urgency01)
+        {
+            var job = CreateFoodJob(npcId, foodId, foodX, foodY, urgency01);
+
+            string reason;
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, 0, out reason), Is.True, reason);
+            return job;
         }
 
         private static Job AssignMoveJob(World world, int npcId, int targetX, int targetY)
+        {
+            return AssignMoveJob(world, npcId, targetX, targetY, urgency01: 0.25f);
+        }
+
+        private static Job AssignMoveJob(World world, int npcId, int targetX, int targetY, float urgency01)
+        {
+            var job = CreateMoveJob(npcId, targetX, targetY, urgency01);
+            string reason;
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, 0, out reason), Is.True, reason);
+            return job;
+        }
+
+        private static Job CreateMoveJob(int npcId, int targetX, int targetY, float urgency01)
         {
             bool created = MoveJobFactory.TryCreateMoveToCellJob(
                 MakeRegistry(),
                 npcId,
                 new Vector2Int(targetX, targetY),
                 0,
-                0.25f,
+                urgency01,
                 "MoveJobQa",
                 out var job,
                 out var reason);
 
             Assert.That(created, Is.True, reason);
-            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, 0, out reason), Is.True, reason);
+            return job;
+        }
+
+        private static Job CreateFoodJob(int npcId, int foodId, int foodX, int foodY, float urgency01)
+        {
+            bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
+                MakeRegistry(),
+                npcId,
+                foodId,
+                new Vector2Int(foodX, foodY),
+                0,
+                urgency01,
+                "Food:1",
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
             return job;
         }
     }

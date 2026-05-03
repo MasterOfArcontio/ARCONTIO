@@ -31,6 +31,7 @@ namespace Arcontio.Core
     {
         private readonly Dictionary<int, NpcJobState> _npcStates = new();
         private readonly Dictionary<string, Job> _jobs = new();
+        private readonly JobArbiter _arbiter = new();
 
         public ReservationStore Reservations { get; } = new();
         public JobCommandBuffer CommandBuffer { get; } = new();
@@ -81,15 +82,17 @@ namespace Arcontio.Core
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Registra un job e lo assegna all'NPC solo se il cursore per-NPC non ha gia'
-        /// un lavoro attivo.
+        /// Registra un job e lo assegna all'NPC passando sempre da una policy di
+        /// arbitraggio minima.
         /// </para>
         ///
         /// <para><b>Anti doppia pipeline</b></para>
         /// <para>
-        /// La prima slice non introduce code multiple o preemption completa. Se un
-        /// job e' gia' attivo, la route job deve considerarsi occupata e impedire al
-        /// bridge legacy di emettere un command parallelo per la stessa intenzione.
+        /// La route job non scrive direttamente nel cursore quando l'NPC e' occupato:
+        /// chiede prima al <c>JobArbiter</c> se il nuovo lavoro puo' sostituire quello
+        /// corrente. Se l'arbitro rifiuta, il chiamante puo' lasciare invariato il
+        /// fallback legacy; se accetta una preemption, il job precedente viene chiuso
+        /// con ragione <c>Preempted</c> e il nuovo job diventa l'unico attivo.
         /// </para>
         /// </summary>
         public bool TryAssignJob(int npcId, Job job, int tick, out string reason)
@@ -110,16 +113,98 @@ namespace Arcontio.Core
 
             EnsureNpcState(npcId);
             var state = _npcStates[npcId];
-            if (state.HasActiveJob)
+            TryGetJob(state.ActiveJobId, out var currentJob);
+            var arbitration = _arbiter.Evaluate(state, currentJob, job);
+            reason = arbitration.Reason;
+
+            if (arbitration.Decision == JobArbitrationDecision.RejectInvalid
+                || arbitration.Decision == JobArbitrationDecision.KeepCurrent)
             {
-                reason = "NpcAlreadyHasActiveJob";
                 return false;
+            }
+
+            if (arbitration.Decision == JobArbitrationDecision.SuspendCurrentForNew
+                || arbitration.Decision == JobArbitrationDecision.CancelCurrentForNew)
+            {
+                FailCurrentJob(npcId, JobFailureReason.Preempted, tick, out _);
+                state = _npcStates[npcId];
             }
 
             _jobs[job.JobId] = job;
             state.AssignJob(job.JobId, tick);
             _npcStates[npcId] = state;
-            reason = "JobAssigned";
+            reason = arbitration.Reason == "NpcIdle" ? "JobAssigned" : arbitration.Reason;
+            return true;
+        }
+
+        // =============================================================================
+        // CompleteCurrentJob
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Chiude positivamente il job corrente dell'NPC e libera il cursore runtime.
+        /// </para>
+        ///
+        /// <para><b>Helper espliciti per lifecycle runtime</b></para>
+        /// <para>
+        /// La state machine puo' ancora manipolare direttamente il cursore nello step
+        /// corrente, ma questi helper definiscono il contratto pubblico minimo per
+        /// future integrazioni: completare, fallire o pulire un job senza duplicare
+        /// accessi ai dizionari interni.
+        /// </para>
+        /// </summary>
+        public bool CompleteCurrentJob(int npcId, int tick, out string reason)
+        {
+            reason = string.Empty;
+
+            if (!TryGetActiveJob(npcId, out var state, out var job) || job == null)
+            {
+                reason = "NoActiveJob";
+                return false;
+            }
+
+            job.MarkCompleted(tick);
+            _jobs.Remove(job.JobId);
+            state.Clear(JobFailureReason.None);
+            _npcStates[npcId] = state;
+            reason = "JobCompleted";
+            return true;
+        }
+
+        public bool FailCurrentJob(int npcId, JobFailureReason failureReason, int tick, out string reason)
+        {
+            reason = string.Empty;
+
+            if (!TryGetActiveJob(npcId, out var state, out var job) || job == null)
+            {
+                reason = "NoActiveJob";
+                return false;
+            }
+
+            job.MarkFailed(failureReason, tick);
+            _jobs.Remove(job.JobId);
+            state.Clear(failureReason);
+            _npcStates[npcId] = state;
+            reason = "JobFailed";
+            return true;
+        }
+
+        public bool ClearNpcJob(int npcId, JobFailureReason clearReason, out string reason)
+        {
+            reason = string.Empty;
+
+            if (!_npcStates.TryGetValue(npcId, out var state))
+            {
+                reason = "NpcStateMissing";
+                return false;
+            }
+
+            if (state.HasActiveJob)
+                _jobs.Remove(state.ActiveJobId);
+
+            state.Clear(clearReason);
+            _npcStates[npcId] = state;
+            reason = "NpcJobCleared";
             return true;
         }
 

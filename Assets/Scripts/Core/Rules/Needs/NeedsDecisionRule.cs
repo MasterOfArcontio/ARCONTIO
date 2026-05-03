@@ -958,12 +958,6 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (world.JobRuntimeState.HasActiveJob(npcId))
-            {
-                reason = "NpcAlreadyHasActiveJob";
-                return true;
-            }
-
             if (!TryResolveKnownCommunityFoodTarget(world, npcId, out int foodObjectId, out int targetX, out int targetY, out string targetSource))
             {
                 reason = "KnownCommunityFoodMissing";
@@ -1060,12 +1054,6 @@ namespace Arcontio.Core
             {
                 reason = "JobRuntimeMissing";
                 return false;
-            }
-
-            if (world.JobRuntimeState.HasActiveJob(npcId))
-            {
-                reason = "NpcAlreadyHasActiveJob";
-                return true;
             }
 
             if (!TryResolveKnownCommunityFoodTarget(world, npcId, out int foodObjectId, out int targetX, out int targetY, out string targetSource))
