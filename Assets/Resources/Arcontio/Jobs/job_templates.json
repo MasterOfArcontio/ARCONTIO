@@ -1,0 +1,31 @@
+{
+  "templates": [
+    {
+      "templateId": "food.eat_known_community_stock.v1",
+      "phases": [
+        {
+          "phaseId": "reach_food",
+          "kind": "ReachTarget",
+          "isInterruptible": true,
+          "actions": [
+            {
+              "actionId": "move_to_food",
+              "kind": "MoveToCell"
+            }
+          ]
+        },
+        {
+          "phaseId": "consume_food",
+          "kind": "Execute",
+          "isInterruptible": false,
+          "actions": [
+            {
+              "actionId": "consume_known_food",
+              "kind": "Consume"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

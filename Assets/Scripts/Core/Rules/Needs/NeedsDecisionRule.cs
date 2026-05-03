@@ -48,11 +48,19 @@ namespace Arcontio.Core
         // È volutamente conservativo: evita che un NPC "usi" risorse che stanno a metà mappa
         // solo perché la LOS non è bloccata (corridoio lungo, ecc.).
         private readonly int _maxSeekRangeCells;
+        private readonly bool _enableFoodJobVerticalSlice;
+        private readonly JobTemplateRegistry _jobTemplateRegistry;
 
-        public NeedsDecisionRule(int decisionEveryTicks = 10, int maxSeekRangeCells = 8)
+        public NeedsDecisionRule(
+            int decisionEveryTicks = 10,
+            int maxSeekRangeCells = 8,
+            bool enableFoodJobVerticalSlice = false,
+            JobTemplateRegistry jobTemplateRegistry = null)
         {
             _decisionEveryTicks = Mathf.Max(1, decisionEveryTicks);
             _maxSeekRangeCells = Mathf.Max(1, maxSeekRangeCells);
+            _enableFoodJobVerticalSlice = enableFoodJobVerticalSlice;
+            _jobTemplateRegistry = jobTemplateRegistry;
         }
 
         public void Handle(World world, ISimEvent e, List<ICommand> outCommands, Telemetry telemetry)
@@ -104,6 +112,22 @@ namespace Arcontio.Core
                 // --- MANGIA ---
                 if (needs.GetValue(NeedKind.Hunger) >= cfg.hungryThreshold)
                 {
+                    // v0.11.01: il Decision Layer puo' non selezionare EatKnownFood
+                    // in tutti gli scenari legacy minimali, ma il gate opt-in deve
+                    // comunque proteggere il caso supportato "community known stock"
+                    // dal vecchio bypass NeedsDecisionRule -> ICommand. Se la route
+                    // job accetta, non emettiamo command legacy nello stesso tick.
+                    if (TryStartFoodJobVerticalSliceFromLegacyFallback(
+                        world,
+                        npcId,
+                        (int)pulse.TickIndex,
+                        in needs,
+                        telemetry,
+                        out _))
+                    {
+                        continue;
+                    }
+
                     if (TryPlanEatOrMove(world, npcId, in needs, (int)pulse.TickIndex, telemetry, out var cmd, out bool didSteal, out bool didMove))
                     {
                         outCommands.Add(cmd);
@@ -279,6 +303,27 @@ namespace Arcontio.Core
             switch (selection.Candidate.Kind)
             {
                 case DecisionIntentKind.EatKnownFood:
+                {
+                    if (TryStartFoodJobVerticalSlice(
+                        world,
+                        npcId,
+                        nowTick,
+                        selection.Candidate,
+                        telemetry,
+                        out string jobRouteReason))
+                    {
+                        cmd = null;
+                        didSteal = false;
+                        didMove = false;
+                        TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, "FoodJobRouteAccepted:" + jobRouteReason);
+                        return true;
+                    }
+
+                    bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    return planned;
+                }
+
                 case DecisionIntentKind.TakeRestrictedFood:
                 {
                     bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
@@ -863,6 +908,190 @@ namespace Arcontio.Core
                 normContext: new DecisionNormContext(false, 1f, true));
 
             return true;
+        }
+
+        // =============================================================================
+        // TryStartFoodJobVerticalSlice
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Devia in modo opt-in il solo caso <c>EatKnownFood</c> community/known stock
+        /// verso il Job System runtime.
+        /// </para>
+        ///
+        /// <para><b>Ponte temporaneo legacy -> job senza doppia pipeline</b></para>
+        /// <para>
+        /// Questo metodo non sostituisce ancora <c>NeedsDecisionRule</c>. Usa la rule
+        /// legacy come punto controllato di bootstrap della vertical slice: se riesce
+        /// ad assegnare un job, il chiamante non deve emettere command legacy nello
+        /// stesso tick per la stessa intenzione. Se il gate e' spento o la route non
+        /// e' applicabile, il comportamento precedente resta invariato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate</b>: default false, comandato da <c>SimulationHost</c>.</item>
+        ///   <item><b>Target</b>: solo food stock community visibile o ricordato.</item>
+        ///   <item><b>Factory</b>: trasforma target gia' scelto in job da template JSON.</item>
+        ///   <item><b>Assign</b>: scrive in <c>World.JobRuntimeState</c>, non nel profilo NPC.</item>
+        /// </list>
+        /// </summary>
+        private bool TryStartFoodJobVerticalSlice(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            Telemetry telemetry,
+            out string reason)
+        {
+            reason = string.Empty;
+
+            if (!_enableFoodJobVerticalSlice)
+            {
+                reason = "GateDisabled";
+                return false;
+            }
+
+            if (world?.JobRuntimeState == null)
+            {
+                reason = "JobRuntimeMissing";
+                return false;
+            }
+
+            if (world.JobRuntimeState.HasActiveJob(npcId))
+            {
+                reason = "NpcAlreadyHasActiveJob";
+                return true;
+            }
+
+            if (!TryResolveKnownCommunityFoodTarget(world, npcId, out int foodObjectId, out int targetX, out int targetY, out string targetSource))
+            {
+                reason = "KnownCommunityFoodMissing";
+                return false;
+            }
+
+            string beliefKey = !candidate.BeliefResult.IsEmpty
+                ? BuildBeliefKey(candidate.BeliefResult.Belief)
+                : targetSource;
+
+            bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
+                _jobTemplateRegistry,
+                npcId,
+                foodObjectId,
+                new Vector2Int(targetX, targetY),
+                nowTick,
+                candidate.NeedUrgency01,
+                beliefKey,
+                out var job,
+                out reason);
+
+            if (!created)
+                return false;
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(npcId, job, nowTick, out reason);
+            telemetry?.Counter(assigned ? "FoodJobVerticalSlice.Assigned" : "FoodJobVerticalSlice.AssignFailed", 1);
+            return assigned;
+        }
+
+        private bool TryResolveKnownCommunityFoodTarget(
+            World world,
+            int npcId,
+            out int foodObjectId,
+            out int targetX,
+            out int targetY,
+            out string targetSource)
+        {
+            foodObjectId = 0;
+            targetX = 0;
+            targetY = 0;
+            targetSource = string.Empty;
+
+            foodObjectId = FindVisibleCommunityFoodStock(world, npcId, _maxSeekRangeCells);
+            if (foodObjectId != 0 && TryGetObjectCell(world, foodObjectId, out targetX, out targetY))
+            {
+                targetSource = "VisibleCommunityFood";
+                return true;
+            }
+
+            foodObjectId = FindRememberedCommunityFoodStock(world, npcId, _maxSeekRangeCells, out targetX, out targetY);
+            if (foodObjectId != 0)
+            {
+                targetSource = "RememberedCommunityFood";
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryStartFoodJobVerticalSliceFromLegacyFallback
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica lo stesso gate food-job al fallback storico fame -> command.
+        /// </para>
+        ///
+        /// <para><b>Anti-bypass transitorio</b></para>
+        /// <para>
+        /// In v0.11.01 <c>NeedsDecisionRule</c> resta legacy, quindi esistono ancora
+        /// percorsi che possono arrivare a <c>TryPlanEatOrMove</c> quando il Decision
+        /// Layer non ha gestito l'intenzione. Questo helper intercetta solo il caso
+        /// gia' autorizzato e sicuro: food stock community conosciuto/visibile. Se la
+        /// route job non accetta, il fallback legacy prosegue invariato.
+        /// </para>
+        /// </summary>
+        private bool TryStartFoodJobVerticalSliceFromLegacyFallback(
+            World world,
+            int npcId,
+            int nowTick,
+            in NpcNeeds needs,
+            Telemetry telemetry,
+            out string reason)
+        {
+            reason = string.Empty;
+
+            if (!_enableFoodJobVerticalSlice)
+            {
+                reason = "GateDisabled";
+                return false;
+            }
+
+            if (world?.JobRuntimeState == null)
+            {
+                reason = "JobRuntimeMissing";
+                return false;
+            }
+
+            if (world.JobRuntimeState.HasActiveJob(npcId))
+            {
+                reason = "NpcAlreadyHasActiveJob";
+                return true;
+            }
+
+            if (!TryResolveKnownCommunityFoodTarget(world, npcId, out int foodObjectId, out int targetX, out int targetY, out string targetSource))
+            {
+                reason = "KnownCommunityFoodMissing";
+                return false;
+            }
+
+            float urgency01 = needs.GetValue(NeedKind.Hunger);
+            bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
+                _jobTemplateRegistry,
+                npcId,
+                foodObjectId,
+                new Vector2Int(targetX, targetY),
+                nowTick,
+                urgency01,
+                targetSource,
+                out var job,
+                out reason);
+
+            if (!created)
+                return false;
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(npcId, job, nowTick, out reason);
+            telemetry?.Counter(assigned ? "FoodJobVerticalSlice.LegacyFallbackAssigned" : "FoodJobVerticalSlice.LegacyFallbackAssignFailed", 1);
+            return assigned;
         }
 
         // ============================================================
