@@ -32,6 +32,10 @@ namespace Arcontio.Core
         [SerializeField] private bool enableLegacyDebugScenarioBootstrap = false;
         [SerializeField] private DebugScenario debugScenario = DebugScenario.None;
 
+        [Header("World Save/Load Bootstrap")]
+        [SerializeField] private bool enableWorldSnapshotBootstrap = false;
+        [SerializeField] private string worldSnapshotSlotName = "default";
+
         private enum DebugScenario
         {
             None = 0,
@@ -104,7 +108,10 @@ namespace Arcontio.Core
 
         private readonly List<ISimEvent> _eventBuffer = new();
 
-        // Contatore del tick (long)
+        // Contatore del tick (long).
+        // Inizializzazione normale: il campo parte da 0 per inizializzazione CLR
+        // e viene incrementato alla fine di StepOneTick. Nel path save/load,
+        // invece, viene riallineato esplicitamente a WorldSaveData.savedAtTick.
         private long _tickIndex;
 
         // Accumulatore di tempo reale per eseguire tick discreti
@@ -128,8 +135,169 @@ namespace Arcontio.Core
         }
         public long TickIndex => _tickIndex;
 
+        // =============================================================================
+        // SaveCurrentWorldSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Entry point tecnico/dev per salvare lo snapshot canonico del mondo
+        /// corrente su disco.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: baseline tecnica v0.10, non UI finale</b></para>
+        /// <para>
+        /// Questo metodo collega intenzionalmente i tre mattoni canonici del macro job
+        /// v0.10: <see cref="WorldSaveBuilder"/> costruisce il DTO, <see cref="WorldSaveIO"/>
+        /// lo scrive nello slot world-level e <c>SimulationHost</c> fornisce il tick
+        /// autorevole. Non sostituisce ancora pulsanti, menu, profili utente o
+        /// politiche di autosave: e' un punto d'ingresso controllato per devtools,
+        /// test manuali e futuri command wrapper.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Guardia World</b>: rifiuta host non inizializzato.</item>
+        ///   <item><b>Builder</b>: fotografa il World senza mutarlo.</item>
+        ///   <item><b>IO</b>: scrive <c>world_snapshot.json</c> nello slot canonico.</item>
+        ///   <item><b>Log</b>: rende leggibile successo/fallimento senza crash opaco.</item>
+        /// </list>
+        /// </summary>
+        public bool SaveCurrentWorldSnapshot(string slotName)
+        {
+            if (_world == null)
+            {
+                Debug.LogError("[SimulationHost] SaveCurrentWorldSnapshot failed: World non inizializzato.");
+                return false;
+            }
+
+            string resolvedSlotName = string.IsNullOrWhiteSpace(slotName) ? "default" : slotName;
+
+            try
+            {
+                // savedAtTick usa la semantica v0.10.13: e' il prossimo tick che
+                // verra' eseguito, perche' _tickIndex viene incrementato solo alla
+                // fine di StepOneTick. Il load non deve quindi sommare uno.
+                WorldSaveData data = WorldSaveBuilder.BuildFromWorld(
+                    _world,
+                    _tickIndex,
+                    configRef: "Arcontio/Config/game_params",
+                    scenarioRef: enableLegacyDebugScenarioBootstrap ? debugScenario.ToString() : string.Empty);
+
+                bool ok = WorldSaveIO.SaveWorldSnapshot(data, resolvedSlotName);
+                if (ok)
+                {
+                    Debug.Log($"[SimulationHost] Saved WorldSaveData slot '{resolvedSlotName}' at tick {_tickIndex}.");
+                }
+                else
+                {
+                    Debug.LogError($"[SimulationHost] SaveCurrentWorldSnapshot failed while writing slot '{resolvedSlotName}'.");
+                }
+
+                return ok;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError($"[SimulationHost] SaveCurrentWorldSnapshot failed for slot '{resolvedSlotName}'. {e}");
+                return false;
+            }
+        }
+
+        // =============================================================================
+        // LoadWorldSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Entry point tecnico/dev per caricare uno snapshot canonico da disco e
+        /// sostituire il World corrente solo dopo un'applicazione riuscita.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: load atomico senza mondo ibrido</b></para>
+        /// <para>
+        /// Il loader canonico richiede un <c>World</c> pulito per preservare ID e
+        /// rifiutare collisioni. Per questo il metodo non applica lo snapshot sopra
+        /// il mondo gia' seedato: crea un nuovo <c>World</c> configurato, applica il
+        /// DTO, ricostruisce cache/landmark e solo alla fine sostituisce il
+        /// riferimento runtime. Se qualcosa fallisce, il mondo corrente resta vivo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Read</b>: usa <see cref="WorldSaveIO"/> per leggere il DTO grezzo.</item>
+        ///   <item><b>Fresh World</b>: crea una nuova istanza configurata dai JSON runtime.</item>
+        ///   <item><b>Apply</b>: delega a <see cref="WorldSaveLoader"/> il restore degli store coperti.</item>
+        ///   <item><b>Swap</b>: sostituisce <c>_world</c>, ripristina tick e resetta buffer runtime transitori.</item>
+        /// </list>
+        /// </summary>
+        public bool LoadWorldSnapshot(string slotName)
+        {
+            string resolvedSlotName = string.IsNullOrWhiteSpace(slotName) ? "default" : slotName;
+            int preNpcCount = CountNpcsForDiagnostics(_world);
+            int preObjectCount = CountObjectsForDiagnostics(_world);
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][SimulationHost] LoadWorldSnapshot START slot='{resolvedSlotName}' " +
+                $"currentWorldHash={(_world != null ? _world.GetHashCode() : 0)} " +
+                $"currentNpcCount={preNpcCount} currentObjectCount={preObjectCount} currentTick={_tickIndex}");
+
+            WorldSaveData data = WorldSaveIO.LoadWorldSnapshotData(resolvedSlotName);
+            if (data == null)
+            {
+                Debug.LogError($"[SimulationHost] LoadWorldSnapshot failed: DTO non leggibile per slot '{resolvedSlotName}'.");
+                return false;
+            }
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][SimulationHost] Snapshot READ OK slot='{resolvedSlotName}' " +
+                $"schemaVersion={data.schemaVersion} savedAtTick={data.savedAtTick} " +
+                $"size={data.worldWidth}x{data.worldHeight} nextNpcId={data.nextNpcId} nextObjectId={data.nextObjectId} " +
+                $"snapshotNpcCount={CountArrayForDiagnostics(data.npcs)} snapshotObjectCount={CountArrayForDiagnostics(data.objects)} " +
+                $"foodStocks={CountArrayForDiagnostics(data.foodStocks)} objectUseStates={CountArrayForDiagnostics(data.objectUseStates)}");
+
+            if (!TryCreateWorldFromSnapshotData(data, out World loadedWorld, out string error))
+            {
+                Debug.LogError(
+                    $"[WorldSnapshotLoadDiag][SimulationHost] Apply FAILED slot='{resolvedSlotName}' " +
+                    $"oldWorldHash={(_world != null ? _world.GetHashCode() : 0)} " +
+                    $"oldNpcCount={preNpcCount} oldObjectCount={preObjectCount} error='{error}'");
+                return false;
+            }
+
+            int loadedNpcCount = CountNpcsForDiagnostics(loadedWorld);
+            int loadedObjectCount = CountObjectsForDiagnostics(loadedWorld);
+            int oldWorldHash = _world != null ? _world.GetHashCode() : 0;
+            int newWorldHash = loadedWorld != null ? loadedWorld.GetHashCode() : 0;
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][SimulationHost] Apply OK before swap slot='{resolvedSlotName}' " +
+                $"oldWorldHash={oldWorldHash} loadedWorldHash={newWorldHash} " +
+                $"loadedNpcCount={loadedNpcCount} loadedObjectCount={loadedObjectCount}");
+
+            _world = loadedWorld;
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][SimulationHost] World SWAP executed slot='{resolvedSlotName}' " +
+                $"oldWorldHash={oldWorldHash} newWorldHash={newWorldHash} " +
+                $"npcCountPre={preNpcCount} npcCountPost={CountNpcsForDiagnostics(_world)} " +
+                $"objectCountPre={preObjectCount} objectCountPost={CountObjectsForDiagnostics(_world)}");
+
+            RestoreTickFromWorldSnapshot(data.savedAtTick);
+            ResetTransientRuntimeAfterWorldSnapshotLoad();
+
+            // Il load dev viene lasciato in pausa per evitare che il primo tick
+            // successivo consumi subito lo stato appena ripristinato mentre un tool
+            // o una view sta ancora ispezionando il risultato.
+            SetPaused(true);
+
+            Debug.Log($"[SimulationHost] Loaded WorldSaveData slot '{resolvedSlotName}' at tick {_tickIndex}.");
+            return true;
+        }
+
         // Flag per evitare seeding multipli (in caso di scene reload accidentali)
         private bool _seeded;
+
+        // Bootstrap failure controllato: se il path snapshot viene richiesto ma fallisce,
+        // l'host non deve cadere in un seed baseline/scenario implicito e mascherare il problema.
+        private bool _bootstrapForcedPause;
 
         // ============================================================
         // TICK CONTROL (Input System)
@@ -301,8 +469,7 @@ namespace Arcontio.Core
             // 3.1) Leggo da file game_params.json i dati di simulazione, che finiscono in simParams.
             // Con quello creo l'istanza di world
             // ******************************************************************************************************************************
-            var simParams = Arcontio.Core.Config.SimulationParamsLoader.LoadFromResources("Arcontio/Config/game_params");
-            _world = new World(new WorldConfig(simParams));
+            _world = CreateWorldFromGameParams();
 
             // ******************************************************************************************************************************
             // 3.2) INIZIALIZZO IL MESSAGE BUS
@@ -326,22 +493,22 @@ namespace Arcontio.Core
             // ******************************************************************************************************************************
             // 4.1) Carichiamo definizioni oggetti da JSON (Resources/Config/object_defs.json).
             // ******************************************************************************************************************************
-            ObjectDatabaseLoader.LoadIntoWorld(_world);
+            LoadWorldRuntimeJsonConfig(_world);
 
             // ******************************************************************************************************************************
             // 4.2) Carica parametri fame/sonno da JSON
             // ******************************************************************************************************************************
-            NeedsConfigLoader.LoadIntoWorld(_world);
+            // Caricato da LoadWorldRuntimeJsonConfig.
 
             // ******************************************************************************************************************************
             // 4.3) Carica parametri decadimento BeliefStore da JSON
             // ******************************************************************************************************************************
-            BeliefDecayConfigLoader.LoadIntoWorld(_world);
+            // Caricato da LoadWorldRuntimeJsonConfig.
 
             // ******************************************************************************************************************************
             // 4.4) Carica pesi QuerySystem BeliefStore da JSON
             // ******************************************************************************************************************************
-            BeliefQueryConfigLoader.LoadIntoWorld(_world);
+            // Caricato da LoadWorldRuntimeJsonConfig.
 
             // ******************************************************************************************************************************
             // 5) ISCRIVO I SISTEMI ALLO SCHEDULER
@@ -450,7 +617,7 @@ namespace Arcontio.Core
             EnsureSeeded();
 
             // Gestione Start/Pause del simulatore
-            IsPaused = startPaused;
+            IsPaused = startPaused || _bootstrapForcedPause;
             if (IsPaused) _accum = 0f;
 
             ArcontioLogger.Debug(
@@ -833,6 +1000,16 @@ namespace Arcontio.Core
             if (_seeded) return;
             _seeded = true;
 
+            if (enableWorldSnapshotBootstrap)
+            {
+                if (TryBootstrapFromWorldSnapshot(out string error))
+                    return;
+
+                Debug.LogError($"[SimulationHost] World snapshot bootstrap failed. Runtime seed skipped to avoid double bootstrap. {error}");
+                _bootstrapForcedPause = true;
+                return;
+            }
+
             SeedTestWorld();
 
             // ============================================================
@@ -843,6 +1020,312 @@ namespace Arcontio.Core
             // - Quindi muri/porte/oggetti che definiscono la geometria non esistono ancora in ctor.
             // - Qui, a seeding completato, ricostruiamo il registry oggettivo dei landmark.
             _world?.RebuildLandmarksBootstrap();
+        }
+
+        // =============================================================================
+        // TryBootstrapFromWorldSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica il percorso tecnico controllato "load from save snapshot" durante
+        /// il bootstrap del runtime.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: snapshot diverso da seed</b></para>
+        /// <para>
+        /// Questo metodo e' volutamente separato da <see cref="SeedTestWorld"/>:
+        /// uno snapshot canonico rappresenta un mondo gia' vissuto e deve preservare
+        /// ID, ownership, memorie, belief e tick globale. I seed baseline/scenario,
+        /// invece, costruiscono condizioni iniziali nuove e possono generare ID.
+        /// Mischiare i due percorsi causerebbe doppio spawn, contatori ID incoerenti
+        /// e stato cognitivo non piu' allineato al JSON salvato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Lettura DTO</b>: usa <see cref="WorldSaveIO"/> e non accede direttamente al disco.</item>
+        ///   <item><b>Mappa</b>: riallinea <c>World.InitMap</c> alle dimensioni dello snapshot prima di applicare oggetti e NPC.</item>
+        ///   <item><b>Applicazione</b>: delega a <see cref="WorldSaveLoader"/> l'autorita' di ricostruzione world-level.</item>
+        ///   <item><b>Tick</b>: ripristina <c>_tickIndex</c>, <see cref="TickContext"/> e <c>World.Global.CurrentTickIndex</c>.</item>
+        /// </list>
+        /// </summary>
+        private bool TryBootstrapFromWorldSnapshot(out string error)
+        {
+            error = string.Empty;
+
+            WorldSaveData data = WorldSaveIO.LoadWorldSnapshotData(worldSnapshotSlotName);
+            if (data == null)
+            {
+                error = $"Nessun WorldSaveData leggibile nello slot '{worldSnapshotSlotName}'.";
+                return false;
+            }
+
+            if (!TryCreateWorldFromSnapshotData(data, out World loadedWorld, out error))
+            {
+                return false;
+            }
+
+            _world = loadedWorld;
+            ResetTransientRuntimeAfterWorldSnapshotLoad();
+
+            RestoreTickFromWorldSnapshot(data.savedAtTick);
+
+            Debug.Log($"[SimulationHost] World snapshot bootstrap loaded slot '{worldSnapshotSlotName}' at tick {_tickIndex}.");
+            return true;
+        }
+
+        // =============================================================================
+        // TryCreateWorldFromSnapshotData
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un <see cref="World"/> pulito, carica i JSON runtime necessari e
+        /// applica il DTO canonico senza toccare il mondo attualmente esposto
+        /// dall'host.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: preflight prima dello swap</b></para>
+        /// <para>
+        /// Questo helper e' condiviso da bootstrap load e load tecnico/dev. La
+        /// regola e' sempre la stessa: lo snapshot viene applicato su una nuova
+        /// istanza; solo il chiamante, dopo il successo, puo' assegnarla a
+        /// <c>_world</c>. In caso di errore, il runtime corrente non viene
+        /// contaminato da NPC, oggetti o cache parzialmente ripristinate.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione dimensioni</b>: rifiuta snapshot senza griglia valida.</item>
+        ///   <item><b>Config</b>: usa i JSON runtime correnti come baseline tecnica v0.10.</item>
+        ///   <item><b>InitMap</b>: riallinea la griglia alle dimensioni persistite.</item>
+        ///   <item><b>Loader</b>: applica store e contatori tramite <see cref="WorldSaveLoader"/>.</item>
+        /// </list>
+        /// </summary>
+        private bool TryCreateWorldFromSnapshotData(WorldSaveData data, out World loadedWorld, out string error)
+        {
+            loadedWorld = null;
+            error = string.Empty;
+
+            if (data == null)
+            {
+                error = "WorldSaveData nullo.";
+                return false;
+            }
+
+            if (data.worldWidth <= 0 || data.worldHeight <= 0)
+            {
+                error = $"Dimensioni snapshot non valide: {data.worldWidth}x{data.worldHeight}.";
+                return false;
+            }
+
+            loadedWorld = CreateWorldFromGameParams();
+            LoadWorldRuntimeJsonConfig(loadedWorld);
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][SimulationHost] Fresh World created " +
+                $"worldHash={loadedWorld.GetHashCode()} mapBeforeInit={loadedWorld.MapWidth}x{loadedWorld.MapHeight}");
+
+            // Il World nasce da game_params per ottenere configurazioni, database
+            // oggetti e sistemi runtime coerenti con l'eseguibile corrente. Prima
+            // di applicare lo snapshot, pero', la griglia deve assumere la
+            // dimensione salvata: bounds check, cache oggetti e occlusion map
+            // devono validare contro la mappa persistita.
+            loadedWorld.InitMap(data.worldWidth, data.worldHeight);
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][SimulationHost] Fresh World InitMap " +
+                $"worldHash={loadedWorld.GetHashCode()} mapAfterInit={loadedWorld.MapWidth}x{loadedWorld.MapHeight}");
+
+            if (!WorldSaveLoader.TryApplyObjectiveWorld(loadedWorld, data, out error))
+            {
+                Debug.LogError(
+                    $"[WorldSnapshotLoadDiag][SimulationHost] WorldSaveLoader.TryApplyObjectiveWorld FAILED " +
+                    $"worldHash={loadedWorld.GetHashCode()} error='{error}'");
+                loadedWorld = null;
+                return false;
+            }
+
+            Debug.Log(
+                $"[WorldSnapshotLoadDiag][SimulationHost] WorldSaveLoader.TryApplyObjectiveWorld OK " +
+                $"worldHash={loadedWorld.GetHashCode()} npcCount={CountNpcsForDiagnostics(loadedWorld)} " +
+                $"objectCount={CountObjectsForDiagnostics(loadedWorld)}");
+
+            loadedWorld.RebuildLandmarksBootstrap();
+            return true;
+        }
+
+        // =============================================================================
+        // CountNpcsForDiagnostics
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Conta gli NPC per i log diagnostici del load snapshot senza introdurre nuova
+        /// logica di persistenza o dipendenze verso la UI.
+        /// </para>
+        ///
+        /// <para><b>Diagnostica non autoritativa</b></para>
+        /// <para>
+        /// Il conteggio usa <c>NpcDna</c> come registro pratico degli NPC materializzati
+        /// nel <see cref="World"/>. Serve solo a capire se il DTO e' stato applicato e
+        /// se lo swap cambia davvero il runtime osservato.
+        /// </para>
+        /// </summary>
+        private static int CountNpcsForDiagnostics(World world)
+        {
+            return world?.NpcDna != null ? world.NpcDna.Count : 0;
+        }
+
+        // =============================================================================
+        // CountObjectsForDiagnostics
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Conta gli oggetti materializzati nel <see cref="World"/> per il tracciamento
+        /// del percorso runtime di load.
+        /// </para>
+        /// </summary>
+        private static int CountObjectsForDiagnostics(World world)
+        {
+            return world?.Objects != null ? world.Objects.Count : 0;
+        }
+
+        // =============================================================================
+        // CountArrayForDiagnostics
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Conta in modo null-safe le sezioni array del DTO snapshot nei log
+        /// diagnostici.
+        /// </para>
+        /// </summary>
+        private static int CountArrayForDiagnostics<T>(T[] values)
+        {
+            return values != null ? values.Length : 0;
+        }
+
+        // =============================================================================
+        // CreateWorldFromGameParams
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un <see cref="World"/> nuovo partendo da <c>game_params.json</c>,
+        /// senza seedare NPC/oggetti e senza caricare scenari.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: creazione World separata da seed e load</b></para>
+        /// <para>
+        /// Il costruttore del <c>World</c> usa i parametri simulativi di base, ma
+        /// non deve decidere se il runtime partira' da baseline neutral, scenario
+        /// legacy o snapshot. I JSON runtime aggiuntivi vengono caricati subito
+        /// dopo tramite <see cref="LoadWorldRuntimeJsonConfig"/> e i seed restano
+        /// confinati in <see cref="EnsureSeeded"/>.
+        /// </para>
+        /// </summary>
+        private World CreateWorldFromGameParams()
+        {
+            var simParams = Arcontio.Core.Config.SimulationParamsLoader.LoadFromResources("Arcontio/Config/game_params");
+            return new World(new WorldConfig(simParams));
+        }
+
+        // =============================================================================
+        // LoadWorldRuntimeJsonConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica nel <see cref="World"/> le configurazioni JSON runtime che non sono
+        /// seed di scenario.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: config non e' scenario</b></para>
+        /// <para>
+        /// Questi loader preparano database oggetti, needs e belief tuning. Non
+        /// creano NPC, non creano oggetti e non devono sovrascrivere uno snapshot
+        /// gia' applicato. Per questo vengono chiamati prima del load DTO e prima
+        /// dei seed, mai dopo.
+        /// </para>
+        /// </summary>
+        private static void LoadWorldRuntimeJsonConfig(World world)
+        {
+            if (world == null)
+                return;
+
+            ObjectDatabaseLoader.LoadIntoWorld(world);
+            NeedsConfigLoader.LoadIntoWorld(world);
+            BeliefDecayConfigLoader.LoadIntoWorld(world);
+            BeliefQueryConfigLoader.LoadIntoWorld(world);
+        }
+
+        // =============================================================================
+        // ResetTransientRuntimeAfterWorldSnapshotLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ripulisce stato transitorio dell'host dopo uno swap di <see cref="World"/>
+        /// da snapshot.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: snapshot world-level, non replay dei buffer</b></para>
+        /// <para>
+        /// Eventi, comandi interni, sistemi schedulati nel buffer e accumulatore di
+        /// tempo reale appartengono al runtime precedente, non allo snapshot. Dopo
+        /// un load tecnico v0.10 vengono quindi svuotati per impedire che comandi o
+        /// eventi pendenti mutino subito il nuovo mondo caricato.
+        /// </para>
+        /// </summary>
+        private void ResetTransientRuntimeAfterWorldSnapshotLoad()
+        {
+            _toRun.Clear();
+            _commands.Clear();
+            _externalCommands.Clear();
+            _eventBuffer.Clear();
+            _accum = 0f;
+            _bus = new MessageBus();
+            _telemetry = new Telemetry();
+            _npcCommunication = new NpcCommunicationPipeline(contactRadius: 2, topN: 6);
+
+            if (_memoryEncoding != null)
+                _memoryEncoding.SetEventsBuffer(_eventBuffer);
+        }
+
+        // =============================================================================
+        // RestoreTickFromWorldSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ripristina il tempo globale del simulatore dopo l'applicazione di uno
+        /// snapshot canonico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: authority temporale unica</b></para>
+        /// <para>
+        /// <c>SimulationHost</c> resta l'unica sorgente autorevole del tick. Il DTO
+        /// salva il valore di <c>_tickIndex</c>, cioe' il prossimo tick che verra'
+        /// eseguito da <see cref="StepOneTick"/>. Per questo il restore assegna
+        /// esattamente <c>savedAtTick</c> e non <c>savedAtTick + 1</c>: al primo
+        /// avanzamento post-load, <see cref="TickContext.BeginTick(long)"/> verra'
+        /// chiamato con lo stesso numero salvato, poi il normale fine tick
+        /// incrementera' il contatore come sempre.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Clamp difensivo</b>: valori negativi vengono portati a zero.</item>
+        ///   <item><b>SimulationHost</b>: aggiorna <c>_tickIndex</c>, usato dallo scheduler.</item>
+        ///   <item><b>TickContext</b>: riallinea il contesto letto da log, sistemi e comandi fuori tick.</item>
+        ///   <item><b>World.Global</b>: riallinea il mirror globale legacy se presente.</item>
+        /// </list>
+        /// </summary>
+        private void RestoreTickFromWorldSnapshot(long savedAtTick)
+        {
+            long restoredTick = savedAtTick;
+            if (restoredTick < 0)
+                restoredTick = 0;
+
+            _tickIndex = restoredTick;
+            TickContext.BeginTick(_tickIndex);
+
+            if (_world != null)
+                _world.Global.CurrentTickIndex = _tickIndex;
         }
 
         private void SeedTestWorld()

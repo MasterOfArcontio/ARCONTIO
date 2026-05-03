@@ -42,6 +42,8 @@ Prima di ogni ragionamento, audit o implementazione non banale, leggi e assimila
 7. `ARCONTIO_Workflow_Operativo_AI_Git_Notion.md`
    = policy di workflow operativo, regole di branch, regole di pubblicazione, regole di sincronizzazione documentale.
 
+8. `Istruzioni.md` nella cartella 'notion_bridge' del repo git ARCONTIO_private_tools
+	
 Nessuna implementazione deve iniziare prima che questa gerarchia contestuale sia assimilata.
 
 ---
@@ -52,9 +54,8 @@ La fase corrente della repository non è una normale campagna di implementazione
 
 ARCONTIO è attualmente in una fase avanzata di preload costituzionale e consolidamento cognitivo della governance AI.
 
-La macro campagna attiva `v0.09` riguarda il consolidamento del backbone runtime.
-v0.09 è stata aperta dopo chiusura del preload costituzionale v0.08
-e si innesta sui forensic findings già emersi.
+La macro campagna attiva `v0.10 — World Persistence Closure & Save/Load Completion` riguarda il consolidamento del sistema di load/save del world.
+v0.10 è stata aperta dopo chiusura consolidamento backbone v0.09
 
 Questo significa che ARCONTIO si trova in una fase di governance infrastrutturale, non di gameplay coding.
 

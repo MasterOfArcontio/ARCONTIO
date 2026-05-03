@@ -20,7 +20,7 @@
 | v0.07 | Explainability Layer v0.06: Job / Phase / Step / Command | Posticipata |
 | v0.08 | Repository Stabilization + Constitutional Documentation Bootstrap | Aprile 2026 | IN CORSO |
 | v0.09 | Simulation Backbone Hardening & Constitutional Alignment | Maggio 2026 | Completata |
-| v0.10 | World Persistence Closure & Save/Load Completion | Maggio-Giugno 2026 | Pending |
+| v0.10 | World Persistence Closure & Save/Load Completion | Maggio 2026 | Completata |
 | v0.11 | Domain Reintegration: Jobs · Work · Social · Dormant Systems | Giugno 2026 | Pending |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
@@ -306,23 +306,29 @@ necessario per l'apertura della campagna tecnica v0.09.
 
 ## v0.10 — World Persistence Closure & Save/Load Completion
 
+**Obiettivo:** chiudere il debito storico di persistenza mondo/NPC con una baseline canonica `WorldSaveData` capace di salvare e ricaricare uno snapshot world-level runtime, preservando ID, tick, NPC, oggetti, food/object-use, belief e memorie soggettive pratiche.
+
+**Milestone persistence closure baseline:** completata con commit tecnico `[Save] add canonical world snapshot save/load baseline` e smoke PlayMode roundtrip positivo. Il formato canonico world-level resta separato dai chunk NPC legacy e da `DevMapIO`; i controlli F3 sono strumenti DEV/DEBUG, non UI finale.
+
 ### Tabella sessioni v0.10
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
-| 1 | Lun | Save | Audit completo world persistence gap | Pending |
-| 2 | Mer | Save | Oggetti + ownership persistence | Pending |
-| 3 | Gio | Save | Food stocks + global stores persistence | Pending |
-| 4 | Lun | Save | Landmark memory persistence | Pending |
-| 5 | Mer | Save | Tick/global state persistence | Pending |
-| 6 | Gio | Load | Distinzione scenario load vs save snapshot | Pending |
-| 7 | Lun | QA | Test save/load mondo completo | Pending |
+| 1 | Lun | Save | Audit completo world persistence gap | ✅ |
+| 2 | Mer | Save | Oggetti + ownership persistence | ✅ |
+| 3 | Gio | Save | Food stocks + global stores persistence | ✅ |
+| 4 | Lun | Save | Landmark memory persistence | ✅ |
+| 5 | Mer | Save | Tick/global state persistence | ✅ |
+| 6 | Gio | Load | Distinzione scenario load vs save snapshot | ✅ |
+| 7 | Lun | QA | Test save/load mondo completo | ✅ |
 
 > **Nota:** questa fase assorbe ogni vecchio “cleanup save/load” sparso e lo ricolloca come campagna unica.
 
 ---
 
 ## v0.11 — Domain Reintegration: Jobs · Work · Social · Dormant Systems
+
+> **Placeholder prossimo macro cantiere:** da aprire con audit dedicato prima di qualunque implementazione. Lo scope operativo resta da confermare alla luce della closure v0.10; nessun nuovo coding e' implicato da questa roadmap closeout.
 
 ### Tabella sessioni v0.11
 
