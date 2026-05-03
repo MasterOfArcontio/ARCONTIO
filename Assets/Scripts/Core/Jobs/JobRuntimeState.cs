@@ -1,7 +1,93 @@
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // JobRuntimeSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot read-only e minimale dello stato job runtime di un singolo NPC.
+    /// </para>
+    ///
+    /// <para><b>Osservabilita' senza Explainability Layer pubblico</b></para>
+    /// <para>
+    /// La struttura copia solo valori primitivi e value type gia' presenti nello
+    /// store runtime. Non espone riferimenti a <c>Job</c>, <c>JobPlan</c>,
+    /// <c>JobPhase</c> o dizionari interni, quindi tooling e test possono leggere lo
+    /// stato senza poter mutare la sorgente di verita' posseduta dal <c>World</c>.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Identita'</b>: npcId, currentJobId e templateId.</item>
+    ///   <item><b>Cursore</b>: fase/action correnti come id leggibili.</item>
+    ///   <item><b>Target</b>: cella e object id copiati dalla request/action attiva.</item>
+    ///   <item><b>Status</b>: stato job, ultimo fallimento ed elapsed tick.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct JobRuntimeSnapshot
+    {
+        public readonly int NpcId;
+        public readonly bool HasActiveJob;
+        public readonly string CurrentJobId;
+        public readonly string TemplateId;
+        public readonly string CurrentPhaseId;
+        public readonly string CurrentActionId;
+        public readonly bool HasTargetCell;
+        public readonly Vector2Int TargetCell;
+        public readonly int TargetObjectId;
+        public readonly JobStatus Status;
+        public readonly JobFailureReason LastFailureReason;
+        public readonly int ElapsedTicks;
+
+        public JobRuntimeSnapshot(
+            int npcId,
+            bool hasActiveJob,
+            string currentJobId,
+            string templateId,
+            string currentPhaseId,
+            string currentActionId,
+            bool hasTargetCell,
+            Vector2Int targetCell,
+            int targetObjectId,
+            JobStatus status,
+            JobFailureReason lastFailureReason,
+            int elapsedTicks)
+        {
+            NpcId = npcId;
+            HasActiveJob = hasActiveJob;
+            CurrentJobId = currentJobId ?? string.Empty;
+            TemplateId = templateId ?? string.Empty;
+            CurrentPhaseId = currentPhaseId ?? string.Empty;
+            CurrentActionId = currentActionId ?? string.Empty;
+            HasTargetCell = hasTargetCell;
+            TargetCell = targetCell;
+            TargetObjectId = targetObjectId;
+            Status = status;
+            LastFailureReason = lastFailureReason;
+            ElapsedTicks = elapsedTicks < 0 ? 0 : elapsedTicks;
+        }
+
+        public static JobRuntimeSnapshot Idle(int npcId, JobFailureReason lastFailureReason)
+        {
+            return new JobRuntimeSnapshot(
+                npcId,
+                false,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                string.Empty,
+                false,
+                Vector2Int.zero,
+                0,
+                JobStatus.Completed,
+                lastFailureReason,
+                0);
+        }
+    }
+
     // =============================================================================
     // JobRuntimeState
     // =============================================================================
@@ -75,6 +161,63 @@ namespace Arcontio.Core
                 return;
 
             _npcStates[npcId] = state;
+        }
+
+        // =============================================================================
+        // GetSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce una copia leggibile dello stato job di un NPC senza esporre
+        /// oggetti runtime mutabili.
+        /// </para>
+        ///
+        /// <para><b>Debug data minimale</b></para>
+        /// <para>
+        /// Questo helper non costruisce un nuovo Explainability Layer e non registra
+        /// trace. Fotografa soltanto il cursore attuale, il piano attivo se presente
+        /// e l'ultimo motivo di fallimento conservato da <c>NpcJobState</c>.
+        /// </para>
+        /// </summary>
+        public JobRuntimeSnapshot GetSnapshot(int npcId, int tick)
+        {
+            if (!_npcStates.TryGetValue(npcId, out var state))
+                return JobRuntimeSnapshot.Idle(npcId, JobFailureReason.None);
+
+            if (!state.HasActiveJob || !TryGetJob(state.ActiveJobId, out var job) || job == null)
+                return JobRuntimeSnapshot.Idle(npcId, state.LastFailureReason);
+
+            string phaseId = string.Empty;
+            string actionId = string.Empty;
+            bool hasTargetCell = job.Request.HasTargetCell;
+            var targetCell = job.Request.TargetCell;
+            int targetObjectId = job.Request.TargetObjectId;
+
+            if (job.Plan.TryGetPhase(state.ActivePhaseIndex, out var phase))
+            {
+                phaseId = phase.PhaseId;
+                if (phase.TryGetAction(state.ActiveActionIndex, out var action))
+                {
+                    actionId = action.ActionId;
+                    hasTargetCell = action.HasTargetCell;
+                    targetCell = action.TargetCell;
+                    targetObjectId = action.TargetObjectId;
+                }
+            }
+
+            return new JobRuntimeSnapshot(
+                npcId,
+                true,
+                job.JobId,
+                job.Plan.PlanId,
+                phaseId,
+                actionId,
+                hasTargetCell,
+                targetCell,
+                targetObjectId,
+                job.Status,
+                state.LastFailureReason,
+                tick - job.CreatedTick);
         }
 
         // =============================================================================

@@ -293,6 +293,79 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void JobRuntimeSnapshotIsEmptyForIdleNpc()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+
+            var snapshot = world.JobRuntimeState.GetSnapshot(npcId, tick: 12);
+
+            Assert.That(snapshot.NpcId, Is.EqualTo(npcId));
+            Assert.That(snapshot.HasActiveJob, Is.False);
+            Assert.That(snapshot.CurrentJobId, Is.Empty);
+            Assert.That(snapshot.TemplateId, Is.Empty);
+            Assert.That(snapshot.CurrentPhaseId, Is.Empty);
+            Assert.That(snapshot.CurrentActionId, Is.Empty);
+            Assert.That(snapshot.HasTargetCell, Is.False);
+            Assert.That(snapshot.TargetObjectId, Is.EqualTo(0));
+            Assert.That(snapshot.LastFailureReason, Is.EqualTo(JobFailureReason.None));
+            Assert.That(snapshot.ElapsedTicks, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void JobRuntimeSnapshotReportsActiveJobCursorAndTarget()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            var job = AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+
+            var snapshot = world.JobRuntimeState.GetSnapshot(npcId, tick: 7);
+
+            Assert.That(snapshot.HasActiveJob, Is.True);
+            Assert.That(snapshot.CurrentJobId, Is.EqualTo(job.JobId));
+            Assert.That(snapshot.TemplateId, Is.EqualTo(JobTemplateRegistry.FoodKnownCommunityStockTemplateId));
+            Assert.That(snapshot.CurrentPhaseId, Is.EqualTo("reach_food"));
+            Assert.That(snapshot.CurrentActionId, Is.EqualTo("move_to_food"));
+            Assert.That(snapshot.HasTargetCell, Is.True);
+            Assert.That(snapshot.TargetCell, Is.EqualTo(new Vector2Int(5, 5)));
+            Assert.That(snapshot.TargetObjectId, Is.EqualTo(foodId));
+            Assert.That(snapshot.Status, Is.EqualTo(JobStatus.Created));
+            Assert.That(snapshot.LastFailureReason, Is.EqualTo(JobFailureReason.None));
+            Assert.That(snapshot.ElapsedTicks, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void JobRuntimeSnapshotReportsLastFailureReasonAfterFail()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+            AssignMoveJob(world, npcId, 4, 6);
+
+            bool failed = world.JobRuntimeState.FailCurrentJob(npcId, JobFailureReason.MovementFailed, 4, out var reason);
+            var snapshot = world.JobRuntimeState.GetSnapshot(npcId, tick: 5);
+
+            Assert.That(failed, Is.True, reason);
+            Assert.That(snapshot.HasActiveJob, Is.False);
+            Assert.That(snapshot.LastFailureReason, Is.EqualTo(JobFailureReason.MovementFailed));
+            Assert.That(snapshot.CurrentJobId, Is.Empty);
+        }
+
+        [Test]
+        public void JobRuntimeSnapshotReadDoesNotMutateRuntimeState()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+            var job = AssignMoveJob(world, npcId, 4, 6);
+            int activeJobCount = world.JobRuntimeState.ActiveJobCount;
+            int reservationCount = world.JobRuntimeState.Reservations.Count;
+
+            var first = world.JobRuntimeState.GetSnapshot(npcId, tick: 2);
+            var second = world.JobRuntimeState.GetSnapshot(npcId, tick: 3);
+
+            Assert.That(first.CurrentJobId, Is.EqualTo(job.JobId));
+            Assert.That(second.CurrentJobId, Is.EqualTo(job.JobId));
+            Assert.That(world.JobRuntimeState.ActiveJobCount, Is.EqualTo(activeJobCount));
+            Assert.That(world.JobRuntimeState.Reservations.Count, Is.EqualTo(reservationCount));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+        }
+
+        [Test]
         public void JobExecutionWhenOnFoodTargetEnqueuesEatFromStockCommand()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
