@@ -420,7 +420,9 @@ namespace Arcontio.Core.Save
                     OwnerId = dto.ownerId,
                     OccupantNpcId = dto.occupantNpcId,
                     IsOpen = dto.isOpen,
-                    IsLocked = dto.isLocked
+                    IsLocked = dto.isLocked,
+                    IsHeld = dto.isHeld,
+                    HolderNpcId = dto.isHeld ? dto.holderNpcId : 0
                 };
 
                 if (!world.TryRegisterLoadedObjectForSaveLoad(instance, out error))
@@ -540,13 +542,19 @@ namespace Arcontio.Core.Save
                     return false;
                 }
 
-                if (world.MapWidth > 0 && world.MapHeight > 0 && !world.InBounds(dto.cellX, dto.cellY))
+                if (dto.isHeld && !WillNpcExistAfterLoad(world, data, dto.holderNpcId))
+                {
+                    error = $"WorldSaveLoader: holder NPC mancante per objectId {dto.objectId}, holderNpcId {dto.holderNpcId}.";
+                    return false;
+                }
+
+                if (!dto.isHeld && world.MapWidth > 0 && world.MapHeight > 0 && !world.InBounds(dto.cellX, dto.cellY))
                 {
                     error = $"WorldSaveLoader: oggetto fuori mappa objectId {dto.objectId} ({dto.cellX},{dto.cellY}).";
                     return false;
                 }
 
-                if (world.HasAnyObjectAt(dto.cellX, dto.cellY))
+                if (!dto.isHeld && world.HasAnyObjectAt(dto.cellX, dto.cellY))
                 {
                     error = $"WorldSaveLoader: cella gia' occupata nel World prima del load oggetti ({dto.cellX},{dto.cellY}).";
                     return false;
@@ -558,11 +566,14 @@ namespace Arcontio.Core.Save
                     return false;
                 }
 
-                string cellKey = dto.cellX + ":" + dto.cellY;
-                if (!seenCells.Add(cellKey))
+                if (!dto.isHeld)
                 {
-                    error = $"WorldSaveLoader: due oggetti nello snapshot occupano la cella ({dto.cellX},{dto.cellY}).";
-                    return false;
+                    string cellKey = dto.cellX + ":" + dto.cellY;
+                    if (!seenCells.Add(cellKey))
+                    {
+                        error = $"WorldSaveLoader: due oggetti nello snapshot occupano la cella ({dto.cellX},{dto.cellY}).";
+                        return false;
+                    }
                 }
 
                 if ((OwnerKind)dto.ownerKind == OwnerKind.Npc && !WillNpcExistAfterLoad(world, data, dto.ownerId))

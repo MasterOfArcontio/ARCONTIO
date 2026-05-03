@@ -42,6 +42,57 @@
           ]
         }
       ]
+    },
+    {
+      "templateId": "transport.object_to_cell.v1",
+      "phases": [
+        {
+          "phaseId": "reach_object",
+          "kind": "ReachTarget",
+          "isInterruptible": true,
+          "actions": [
+            {
+              "actionId": "move_to_object",
+              "kind": "MoveToCell"
+            }
+          ]
+        },
+        {
+          "phaseId": "pickup_object",
+          "kind": "Execute",
+          "isInterruptible": false,
+          "actions": [
+            {
+              "actionId": "pickup_object",
+              "kind": "PickUp"
+            }
+          ]
+        },
+        {
+          "phaseId": "reach_destination",
+          "kind": "ReachTarget",
+          "isInterruptible": true,
+          "actions": [
+            {
+              "actionId": "move_to_destination",
+              "kind": "MoveToCell",
+              "targetCellSource": "secondary"
+            }
+          ]
+        },
+        {
+          "phaseId": "drop_object",
+          "kind": "Cleanup",
+          "isInterruptible": false,
+          "actions": [
+            {
+              "actionId": "drop_object",
+              "kind": "Drop",
+              "targetCellSource": "secondary"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

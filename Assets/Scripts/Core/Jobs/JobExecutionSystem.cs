@@ -92,6 +92,12 @@ namespace Arcontio.Core
             if (action.Kind == JobActionKind.Consume)
                 return ExecuteConsumeKnownFood(world, runtime, npcId, action, npcCell);
 
+            if (action.Kind == JobActionKind.PickUp)
+                return ExecutePickUpObject(world, runtime, npcId, action, npcCell);
+
+            if (action.Kind == JobActionKind.Drop)
+                return ExecuteDropObject(world, runtime, npcId, action, npcCell);
+
             return StepResult.Failed(JobFailureReason.StepFailed, "UnsupportedJobActionInRuntimeSlice");
         }
 
@@ -177,6 +183,62 @@ namespace Arcontio.Core
 
             runtime.CommandBuffer.Enqueue(new EatFromStockCommand(npcId, action.TargetObjectId));
             return StepResult.Succeeded("ConsumeCommandEnqueued");
+        }
+
+        private static StepResult ExecutePickUpObject(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell)
+        {
+            if (action.TargetObjectId <= 0)
+                return StepResult.Failed(JobFailureReason.MissingTarget, "PickUpMissingObject");
+
+            if (!world.Objects.TryGetValue(action.TargetObjectId, out var obj) || obj == null)
+                return StepResult.Failed(JobFailureReason.MissingTarget, "PickUpObjectMissing");
+
+            if (obj.IsHeld)
+                return StepResult.Failed(JobFailureReason.InvalidRequest, "PickUpObjectAlreadyHeld");
+
+            if (npcCell.X != obj.CellX || npcCell.Y != obj.CellY)
+                return StepResult.Failed(JobFailureReason.MissingTarget, "PickUpObjectNoLongerCoLocated");
+
+            runtime.CommandBuffer.Enqueue(new PickUpObjectCommand(npcId, action.TargetObjectId));
+            return StepResult.Succeeded("PickUpCommandEnqueued");
+        }
+
+        private static StepResult ExecuteDropObject(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell)
+        {
+            if (action.TargetObjectId <= 0)
+                return StepResult.Failed(JobFailureReason.MissingTarget, "DropMissingObject");
+
+            if (!action.HasTargetCell)
+                return StepResult.Failed(JobFailureReason.MissingTarget, "DropMissingTargetCell");
+
+            if (!world.Objects.TryGetValue(action.TargetObjectId, out var obj) || obj == null)
+                return StepResult.Failed(JobFailureReason.MissingTarget, "DropObjectMissing");
+
+            if (!obj.IsHeld || obj.HolderNpcId != npcId)
+                return StepResult.Failed(JobFailureReason.InvalidRequest, "DropObjectNotHeldByNpc");
+
+            if (npcCell.X != action.TargetCell.x || npcCell.Y != action.TargetCell.y)
+                return StepResult.Failed(JobFailureReason.MissingTarget, "DropNpcNoLongerAtDestination");
+
+            if (!world.InBounds(action.TargetCell.x, action.TargetCell.y))
+                return StepResult.Failed(JobFailureReason.MissingTarget, "DropTargetOutOfBounds");
+
+            int existing = world.GetObjectAt(action.TargetCell.x, action.TargetCell.y);
+            if (existing >= 0 && existing != action.TargetObjectId)
+                return StepResult.Failed(JobFailureReason.StepFailed, "DropTargetOccupied");
+
+            runtime.CommandBuffer.Enqueue(new DropObjectCommand(npcId, action.TargetObjectId, action.TargetCell.x, action.TargetCell.y));
+            return StepResult.Succeeded("DropCommandEnqueued");
         }
     }
 }

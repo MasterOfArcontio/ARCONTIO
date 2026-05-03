@@ -1159,6 +1159,7 @@ namespace Arcontio.Core
                 int objectId = kv.Key;
                 var obj = kv.Value;
                 if (obj == null) continue;
+                if (obj.IsHeld) continue;
 
                 int x = obj.CellX;
                 int y = obj.CellY;
@@ -3655,7 +3656,9 @@ if (!NpcAction.ContainsKey(id))
                 CellY = y,
                 OwnerKind = ownerKind,
                 OwnerId = ownerId,
-                OccupantNpcId = -1
+                OccupantNpcId = -1,
+                IsHeld = false,
+                HolderNpcId = 0
             };
 
             Objects[id] = inst;
@@ -3737,13 +3740,22 @@ if (!NpcAction.ContainsKey(id))
 
             int x = loadedObject.CellX;
             int y = loadedObject.CellY;
-            if (MapWidth > 0 && MapHeight > 0 && !InBounds(x, y))
+            bool isHeld = loadedObject.IsHeld;
+            int holderNpcId = loadedObject.HolderNpcId;
+
+            if (isHeld && !NpcDna.ContainsKey(holderNpcId))
+            {
+                error = $"World.TryRegisterLoadedObjectForSaveLoad: holder NPC mancante per objectId {objectId}, holderNpcId {holderNpcId}.";
+                return false;
+            }
+
+            if (!isHeld && MapWidth > 0 && MapHeight > 0 && !InBounds(x, y))
             {
                 error = $"World.TryRegisterLoadedObjectForSaveLoad: posizione fuori mappa per objectId {objectId} ({x},{y}).";
                 return false;
             }
 
-            if (HasAnyObjectAt(x, y))
+            if (!isHeld && HasAnyObjectAt(x, y))
             {
                 error = $"World.TryRegisterLoadedObjectForSaveLoad: cella occupata ({x},{y}) per objectId {objectId}.";
                 return false;
@@ -3761,7 +3773,9 @@ if (!NpcAction.ContainsKey(id))
                 OwnerId = loadedObject.OwnerId,
                 OccupantNpcId = loadedObject.OccupantNpcId,
                 IsOpen = loadedObject.IsOpen,
-                IsLocked = loadedObject.IsLocked
+                IsLocked = loadedObject.IsLocked,
+                IsHeld = isHeld,
+                HolderNpcId = isHeld ? holderNpcId : 0
             };
 
             Objects[objectId] = inst;
@@ -3769,12 +3783,12 @@ if (!NpcAction.ContainsKey(id))
             // Manteniamo le cache incrementali coerenti subito dopo il restore.
             // RebuildDerivedCachesGlobal resta comunque disponibile al loader per
             // una ricostruzione globale a fine snapshot.
-            if (def.IsOccluder || def.BlocksVision || def.BlocksMovement)
+            if (!isHeld && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
                 PlaceOccluderInCache(objectId, x, y, def);
 
             // Le porte aperte richiedono un riallineamento della cache rispetto
             // allo stato chiuso di default derivato dalla definizione oggetto.
-            if (def.IsDoor && inst.IsOpen)
+            if (!isHeld && def.IsDoor && inst.IsOpen)
                 SetDoorOpen(objectId, true);
 
             // Come per gli NPC, avanzamento monotono locale. Il valore preciso
@@ -3835,6 +3849,166 @@ if (!NpcAction.ContainsKey(id))
 
             // 4) rimuovi dal registry oggetti
             Objects.Remove(objectId);
+        }
+
+        // =============================================================================
+        // TryPickUpObject
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Tenta di agganciare fisicamente un oggetto grounded a un NPC, rimuovendolo
+        /// dalla griglia senza distruggerne l'istanza runtime.
+        /// </para>
+        ///
+        /// <para><b>Holder fisico MVP, non inventario completo</b></para>
+        /// <para>
+        /// Questa API esiste per il job debug <c>transport.object_to_cell.v1</c>. La
+        /// mutazione resta world-authoritative e non passa da Transform Unity: il
+        /// rendering vedra' semplicemente che l'oggetto non e' piu' grounded. Non
+        /// modifica <c>OwnerKind</c>/<c>OwnerId</c>, non crea stacking, non introduce
+        /// peso, slot, equipaggiamento o ownership sociale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: NPC e oggetto devono esistere e l'oggetto non deve essere gia' held.</item>
+        ///   <item><b>Co-locazione</b>: il pickup e' consentito solo se NPC e oggetto condividono la cella.</item>
+        ///   <item><b>Griglia</b>: libera <c>_objIdByCell</c> e cache occlusion/blocking della cella origine.</item>
+        ///   <item><b>Holder</b>: imposta <c>IsHeld</c> e <c>HolderNpcId</c> sull'istanza oggetto.</item>
+        /// </list>
+        /// </summary>
+        public bool TryPickUpObject(int npcId, int objectId, out int fromX, out int fromY, out string reason)
+        {
+            fromX = 0;
+            fromY = 0;
+            reason = string.Empty;
+
+            if (!ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            if (!Objects.TryGetValue(objectId, out var obj) || obj == null)
+            {
+                reason = "ObjectMissing";
+                return false;
+            }
+
+            if (obj.IsHeld)
+            {
+                reason = "ObjectAlreadyHeld";
+                return false;
+            }
+
+            if (!GridPos.TryGetValue(npcId, out var npcCell))
+            {
+                reason = "NpcPositionMissing";
+                return false;
+            }
+
+            fromX = obj.CellX;
+            fromY = obj.CellY;
+
+            if (npcCell.X != fromX || npcCell.Y != fromY)
+            {
+                reason = "NpcNotOnObjectCell";
+                return false;
+            }
+
+            if (_objIdByCell != null && _objIdByCell.Length == MapWidth * MapHeight && InBounds(fromX, fromY))
+            {
+                int idx = CellIndex(fromX, fromY);
+                if (_objIdByCell[idx] == objectId)
+                    _objIdByCell[idx] = -1;
+            }
+
+            if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
+                ClearOccluderFromCache(objectId, fromX, fromY);
+
+            obj.IsHeld = true;
+            obj.HolderNpcId = npcId;
+            reason = "ObjectPickedUp";
+            return true;
+        }
+
+        // =============================================================================
+        // TryDropObject
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Tenta di depositare su una cella libera un oggetto fisicamente trasportato
+        /// da un NPC.
+        /// </para>
+        ///
+        /// <para><b>Ritorno da holder a grounded</b></para>
+        /// <para>
+        /// Il drop e' la controparte controllata di <see cref="TryPickUpObject"/>:
+        /// ripristina la presenza nella griglia, riallinea le cache derivate quando
+        /// l'oggetto blocca visione/movimento e lascia invariata la ownership logica.
+        /// Il vincolo "1 object per cell" resta obbligatorio anche per DevTools.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: NPC, oggetto, holder e cella destinazione devono essere coerenti.</item>
+        ///   <item><b>Vincolo cella</b>: rifiuta drop fuori mappa o su cella gia' occupata.</item>
+        ///   <item><b>Grounding</b>: aggiorna coordinate, indice cella e cache occlusion/blocking.</item>
+        ///   <item><b>Holder reset</b>: azzera <c>IsHeld</c> e <c>HolderNpcId</c>.</item>
+        /// </list>
+        /// </summary>
+        public bool TryDropObject(int npcId, int objectId, int targetX, int targetY, out string reason)
+        {
+            reason = string.Empty;
+
+            if (!ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            if (!Objects.TryGetValue(objectId, out var obj) || obj == null)
+            {
+                reason = "ObjectMissing";
+                return false;
+            }
+
+            if (!obj.IsHeld || obj.HolderNpcId != npcId)
+            {
+                reason = "ObjectNotHeldByNpc";
+                return false;
+            }
+
+            if (!InBounds(targetX, targetY))
+            {
+                reason = "DropCellOutOfBounds";
+                return false;
+            }
+
+            int existing = GetObjectAt(targetX, targetY);
+            if (existing >= 0 && existing != objectId)
+            {
+                reason = "DropCellOccupied";
+                return false;
+            }
+
+            obj.CellX = targetX;
+            obj.CellY = targetY;
+            obj.IsHeld = false;
+            obj.HolderNpcId = 0;
+
+            if (_objIdByCell != null && _objIdByCell.Length == MapWidth * MapHeight)
+                _objIdByCell[CellIndex(targetX, targetY)] = objectId;
+
+            if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
+            {
+                PlaceOccluderInCache(objectId, targetX, targetY, def);
+                if (def.IsDoor && obj.IsOpen)
+                    SetDoorOpen(objectId, true);
+            }
+
+            reason = "ObjectDropped";
+            return true;
         }
 
         /// <summary>
@@ -3993,7 +4167,7 @@ if (!NpcAction.ContainsKey(id))
             foreach (var kv in Objects)
             {
                 var o = kv.Value;
-                if (o != null && o.CellX == x && o.CellY == y)
+                if (o != null && !o.IsHeld && o.CellX == x && o.CellY == y)
                     return true;
             }
             return false;

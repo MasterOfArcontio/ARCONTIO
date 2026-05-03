@@ -44,6 +44,7 @@ namespace Arcontio.View.MapGrid
             EraseNpc = 4,
             PlaceDoor = 5,
             PlaceFoodStock = 6,
+            ForcedTransportObject = 7,
         }
 
         /// <summary>
@@ -152,6 +153,12 @@ namespace Arcontio.View.MapGrid
 
         // Cibo addosso: incremento del cibo privato trasportato dall'NPC selezionato.
         private int _carriedFoodUnits = 1;
+
+        // Forced transport object job: stato temporaneo view-side per la micro feature debug.
+        private int _transportObjectId = -1;
+        private bool _transportHasDestination;
+        private int _transportDestinationX;
+        private int _transportDestinationY;
 
         // Brush: cache dell'ultima cella "dipinta" per evitare spam sullo stesso tile.
         private int _lastPaintX = int.MinValue;
@@ -370,6 +377,11 @@ namespace Arcontio.View.MapGrid
                     if (mouse.leftButton.wasPressedThisFrame)
                         Enqueue(BuildFoodStockPlacementCommand(MapGridWorldProvider.TryGetWorld(), cx, cy));
                     break;
+
+                case Tool.ForcedTransportObject:
+                    if (mouse.leftButton.wasPressedThisFrame)
+                        HandleForcedTransportSelection(MapGridWorldProvider.TryGetWorld(), cx, cy);
+                    break;
             }
         }
 
@@ -535,6 +547,10 @@ namespace Arcontio.View.MapGrid
             if (GUILayout.Toggle(_tool == Tool.PlaceFoodStock, "Inserisci cibo", "Button")) _tool = Tool.PlaceFoodStock;
             GUILayout.EndHorizontal();
 
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Toggle(_tool == Tool.ForcedTransportObject, "Forced Transport Object", "Button")) _tool = Tool.ForcedTransportObject;
+            GUILayout.EndHorizontal();
+
             // ------------------------------------------------------------
             // Shape selection (only relevant for Place/Erase)
             // ------------------------------------------------------------
@@ -577,6 +593,7 @@ namespace Arcontio.View.MapGrid
             DrawNpcCarriedFoodControls(world);
             DrawDoorPlacementControls();
             DrawFoodStockPlacementControls(world);
+            DrawForcedTransportObjectControls(world);
 
             GUILayout.Space(8);
 
@@ -1003,7 +1020,7 @@ namespace Arcontio.View.MapGrid
             bool hasNpc = world.TryGetNpcAt(cx, cy, out npcId);
 
             string objLabel = (objId >= 0 && world.Objects.TryGetValue(objId, out var inst) && inst != null)
-                ? $"{objId} ({inst.DefId})"
+                ? $"{objId} ({inst.DefId}) held={inst.IsHeld}:{inst.HolderNpcId}"
                 : (objId >= 0 ? $"{objId}" : "<none>");
 
             GUILayout.Label($"Cell: ({cx},{cy})");
@@ -1035,6 +1052,144 @@ namespace Arcontio.View.MapGrid
                 }
             }
             GUILayout.Label($"Landmarks here: {lmCount}");
+        }
+
+        // =============================================================================
+        // DrawForcedTransportObjectControls
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna il blocco F3 che forza l'assegnazione del job reale
+        /// <c>transport.object_to_cell.v1</c>.
+        /// </para>
+        ///
+        /// <para><b>Debug injection dichiarata</b></para>
+        /// <para>
+        /// La UI conserva solo selezioni temporanee: NPC scelto tramite
+        /// <c>NPCSelection</c>, oggetto scelto cliccando una cella con oggetto e
+        /// destinazione scelta cliccando una cella. Il pulsante finale chiama
+        /// l'entry point tecnico del <c>SimulationHost</c>, che assegna un job
+        /// runtime invece di spostare direttamente l'oggetto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Selezione oggetto</b>: left click su cella con oggetto grounded.</item>
+        ///   <item><b>Selezione destinazione</b>: left click successivo su cella target.</item>
+        ///   <item><b>Assign</b>: invoca <c>ForceAssignTransportObjectJobFromDevTools</c>.</item>
+        /// </list>
+        /// </summary>
+        private void DrawForcedTransportObjectControls(World world)
+        {
+            GUILayout.Space(8);
+            GUILayout.Label("DEBUG Forced Transport Object Job");
+
+            int selectedNpcId = NPCSelection.SelectedNpcId;
+            bool hasSelectedNpc = selectedNpcId > 0 && world.ExistsNpc(selectedNpcId);
+            GUILayout.Label(hasSelectedNpc ? $"NPC: {selectedNpcId}" : "NPC: nessun NPC selezionato");
+
+            bool hasSelectedObject =
+                _transportObjectId > 0
+                && world.Objects.TryGetValue(_transportObjectId, out var selectedObject)
+                && selectedObject != null
+                && !selectedObject.IsHeld;
+
+            GUILayout.Label(hasSelectedObject
+                ? $"Object: {_transportObjectId} ({selectedObject.DefId}) at ({selectedObject.CellX},{selectedObject.CellY})"
+                : "Object: click su oggetto grounded");
+
+            GUILayout.Label(_transportHasDestination
+                ? $"Destination: ({_transportDestinationX},{_transportDestinationY})"
+                : "Destination: click su cella destinazione");
+
+            if (_tool == Tool.ForcedTransportObject)
+                GUILayout.Label("Click mappa: prima oggetto, poi destinazione");
+
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Reset", GUILayout.Width(80)))
+            {
+                _transportObjectId = -1;
+                _transportHasDestination = false;
+            }
+
+            bool previousEnabled = GUI.enabled;
+            GUI.enabled = previousEnabled && hasSelectedNpc && hasSelectedObject && _transportHasDestination;
+            if (GUILayout.Button("Forced Transport Object", GUILayout.Width(190)))
+                ExecuteForcedTransportObjectJob(selectedNpcId);
+            GUI.enabled = previousEnabled;
+            GUILayout.EndHorizontal();
+        }
+
+        // =============================================================================
+        // HandleForcedTransportSelection
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interpreta i click mappa quando il tool Forced Transport Object e' attivo.
+        /// </para>
+        ///
+        /// <para><b>Stato temporaneo solo view-side</b></para>
+        /// <para>
+        /// Il primo click su una cella con oggetto grounded seleziona l'objectId. I
+        /// click successivi impostano la destinazione. Nessun click muta il World:
+        /// l'unica mutazione possibile avviene quando il pulsante assegna il job.
+        /// </para>
+        /// </summary>
+        private void HandleForcedTransportSelection(World world, int cellX, int cellY)
+        {
+            if (world == null)
+                return;
+
+            int objectAtCell = world.GetObjectAt(cellX, cellY);
+            if (_transportObjectId <= 0 && objectAtCell > 0)
+            {
+                _transportObjectId = objectAtCell;
+                _transportHasDestination = false;
+                return;
+            }
+
+            if (objectAtCell > 0 && Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed)
+            {
+                _transportObjectId = objectAtCell;
+                _transportHasDestination = false;
+                return;
+            }
+
+            _transportDestinationX = cellX;
+            _transportDestinationY = cellY;
+            _transportHasDestination = true;
+        }
+
+        // =============================================================================
+        // ExecuteForcedTransportObjectJob
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Chiede al <c>SimulationHost</c> di creare e assegnare il job debug di
+        /// trasporto oggetto.
+        /// </para>
+        ///
+        /// <para><b>Nessun bypass del Job System</b></para>
+        /// <para>
+        /// Questo metodo non crea commands di pickup/drop e non sposta oggetti. Passa
+        /// solo dati primitivi all'host; da li' in poi il job verra' eseguito a tick
+        /// dal runtime esistente.
+        /// </para>
+        /// </summary>
+        private void ExecuteForcedTransportObjectJob(int npcId)
+        {
+            var host = SimulationHost.Instance;
+            if (host == null)
+            {
+                Debug.LogError("[DevTools][ForcedTransportObject] SimulationHost.Instance nullo.");
+                return;
+            }
+
+            var destination = new Vector2Int(_transportDestinationX, _transportDestinationY);
+            if (host.ForceAssignTransportObjectJobFromDevTools(npcId, _transportObjectId, destination, out string reason))
+                Debug.Log($"[DevTools][ForcedTransportObject] Job assigned npc={npcId} object={_transportObjectId} destination=({destination.x},{destination.y})");
+            else
+                Debug.LogWarning($"[DevTools][ForcedTransportObject] Assign failed npc={npcId} object={_transportObjectId} destination=({destination.x},{destination.y}) reason={reason}");
         }
 
         // =============================================================================

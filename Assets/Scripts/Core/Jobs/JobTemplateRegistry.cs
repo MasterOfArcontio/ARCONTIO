@@ -31,6 +31,7 @@ namespace Arcontio.Core
         public const string DefaultResourcePath = "Arcontio/Jobs/job_templates";
         public const string FoodKnownCommunityStockTemplateId = "food.eat_known_community_stock.v1";
         public const string GenericMoveToCellTemplateId = "generic.move_to_cell.v1";
+        public const string TransportObjectToCellTemplateId = "transport.object_to_cell.v1";
 
         private readonly Dictionary<string, JobTemplateDefinition> _templates = new();
 
@@ -121,7 +122,7 @@ namespace Arcontio.Core
                         return false;
                     }
 
-                    actions[a] = MaterializeAction(actionDef.actionId, actionKind, request);
+                    actions[a] = MaterializeAction(actionDef, actionKind, request);
                 }
 
                 materializedPhases[p] = new JobPhase(
@@ -138,15 +139,31 @@ namespace Arcontio.Core
             return true;
         }
 
-        private static JobAction MaterializeAction(string actionId, JobActionKind kind, JobRequest request)
+        private static JobAction MaterializeAction(JobTemplateActionDefinition actionDef, JobActionKind kind, JobRequest request)
         {
+            string actionId = actionDef != null ? actionDef.actionId : string.Empty;
+            bool hasTargetCell = request.HasTargetCell;
+            Vector2Int targetCell = request.TargetCell;
+
+            if (actionDef != null && string.Equals(actionDef.targetCellSource, "secondary", StringComparison.OrdinalIgnoreCase))
+            {
+                hasTargetCell = request.HasSecondaryTargetCell;
+                targetCell = request.SecondaryTargetCell;
+            }
+
             if (kind == JobActionKind.MoveToCell)
-                return new JobAction(actionId, kind, actionId, request.HasTargetCell, request.TargetCell, request.TargetObjectId, 0, string.Empty);
+            {
+                int targetObjectId = actionDef != null && string.Equals(actionDef.targetCellSource, "secondary", StringComparison.OrdinalIgnoreCase)
+                    ? 0
+                    : request.TargetObjectId;
+
+                return new JobAction(actionId, kind, actionId, hasTargetCell, targetCell, targetObjectId, 0, string.Empty);
+            }
 
             if (kind == JobActionKind.Consume)
-                return new JobAction(actionId, kind, actionId, request.HasTargetCell, request.TargetCell, request.TargetObjectId, 0, "known_food");
+                return new JobAction(actionId, kind, actionId, hasTargetCell, targetCell, request.TargetObjectId, 0, "known_food");
 
-            return new JobAction(actionId, kind, actionId, request.HasTargetCell, request.TargetCell, request.TargetObjectId, 0, string.Empty);
+            return new JobAction(actionId, kind, actionId, hasTargetCell, targetCell, request.TargetObjectId, 0, string.Empty);
         }
 
         private static bool TryParseEnum<TEnum>(string value, TEnum fallback, out TEnum parsed)
@@ -189,5 +206,6 @@ namespace Arcontio.Core
     {
         public string actionId;
         public string kind;
+        public string targetCellSource;
     }
 }

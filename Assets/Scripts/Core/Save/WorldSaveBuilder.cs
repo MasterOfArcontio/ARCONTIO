@@ -214,7 +214,9 @@ namespace Arcontio.Core.Save
                     ownerId = obj.OwnerId,
                     occupantNpcId = obj.OccupantNpcId,
                     isOpen = obj.IsOpen,
-                    isLocked = obj.IsLocked
+                    isLocked = obj.IsLocked,
+                    isHeld = obj.IsHeld,
+                    holderNpcId = obj.IsHeld ? obj.HolderNpcId : 0
                 });
             }
 

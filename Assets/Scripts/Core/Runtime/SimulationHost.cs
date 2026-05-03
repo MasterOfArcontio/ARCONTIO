@@ -140,6 +140,107 @@ namespace Arcontio.Core
         public long TickIndex => _tickIndex;
 
         // =============================================================================
+        // ForceAssignTransportObjectJobFromDevTools
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Entry point tecnico/debug che assegna direttamente a un NPC un job runtime
+        /// <c>transport.object_to_cell.v1</c>.
+        /// </para>
+        ///
+        /// <para><b>Forced injection DevTools, non MBQD</b></para>
+        /// <para>
+        /// Questo metodo e' intenzionalmente fuori da Memory/Belief/Query/Decision:
+        /// il pannello F3 fornisce NPC, oggetto e destinazione gia' scelti dall'utente.
+        /// La scorciatoia e' ammessa solo come debug injection, ma l'esecuzione resta
+        /// nel Job System reale: il job passa da <c>JobRuntimeState</c>,
+        /// <c>JobExecutionSystem</c>, <c>JobCommandBuffer</c> e commands world-side.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: controlla World, registry, NPC, oggetto grounded e cella destinazione.</item>
+        ///   <item><b>Factory</b>: materializza il template JSON tramite <c>TransportObjectJobFactory</c>.</item>
+        ///   <item><b>Forced cancel</b>: chiude l'eventuale job corrente come <c>Cancelled</c> prima dell'assegnazione.</item>
+        ///   <item><b>Assign</b>: usa comunque <c>TryAssignJob</c>, quindi non crea uno scheduler parallelo.</item>
+        /// </list>
+        /// </summary>
+        public bool ForceAssignTransportObjectJobFromDevTools(
+            int npcId,
+            int objectId,
+            Vector2Int destinationCell,
+            out string reason)
+        {
+            reason = string.Empty;
+
+            if (_world == null)
+            {
+                reason = "WorldMissing";
+                return false;
+            }
+
+            if (_jobTemplateRegistry == null)
+            {
+                reason = "JobTemplateRegistryMissing";
+                return false;
+            }
+
+            if (!_world.ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            if (!_world.Objects.TryGetValue(objectId, out var obj) || obj == null)
+            {
+                reason = "ObjectMissing";
+                return false;
+            }
+
+            if (obj.IsHeld)
+            {
+                reason = "ObjectAlreadyHeld";
+                return false;
+            }
+
+            if (!_world.InBounds(destinationCell.x, destinationCell.y))
+            {
+                reason = "DestinationOutOfBounds";
+                return false;
+            }
+
+            int existingAtDestination = _world.GetObjectAt(destinationCell.x, destinationCell.y);
+            if (existingAtDestination >= 0 && existingAtDestination != objectId)
+            {
+                reason = "DestinationOccupied";
+                return false;
+            }
+
+            var objectCell = new Vector2Int(obj.CellX, obj.CellY);
+            if (!TransportObjectJobFactory.TryCreateTransportObjectToCellJob(
+                    _jobTemplateRegistry,
+                    npcId,
+                    objectId,
+                    objectCell,
+                    destinationCell,
+                    (int)_tickIndex,
+                    out var job,
+                    out reason))
+            {
+                return false;
+            }
+
+            if (_world.JobRuntimeState.HasActiveJob(npcId))
+                _world.JobRuntimeState.ClearNpcJob(npcId, JobFailureReason.Cancelled, out _);
+
+            if (!_world.JobRuntimeState.TryAssignJob(npcId, job, (int)_tickIndex, out reason))
+                return false;
+
+            reason = "DevToolsForcedTransportJobAssigned";
+            return true;
+        }
+
+        // =============================================================================
         // SaveCurrentWorldSnapshot
         // =============================================================================
         /// <summary>

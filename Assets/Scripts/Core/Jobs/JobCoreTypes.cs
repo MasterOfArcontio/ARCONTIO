@@ -192,6 +192,8 @@ namespace Arcontio.Core
         public readonly int CreatedTick;
         public readonly bool HasTargetCell;
         public readonly Vector2Int TargetCell;
+        public readonly bool HasSecondaryTargetCell;
+        public readonly Vector2Int SecondaryTargetCell;
         public readonly int TargetObjectId;
         public readonly string BeliefKey;
         public readonly string DebugLabel;
@@ -207,7 +209,9 @@ namespace Arcontio.Core
             Vector2Int targetCell,
             int targetObjectId,
             string beliefKey,
-            string debugLabel)
+            string debugLabel,
+            bool hasSecondaryTargetCell = false,
+            Vector2Int secondaryTargetCell = default)
         {
             // Gli identificatori nulli vengono normalizzati per rendere i log e i
             // test deterministici senza imporre subito un generatore globale di ID.
@@ -219,6 +223,8 @@ namespace Arcontio.Core
             CreatedTick = createdTick;
             HasTargetCell = hasTargetCell;
             TargetCell = targetCell;
+            HasSecondaryTargetCell = hasSecondaryTargetCell;
+            SecondaryTargetCell = secondaryTargetCell;
             TargetObjectId = targetObjectId;
             BeliefKey = beliefKey ?? string.Empty;
             DebugLabel = debugLabel ?? string.Empty;
