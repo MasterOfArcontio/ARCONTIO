@@ -130,6 +130,8 @@ namespace Arcontio.Core
 
         public int KnownLandmarksCount => _landmarksById.Count;
         public int KnownEdgesCount => _edgesByKey.Count;
+        public int MaxLandmarksForSaveLoad => _maxLandmarks;
+        public int MaxEdgesForSaveLoad => _maxEdges;
 
         public NpcLandmarkMemory(int maxLandmarks, int maxEdges)
         {
@@ -147,6 +149,182 @@ namespace Arcontio.Core
 
             LastVisitedLandmarkId = 0;
             LastVisitedLandmarkTick = long.MinValue;
+        }
+
+        // =============================================================================
+        // SaveLoadLandmarkEntry
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Vista primitiva e read-only di un landmark conosciuto da un NPC, usata
+        /// esclusivamente dalla pipeline save/load canonica.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: snapshot della conoscenza, non del registry</b></para>
+        /// <para>
+        /// Questo record non descrive un landmark oggettivo del mondo: descrive che
+        /// cosa il singolo NPC ricorda di quel nodo, con last seen e confidence locali.
+        /// </para>
+        /// </summary>
+        public readonly struct SaveLoadLandmarkEntry
+        {
+            public readonly int NodeId;
+            public readonly long LastSeenTick;
+            public readonly float Confidence01;
+
+            public SaveLoadLandmarkEntry(int nodeId, long lastSeenTick, float confidence01)
+            {
+                NodeId = nodeId;
+                LastSeenTick = lastSeenTick;
+                Confidence01 = confidence01;
+            }
+        }
+
+        // =============================================================================
+        // SaveLoadEdgeEntry
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Vista primitiva e read-only di un edge semplice conosciuto da un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: topologia soggettiva persistita</b></para>
+        /// <para>
+        /// Due NPC possono ricordare edge diversi o confidence diverse. Il save/load
+        /// copia quindi lo stato di questo store senza interrogare o completare il
+        /// <c>LandmarkRegistry</c> oggettivo.
+        /// </para>
+        /// </summary>
+        public readonly struct SaveLoadEdgeEntry
+        {
+            public readonly int NodeA;
+            public readonly int NodeB;
+            public readonly int CostCells;
+            public readonly long LastSeenTick;
+            public readonly float Confidence01;
+
+            public SaveLoadEdgeEntry(int nodeA, int nodeB, int costCells, long lastSeenTick, float confidence01)
+            {
+                NodeA = nodeA;
+                NodeB = nodeB;
+                CostCells = costCells;
+                LastSeenTick = lastSeenTick;
+                Confidence01 = confidence01;
+            }
+        }
+
+        // =============================================================================
+        // FillSaveLoadEntries
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia in buffer esterni la memoria landmark soggettiva corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: estrazione passiva</b></para>
+        /// <para>
+        /// Il metodo non risolve coordinate dal registry e non arricchisce gli entry:
+        /// espone solo i dati davvero posseduti dallo store per-NPC.
+        /// </para>
+        /// </summary>
+        public void FillSaveLoadEntries(
+            List<SaveLoadLandmarkEntry> outLandmarks,
+            List<SaveLoadEdgeEntry> outEdges)
+        {
+            outLandmarks?.Clear();
+            outEdges?.Clear();
+
+            if (outLandmarks != null)
+            {
+                foreach (var kv in _landmarksById)
+                {
+                    var entry = kv.Value;
+                    outLandmarks.Add(new SaveLoadLandmarkEntry(entry.NodeId, entry.LastSeenTick, entry.Confidence01));
+                }
+            }
+
+            if (outEdges != null)
+            {
+                foreach (var kv in _edgesByKey)
+                {
+                    var entry = kv.Value;
+                    outEdges.Add(new SaveLoadEdgeEntry(entry.Key.A, entry.Key.B, entry.CostCells, entry.LastSeenTick, entry.Confidence01));
+                }
+            }
+        }
+
+        // =============================================================================
+        // TryReplaceAllForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ripristina integralmente la memoria landmark soggettiva da snapshot.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: load senza insegnamento implicito</b></para>
+        /// <para>
+        /// Il restore non chiama <see cref="LearnLandmark"/> o <see cref="LearnEdge"/>,
+        /// perche' quei metodi applicano policy di reinforcement/cooldown. Qui non
+        /// stiamo simulando una nuova percezione: stiamo rimettendo nello store cio'
+        /// che l'NPC ricordava al momento del save.
+        /// </para>
+        /// </summary>
+        public bool TryReplaceAllForSaveLoad(
+            IReadOnlyList<SaveLoadLandmarkEntry> landmarks,
+            IReadOnlyList<SaveLoadEdgeEntry> edges,
+            int lastVisitedLandmarkId,
+            long lastVisitedLandmarkTick,
+            out string error)
+        {
+            if (landmarks == null || edges == null)
+            {
+                error = "NpcLandmarkMemory.TryReplaceAllForSaveLoad: landmarks/edges nulli.";
+                return false;
+            }
+
+            if (landmarks.Count > _maxLandmarks || edges.Count > _maxEdges)
+            {
+                error = $"NpcLandmarkMemory.TryReplaceAllForSaveLoad: snapshot oltre cap landmarks={landmarks.Count}/{_maxLandmarks}, edges={edges.Count}/{_maxEdges}.";
+                return false;
+            }
+
+            _landmarksById.Clear();
+            _edgesByKey.Clear();
+
+            // I cooldown di eviction restano volutamente esclusi dallo snapshot
+            // v0.10.11: sono freni temporanei interni alla maintenance, non conoscenza
+            // stabile dell'NPC. Ripartono vuoti dopo load.
+            _nodeEvictionCooldownUntilTick.Clear();
+            _edgeEvictionCooldownUntilTick.Clear();
+
+            for (int i = 0; i < landmarks.Count; i++)
+            {
+                var src = landmarks[i];
+                _landmarksById[src.NodeId] = new LandmarkEntry
+                {
+                    NodeId = src.NodeId,
+                    LastSeenTick = src.LastSeenTick,
+                    Confidence01 = Mathf.Clamp01(src.Confidence01)
+                };
+            }
+
+            for (int i = 0; i < edges.Count; i++)
+            {
+                var src = edges[i];
+                var key = new EdgeKey(src.NodeA, src.NodeB);
+                _edgesByKey[key] = new EdgeEntry
+                {
+                    Key = key,
+                    CostCells = src.CostCells,
+                    LastSeenTick = src.LastSeenTick,
+                    Confidence01 = Mathf.Clamp01(src.Confidence01)
+                };
+            }
+
+            LastVisitedLandmarkId = lastVisitedLandmarkId;
+            LastVisitedLandmarkTick = lastVisitedLandmarkTick;
+            error = string.Empty;
+            return true;
         }
 
         // ============================================================

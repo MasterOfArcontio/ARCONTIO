@@ -702,6 +702,164 @@ namespace Arcontio.Core
         /// <summary>Prossimo ID oggetto disponibile. Incrementato da <c>CreateObject</c>.</summary>
         private int _nextObjectId = 1;
 
+        // =============================================================================
+        // NextNpcId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone in sola lettura il prossimo identificativo NPC che verra' assegnato
+        /// da <see cref="CreateNpc"/>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: authority del World sugli id</b></para>
+        /// <para>
+        /// Il contatore resta privato e mutabile solo dal <c>World</c>: i sistemi di
+        /// persistenza possono leggerlo per creare snapshot completi, ma non possono
+        /// modificarlo ne' saltare la pipeline canonica di creazione NPC. Questo evita
+        /// scorciatoie fragili come ricostruire il valore con <c>max(id)+1</c>, che non
+        /// sarebbe necessariamente equivalente allo stato runtime reale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Getter</b>: restituisce il campo privato <c>_nextNpcId</c>.</item>
+        ///   <item><b>Restore controllato</b>: il load canonico puo' riallineare il contatore solo tramite API save/load dedicate.</item>
+        /// </list>
+        /// </summary>
+        public int NextNpcId => _nextNpcId;
+
+        // =============================================================================
+        // NextObjectId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone in sola lettura il prossimo identificativo oggetto che verra'
+        /// assegnato da <see cref="CreateObject"/>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: identita' oggetto stabile</b></para>
+        /// <para>
+        /// Oggetti, food stock, stati d'uso, ownership e memorie soggettive si
+        /// collegano tramite <c>objectId</c>. Lo snapshot canonico deve quindi salvare
+        /// non solo gli id gia' esistenti, ma anche il prossimo id disponibile, cosi'
+        /// da evitare collisioni quando il runtime creera' nuovi oggetti dopo un load
+        /// futuro.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Getter</b>: restituisce il campo privato <c>_nextObjectId</c>.</item>
+        ///   <item><b>Restore controllato</b>: il load canonico puo' riallineare il contatore solo tramite API save/load dedicate.</item>
+        /// </list>
+        /// </summary>
+        public int NextObjectId => _nextObjectId;
+
+        // =============================================================================
+        // TryRestoreNextNpcIdForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ripristina il prossimo ID NPC disponibile durante un bootstrap da
+        /// snapshot canonico. Questa API appartiene esclusivamente alla
+        /// save/load authority: non deve essere chiamata da decision layer,
+        /// gameplay system, comandi ordinari o strumenti UI.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: contatore coerente con gli ID preservati</b></para>
+        /// <para>
+        /// Gli NPC caricati da snapshot mantengono il loro <c>npcId</c>
+        /// originale. Il contatore deve quindi essere maggiore di ogni ID gia'
+        /// presente, altrimenti una futura chiamata runtime a <see cref="CreateNpc"/>
+        /// potrebbe riutilizzare un identificativo ancora vivo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione range</b>: rifiuta valori minori di 1.</item>
+        ///   <item><b>Validazione collisione</b>: rifiuta valori non superiori agli ID gia' registrati.</item>
+        ///   <item><b>Mutazione privata</b>: aggiorna solo <c>_nextNpcId</c>.</item>
+        /// </list>
+        /// </summary>
+        public bool TryRestoreNextNpcIdForSaveLoad(int nextNpcId, out string error)
+        {
+            // Gli ID 0 e negativi sono sentinelle o valori invalidi in ARCONTIO:
+            // il prossimo ID allocabile deve sempre partire almeno da 1.
+            if (nextNpcId < 1)
+            {
+                error = "World.TryRestoreNextNpcIdForSaveLoad: nextNpcId deve essere >= 1.";
+                return false;
+            }
+
+            // Non accettiamo un contatore che possa collidere con NPC gia'
+            // materializzati. Questo controllo preserva l'authority del World
+            // anche se il loader applica lo snapshot in piu' passaggi.
+            foreach (var npcId in NpcDna.Keys)
+            {
+                if (npcId >= nextNpcId)
+                {
+                    error = $"World.TryRestoreNextNpcIdForSaveLoad: nextNpcId={nextNpcId} collide con npcId esistente {npcId}.";
+                    return false;
+                }
+            }
+
+            _nextNpcId = nextNpcId;
+            error = string.Empty;
+            return true;
+        }
+
+        // =============================================================================
+        // TryRestoreNextObjectIdForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ripristina il prossimo ID oggetto disponibile durante un bootstrap da
+        /// snapshot canonico. Questa API e' volutamente separata da
+        /// <see cref="CreateObject"/> per evitare che il gameplay ordinario possa
+        /// saltare la sequenza normale di allocazione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: identita' oggetto stabile</b></para>
+        /// <para>
+        /// Oggetti, food stock, ownership e memorie soggettive referenziano
+        /// <c>objectId</c>. Dopo un load, il contatore deve essere coerente con
+        /// gli ID preservati, non semplicemente ricalcolato in modo implicito da
+        /// un sistema esterno.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione range</b>: rifiuta valori minori di 1.</item>
+        ///   <item><b>Validazione collisione</b>: rifiuta valori non superiori agli oggetti gia' registrati.</item>
+        ///   <item><b>Mutazione privata</b>: aggiorna solo <c>_nextObjectId</c>.</item>
+        /// </list>
+        /// </summary>
+        public bool TryRestoreNextObjectIdForSaveLoad(int nextObjectId, out string error)
+        {
+            // Come per gli NPC, l'ID 0 e' riservato a "nessun oggetto":
+            // non deve mai diventare il prossimo identificativo allocabile.
+            if (nextObjectId < 1)
+            {
+                error = "World.TryRestoreNextObjectIdForSaveLoad: nextObjectId deve essere >= 1.";
+                return false;
+            }
+
+            // Il contatore ripristinato deve essere oltre tutti gli oggetti
+            // gia' presenti, altrimenti il prossimo CreateObject potrebbe
+            // sovrascrivere o duplicare un'identita' persistita.
+            foreach (var objectId in Objects.Keys)
+            {
+                if (objectId >= nextObjectId)
+                {
+                    error = $"World.TryRestoreNextObjectIdForSaveLoad: nextObjectId={nextObjectId} collide con objectId esistente {objectId}.";
+                    return false;
+                }
+            }
+
+            _nextObjectId = nextObjectId;
+            error = string.Empty;
+            return true;
+        }
+
         // ============================================================
         // CTOR / INIT
         // ============================================================
@@ -3077,6 +3235,135 @@ if (!NpcAction.ContainsKey(id))
             return id;
         }
 
+        // =============================================================================
+        // TryRegisterLoadedNpcForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un NPC ricostruito da snapshot usando un ID gia' assegnato
+        /// nel salvataggio. Questa API e' riservata alla pipeline save/load e al
+        /// bootstrap controllato: il runtime normale deve continuare a usare
+        /// <see cref="CreateNpc"/>, che resta l'unico percorso ordinario per
+        /// allocare nuovi NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ID preservati senza remap implicito</b></para>
+        /// <para>
+        /// Ownership, memorie, belief e riferimenti sociali dipendono dalla
+        /// stabilita' di <c>npcId</c>. Durante un load canonico non vogliamo
+        /// creare una mappa oldId-&gt;newId come nel percorso legacy:
+        /// vogliamo ripristinare lo stesso identificativo e avanzare il counter
+        /// interno oltre quell'ID.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: rifiuta ID invalidi, duplicati e DNA nullo.</item>
+        ///   <item><b>Store oggettivi NPC</b>: ricostruisce DNA, profile, needs, social, posizione e facing.</item>
+        ///   <item><b>Store runtime minimi</b>: inizializza memory, belief, landmark memory e diagnostica come <c>CreateNpc</c>.</item>
+        ///   <item><b>Counter</b>: porta <c>_nextNpcId</c> almeno a <c>npcId + 1</c>.</item>
+        /// </list>
+        /// </summary>
+        public bool TryRegisterLoadedNpcForSaveLoad(
+            int npcId,
+            NpcDnaProfile dna,
+            NpcProfile profile,
+            NpcNeeds needs,
+            Social social,
+            int x,
+            int y,
+            CardinalDirection facing,
+            out string error)
+        {
+            // Il loader canonico deve preservare ID reali, non inventare
+            // sentinelle. 0 e negativi sono quindi sempre invalidi.
+            if (npcId <= 0)
+            {
+                error = "World.TryRegisterLoadedNpcForSaveLoad: npcId deve essere > 0.";
+                return false;
+            }
+
+            // NpcDna e' la sorgente di esistenza dell'NPC nel World corrente:
+            // se la chiave esiste gia', qualunque reinserimento sarebbe una
+            // duplicazione di identita'.
+            if (NpcDna.ContainsKey(npcId))
+            {
+                error = $"World.TryRegisterLoadedNpcForSaveLoad: npcId duplicato {npcId}.";
+                return false;
+            }
+
+            // Il DNA non e' un componente accessorio: CreateNpc lo usa per
+            // inizializzare il profilo runtime. Il loader deve riceverlo gia'
+            // ricostruito dal DTO o fallire in modo leggibile.
+            if (dna == null)
+            {
+                error = $"World.TryRegisterLoadedNpcForSaveLoad: DNA nullo per npcId {npcId}.";
+                return false;
+            }
+
+            // Manteniamo una validazione piu' stretta del percorso runtime
+            // storico: uno snapshot canonico non dovrebbe materializzare NPC
+            // fuori mappa, perche' poi movimento, percezione e query griglia
+            // avrebbero stati iniziali incoerenti.
+            if (MapWidth > 0 && MapHeight > 0 && !InBounds(x, y))
+            {
+                error = $"World.TryRegisterLoadedNpcForSaveLoad: posizione fuori mappa per npcId {npcId} ({x},{y}).";
+                return false;
+            }
+
+            // Ricostruzione degli stessi store base usati da CreateNpc, ma
+            // senza allocare un nuovo ID sequenziale. Il profile salvato, se
+            // presente, prevale sul profilo derivato dal DNA.
+            NpcDna[npcId] = dna;
+            NpcProfiles[npcId] = profile ?? NpcProfile.InitFromDna(dna);
+            Needs[npcId] = needs;
+            Social[npcId] = social;
+            GridPos[npcId] = new GridPosition(x, y);
+            NpcFacing[npcId] = facing;
+
+            // MemoryStore vuoto: le trace salvate restano responsabilita' del
+            // loader/NpcSaveSystem, che puo' aggiungerle dopo la registrazione
+            // dell'identita' stabile.
+            var store = new MemoryStore();
+            store.MaxTraces = Config.Sim.memory.max_traces_per_npc;
+            Memory[npcId] = store;
+
+            // BeliefStore e landmark memory vengono creati per rendere valido
+            // il runtime minimo, ma il contenuto soggettivo non viene inventato
+            // qui. I futuri checkpoint applicheranno le sezioni dedicate.
+            Beliefs[npcId] = new BeliefStore();
+            EnsureNpcLandmarkMemory(npcId);
+
+            // Store runtime/diagnostici inizializzati come in CreateNpc per
+            // evitare null/missing entry nei sistemi gia' esistenti dopo load.
+            if (!NpcPrivateFood.ContainsKey(npcId))
+                NpcPrivateFood[npcId] = 0;
+
+            if (!NpcLastPrivateFoodConsumeTick.ContainsKey(npcId))
+                NpcLastPrivateFoodConsumeTick[npcId] = -999999;
+
+            if (!NpcMoveIntents.ContainsKey(npcId))
+                NpcMoveIntents[npcId] = default;
+
+            if (!NpcScanStates.ContainsKey(npcId))
+                NpcScanStates[npcId] = default;
+
+            if (!NpcAction.ContainsKey(npcId))
+                NpcAction[npcId] = NpcActionState.Idle();
+
+            if (!NpcBalloonSignals.ContainsKey(npcId))
+                NpcBalloonSignals[npcId] = default;
+
+            // Il counter viene solo avanzato, mai riportato indietro: il valore
+            // esatto dello snapshot potra' poi essere imposto da
+            // TryRestoreNextNpcIdForSaveLoad con validazione globale.
+            if (_nextNpcId <= npcId)
+                _nextNpcId = npcId + 1;
+
+            error = string.Empty;
+            return true;
+        }
+
         public void SetFacing(int npcId, CardinalDirection dir)
         {
             if (!ExistsNpc(npcId)) return;
@@ -3343,6 +3630,122 @@ if (!NpcAction.ContainsKey(id))
             }
 
             return id;
+        }
+
+        // =============================================================================
+        // TryRegisterLoadedObjectForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra nel World un oggetto ricostruito da snapshot mantenendo
+        /// l'<c>objectId</c> originale. Questa API e' riservata alla
+        /// save/load authority: gameplay, decision layer e system ordinari
+        /// devono continuare a creare oggetti tramite <see cref="CreateObject"/>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: authority controllata sugli oggetti caricati</b></para>
+        /// <para>
+        /// Uno snapshot canonico deve poter preservare identita', ownership,
+        /// occupant e stato porta senza passare dal formato debug. Allo stesso
+        /// tempo, non puo' bypassare le regole base del World: ID unici,
+        /// definizione esistente, coordinate valide e standard 1 object per cell.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione ID</b>: rifiuta ID invalidi o duplicati.</item>
+        ///   <item><b>Validazione geometrica</b>: rifiuta defId sconosciuti, celle fuori mappa e celle occupate.</item>
+        ///   <item><b>Inserimento</b>: copia i campi runtime persistiti nell'istanza World.</item>
+        ///   <item><b>Cache</b>: ricostruisce la parte oggetto/occlusione tramite la stessa logica usata da CreateObject.</item>
+        ///   <item><b>Counter</b>: porta <c>_nextObjectId</c> almeno a <c>objectId + 1</c>.</item>
+        /// </list>
+        /// </summary>
+        public bool TryRegisterLoadedObjectForSaveLoad(WorldObjectInstance loadedObject, out string error)
+        {
+            // Il loader lavora su istanze gia' tradotte dal DTO. Non crea
+            // oggetti impliciti da null, perche' nasconderebbe snapshot corrotti.
+            if (loadedObject == null)
+            {
+                error = "World.TryRegisterLoadedObjectForSaveLoad: loadedObject nullo.";
+                return false;
+            }
+
+            int objectId = loadedObject.ObjectId;
+            if (objectId <= 0)
+            {
+                error = "World.TryRegisterLoadedObjectForSaveLoad: ObjectId deve essere > 0.";
+                return false;
+            }
+
+            // Preservare ID significa anche rifiutare duplicati in modo duro:
+            // un sovrascrittura qui romperebbe food stock, object use e memorie.
+            if (Objects.ContainsKey(objectId))
+            {
+                error = $"World.TryRegisterLoadedObjectForSaveLoad: objectId duplicato {objectId}.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(loadedObject.DefId))
+            {
+                error = $"World.TryRegisterLoadedObjectForSaveLoad: defId mancante per objectId {objectId}.";
+                return false;
+            }
+
+            if (!TryGetObjectDef(loadedObject.DefId, out var def) || def == null)
+            {
+                error = $"World.TryRegisterLoadedObjectForSaveLoad: defId sconosciuto '{loadedObject.DefId}' per objectId {objectId}.";
+                return false;
+            }
+
+            int x = loadedObject.CellX;
+            int y = loadedObject.CellY;
+            if (MapWidth > 0 && MapHeight > 0 && !InBounds(x, y))
+            {
+                error = $"World.TryRegisterLoadedObjectForSaveLoad: posizione fuori mappa per objectId {objectId} ({x},{y}).";
+                return false;
+            }
+
+            if (HasAnyObjectAt(x, y))
+            {
+                error = $"World.TryRegisterLoadedObjectForSaveLoad: cella occupata ({x},{y}) per objectId {objectId}.";
+                return false;
+            }
+
+            // Copiamo in una nuova istanza per evitare che il DTO/adapter esterno
+            // mantenga una reference mutabile allo stato interno del World.
+            var inst = new WorldObjectInstance
+            {
+                ObjectId = objectId,
+                DefId = loadedObject.DefId,
+                CellX = x,
+                CellY = y,
+                OwnerKind = loadedObject.OwnerKind,
+                OwnerId = loadedObject.OwnerId,
+                OccupantNpcId = loadedObject.OccupantNpcId,
+                IsOpen = loadedObject.IsOpen,
+                IsLocked = loadedObject.IsLocked
+            };
+
+            Objects[objectId] = inst;
+
+            // Manteniamo le cache incrementali coerenti subito dopo il restore.
+            // RebuildDerivedCachesGlobal resta comunque disponibile al loader per
+            // una ricostruzione globale a fine snapshot.
+            if (def.IsOccluder || def.BlocksVision || def.BlocksMovement)
+                PlaceOccluderInCache(objectId, x, y, def);
+
+            // Le porte aperte richiedono un riallineamento della cache rispetto
+            // allo stato chiuso di default derivato dalla definizione oggetto.
+            if (def.IsDoor && inst.IsOpen)
+                SetDoorOpen(objectId, true);
+
+            // Come per gli NPC, avanzamento monotono locale. Il valore preciso
+            // salvato potra' essere validato e imposto dal restore del counter.
+            if (_nextObjectId <= objectId)
+                _nextObjectId = objectId + 1;
+
+            error = string.Empty;
+            return true;
         }
 
         public void DestroyObject(int objectId)
