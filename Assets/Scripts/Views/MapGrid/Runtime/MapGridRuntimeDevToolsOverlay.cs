@@ -159,6 +159,7 @@ namespace Arcontio.View.MapGrid
         private bool _transportHasDestination;
         private int _transportDestinationX;
         private int _transportDestinationY;
+        private string _transportSelectionMessage = string.Empty;
 
         // Brush: cache dell'ultima cella "dipinta" per evitare spam sullo stesso tile.
         private int _lastPaintX = int.MinValue;
@@ -338,7 +339,7 @@ namespace Arcontio.View.MapGrid
 
             // Right click: in DevMode resta un erase "always", come in v0.
             // Questo è utilissimo per debug rapido ("togli quella cosa") anche se stai usando tool diversi.
-            if (mouse.rightButton.wasPressedThisFrame)
+            if (_tool != Tool.ForcedTransportObject && mouse.rightButton.wasPressedThisFrame)
             {
                 Enqueue(new DevEraseObjectCommand(cx, cy));
                 return;
@@ -532,23 +533,23 @@ namespace Arcontio.View.MapGrid
             // ------------------------------------------------------------
             GUILayout.Label("Tool");
             GUILayout.BeginHorizontal();
-            if (GUILayout.Toggle(_tool == Tool.Place, "Place", "Button")) _tool = Tool.Place;
-            if (GUILayout.Toggle(_tool == Tool.Erase, "Erase", "Button")) _tool = Tool.Erase;
+            if (GUILayout.Toggle(_tool == Tool.Place, "Place", "Button")) SelectTool(Tool.Place);
+            if (GUILayout.Toggle(_tool == Tool.Erase, "Erase", "Button")) SelectTool(Tool.Erase);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Toggle(_tool == Tool.SpawnNpc, "Spawn NPC", "Button")) _tool = Tool.SpawnNpc;
-            if (GUILayout.Toggle(_tool == Tool.OrientNpc, "Orient NPC", "Button")) _tool = Tool.OrientNpc;
-            if (GUILayout.Toggle(_tool == Tool.EraseNpc, "Erase NPC", "Button")) _tool = Tool.EraseNpc;
+            if (GUILayout.Toggle(_tool == Tool.SpawnNpc, "Spawn NPC", "Button")) SelectTool(Tool.SpawnNpc);
+            if (GUILayout.Toggle(_tool == Tool.OrientNpc, "Orient NPC", "Button")) SelectTool(Tool.OrientNpc);
+            if (GUILayout.Toggle(_tool == Tool.EraseNpc, "Erase NPC", "Button")) SelectTool(Tool.EraseNpc);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Toggle(_tool == Tool.PlaceDoor, "Inserisci porta", "Button")) _tool = Tool.PlaceDoor;
-            if (GUILayout.Toggle(_tool == Tool.PlaceFoodStock, "Inserisci cibo", "Button")) _tool = Tool.PlaceFoodStock;
+            if (GUILayout.Toggle(_tool == Tool.PlaceDoor, "Inserisci porta", "Button")) SelectTool(Tool.PlaceDoor);
+            if (GUILayout.Toggle(_tool == Tool.PlaceFoodStock, "Inserisci cibo", "Button")) SelectTool(Tool.PlaceFoodStock);
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Toggle(_tool == Tool.ForcedTransportObject, "Forced Transport Object", "Button")) _tool = Tool.ForcedTransportObject;
+            if (GUILayout.Toggle(_tool == Tool.ForcedTransportObject, "Forced Transport Object", "Button")) SelectTool(Tool.ForcedTransportObject);
             GUILayout.EndHorizontal();
 
             // ------------------------------------------------------------
@@ -1088,29 +1089,30 @@ namespace Arcontio.View.MapGrid
             bool hasSelectedNpc = selectedNpcId > 0 && world.ExistsNpc(selectedNpcId);
             GUILayout.Label(hasSelectedNpc ? $"NPC: {selectedNpcId}" : "NPC: nessun NPC selezionato");
 
+            WorldObjectInstance selectedObject = null;
             bool hasSelectedObject =
                 _transportObjectId > 0
-                && world.Objects.TryGetValue(_transportObjectId, out var selectedObject)
+                && world.Objects.TryGetValue(_transportObjectId, out selectedObject)
                 && selectedObject != null
                 && !selectedObject.IsHeld;
 
             GUILayout.Label(hasSelectedObject
                 ? $"Object: {_transportObjectId} ({selectedObject.DefId}) at ({selectedObject.CellX},{selectedObject.CellY})"
-                : "Object: click su oggetto grounded");
+                : "Object: nessun oggetto selezionato");
 
             GUILayout.Label(_transportHasDestination
                 ? $"Destination: ({_transportDestinationX},{_transportDestinationY})"
-                : "Destination: click su cella destinazione");
+                : "Destination: nessuna destinazione selezionata");
+
+            if (!string.IsNullOrWhiteSpace(_transportSelectionMessage))
+                GUILayout.Label(_transportSelectionMessage);
 
             if (_tool == Tool.ForcedTransportObject)
                 GUILayout.Label("Click mappa: prima oggetto, poi destinazione");
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Reset", GUILayout.Width(80)))
-            {
-                _transportObjectId = -1;
-                _transportHasDestination = false;
-            }
+            if (GUILayout.Button("Reset Transport Selection", GUILayout.Width(180)))
+                ResetTransportSelection();
 
             bool previousEnabled = GUI.enabled;
             GUI.enabled = previousEnabled && hasSelectedNpc && hasSelectedObject && _transportHasDestination;
@@ -1138,13 +1140,23 @@ namespace Arcontio.View.MapGrid
         private void HandleForcedTransportSelection(World world, int cellX, int cellY)
         {
             if (world == null)
+            {
+                _transportSelectionMessage = "World non disponibile.";
                 return;
+            }
 
             int objectAtCell = world.GetObjectAt(cellX, cellY);
-            if (_transportObjectId <= 0 && objectAtCell > 0)
+            if (_transportObjectId <= 0)
             {
+                if (objectAtCell <= 0 || !world.Objects.TryGetValue(objectAtCell, out var candidate) || candidate == null || candidate.IsHeld)
+                {
+                    _transportSelectionMessage = $"Nessun oggetto grounded selezionabile in ({cellX},{cellY}).";
+                    return;
+                }
+
                 _transportObjectId = objectAtCell;
                 _transportHasDestination = false;
+                _transportSelectionMessage = $"Oggetto selezionato: {_transportObjectId}. Ora scegli la destinazione.";
                 return;
             }
 
@@ -1152,12 +1164,14 @@ namespace Arcontio.View.MapGrid
             {
                 _transportObjectId = objectAtCell;
                 _transportHasDestination = false;
+                _transportSelectionMessage = $"Oggetto riselezionato: {_transportObjectId}. Ora scegli la destinazione.";
                 return;
             }
 
             _transportDestinationX = cellX;
             _transportDestinationY = cellY;
             _transportHasDestination = true;
+            _transportSelectionMessage = $"Destinazione selezionata: ({cellX},{cellY}).";
         }
 
         // =============================================================================
@@ -1492,6 +1506,22 @@ namespace Arcontio.View.MapGrid
             }
 
             return null;
+        }
+
+        private void SelectTool(Tool nextTool)
+        {
+            if (_tool == nextTool)
+                return;
+
+            _tool = nextTool;
+            ResetTransientInputState();
+        }
+
+        private void ResetTransportSelection()
+        {
+            _transportObjectId = -1;
+            _transportHasDestination = false;
+            _transportSelectionMessage = string.Empty;
         }
 
         private void ResetTransientInputState()
