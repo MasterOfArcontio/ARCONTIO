@@ -26,6 +26,22 @@
           ]
         }
       ]
+    },
+    {
+      "templateId": "generic.move_to_cell.v1",
+      "phases": [
+        {
+          "phaseId": "move_to_cell",
+          "kind": "ReachTarget",
+          "isInterruptible": true,
+          "actions": [
+            {
+              "actionId": "move_to_cell",
+              "kind": "MoveToCell"
+            }
+          ]
+        }
+      ]
     }
   ]
 }

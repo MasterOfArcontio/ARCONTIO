@@ -75,7 +75,7 @@ namespace Arcontio.Core
                 return StepResult.Failed(JobFailureReason.MissingTarget, "NpcPositionMissing");
 
             if (action.Kind == JobActionKind.MoveToCell)
-                return ExecuteMoveTo(world, runtime, npcId, action, npcCell);
+                return ExecuteMoveTo(world, runtime, npcId, job.Request.IntentKind, action, npcCell);
 
             if (action.Kind == JobActionKind.Consume)
                 return ExecuteConsumeKnownFood(world, runtime, npcId, action, npcCell);
@@ -87,6 +87,7 @@ namespace Arcontio.Core
             World world,
             JobRuntimeState runtime,
             int npcId,
+            DecisionIntentKind intentKind,
             JobAction action,
             GridPosition npcCell)
         {
@@ -110,13 +111,27 @@ namespace Arcontio.Core
                     Active = true,
                     TargetX = action.TargetCell.x,
                     TargetY = action.TargetCell.y,
-                    Reason = MoveIntentReason.SeekFood,
+                    Reason = ResolveMoveIntentReason(intentKind),
                     TargetObjectId = action.TargetObjectId,
                     Urgency01 = 1f
                 }));
             }
 
             return StepResult.Running(alreadyMovingToTarget ? "MoveAlreadyRequested" : "MoveCommandEnqueued");
+        }
+
+        private static MoveIntentReason ResolveMoveIntentReason(DecisionIntentKind intentKind)
+        {
+            if (intentKind == DecisionIntentKind.EatKnownFood || intentKind == DecisionIntentKind.SearchFood)
+                return MoveIntentReason.SeekFood;
+
+            if (intentKind == DecisionIntentKind.RestKnownPlace || intentKind == DecisionIntentKind.SearchRestPlace)
+                return MoveIntentReason.SeekBed;
+
+            if (intentKind == DecisionIntentKind.SeekSocialContact || intentKind == DecisionIntentKind.AskForHelp)
+                return MoveIntentReason.SeekTalkTarget;
+
+            return MoveIntentReason.None;
         }
 
         private static StepResult ExecuteConsumeKnownFood(

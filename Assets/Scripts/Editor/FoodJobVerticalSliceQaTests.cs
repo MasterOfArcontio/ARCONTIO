@@ -33,10 +33,20 @@ namespace Arcontio.Tests
     public sealed class FoodJobVerticalSliceQaTests
     {
         private const string TemplateJson =
-            "{\"templates\":[{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\"}]}]}]}";
+            "{\"templates\":[{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\"}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
 
         [Test]
-        public void RegistryLoadsFoodTemplateAndFactoryCreatesTwoPhasePlan()
+        public void RegistryLoadsFoodAndMoveTemplates()
+        {
+            var registry = MakeRegistry();
+
+            Assert.That(registry.Count, Is.EqualTo(2));
+            Assert.That(registry.TryGetTemplate(JobTemplateRegistry.FoodKnownCommunityStockTemplateId, out _), Is.True);
+            Assert.That(registry.TryGetTemplate(JobTemplateRegistry.GenericMoveToCellTemplateId, out _), Is.True);
+        }
+
+        [Test]
+        public void FoodFactoryCreatesTwoPhasePlan()
         {
             var registry = MakeRegistry();
 
@@ -51,7 +61,6 @@ namespace Arcontio.Tests
                 out var job,
                 out var reason);
 
-            Assert.That(registry.Count, Is.EqualTo(1));
             Assert.That(created, Is.True, reason);
             Assert.That(job.Plan.PhaseCount, Is.EqualTo(2));
             Assert.That(job.Plan.TryGetPhase(0, out var reach), Is.True);
@@ -59,6 +68,31 @@ namespace Arcontio.Tests
             Assert.That(reach.TryGetAction(0, out var move), Is.True);
             Assert.That(move.Kind, Is.EqualTo(JobActionKind.MoveToCell));
             Assert.That(move.TargetObjectId, Is.EqualTo(10));
+        }
+
+        [Test]
+        public void MoveFactoryCreatesSinglePhaseMovePlan()
+        {
+            var registry = MakeRegistry();
+
+            bool created = MoveJobFactory.TryCreateMoveToCellJob(
+                registry,
+                npcId: 1,
+                targetCell: new Vector2Int(4, 6),
+                tick: 3,
+                urgency01: 0.4f,
+                debugLabel: "MoveFactoryQa",
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            Assert.That(job.Plan.PhaseCount, Is.EqualTo(1));
+            Assert.That(job.Plan.TryGetPhase(0, out var phase), Is.True);
+            Assert.That(phase.TryGetAction(0, out var move), Is.True);
+            Assert.That(move.Kind, Is.EqualTo(JobActionKind.MoveToCell));
+            Assert.That(move.HasTargetCell, Is.True);
+            Assert.That(move.TargetCell, Is.EqualTo(new Vector2Int(4, 6)));
+            Assert.That(move.TargetObjectId, Is.EqualTo(0));
         }
 
         [Test]
@@ -73,6 +107,56 @@ namespace Arcontio.Tests
             var commands = world.JobRuntimeState.CommandBuffer.Snapshot();
             Assert.That(commands.Length, Is.EqualTo(1));
             Assert.That(commands[0], Is.TypeOf<SetMoveIntentCommand>());
+        }
+
+        [Test]
+        public void GenericMoveJobWhenFarFromTargetEnqueuesMoveIntentCommand()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+            var job = AssignMoveJob(world, npcId, 4, 6);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            var commands = world.JobRuntimeState.CommandBuffer.Snapshot();
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Running));
+            Assert.That(commands.Length, Is.EqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<SetMoveIntentCommand>());
+        }
+
+        [Test]
+        public void GenericMoveJobCompletesWhenTargetCellReached()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 4, npcY: 6, out int npcId);
+            var job = AssignMoveJob(world, npcId, 4, 6);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Completed));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void GenericMoveJobDoesNotDuplicateCommandWhenIntentAlreadyMatches()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+            AssignMoveJob(world, npcId, 4, 6);
+            world.SetMoveIntent(npcId, new MoveIntent
+            {
+                Active = true,
+                TargetX = 4,
+                TargetY = 6,
+                TargetObjectId = 0,
+                Reason = MoveIntentReason.None
+            });
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
         }
 
         [Test]
@@ -129,19 +213,7 @@ namespace Arcontio.Tests
 
         private static World MakeWorldWithNpcAndCommunityFood(int npcX, int npcY, int foodX, int foodY, out int npcId, out int foodId)
         {
-            var world = new World(new WorldConfig(new SimulationParams()));
-            world.Global.Needs = NeedsConfig.Default();
-            world.Global.BeliefQuery = BeliefQueryConfig.Default();
-            world.Global.NpcOperationalRangeCells = 16;
-            world.Global.NpcVisionRangeCells = 16;
-            world.Global.NpcVisionUseCone = false;
-
-            npcId = world.CreateNpc(
-                NpcDnaProfile.CreateDefault("food_job_qa"),
-                NpcNeeds.Make(0.95f, 0.1f),
-                new Arcontio.Core.Social { JusticePerception01 = 0.9f },
-                npcX,
-                npcY);
+            var world = MakeWorldWithNpcOnly(npcX, npcY, out npcId);
 
             foodId = 77;
             world.Objects[foodId] = new WorldObjectInstance
@@ -160,6 +232,25 @@ namespace Arcontio.Tests
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
             };
+
+            return world;
+        }
+
+        private static World MakeWorldWithNpcOnly(int npcX, int npcY, out int npcId)
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            world.Global.Needs = NeedsConfig.Default();
+            world.Global.BeliefQuery = BeliefQueryConfig.Default();
+            world.Global.NpcOperationalRangeCells = 16;
+            world.Global.NpcVisionRangeCells = 16;
+            world.Global.NpcVisionUseCone = false;
+
+            npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("food_job_qa"),
+                NpcNeeds.Make(0.95f, 0.1f),
+                new Arcontio.Core.Social { JusticePerception01 = 0.9f },
+                npcX,
+                npcY);
 
             return world;
         }
@@ -190,6 +281,23 @@ namespace Arcontio.Tests
 
             Assert.That(created, Is.True, reason);
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, 0, out reason), Is.True, reason);
+        }
+
+        private static Job AssignMoveJob(World world, int npcId, int targetX, int targetY)
+        {
+            bool created = MoveJobFactory.TryCreateMoveToCellJob(
+                MakeRegistry(),
+                npcId,
+                new Vector2Int(targetX, targetY),
+                0,
+                0.25f,
+                "MoveJobQa",
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, 0, out reason), Is.True, reason);
+            return job;
         }
     }
 }
