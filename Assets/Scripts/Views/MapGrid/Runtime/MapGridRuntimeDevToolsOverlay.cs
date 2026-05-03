@@ -155,6 +155,9 @@ namespace Arcontio.View.MapGrid
         private int _carriedFoodUnits = 1;
 
         // Forced transport object job: stato temporaneo view-side per la micro feature debug.
+        private bool _transportModeActive;
+        private int _transportNpcId = -1;
+        private Tool _toolBeforeTransport = Tool.Place;
         private int _transportObjectId = -1;
         private bool _transportHasDestination;
         private int _transportDestinationX;
@@ -211,6 +214,7 @@ namespace Arcontio.View.MapGrid
             if (_enabled)
             {
                 _enabled = false;
+                DeactivateTransportMode(clearMessage: true);
                 ResetTransientInputState();
                 return;
             }
@@ -238,6 +242,7 @@ namespace Arcontio.View.MapGrid
         public void OpenSpawnToolOverlay()
         {
             _enabled = true;
+            DeactivateTransportMode(clearMessage: true);
             _tool = Tool.SpawnNpc;
 
             if (_enabled && string.IsNullOrWhiteSpace(_selectedDefId))
@@ -337,9 +342,20 @@ namespace Arcontio.View.MapGrid
             var mouse = Mouse.current;
             if (mouse == null) return;
 
+            // La modalita' transport debug e' armata in modo esplicito e deve avere
+            // priorita' assoluta: finche' e' attiva nessun altro tool F3 puo'
+            // interpretare click della griglia come spawn, erase, place o facing.
+            if (_transportModeActive)
+            {
+                if (mouse.leftButton.wasPressedThisFrame)
+                    HandleForcedTransportSelection(MapGridWorldProvider.TryGetWorld(), cx, cy);
+
+                return;
+            }
+
             // Right click: in DevMode resta un erase "always", come in v0.
             // Questo è utilissimo per debug rapido ("togli quella cosa") anche se stai usando tool diversi.
-            if (_tool != Tool.ForcedTransportObject && mouse.rightButton.wasPressedThisFrame)
+            if (mouse.rightButton.wasPressedThisFrame)
             {
                 Enqueue(new DevEraseObjectCommand(cx, cy));
                 return;
@@ -532,6 +548,8 @@ namespace Arcontio.View.MapGrid
             // TOOL selection
             // ------------------------------------------------------------
             GUILayout.Label("Tool");
+            bool toolButtonsEnabled = GUI.enabled;
+            GUI.enabled = toolButtonsEnabled && !_transportModeActive;
             GUILayout.BeginHorizontal();
             if (GUILayout.Toggle(_tool == Tool.Place, "Place", "Button")) SelectTool(Tool.Place);
             if (GUILayout.Toggle(_tool == Tool.Erase, "Erase", "Button")) SelectTool(Tool.Erase);
@@ -548,9 +566,7 @@ namespace Arcontio.View.MapGrid
             if (GUILayout.Toggle(_tool == Tool.PlaceFoodStock, "Inserisci cibo", "Button")) SelectTool(Tool.PlaceFoodStock);
             GUILayout.EndHorizontal();
 
-            GUILayout.BeginHorizontal();
-            if (GUILayout.Toggle(_tool == Tool.ForcedTransportObject, "Forced Transport Object", "Button")) SelectTool(Tool.ForcedTransportObject);
-            GUILayout.EndHorizontal();
+            GUI.enabled = toolButtonsEnabled;
 
             // ------------------------------------------------------------
             // Shape selection (only relevant for Place/Erase)
@@ -1087,7 +1103,8 @@ namespace Arcontio.View.MapGrid
 
             int selectedNpcId = NPCSelection.SelectedNpcId;
             bool hasSelectedNpc = selectedNpcId > 0 && world.ExistsNpc(selectedNpcId);
-            GUILayout.Label(hasSelectedNpc ? $"NPC: {selectedNpcId}" : "NPC: nessun NPC selezionato");
+            GUILayout.Label(hasSelectedNpc ? $"NPC selezionato: {selectedNpcId}" : "NPC selezionato: nessuno");
+            GUILayout.Label(_transportModeActive ? $"NPC transport: {_transportNpcId}" : "NPC transport: non attivo");
 
             WorldObjectInstance selectedObject = null;
             bool hasSelectedObject =
@@ -1107,19 +1124,22 @@ namespace Arcontio.View.MapGrid
             if (!string.IsNullOrWhiteSpace(_transportSelectionMessage))
                 GUILayout.Label(_transportSelectionMessage);
 
-            if (_tool == Tool.ForcedTransportObject)
-                GUILayout.Label("Click mappa: prima oggetto, poi destinazione");
-
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Reset Transport Selection", GUILayout.Width(180)))
-                ResetTransportSelection();
-
             bool previousEnabled = GUI.enabled;
-            GUI.enabled = previousEnabled && hasSelectedNpc && hasSelectedObject && _transportHasDestination;
-            if (GUILayout.Button("Forced Transport Object", GUILayout.Width(190)))
-                ExecuteForcedTransportObjectJob(selectedNpcId);
+
+            GUI.enabled = previousEnabled && !_transportModeActive && hasSelectedNpc;
+            if (GUILayout.Button("ATTIVA TRASPORTO OGGETTI", GUILayout.Width(210)))
+                ActivateTransportMode(selectedNpcId);
+
+            GUI.enabled = previousEnabled && _transportModeActive;
+            if (GUILayout.Button("DISATTIVA TRASPORTO OGGETTI", GUILayout.Width(230)))
+                DeactivateTransportMode(clearMessage: true);
+
             GUI.enabled = previousEnabled;
             GUILayout.EndHorizontal();
+
+            if (_transportModeActive)
+                GUILayout.Label(_transportObjectId > 0 ? "Click destinazione libera per assegnare il job." : "Click una cella con oggetto grounded.");
         }
 
         // =============================================================================
@@ -1145,12 +1165,22 @@ namespace Arcontio.View.MapGrid
                 return;
             }
 
+            if (!_transportModeActive)
+                return;
+
+            if (_transportNpcId <= 0 || !world.ExistsNpc(_transportNpcId))
+            {
+                DeactivateTransportMode(clearMessage: false);
+                _transportSelectionMessage = "NPC transport non piu' valido. Modalita' disattivata.";
+                return;
+            }
+
             int objectAtCell = world.GetObjectAt(cellX, cellY);
             if (_transportObjectId <= 0)
             {
                 if (objectAtCell <= 0 || !world.Objects.TryGetValue(objectAtCell, out var candidate) || candidate == null || candidate.IsHeld)
                 {
-                    _transportSelectionMessage = $"Nessun oggetto grounded selezionabile in ({cellX},{cellY}).";
+                    _transportSelectionMessage = $"Seleziona prima una cella con oggetto. Cella ({cellX},{cellY}) vuota o non valida.";
                     return;
                 }
 
@@ -1160,11 +1190,9 @@ namespace Arcontio.View.MapGrid
                 return;
             }
 
-            if (objectAtCell > 0 && Keyboard.current != null && Keyboard.current.leftShiftKey.isPressed)
+            if (objectAtCell > 0)
             {
-                _transportObjectId = objectAtCell;
-                _transportHasDestination = false;
-                _transportSelectionMessage = $"Oggetto riselezionato: {_transportObjectId}. Ora scegli la destinazione.";
+                _transportSelectionMessage = $"Destinazione occupata in ({cellX},{cellY}). Scegli una cella libera.";
                 return;
             }
 
@@ -1172,6 +1200,12 @@ namespace Arcontio.View.MapGrid
             _transportDestinationY = cellY;
             _transportHasDestination = true;
             _transportSelectionMessage = $"Destinazione selezionata: ({cellX},{cellY}).";
+
+            if (ExecuteForcedTransportObjectJob(_transportNpcId))
+            {
+                ResetTransportSelection();
+                _transportSelectionMessage = "Transport job assegnato. Seleziona un altro oggetto per continuare.";
+            }
         }
 
         // =============================================================================
@@ -1190,20 +1224,26 @@ namespace Arcontio.View.MapGrid
         /// dal runtime esistente.
         /// </para>
         /// </summary>
-        private void ExecuteForcedTransportObjectJob(int npcId)
+        private bool ExecuteForcedTransportObjectJob(int npcId)
         {
             var host = SimulationHost.Instance;
             if (host == null)
             {
                 Debug.LogError("[DevTools][ForcedTransportObject] SimulationHost.Instance nullo.");
-                return;
+                _transportSelectionMessage = "SimulationHost non disponibile.";
+                return false;
             }
 
             var destination = new Vector2Int(_transportDestinationX, _transportDestinationY);
             if (host.ForceAssignTransportObjectJobFromDevTools(npcId, _transportObjectId, destination, out string reason))
+            {
                 Debug.Log($"[DevTools][ForcedTransportObject] Job assigned npc={npcId} object={_transportObjectId} destination=({destination.x},{destination.y})");
-            else
-                Debug.LogWarning($"[DevTools][ForcedTransportObject] Assign failed npc={npcId} object={_transportObjectId} destination=({destination.x},{destination.y}) reason={reason}");
+                return true;
+            }
+
+            Debug.LogWarning($"[DevTools][ForcedTransportObject] Assign failed npc={npcId} object={_transportObjectId} destination=({destination.x},{destination.y}) reason={reason}");
+            _transportSelectionMessage = $"Transport job non assegnato: {reason}";
+            return false;
         }
 
         // =============================================================================
@@ -1510,11 +1550,46 @@ namespace Arcontio.View.MapGrid
 
         private void SelectTool(Tool nextTool)
         {
+            if (_transportModeActive)
+                return;
+
             if (_tool == nextTool)
                 return;
 
             _tool = nextTool;
             ResetTransientInputState();
+        }
+
+        private void ActivateTransportMode(int npcId)
+        {
+            var world = MapGridWorldProvider.TryGetWorld();
+            if (world == null || npcId <= 0 || !world.ExistsNpc(npcId))
+            {
+                _transportSelectionMessage = "Seleziona un NPC valido prima di attivare il trasporto oggetti.";
+                return;
+            }
+
+            _toolBeforeTransport = _tool == Tool.ForcedTransportObject ? Tool.Place : _tool;
+            _transportModeActive = true;
+            _transportNpcId = npcId;
+            _tool = Tool.ForcedTransportObject;
+            ResetTransientInputState();
+            ResetTransportSelection();
+            _transportSelectionMessage = $"Trasporto oggetti attivo per NPC {_transportNpcId}. Seleziona un oggetto grounded.";
+        }
+
+        private void DeactivateTransportMode(bool clearMessage)
+        {
+            _transportModeActive = false;
+            _transportNpcId = -1;
+            _tool = _toolBeforeTransport == Tool.ForcedTransportObject ? Tool.Place : _toolBeforeTransport;
+            ResetTransientInputState();
+            ResetTransportSelection();
+
+            if (!clearMessage)
+                return;
+
+            _transportSelectionMessage = string.Empty;
         }
 
         private void ResetTransportSelection()
