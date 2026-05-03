@@ -123,6 +123,9 @@ namespace Arcontio.Core
                 return false;
             }
 
+            if (!TryReserveJobTarget(job, tick, out reason))
+                return false;
+
             if (arbitration.Decision == JobArbitrationDecision.SuspendCurrentForNew
                 || arbitration.Decision == JobArbitrationDecision.CancelCurrentForNew)
             {
@@ -135,6 +138,47 @@ namespace Arcontio.Core
             _npcStates[npcId] = state;
             reason = arbitration.Reason == "NpcIdle" ? "JobAssigned" : arbitration.Reason;
             return true;
+        }
+
+        private bool TryReserveJobTarget(Job job, int tick, out string reason)
+        {
+            reason = string.Empty;
+
+            if (job == null)
+            {
+                reason = "JobMissing";
+                return false;
+            }
+
+            var request = job.Request;
+            if (!request.HasTargetCell && request.TargetObjectId <= 0)
+            {
+                reason = "NoReservableTarget";
+                return true;
+            }
+
+            var targetKind = request.TargetObjectId > 0
+                ? ReservationTargetKind.Object
+                : ReservationTargetKind.Cell;
+
+            var record = new ReservationRecord(
+                string.Empty,
+                job.JobId,
+                request.NpcId,
+                targetKind,
+                request.TargetCell,
+                request.TargetObjectId,
+                tick,
+                tick + 100);
+
+            if (Reservations.TryReserve(record, out _))
+            {
+                reason = "ReservationAccepted";
+                return true;
+            }
+
+            reason = "ReservationDenied";
+            return false;
         }
 
         // =============================================================================
@@ -164,6 +208,7 @@ namespace Arcontio.Core
             }
 
             job.MarkCompleted(tick);
+            Reservations.ReleaseByJob(job.JobId);
             _jobs.Remove(job.JobId);
             state.Clear(JobFailureReason.None);
             _npcStates[npcId] = state;
@@ -182,6 +227,7 @@ namespace Arcontio.Core
             }
 
             job.MarkFailed(failureReason, tick);
+            Reservations.ReleaseByJob(job.JobId);
             _jobs.Remove(job.JobId);
             state.Clear(failureReason);
             _npcStates[npcId] = state;
@@ -200,7 +246,10 @@ namespace Arcontio.Core
             }
 
             if (state.HasActiveJob)
+            {
+                Reservations.ReleaseByJob(state.ActiveJobId);
                 _jobs.Remove(state.ActiveJobId);
+            }
 
             state.Clear(clearReason);
             _npcStates[npcId] = state;
@@ -263,6 +312,7 @@ namespace Arcontio.Core
         {
             _jobs.Clear();
             CommandBuffer.Clear();
+            Reservations.PruneExpired(int.MaxValue);
 
             var keys = new List<int>(_npcStates.Keys);
             for (int i = 0; i < keys.Count; i++)

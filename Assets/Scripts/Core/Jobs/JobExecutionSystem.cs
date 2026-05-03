@@ -52,7 +52,19 @@ namespace Arcontio.Core
 
                 var result = ExecuteCurrentAction(world, runtime, npcId, in npcState, job, (int)tick.Index);
                 var updatedState = npcState;
-                _stateMachine.ApplyStepResult(ref updatedState, job, result, (int)tick.Index);
+                var machineResult = _stateMachine.ApplyStepResult(ref updatedState, job, result, (int)tick.Index);
+                if (machineResult.TickResult == JobStateMachineTickResult.JobCompleted)
+                {
+                    runtime.CompleteCurrentJob(npcId, (int)tick.Index, out _);
+                    continue;
+                }
+
+                if (machineResult.TickResult == JobStateMachineTickResult.JobFailed)
+                {
+                    runtime.FailCurrentJob(npcId, machineResult.FailureReason, (int)tick.Index, out _);
+                    continue;
+                }
+
                 runtime.SetNpcState(npcId, in updatedState);
             }
         }

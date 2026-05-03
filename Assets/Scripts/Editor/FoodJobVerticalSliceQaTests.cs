@@ -222,6 +222,77 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void JobRuntimeStateRejectsSecondNpcForReservedFoodTarget()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int firstNpcId, out int foodId);
+            int secondNpcId = CreateAdditionalNpc(world, 2, 1);
+            AssignFoodJob(world, firstNpcId, foodId, 5, 5, urgency01: 0.95f);
+            var secondJob = CreateFoodJob(secondNpcId, foodId, 5, 5, urgency01: 0.95f);
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(secondNpcId, secondJob, 1, out var reason);
+
+            Assert.That(assigned, Is.False, reason);
+            Assert.That(reason, Is.EqualTo("ReservationDenied"));
+            Assert.That(world.JobRuntimeState.Reservations.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.HasActiveJob(firstNpcId), Is.True);
+            Assert.That(world.JobRuntimeState.HasActiveJob(secondNpcId), Is.False);
+        }
+
+        [Test]
+        public void JobRuntimeStateReleasesReservationWhenJobCompletes()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 4, npcY: 6, out int npcId);
+            AssignMoveJob(world, npcId, 4, 6);
+            var system = new JobExecutionSystem();
+
+            Assert.That(world.JobRuntimeState.Reservations.Count, Is.EqualTo(1));
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.JobRuntimeState.Reservations.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void JobRuntimeStateReleasesReservationWhenJobFails()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 0,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            var system = new JobExecutionSystem();
+
+            Assert.That(world.JobRuntimeState.Reservations.Count, Is.EqualTo(1));
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.JobRuntimeState.Reservations.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void NeedsDecisionRuleFallsBackToLegacyWhenFoodReservationDenied()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int firstNpcId, out int foodId);
+            int secondNpcId = CreateAdditionalNpc(world, 5, 5);
+            AddFoodBelief(world, firstNpcId, 5, 5);
+            AddFoodBelief(world, secondNpcId, 5, 5);
+            AssignFoodJob(world, firstNpcId, foodId, 5, 5, urgency01: 0.95f);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
+            Assert.That(world.JobRuntimeState.HasActiveJob(firstNpcId), Is.True);
+        }
+
+        [Test]
         public void JobExecutionWhenOnFoodTargetEnqueuesEatFromStockCommand()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
@@ -315,6 +386,16 @@ namespace Arcontio.Tests
                 npcY);
 
             return world;
+        }
+
+        private static int CreateAdditionalNpc(World world, int npcX, int npcY)
+        {
+            return world.CreateNpc(
+                NpcDnaProfile.CreateDefault("food_job_qa_extra"),
+                NpcNeeds.Make(0.95f, 0.1f),
+                new Arcontio.Core.Social { JusticePerception01 = 0.9f },
+                npcX,
+                npcY);
         }
 
         private static void AddFoodBelief(World world, int npcId, int x, int y)
