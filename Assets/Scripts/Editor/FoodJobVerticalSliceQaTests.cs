@@ -396,6 +396,21 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void NeedsDecisionRuleWithAcceptedFoodJobDoesNotEmitLegacyMoveCommand()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out _);
+            AddFoodBelief(world, npcId, 5, 5);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent) && intent.Active, Is.False);
+        }
+
+        [Test]
         public void NeedsDecisionRuleWithGateFalseKeepsLegacyFoodCommandFallback()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out _);
@@ -408,6 +423,39 @@ namespace Arcontio.Tests
             Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
             Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+        }
+
+        [Test]
+        public void NeedsDecisionRuleWithGateTrueKeepsPrivateCarriedFoodOnLegacyCommand()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            world.NpcPrivateFood[npcId] = 1;
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<EatPrivateFoodCommand>());
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+        }
+
+        [Test]
+        public void NeedsDecisionRuleWithGateTrueKeepsPrivateStockTheftOnLegacyCommand()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int thiefNpcId);
+            int victimNpcId = CreateAdditionalNpc(world, 6, 5);
+            int stockObjectId = AddPrivateFoodStock(world, victimNpcId, 5, 5);
+            AddRememberedWorldObject(world, thiefNpcId, stockObjectId, 5, 5, OwnerKind.Npc, victimNpcId);
+            world.Social[thiefNpcId] = new Arcontio.Core.Social { JusticePerception01 = 0.1f };
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<StealFromStockCommand>());
+            Assert.That(world.JobRuntimeState.HasActiveJob(thiefNpcId), Is.False);
         }
 
         private static JobTemplateRegistry MakeRegistry()
@@ -469,6 +517,48 @@ namespace Arcontio.Tests
                 new Arcontio.Core.Social { JusticePerception01 = 0.9f },
                 npcX,
                 npcY);
+        }
+
+        private static int AddPrivateFoodStock(World world, int ownerNpcId, int x, int y)
+        {
+            int foodId = 1701;
+            world.Objects[foodId] = new WorldObjectInstance
+            {
+                ObjectId = foodId,
+                DefId = "food_stock_private",
+                CellX = x,
+                CellY = y,
+                OwnerKind = OwnerKind.Npc,
+                OwnerId = ownerNpcId
+            };
+
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 3,
+                OwnerKind = OwnerKind.Npc,
+                OwnerId = ownerNpcId
+            };
+
+            return foodId;
+        }
+
+        private static void AddRememberedWorldObject(World world, int npcId, int objectId, int x, int y, OwnerKind ownerKind, int ownerId)
+        {
+            if (!world.NpcObjectMemory.ContainsKey(npcId))
+                world.NpcObjectMemory[npcId] = new NpcObjectMemoryStore(8);
+
+            world.NpcObjectMemory[npcId].UpsertWorldObject(
+                nowTick: 0,
+                defId: "food_stock_private",
+                objectId: objectId,
+                x: x,
+                y: y,
+                ownerKind: ownerKind,
+                ownerId: ownerId,
+                reliability01: 0.95f,
+                utility01: 0.95f,
+                pinIfOwnedByNpc: false,
+                npcIdForPinLogic: npcId);
         }
 
         private static void AddFoodBelief(World world, int npcId, int x, int y)
