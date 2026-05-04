@@ -638,6 +638,32 @@ namespace Arcontio.Core
         /// </summary>
         public readonly MemoryBeliefDecisionExplainabilityRegistry MemoryBeliefDecisionExplainability;
 
+        // =============================================================================
+        // JobRuntimeState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Store runtime transitorio del Job System posseduto dal World.
+        /// </para>
+        ///
+        /// <para><b>Ownership runtime senza persistenza v0.11.01</b></para>
+        /// <para>
+        /// Il Job System non deve vivere soltanto dentro il sistema che lo ticka,
+        /// perche' quello creerebbe una source of truth parallela e non ispezionabile.
+        /// Allo stesso tempo questa prima slice non persiste job attivi: dopo load lo
+        /// store viene ricreato/azzerato e il tick successivo puo' ricostruire nuove
+        /// intenzioni da needs, memory e beliefs.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>NpcJobState</b>: cursore operativo per NPC.</item>
+        ///   <item><b>Jobs</b>: job runtime attivi non serializzati.</item>
+        ///   <item><b>JobCommandBuffer</b>: command prodotti dagli step e pompati dall'host.</item>
+        /// </list>
+        /// </summary>
+        public readonly JobRuntimeState JobRuntimeState;
+
         /// <summary>
         /// Stato di scan direzionale per NPC.
         /// <list type="bullet">
@@ -916,6 +942,11 @@ namespace Arcontio.Core
                 mbqd?.ringBuffer_query ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultQueryCapacity,
                 mbqd?.ringBuffer_decision ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultDecisionCapacity,
                 mbqd?.ringBuffer_bridge ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultBridgeCapacity);
+
+            // Store passivo del Job System. Nasce sempre per evitare null-check nei
+            // sistemi runtime, ma resta vuoto finche' il gate opt-in food job non
+            // devia una decisione verso la vertical slice v0.11.01.
+            JobRuntimeState = new JobRuntimeState();
 
             // ============================================================
             // DEBUG FOV TELEMETRY (config-driven)
@@ -3203,6 +3234,8 @@ namespace Arcontio.Core
             if (!NpcMoveIntents.ContainsKey(id))
                 NpcMoveIntents[id] = default;
 
+            JobRuntimeState.EnsureNpcState(id);
+
             // Scan state init (se non presente)
             if (!NpcScanStates.ContainsKey(id))
                 NpcScanStates[id] = default;
@@ -3344,6 +3377,11 @@ if (!NpcAction.ContainsKey(id))
 
             if (!NpcMoveIntents.ContainsKey(npcId))
                 NpcMoveIntents[npcId] = default;
+
+            // v0.11.01: i job attivi non sono persistiti. Il load ID-preserving
+            // registra quindi solo uno slot runtime vuoto per permettere al prossimo
+            // tick di ricostruire eventuali intenzioni da needs/beliefs.
+            JobRuntimeState.EnsureNpcState(npcId);
 
             if (!NpcScanStates.ContainsKey(npcId))
                 NpcScanStates[npcId] = default;

@@ -36,6 +36,9 @@ namespace Arcontio.Core
         [SerializeField] private bool enableWorldSnapshotBootstrap = false;
         [SerializeField] private string worldSnapshotSlotName = "default";
 
+        [Header("Job Runtime Experimental Gates")]
+        [SerializeField] private bool enableFoodJobVerticalSlice = false;
+
         private enum DebugScenario
         {
             None = 0,
@@ -61,6 +64,7 @@ namespace Arcontio.Core
         private MessageBus _bus;
         private Scheduler _scheduler;
         private Telemetry _telemetry;
+        private JobTemplateRegistry _jobTemplateRegistry;
 
         private NpcCommunicationPipeline _npcCommunication;
         // MemoryTrace
@@ -511,6 +515,14 @@ namespace Arcontio.Core
             // Caricato da LoadWorldRuntimeJsonConfig.
 
             // ******************************************************************************************************************************
+            // 4.5) Carica template job runtime minimali da JSON
+            // ******************************************************************************************************************************
+            // v0.11.01 introduce un registry volutamente piccolo: il JSON descrive
+            // solo template/fasi/action, mentre target e logica reale restano nel
+            // codice C# e nel decision layer. Il gate food resta default false.
+            _jobTemplateRegistry = JobTemplateRegistry.LoadDefault();
+
+            // ******************************************************************************************************************************
             // 5) ISCRIVO I SISTEMI ALLO SCHEDULER
             // ******************************************************************************************************************************
 
@@ -604,12 +616,25 @@ namespace Arcontio.Core
             _scheduler.AddSystem(new BeliefDecaySystem());
 
             // ******************************************************************************************************************************
+            // 7.5) JOB EXECUTION - vertical slice food opt-in v0.11.01
+            // ******************************************************************************************************************************
+            // Il sistema gira prima della rule phase e produce solo ICommand nel
+            // JobCommandBuffer posseduto da World.JobRuntimeState. Il pump effettivo
+            // resta piu' sotto, nel punto unico in cui SimulationHost esegue command
+            // contro il World.
+            _scheduler.AddSystem(new JobExecutionSystem());
+
+            // ******************************************************************************************************************************
             // 8) INIZIALIZZO LE RULES
             // ******************************************************************************************************************************
             // ATTENZIONE: le Rules della memoria sono inizializzate in MemoryEncodingSystem
             _rules.Add(new DebugEventLogRule());
             //     _rules.Add(new BasicSurvivalRule());
-            _rules.Add(new NeedsDecisionRule(decisionEveryTicks: 25, _world.Global.NpcOperationalRangeCells));
+            _rules.Add(new NeedsDecisionRule(
+                decisionEveryTicks: 25,
+                maxSeekRangeCells: _world.Global.NpcOperationalRangeCells,
+                enableFoodJobVerticalSlice: enableFoodJobVerticalSlice,
+                jobTemplateRegistry: _jobTemplateRegistry));
 
             // ******************************************************************************************************************************
             // 9) SEED (Selettore dei casi di test)
@@ -885,6 +910,12 @@ namespace Arcontio.Core
                 for (int r = 0; r < _rules.Count; r++)
                     _rules[r].Handle(_world, e, _commands, _telemetry);
             }
+
+            // I command prodotti dal JobExecutionSystem entrano nello stesso pump dei
+            // command legacy rule-driven. Questo mantiene un'unica authority di
+            // mutazione World: gli step accodano intenzioni operative, ma solo qui
+            // ICommand.Execute applica effetti reali.
+            FlushJobCommandsIntoMainCommandBuffer();
 
             // Esegue comandi (mutano World)
             for (int c = 0; c < _commands.Count; c++)
@@ -1283,8 +1314,46 @@ namespace Arcontio.Core
             _telemetry = new Telemetry();
             _npcCommunication = new NpcCommunicationPipeline(contactRadius: 2, topN: 6);
 
+            // v0.11.01: i job attivi sono runtime transitorio, non snapshot state.
+            // Dopo load lo store resta presente ma viene azzerato per evitare che
+            // un job del vecchio mondo continui ad agire sul nuovo World.
+            _world?.JobRuntimeState?.ClearTransientJobs();
+
             if (_memoryEncoding != null)
                 _memoryEncoding.SetEventsBuffer(_eventBuffer);
+        }
+
+        // =============================================================================
+        // FlushJobCommandsIntoMainCommandBuffer
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Trasferisce i command prodotti dal Job System nel buffer command principale
+        /// del tick.
+        /// </para>
+        ///
+        /// <para><b>Command pump unico</b></para>
+        /// <para>
+        /// Il Job System non possiede una via opaca per mutare il mondo. I suoi step
+        /// scrivono nel <c>JobCommandBuffer</c>, poi <c>SimulationHost</c> li sposta
+        /// nel buffer gia' usato dalle rules. L'esecuzione resta quindi ordinata,
+        /// visibile e concentrata nel solo punto in cui i command toccano il World.
+        /// </para>
+        /// </summary>
+        private void FlushJobCommandsIntoMainCommandBuffer()
+        {
+            var runtime = _world?.JobRuntimeState;
+            if (runtime == null || runtime.CommandBuffer.Count == 0)
+                return;
+
+            var snapshot = runtime.CommandBuffer.Snapshot();
+            for (int i = 0; i < snapshot.Length; i++)
+            {
+                if (snapshot[i] != null)
+                    _commands.Add(snapshot[i]);
+            }
+
+            runtime.CommandBuffer.Clear();
         }
 
         // =============================================================================
