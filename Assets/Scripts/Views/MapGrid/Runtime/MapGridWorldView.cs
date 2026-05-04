@@ -770,6 +770,19 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
                 int objId = kv.Key;
                 var inst = kv.Value;
 
+                if (inst != null && inst.IsHeld)
+                {
+                    if (_objectViews.TryGetValue(objId, out var heldRenderer) && heldRenderer != null)
+                    {
+                        heldRenderer.enabled = false;
+                        var heldLabel = heldRenderer.GetComponent<MapGridStockLabel>();
+                        if (heldLabel != null)
+                            heldLabel.SetText("");
+                    }
+
+                    continue;
+                }
+
                 if (!_objectViews.TryGetValue(objId, out var sr) || sr == null)
                 {
                     // risolvi spriteKey da ObjectDef (se presente), altrimenti fallback
@@ -793,6 +806,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
                     _objectViews[objId] = sr;
                 }
 
+                sr.enabled = true;
                 sr.transform.position = CellCenterWorld(inst.CellX, inst.CellY);
                 sr.sortingOrder = sortByY ? objectBaseOrder - inst.CellY : objectBaseOrder;
 

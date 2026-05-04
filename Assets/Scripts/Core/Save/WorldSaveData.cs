@@ -221,6 +221,8 @@ namespace Arcontio.Core.Save
         public int occupantNpcId;
         public bool isOpen;
         public bool isLocked;
+        public bool isHeld;
+        public int holderNpcId;
     }
 
     // =============================================================================
