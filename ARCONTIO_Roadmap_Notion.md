@@ -21,7 +21,9 @@
 | v0.08 | Repository Stabilization + Constitutional Documentation Bootstrap | Aprile 2026 | IN CORSO |
 | v0.09 | Simulation Backbone Hardening & Constitutional Alignment | Maggio 2026 | Completata |
 | v0.10 | World Persistence Closure & Save/Load Completion | Maggio 2026 | Completata |
-| v0.11 | Domain Reintegration: Jobs · Work · Social · Dormant Systems | Giugno 2026 | Pending |
+| v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
+| v0.11B | Decision Architecture (MBQD) Foundation | Maggio-Giugno 2026 | Prossimo cantiere |
+| v0.11C | Work/Social/Dormant Systems Forensic Audit | Giugno 2026 | Future |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
 | v0.14 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
@@ -326,22 +328,51 @@ necessario per l'apertura della campagna tecnica v0.09.
 
 ---
 
-## v0.11 — Domain Reintegration: Jobs · Work · Social · Dormant Systems
+## v0.11 — Domain Reintegration split
 
-> **Placeholder prossimo macro cantiere:** da aprire con audit dedicato prima di qualunque implementazione. Lo scope operativo resta da confermare alla luce della closure v0.10; nessun nuovo coding e' implicato da questa roadmap closeout.
+> **Nota roadmap:** v0.11 è stata splittata in tre sottofasi per evitare di mescolare Job runtime, Decision architecture e Work/Social audit. La v0.11 non è chiusa integralmente: è chiusa solo la fase v0.11A.
 
-### Tabella sessioni v0.11
+### v0.11A — Job Backbone Reintegration
 
-| # | Giorno | Sistema | Task | Stato |
-|---|--------|---------|------|-------|
-| 1 | Lun | Jobs | Reinnesto Job runtime contracts | Pending |
-| 2 | Mer | Work | WorkSystem activation | Pending |
-| 3 | Gio | Social | SocialSystem activation | Pending |
-| 4 | Lun | Rules | Dormant rules reintegro | Pending |
-| 5 | Mer | Commands | Bridge job/social → command pipeline | Pending |
-| 6 | Gio | QA | Test integrazione domini superiori | Pending |
+**Status:** COMPLETATA / ✅
 
-> **Nota:** qui tornano dentro i layer già abbozzati ma oggi sospesi o solo parzialmente innestati.
+**Scopo:** riattivare il Job System come runtime reale e tick-based.
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11.00 | Job System Forensic Audit | ✅ |
+| v0.11.01 | Food Job Vertical Slice | ✅ |
+| v0.11.02 | Generic Move Job Route | ✅ |
+| v0.11.03 | Job Arbiter Runtime Activation | ✅ |
+| v0.11.04 | Reservation Runtime Integration | ✅ |
+| v0.11.05 | Job Runtime Snapshot | ✅ |
+| v0.11.06 | NeedsDecisionRule Job Bridge | ✅ |
+
+**Esito consolidato v0.11A:**
+
+- Job backbone runtime riattivato su slice food e move;
+- `JobArbiter`, preemption minima, reservation runtime e snapshot runtime resi vivi;
+- bridge `NeedsDecisionRule` → Job mantenuto come percorso legacy/transitorio controllato;
+- Decision Records `ARC-DEC-010` → `ARC-DEC-017` consolidati;
+- `ARC-CON-011 — Architettura della Memoria NPC` prodotto/consolidato;
+- test finali `FoodJobVerticalSliceQaTests`: 25/25 passed;
+- branch task job backbone committato/pushato con commit `676b443`, `d0a844e`, `325fafd`, `cafb4fe`, `585279b`, `3046958`.
+
+### v0.11B — Decision Architecture (MBQD) Foundation
+
+**Status:** IN PREPARAZIONE / PENDING
+
+**Scopo:** progettare e avviare la pipeline `Memory → Belief → Query → Decision → Job`.
+
+**Nota operativa:** questa è la prossima apertura tecnica. Deve partire dall'architettura decisionale e non da patch dirette su WorkSystem o SocialSystem.
+
+### v0.11C — Work/Social/Dormant Systems Forensic Audit
+
+**Status:** FUTURA / PENDING
+
+**Scopo:** auditare WorkSystem, SocialSystem e sistemi dormant/placeholder dopo la foundation decisionale.
+
+**Nota:** Work/Social/Dormant restano fuori scope finché v0.11B non chiarisce la pipeline decisionale minima.
 
 ---
 

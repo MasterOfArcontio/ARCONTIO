@@ -115,10 +115,73 @@ a primo livello di runtime costituzionalmente hardenizzato.
 
 ---
 
-# 3. Prossimi Main Job in coda (non saltare avanti salvo richiesta)
+# 3. Stato macro roadmap v0.11 split
 
-* `v0.11` — Domain Reintegration: Jobs · Work · Social · Dormant Systems
-* `v0.12` — Jobs Backbone Primary Integration (provvisorio, da confermare dopo audit)
+La campagna originaria:
+
+`v0.11` — Domain Reintegration: Jobs · Work · Social · Dormant Systems
+
+è stata splittata in tre sottofasi per evitare di mescolare Job runtime, Decision architecture e Work/Social audit.
+
+La v0.11 NON è chiusa integralmente.
+È chiusa solo la fase `v0.11A`.
+
+## v0.11A — Job Backbone Reintegration
+
+STATUS:
+COMPLETED / DONE
+
+SCOPE:
+riattivare il Job System come runtime reale e tick-based.
+
+Task completati:
+
+* `v0.11.00` — Job System Forensic Audit
+* `v0.11.01` — Food Job Vertical Slice
+* `v0.11.02` — Generic Move Job Route
+* `v0.11.03` — Job Arbiter Runtime Activation
+* `v0.11.04` — Reservation Runtime Integration
+* `v0.11.05` — Job Runtime Snapshot
+* `v0.11.06` — NeedsDecisionRule Job Bridge
+
+Consolidato:
+
+* Decision Records `ARC-DEC-010` → `ARC-DEC-017`
+* `ARC-CON-011` — Architettura della Memoria NPC
+* `FoodJobVerticalSliceQaTests`: 25/25 passed
+* commit job backbone: `676b443`, `d0a844e`, `325fafd`, `cafb4fe`, `585279b`, `3046958`
+
+## v0.11B — Decision Architecture (MBQD) Foundation
+
+STATUS:
+IN PREPARAZIONE / PENDING
+
+SCOPE:
+progettare e avviare la pipeline:
+
+`Memory → Belief → Query → Decision → Job`
+
+Prerequisiti consolidati:
+
+* Job Backbone `v0.11A` completed
+* `ARC-CON-011` Memory Architecture completed
+* `ARC-DEC-010` → `ARC-DEC-017` consolidated
+
+Regole operative:
+
+* `NeedsDecisionRule` resta legacy/transitorio.
+* `NeedsDecisionRule` non va rimosso senza checkpoint dedicato.
+* La prossima apertura tecnica deve partire da architettura decisionale, non da Work/Social patch diretta.
+
+## v0.11C — Work/Social/Dormant Systems Forensic Audit
+
+STATUS:
+FUTURA / PENDING
+
+SCOPE:
+auditare WorkSystem, SocialSystem e sistemi dormant/placeholder dopo la foundation decisionale.
+
+Non procedere a patch Work/Social finché `v0.11B` non ha definito il backbone decisionale minimo.
 
 ---
 
@@ -126,9 +189,9 @@ a primo livello di runtime costituzionalmente hardenizzato.
 
 I seguenti macro job restano intenzionalmente in pausa finché la closure backbone repository non avanza:
 
-* espansioni Job System
-* espansioni architettura Memory
-* espansioni Social communication
+* espansioni Job System fuori dal backbone v0.11A già chiuso
+* espansioni architettura Memory fuori da `ARC-CON-011`
+* espansioni Social communication prima dell'audit v0.11C
 * espansioni Explainability UI
 * aggiunte feature runtime ampie
 
