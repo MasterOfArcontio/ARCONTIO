@@ -258,7 +258,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void NeedsDecisionRuleFallsBackToLegacyWhenJobArbiterRejectsFoodRoute()
+        public void JobAssignmentRejectedDoesNotInvalidateFoodBelief()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out _);
             AddFoodBelief(world, npcId, 5, 5);
@@ -273,6 +273,8 @@ namespace Arcontio.Tests
             Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
             Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
             AssertLatestBridge(world, npcId, LegacyFallbackKind.CompatibilityFallback, "FoodJobRouteRejectedThenLegacyFood:JobArbiterRejectedLegacyFoodFallback");
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Active);
+            AssertLatestFailureLearning(world, npcId, JobFailureReason.Unknown, "OperationalFailure:JobAssignmentRejected");
         }
 
         [Test]
@@ -329,7 +331,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void NeedsDecisionRuleFallsBackToLegacyWhenFoodReservationDenied()
+        public void ReservationDeniedDoesNotInvalidateBelief()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int firstNpcId, out int foodId);
             int secondNpcId = CreateAdditionalNpc(world, 5, 5);
@@ -348,6 +350,8 @@ namespace Arcontio.Tests
             Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
             Assert.That(world.JobRuntimeState.HasActiveJob(firstNpcId), Is.True);
             AssertLatestBridge(world, secondNpcId, LegacyFallbackKind.CompatibilityFallback, "FoodJobRouteRejectedThenLegacyFood:ReservationDeniedLegacyFoodFallback");
+            AssertFoodBeliefStatus(world, secondNpcId, BeliefStatus.Active);
+            AssertLatestFailureLearning(world, secondNpcId, JobFailureReason.ReservationDenied, "OperationalFailure:ReservationDenied");
         }
 
         [Test]
@@ -525,6 +529,57 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void RememberedFoodMissingProducesBeliefContradiction()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            PreferKnownFoodDecision(world, npcId);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            AssertLatestBeliefTrace(world, npcId, MemoryBeliefDecisionBeliefOperation.Discarded, "BeliefContradiction:RememberedFoodMissing");
+        }
+
+        [Test]
+        public void FoodTargetMismatchProducesContradiction()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 6, npcY: 5, foodX: 6, foodY: 5, out int npcId, out _);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            PreferKnownFoodDecision(world, npcId);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            AssertLatestBeliefTrace(world, npcId, MemoryBeliefDecisionBeliefOperation.Discarded, "BeliefContradiction:FoodTargetMismatch");
+        }
+
+        [Test]
+        public void ExistingFoodFallbackBehaviorStillPasses()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out _);
+            AddFoodBelief(world, npcId, 5, 5);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: false, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Active);
+        }
+
+        [Test]
         public void NeedsDecisionRuleWithGateTrueKeepsPrivateCarriedFoodOnLegacyCommand()
         {
             var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
@@ -603,6 +658,8 @@ namespace Arcontio.Tests
             world.Config.Sim.memory_belief_decision_explainability.logDecision = true;
             world.Config.Sim.memory_belief_decision_explainability.logBridge = true;
             world.Config.Sim.memory_belief_decision_explainability.logJobRequest = true;
+            world.Config.Sim.memory_belief_decision_explainability.logBelief = true;
+            world.Config.Sim.memory_belief_decision_explainability.logFailureLearning = true;
         }
 
         private static void AssertLatestBridge(World world, int npcId, LegacyFallbackKind expectedKind, string expectedReason)
@@ -612,6 +669,40 @@ namespace Arcontio.Tests
             Assert.That(trace.Bridge, Is.Not.Null);
             Assert.That(trace.Bridge.FallbackKind, Is.EqualTo(expectedKind));
             Assert.That(trace.Bridge.Reason, Is.EqualTo(expectedReason));
+        }
+
+        private static void AssertLatestBeliefTrace(
+            World world,
+            int npcId,
+            MemoryBeliefDecisionBeliefOperation expectedOperation,
+            string expectedReason)
+        {
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestBeliefTrace(out var trace), Is.True);
+            Assert.That(trace.Belief, Is.Not.Null);
+            Assert.That(trace.Belief.Operation, Is.EqualTo(expectedOperation));
+            Assert.That(trace.Belief.Reason, Is.EqualTo(expectedReason));
+        }
+
+        private static void AssertLatestFailureLearning(
+            World world,
+            int npcId,
+            JobFailureReason expectedReason,
+            string expectedDiagnosticReason)
+        {
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestFailureLearningTrace(out var trace), Is.True);
+            Assert.That(trace.FailureLearning, Is.Not.Null);
+            Assert.That(trace.FailureLearning.FailureReason, Is.EqualTo(expectedReason));
+            Assert.That(trace.FailureLearning.Reason, Is.EqualTo(expectedDiagnosticReason));
+        }
+
+        private static void AssertFoodBeliefStatus(World world, int npcId, BeliefStatus expectedStatus)
+        {
+            Assert.That(world.Beliefs.TryGetValue(npcId, out var store), Is.True);
+            Assert.That(store.Entries.Count, Is.GreaterThanOrEqualTo(1));
+            Assert.That(store.Entries[0].Category, Is.EqualTo(BeliefCategory.Food));
+            Assert.That(store.Entries[0].Status, Is.EqualTo(expectedStatus));
         }
 
         private static void PreferKnownFoodDecision(World world, int npcId)
