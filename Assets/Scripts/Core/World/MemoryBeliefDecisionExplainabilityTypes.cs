@@ -247,6 +247,42 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // LegacyFallbackKind
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Classificazione stabile dei fallback legacy osservati nel ponte transitorio
+    /// MBQD -> NeedsDecisionRule.
+    /// </para>
+    ///
+    /// <para><b>Fallback espliciti senza cambio comportamentale</b></para>
+    /// <para>
+    /// L'enum non decide quando un fallback scatta e non introduce nuove route. Serve
+    /// solo a rendere auditabile il motivo architetturale del ritorno al runtime
+    /// legacy, mantenendo intatti command, job e no-op esistenti.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>None</b>: nessun fallback legacy e nessuna classificazione speciale.</item>
+    ///   <item><b>CompatibilityFallback</b>: preserva intenzionalmente runtime e test legacy durante la migrazione.</item>
+    ///   <item><b>TransitionalDebtFallback</b>: debito noto da migrare in futuro verso Job/MBQD.</item>
+    ///   <item><b>NonExecutableIntentFallback</b>: intent selezionato ma privo di job/step eseguibile.</item>
+    ///   <item><b>SafetyFallback</b>: fallback difensivo per evitare target invalido o stato incoerente.</item>
+    ///   <item><b>NoOpFallback</b>: nessuna azione intenzionale, ma la scelta resta osservabile.</item>
+    /// </list>
+    /// </summary>
+    public enum LegacyFallbackKind
+    {
+        None = 0,
+        CompatibilityFallback = 1,
+        TransitionalDebtFallback = 2,
+        NonExecutableIntentFallback = 3,
+        SafetyFallback = 4,
+        NoOpFallback = 5
+    }
+
+    // =============================================================================
     // MemoryBeliefDecisionScoreContributionRef
     // =============================================================================
     /// <summary>
@@ -543,6 +579,7 @@ namespace Arcontio.Core
         public Vector2Int TargetCell;
         public MemoryBeliefDecisionTargetSource TargetSource;
         public bool LegacyFallbackUsed;
+        public LegacyFallbackKind FallbackKind;
         public string Reason = string.Empty;
     }
 
