@@ -11,12 +11,13 @@ namespace Arcontio.Core
     /// eseguibile dalla prima vertical slice v0.11.01.
     /// </para>
     ///
-    /// <para><b>Decision -> Job senza nuova onniscienza</b></para>
+    /// <para><b>Decision -> JobRequest -> Job senza nuova onniscienza</b></para>
     /// <para>
-    /// La factory non cerca cibo nel mondo. Riceve un objectId e una cella gia'
-    /// scelti dal ponte decisionale, costruisce una <c>JobRequest</c> e chiede al
-    /// registry JSON il piano dichiarativo. In questo modo la conoscenza resta nel
-    /// decision layer legacy/transitorio e la factory resta solo un adattatore.
+    /// La factory non cerca cibo nel mondo. Nel path MBQD hardenizzato riceve un
+    /// <c>JobRequest</c> gia' costruito dal Legacy Transitional Decision Bridge e
+    /// chiede al registry JSON il piano dichiarativo. L'overload storico resta
+    /// disponibile solo per compatibilita' dei test e dei chiamanti v0.11B, ma delega
+    /// al nuovo overload per evitare due semantiche parallele.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -28,6 +29,71 @@ namespace Arcontio.Core
     /// </summary>
     public static class FoodJobFactory
     {
+        // =============================================================================
+        // TryCreateKnownCommunityFoodJob
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea il job food a partire da un <c>JobRequest</c> gia' pre-costruito dal
+        /// boundary Decision -> JobRequest.
+        /// </para>
+        ///
+        /// <para><b>Command Authority preservata</b></para>
+        /// <para>
+        /// Questo overload non emette <c>ICommand</c>, non assegna il job e non muta
+        /// il <c>World</c>. Materializza soltanto il piano food dal template esistente:
+        /// l'esecuzione resta a <c>JobRuntimeState</c>, <c>JobExecutionSystem</c>,
+        /// <c>JobCommandBuffer</c> e al command pump finale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione request</b>: intent, NPC, target object e target cell devono essere coerenti.</item>
+        ///   <item><b>Template</b>: usa solo <c>food.eat_known_community_stock.v1</c>.</item>
+        ///   <item><b>Job</b>: conserva il <c>JobRequest</c> ricevuto senza ricostruire semantica decisionale.</item>
+        /// </list>
+        /// </summary>
+        public static bool TryCreateKnownCommunityFoodJob(
+            JobTemplateRegistry registry,
+            JobRequest request,
+            out Job job,
+            out string reason)
+        {
+            job = null;
+            reason = string.Empty;
+
+            if (registry == null)
+            {
+                reason = "RegistryMissing";
+                return false;
+            }
+
+            if (request.NpcId <= 0)
+            {
+                reason = "InvalidNpcId";
+                return false;
+            }
+
+            if (request.IntentKind != DecisionIntentKind.EatKnownFood)
+            {
+                reason = "InvalidFoodJobIntent";
+                return false;
+            }
+
+            if (!request.HasTargetCell || request.TargetObjectId <= 0)
+            {
+                reason = "InvalidFoodJobTarget";
+                return false;
+            }
+
+            if (!registry.TryBuildPlan(JobTemplateRegistry.FoodKnownCommunityStockTemplateId, request, out var plan, out reason))
+                return false;
+
+            job = new Job($"job_food_{request.NpcId}_{request.TargetObjectId}_{request.CreatedTick}", request, plan);
+            reason = "FoodJobCreated";
+            return true;
+        }
+
         public static bool TryCreateKnownCommunityFoodJob(
             JobTemplateRegistry registry,
             int npcId,
@@ -42,18 +108,6 @@ namespace Arcontio.Core
             job = null;
             reason = string.Empty;
 
-            if (registry == null)
-            {
-                reason = "RegistryMissing";
-                return false;
-            }
-
-            if (npcId <= 0 || foodObjectId <= 0)
-            {
-                reason = "InvalidFoodJobTarget";
-                return false;
-            }
-
             var request = new JobRequest(
                 $"jobreq_food_{npcId}_{foodObjectId}_{tick}",
                 npcId,
@@ -67,12 +121,7 @@ namespace Arcontio.Core
                 beliefKey,
                 "FoodJobVerticalSlice");
 
-            if (!registry.TryBuildPlan(JobTemplateRegistry.FoodKnownCommunityStockTemplateId, request, out var plan, out reason))
-                return false;
-
-            job = new Job($"job_food_{npcId}_{foodObjectId}_{tick}", request, plan);
-            reason = "FoodJobCreated";
-            return true;
+            return TryCreateKnownCommunityFoodJob(registry, request, out job, out reason);
         }
     }
 }
