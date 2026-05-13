@@ -556,6 +556,7 @@ namespace Arcontio.Core
 
             if (string.Equals(jobRouteReason, "SameOrLowerPriority", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(jobRouteReason, "CurrentJobPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentStillPreferred", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(jobRouteReason, "CurrentPhaseProtected", System.StringComparison.OrdinalIgnoreCase))
                 return LegacyFallbackKind.CompatibilityFallback;
 
@@ -587,6 +588,7 @@ namespace Arcontio.Core
                 normalizedReason = "ReservationDeniedLegacyFoodFallback";
             else if (string.Equals(normalizedReason, "SameOrLowerPriority", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(normalizedReason, "CurrentJobPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "CurrentStillPreferred", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(normalizedReason, "CurrentPhaseProtected", System.StringComparison.OrdinalIgnoreCase))
                 normalizedReason = "JobArbiterRejectedLegacyFoodFallback";
             else if (string.Equals(normalizedReason, "KnownCommunityFoodMissing", System.StringComparison.OrdinalIgnoreCase)
