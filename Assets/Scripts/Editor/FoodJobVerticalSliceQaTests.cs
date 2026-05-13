@@ -71,6 +71,57 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void FoodFactoryAcceptsPrebuiltJobRequest()
+        {
+            var registry = MakeRegistry();
+            var request = MakeFoodJobRequest(
+                npcId: 1,
+                foodObjectId: 10,
+                targetCell: new Vector2Int(5, 5),
+                tick: 2,
+                urgency01: 0.92f,
+                beliefKey: "Food:99@5,5");
+
+            bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
+                registry,
+                request,
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            Assert.That(job, Is.Not.Null);
+            AssertFoodBoundaryFields(job.Request, request);
+            Assert.That(job.Plan.PlanId, Is.EqualTo(JobTemplateRegistry.FoodKnownCommunityStockTemplateId));
+        }
+
+        [Test]
+        public void FoodFactoryPrebuiltRequestPreservesDecisionBoundaryFields()
+        {
+            var registry = MakeRegistry();
+            var request = MakeFoodJobRequest(
+                npcId: 7,
+                foodObjectId: 44,
+                targetCell: new Vector2Int(8, 3),
+                tick: 12,
+                urgency01: 0.73f,
+                beliefKey: "Food:123@8,3");
+
+            bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
+                registry,
+                request,
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            AssertFoodBoundaryFields(job.Request, request);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.EatKnownFood));
+            Assert.That(job.Request.Urgency01, Is.EqualTo(0.73f).Within(0.0001f));
+            Assert.That(job.Request.BeliefKey, Is.EqualTo("Food:123@8,3"));
+            Assert.That(job.Request.TargetCell, Is.EqualTo(new Vector2Int(8, 3)));
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(44));
+        }
+
+        [Test]
         public void MoveFactoryCreatesSinglePhaseMovePlan()
         {
             var registry = MakeRegistry();
@@ -396,6 +447,26 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void AcceptedFoodJobPreservesDecisionBoundaryFields()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AddFoodBelief(world, npcId, 5, 5);
+            PreferKnownFoodDecision(world, npcId);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.EatKnownFood));
+            Assert.That(job.Request.Urgency01, Is.EqualTo(0.95f).Within(0.0001f));
+            Assert.That(job.Request.BeliefKey, Is.EqualTo("Food:1@5,5"));
+            Assert.That(job.Request.TargetCell, Is.EqualTo(new Vector2Int(5, 5)));
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(foodId));
+        }
+
+        [Test]
         public void NeedsDecisionRuleWithAcceptedFoodJobDoesNotEmitLegacyMoveCommand()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out _);
@@ -463,6 +534,60 @@ namespace Arcontio.Tests
             var registry = new JobTemplateRegistry();
             registry.LoadFromJson(TemplateJson);
             return registry;
+        }
+
+        private static JobRequest MakeFoodJobRequest(
+            int npcId,
+            int foodObjectId,
+            Vector2Int targetCell,
+            int tick,
+            float urgency01,
+            string beliefKey)
+        {
+            return new JobRequest(
+                $"jobreq_food_{npcId}_{foodObjectId}_{tick}",
+                npcId,
+                DecisionIntentKind.EatKnownFood,
+                urgency01 >= 0.85f ? JobPriorityClass.Critical : JobPriorityClass.Important,
+                urgency01,
+                tick,
+                true,
+                targetCell,
+                foodObjectId,
+                beliefKey,
+                "FoodJobVerticalSlice");
+        }
+
+        private static void AssertFoodBoundaryFields(JobRequest actual, JobRequest expected)
+        {
+            Assert.That(actual.IntentKind, Is.EqualTo(expected.IntentKind));
+            Assert.That(actual.Urgency01, Is.EqualTo(expected.Urgency01).Within(0.0001f));
+            Assert.That(actual.BeliefKey, Is.EqualTo(expected.BeliefKey));
+            Assert.That(actual.HasTargetCell, Is.EqualTo(expected.HasTargetCell));
+            Assert.That(actual.TargetCell, Is.EqualTo(expected.TargetCell));
+            Assert.That(actual.TargetObjectId, Is.EqualTo(expected.TargetObjectId));
+        }
+
+        private static void PreferKnownFoodDecision(World world, int npcId)
+        {
+            Assert.That(world.NpcProfiles.TryGetValue(npcId, out var profile), Is.True);
+
+            // In questo test vogliamo attraversare il boundary reale EatKnownFood
+            // -> JobRequest -> FoodJobFactory. La selezione runtime normale resta
+            // weighted-random top-N e puo' scegliere SearchFood anche quando il
+            // candidato noto e' disponibile; qui forziamo solo lo scenario QA a
+            // scegliere deterministicamente il candidato col punteggio piu' alto.
+            world.Config.Sim.decision.selectionMode = "DeterministicTop1";
+
+            // Alziamo l'affinita' agricola e azzeriamo quella esplorativa per far
+            // emergere EatKnownFood come miglior candidato senza modificare la
+            // pipeline decisionale di produzione o i fallback legacy.
+            profile.Competence.Set(DomainKind.Agriculture, 1f);
+            profile.Preference.Set(DomainKind.Agriculture, 1f);
+            profile.Obligation.Set(DomainKind.Agriculture, 1f);
+            profile.Competence.Set(DomainKind.Exploration, 0f);
+            profile.Preference.Set(DomainKind.Exploration, 0f);
+            profile.Obligation.Set(DomainKind.Exploration, 0f);
         }
 
         private static World MakeWorldWithNpcAndCommunityFood(int npcX, int npcY, int foodX, int foodY, out int npcId, out int foodId)
