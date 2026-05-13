@@ -265,6 +265,13 @@ namespace Arcontio.Core
             {
                 cmd = new EatPrivateFoodCommand(npcId);
                 handled = true;
+                TryLogDecisionBridgeFallback(
+                    nowTick,
+                    npcId,
+                    DecisionIntentKind.EatKnownFood,
+                    cmd,
+                    LegacyFallbackKind.CompatibilityFallback,
+                    "PrivateCarriedFoodLegacyCommand");
                 return true;
             }
 
@@ -308,19 +315,21 @@ namespace Arcontio.Core
                         cmd = null;
                         didSteal = false;
                         didMove = false;
-                        TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, "FoodJobRouteAccepted:" + jobRouteReason);
+                        TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, LegacyFallbackKind.None, "FoodJobRouteAccepted:" + jobRouteReason);
                         return true;
                     }
 
                     bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    var fallbackKind = ResolveFoodJobRouteFallbackKind(jobRouteReason, planned);
+                    string fallbackReason = BuildFoodJobRouteFallbackReason(jobRouteReason, planned);
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, fallbackKind, fallbackReason);
                     return planned;
                 }
 
                 case DecisionIntentKind.TakeRestrictedFood:
                 {
                     bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, LegacyFallbackKind.TransitionalDebtFallback, planned ? "RestrictedFoodLegacyCommandAdapter" : "RestrictedFoodLegacyAdapterNoCommand");
                     return planned;
                 }
 
@@ -328,7 +337,7 @@ namespace Arcontio.Core
                 case DecisionIntentKind.UseRestrictedRestPlace:
                 {
                     bool planned = TryPlanSleep(world, npcId, needs, out cmd, out didSteal);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, LegacyFallbackKind.TransitionalDebtFallback, planned ? "RestLegacyCommandAdapter" : "RestLegacyAdapterNoCommand");
                     return planned;
                 }
 
@@ -343,12 +352,12 @@ namespace Arcontio.Core
                     didSteal = false;
                     didMove = false;
                     handled = false;
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "LegacyFallbackForNonExecutableIntent");
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, LegacyFallbackKind.NonExecutableIntentFallback, "NonExecutableIntentLegacyFallback");
                     return false;
 
                 default:
                     handled = false;
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "UnsupportedIntent");
+                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, LegacyFallbackKind.NoOpFallback, "UnsupportedIntentNoOp");
                     return false;
             }
         }
@@ -519,6 +528,80 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // ResolveFoodJobRouteFallbackKind
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Classifica il motivo per cui la route <c>EatKnownFood -> Job</c> e' tornata
+        /// al percorso legacy.
+        /// </para>
+        ///
+        /// <para><b>Classificazione diagnostica, non routing</b></para>
+        /// <para>
+        /// Questo helper non decide se emettere command e non assegna job. Traduce una
+        /// reason gia' prodotta dal boundary food-job in una categoria stabile per EL e
+        /// log strutturato, lasciando invariato il comportamento runtime v0.11B.
+        /// </para>
+        /// </summary>
+        private static LegacyFallbackKind ResolveFoodJobRouteFallbackKind(string jobRouteReason, bool planned)
+        {
+            if (!planned)
+                return LegacyFallbackKind.SafetyFallback;
+
+            if (string.Equals(jobRouteReason, "GateDisabled", System.StringComparison.OrdinalIgnoreCase))
+                return LegacyFallbackKind.CompatibilityFallback;
+
+            if (string.Equals(jobRouteReason, "ReservationDenied", System.StringComparison.OrdinalIgnoreCase))
+                return LegacyFallbackKind.CompatibilityFallback;
+
+            if (string.Equals(jobRouteReason, "SameOrLowerPriority", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentJobPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentStillPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentPhaseProtected", System.StringComparison.OrdinalIgnoreCase))
+                return LegacyFallbackKind.CompatibilityFallback;
+
+            if (string.IsNullOrWhiteSpace(jobRouteReason)
+                || jobRouteReason.StartsWith("FoodJobRouteFailed", System.StringComparison.OrdinalIgnoreCase)
+                || jobRouteReason.StartsWith("ResolvedTargetMismatch", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "KnownCommunityFoodMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "JobRuntimeMissing", System.StringComparison.OrdinalIgnoreCase))
+                return LegacyFallbackKind.SafetyFallback;
+
+            return LegacyFallbackKind.TransitionalDebtFallback;
+        }
+
+        // =============================================================================
+        // BuildFoodJobRouteFallbackReason
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce reason string stabili per il log di fallback della route food-job.
+        /// </para>
+        /// </summary>
+        private static string BuildFoodJobRouteFallbackReason(string jobRouteReason, bool planned)
+        {
+            string normalizedReason = string.IsNullOrWhiteSpace(jobRouteReason) ? "Unknown" : jobRouteReason;
+
+            if (string.Equals(normalizedReason, "GateDisabled", System.StringComparison.OrdinalIgnoreCase))
+                normalizedReason = "FoodJobGateDisabled";
+            else if (string.Equals(normalizedReason, "ReservationDenied", System.StringComparison.OrdinalIgnoreCase))
+                normalizedReason = "ReservationDeniedLegacyFoodFallback";
+            else if (string.Equals(normalizedReason, "SameOrLowerPriority", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "CurrentJobPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "CurrentStillPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "CurrentPhaseProtected", System.StringComparison.OrdinalIgnoreCase))
+                normalizedReason = "JobArbiterRejectedLegacyFoodFallback";
+            else if (string.Equals(normalizedReason, "KnownCommunityFoodMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "JobRuntimeMissing", System.StringComparison.OrdinalIgnoreCase)
+                || normalizedReason.StartsWith("ResolvedTargetMismatch", System.StringComparison.OrdinalIgnoreCase))
+                normalizedReason = "FoodJobRouteFailed:" + normalizedReason;
+
+            return planned
+                ? "FoodJobRouteRejectedThenLegacyFood:" + normalizedReason
+                : "FoodJobRouteFailed:" + normalizedReason;
+        }
+
+        // =============================================================================
         // TryEmitDecisionTrace
         // =============================================================================
         /// <summary>
@@ -614,10 +697,14 @@ namespace Arcontio.Core
             bool didMove,
             bool handled,
             bool legacyFallbackUsed,
+            LegacyFallbackKind fallbackKind,
             string reason)
         {
             if (config == null)
+            {
+                TryLogDecisionBridgeFallback(tick, npcId, candidate, command, fallbackKind, reason);
                 return;
+            }
 
             var targetCell = Vector2Int.zero;
             var targetSource = MemoryBeliefDecisionTargetSource.None;
@@ -648,9 +735,61 @@ namespace Arcontio.Core
                     TargetCell = targetCell,
                     TargetSource = targetSource,
                     LegacyFallbackUsed = legacyFallbackUsed,
+                    FallbackKind = fallbackKind,
                     Reason = reason ?? string.Empty,
                 },
             });
+
+            TryLogDecisionBridgeFallback(tick, npcId, candidate, command, fallbackKind, reason);
+        }
+
+        // =============================================================================
+        // TryLogDecisionBridgeFallback
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scrive un log strutturato solo quando il bridge decide davvero un fallback o
+        /// un no-op classificato.
+        /// </para>
+        ///
+        /// <para><b>Osservabilita' senza spam decisionale</b></para>
+        /// <para>
+        /// Il log resta spento per il path nominale <c>FallbackKind.None</c>. In questo
+        /// modo la patch rende visibili i ritorni legacy senza duplicare ogni selezione
+        /// MBQD gia' coperta da <c>log.decision.bridge.intent</c>.
+        /// </para>
+        /// </summary>
+        private static void TryLogDecisionBridgeFallback(
+            int tick,
+            int npcId,
+            DecisionCandidate candidate,
+            ICommand command,
+            LegacyFallbackKind fallbackKind,
+            string reason)
+        {
+            TryLogDecisionBridgeFallback(tick, npcId, candidate.Kind, command, fallbackKind, reason);
+        }
+
+        private static void TryLogDecisionBridgeFallback(
+            int tick,
+            int npcId,
+            DecisionIntentKind intent,
+            ICommand command,
+            LegacyFallbackKind fallbackKind,
+            string reason)
+        {
+            if (fallbackKind == LegacyFallbackKind.None)
+                return;
+
+            ArcontioLogger.Info(
+                new LogContext(tick: tick, channel: "DecisionBridgeFallback", npcId: npcId),
+                new LogBlock(LogLevel.Info, "log.decision.bridge.fallback")
+                    .AddField("tick", tick)
+                    .AddField("npcId", npcId)
+                    .AddField("intent", intent.ToString())
+                    .AddField("fallbackKind", fallbackKind.ToString())
+                    .AddField("reason", reason ?? string.Empty)
+                    .AddField("commandName", command != null ? command.Name : string.Empty));
         }
 
         // =============================================================================

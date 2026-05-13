@@ -262,6 +262,8 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out _);
             AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            PreferKnownFoodDecision(world, npcId);
             AssignFoodJob(world, npcId, 77, 5, 5, urgency01: 0.90f);
             var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
@@ -270,6 +272,7 @@ namespace Arcontio.Tests
 
             Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
             Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
+            AssertLatestBridge(world, npcId, LegacyFallbackKind.CompatibilityFallback, "FoodJobRouteRejectedThenLegacyFood:JobArbiterRejectedLegacyFoodFallback");
         }
 
         [Test]
@@ -332,6 +335,9 @@ namespace Arcontio.Tests
             int secondNpcId = CreateAdditionalNpc(world, 5, 5);
             AddFoodBelief(world, firstNpcId, 5, 5);
             AddFoodBelief(world, secondNpcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            PreferKnownFoodDecision(world, secondNpcId);
+            world.Needs[firstNpcId] = NpcNeeds.Make(0.1f, 0.1f);
             AssignFoodJob(world, firstNpcId, foodId, 5, 5, urgency01: 0.95f);
             var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
@@ -341,6 +347,7 @@ namespace Arcontio.Tests
             Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
             Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
             Assert.That(world.JobRuntimeState.HasActiveJob(firstNpcId), Is.True);
+            AssertLatestBridge(world, secondNpcId, LegacyFallbackKind.CompatibilityFallback, "FoodJobRouteRejectedThenLegacyFood:ReservationDeniedLegacyFoodFallback");
         }
 
         [Test]
@@ -451,6 +458,7 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
             AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
             PreferKnownFoodDecision(world, npcId);
             var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
@@ -464,6 +472,7 @@ namespace Arcontio.Tests
             Assert.That(job.Request.BeliefKey, Is.EqualTo("Food:1@5,5"));
             Assert.That(job.Request.TargetCell, Is.EqualTo(new Vector2Int(5, 5)));
             Assert.That(job.Request.TargetObjectId, Is.EqualTo(foodId));
+            AssertLatestBridge(world, npcId, LegacyFallbackKind.None, "FoodJobRouteAccepted:JobAssigned");
         }
 
         [Test]
@@ -486,6 +495,8 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out _);
             AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            PreferKnownFoodDecision(world, npcId);
             var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: false, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
 
@@ -494,6 +505,23 @@ namespace Arcontio.Tests
             Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
             Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            AssertLatestBridge(world, npcId, LegacyFallbackKind.CompatibilityFallback, "FoodJobRouteRejectedThenLegacyFood:FoodJobGateDisabled");
+        }
+
+        [Test]
+        public void NeedsDecisionRuleWithSearchFoodWritesNonExecutableFallbackTrace()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            EnableMbdBridgeExplainability(world);
+            world.Config.Sim.decision.selectionMode = "DeterministicTop1";
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            AssertLatestBridge(world, npcId, LegacyFallbackKind.NonExecutableIntentFallback, "NonExecutableIntentLegacyFallback");
         }
 
         [Test]
@@ -566,6 +594,24 @@ namespace Arcontio.Tests
             Assert.That(actual.HasTargetCell, Is.EqualTo(expected.HasTargetCell));
             Assert.That(actual.TargetCell, Is.EqualTo(expected.TargetCell));
             Assert.That(actual.TargetObjectId, Is.EqualTo(expected.TargetObjectId));
+        }
+
+        private static void EnableMbdBridgeExplainability(World world)
+        {
+            world.Config.Sim.memory_belief_decision_explainability.enabled = true;
+            world.Config.Sim.memory_belief_decision_explainability.writeJsonLog = false;
+            world.Config.Sim.memory_belief_decision_explainability.logDecision = true;
+            world.Config.Sim.memory_belief_decision_explainability.logBridge = true;
+            world.Config.Sim.memory_belief_decision_explainability.logJobRequest = true;
+        }
+
+        private static void AssertLatestBridge(World world, int npcId, LegacyFallbackKind expectedKind, string expectedReason)
+        {
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestBridgeTrace(out var trace), Is.True);
+            Assert.That(trace.Bridge, Is.Not.Null);
+            Assert.That(trace.Bridge.FallbackKind, Is.EqualTo(expectedKind));
+            Assert.That(trace.Bridge.Reason, Is.EqualTo(expectedReason));
         }
 
         private static void PreferKnownFoodDecision(World world, int npcId)
