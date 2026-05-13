@@ -32,6 +32,7 @@ namespace Arcontio.Core
     {
         private readonly List<int> _activeNpcIds = new();
         private readonly JobStateMachine _stateMachine = new();
+        private readonly BeliefUpdater _beliefUpdater = new();
 
         public int Period => 1;
 
@@ -61,6 +62,7 @@ namespace Arcontio.Core
 
                 if (machineResult.TickResult == JobStateMachineTickResult.JobFailed)
                 {
+                    ApplyFoodExecutionFailureCognitiveFeedback(world, npcId, job, result, (int)tick.Index, telemetry);
                     runtime.FailCurrentJob(npcId, machineResult.FailureReason, (int)tick.Index, out _);
                     continue;
                 }
@@ -239,6 +241,159 @@ namespace Arcontio.Core
 
             runtime.CommandBuffer.Enqueue(new DropObjectCommand(npcId, action.TargetObjectId, action.TargetCell.x, action.TargetCell.y));
             return StepResult.Succeeded("DropCommandEnqueued");
+        }
+
+        // =============================================================================
+        // ApplyFoodExecutionFailureCognitiveFeedback
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega il fallimento reale di execution del job food a un feedback
+        /// cognitivo minimo sul BeliefStore dell'NPC.
+        /// </para>
+        ///
+        /// <para><b>Failure operativo != sempre belief falsa</b></para>
+        /// <para>
+        /// Questo bridge copre solo fallimenti target-related del consume food. Non
+        /// interpreta reservation, preemption, movement o piano mancante come
+        /// contradiction, perche' quei casi possono dipendere da scheduling,
+        /// pathfinding o integrita' del job e non dal contenuto della belief Food.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate intent</b>: agisce solo su <c>EatKnownFood</c>.</item>
+        ///   <item><b>Gate reason</b>: accetta solo i diagnostic message Consume target-related richiesti.</item>
+        ///   <item><b>Feedback</b>: usa categoria <c>Food</c> + <c>JobRequest.TargetCell</c>, non un nuovo contratto BeliefId.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyFoodExecutionFailureCognitiveFeedback(
+            World world,
+            int npcId,
+            Job job,
+            StepResult stepResult,
+            int tick,
+            Telemetry telemetry)
+        {
+            if (world == null || job == null)
+                return;
+
+            if (job.Request.IntentKind != DecisionIntentKind.EatKnownFood || !job.Request.HasTargetCell)
+                return;
+
+            if (!IsFoodExecutionTargetContradiction(stepResult.DiagnosticMessage))
+                return;
+
+            if (!world.Beliefs.TryGetValue(npcId, out var store) || store == null)
+                return;
+
+            if (TryFindFoodBeliefByPosition(store, job.Request.TargetCell, out var existingBelief)
+                && existingBelief.Status == BeliefStatus.Discarded)
+            {
+                telemetry?.Counter("JobExecution.FoodFailureBeliefAlreadyDiscarded", 1);
+                EmitFoodExecutionFailureLearningTrace(world, npcId, job, stepResult, tick, "FoodExecutionFailureAlreadyDiscarded");
+                return;
+            }
+
+            var signal = new BeliefFailureSignal(
+                npcId: npcId,
+                beliefId: 0,
+                category: BeliefCategory.Food,
+                estimatedPosition: job.Request.TargetCell,
+                failureKind: BeliefFailureKind.DirectLocalContradiction,
+                penalty01: 1f,
+                tick: tick);
+
+            bool updated = _beliefUpdater.UpdateFromOperationalFailure(signal, store);
+            telemetry?.Counter(updated ? "JobExecution.FoodFailureBeliefDiscarded" : "JobExecution.FoodFailureBeliefNoMatch", 1);
+
+            if (updated && TryFindFoodBeliefByPosition(store, job.Request.TargetCell, out var updatedBelief))
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(
+                    world.Config?.Sim?.memory_belief_decision_explainability,
+                    world.MemoryBeliefDecisionExplainability,
+                    new MemoryBeliefDecisionTrace
+                    {
+                        Kind = MemoryBeliefDecisionTraceKind.Belief,
+                        Tick = tick,
+                        NpcId = npcId,
+                        Belief = new MemoryBeliefDecisionBeliefRecord
+                        {
+                            Operation = MemoryBeliefDecisionBeliefOperation.Discarded,
+                            HasSourceTrace = false,
+                            SourceTraceType = default,
+                            Belief = ToBeliefRef(updatedBelief),
+                            Reason = "BeliefContradiction:FoodExecutionTargetFailure:" + stepResult.DiagnosticMessage,
+                        },
+                    });
+            }
+
+            EmitFoodExecutionFailureLearningTrace(world, npcId, job, stepResult, tick, "OperationalFailure:FoodExecutionTargetFailure:" + stepResult.DiagnosticMessage);
+        }
+
+        private static bool IsFoodExecutionTargetContradiction(string diagnosticMessage)
+        {
+            return string.Equals(diagnosticMessage, "ConsumeFoodUnavailable", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "ConsumeFoodObjectMissing", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "ConsumeTargetNoLongerCoLocated", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "ConsumeMissingFoodObject", System.StringComparison.Ordinal);
+        }
+
+        private static bool TryFindFoodBeliefByPosition(BeliefStore store, Vector2Int targetCell, out BeliefEntry belief)
+        {
+            belief = default;
+
+            if (store == null)
+                return false;
+
+            var entries = store.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                if (entry.Category != BeliefCategory.Food || entry.EstimatedPosition != targetCell)
+                    continue;
+
+                belief = entry;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static void EmitFoodExecutionFailureLearningTrace(
+            World world,
+            int npcId,
+            Job job,
+            StepResult stepResult,
+            int tick,
+            string reason)
+        {
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteFailureLearningTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                world.MemoryBeliefDecisionExplainability,
+                npcId,
+                tick,
+                job.JobId,
+                job.Request.TargetCell,
+                stepResult.FailureReason,
+                tick,
+                1f,
+                reason);
+        }
+
+        private static MemoryBeliefDecisionBeliefRef ToBeliefRef(BeliefEntry belief)
+        {
+            return new MemoryBeliefDecisionBeliefRef
+            {
+                Category = belief.Category,
+                Status = belief.Status,
+                Source = belief.Source,
+                BeliefId = belief.BeliefId,
+                EstimatedPosition = belief.EstimatedPosition,
+                Confidence = belief.Confidence,
+                Freshness = belief.Freshness,
+                SourceCount = belief.SourceCount,
+            };
         }
     }
 }
