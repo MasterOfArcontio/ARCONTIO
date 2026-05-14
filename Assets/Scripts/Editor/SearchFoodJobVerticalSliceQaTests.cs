@@ -1,0 +1,264 @@
+using System.Collections.Generic;
+using Arcontio.Core;
+using Arcontio.Core.Config;
+using Arcontio.Core.Diagnostics;
+using NUnit.Framework;
+using UnityEngine;
+
+namespace Arcontio.Tests
+{
+    // =============================================================================
+    // SearchFoodJobVerticalSliceQaTests
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Test QA EditMode per la vertical slice v0.11b.04 che rende <c>SearchFood</c>
+    /// job-executable tramite una probe cell locale.
+    /// </para>
+    ///
+    /// <para><b>SearchFood senza telepatia</b></para>
+    /// <para>
+    /// Questi test proteggono il contratto della patch: il job SearchFood non punta
+    /// a un oggetto cibo, non cerca in <c>World.Objects</c> o <c>FoodStocks</c> e
+    /// produce solo un movimento locale. La scoperta cognitiva del cibo resta fuori
+    /// dalla factory e dal decision bridge, affidata ai sistemi runtime di
+    /// percezione, memoria e belief nei tick successivi.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Factory</b>: conserva il <c>JobRequest</c> pre-costruito.</item>
+    ///   <item><b>Bridge</b>: SearchFood selezionato assegna un job senza command legacy.</item>
+    ///   <item><b>Execution</b>: il job produce <c>SetMoveIntentCommand</c> con purpose SeekFood.</item>
+    ///   <item><b>Fallback</b>: quando non esiste probe fisica valida resta osservabile.</item>
+    /// </list>
+    /// </summary>
+    public sealed class SearchFoodJobVerticalSliceQaTests
+    {
+        private const string TemplateJson =
+            "{\"templates\":[{\"templateId\":\"food.search_local_probe.v1\",\"phases\":[{\"phaseId\":\"search_food_probe\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_probe\",\"kind\":\"MoveToCell\"}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
+
+        [Test]
+        public void SearchFoodFactoryAcceptsPrebuiltJobRequest()
+        {
+            var registry = MakeRegistry();
+            var target = new Vector2Int(6, 5);
+            var request = MakeSearchFoodRequest(npcId: 1, target, tick: 2, urgency01: 0.91f);
+
+            bool created = SearchFoodJobFactory.TryCreateSearchFoodLocalProbeJob(
+                registry,
+                request,
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            Assert.That(job, Is.Not.Null);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
+            Assert.That(job.Request.TargetCell, Is.EqualTo(target));
+            Assert.That(job.Plan.PlanId, Is.EqualTo(JobTemplateRegistry.SearchFoodLocalProbeTemplateId));
+            Assert.That(job.Plan.TryGetPhase(0, out var phase), Is.True);
+            Assert.That(phase.TryGetAction(0, out var action), Is.True);
+            Assert.That(action.Kind, Is.EqualTo(JobActionKind.MoveToCell));
+        }
+
+        [Test]
+        public void SearchFoodSelectionStartsLocalProbeJob()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            EnableMbdBridgeExplainability(world);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
+            Assert.That(job.Request.HasTargetCell, Is.True);
+            AssertLatestBridge(world, npcId, LegacyFallbackKind.None, "SearchFoodJobRouteAccepted:JobAssigned");
+        }
+
+        [Test]
+        public void SearchFoodJobEnqueuesSeekFoodMoveIntent()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            var probe = job.Request.TargetCell;
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            var buffered = world.JobRuntimeState.CommandBuffer.Snapshot();
+            Assert.That(buffered.Length, Is.EqualTo(1));
+            Assert.That(buffered[0], Is.TypeOf<SetMoveIntentCommand>());
+            buffered[0].Execute(world, new MessageBus());
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent), Is.True);
+            Assert.That(intent.Active, Is.True);
+            Assert.That(intent.TargetX, Is.EqualTo(probe.x));
+            Assert.That(intent.TargetY, Is.EqualTo(probe.y));
+            Assert.That(intent.TargetObjectId, Is.EqualTo(0));
+            Assert.That(intent.Reason, Is.EqualTo(MoveIntentReason.SeekFood));
+        }
+
+        [Test]
+        public void SearchFoodDoesNotUseFoodObjectTarget()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            world.Objects[77] = new WorldObjectInstance
+            {
+                ObjectId = 77,
+                DefId = "food_stock",
+                CellX = 9,
+                CellY = 9,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            world.FoodStocks[77] = new FoodStockComponent
+            {
+                Units = 3,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
+            Assert.That(job.Request.TargetCell, Is.Not.EqualTo(new Vector2Int(9, 9)));
+        }
+
+        [Test]
+        public void SearchFoodFallsBackWhenNoProbeCellAvailable()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            EnableMbdBridgeExplainability(world);
+            OccupySearchProbeCells(world, npcId, 5, 5);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            AssertLatestBridge(
+                world,
+                npcId,
+                LegacyFallbackKind.SafetyFallback,
+                "NonExecutableIntentFallback:SearchFoodJobRouteRejected:SearchFoodProbeUnavailable");
+        }
+
+        private static JobTemplateRegistry MakeRegistry()
+        {
+            var registry = new JobTemplateRegistry();
+            registry.LoadFromJson(TemplateJson);
+            return registry;
+        }
+
+        private static JobRequest MakeSearchFoodRequest(int npcId, Vector2Int targetCell, int tick, float urgency01)
+        {
+            return new JobRequest(
+                $"jobreq_search_food_probe_{npcId}_{targetCell.x}_{targetCell.y}_{tick}",
+                npcId,
+                DecisionIntentKind.SearchFood,
+                JobPriorityClass.Important,
+                urgency01,
+                tick,
+                true,
+                targetCell,
+                0,
+                string.Empty,
+                "SearchFoodLocalProbe");
+        }
+
+        private static World MakeWorldWithHungryNpc(int npcX, int npcY, out int npcId)
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            world.Global.Needs = NeedsConfig.Default();
+            world.Global.BeliefQuery = BeliefQueryConfig.Default();
+            world.Global.NpcOperationalRangeCells = 16;
+            world.Global.NpcVisionRangeCells = 16;
+            world.Global.NpcVisionUseCone = false;
+            world.Config.Sim.decision.selectionMode = "DeterministicTop1";
+
+            npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("search_food_job_qa"),
+                NpcNeeds.Make(0.95f, 0.1f),
+                new Arcontio.Core.Social { JusticePerception01 = 0.9f },
+                npcX,
+                npcY);
+
+            Assert.That(world.NpcProfiles.TryGetValue(npcId, out var profile), Is.True);
+            profile.Competence.Set(DomainKind.Exploration, 1f);
+            profile.Preference.Set(DomainKind.Exploration, 1f);
+            profile.Obligation.Set(DomainKind.Exploration, 1f);
+            profile.Competence.Set(DomainKind.Agriculture, 0f);
+            profile.Preference.Set(DomainKind.Agriculture, 0f);
+            profile.Obligation.Set(DomainKind.Agriculture, 0f);
+
+            return world;
+        }
+
+        private static void EnableMbdBridgeExplainability(World world)
+        {
+            world.Config.Sim.memory_belief_decision_explainability.enabled = true;
+            world.Config.Sim.memory_belief_decision_explainability.writeJsonLog = false;
+            world.Config.Sim.memory_belief_decision_explainability.logDecision = true;
+            world.Config.Sim.memory_belief_decision_explainability.logBridge = true;
+            world.Config.Sim.memory_belief_decision_explainability.logJobRequest = true;
+        }
+
+        private static void AssertLatestBridge(World world, int npcId, LegacyFallbackKind expectedKind, string expectedReason)
+        {
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestBridgeTrace(out var trace), Is.True);
+            Assert.That(trace.Bridge, Is.Not.Null);
+            Assert.That(trace.Bridge.FallbackKind, Is.EqualTo(expectedKind));
+            Assert.That(trace.Bridge.Reason, Is.EqualTo(expectedReason));
+        }
+
+        private static void OccupySearchProbeCells(World world, int excludedNpcId, int originX, int originY)
+        {
+            var offsets = new[]
+            {
+                new Vector2Int(1, 0),
+                new Vector2Int(0, 1),
+                new Vector2Int(-1, 0),
+                new Vector2Int(0, -1),
+                new Vector2Int(2, 0),
+                new Vector2Int(0, 2),
+                new Vector2Int(-2, 0),
+                new Vector2Int(0, -2),
+                new Vector2Int(1, 1),
+                new Vector2Int(-1, 1),
+                new Vector2Int(-1, -1),
+                new Vector2Int(1, -1),
+            };
+
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                var cell = new Vector2Int(originX + offsets[i].x, originY + offsets[i].y);
+                if (!world.InBounds(cell.x, cell.y))
+                    continue;
+
+                int blockerNpcId = world.CreateNpc(
+                    NpcDnaProfile.CreateDefault("search_food_probe_blocker"),
+                    NpcNeeds.Make(0.1f, 0.1f),
+                    new Arcontio.Core.Social { JusticePerception01 = 0.9f },
+                    cell.x,
+                    cell.y);
+
+                world.Needs[blockerNpcId] = NpcNeeds.Make(0.1f, 0.1f);
+                Assert.That(blockerNpcId, Is.Not.EqualTo(excludedNpcId));
+            }
+        }
+    }
+}
