@@ -156,6 +156,65 @@ namespace Arcontio.Tests
                 "NonExecutableIntentFallback:SearchFoodJobRouteRejected:SearchFoodProbeUnavailable");
         }
 
+        [Test]
+        public void SearchFoodLocalProbeCanLeadToFoodBeliefAndEatKnownFood()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            RegisterInteractableFoodStock(world, objectId: 501, x: 7, y: 5);
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var searchJob), Is.True);
+            Assert.That(searchJob.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+            Assert.That(searchJob.Request.TargetObjectId, Is.EqualTo(0));
+            Assert.That(searchJob.Request.TargetCell, Is.EqualTo(new Vector2Int(6, 5)));
+
+            var spottedEvents = RunSearchFoodExecutionPerceptionMemoryPipeline(world, npcId, tick: 1);
+
+            Assert.That(ContainsObjectSpotted(spottedEvents, npcId, objectId: 501), Is.True);
+            Assert.That(HasRememberedObject(world, npcId, objectId: 501, defId: "food_stock", x: 7, y: 5), Is.True);
+            Assert.That(HasMemoryTrace(world, npcId, MemoryType.ObjectSpotted, subjectId: 501, defId: "food_stock", x: 7, y: 5), Is.True);
+            Assert.That(HasFoodBelief(world, npcId, new Vector2Int(7, 5)), Is.True);
+
+            var queryService = new BeliefQueryService();
+            var queryResult = queryService.GetBestKnownFoodSource(
+                world.Beliefs[npcId],
+                new Vector2Int(6, 5),
+                0.95f,
+                world.Global.BeliefQuery);
+
+            Assert.That(queryResult.IsEmpty, Is.False);
+            Assert.That(queryResult.Belief.Category, Is.EqualTo(BeliefCategory.Food));
+            Assert.That(SelectNextDecision(world, npcId, tick: 2).Kind, Is.EqualTo(DecisionIntentKind.EatKnownFood));
+        }
+
+        [Test]
+        public void SearchFoodProbeDoesNotCreateFoodBeliefWithoutPerception()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var searchJob), Is.True);
+            Assert.That(searchJob.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+
+            var spottedEvents = RunSearchFoodExecutionPerceptionMemoryPipeline(world, npcId, tick: 1);
+
+            Assert.That(spottedEvents.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(searchJob.Request.TargetCell.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(searchJob.Request.TargetCell.y));
+            Assert.That(HasAnyFoodBelief(world, npcId), Is.False);
+            Assert.That(SelectNextDecision(world, npcId, tick: 2).Kind, Is.EqualTo(DecisionIntentKind.SearchFood));
+        }
+
         private static JobTemplateRegistry MakeRegistry()
         {
             var registry = new JobTemplateRegistry();
@@ -200,11 +259,237 @@ namespace Arcontio.Tests
             profile.Competence.Set(DomainKind.Exploration, 1f);
             profile.Preference.Set(DomainKind.Exploration, 1f);
             profile.Obligation.Set(DomainKind.Exploration, 1f);
-            profile.Competence.Set(DomainKind.Agriculture, 0f);
-            profile.Preference.Set(DomainKind.Agriculture, 0f);
-            profile.Obligation.Set(DomainKind.Agriculture, 0f);
+            profile.Competence.Set(DomainKind.Agriculture, 1f);
+            profile.Preference.Set(DomainKind.Agriculture, 1f);
+            profile.Obligation.Set(DomainKind.Agriculture, 1f);
 
             return world;
+        }
+
+        private static List<ISimEvent> RunSearchFoodExecutionPerceptionMemoryPipeline(World world, int npcId, int tick)
+        {
+            TickContext.BeginTick(tick);
+            world.Global.CurrentTickIndex = tick;
+
+            var bus = new MessageBus();
+            var telemetry = new Telemetry();
+            var jobExecution = new JobExecutionSystem();
+            var movement = new MovementSystem();
+            var perception = new ObjectPerceptionSystem();
+            var memoryEncoding = new MemoryEncodingSystem();
+            var eventBuffer = new List<ISimEvent>();
+
+            // Il test riproduce la catena runtime minima:
+            // JobExecution produce ICommand nel JobCommandBuffer, il command pump
+            // lo applica, MovementSystem consuma il MoveIntent, poi Perception e
+            // MemoryEncoding trasformano solo eventi visti in memoria/belief.
+            jobExecution.Update(world, new Tick(tick, 1f), bus, telemetry);
+            FlushJobCommandBuffer(world, bus);
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            var probe = job.Request.TargetCell;
+            for (int i = 0; i < 4; i++)
+            {
+                movement.Update(world, new Tick(tick + 1 + i, 1f), bus, telemetry);
+                if (world.GridPos.TryGetValue(npcId, out var pos)
+                    && pos.X == probe.x
+                    && pos.Y == probe.y)
+                {
+                    break;
+                }
+            }
+
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(probe.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(probe.y));
+
+            perception.Update(world, new Tick(tick + 5, 1f), bus, telemetry);
+            bus.DrainTo(eventBuffer);
+            memoryEncoding.SetEventsBuffer(eventBuffer);
+            memoryEncoding.Update(world, new Tick(tick + 5, 1f), bus, telemetry);
+
+            return eventBuffer;
+        }
+
+        private static void FlushJobCommandBuffer(World world, MessageBus bus)
+        {
+            var snapshot = world.JobRuntimeState.CommandBuffer.Snapshot();
+            for (int i = 0; i < snapshot.Length; i++)
+                snapshot[i].Execute(world, bus);
+
+            world.JobRuntimeState.CommandBuffer.Clear();
+        }
+
+        private static DecisionCandidate SelectNextDecision(World world, int npcId, int tick)
+        {
+            Assert.That(world.GridPos.TryGetValue(npcId, out var pos), Is.True);
+            Assert.That(world.Needs.TryGetValue(npcId, out var needs), Is.True);
+            Assert.That(world.NpcDna.TryGetValue(npcId, out var dna), Is.True);
+            Assert.That(world.NpcProfiles.TryGetValue(npcId, out var profile), Is.True);
+            Assert.That(world.Beliefs.TryGetValue(npcId, out var beliefs), Is.True);
+
+            var context = new DecisionEvaluationContext(
+                npcId: npcId,
+                tick: tick,
+                needs: needs,
+                dna: dna,
+                profile: profile,
+                npcPosition: new Vector2Int(pos.X, pos.Y),
+                beliefs: beliefs,
+                beliefQueryConfig: world.Global.BeliefQuery,
+                explainabilityConfig: null,
+                scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
+                normContext: new DecisionNormContext(true, 0.50f, true));
+
+            var candidates = new List<DecisionCandidate>();
+            var generator = new DecisionCandidateGenerator();
+            var scoring = new DecisionScoringService();
+            var selection = new DecisionSelectionService();
+
+            generator.GeneratePhase1Candidates(context, candidates);
+            scoring.ScoreCandidates(context, candidates, DecisionScoringConfig.Default());
+            var selected = selection.Select(context, candidates, TopOneSelection(), new System.Random(11));
+
+            Assert.That(selected.IsEmpty, Is.False);
+            return selected.Candidate;
+        }
+
+        private static DecisionSelectionConfig TopOneSelection()
+        {
+            return new DecisionSelectionConfig
+            {
+                topN = 1,
+                noise01 = 0f,
+                impulsivityNoiseBonus = 0f,
+                minimumWeight = 0.001f
+            };
+        }
+
+        private static void RegisterInteractableFoodStock(World world, int objectId, int x, int y)
+        {
+            world.ObjectDefs["food_stock"] = new ObjectDef
+            {
+                Id = "food_stock",
+                DisplayName = "Food stock",
+                IsInteractable = true,
+                IsOccluder = false,
+                BlocksMovement = false,
+                BlocksVision = false
+            };
+
+            world.Objects[objectId] = new WorldObjectInstance
+            {
+                ObjectId = objectId,
+                DefId = "food_stock",
+                CellX = x,
+                CellY = y,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+
+            world.FoodStocks[objectId] = new FoodStockComponent
+            {
+                Units = 3,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+        }
+
+        private static bool ContainsObjectSpotted(List<ISimEvent> events, int npcId, int objectId)
+        {
+            for (int i = 0; i < events.Count; i++)
+            {
+                if (events[i] is ObjectSpottedEvent spotted
+                    && spotted.ObserverNpcId == npcId
+                    && spotted.ObjectId == objectId)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasRememberedObject(World world, int npcId, int objectId, string defId, int x, int y)
+        {
+            if (!world.NpcObjectMemory.TryGetValue(npcId, out var store) || store == null)
+                return false;
+
+            for (int i = 0; i < store.Slots.Length; i++)
+            {
+                var slot = store.Slots[i];
+                if (!slot.IsValid)
+                    continue;
+
+                if (slot.ObjectId == objectId
+                    && slot.DefId == defId
+                    && slot.CellX == x
+                    && slot.CellY == y)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasMemoryTrace(World world, int npcId, MemoryType type, int subjectId, string defId, int x, int y)
+        {
+            if (!world.Memory.TryGetValue(npcId, out var store) || store == null)
+                return false;
+
+            var traces = store.Traces;
+            for (int i = 0; i < traces.Count; i++)
+            {
+                var trace = traces[i];
+                if (trace.Type == type
+                    && trace.SubjectId == subjectId
+                    && trace.SubjectDefId == defId
+                    && trace.CellX == x
+                    && trace.CellY == y)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasFoodBelief(World world, int npcId, Vector2Int estimatedPosition)
+        {
+            if (!world.Beliefs.TryGetValue(npcId, out var store) || store == null)
+                return false;
+
+            var entries = store.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                if (entry.Category == BeliefCategory.Food
+                    && entry.EstimatedPosition == estimatedPosition
+                    && entry.Status != BeliefStatus.Discarded)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasAnyFoodBelief(World world, int npcId)
+        {
+            if (!world.Beliefs.TryGetValue(npcId, out var store) || store == null)
+                return false;
+
+            var entries = store.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (entries[i].Category == BeliefCategory.Food
+                    && entries[i].Status != BeliefStatus.Discarded)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static void EnableMbdBridgeExplainability(World world)
