@@ -44,6 +44,22 @@
       ]
     },
     {
+      "templateId": "food.search_local_probe.v1",
+      "phases": [
+        {
+          "phaseId": "search_food_probe",
+          "kind": "ReachTarget",
+          "isInterruptible": true,
+          "actions": [
+            {
+              "actionId": "move_to_probe",
+              "kind": "MoveToCell"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "templateId": "transport.object_to_cell.v1",
       "phases": [
         {

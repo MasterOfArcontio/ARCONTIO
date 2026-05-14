@@ -343,6 +343,42 @@ namespace Arcontio.Core
                 }
 
                 case DecisionIntentKind.SearchFood:
+                {
+                    if (TryStartSearchFoodJobVerticalSlice(
+                        world,
+                        npcId,
+                        nowTick,
+                        selection.Candidate,
+                        telemetry,
+                        out string searchJobRouteReason))
+                    {
+                        cmd = null;
+                        didSteal = false;
+                        didMove = false;
+                        TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, LegacyFallbackKind.None, "SearchFoodJobRouteAccepted:" + searchJobRouteReason);
+                        return true;
+                    }
+
+                    cmd = null;
+                    didSteal = false;
+                    didMove = false;
+                    handled = false;
+                    TryEmitBridgeTrace(
+                        explainabilityConfig,
+                        world.MemoryBeliefDecisionExplainability,
+                        nowTick,
+                        npcId,
+                        selection.Candidate,
+                        cmd,
+                        didSteal,
+                        didMove,
+                        false,
+                        true,
+                        ResolveSearchFoodJobRouteFallbackKind(searchJobRouteReason),
+                        "NonExecutableIntentFallback:SearchFoodJobRouteRejected:" + searchJobRouteReason);
+                    return false;
+                }
+
                 case DecisionIntentKind.SearchRestPlace:
                 case DecisionIntentKind.WaitAndObserve:
                     // Ricerca/attesa non hanno ancora un Job/Step dedicato. Il ponte
@@ -485,6 +521,40 @@ namespace Arcontio.Core
             return true;
         }
 
+        private static bool BuildJobRequestFromSelectedCandidate(
+            int tick,
+            int npcId,
+            DecisionCandidate candidate,
+            Vector2Int targetCell,
+            out JobRequest request,
+            out string reason)
+        {
+            request = default;
+            reason = string.Empty;
+
+            if (candidate.Kind != DecisionIntentKind.SearchFood)
+            {
+                reason = "UnsupportedJobRequestIntent";
+                return false;
+            }
+
+            request = new JobRequest(
+                $"jobreq_search_food_probe_{npcId}_{targetCell.x}_{targetCell.y}_{tick}",
+                npcId,
+                DecisionIntentKind.SearchFood,
+                ResolveJobPriorityClass(candidate),
+                candidate.NeedUrgency01,
+                tick,
+                true,
+                targetCell,
+                0,
+                string.Empty,
+                "SearchFoodLocalProbe");
+
+            reason = "JobRequestBuilt";
+            return true;
+        }
+
         // =============================================================================
         // ResolveJobPriorityClass
         // =============================================================================
@@ -569,6 +639,22 @@ namespace Arcontio.Core
                 return LegacyFallbackKind.SafetyFallback;
 
             return LegacyFallbackKind.TransitionalDebtFallback;
+        }
+
+        private static LegacyFallbackKind ResolveSearchFoodJobRouteFallbackKind(string jobRouteReason)
+        {
+            if (string.Equals(jobRouteReason, "SearchFoodProbeUnavailable", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "NpcPositionMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "JobRuntimeMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "RegistryMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "TemplateMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "MissingSearchFoodProbeCell", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "InvalidSearchFoodJobIntent", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return LegacyFallbackKind.SafetyFallback;
+            }
+
+            return LegacyFallbackKind.NonExecutableIntentFallback;
         }
 
         // =============================================================================
@@ -1310,6 +1396,188 @@ namespace Arcontio.Core
                 scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
                 normContext: new DecisionNormContext(false, 1f, true));
 
+            return true;
+        }
+
+        // =============================================================================
+        // TryStartSearchFoodJobVerticalSlice
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Devia il solo intent <c>SearchFood</c> verso un job eseguibile minimale:
+        /// movimento verso una probe cell locale.
+        /// </para>
+        ///
+        /// <para><b>Probe locale, non conoscenza del cibo</b></para>
+        /// <para>
+        /// La probe cell e' una destinazione operativa esplorativa scelta vicino
+        /// all'NPC. Non rappresenta una belief Food, non deriva da <c>World.Objects</c>
+        /// o <c>FoodStocks</c> e non aggiorna direttamente memoria o belief. Il suo
+        /// unico scopo e' far muovere fisicamente l'NPC in modo che, nei tick
+        /// successivi, <c>ObjectPerceptionSystem</c>, <c>MemoryEncodingSystem</c> e
+        /// <c>BeliefUpdater</c> possano eventualmente scoprire cibo tramite la
+        /// pipeline percettiva reale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Probe</b>: risolta in modo deterministico da posizione NPC e vincoli fisici locali.</item>
+        ///   <item><b>Request</b>: <c>SearchFood</c>, target cell presente, target object assente.</item>
+        ///   <item><b>Factory</b>: materializza il template <c>food.search_local_probe.v1</c>.</item>
+        ///   <item><b>Assign</b>: consegna il job a <c>JobRuntimeState</c> senza emettere command legacy.</item>
+        /// </list>
+        /// </summary>
+        private bool TryStartSearchFoodJobVerticalSlice(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            Telemetry telemetry,
+            out string reason)
+        {
+            reason = string.Empty;
+
+            if (!_enableFoodJobVerticalSlice)
+            {
+                reason = "GateDisabled";
+                return false;
+            }
+
+            if (world?.JobRuntimeState == null)
+            {
+                reason = "JobRuntimeMissing";
+                return false;
+            }
+
+            if (!TryResolveSearchFoodProbeCell(world, npcId, out var probeCell, out reason))
+                return false;
+
+            if (!BuildJobRequestFromSelectedCandidate(
+                nowTick,
+                npcId,
+                candidate,
+                probeCell,
+                out var request,
+                out reason))
+            {
+                return false;
+            }
+
+            bool created = SearchFoodJobFactory.TryCreateSearchFoodLocalProbeJob(
+                _jobTemplateRegistry,
+                request,
+                out var job,
+                out reason);
+
+            if (!created)
+                return false;
+
+            TryEmitJobRequestTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                world.MemoryBeliefDecisionExplainability,
+                nowTick,
+                npcId,
+                request,
+                job.JobId,
+                legacyBridgeStillUsed: false);
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(npcId, job, nowTick, out reason);
+            telemetry?.Counter(assigned ? "SearchFoodJobVerticalSlice.Assigned" : "SearchFoodJobVerticalSlice.AssignFailed", 1);
+            return assigned;
+        }
+
+        // =============================================================================
+        // TryResolveSearchFoodProbeCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sceglie una cella locale esplorativa per SearchFood senza trasformarla in
+        /// conoscenza cognitiva di una fonte di cibo.
+        /// </para>
+        ///
+        /// <para><b>Anti-telepatia nella probe policy</b></para>
+        /// <para>
+        /// Questo helper usa solo posizione NPC e vincoli fisici locali: bounds,
+        /// blocco movimento e occupazione. Non legge oggetti per categoria, non
+        /// consulta stock alimentari, non mantiene memoria di celle visitate e non
+        /// introduce random policy. La scelta e' deterministica per rendere la slice
+        /// testabile e compatibile col tick runtime.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Origine</b>: posizione corrente dell'NPC da <c>GridPos</c>.</item>
+        ///   <item><b>Ordine stabile</b>: cardinali a raggio 1, poi diagonali/cardinali a raggio 2.</item>
+        ///   <item><b>Gate fisici</b>: in bounds, non movement-blocked, non occupata da NPC o oggetto.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryResolveSearchFoodProbeCell(World world, int npcId, out Vector2Int probeCell, out string reason)
+        {
+            probeCell = default;
+            reason = string.Empty;
+
+            if (world == null || !world.GridPos.TryGetValue(npcId, out var position))
+            {
+                reason = "NpcPositionMissing";
+                return false;
+            }
+
+            var origin = new Vector2Int(position.X, position.Y);
+            var offsets = SearchFoodProbeOffsets;
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                var candidate = origin + offsets[i];
+                if (!IsValidSearchFoodProbeCell(world, npcId, candidate))
+                    continue;
+
+                probeCell = candidate;
+                reason = "SearchFoodProbeResolved";
+                return true;
+            }
+
+            reason = "SearchFoodProbeUnavailable";
+            return false;
+        }
+
+        private static readonly Vector2Int[] SearchFoodProbeOffsets =
+        {
+            new Vector2Int(1, 0),
+            new Vector2Int(0, 1),
+            new Vector2Int(-1, 0),
+            new Vector2Int(0, -1),
+            new Vector2Int(2, 0),
+            new Vector2Int(0, 2),
+            new Vector2Int(-2, 0),
+            new Vector2Int(0, -2),
+            new Vector2Int(1, 1),
+            new Vector2Int(-1, 1),
+            new Vector2Int(-1, -1),
+            new Vector2Int(1, -1),
+        };
+
+        private static bool IsValidSearchFoodProbeCell(World world, int npcId, Vector2Int cell)
+        {
+            if (!world.InBounds(cell.x, cell.y))
+                return false;
+
+            if (world.IsMovementBlocked(cell.x, cell.y))
+                return false;
+
+            if (world.GetObjectAt(cell.x, cell.y) >= 0)
+                return false;
+
+            foreach (var kv in world.GridPos)
+            {
+                if (kv.Key == npcId)
+                    continue;
+
+                if (kv.Value.X == cell.x && kv.Value.Y == cell.y)
+                    return false;
+            }
+
+            // TODO ARC-CON-014: preferire celle non attualmente visibili solo quando
+            // esistera' un helper canonico "cell currently visible by NPC" riusabile
+            // senza duplicare la semantica di ObjectPerceptionSystem/FOV debug.
             return true;
         }
 
