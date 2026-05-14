@@ -322,6 +322,7 @@ namespace Arcontio.Core
                     bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
                     var fallbackKind = ResolveFoodJobRouteFallbackKind(jobRouteReason, planned);
                     string fallbackReason = BuildFoodJobRouteFallbackReason(jobRouteReason, planned);
+                    ApplyFoodRouteFailureCognitiveFeedback(world, npcId, nowTick, selection.Candidate, jobRouteReason, explainabilityConfig, telemetry);
                     TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, fallbackKind, fallbackReason);
                     return planned;
                 }
@@ -876,6 +877,265 @@ namespace Arcontio.Core
                 Freshness = belief.Freshness,
                 SourceCount = belief.SourceCount,
             };
+        }
+
+        // =============================================================================
+        // ApplyFoodRouteFailureCognitiveFeedback
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce i fallimenti significativi del path food runtime in un feedback
+        /// cognitivo minimo, mantenendo invariati fallback legacy e job semantics.
+        /// </para>
+        ///
+        /// <para><b>Failure operativo != sempre belief falsa</b></para>
+        /// <para>
+        /// ARC-CON-014 richiede che i fallimenti significativi non restino muti per la
+        /// cognizione dell'NPC. Questo pero' non significa invalidare sempre il target:
+        /// una reservation negata o un job rifiutato dall'arbitro indicano contesa o
+        /// scheduling, non necessariamente una credenza falsa. Solo i casi in cui il
+        /// target ricordato manca o non coincide piu' generano una contradiction.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Contradiction</b>: cibo ricordato mancante o target mismatch, con update BeliefStore.</item>
+        ///   <item><b>Operational trace</b>: reservation denied o assignment rejected, senza invalidare belief.</item>
+        ///   <item><b>Anti-spam</b>: non riemette contradiction se la belief e' gia' Discarded.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyFoodRouteFailureCognitiveFeedback(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            string jobRouteReason,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            Telemetry telemetry)
+        {
+            if (world == null || candidate.Kind != DecisionIntentKind.EatKnownFood || candidate.BeliefResult.IsEmpty)
+                return;
+
+            if (string.Equals(jobRouteReason, "KnownCommunityFoodMissing", System.StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyFoodBeliefContradictionFromCandidate(
+                    world,
+                    npcId,
+                    nowTick,
+                    candidate,
+                    "BeliefContradiction:RememberedFoodMissing",
+                    telemetry);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(jobRouteReason)
+                && jobRouteReason.StartsWith("ResolvedTargetMismatch", System.StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyFoodBeliefContradictionFromCandidate(
+                    world,
+                    npcId,
+                    nowTick,
+                    candidate,
+                    "BeliefContradiction:FoodTargetMismatch",
+                    telemetry);
+                return;
+            }
+
+            if (string.Equals(jobRouteReason, "ReservationDenied", System.StringComparison.OrdinalIgnoreCase))
+            {
+                EmitFoodOperationalFailureTrace(
+                    world,
+                    npcId,
+                    nowTick,
+                    candidate,
+                    JobFailureReason.ReservationDenied,
+                    "OperationalFailure:ReservationDenied",
+                    explainabilityConfig);
+                return;
+            }
+
+            if (IsFoodJobAssignmentRejected(jobRouteReason))
+            {
+                EmitFoodOperationalFailureTrace(
+                    world,
+                    npcId,
+                    nowTick,
+                    candidate,
+                    JobFailureReason.Unknown,
+                    "OperationalFailure:JobAssignmentRejected",
+                    explainabilityConfig);
+            }
+        }
+
+        // =============================================================================
+        // ApplyFoodBeliefContradictionFromCandidate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica una contradiction locale alla belief Food che ha guidato il
+        /// candidato EatKnownFood selezionato.
+        /// </para>
+        ///
+        /// <para><b>Feedback cognitivo minimo e localizzato</b></para>
+        /// <para>
+        /// Il metodo non cerca nuovi target e non decide una nuova azione. Usa solo la
+        /// belief gia' trasportata dal candidato MBQD, delega la mutazione al
+        /// <c>BeliefUpdater</c> e produce una trace Belief esplicita quando lo store
+        /// e' stato davvero aggiornato.
+        /// </para>
+        /// </summary>
+        private void ApplyFoodBeliefContradictionFromCandidate(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            string reason,
+            Telemetry telemetry)
+        {
+            if (!world.Beliefs.TryGetValue(npcId, out var store) || store == null)
+                return;
+
+            var selectedBelief = candidate.BeliefResult.Belief;
+            if (selectedBelief.Status == BeliefStatus.Discarded)
+            {
+                telemetry?.Counter("BeliefUpdater.FoodRouteContradictionAlreadyDiscarded", 1);
+                return;
+            }
+
+            var signal = new BeliefFailureSignal(
+                npcId: npcId,
+                beliefId: selectedBelief.BeliefId,
+                category: BeliefCategory.Food,
+                estimatedPosition: selectedBelief.EstimatedPosition,
+                failureKind: BeliefFailureKind.DirectLocalContradiction,
+                penalty01: 1f,
+                tick: nowTick);
+
+            bool updated = _beliefUpdater.UpdateFromOperationalFailure(signal, store);
+            telemetry?.Counter(updated ? "BeliefUpdater.FoodRouteContradictionApplied" : "BeliefUpdater.FoodRouteContradictionNoMatch", 1);
+
+            if (updated && TryFindBeliefById(store, selectedBelief.BeliefId, out var updatedBelief))
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(
+                    world.Config?.Sim?.memory_belief_decision_explainability,
+                    world.MemoryBeliefDecisionExplainability,
+                    new MemoryBeliefDecisionTrace
+                    {
+                        Kind = MemoryBeliefDecisionTraceKind.Belief,
+                        Tick = nowTick,
+                        NpcId = npcId,
+                        Belief = new MemoryBeliefDecisionBeliefRecord
+                        {
+                            Operation = MemoryBeliefDecisionBeliefOperation.Discarded,
+                            HasSourceTrace = false,
+                            SourceTraceType = default,
+                            Belief = ToBeliefRef(updatedBelief),
+                            Reason = reason ?? string.Empty,
+                        },
+                    });
+            }
+        }
+
+        // =============================================================================
+        // EmitFoodOperationalFailureTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un fallimento operativo del food path senza invalidare la belief
+        /// che ha motivato la decisione.
+        /// </para>
+        ///
+        /// <para><b>Trace operativa senza mutazione cognitiva forte</b></para>
+        /// <para>
+        /// Reservation denied e assignment rejected sono segnali utili per audit e
+        /// futuro scoring, ma non provano che il cibo non esista. Per questo la patch
+        /// li rende osservabili come failure learning EL e lascia intatto il
+        /// BeliefStore.
+        /// </para>
+        /// </summary>
+        private static void EmitFoodOperationalFailureTrace(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            JobFailureReason failureReason,
+            string reason,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig)
+        {
+            if (world == null || explainabilityConfig == null)
+                return;
+
+            var targetCell = candidate.BeliefResult.IsEmpty
+                ? Vector2Int.zero
+                : candidate.BeliefResult.Belief.EstimatedPosition;
+
+            if (HasLatestEquivalentFailureTrace(world, npcId, targetCell, failureReason, reason))
+                return;
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteFailureLearningTrace(
+                explainabilityConfig,
+                world.MemoryBeliefDecisionExplainability,
+                npcId,
+                nowTick,
+                string.Empty,
+                targetCell,
+                failureReason,
+                nowTick,
+                0f,
+                reason);
+        }
+
+        private static bool IsFoodJobAssignmentRejected(string jobRouteReason)
+        {
+            return string.Equals(jobRouteReason, "CurrentStillPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentJobPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "SameOrLowerPriority", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentPhaseProtected", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentPhaseNotInterruptible", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "NewJobMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "InvalidNpcId", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "JobMissing", System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryFindBeliefById(BeliefStore store, int beliefId, out BeliefEntry belief)
+        {
+            belief = default;
+
+            if (store == null || beliefId <= 0)
+                return false;
+
+            var entries = store.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (entries[i].BeliefId != beliefId)
+                    continue;
+
+                belief = entries[i];
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasLatestEquivalentFailureTrace(
+            World world,
+            int npcId,
+            Vector2Int targetCell,
+            JobFailureReason failureReason,
+            string reason)
+        {
+            if (world?.MemoryBeliefDecisionExplainability == null)
+                return false;
+
+            if (!world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store) || store == null)
+                return false;
+
+            if (!store.TryGetLatestFailureLearningTrace(out var trace) || trace?.FailureLearning == null)
+                return false;
+
+            return trace.FailureLearning.TargetCell == targetCell
+                && trace.FailureLearning.FailureReason == failureReason
+                && string.Equals(trace.FailureLearning.Reason, reason, System.StringComparison.Ordinal);
         }
 
         // =============================================================================

@@ -258,7 +258,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void NeedsDecisionRuleFallsBackToLegacyWhenJobArbiterRejectsFoodRoute()
+        public void JobAssignmentRejectedDoesNotInvalidateFoodBelief()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out _);
             AddFoodBelief(world, npcId, 5, 5);
@@ -273,6 +273,8 @@ namespace Arcontio.Tests
             Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
             Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
             AssertLatestBridge(world, npcId, LegacyFallbackKind.CompatibilityFallback, "FoodJobRouteRejectedThenLegacyFood:JobArbiterRejectedLegacyFoodFallback");
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Active);
+            AssertLatestFailureLearning(world, npcId, JobFailureReason.Unknown, "OperationalFailure:JobAssignmentRejected");
         }
 
         [Test]
@@ -329,7 +331,113 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void NeedsDecisionRuleFallsBackToLegacyWhenFoodReservationDenied()
+        public void AssignedFoodJobConsumeFoodUnavailableUpdatesFoodBelief()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 0,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            var system = new JobExecutionSystem();
+
+            // Il primo tick attraversa la fase ReachTarget gia' soddisfatta; il
+            // secondo entra nella fase Consume e produce il failure reale del job.
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            AssertLatestBeliefTrace(
+                world,
+                npcId,
+                MemoryBeliefDecisionBeliefOperation.Discarded,
+                "BeliefContradiction:FoodExecutionTargetFailure:ConsumeFoodUnavailable");
+            AssertLatestFailureLearning(
+                world,
+                npcId,
+                JobFailureReason.MissingTarget,
+                "OperationalFailure:FoodExecutionTargetFailure:ConsumeFoodUnavailable");
+        }
+
+        [Test]
+        public void AssignedFoodJobConsumeFoodObjectMissingUpdatesFoodBelief()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            world.Objects.Remove(foodId);
+            var system = new JobExecutionSystem();
+
+            // Lo stock resta presente ma l'istanza oggetto sparisce: questo distingue
+            // il failure da una semplice risorsa esaurita e copre il path
+            // ConsumeFoodObjectMissing nel vero runtime di execution.
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            AssertLatestBeliefTrace(
+                world,
+                npcId,
+                MemoryBeliefDecisionBeliefOperation.Discarded,
+                "BeliefContradiction:FoodExecutionTargetFailure:ConsumeFoodObjectMissing");
+            AssertLatestFailureLearning(
+                world,
+                npcId,
+                JobFailureReason.MissingTarget,
+                "OperationalFailure:FoodExecutionTargetFailure:ConsumeFoodObjectMissing");
+        }
+
+        [Test]
+        public void AssignedFoodJobMovementFailureDoesNotInvalidateFoodBelief()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            var job = CreateFoodJobWithMissingMoveTarget(npcId, foodId, 5, 5);
+            string reason;
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, 0, out reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            // Il job e' un EatKnownFood valido come Request, ma il suo step di
+            // movimento e' volutamente malformed. Questo verifica che failure
+            // operativi di movimento/piano non vengano reinterpretati come belief
+            // falsa sul cibo ricordato.
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Active);
+            AssertNoBeliefTrace(world, npcId);
+        }
+
+        [Test]
+        public void PreemptedFoodJobDoesNotInvalidateFoodBelief()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            var emergency = CreateEmergencyPreemptJob(npcId);
+            string reason;
+
+            // La preemption e' una decisione dell'arbitro job, non una prova che il
+            // target food sia falso. Il bridge execution->belief non deve quindi
+            // toccare la credenza quando il job food viene sostituito.
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, emergency, 1, out reason), Is.True, reason);
+
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Active);
+            AssertNoBeliefTrace(world, npcId);
+            Assert.That(world.JobRuntimeState.GetSnapshot(npcId, 1).LastFailureReason, Is.EqualTo(JobFailureReason.None));
+        }
+
+        [Test]
+        public void ReservationDeniedDoesNotInvalidateBelief()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int firstNpcId, out int foodId);
             int secondNpcId = CreateAdditionalNpc(world, 5, 5);
@@ -348,6 +456,8 @@ namespace Arcontio.Tests
             Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
             Assert.That(world.JobRuntimeState.HasActiveJob(firstNpcId), Is.True);
             AssertLatestBridge(world, secondNpcId, LegacyFallbackKind.CompatibilityFallback, "FoodJobRouteRejectedThenLegacyFood:ReservationDeniedLegacyFoodFallback");
+            AssertFoodBeliefStatus(world, secondNpcId, BeliefStatus.Active);
+            AssertLatestFailureLearning(world, secondNpcId, JobFailureReason.ReservationDenied, "OperationalFailure:ReservationDenied");
         }
 
         [Test]
@@ -525,6 +635,57 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void RememberedFoodMissingProducesBeliefContradiction()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            PreferKnownFoodDecision(world, npcId);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            AssertLatestBeliefTrace(world, npcId, MemoryBeliefDecisionBeliefOperation.Discarded, "BeliefContradiction:RememberedFoodMissing");
+        }
+
+        [Test]
+        public void FoodTargetMismatchProducesContradiction()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 6, npcY: 5, foodX: 6, foodY: 5, out int npcId, out _);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            PreferKnownFoodDecision(world, npcId);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            AssertLatestBeliefTrace(world, npcId, MemoryBeliefDecisionBeliefOperation.Discarded, "BeliefContradiction:FoodTargetMismatch");
+        }
+
+        [Test]
+        public void ExistingFoodFallbackBehaviorStillPasses()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out _);
+            AddFoodBelief(world, npcId, 5, 5);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: false, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+
+            Assert.That(commands.Count, Is.GreaterThanOrEqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Active);
+        }
+
+        [Test]
         public void NeedsDecisionRuleWithGateTrueKeepsPrivateCarriedFoodOnLegacyCommand()
         {
             var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
@@ -603,6 +764,8 @@ namespace Arcontio.Tests
             world.Config.Sim.memory_belief_decision_explainability.logDecision = true;
             world.Config.Sim.memory_belief_decision_explainability.logBridge = true;
             world.Config.Sim.memory_belief_decision_explainability.logJobRequest = true;
+            world.Config.Sim.memory_belief_decision_explainability.logBelief = true;
+            world.Config.Sim.memory_belief_decision_explainability.logFailureLearning = true;
         }
 
         private static void AssertLatestBridge(World world, int npcId, LegacyFallbackKind expectedKind, string expectedReason)
@@ -612,6 +775,48 @@ namespace Arcontio.Tests
             Assert.That(trace.Bridge, Is.Not.Null);
             Assert.That(trace.Bridge.FallbackKind, Is.EqualTo(expectedKind));
             Assert.That(trace.Bridge.Reason, Is.EqualTo(expectedReason));
+        }
+
+        private static void AssertLatestBeliefTrace(
+            World world,
+            int npcId,
+            MemoryBeliefDecisionBeliefOperation expectedOperation,
+            string expectedReason)
+        {
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestBeliefTrace(out var trace), Is.True);
+            Assert.That(trace.Belief, Is.Not.Null);
+            Assert.That(trace.Belief.Operation, Is.EqualTo(expectedOperation));
+            Assert.That(trace.Belief.Reason, Is.EqualTo(expectedReason));
+        }
+
+        private static void AssertLatestFailureLearning(
+            World world,
+            int npcId,
+            JobFailureReason expectedReason,
+            string expectedDiagnosticReason)
+        {
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestFailureLearningTrace(out var trace), Is.True);
+            Assert.That(trace.FailureLearning, Is.Not.Null);
+            Assert.That(trace.FailureLearning.FailureReason, Is.EqualTo(expectedReason));
+            Assert.That(trace.FailureLearning.Reason, Is.EqualTo(expectedDiagnosticReason));
+        }
+
+        private static void AssertNoBeliefTrace(World world, int npcId)
+        {
+            if (!world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store))
+                return;
+
+            Assert.That(store.TryGetLatestBeliefTrace(out _), Is.False);
+        }
+
+        private static void AssertFoodBeliefStatus(World world, int npcId, BeliefStatus expectedStatus)
+        {
+            Assert.That(world.Beliefs.TryGetValue(npcId, out var store), Is.True);
+            Assert.That(store.Entries.Count, Is.GreaterThanOrEqualTo(1));
+            Assert.That(store.Entries[0].Category, Is.EqualTo(BeliefCategory.Food));
+            Assert.That(store.Entries[0].Status, Is.EqualTo(expectedStatus));
         }
 
         private static void PreferKnownFoodDecision(World world, int npcId)
@@ -801,6 +1006,51 @@ namespace Arcontio.Tests
 
             Assert.That(created, Is.True, reason);
             return job;
+        }
+
+        private static Job CreateFoodJobWithMissingMoveTarget(int npcId, int foodId, int foodX, int foodY)
+        {
+            var request = MakeFoodJobRequest(npcId, foodId, new Vector2Int(foodX, foodY), 0, 0.95f, "Food:1");
+            var plan = new JobPlan(
+                "food.malformed_move_for_qa",
+                new[]
+                {
+                    new JobPhase(
+                        "reach_food",
+                        JobPhaseKind.ReachTarget,
+                        "Reach food",
+                        1,
+                        true,
+                        new[] { JobAction.Simple("move_missing_target", JobActionKind.MoveToCell, "Move missing target") }),
+                });
+
+            return new Job("job_food_missing_move_target_qa", request, plan);
+        }
+
+        private static Job CreateEmergencyPreemptJob(int npcId)
+        {
+            var request = JobRequest.WithoutTarget(
+                "jobreq_emergency_preempt_qa",
+                npcId,
+                DecisionIntentKind.WaitAndObserve,
+                JobPriorityClass.Emergency,
+                1f,
+                1,
+                "EmergencyPreemptQa");
+            var plan = new JobPlan(
+                "emergency.preempt.qa",
+                new[]
+                {
+                    new JobPhase(
+                        "wait",
+                        JobPhaseKind.Execute,
+                        "Emergency wait",
+                        1,
+                        true,
+                        new[] { JobAction.Wait("wait_once", 1, "Wait once") }),
+                });
+
+            return new Job("job_emergency_preempt_qa", request, plan);
         }
     }
 }
