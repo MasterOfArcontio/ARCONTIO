@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using Arcontio.Core.Config;
 using Arcontio.Core.Diagnostics;
 
 namespace Arcontio.Core
@@ -42,6 +43,8 @@ namespace Arcontio.Core
                 return;
 
             var runtime = world.JobRuntimeState;
+            var explainabilityConfig = world.Config?.Sim?.memory_belief_decision_explainability;
+            var explainabilityRegistry = world.MemoryBeliefDecisionExplainability;
             runtime.Reservations.PruneExpired((int)tick.Index);
             runtime.CopyNpcIdsWithActiveJobsTo(_activeNpcIds);
 
@@ -51,9 +54,32 @@ namespace Arcontio.Core
                 if (!runtime.TryGetActiveJob(npcId, out var npcState, out var job) || job == null)
                     continue;
 
-                var result = ExecuteCurrentAction(world, runtime, npcId, in npcState, job, (int)tick.Index);
+                var result = ExecuteCurrentAction(
+                    world,
+                    runtime,
+                    npcId,
+                    in npcState,
+                    job,
+                    (int)tick.Index,
+                    explainabilityConfig,
+                    explainabilityRegistry);
                 var updatedState = npcState;
-                var machineResult = _stateMachine.ApplyStepResult(ref updatedState, job, result, (int)tick.Index);
+
+                // La state machine possiede gia' la semantica di avanzamento
+                // lifecycle/phase/step/state. Usare l'overload EL-aware non cambia
+                // il risultato operativo: aggiunge soltanto una fotografia
+                // osservativa nel registry, cosi' il pannello Job mostra cio' che il
+                // runtime ha davvero consumato senza leggere direttamente il World.
+                // Assignment, arbitration e reservation restano fuori da questa
+                // slice: qui cabliamo solo execution -> lifecycle explainability.
+                var machineResult = _stateMachine.ApplyStepResult(
+                    ref updatedState,
+                    job,
+                    result,
+                    (int)tick.Index,
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId);
                 if (machineResult.TickResult == JobStateMachineTickResult.JobCompleted)
                 {
                     runtime.CompleteCurrentJob(npcId, (int)tick.Index, out _);
@@ -77,7 +103,9 @@ namespace Arcontio.Core
             int npcId,
             in NpcJobState npcState,
             Job job,
-            int tick)
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
         {
             if (!job.Plan.TryGetPhase(npcState.ActivePhaseIndex, out var phase))
                 return StepResult.Failed(JobFailureReason.MissingPlan, "MissingJobPhase");
@@ -89,16 +117,16 @@ namespace Arcontio.Core
                 return StepResult.Failed(JobFailureReason.MissingTarget, "NpcPositionMissing");
 
             if (action.Kind == JobActionKind.MoveToCell)
-                return ExecuteMoveTo(world, runtime, npcId, job.Request.IntentKind, action, npcCell);
+                return ExecuteMoveTo(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.Consume)
-                return ExecuteConsumeKnownFood(world, runtime, npcId, action, npcCell);
+                return ExecuteConsumeKnownFood(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.PickUp)
-                return ExecutePickUpObject(world, runtime, npcId, action, npcCell);
+                return ExecutePickUpObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.Drop)
-                return ExecuteDropObject(world, runtime, npcId, action, npcCell);
+                return ExecuteDropObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             return StepResult.Failed(JobFailureReason.StepFailed, "UnsupportedJobActionInRuntimeSlice");
         }
@@ -107,9 +135,12 @@ namespace Arcontio.Core
             World world,
             JobRuntimeState runtime,
             int npcId,
-            DecisionIntentKind intentKind,
+            Job job,
             JobAction action,
-            GridPosition npcCell)
+            GridPosition npcCell,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
         {
             if (!action.HasTargetCell)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "MoveMissingTargetCell");
@@ -126,15 +157,25 @@ namespace Arcontio.Core
 
             if (!alreadyMovingToTarget)
             {
+                // L'overload EL-aware del command buffer conserva la stessa command
+                // authority: lo step continua solo ad accodare un ICommand e non
+                // muta il World. La trace e' osservativa, utile per collegare
+                // StepResult -> CommandBuffer -> command pump nel pannello Job.
                 runtime.CommandBuffer.Enqueue(new SetMoveIntentCommand(npcId, new MoveIntent
                 {
                     Active = true,
                     TargetX = action.TargetCell.x,
                     TargetY = action.TargetCell.y,
-                    Reason = ResolveMoveIntentReason(intentKind),
+                    Reason = ResolveMoveIntentReason(job.Request.IntentKind),
                     TargetObjectId = action.TargetObjectId,
                     Urgency01 = 1f
-                }));
+                }),
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job.JobId,
+                "MoveToCellCommandEnqueued");
             }
 
             return StepResult.Running(alreadyMovingToTarget ? "MoveAlreadyRequested" : "MoveCommandEnqueued");
@@ -158,8 +199,12 @@ namespace Arcontio.Core
             World world,
             JobRuntimeState runtime,
             int npcId,
+            Job job,
             JobAction action,
-            GridPosition npcCell)
+            GridPosition npcCell,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
         {
             if (action.TargetObjectId <= 0)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeMissingFoodObject");
@@ -183,7 +228,14 @@ namespace Arcontio.Core
                 return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeTargetNoLongerCoLocated");
             }
 
-            runtime.CommandBuffer.Enqueue(new EatFromStockCommand(npcId, action.TargetObjectId));
+            runtime.CommandBuffer.Enqueue(
+                new EatFromStockCommand(npcId, action.TargetObjectId),
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job.JobId,
+                "ConsumeCommandEnqueued");
             return StepResult.Succeeded("ConsumeCommandEnqueued");
         }
 
@@ -191,8 +243,12 @@ namespace Arcontio.Core
             World world,
             JobRuntimeState runtime,
             int npcId,
+            Job job,
             JobAction action,
-            GridPosition npcCell)
+            GridPosition npcCell,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
         {
             if (action.TargetObjectId <= 0)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "PickUpMissingObject");
@@ -206,7 +262,14 @@ namespace Arcontio.Core
             if (npcCell.X != obj.CellX || npcCell.Y != obj.CellY)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "PickUpObjectNoLongerCoLocated");
 
-            runtime.CommandBuffer.Enqueue(new PickUpObjectCommand(npcId, action.TargetObjectId));
+            runtime.CommandBuffer.Enqueue(
+                new PickUpObjectCommand(npcId, action.TargetObjectId),
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job.JobId,
+                "PickUpCommandEnqueued");
             return StepResult.Succeeded("PickUpCommandEnqueued");
         }
 
@@ -214,8 +277,12 @@ namespace Arcontio.Core
             World world,
             JobRuntimeState runtime,
             int npcId,
+            Job job,
             JobAction action,
-            GridPosition npcCell)
+            GridPosition npcCell,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
         {
             if (action.TargetObjectId <= 0)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "DropMissingObject");
@@ -239,7 +306,14 @@ namespace Arcontio.Core
             if (existing >= 0 && existing != action.TargetObjectId)
                 return StepResult.Failed(JobFailureReason.StepFailed, "DropTargetOccupied");
 
-            runtime.CommandBuffer.Enqueue(new DropObjectCommand(npcId, action.TargetObjectId, action.TargetCell.x, action.TargetCell.y));
+            runtime.CommandBuffer.Enqueue(
+                new DropObjectCommand(npcId, action.TargetObjectId, action.TargetCell.x, action.TargetCell.y),
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job.JobId,
+                "DropCommandEnqueued");
             return StepResult.Succeeded("DropCommandEnqueued");
         }
 
