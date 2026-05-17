@@ -880,6 +880,64 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // LogSearchFoodJobRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Emette diagnostica strutturata per la sola route SearchFood -> Job.
+        /// </para>
+        ///
+        /// <para><b>Diagnostica senza cambio di comportamento</b></para>
+        /// <para>
+        /// Questo helper non decide, non costruisce job, non assegna job e non modifica
+        /// fallback. Serve solo a rendere osservabile il punto esatto in cui la catena
+        /// <c>SearchFood -> JobRequest -> Job -> TryAssignJob</c> si interrompe oppure
+        /// conferma il successo. Il successo non passa da <c>DecisionBridgeFallback</c>
+        /// perche' usa <c>FallbackKind.None</c>, quindi senza questo log positivo lo
+        /// smoke runtime non puo' distinguere tra route accettata e pannello UI vuoto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>stage</b>: punto della route raggiunto.</item>
+        ///   <item><b>reason</b>: reason stabile o reason runtime specifica prefissata.</item>
+        ///   <item><b>probe/request/factory/assignment</b>: booleane diagnostiche additive.</item>
+        /// </list>
+        /// </summary>
+        private static void LogSearchFoodJobRoute(
+            int tick,
+            int npcId,
+            string stage,
+            string reason,
+            bool gateEnabled,
+            bool probeFound = false,
+            Vector2Int probeCell = default,
+            bool requestBuilt = false,
+            bool factoryCreated = false,
+            string jobId = "",
+            bool assigned = false,
+            string assignReason = "")
+        {
+            ArcontioLogger.Debug(
+                new LogContext(tick: tick, channel: "DecisionBridgeJobRoute", npcId: npcId),
+                new LogBlock(LogLevel.Debug, "log.decision.bridge.job_route")
+                    .AddField("tick", tick)
+                    .AddField("npcId", npcId)
+                    .AddField("intent", DecisionIntentKind.SearchFood.ToString())
+                    .AddField("stage", stage ?? string.Empty)
+                    .AddField("reason", reason ?? string.Empty)
+                    .AddField("gateEnabled", gateEnabled)
+                    .AddField("probeFound", probeFound)
+                    .AddField("probeX", probeFound ? probeCell.x : 0)
+                    .AddField("probeY", probeFound ? probeCell.y : 0)
+                    .AddField("requestBuilt", requestBuilt)
+                    .AddField("factoryCreated", factoryCreated)
+                    .AddField("jobId", jobId ?? string.Empty)
+                    .AddField("assigned", assigned)
+                    .AddField("assignReason", assignReason ?? string.Empty));
+        }
+
+        // =============================================================================
         // ToDecisionCandidateRecords
         // =============================================================================
         /// <summary>
@@ -1437,20 +1495,56 @@ namespace Arcontio.Core
         {
             reason = string.Empty;
 
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                "EnterSearchFoodRoute",
+                "EnterSearchFoodRoute",
+                _enableFoodJobVerticalSlice);
+
             if (!_enableFoodJobVerticalSlice)
             {
                 reason = "GateDisabled";
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "GateDisabled",
+                    reason,
+                    _enableFoodJobVerticalSlice);
                 return false;
             }
 
             if (world?.JobRuntimeState == null)
             {
                 reason = "JobRuntimeMissing";
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "JobRuntimeMissing",
+                    reason,
+                    _enableFoodJobVerticalSlice);
                 return false;
             }
 
             if (!TryResolveSearchFoodProbeCell(world, npcId, out var probeCell, out reason))
+            {
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "ProbeUnavailable",
+                    reason,
+                    _enableFoodJobVerticalSlice);
                 return false;
+            }
+
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                "ProbeResolved",
+                reason,
+                _enableFoodJobVerticalSlice,
+                probeFound: true,
+                probeCell: probeCell);
 
             if (!BuildJobRequestFromSelectedCandidate(
                 nowTick,
@@ -1460,8 +1554,26 @@ namespace Arcontio.Core
                 out var request,
                 out reason))
             {
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "RequestBuildFailed",
+                    "SearchFoodRequestBuildFailed:" + reason,
+                    _enableFoodJobVerticalSlice,
+                    probeFound: true,
+                    probeCell: probeCell);
                 return false;
             }
+
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                "RequestBuilt",
+                "SearchFoodRequestBuilt",
+                _enableFoodJobVerticalSlice,
+                probeFound: true,
+                probeCell: probeCell,
+                requestBuilt: true);
 
             bool created = SearchFoodJobFactory.TryCreateSearchFoodLocalProbeJob(
                 _jobTemplateRegistry,
@@ -1470,7 +1582,30 @@ namespace Arcontio.Core
                 out reason);
 
             if (!created)
+            {
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "FactoryFailed",
+                    "SearchFoodFactoryFailed:" + reason,
+                    _enableFoodJobVerticalSlice,
+                    probeFound: true,
+                    probeCell: probeCell,
+                    requestBuilt: true);
                 return false;
+            }
+
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                "FactoryCreated",
+                "SearchFoodFactoryCreated",
+                _enableFoodJobVerticalSlice,
+                probeFound: true,
+                probeCell: probeCell,
+                requestBuilt: true,
+                factoryCreated: true,
+                jobId: job.JobId);
 
             TryEmitJobRequestTrace(
                 world.Config?.Sim?.memory_belief_decision_explainability,
@@ -1482,6 +1617,20 @@ namespace Arcontio.Core
                 legacyBridgeStillUsed: false);
 
             bool assigned = world.JobRuntimeState.TryAssignJob(npcId, job, nowTick, out reason);
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                assigned ? "AssignmentAccepted" : "AssignmentRejected",
+                assigned ? "SearchFoodJobRouteAccepted:" + reason : "SearchFoodAssignmentRejected:" + reason,
+                _enableFoodJobVerticalSlice,
+                probeFound: true,
+                probeCell: probeCell,
+                requestBuilt: true,
+                factoryCreated: true,
+                jobId: job.JobId,
+                assigned: assigned,
+                assignReason: reason);
+
             telemetry?.Counter(assigned ? "SearchFoodJobVerticalSlice.Assigned" : "SearchFoodJobVerticalSlice.AssignFailed", 1);
             return assigned;
         }

@@ -37,7 +37,33 @@ namespace Arcontio.Core
         [SerializeField] private string worldSnapshotSlotName = "default";
 
         [Header("Job Runtime Experimental Gates")]
-        [SerializeField] private bool enableFoodJobVerticalSlice = false;
+        // =============================================================================
+        // enableFoodJobVerticalSlice
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita il routing Job della vertical slice food/search nel runtime
+        /// bootstrap ordinario.
+        /// </para>
+        ///
+        /// <para><b>ARC-CON-014 - Decisione -> Job come default operativo</b></para>
+        /// <para>
+        /// Dopo le slice v0.11b.01-v0.11b.04 questo gate non rappresenta piu' un
+        /// esperimento spento di default: <c>EatKnownFood</c> e <c>SearchFood</c>
+        /// possiedono un percorso reale <c>DecisionCandidate -> JobRequest -> Job</c>.
+        /// Tenerlo disattivato impedisce a <c>SearchFood</c> selezionato di creare
+        /// un job e lascia il runtime nel fallback <c>GateDisabled</c>.
+        /// </para>
+        ///
+        /// <para>
+        /// Questa opzione NON rimuove i fallback legacy e non rende obbligatorio il
+        /// successo del Job System: se una route fallisce, <c>NeedsDecisionRule</c>
+        /// conserva i fallback classificati e osservabili gia' esistenti. Una scena
+        /// o un test che voglia tornare al comportamento legacy puo' ancora
+        /// disabilitare esplicitamente il flag via Inspector.
+        /// </para>
+        /// </summary>
+        [SerializeField] private bool enableFoodJobVerticalSlice = true;
 
         private enum DebugScenario
         {
@@ -620,8 +646,24 @@ namespace Arcontio.Core
             // ******************************************************************************************************************************
             // v0.11.01 introduce un registry volutamente piccolo: il JSON descrive
             // solo template/fasi/action, mentre target e logica reale restano nel
-            // codice C# e nel decision layer. Il gate food resta default false.
+            // codice C# e nel decision layer. Dopo v0.11b.01-v0.11b.04 il gate food
+            // e' acceso di default, quindi questo log di bootstrap serve a verificare
+            // che la scena runtime stia usando davvero il valore e i template attesi.
             _jobTemplateRegistry = JobTemplateRegistry.LoadDefault();
+            ArcontioLogger.Info(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "SimulationHost"),
+                new LogBlock(LogLevel.Info, "log.simulationhost.food_job_vertical_slice_config")
+                    .AddField("enableFoodJobVerticalSlice", enableFoodJobVerticalSlice)
+                    .AddField("jobTemplateRegistryLoaded", _jobTemplateRegistry != null)
+                    .AddField("templateCount", _jobTemplateRegistry?.Count ?? 0)
+                    .AddField(
+                        "hasSearchFoodTemplate",
+                        _jobTemplateRegistry != null
+                        && _jobTemplateRegistry.TryGetTemplate(JobTemplateRegistry.SearchFoodLocalProbeTemplateId, out _))
+                    .AddField(
+                        "hasEatKnownFoodTemplate",
+                        _jobTemplateRegistry != null
+                        && _jobTemplateRegistry.TryGetTemplate(JobTemplateRegistry.FoodKnownCommunityStockTemplateId, out _)));
 
             // ******************************************************************************************************************************
             // 5) ISCRIVO I SISTEMI ALLO SCHEDULER
