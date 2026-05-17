@@ -106,6 +106,82 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void SearchFoodRunningMoveEmitsLifecycleStepStateAndCommandTrace()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            EnableMbdJobLifecycleExplainability(world);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out _), Is.True);
+
+            var system = new JobExecutionSystem();
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.JobLifecycleTraceCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(store.StepTraceCount, Is.EqualTo(1));
+            Assert.That(store.JobStateTraceCount, Is.EqualTo(1));
+            Assert.That(store.CommandTraceCount, Is.EqualTo(1));
+
+            Assert.That(store.TryGetLatestJobLifecycleTrace(out var lifecycleTrace), Is.True);
+            Assert.That(lifecycleTrace.JobLifecycle.Operation, Is.EqualTo(MemoryBeliefDecisionJobLifecycleOperation.Activated));
+
+            Assert.That(store.TryGetLatestStepTrace(out var stepTrace), Is.True);
+            Assert.That(stepTrace.Step.Step.Kind, Is.EqualTo(JobActionKind.MoveToCell));
+            Assert.That(stepTrace.Step.Result.Status, Is.EqualTo(StepResultStatus.Running));
+            Assert.That(stepTrace.Step.Result.DiagnosticMessage, Is.EqualTo("MoveCommandEnqueued"));
+
+            Assert.That(store.TryGetLatestJobStateTrace(out var stateTrace), Is.True);
+            Assert.That(stateTrace.JobState.HasActiveJob, Is.True);
+
+            Assert.That(store.TryGetLatestCommandTrace(out var commandTrace), Is.True);
+            Assert.That(commandTrace.Command.Operation, Is.EqualTo(MemoryBeliefDecisionCommandOperation.Enqueued));
+            Assert.That(commandTrace.Command.CommandName, Is.EqualTo(nameof(SetMoveIntentCommand)));
+        }
+
+        [Test]
+        public void SearchFoodViewModelSeesPhaseStepAndStateAfterProbeReached()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            EnableMbdJobLifecycleExplainability(world);
+            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
+            var commands = new List<ICommand>();
+            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            var probe = job.Request.TargetCell;
+
+            var jobSystem = new JobExecutionSystem();
+            var bus = new MessageBus();
+            jobSystem.Update(world, new Tick(1, 1f), bus, new Telemetry());
+            var buffered = world.JobRuntimeState.CommandBuffer.Snapshot();
+            Assert.That(buffered.Length, Is.EqualTo(1));
+            buffered[0].Execute(world, bus);
+            world.JobRuntimeState.CommandBuffer.Clear();
+
+            var movement = new MovementSystem();
+            movement.Update(world, new Tick(2, 1f), bus, new Telemetry());
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(probe.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(probe.y));
+
+            jobSystem.Update(world, new Tick(3, 1f), bus, new Telemetry());
+
+            var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
+            bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(world, npcId, viewModel);
+
+            Assert.That(built, Is.True);
+            Assert.That(viewModel.LatestJobPhase.HasValue, Is.True);
+            Assert.That(viewModel.LatestJobPhase.Operation, Is.EqualTo("Completed"));
+            Assert.That(viewModel.LatestStep.HasValue, Is.True);
+            Assert.That(viewModel.LatestStep.Step.Kind, Is.EqualTo("MoveToCell"));
+            Assert.That(viewModel.LatestStep.Result.Status, Is.EqualTo("Succeeded"));
+            Assert.That(viewModel.CurrentNpcJobState.HasValue, Is.True);
+            Assert.That(viewModel.CurrentNpcJobState.HasActiveJob, Is.False);
+            Assert.That(viewModel.LatestJobLifecycle.HasValue, Is.True);
+            Assert.That(viewModel.LatestJobLifecycle.Operation, Is.EqualTo("Completed"));
+        }
+
+        [Test]
         public void SearchFoodDoesNotUseFoodObjectTarget()
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
@@ -214,6 +290,16 @@ namespace Arcontio.Tests
             world.Config.Sim.memory_belief_decision_explainability.logDecision = true;
             world.Config.Sim.memory_belief_decision_explainability.logBridge = true;
             world.Config.Sim.memory_belief_decision_explainability.logJobRequest = true;
+        }
+
+        private static void EnableMbdJobLifecycleExplainability(World world)
+        {
+            EnableMbdBridgeExplainability(world);
+            world.Config.Sim.memory_belief_decision_explainability.logJobLifecycle = true;
+            world.Config.Sim.memory_belief_decision_explainability.logJobPhase = true;
+            world.Config.Sim.memory_belief_decision_explainability.logStep = true;
+            world.Config.Sim.memory_belief_decision_explainability.logJobState = true;
+            world.Config.Sim.memory_belief_decision_explainability.logCommand = true;
         }
 
         private static void AssertLatestBridge(World world, int npcId, LegacyFallbackKind expectedKind, string expectedReason)
