@@ -631,7 +631,7 @@ namespace Arcontio.Tests
 
             Assert.That(commands.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
-            AssertLatestBridge(world, npcId, LegacyFallbackKind.NonExecutableIntentFallback, "NonExecutableIntentLegacyFallback");
+            AssertLatestBridge(world, npcId, LegacyFallbackKind.NonExecutableIntentFallback, "NonExecutableIntentFallback:SearchFoodJobRouteRejected:TemplateMissing");
         }
 
         [Test]
