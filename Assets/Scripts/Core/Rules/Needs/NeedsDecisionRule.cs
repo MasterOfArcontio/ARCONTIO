@@ -647,7 +647,6 @@ namespace Arcontio.Core
                 || string.Equals(jobRouteReason, "NpcPositionMissing", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(jobRouteReason, "JobRuntimeMissing", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(jobRouteReason, "RegistryMissing", System.StringComparison.OrdinalIgnoreCase)
-                || string.Equals(jobRouteReason, "TemplateMissing", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(jobRouteReason, "MissingSearchFoodProbeCell", System.StringComparison.OrdinalIgnoreCase)
                 || string.Equals(jobRouteReason, "InvalidSearchFoodJobIntent", System.StringComparison.OrdinalIgnoreCase))
             {
