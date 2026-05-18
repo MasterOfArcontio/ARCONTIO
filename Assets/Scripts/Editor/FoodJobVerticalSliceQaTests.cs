@@ -619,7 +619,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void NeedsDecisionRuleWithSearchFoodWritesNonExecutableFallbackTrace()
+        public void NeedsDecisionRuleWithSearchFoodMissingTemplateWritesSafetyFallbackTrace()
         {
             var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
             EnableMbdBridgeExplainability(world);
@@ -631,7 +631,11 @@ namespace Arcontio.Tests
 
             Assert.That(commands.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
-            AssertLatestBridge(world, npcId, LegacyFallbackKind.NonExecutableIntentFallback, "NonExecutableIntentLegacyFallback");
+            AssertLatestBridge(
+                world,
+                npcId,
+                LegacyFallbackKind.SafetyFallback,
+                "NonExecutableIntentFallback:SearchFoodJobRouteRejected:TemplateMissing");
         }
 
         [Test]
