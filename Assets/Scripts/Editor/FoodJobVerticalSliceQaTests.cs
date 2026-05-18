@@ -619,7 +619,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void NeedsDecisionRuleWithSearchFoodWritesNonExecutableFallbackTrace()
+        public void NeedsDecisionRuleWithSearchFoodMissingTemplateWritesNonExecutableFallbackTrace()
         {
             var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
             EnableMbdBridgeExplainability(world);
