@@ -39,6 +39,7 @@ namespace Arcontio.Core
         private readonly DecisionScoringService _decisionScoringService = new();
         private readonly DecisionSelectionService _decisionSelectionService = new();
         private readonly DecisionContextBuilder _decisionContextBuilder = new();
+        private readonly IntentExecutionRouter _intentExecutionRouter = new();
         private readonly List<DecisionCandidate> _decisionCandidates = new(16);
         private readonly System.Random _decisionRandom = new(1505);
 
@@ -447,156 +448,6 @@ namespace Arcontio.Core
                 jobId,
                 "DecisionCandidateProjectedToExecutableJobRequest",
                 legacyBridgeStillUsed);
-        }
-
-        // =============================================================================
-        // BuildJobRequestFromSelectedCandidate
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce il <c>JobRequest</c> reale derivato dal candidato selezionato
-        /// dal Decision Layer.
-        /// </para>
-        ///
-        /// <para><b>Boundary reale EatKnownFood-only</b></para>
-        /// <para>
-        /// Questo helper e' volutamente stretto: supporta solo <c>EatKnownFood</c>,
-        /// non legge <c>World</c>, non emette <c>ICommand</c>, non assegna job e non
-        /// muta stato. Riceve dal bridge legacy solo l'identificatore oggetto gia'
-        /// risolto operativamente, mentre intenzione, urgenza, belief key e target
-        /// cella provengono dal candidato selezionato dal percorso
-        /// Query -> Candidate -> Scoring -> Selection.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Gate intent</b>: rifiuta ogni intenzione diversa da <c>EatKnownFood</c>.</item>
-        ///   <item><b>Belief target</b>: richiede il target gia' scelto dal QuerySystem.</item>
-        ///   <item><b>Object id</b>: conserva il target operativo quando il bridge lo possiede.</item>
-        /// </list>
-        /// </summary>
-        private static bool BuildJobRequestFromSelectedCandidate(
-            int tick,
-            int npcId,
-            DecisionCandidate candidate,
-            int targetObjectId,
-            out JobRequest request,
-            out string reason)
-        {
-            request = default;
-            reason = string.Empty;
-
-            if (candidate.Kind != DecisionIntentKind.EatKnownFood)
-            {
-                reason = "UnsupportedJobRequestIntent";
-                return false;
-            }
-
-            if (candidate.BeliefResult.IsEmpty)
-            {
-                reason = "MissingBeliefTarget";
-                return false;
-            }
-
-            if (targetObjectId <= 0)
-            {
-                reason = "MissingTargetObject";
-                return false;
-            }
-
-            string beliefKey = BuildBeliefKey(candidate.BeliefResult.Belief);
-            request = new JobRequest(
-                $"jobreq_food_{npcId}_{targetObjectId}_{tick}",
-                npcId,
-                candidate.Kind,
-                ResolveJobPriorityClass(candidate),
-                candidate.NeedUrgency01,
-                tick,
-                true,
-                candidate.BeliefResult.Belief.EstimatedPosition,
-                targetObjectId,
-                beliefKey,
-                "FoodJobVerticalSlice");
-
-            reason = "JobRequestBuilt";
-            return true;
-        }
-
-        private static bool BuildJobRequestFromSelectedCandidate(
-            int tick,
-            int npcId,
-            DecisionCandidate candidate,
-            Vector2Int targetCell,
-            out JobRequest request,
-            out string reason)
-        {
-            request = default;
-            reason = string.Empty;
-
-            if (candidate.Kind != DecisionIntentKind.SearchFood)
-            {
-                reason = "UnsupportedJobRequestIntent";
-                return false;
-            }
-
-            request = new JobRequest(
-                $"jobreq_search_food_probe_{npcId}_{targetCell.x}_{targetCell.y}_{tick}",
-                npcId,
-                DecisionIntentKind.SearchFood,
-                ResolveJobPriorityClass(candidate),
-                candidate.NeedUrgency01,
-                tick,
-                true,
-                targetCell,
-                0,
-                string.Empty,
-                "SearchFoodLocalProbe");
-
-            reason = "JobRequestBuilt";
-            return true;
-        }
-
-        // =============================================================================
-        // ResolveJobPriorityClass
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Mappa il candidato decisionale in una classe di priorita' minima per la
-        /// trace diagnostica del Job System.
-        /// </para>
-        ///
-        /// <para><b>Mappatura conservativa e leggibile</b></para>
-        /// <para>
-        /// La policy completa appartiene al futuro boundary Decision -> Job. Qui ci
-        /// serve solo una classificazione coerente e spiegabile per il log runtime.
-        /// </para>
-        /// </summary>
-        private static JobPriorityClass ResolveJobPriorityClass(DecisionCandidate candidate)
-        {
-            if (candidate.IsCritical)
-                return JobPriorityClass.Critical;
-
-            if (candidate.NeedUrgency01 >= 0.8f)
-                return JobPriorityClass.Important;
-
-            if (candidate.Kind == DecisionIntentKind.WaitAndObserve)
-                return JobPriorityClass.Idle;
-
-            return JobPriorityClass.Normal;
-        }
-
-        // =============================================================================
-        // BuildBeliefKey
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce una chiave diagnostica compatta per correlare la richiesta job
-        /// alla belief che l'ha motivata.
-        /// </para>
-        /// </summary>
-        private static string BuildBeliefKey(BeliefEntry belief)
-        {
-            return $"{belief.Category}:{belief.BeliefId}@{belief.EstimatedPosition.x},{belief.EstimatedPosition.y}";
         }
 
         // =============================================================================
@@ -1485,14 +1336,14 @@ namespace Arcontio.Core
                 probeFound: true,
                 probeCell: probeCell);
 
-            if (!BuildJobRequestFromSelectedCandidate(
+            if (!_intentExecutionRouter.TryRouteSearchFood(
                 nowTick,
                 npcId,
                 candidate,
                 probeCell,
-                out var request,
-                out reason))
+                out var route))
             {
+                reason = route.Reason;
                 LogSearchFoodJobRoute(
                     nowTick,
                     npcId,
@@ -1504,6 +1355,7 @@ namespace Arcontio.Core
                 return false;
             }
 
+            var request = route.Request;
             LogSearchFoodJobRoute(
                 nowTick,
                 npcId,
@@ -1723,17 +1575,18 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!BuildJobRequestFromSelectedCandidate(
+            if (!_intentExecutionRouter.TryRouteEatKnownFood(
                 nowTick,
                 npcId,
                 candidate,
                 foodObjectId,
-                out var request,
-                out reason))
+                out var route))
             {
+                reason = route.Reason;
                 return false;
             }
 
+            var request = route.Request;
             // Il boundary reale di questa patch resta intenzionalmente stretto:
             // il Decision Layer seleziona EatKnownFood e produce un JobRequest dati,
             // mentre la verifica legacy del target operativo resta qui nel bridge.
