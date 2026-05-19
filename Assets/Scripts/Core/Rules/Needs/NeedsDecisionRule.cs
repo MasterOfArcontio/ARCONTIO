@@ -40,6 +40,7 @@ namespace Arcontio.Core
         private readonly DecisionSelectionService _decisionSelectionService = new();
         private readonly DecisionContextBuilder _decisionContextBuilder = new();
         private readonly IntentExecutionRouter _intentExecutionRouter = new();
+        private readonly DecisionExplainabilityBridge _decisionExplainabilityBridge = new();
         private readonly List<DecisionCandidate> _decisionCandidates = new(16);
         private readonly System.Random _decisionRandom = new(1505);
 
@@ -267,7 +268,7 @@ namespace Arcontio.Core
             {
                 cmd = new EatPrivateFoodCommand(npcId);
                 handled = true;
-                TryLogDecisionBridgeFallback(
+                _decisionExplainabilityBridge.TryLogDecisionBridgeFallback(
                     nowTick,
                     npcId,
                     DecisionIntentKind.EatKnownFood,
@@ -293,7 +294,7 @@ namespace Arcontio.Core
 
             handled = true;
             telemetry?.Counter("DecisionBridge.IntentSelected", 1);
-            TryEmitDecisionTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, context, true, _decisionCandidates, selection, selectionConfig);
+            _decisionExplainabilityBridge.TryEmitDecisionTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, context, true, _decisionCandidates, selection, selectionConfig);
 
             ArcontioLogger.Info(
                 new LogContext(tick: nowTick, channel: "DecisionBridge", npcId: npcId),
@@ -317,7 +318,7 @@ namespace Arcontio.Core
                         cmd = null;
                         didSteal = false;
                         didMove = false;
-                        TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, LegacyFallbackKind.None, "FoodJobRouteAccepted:" + jobRouteReason);
+                        _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, LegacyFallbackKind.None, "FoodJobRouteAccepted:" + jobRouteReason);
                         return true;
                     }
 
@@ -325,14 +326,14 @@ namespace Arcontio.Core
                     var fallbackKind = ResolveFoodJobRouteFallbackKind(jobRouteReason, planned);
                     string fallbackReason = BuildFoodJobRouteFallbackReason(jobRouteReason, planned);
                     ApplyFoodRouteFailureCognitiveFeedback(world, npcId, nowTick, selection.Candidate, jobRouteReason, explainabilityConfig, telemetry);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, fallbackKind, fallbackReason);
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, fallbackKind, fallbackReason);
                     return planned;
                 }
 
                 case DecisionIntentKind.TakeRestrictedFood:
                 {
                     bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, LegacyFallbackKind.TransitionalDebtFallback, planned ? "RestrictedFoodLegacyCommandAdapter" : "RestrictedFoodLegacyAdapterNoCommand");
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, LegacyFallbackKind.TransitionalDebtFallback, planned ? "RestrictedFoodLegacyCommandAdapter" : "RestrictedFoodLegacyAdapterNoCommand");
                     return planned;
                 }
 
@@ -340,7 +341,7 @@ namespace Arcontio.Core
                 case DecisionIntentKind.UseRestrictedRestPlace:
                 {
                     bool planned = TryPlanSleep(world, npcId, needs, out cmd, out didSteal);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, LegacyFallbackKind.TransitionalDebtFallback, planned ? "RestLegacyCommandAdapter" : "RestLegacyAdapterNoCommand");
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, LegacyFallbackKind.TransitionalDebtFallback, planned ? "RestLegacyCommandAdapter" : "RestLegacyAdapterNoCommand");
                     return planned;
                 }
 
@@ -357,7 +358,7 @@ namespace Arcontio.Core
                         cmd = null;
                         didSteal = false;
                         didMove = false;
-                        TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, LegacyFallbackKind.None, "SearchFoodJobRouteAccepted:" + searchJobRouteReason);
+                        _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, LegacyFallbackKind.None, "SearchFoodJobRouteAccepted:" + searchJobRouteReason);
                         return true;
                     }
 
@@ -365,7 +366,7 @@ namespace Arcontio.Core
                     didSteal = false;
                     didMove = false;
                     handled = false;
-                    TryEmitBridgeTrace(
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(
                         explainabilityConfig,
                         world.MemoryBeliefDecisionExplainability,
                         nowTick,
@@ -391,63 +392,14 @@ namespace Arcontio.Core
                     didSteal = false;
                     didMove = false;
                     handled = false;
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, LegacyFallbackKind.NonExecutableIntentFallback, "NonExecutableIntentLegacyFallback");
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, LegacyFallbackKind.NonExecutableIntentFallback, "NonExecutableIntentLegacyFallback");
                     return false;
 
                 default:
                     handled = false;
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, LegacyFallbackKind.NoOpFallback, "UnsupportedIntentNoOp");
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, LegacyFallbackKind.NoOpFallback, "UnsupportedIntentNoOp");
                     return false;
             }
-        }
-
-        // =============================================================================
-        // TryEmitJobRequestTrace
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Esporta il boundary <c>Decision -> JobRequest</c> usando la stessa richiesta
-        /// dati che puo' alimentare il Job System reale.
-        /// </para>
-        ///
-        /// <para><b>Legacy Transitional Decision Bridge</b></para>
-        /// <para>
-        /// <c>NeedsDecisionRule</c> resta il ponte transitorio autorizzato tra la
-        /// selezione MBQD e l'esecuzione storica. Questa patch non rimuove i fallback
-        /// legacy e non rende eseguibili nuove intenzioni: rende soltanto reale, per
-        /// <c>EatKnownFood</c>, il contratto dati che attraversa il confine
-        /// Decision -> Job. Il Decision Layer continua a non emettere <c>ICommand</c>;
-        /// la Command Authority resta sotto Job/Step/Command.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Request condivisa</b>: il record EL riceve il <c>JobRequest</c> gia' costruito dal boundary reale.</item>
-        ///   <item><b>JobId</b>: resta vuoto quando la trace precede l'istanza del job, oppure contiene il job assegnabile.</item>
-        ///   <item><b>Legacy flag</b>: resta esplicito per distinguere route job reali e fallback transitori.</item>
-        /// </list>
-        /// </summary>
-        private static void TryEmitJobRequestTrace(
-            MemoryBeliefDecisionExplainabilityParams config,
-            MemoryBeliefDecisionExplainabilityRegistry registry,
-            int tick,
-            int npcId,
-            JobRequest request,
-            string jobId,
-            bool legacyBridgeStillUsed)
-        {
-            if (config == null)
-                return;
-
-            MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobRequestTrace(
-                config,
-                registry,
-                npcId,
-                tick,
-                request,
-                jobId,
-                "DecisionCandidateProjectedToExecutableJobRequest",
-                legacyBridgeStillUsed);
         }
 
         // =============================================================================
@@ -540,197 +492,6 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
-        // TryEmitDecisionTrace
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Esporta uno snapshot EL della selezione del Decision Layer appena calcolata.
-        /// </para>
-        ///
-        /// <para><b>Decision Layer auditabile</b></para>
-        /// <para>
-        /// Il metodo non rigenera candidati, non ricalcola score e non interroga il
-        /// World. Riceve context, candidati e selezione dal punto della pipeline che
-        /// li possiede gia', poi li copia in record passivi per il sink JSONL.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Guard config</b>: se EL e' spento il sink fara' comunque no-op.</item>
-        ///   <item><b>Selection</b>: salva intenzione, score e indice selezionato.</item>
-        ///   <item><b>Candidates</b>: copia i candidati gia' score-ati con breakdown.</item>
-        /// </list>
-        /// </summary>
-        private static void TryEmitDecisionTrace(
-            MemoryBeliefDecisionExplainabilityParams config,
-            MemoryBeliefDecisionExplainabilityRegistry registry,
-            in DecisionEvaluationContext context,
-            bool auditValid,
-            List<DecisionCandidate> candidates,
-            DecisionSelectionResult selection,
-            DecisionSelectionConfig selectionConfig)
-        {
-            if (config == null)
-                return;
-
-            // L'effettivo rumore di selezione e' calcolato nello stesso modo del
-            // SelectionService, ma senza rieseguire la roulette o riordinare candidati.
-            float impulsivity01 = context.Dna != null ? context.Dna.CognitiveModulators.Impulsivity01 : 0f;
-            float effectiveNoise01 = Clamp01(selectionConfig.noise01 + (impulsivity01 * selectionConfig.impulsivityNoiseBonus));
-
-            var trace = new MemoryBeliefDecisionTrace
-            {
-                Kind = MemoryBeliefDecisionTraceKind.Decision,
-                Tick = context.Tick,
-                NpcId = context.NpcId,
-                Decision = new MemoryBeliefDecisionDecisionRecord
-                {
-                    AuditValid = auditValid,
-                    CandidateCount = candidates != null ? candidates.Count : 0,
-                    SelectedIntent = selection.IsEmpty ? DecisionIntentKind.None : selection.Candidate.Kind,
-                    SelectedScore = selection.IsEmpty ? 0f : selection.Candidate.FinalScore,
-                    SelectedIndex = selection.SelectedIndex,
-                    SelectionTopN = selectionConfig.topN,
-                    SelectionNoise01 = selectionConfig.noise01,
-                    Impulsivity01 = impulsivity01,
-                    EffectiveNoise01 = effectiveNoise01,
-                    Candidates = ToDecisionCandidateRecords(candidates),
-                },
-            };
-
-            MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(config, registry, trace);
-        }
-
-        // =============================================================================
-        // TryEmitBridgeTrace
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Esporta il record EL del ponte provvisorio tra intenzione decisionale e
-        /// command legacy.
-        /// </para>
-        ///
-        /// <para><b>Decision / Execution Bridge</b></para>
-        /// <para>
-        /// La funzione rende visibile se l'intenzione selezionata e' diventata un
-        /// command, se ha richiesto movimento o furto, oppure se la rule legacy deve
-        /// ancora proseguire perche' l'intenzione non ha Job eseguibile.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Command</b>: nome del command prodotto, se esiste.</item>
-        ///   <item><b>Target</b>: cella del belief vincitore quando disponibile.</item>
-        ///   <item><b>Fallback</b>: flag esplicito per intenzioni non ancora eseguibili.</item>
-        /// </list>
-        /// </summary>
-        private static void TryEmitBridgeTrace(
-            MemoryBeliefDecisionExplainabilityParams config,
-            MemoryBeliefDecisionExplainabilityRegistry registry,
-            int tick,
-            int npcId,
-            DecisionCandidate candidate,
-            ICommand command,
-            bool didSteal,
-            bool didMove,
-            bool handled,
-            bool legacyFallbackUsed,
-            LegacyFallbackKind fallbackKind,
-            string reason)
-        {
-            if (config == null)
-            {
-                TryLogDecisionBridgeFallback(tick, npcId, candidate, command, fallbackKind, reason);
-                return;
-            }
-
-            var targetCell = Vector2Int.zero;
-            var targetSource = MemoryBeliefDecisionTargetSource.None;
-            if (candidate.Metadata.RequiresBeliefTarget && !candidate.BeliefResult.IsEmpty)
-            {
-                // Il bridge non cerca un nuovo target: copia quello gia' scelto dal
-                // QuerySystem per il candidato decisionale.
-                targetCell = candidate.BeliefResult.Belief.EstimatedPosition;
-                targetSource = MemoryBeliefDecisionTargetSource.BeliefQuery;
-            }
-            else if (command != null)
-            {
-                targetSource = MemoryBeliefDecisionTargetSource.LegacyFallback;
-            }
-
-            MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
-            {
-                Kind = MemoryBeliefDecisionTraceKind.Bridge,
-                Tick = tick,
-                NpcId = npcId,
-                Bridge = new MemoryBeliefDecisionBridgeRecord
-                {
-                    SelectedIntent = candidate.Kind,
-                    CommandName = command != null ? command.Name : string.Empty,
-                    Handled = handled,
-                    DidMove = didMove,
-                    DidSteal = didSteal,
-                    TargetCell = targetCell,
-                    TargetSource = targetSource,
-                    LegacyFallbackUsed = legacyFallbackUsed,
-                    FallbackKind = fallbackKind,
-                    Reason = reason ?? string.Empty,
-                },
-            });
-
-            TryLogDecisionBridgeFallback(tick, npcId, candidate, command, fallbackKind, reason);
-        }
-
-        // =============================================================================
-        // TryLogDecisionBridgeFallback
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Scrive un log strutturato solo quando il bridge decide davvero un fallback o
-        /// un no-op classificato.
-        /// </para>
-        ///
-        /// <para><b>Osservabilita' senza spam decisionale</b></para>
-        /// <para>
-        /// Il log resta spento per il path nominale <c>FallbackKind.None</c>. In questo
-        /// modo la patch rende visibili i ritorni legacy senza duplicare ogni selezione
-        /// MBQD gia' coperta da <c>log.decision.bridge.intent</c>.
-        /// </para>
-        /// </summary>
-        private static void TryLogDecisionBridgeFallback(
-            int tick,
-            int npcId,
-            DecisionCandidate candidate,
-            ICommand command,
-            LegacyFallbackKind fallbackKind,
-            string reason)
-        {
-            TryLogDecisionBridgeFallback(tick, npcId, candidate.Kind, command, fallbackKind, reason);
-        }
-
-        private static void TryLogDecisionBridgeFallback(
-            int tick,
-            int npcId,
-            DecisionIntentKind intent,
-            ICommand command,
-            LegacyFallbackKind fallbackKind,
-            string reason)
-        {
-            if (fallbackKind == LegacyFallbackKind.None)
-                return;
-
-            ArcontioLogger.Info(
-                new LogContext(tick: tick, channel: "DecisionBridgeFallback", npcId: npcId),
-                new LogBlock(LogLevel.Info, "log.decision.bridge.fallback")
-                    .AddField("tick", tick)
-                    .AddField("npcId", npcId)
-                    .AddField("intent", intent.ToString())
-                    .AddField("fallbackKind", fallbackKind.ToString())
-                    .AddField("reason", reason ?? string.Empty)
-                    .AddField("commandName", command != null ? command.Name : string.Empty));
-        }
-
-        // =============================================================================
         // LogSearchFoodJobRoute
         // =============================================================================
         /// <summary>
@@ -786,56 +547,6 @@ namespace Arcontio.Core
                     .AddField("jobId", jobId ?? string.Empty)
                     .AddField("assigned", assigned)
                     .AddField("assignReason", assignReason ?? string.Empty));
-        }
-
-        // =============================================================================
-        // ToDecisionCandidateRecords
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Copia i candidati decisionali in record EL serializzabili.
-        /// </para>
-        ///
-        /// <para><b>Candidati come snapshot</b></para>
-        /// <para>
-        /// La conversione non cambia disponibilita', score o belief target. Serve solo
-        /// a rendere analizzabile dopo il tick l'insieme che ha partecipato alla
-        /// selezione.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Null guard</b>: array vuoto quando non esistono candidati.</item>
-        ///   <item><b>Belief</b>: snapshot del target scelto dal QuerySystem, se presente.</item>
-        ///   <item><b>Score</b>: breakdown decisionale copiato voce per voce.</item>
-        /// </list>
-        /// </summary>
-        private static MemoryBeliefDecisionCandidateRecord[] ToDecisionCandidateRecords(List<DecisionCandidate> candidates)
-        {
-            if (candidates == null || candidates.Count == 0)
-                return System.Array.Empty<MemoryBeliefDecisionCandidateRecord>();
-
-            var records = new MemoryBeliefDecisionCandidateRecord[candidates.Count];
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                var candidate = candidates[i];
-                records[i] = new MemoryBeliefDecisionCandidateRecord
-                {
-                    Intent = candidate.Kind,
-                    Available = candidate.IsAvailable,
-                    Need = candidate.Metadata.PrimaryNeed,
-                    NeedUrgency01 = candidate.NeedUrgency01,
-                    IsCritical = candidate.IsCritical,
-                    RequiresBeliefTarget = candidate.Metadata.RequiresBeliefTarget,
-                    BeliefResultEmpty = candidate.BeliefResult.IsEmpty,
-                    Belief = candidate.BeliefResult.IsEmpty ? default : ToBeliefRef(candidate.BeliefResult.Belief),
-                    Score = candidate.FinalScore,
-                    FilteredReason = candidate.FilteredReason ?? string.Empty,
-                    ScoreContributions = ToScoreContributionRefs(candidate.ScoreContributions),
-                };
-            }
-
-            return records;
         }
 
         // =============================================================================
@@ -1134,45 +845,6 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
-        // ToScoreContributionRefs
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Converte i contributi dello scoring decisionale in payload EL.
-        /// </para>
-        ///
-        /// <para><b>Breakdown esplicito</b></para>
-        /// <para>
-        /// Le label prodotte da <c>DecisionScoringService</c> restano inalterate, in
-        /// modo che il file JSONL possa spiegare il ranking senza log testuali fragili.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Guard</b>: array vuoto per candidati non score-ati.</item>
-        ///   <item><b>Copia</b>: ogni contributo mantiene label e valore.</item>
-        ///   <item><b>Output</b>: array passivo pronto per il sink.</item>
-        /// </list>
-        /// </summary>
-        private static MemoryBeliefDecisionScoreContributionRef[] ToScoreContributionRefs(DecisionScoreContribution[] contributions)
-        {
-            if (contributions == null || contributions.Length == 0)
-                return System.Array.Empty<MemoryBeliefDecisionScoreContributionRef>();
-
-            var records = new MemoryBeliefDecisionScoreContributionRef[contributions.Length];
-            for (int i = 0; i < contributions.Length; i++)
-            {
-                records[i] = new MemoryBeliefDecisionScoreContributionRef
-                {
-                    Label = contributions[i].Label,
-                    Value = contributions[i].Value,
-                };
-            }
-
-            return records;
-        }
-
-        // =============================================================================
         // Clamp01
         // =============================================================================
         /// <summary>
@@ -1398,7 +1070,7 @@ namespace Arcontio.Core
                 factoryCreated: true,
                 jobId: job.JobId);
 
-            TryEmitJobRequestTrace(
+            _decisionExplainabilityBridge.TryEmitJobRequestTrace(
                 world.Config?.Sim?.memory_belief_decision_explainability,
                 world.MemoryBeliefDecisionExplainability,
                 nowTick,
@@ -1608,7 +1280,7 @@ namespace Arcontio.Core
             if (!created)
                 return false;
 
-            TryEmitJobRequestTrace(
+            _decisionExplainabilityBridge.TryEmitJobRequestTrace(
                 world.Config?.Sim?.memory_belief_decision_explainability,
                 world.MemoryBeliefDecisionExplainability,
                 nowTick,
