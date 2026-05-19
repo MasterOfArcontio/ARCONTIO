@@ -6,7 +6,42 @@ using UnityEngine;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // NeedsDecisionRule
+    // =============================================================================
     /// <summary>
+    /// <para>
+    /// Compatibility shim runtime per il vecchio ciclo decisionale basato sui bisogni.
+    /// </para>
+    ///
+    /// <para><b>v0.11c.01e - Legacy Transitional Decision Bridge</b></para>
+    /// <para>
+    /// Questa classe non rappresenta il modello architetturale target del Decision
+    /// Layer. Resta viva per compatibilita' con il runtime osservabile v0.11B/v0.11C:
+    /// riceve il tick, attraversa il primo MBQD reale quando possibile, e mantiene
+    /// ancora i fallback storici verso <c>ICommand</c> finche' il futuro
+    /// <c>DecisionOrchestratorSystem</c> non diventera' il punto primario.
+    /// </para>
+    ///
+    /// <para><b>Boundary temporaneo dichiarato</b></para>
+    /// <para>
+    /// Le responsabilita' gia' estratte non devono rientrare qui: costruzione del
+    /// contesto, routing intent-to-JobRequest ed emissione explainability vivono nei
+    /// componenti dedicati. Le scansioni su <c>World</c>, i fallback food/rest e i
+    /// command legacy rimasti in questa classe sono debito transitorio esplicito, non
+    /// pattern da copiare nel nuovo orchestrator.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Cadence legacy</b>: usa ancora <c>TickPulseEvent</c> e throttle locale.</item>
+    ///   <item><b>MBQD callsite</b>: invoca generator/scoring/selection e route estratte.</item>
+    ///   <item><b>Job bridge</b>: tenta Food/SearchFood job vertical slice senza preemption diretta.</item>
+    ///   <item><b>Fallback legacy</b>: conserva command storici per compatibilita' runtime.</item>
+    ///   <item><b>Feedback food</b>: mantiene il feedback cognitivo minimo dei failure food.</item>
+    /// </list>
+    /// </summary>
+    /// <remarks>
     /// NeedsDecisionRule (Day9):
     /// Rule alto livello, coerente col tuo stile:
     /// - Reagisce a eventi (TickPulseEvent) e produce Commands.
@@ -30,11 +65,16 @@ namespace Arcontio.Core
     ///   (es. lo hai visto un secondo fa, ti giri, ecc.).
     /// - Se in futuro vuoi coerenza totale col pipeline Range?Cone?LOS, il posto giusto
     ///   è far sì che NeedsDecisionRule consulti Memory/ObjectPerception, non il World "nudo".
-    /// </summary>
+    /// </remarks>
     public sealed class NeedsDecisionRule : IRule
     {
         private readonly BeliefUpdater _beliefUpdater = new();
         private readonly BeliefQueryService _beliefQueryService = new();
+
+        // Componenti gia' estratti dalla rule durante v0.11c.01. Restano iniettati
+        // come callsite interni per preservare il comportamento runtime, ma indicano
+        // il confine target: il futuro orchestrator dovra' comporli senza assorbire
+        // fallback legacy, scansioni World o command adapter storici.
         private readonly DecisionCandidateGenerator _decisionCandidateGenerator = new();
         private readonly DecisionScoringService _decisionScoringService = new();
         private readonly DecisionSelectionService _decisionSelectionService = new();
@@ -44,7 +84,9 @@ namespace Arcontio.Core
         private readonly List<DecisionCandidate> _decisionCandidates = new(16);
         private readonly System.Random _decisionRandom = new(1505);
 
-        // Throttle: decidiamo ogni N tick-pulse (per log leggibile)
+        // Throttle legacy: decide ogni N tick-pulse per contenere il rumore del
+        // vecchio bridge. Non e' ancora la cognitive cadence target descritta da
+        // ARC-DEC-018/019 e non deve diventare NpcDecisionScheduler.
         private readonly int _decisionEveryTicks;
 
         // Range di ricerca "decisionale" per cibo/letto.
@@ -68,6 +110,10 @@ namespace Arcontio.Core
 
         public void Handle(World world, ISimEvent e, List<ICommand> outCommands, Telemetry telemetry)
         {
+            // Entry point legacy del bridge: il futuro DecisionOrchestratorSystem non
+            // deve essere cablato qui in modo implicito. Fino alla migrazione
+            // dedicata, questa rule resta l'adapter compatibile che puo' ancora
+            // produrre ICommand tramite fallback storici.
             // Usiamo TickPulseEvent come clock decisionale.
             if (e is not TickPulseEvent pulse)
                 return;
@@ -209,12 +255,13 @@ namespace Arcontio.Core
         /// bisogni.
         /// </para>
         ///
-        /// <para><b>Integrazione progressiva Decision -> Command</b></para>
+        /// <para><b>Compatibility shim, non modello target</b></para>
         /// <para>
-        /// Il metodo usa il nuovo Decision Layer per scegliere un'intenzione, ma lascia
-        /// ancora alla rule legacy la traduzione concreta verso i command esistenti.
-        /// Questo evita di introdurre il Job System in anticipo e riduce il rischio di
-        /// rompere fame/riposo mentre il layer di esecuzione non e' ancora pronto.
+        /// Il metodo usa i componenti MBQD gia' estratti per scegliere un'intenzione,
+        /// poi resta nel vecchio bridge per preservare route Job vertical slice e
+        /// fallback command legacy. La presenza di <c>ICommand</c> in questa firma e'
+        /// debito compatibile: non deve essere copiata nel futuro orchestrator e non
+        /// assegna autorita' di preemption al Decision Layer.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -222,7 +269,8 @@ namespace Arcontio.Core
         ///   <item><b>Gate</b>: attiva il ponte solo per fame/riposo, non per sete ancora priva di command.</item>
         ///   <item><b>Context</b>: costruisce un <c>DecisionEvaluationContext</c> con input per-NPC e belief soggettivi.</item>
         ///   <item><b>Pipeline</b>: genera candidati, calcola score e seleziona weighted random.</item>
-        ///   <item><b>Adapter</b>: traduce solo intenzioni MVP in command legacy o in attesa/ricerca.</item>
+        ///   <item><b>Adapter</b>: delega Food/SearchFood ai job route estratti dove possibile.</item>
+        ///   <item><b>Fallback</b>: conserva command legacy e no-op transitori senza cambiare policy.</item>
         /// </list>
         /// </summary>
         private bool TryPlanFromDecisionLayer(
