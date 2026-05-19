@@ -38,6 +38,7 @@ namespace Arcontio.Core
         private readonly DecisionCandidateGenerator _decisionCandidateGenerator = new();
         private readonly DecisionScoringService _decisionScoringService = new();
         private readonly DecisionSelectionService _decisionSelectionService = new();
+        private readonly DecisionContextBuilder _decisionContextBuilder = new();
         private readonly List<DecisionCandidate> _decisionCandidates = new(16);
         private readonly System.Random _decisionRandom = new(1505);
 
@@ -248,7 +249,7 @@ namespace Arcontio.Core
 
             var explainabilityConfig = world.Config?.Sim?.memory_belief_decision_explainability;
 
-            if (!TryBuildDecisionContext(world, npcId, in needs, nowTick, out var context))
+            if (!_decisionContextBuilder.TryBuild(world, npcId, in needs, nowTick, out var context))
                 return false;
 
             var audit = DecisionInputAudit.Audit(context);
@@ -1393,67 +1394,6 @@ namespace Arcontio.Core
             config.impulsivityNoiseBonus = Clamp01(runtimeConfig.impulsivityNoiseBonus);
             config.minimumWeight = runtimeConfig.minimumWeight > 0f ? runtimeConfig.minimumWeight : config.minimumWeight;
             return config;
-        }
-
-        // =============================================================================
-        // TryBuildDecisionContext
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce il contesto minimo ammesso dal Decision Layer per un singolo NPC.
-        /// </para>
-        ///
-        /// <para><b>Whitelist input Decision Layer</b></para>
-        /// <para>
-        /// Anche se questa rule legacy riceve ancora <c>World</c>, il contesto passato
-        /// al Decision Layer contiene solo componenti per-NPC gia' risolti e il
-        /// <c>BeliefStore</c> soggettivo. Il Decision Layer non riceve mai il World.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Dna/Profile</b>: identita' cognitiva e profilo runtime dell'NPC.</item>
-        ///   <item><b>Position</b>: posizione necessaria al QuerySystem per la distanza.</item>
-        ///   <item><b>Beliefs</b>: store soggettivo usato solo via BeliefQueryService.</item>
-        ///   <item><b>Schedule/Norm</b>: contesti MVP inattivi o permissivi in questa integrazione.</item>
-        /// </list>
-        /// </summary>
-        private static bool TryBuildDecisionContext(
-            World world,
-            int npcId,
-            in NpcNeeds needs,
-            int nowTick,
-            out DecisionEvaluationContext context)
-        {
-            context = default;
-
-            if (!world.NpcDna.TryGetValue(npcId, out var dna) || dna == null)
-                return false;
-
-            if (!world.NpcProfiles.TryGetValue(npcId, out var profile) || profile == null)
-                return false;
-
-            if (!world.GridPos.TryGetValue(npcId, out var position))
-                return false;
-
-            if (!world.Beliefs.TryGetValue(npcId, out var beliefs) || beliefs == null)
-                return false;
-
-            context = new DecisionEvaluationContext(
-                npcId: npcId,
-                tick: nowTick,
-                needs: needs,
-                dna: dna,
-                profile: profile,
-                npcPosition: new Vector2Int(position.X, position.Y),
-                beliefs: beliefs,
-                beliefQueryConfig: world.Global.BeliefQuery,
-                explainabilityConfig: world.Config?.Sim?.memory_belief_decision_explainability,
-                explainabilityRegistry: world.MemoryBeliefDecisionExplainability,
-                scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
-                normContext: new DecisionNormContext(false, 1f, true));
-
-            return true;
         }
 
         // =============================================================================
