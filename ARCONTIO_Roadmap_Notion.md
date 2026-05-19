@@ -22,8 +22,9 @@
 | v0.09 | Simulation Backbone Hardening & Constitutional Alignment | Maggio 2026 | Completata |
 | v0.10 | World Persistence Closure & Save/Load Completion | Maggio 2026 | Completata |
 | v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
-| v0.11B | Decision Architecture (MBQD) Foundation | Maggio-Giugno 2026 | Prossimo cantiere |
-| v0.11C | Work/Social/Dormant Systems Forensic Audit | Giugno 2026 | Future |
+| v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
+| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11c.02 |
+| v0.11D | Work/Social/Dormant Systems Forensic Audit | Giugno 2026 | Future |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
 | v0.14 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
@@ -330,7 +331,7 @@ necessario per l'apertura della campagna tecnica v0.09.
 
 ## v0.11 — Domain Reintegration split
 
-> **Nota roadmap:** v0.11 è stata splittata in tre sottofasi per evitare di mescolare Job runtime, Decision architecture e Work/Social audit. La v0.11 non è chiusa integralmente: è chiusa solo la fase v0.11A.
+> **Nota roadmap:** v0.11 è stata splittata in sottofasi per evitare di mescolare Job runtime, Decision architecture, temporal runtime e Work/Social audit. La v0.11 non è chiusa integralmente: sono chiuse v0.11A, v0.11B e il checkpoint v0.11c.01 della fase v0.11C.
 
 ### v0.11A — Job Backbone Reintegration
 
@@ -360,19 +361,82 @@ necessario per l'apertura della campagna tecnica v0.09.
 
 ### v0.11B — Decision Architecture (MBQD) Foundation
 
-**Status:** IN PREPARAZIONE / PENDING
+**Status:** COMPLETATA / ✅
 
 **Scopo:** progettare e avviare la pipeline `Memory → Belief → Query → Decision → Job`.
 
-**Nota operativa:** questa è la prossima apertura tecnica. Deve partire dall'architettura decisionale e non da patch dirette su WorkSystem o SocialSystem.
+**Esito consolidato v0.11B:**
 
-### v0.11C — Work/Social/Dormant Systems Forensic Audit
+- primo loop runtime osservabile Decision → JobRequest → Job → Step → Command → World → Perception → Memory → Belief → next decision;
+- recovery QA `v0.11b.05` reintegrata tramite PR #10;
+- SearchFood perception-to-belief closure coperta da test;
+- `ARC-CON-014` MBQD v1.0 consolidato;
+- `ARC-DEC-018` formalizza azioni multi-tick e separazione delle cadence runtime.
+
+### v0.11C — Decision Orchestrator & Temporal Runtime Foundation
+
+**Status:** IN CORSO / NEXT: v0.11c.02
+
+**Scopo:** separare progressivamente orchestration decisionale, costruzione del contesto, routing intenzione→esecuzione, explainability decisionale e cadence runtime, senza trasformare `NeedsDecisionRule` in nuovo monolite e senza spostare nel Decision Layer autorità di preemption.
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11c.01a | Decision Orchestrator skeleton no-op | ✅ |
+| v0.11c.01b | DecisionContextBuilder extraction | ✅ |
+| v0.11c.01c | IntentExecutionRouter / JobRequestBuilder extraction | ✅ |
+| v0.11c.01d | DecisionExplainabilityBridge extraction | ✅ |
+| v0.11c.01e | NeedsDecisionRule compatibility shim | ✅ |
+| v0.11c.02 | Multi-Tick Action Runtime | NEXT |
+
+**Esito consolidato v0.11c.01:**
+
+- introdotto skeleton no-op del futuro `DecisionOrchestratorSystem`;
+- separata la costruzione del `DecisionEvaluationContext` in `DecisionContextBuilder`;
+- separato il boundary SelectedDecision → JobRequest in `IntentExecutionRouter` / `JobRequestBuilder`;
+- separato il boundary di explainability decisionale in `DecisionExplainabilityBridge`;
+- dichiarato `NeedsDecisionRule` come compatibility shim / legacy transitional bridge;
+- preservato il comportamento runtime esistente;
+- nessun cablaggio produttivo dell'Orchestrator come primary;
+- nessuna modifica a `SimulationHost`, `JobArbiter`, `JobRuntimeState` o `JobExecutionSystem`;
+- nessuna implementazione di preemption, nuova cadence produttiva o migrazione fallback legacy.
+
+**PR incluse in v0.11c.01:**
+
+- PR #9 — `v0.11c.01a` Decision Orchestrator skeleton no-op;
+- PR #11 — `v0.11c.01b` DecisionContextBuilder extraction;
+- PR #12 — `v0.11c.01c` IntentExecutionRouter / JobRequestBuilder extraction;
+- PR #13 — `v0.11c.01d` DecisionExplainabilityBridge extraction;
+- PR #14 — `v0.11c.01e` NeedsDecisionRule compatibility shim.
+
+**Validazione aggregata v0.11c.01:**
+
+- `DecisionOrchestratorNoOpQaTests`: passed;
+- `DecisionContextBuilderQaTests`: passed;
+- `IntentExecutionRouterQaTests`: passed;
+- `DecisionExplainabilityBridgeQaTests`: passed;
+- `DecisionLayerQaTests`: passed;
+- `SearchFoodJobVerticalSliceQaTests`: passed;
+- `FoodJobVerticalSliceQaTests`: passed;
+- `JobSystemEndToEndQaTests`: passed quando eseguiti nel blocco 01a;
+- `MemoryBeliefDecisionRuntimeJobScenarioQaTests`: passed nei blocchi di recovery/01c/01d/01e.
+
+**Prossimo checkpoint operativo:**
+
+`v0.11c.02 — Multi-Tick Action Runtime`
+
+Branch previsto:
+`ai-task/v0.11c.02a-multitick-action-audit`
+
+Modalità:
+READ ONLY FORENSIC AUDIT FIRST
+
+### v0.11D — Work/Social/Dormant Systems Forensic Audit
 
 **Status:** FUTURA / PENDING
 
-**Scopo:** auditare WorkSystem, SocialSystem e sistemi dormant/placeholder dopo la foundation decisionale.
+**Scopo:** auditare WorkSystem, SocialSystem e sistemi dormant/placeholder dopo la foundation decisionale e temporale.
 
-**Nota:** Work/Social/Dormant restano fuori scope finché v0.11B non chiarisce la pipeline decisionale minima.
+**Nota:** Work/Social/Dormant restano fuori scope finché v0.11C non chiarisce la pipeline decisionale e temporale minima.
 
 ---
 
