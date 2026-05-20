@@ -664,7 +664,7 @@ namespace Arcontio.Core
             // Il default tipizzato vive in MovementParams. Non leggiamo direttamente
             // game_params.json qui: JsonUtility popola world.Config e mantiene il
             // fallback se il campo non e' presente nel file dell'operatore.
-            return Mathf.Max(1, world?.Config?.Sim?.movement?.baseWalkCellDurationTicks ?? 2);
+            return Mathf.Max(1, world?.Config?.Sim?.movement?.baseWalkCellDurationTicks ?? 3);
         }
 
         private static RunningActionKey ResolveRunningActionKey(JobRuntimeState runtime, int npcId, string jobId)

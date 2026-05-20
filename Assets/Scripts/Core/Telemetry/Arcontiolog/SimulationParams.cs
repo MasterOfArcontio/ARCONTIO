@@ -26,6 +26,14 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class SimulationParams
     {
+        // ---------------- Runtime tick canonico ----------------
+        //
+        // ARC-DEC-006 e ARC-DEC-020 stabiliscono che il tick discreto globale e'
+        // l'unita' temporale canonica della simulazione. Questo campo controlla la
+        // frequenza con cui SimulationHost produce tick reali; l'Inspector non deve
+        // diventare una seconda fonte primaria per la cadence runtime.
+        public int ticksPerSecond = 5;
+
         // ---------------- Mappa ----------------
         public int worldWidth = 64;
         public int worldHeight = 64;
@@ -195,10 +203,10 @@ namespace Arcontio.Core.Config
         public bool enableJobRunningActionTraversal = false;
 
         // Durata base del traversal cardinale di una singola cella quando il gate
-        // sopra e' attivo. ARC-DEC-020 richiede che le durate base siano
-        // configurabili, ma questa patch non modifica game_params.json per evitare
-        // di includere override locali dell'operatore.
-        public int baseWalkCellDurationTicks = 2;
+        // sopra e' attivo. ARC-DEC-020 richiede che le durate base siano configurabili:
+        // il valore canonico vive in game_params.json e viene letto attraverso questo
+        // DTO, non da costanti nascoste nel runtime movement/job.
+        public int baseWalkCellDurationTicks = 3;
 
         // ── FAILURE LADDER: BACK-OFF / REPLAN (v0.03.05-FailureLadder) ──────
         //

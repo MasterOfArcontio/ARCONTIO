@@ -36,6 +36,70 @@ namespace Arcontio.Tests
     public sealed class RunningActionProductiveTickingQaTests
     {
         // =============================================================================
+        // RuntimeTimingParamsLoadFromJsonAndDeriveTickInterval
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che i parametri temporali canonici siano deserializzati dal DTO
+        /// tipizzato e che <c>SimulationHost</c> derivi l'intervallo di tick da
+        /// <c>ticksPerSecond</c>, non da campi Inspector.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void RuntimeTimingParamsLoadFromJsonAndDeriveTickInterval()
+        {
+            // Arrange: JSON minimale equivalente al frammento canonico di
+            // game_params.json. JsonUtility ignora le sezioni assenti, quindi il test
+            // resta focalizzato sui parametri runtime/timing richiesti da 03-prep.
+            const string json = "{"
+                + "\"ticksPerSecond\":5,"
+                + "\"movement\":{"
+                + "\"enableJobRunningActionTraversal\":false,"
+                + "\"baseWalkCellDurationTicks\":3"
+                + "}"
+                + "}";
+
+            // Act: la config tipizzata legge i valori e SimulationHost calcola il
+            // proprio intervallo senza dipendere da ArcontioRuntime Inspector.
+            var sim = JsonUtility.FromJson<SimulationParams>(json);
+            float tickInterval = SimulationHost.ResolveTickIntervalSeconds(sim);
+            float tickDeltaTime = SimulationHost.ResolveTickDeltaTime(sim);
+
+            // Assert: fonte unica game_params -> SimulationParams -> runtime.
+            Assert.That(sim.ticksPerSecond, Is.EqualTo(5));
+            Assert.That(tickInterval, Is.EqualTo(0.2f).Within(0.0001f));
+            Assert.That(tickDeltaTime, Is.EqualTo(tickInterval).Within(0.0001f));
+            Assert.That(sim.movement.baseWalkCellDurationTicks, Is.EqualTo(3));
+            Assert.That(sim.movement.enableJobRunningActionTraversal, Is.False);
+        }
+
+        // =============================================================================
+        // RuntimeTimingDefaultsKeepTraversalGateOff
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica i fallback tipizzati quando il JSON non specifica valori: la
+        /// cadence ha un default sicuro e il traversal running action resta spento.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void RuntimeTimingDefaultsKeepTraversalGateOff()
+        {
+            // Arrange: DTO default, come path di fallback del loader quando
+            // game_params.json manca o non contiene le sezioni nuove.
+            var sim = new SimulationParams();
+
+            // Act: risolviamo la cadence attraverso il boundary pubblico del runtime.
+            float tickInterval = SimulationHost.ResolveTickIntervalSeconds(sim);
+
+            // Assert: traversal off di default e durata base configurabile presente.
+            Assert.That(sim.ticksPerSecond, Is.EqualTo(5));
+            Assert.That(tickInterval, Is.EqualTo(0.2f).Within(0.0001f));
+            Assert.That(sim.movement.enableJobRunningActionTraversal, Is.False);
+            Assert.That(sim.movement.baseWalkCellDurationTicks, Is.EqualTo(3));
+        }
+
+        // =============================================================================
         // WaitTicksRegistersAndTicksRunningActionWithoutWorldMutation
         // =============================================================================
         /// <summary>
