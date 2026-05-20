@@ -181,16 +181,17 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // SkeletonIsNotWiredIntoProductiveRuntime
+        // RuntimeStateDoesNotStoreRunningActionDirectly
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica il vincolo no-op di v0.11c.02b: il nuovo tipo non e' un command
-        /// e non compare come campo/proprieta' di <c>JobRuntimeState</c>.
+        /// Verifica il confine dopo v0.11c.02d: il nuovo tipo non e' un command e
+        /// non viene conservato direttamente da <c>JobRuntimeState</c>. Lo storage
+        /// produttivo autorizzato passa dallo <c>RunningActionStore</c> dedicato.
         /// </para>
         /// </summary>
         [Test]
-        public void SkeletonIsNotWiredIntoProductiveRuntime()
+        public void RuntimeStateDoesNotStoreRunningActionDirectly()
         {
             // Arrange: reflection limitata al contratto pubblico/privato del runtime job.
             var runningActionType = typeof(RunningActionRuntimeState);
@@ -199,11 +200,14 @@ namespace Arcontio.Tests
             var properties = runtimeStateType.GetProperties(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
             // Act: cerchiamo cablaggi diretti del nuovo skeleton nello store produttivo.
+            // v0.11c.02d consente invece la proprieta' RunningActions, che mantiene
+            // separato il progress volatile dal cursore job.
             bool commandAssignable = typeof(ICommand).IsAssignableFrom(runningActionType);
             bool hasFieldWiring = fields.Any(field => ReferencesRunningActionType(field.FieldType, runningActionType));
             bool hasPropertyWiring = properties.Any(property => ReferencesRunningActionType(property.PropertyType, runningActionType));
 
-            // Assert: lo skeleton resta passivo e non produttivo.
+            // Assert: lo skeleton resta passivo e non viene annidato direttamente
+            // dentro JobRuntimeState.
             Assert.That(commandAssignable, Is.False);
             Assert.That(hasFieldWiring, Is.False);
             Assert.That(hasPropertyWiring, Is.False);
