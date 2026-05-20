@@ -222,16 +222,17 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // ExecutorIsNotWiredIntoProductiveRuntime
+        // ExecutorIsWiredOnlyIntoJobExecutionSystem
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che v0.11c.02c non abbia ancora collegato l'executor allo store
-        /// produttivo del Job System.
+        /// Verifica il nuovo confine v0.11c.02e: l'executor puo' comparire nel
+        /// <c>JobExecutionSystem</c>, ma non deve diventare stato di
+        /// <c>JobRuntimeState</c>.
         /// </para>
         /// </summary>
         [Test]
-        public void ExecutorIsNotWiredIntoProductiveRuntime()
+        public void ExecutorIsWiredOnlyIntoJobExecutionSystem()
         {
             // Arrange: reflection limitata ai tipi runtime che non devono cambiare in 02c.
             Type executorType = typeof(RunningActionExecutor);
@@ -239,12 +240,15 @@ namespace Arcontio.Tests
             Type executionSystemType = typeof(JobExecutionSystem);
 
             // Act: cerchiamo riferimenti diretti all'executor nei punti produttivi.
+            // Dopo 02e e' ammesso un riferimento nel sistema di execution per
+            // tickare WaitTicks controllati; resta vietato conservarlo nello store.
             bool runtimeReferencesExecutor = ReferencesType(runtimeStateType, executorType);
             bool executionReferencesExecutor = ReferencesType(executionSystemType, executorType);
 
-            // Assert: l'executor esiste, ma non e' ancora nel tick produttivo.
+            // Assert: l'executor entra nel tick produttivo solo come servizio del
+            // JobExecutionSystem, non come sorgente di stato runtime.
             Assert.That(runtimeReferencesExecutor, Is.False);
-            Assert.That(executionReferencesExecutor, Is.False);
+            Assert.That(executionReferencesExecutor, Is.True);
         }
 
         private static RunningActionRuntimeState MakeState(int requiredTicks, int timeoutTicks)

@@ -33,6 +33,7 @@ namespace Arcontio.Core
     {
         private readonly List<int> _activeNpcIds = new();
         private readonly JobStateMachine _stateMachine = new();
+        private readonly RunningActionExecutor _runningActionExecutor = new();
         private readonly BeliefUpdater _beliefUpdater = new();
 
         public int Period => 1;
@@ -57,6 +58,7 @@ namespace Arcontio.Core
                 var result = ExecuteCurrentAction(
                     world,
                     runtime,
+                    _runningActionExecutor,
                     npcId,
                     in npcState,
                     job,
@@ -100,6 +102,7 @@ namespace Arcontio.Core
         private static StepResult ExecuteCurrentAction(
             World world,
             JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
             int npcId,
             in NpcJobState npcState,
             Job job,
@@ -116,6 +119,9 @@ namespace Arcontio.Core
             if (!world.GridPos.TryGetValue(npcId, out var npcCell))
                 return StepResult.Failed(JobFailureReason.MissingTarget, "NpcPositionMissing");
 
+            if (action.Kind == JobActionKind.WaitTicks)
+                return ExecuteRunningWaitAction(runtime, runningActionExecutor, npcId, in npcState, job, phase, action, tick);
+
             if (action.Kind == JobActionKind.MoveToCell)
                 return ExecuteMoveTo(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
@@ -129,6 +135,81 @@ namespace Arcontio.Core
                 return ExecuteDropObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             return StepResult.Failed(JobFailureReason.StepFailed, "UnsupportedJobActionInRuntimeSlice");
+        }
+
+        private static StepResult ExecuteRunningWaitAction(
+            JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
+            int npcId,
+            in NpcJobState npcState,
+            Job job,
+            JobPhase phase,
+            JobAction action,
+            int tick)
+        {
+            if (runtime == null || runningActionExecutor == null || job == null)
+                return StepResult.Failed(JobFailureReason.StepFailed, "RunningActionRuntimeMissing");
+
+            // v0.11c.02e collega produttivamente store + executor solo su WaitTicks:
+            // e' una running action controllata, priva di target, priva di command
+            // finale e non legata al MovementSystem. Il cursore NPC/job resta la
+            // sorgente di identita' per evitare un secondo stato operativo: se
+            // phase/action cambiano, cambia anche la chiave dello stato volatile.
+            var key = new RunningActionKey(npcId, job.JobId, npcState.ActivePhaseIndex, npcState.ActiveActionIndex);
+            if (!runtime.RunningActions.TryGet(key, out var runningAction) || runningAction == null)
+            {
+                int requiredTicks = Mathf.Max(1, action.DurationTicks);
+                var policy = new RunningActionCompletionPolicy(
+                    requiredTicks,
+                    timeoutTicks: 0,
+                    failureReason: JobFailureReason.StepFailed,
+                    interruptionReason: JobFailureReason.Cancelled);
+
+                runningAction = RunningActionRuntimeState.Start(
+                    $"run_{job.JobId}_{npcState.ActivePhaseIndex}_{npcState.ActiveActionIndex}",
+                    RunningActionKind.Wait,
+                    npcId,
+                    job.JobId,
+                    phase.PhaseId,
+                    action.ActionId,
+                    tick,
+                    policy);
+
+                if (!runtime.RunningActions.Register(key, runningAction, out var registerReason))
+                    return StepResult.Failed(JobFailureReason.StepFailed, registerReason);
+            }
+
+            var executorResult = runningActionExecutor.Tick(
+                runningAction,
+                RunningActionExecutorTickRequest.Advance(1, tick, "WaitTicksRunningActionTick"));
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.Completed)
+            {
+                // La completion interna autorizza solo la state machine ad avanzare
+                // lo step. Non emette ICommand: WaitTicks non ha una mutazione finale
+                // del World in questa patch. Lo stato volatile viene rimosso prima di
+                // restituire Succeeded per evitare progress appeso se il job continua
+                // con altre action nella stessa fase.
+                runtime.RunningActions.Clear(key);
+                return StepResult.Succeeded("WaitTicksRunningActionCompleted");
+            }
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.Advanced)
+                return StepResult.Running("WaitTicksRunningActionRunning");
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.NoProgress)
+                return StepResult.Running("WaitTicksRunningActionNoProgress");
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.TimedOut
+                || executorResult.Kind == RunningActionExecutorResultKind.Failed
+                || executorResult.Kind == RunningActionExecutorResultKind.Interrupted
+                || executorResult.Kind == RunningActionExecutorResultKind.AlreadyTerminal
+                || executorResult.Kind == RunningActionExecutorResultKind.InvalidState)
+            {
+                return StepResult.Failed(JobFailureReason.StepFailed, executorResult.Reason);
+            }
+
+            return StepResult.Running("WaitTicksRunningActionPending");
         }
 
         private static StepResult ExecuteMoveTo(
