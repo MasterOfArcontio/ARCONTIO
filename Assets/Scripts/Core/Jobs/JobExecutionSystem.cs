@@ -623,7 +623,7 @@ namespace Arcontio.Core
 
         private static bool CanUseRunningActionCellTraversal(World world, GridPosition npcCell, Vector2Int targetCell)
         {
-            if (world?.Config?.Sim?.movement == null || !world.Config.Sim.movement.enableJobRunningActionTraversal)
+            if (world?.Config?.Sim == null || !world.Config.Sim.ResolveEnableJobRunningActionTraversal())
                 return false;
 
             // Foundation volutamente stretta: solo una cella cardinale. Target
@@ -661,10 +661,11 @@ namespace Arcontio.Core
 
         private static int ResolveBaseWalkCellDurationTicks(World world)
         {
-            // Il default tipizzato vive in MovementParams. Non leggiamo direttamente
-            // game_params.json qui: JsonUtility popola world.Config e mantiene il
-            // fallback se il campo non e' presente nel file dell'operatore.
-            return Mathf.Max(1, world?.Config?.Sim?.movement?.baseWalkCellDurationTicks ?? 3);
+            // Il default tipizzato vive nel gruppo Tick di SimulationParams. Non
+            // leggiamo direttamente game_params.json qui: JsonUtility popola
+            // world.Config e il resolver conserva fallback transitori dal vecchio
+            // layout movement senza lasciare al MovementSystem authority sul tempo.
+            return Mathf.Max(1, world?.Config?.Sim?.ResolveBaseWalkCellDurationTicks() ?? TickParams.DefaultBaseWalkCellDurationTicks);
         }
 
         private static RunningActionKey ResolveRunningActionKey(JobRuntimeState runtime, int npcId, string jobId)

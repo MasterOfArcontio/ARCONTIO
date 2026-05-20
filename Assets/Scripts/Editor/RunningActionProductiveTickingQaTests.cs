@@ -52,10 +52,10 @@ namespace Arcontio.Tests
             // game_params.json. JsonUtility ignora le sezioni assenti, quindi il test
             // resta focalizzato sui parametri runtime/timing richiesti da 03-prep.
             const string json = "{"
+                + "\"tick\":{"
                 + "\"ticksPerSecond\":5,"
-                + "\"movement\":{"
-                + "\"enableJobRunningActionTraversal\":false,"
-                + "\"baseWalkCellDurationTicks\":3"
+                + "\"baseWalkCellDurationTicks\":3,"
+                + "\"enableJobRunningActionTraversal\":false"
                 + "}"
                 + "}";
 
@@ -66,11 +66,11 @@ namespace Arcontio.Tests
             float tickDeltaTime = SimulationHost.ResolveTickDeltaTime(sim);
 
             // Assert: fonte unica game_params -> SimulationParams -> runtime.
-            Assert.That(sim.ticksPerSecond, Is.EqualTo(5));
+            Assert.That(sim.ResolveTicksPerSecond(), Is.EqualTo(5));
             Assert.That(tickInterval, Is.EqualTo(0.2f).Within(0.0001f));
             Assert.That(tickDeltaTime, Is.EqualTo(tickInterval).Within(0.0001f));
-            Assert.That(sim.movement.baseWalkCellDurationTicks, Is.EqualTo(3));
-            Assert.That(sim.movement.enableJobRunningActionTraversal, Is.False);
+            Assert.That(sim.ResolveBaseWalkCellDurationTicks(), Is.EqualTo(3));
+            Assert.That(sim.ResolveEnableJobRunningActionTraversal(), Is.False);
         }
 
         // =============================================================================
@@ -93,10 +93,45 @@ namespace Arcontio.Tests
             float tickInterval = SimulationHost.ResolveTickIntervalSeconds(sim);
 
             // Assert: traversal off di default e durata base configurabile presente.
-            Assert.That(sim.ticksPerSecond, Is.EqualTo(5));
+            Assert.That(sim.ResolveTicksPerSecond(), Is.EqualTo(5));
             Assert.That(tickInterval, Is.EqualTo(0.2f).Within(0.0001f));
-            Assert.That(sim.movement.enableJobRunningActionTraversal, Is.False);
-            Assert.That(sim.movement.baseWalkCellDurationTicks, Is.EqualTo(3));
+            Assert.That(sim.ResolveEnableJobRunningActionTraversal(), Is.False);
+            Assert.That(sim.ResolveBaseWalkCellDurationTicks(), Is.EqualTo(3));
+        }
+
+        // =============================================================================
+        // RuntimeTimingLegacyLayoutStillResolvesAsFallback
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica la compatibilita' transitoria con il layout precedente, dove
+        /// <c>ticksPerSecond</c> era root e i parametri traversal vivevano in
+        /// <c>movement</c>.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void RuntimeTimingLegacyLayoutStillResolvesAsFallback()
+        {
+            // Arrange: vecchio layout pre-gruppo Tick. Il test protegge solo la lettura
+            // compatibile, non promuove questo schema a fonte canonica.
+            const string json = "{"
+                + "\"ticksPerSecond\":7,"
+                + "\"movement\":{"
+                + "\"enableJobRunningActionTraversal\":true,"
+                + "\"baseWalkCellDurationTicks\":4"
+                + "}"
+                + "}";
+
+            // Act: JsonUtility popola i campi legacy e i resolver li traducono nella
+            // semantica runtime corrente.
+            var sim = JsonUtility.FromJson<SimulationParams>(json);
+            float tickInterval = SimulationHost.ResolveTickIntervalSeconds(sim);
+
+            // Assert: layout vecchio ancora leggibile, senza duplicare consumer.
+            Assert.That(sim.ResolveTicksPerSecond(), Is.EqualTo(7));
+            Assert.That(tickInterval, Is.EqualTo(1f / 7f).Within(0.0001f));
+            Assert.That(sim.ResolveEnableJobRunningActionTraversal(), Is.True);
+            Assert.That(sim.ResolveBaseWalkCellDurationTicks(), Is.EqualTo(4));
         }
 
         // =============================================================================
@@ -607,8 +642,12 @@ namespace Arcontio.Tests
         {
             // Gate produttivo del traversal 02g. Lasciarlo spento di default
             // preserva le vertical slice legacy che si aspettano SetMoveIntentCommand.
-            world.Config.Sim.movement.enableJobRunningActionTraversal = true;
-            world.Config.Sim.movement.baseWalkCellDurationTicks = durationTicks;
+            world.Config.Sim.tick = new TickParams
+            {
+                ticksPerSecond = TickParams.DefaultTicksPerSecond,
+                baseWalkCellDurationTicks = durationTicks,
+                enableJobRunningActionTraversal = true
+            };
         }
 
         private static Job MakeWaitJob(int npcId, string jobId, int durationTicks)

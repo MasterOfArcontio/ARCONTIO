@@ -848,7 +848,7 @@ namespace Arcontio.Core
         /// </summary>
         public static float ResolveTickIntervalSeconds(SimulationParams simParams)
         {
-            return 1f / Mathf.Max(1, simParams?.ticksPerSecond ?? 5);
+            return 1f / Mathf.Max(1, simParams?.ResolveTicksPerSecond() ?? TickParams.DefaultTicksPerSecond);
         }
 
         // =============================================================================

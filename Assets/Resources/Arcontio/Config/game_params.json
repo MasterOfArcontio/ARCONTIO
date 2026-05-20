@@ -1,7 +1,11 @@
 {
   "worldWidth": 64,
   "worldHeight": 64,
-  "ticksPerSecond": 5,
+  "tick": {
+    "ticksPerSecond": 5,
+    "baseWalkCellDurationTicks": 3,
+    "enableJobRunningActionTraversal": false
+  },
   "Language": "it",
   "npcVisionRangeCells": 17,
   "npcOperationalRangeCells": 20,
@@ -32,8 +36,6 @@
     "intentStuckTicksBlocked": 6,
     "directPrefixCells": 3,
     "directCheckFovOnAcquisition": true,
-    "enableJobRunningActionTraversal": false,
-    "baseWalkCellDurationTicks": 3,
     "backoff_stage1_ticks": 24,
     "backoff_stage2_ticks": 60,
     "backoff_max_stages": 2,
