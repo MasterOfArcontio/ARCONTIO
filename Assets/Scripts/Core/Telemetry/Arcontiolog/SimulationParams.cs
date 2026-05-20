@@ -26,17 +26,24 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class SimulationParams
     {
-        // ---------------- Runtime tick canonico ----------------
-        //
-        // ARC-DEC-006 e ARC-DEC-020 stabiliscono che il tick discreto globale e'
-        // l'unita' temporale canonica della simulazione. Questo campo controlla la
-        // frequenza con cui SimulationHost produce tick reali; l'Inspector non deve
-        // diventare una seconda fonte primaria per la cadence runtime.
-        public int ticksPerSecond = 5;
-
         // ---------------- Mappa ----------------
         public int worldWidth = 64;
         public int worldHeight = 64;
+
+        // ---------------- Runtime tick canonico ----------------
+        //
+        // ARC-DEC-006 e ARC-DEC-020 stabiliscono che il tick discreto globale e'
+        // l'unita' temporale canonica della simulazione. La sezione "tick" e' il
+        // gruppo canonico per frequenza runtime e durate multi-tick bilanciabili:
+        // Movement non deve possedere parametri temporali strutturali come fonte
+        // primaria, perche' movement, job execution e future cadence condividono lo
+        // stesso asse temporale globale.
+        public TickParams tick;
+
+        // Campo legacy mantenuto solo come fallback per vecchi JSON pre-v0.11c.03-prep-b.
+        // Il layout canonico e' "tick.ticksPerSecond"; i consumer devono passare da
+        // ResolveTicksPerSecond() e non leggere direttamente questo valore.
+        public int ticksPerSecond = 0;
 
         // ---------------- Localizzazione (usata anche dal logger) ----------------
         public string Language = "it";
@@ -101,6 +108,148 @@ namespace Arcontio.Core.Config
         // Parametri globali del sistema di memoria NPC.
         // I tratti individuali (Resilience, Rumination, ecc.) vengono letti dal DNA.
         public MemorySystemParams memory = new MemorySystemParams();
+
+        // =============================================================================
+        // ResolveTicksPerSecond
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la frequenza del tick globale usando il layout canonico
+        /// <c>tick.ticksPerSecond</c>, con fallback compatibile al vecchio campo root.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: Tick come gruppo temporale canonico</b></para>
+        /// <para>
+        /// Il tempo simulativo deve essere leggibile da una sola famiglia dati. Questo
+        /// metodo protegge i consumer dal layout JSON concreto: il runtime legge una
+        /// semantica, non una posizione sparsa nel file.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Canonico</b>: se presente e positivo, usa <c>tick.ticksPerSecond</c>.</item>
+        ///   <item><b>Legacy</b>: se il vecchio root field e' positivo, lo accetta come fallback transitorio.</item>
+        ///   <item><b>Default</b>: in assenza di config valida usa il default costituzionale.</item>
+        /// </list>
+        /// </summary>
+        public int ResolveTicksPerSecond()
+        {
+            if (ticksPerSecond > 0 && (tick == null || tick.ticksPerSecond == TickParams.DefaultTicksPerSecond))
+                return ticksPerSecond;
+
+            if (tick != null && tick.ticksPerSecond > 0)
+                return tick.ticksPerSecond;
+
+            return TickParams.DefaultTicksPerSecond;
+        }
+
+        // =============================================================================
+        // ResolveBaseWalkCellDurationTicks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la durata base del traversal one-cell multi-tick usando il gruppo
+        /// canonico <c>tick</c>, con fallback temporaneo dal vecchio layout
+        /// <c>movement</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: Movement non possiede il tempo canonico</b></para>
+        /// <para>
+        /// Il movimento usa questa durata, ma non ne e' proprietario architetturale:
+        /// la durata descrive progresso temporale runtime e appartiene al gruppo Tick.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Canonico</b>: <c>tick.baseWalkCellDurationTicks</c>.</item>
+        ///   <item><b>Legacy</b>: <c>movement.baseWalkCellDurationTicks</c> per vecchi JSON.</item>
+        ///   <item><b>Default</b>: valore prudente minimo della foundation multi-tick.</item>
+        /// </list>
+        /// </summary>
+        public int ResolveBaseWalkCellDurationTicks()
+        {
+            if (ticksPerSecond > 0
+                && movement != null
+                && movement.baseWalkCellDurationTicks > 0
+                && (tick == null || tick.baseWalkCellDurationTicks == TickParams.DefaultBaseWalkCellDurationTicks))
+            {
+                return movement.baseWalkCellDurationTicks;
+            }
+
+            if (tick != null && tick.baseWalkCellDurationTicks > 0)
+                return tick.baseWalkCellDurationTicks;
+
+            return TickParams.DefaultBaseWalkCellDurationTicks;
+        }
+
+        // =============================================================================
+        // ResolveEnableJobRunningActionTraversal
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il gate del traversal running action produttivo dal gruppo
+        /// temporale canonico <c>tick</c>, con fallback al vecchio campo movement
+        /// quando il vecchio <c>ticksPerSecond</c> root segnala un JSON legacy.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: gate temporale esplicito</b></para>
+        /// <para>
+        /// Il gate resta spento di default. La compatibilita' con il vecchio layout e'
+        /// deliberatamente confinata al resolver: i consumer non leggono piu' Movement
+        /// come authority temporale primaria.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Canonico</b>: <c>tick.enableJobRunningActionTraversal</c>.</item>
+        ///   <item><b>Legacy</b>: vecchio <c>movement.enableJobRunningActionTraversal</c> quando il root legacy e' presente.</item>
+        ///   <item><b>Default</b>: false, nessuna attivazione implicita del traversal.</item>
+        /// </list>
+        /// </summary>
+        public bool ResolveEnableJobRunningActionTraversal()
+        {
+            if (ticksPerSecond > 0 && movement != null && movement.enableJobRunningActionTraversal)
+                return true;
+
+            if (tick != null)
+                return tick.enableJobRunningActionTraversal;
+
+            return movement != null && movement.enableJobRunningActionTraversal;
+        }
+    }
+
+    // =============================================================================
+    // TickParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile del gruppo <c>tick</c> in <c>game_params.json</c>.
+    /// </para>
+    ///
+    /// <para><b>Fonte canonica del tempo runtime</b></para>
+    /// <para>
+    /// Questo gruppo raccoglie i parametri che descrivono tempo simulativo, cadence
+    /// runtime e durate base multi-tick. ARC-DEC-006 e ARC-DEC-020 richiedono un tick
+    /// globale unico: le cadence future saranno frequenze calcolate su questo asse,
+    /// non timeline parallele e non parametri sparsi nei domini che li consumano.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>ticksPerSecond</b>: frequenza del tick globale prodotta da SimulationHost.</item>
+    ///   <item><b>baseWalkCellDurationTicks</b>: durata base del traversal cardinale one-cell.</item>
+    ///   <item><b>enableJobRunningActionTraversal</b>: gate esplicito del path Job running action traversal.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class TickParams
+    {
+        public const int DefaultTicksPerSecond = 5;
+        public const int DefaultBaseWalkCellDurationTicks = 3;
+
+        public int ticksPerSecond = DefaultTicksPerSecond;
+        public int baseWalkCellDurationTicks = DefaultBaseWalkCellDurationTicks;
+        public bool enableJobRunningActionTraversal = false;
     }
 
     // =============================================================================
@@ -196,17 +345,16 @@ namespace Arcontio.Core.Config
 
         // ── JOB RUNNING ACTION TRAVERSAL FOUNDATION (v0.11c.02g) ─────────────
         //
-        // Gate esplicito per il primo ponte controllato MoveToCell -> running action
-        // -> completion -> mutazione World finale. Default false per preservare il
-        // comportamento storico: i job esistenti continuano a produrre MoveIntent e
-        // a lasciare il movimento reale al MovementSystem.
+        // Campo mantenuto solo per compatibilita' con JSON precedenti. Il gate
+        // canonico vive ora in SimulationParams.tick, perche' abilita una semantica
+        // temporale del Job runtime e non una proprieta' strutturale del MovementSystem.
+        // I consumer non devono leggere direttamente questo campo.
         public bool enableJobRunningActionTraversal = false;
 
-        // Durata base del traversal cardinale di una singola cella quando il gate
-        // sopra e' attivo. ARC-DEC-020 richiede che le durate base siano configurabili:
-        // il valore canonico vive in game_params.json e viene letto attraverso questo
-        // DTO, non da costanti nascoste nel runtime movement/job.
-        public int baseWalkCellDurationTicks = 3;
+        // Campo legacy mantenuto solo come fallback per vecchi JSON. La durata
+        // canonica vive in SimulationParams.tick.baseWalkCellDurationTicks, cosi'
+        // il tempo runtime resta centralizzato nel gruppo Tick.
+        public int baseWalkCellDurationTicks = 0;
 
         // ── FAILURE LADDER: BACK-OFF / REPLAN (v0.03.05-FailureLadder) ──────
         //
