@@ -370,12 +370,37 @@ namespace Arcontio.Core
             if (world == null || runtime == null || job == null)
                 return StepResult.Failed(JobFailureReason.MovementFailed, "TraversalRuntimeMissing");
 
-            if (!CanEnterTraversalTarget(world, npcId, action.TargetCell, out var blockedReason))
-                return StepResult.Failed(JobFailureReason.MovementFailed, blockedReason);
-
             // La chiave resta agganciata al cursore job corrente: il progress
             // volatile non diventa una seconda authority su destinazione o path.
             var key = ResolveRunningActionKey(runtime, npcId, job.JobId);
+
+            if (!CanEnterTraversalTarget(world, npcId, action.TargetCell, out var blockedReason))
+            {
+                ReleaseTraversalDestinationReservation(
+                    runtime,
+                    in key,
+                    action.TargetCell,
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    tick,
+                    npcId);
+                return StepResult.Failed(JobFailureReason.MovementFailed, blockedReason);
+            }
+
+            if (!TryEnsureTraversalDestinationReservation(
+                    runtime,
+                    npcId,
+                    job,
+                    action,
+                    in key,
+                    tick,
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    out var reservationBlockedResult))
+            {
+                return reservationBlockedResult;
+            }
+
             if (!runtime.RunningActions.TryGet(key, out var runningAction) || runningAction == null)
             {
                 int requiredTicks = ResolveBaseWalkCellDurationTicks(world);
@@ -425,6 +450,14 @@ namespace Arcontio.Core
             {
                 if (!CanEnterTraversalTarget(world, npcId, action.TargetCell, out var completionBlockedReason))
                 {
+                    ReleaseTraversalDestinationReservation(
+                        runtime,
+                        in key,
+                        action.TargetCell,
+                        explainabilityConfig,
+                        explainabilityRegistry,
+                        tick,
+                        npcId);
                     runtime.RunningActions.Clear(key);
                     return StepResult.Failed(JobFailureReason.MovementFailed, completionBlockedReason);
                 }
@@ -441,6 +474,14 @@ namespace Arcontio.Core
                     npcCell.Y,
                     action.TargetCell.x,
                     action.TargetCell.y);
+                ReleaseTraversalDestinationReservation(
+                    runtime,
+                    in key,
+                    action.TargetCell,
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    tick,
+                    npcId);
                 runtime.RunningActions.Clear(key);
                 return StepResult.Succeeded("MoveToCellTraversalCompleted");
             }
@@ -457,11 +498,127 @@ namespace Arcontio.Core
                 || executorResult.Kind == RunningActionExecutorResultKind.AlreadyTerminal
                 || executorResult.Kind == RunningActionExecutorResultKind.InvalidState)
             {
+                ReleaseTraversalDestinationReservation(
+                    runtime,
+                    in key,
+                    action.TargetCell,
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    tick,
+                    npcId);
                 runtime.RunningActions.Clear(key);
                 return StepResult.Failed(JobFailureReason.MovementFailed, executorResult.Reason);
             }
 
             return StepResult.Running("MoveToCellTraversalPending");
+        }
+
+        private static bool TryEnsureTraversalDestinationReservation(
+            JobRuntimeState runtime,
+            int npcId,
+            Job job,
+            JobAction action,
+            in RunningActionKey key,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            out StepResult blockedResult)
+        {
+            blockedResult = default;
+
+            if (runtime?.Reservations == null || job == null)
+            {
+                blockedResult = StepResult.Failed(JobFailureReason.ReservationDenied, "TraversalReservationStoreMissing");
+                return false;
+            }
+
+            var targetCell = action.TargetCell;
+            var reservationId = BuildTraversalDestinationReservationId(in key, targetCell);
+            var record = new ReservationRecord(
+                reservationId,
+                job.JobId,
+                npcId,
+                ReservationTargetKind.Cell,
+                targetCell,
+                -1,
+                tick,
+                tick + ResolveTraversalReservationDurationTicks(action));
+
+            // ARC-DEC-020 richiede che la cella destinazione sia riservata prima
+            // dell'inizio del movimento multi-tick e resti protetta durante il
+            // progress. La policy minima 02h non introduce attese complesse: se un
+            // altro job possiede la cella, lo step torna Blocked(1) e la state
+            // machine riprova in modo deterministico al tick successivo.
+            if (runtime.Reservations.TryGetByTarget(ReservationTargetKind.Cell, targetCell, -1, out var existing))
+            {
+                if (existing.JobId == job.JobId)
+                    return true;
+
+                runtime.Reservations.TryReserve(
+                    record,
+                    out _,
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    tick,
+                    npcId);
+                blockedResult = StepResult.Blocked(1, "MoveToCellTraversalDestinationReserved");
+                return false;
+            }
+
+            if (runtime.Reservations.TryReserve(
+                    record,
+                    out _,
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    tick,
+                    npcId))
+            {
+                return true;
+            }
+
+            blockedResult = StepResult.Blocked(1, "MoveToCellTraversalDestinationReserved");
+            return false;
+        }
+
+        private static void ReleaseTraversalDestinationReservation(
+            JobRuntimeState runtime,
+            in RunningActionKey key,
+            Vector2Int targetCell,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int tick,
+            int npcId)
+        {
+            if (runtime?.Reservations == null)
+                return;
+
+            // Rilasciamo solo la reservation action-scoped del traversal. Se la
+            // stessa cella e' gia' coperta da una reservation job-level esistente,
+            // quella resta responsabilita' del lifecycle del job e viene liberata
+            // dai path Complete/Fail/Preempt/Clear gia' presenti in JobRuntimeState.
+            runtime.Reservations.Release(
+                BuildTraversalDestinationReservationId(in key, targetCell),
+                out _,
+                explainabilityConfig,
+                explainabilityRegistry,
+                tick,
+                npcId);
+        }
+
+        private static string BuildTraversalDestinationReservationId(in RunningActionKey key, Vector2Int targetCell)
+        {
+            return "traversal:" + key.JobId + ":" + key.NpcId + ":" + key.PhaseIndex + ":" + key.ActionIndex + ":" + targetCell.x + ":" + targetCell.y;
+        }
+
+        private static int ResolveTraversalReservationDurationTicks(JobAction action)
+        {
+            // La reservation temporale action-scoped viene tenuta abbastanza a lungo
+            // da coprire il prossimo tick di progress anche se il chiamante usa un
+            // DurationTicks esplicito in futuro. Per il MoveToCell 02g la durata
+            // effettiva resta nella config movement, quindi qui manteniamo solo una
+            // finestra difensiva e il refresh al tick successivo avviene dal path
+            // TryEnsureTraversalDestinationReservation.
+            return Mathf.Max(2, action.DurationTicks + 2);
         }
 
         private static bool CanUseRunningActionCellTraversal(World world, GridPosition npcCell, Vector2Int targetCell)
