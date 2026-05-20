@@ -416,6 +416,13 @@ namespace Arcontio.View.MapGrid
                 if (!_npcLines.TryGetValue(npcId, out var line))
                     continue;
 
+                // Policy UX v0.11 debug:
+                // una sola card NPC puo' restare completa. La selezione e' uno stato
+                // view-only condiviso da NPCSelection; gli NPC non selezionati restano
+                // osservabili con una micro-card needs-only, senza duplicare memoria,
+                // inventario, MBQD, navigazione e altre sezioni pesanti.
+                card.SetCompactNeedsOnly(!IsNpcSelectedForFullCard(npcId));
+
                 Vector2 anchor = GetNpcAnchorLocal(world, npcId, cam, tileSizeWorld);
                 if (float.IsNaN(anchor.x))
                 {
@@ -516,6 +523,11 @@ namespace Arcontio.View.MapGrid
             float x = (npcId % 2 == 0) ? 160f : -160f;
             float y = 60f + ((npcId * 17) % 60);
             return new Vector2(x, y);
+        }
+
+        private static bool IsNpcSelectedForFullCard(int npcId)
+        {
+            return npcId > 0 && SocialViewer.UI.NPCSelection.SelectedNpcId == npcId;
         }
 
         private static Vector2 DefaultObjectOffset(int objId)
@@ -644,6 +656,17 @@ namespace Arcontio.View.MapGrid
                 world.GridPos.TryGetValue(npcId, out var pos);
                 world.NpcFacing.TryGetValue(npcId, out var facing);
                 world.Needs.TryGetValue(npcId, out var needs);
+                bool isSelectedNpc = IsNpcSelectedForFullCard(npcId);
+
+                // Se l'NPC non e' selezionato, la card deve restare una micro-card:
+                // aggiorniamo soltanto le barre needs e saltiamo la costruzione delle
+                // sezioni diagnostiche complete. Questo mantiene l'overlay scalabile
+                // con molti NPC e garantisce che la view non moltiplichi lavoro UI
+                // inutile per memoria, MBQD, navigazione e inventario.
+                card.SetCompactNeedsOnly(!isSelectedNpc);
+                card.UpdateNeedsBars(needs);
+                if (!isSelectedNpc)
+                    continue;
 
                 // ============================================================
                 // HEADER / IDENTITY / STATE
@@ -671,8 +694,6 @@ namespace Arcontio.View.MapGrid
                 // NPCSelection vive nello strato view condiviso e non nel core
                 // simulativo. Qui lo mostriamo soltanto per rendere verificabile
                 // il click sinistro introdotto nella sessione k.
-                bool isSelectedNpc = SocialViewer.UI.NPCSelection.SelectedNpcId == npcId;
-
                 _sbHeader.Append('\n')
                     .Append("Selected = ").Append(isSelectedNpc ? "YES" : "NO")
                     .Append('\n')

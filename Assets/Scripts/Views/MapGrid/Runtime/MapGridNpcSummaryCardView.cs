@@ -36,8 +36,10 @@ namespace Arcontio.View.MapGrid
         private GameObject _root;
         private RectTransform _rootRt;
         private Image _rootBg;
+        private GameObject _compactNeedsRoot;
 
         private const int DefaultWidth = 380;
+        private const int CompactWidth = 176;
         private const int DefaultHeaderFont = 14;
         private const int DefaultBodyFont = 12;
 
@@ -84,6 +86,8 @@ namespace Arcontio.View.MapGrid
         //   così Hunger/Thirst/Rest, Health/Comfort parziali e i needs psicologici
         //   Security/Stability/Sociality vengono mostrati dallo stesso meccanismo.
         private NeedBarRow[] _needBars;
+        private NeedBarRow[] _compactNeedBars;
+        private bool _compactNeedsOnly;
 
         /// <summary>
         /// Stato collapse "globale" per sezione.
@@ -162,6 +166,7 @@ namespace Arcontio.View.MapGrid
             _needsSection = BuildSection(_root.transform, KeyNeeds, "Needs", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _needsSection.RootImage.color = new Color(0.10f, 0.25f, 0.30f, 0.72f);
             BuildNeedsBars(_needsSection);
+            BuildCompactNeedsCard(_root.transform);
 
             // Comms (token IN/OUT)
             _commsSection = BuildSection(_root.transform, KeyComms, "Comms", DefaultBodyFont, FontStyle.Normal, collapsible: true);
@@ -186,6 +191,7 @@ namespace Arcontio.View.MapGrid
             BuildDnaDriftRows(_dnaDriftSection);
 
             SetVisible(false);
+            SetCompactNeedsOnly(false);
         }
 
         // ============================================================
@@ -298,6 +304,55 @@ namespace Arcontio.View.MapGrid
         {
             if (_root != null)
                 _root.SetActive(visible);
+        }
+
+        // =============================================================================
+        // SetCompactNeedsOnly
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Seleziona la forma visiva della card NPC nel debug overlay F1.
+        /// </para>
+        ///
+        /// <para><b>Una sola card completa</b></para>
+        /// <para>
+        /// Il controller dell'overlay decide quale NPC e' selezionato. Questa view
+        /// applica solo la presentazione: in modalita' compatta mantiene visibili
+        /// esclusivamente i bisogni, nascondendo sezioni diagnostiche pesanti come
+        /// inventario, memoria, navigazione, percezione e DNA drift. Non legge il
+        /// World e non cambia alcun dato simulativo.
+        /// </para>
+        /// </summary>
+        public void SetCompactNeedsOnly(bool compactNeedsOnly)
+        {
+            _compactNeedsOnly = compactNeedsOnly;
+
+            // La root resta la stessa per conservare drag, offset e linee gia'
+            // gestiti dal controller. Cambia soltanto quali figli partecipano al
+            // layout e la larghezza base usata dal ContentSizeFitter.
+            if (_rootRt != null)
+                _rootRt.sizeDelta = compactNeedsOnly
+                    ? new Vector2(CompactWidth, 96)
+                    : new Vector2(DefaultWidth, 420);
+
+            SetSectionVisible(_headerSection, !compactNeedsOnly);
+            SetSectionVisible(_actionSection, !compactNeedsOnly);
+            SetSectionVisible(_inventorySection, !compactNeedsOnly);
+            SetSectionVisible(_needsSection, !compactNeedsOnly);
+            SetSectionVisible(_commsSection, !compactNeedsOnly);
+            SetSectionVisible(_landmarksSection, !compactNeedsOnly);
+            SetSectionVisible(_memSection, !compactNeedsOnly);
+            SetSectionVisible(_objMemSection, !compactNeedsOnly);
+            SetSectionVisible(_dnaDriftSection, !compactNeedsOnly);
+
+            if (_compactNeedsRoot != null)
+                _compactNeedsRoot.SetActive(compactNeedsOnly);
+        }
+
+        private static void SetSectionVisible(SectionView section, bool visible)
+        {
+            if (section?.Root != null)
+                section.Root.SetActive(visible);
         }
 
         /// <summary>
@@ -562,6 +617,7 @@ namespace Arcontio.View.MapGrid
         {
             public Text  LabelText;
             public Image BarFill;   // anchor-based, anchorMax.x = 1 - value01
+            public bool  CompactValueText;
             public Text  ValueText; // supportRichText=true — mostra valore + flag alert/critical
 
             /// <summary>
@@ -583,7 +639,9 @@ namespace Arcontio.View.MapGrid
                 BarFill.color = NeedBarColor(v);
 
                 // Flag colorato nel testo (rich text abilitato in MakeNeedBarRow)
-                if (isCritical)
+                if (CompactValueText)
+                    ValueText.text = isCritical ? "<color=#DA2E2E>!!</color>" : (isAlert ? "<color=#E5C71A>!</color>" : string.Empty);
+                else if (isCritical)
                     ValueText.text = v.ToString("0.00") + " <color=#DA2E2E>[CRIT]</color>";
                 else if (isAlert)
                     ValueText.text = v.ToString("0.00") + " <color=#E5C71A>[!]</color>";
@@ -611,6 +669,85 @@ namespace Arcontio.View.MapGrid
             _needBars  = new NeedBarRow[count];
             for (int i = 0; i < count; i++)
                 _needBars[i] = MakeNeedBarRow(parent, ((NeedKind)i).ToString());
+        }
+
+        // =============================================================================
+        // BuildCompactNeedsCard
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la micro-card needs-only usata dagli NPC non selezionati.
+        /// </para>
+        ///
+        /// <para><b>Debug overlay scalabile</b></para>
+        /// <para>
+        /// Questa micro-card non duplica la semantica dei bisogni: riusa gli stessi
+        /// valori e flag <c>NpcNeeds</c> della card completa, ma li presenta in una
+        /// griglia densa a due colonne. Il suo scopo e' mantenere leggibili molte
+        /// entita' contemporanee senza moltiplicare sezioni diagnostiche pesanti.
+        /// </para>
+        /// </summary>
+        private void BuildCompactNeedsCard(Transform parent)
+        {
+            _compactNeedsRoot = new GameObject("CompactNeedsCard");
+            _compactNeedsRoot.transform.SetParent(parent, false);
+
+            var image = _compactNeedsRoot.AddComponent<Image>();
+            image.raycastTarget = true;
+            image.color = new Color(0.02f, 0.08f, 0.10f, 0.82f);
+
+            var layout = _compactNeedsRoot.AddComponent<VerticalLayoutGroup>();
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.spacing = 3;
+            layout.padding = new RectOffset(5, 5, 4, 4);
+
+            var titleGo = new GameObject("Title");
+            titleGo.transform.SetParent(_compactNeedsRoot.transform, false);
+            var title = titleGo.AddComponent<Text>();
+            title.font = GetUiFont();
+            title.fontSize = 10;
+            title.fontStyle = FontStyle.Bold;
+            title.alignment = TextAnchor.MiddleLeft;
+            title.horizontalOverflow = HorizontalWrapMode.Overflow;
+            title.verticalOverflow = VerticalWrapMode.Truncate;
+            title.raycastTarget = false;
+            title.text = "Needs";
+            titleGo.AddComponent<LayoutElement>().preferredHeight = 12f;
+
+            var gridGo = new GameObject("NeedsGrid");
+            gridGo.transform.SetParent(_compactNeedsRoot.transform, false);
+
+            var grid = gridGo.AddComponent<GridLayoutGroup>();
+            grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            grid.constraintCount = 2;
+            grid.spacing = new Vector2(3f, 2f);
+            grid.cellSize = new Vector2(80f, 14f);
+            grid.childAlignment = TextAnchor.UpperLeft;
+            gridGo.AddComponent<LayoutElement>().preferredHeight = 64f;
+
+            int count = (int)NeedKind.COUNT;
+            _compactNeedBars = new NeedBarRow[count];
+            for (int i = 0; i < count; i++)
+                _compactNeedBars[i] = MakeCompactNeedBarRow(gridGo.transform, CompactNeedLabel((NeedKind)i));
+        }
+
+        private static string CompactNeedLabel(NeedKind kind)
+        {
+            return kind switch
+            {
+                NeedKind.Hunger => "Hun",
+                NeedKind.Thirst => "Thr",
+                NeedKind.Rest => "Rst",
+                NeedKind.Health => "Hlt",
+                NeedKind.Comfort => "Com",
+                NeedKind.Security => "Sec",
+                NeedKind.Stability => "Stb",
+                NeedKind.Sociality => "Soc",
+                _ => kind.ToString()
+            };
         }
 
         private static NeedBarRow MakeNeedBarRow(Transform parent, string label)
@@ -686,6 +823,79 @@ namespace Arcontio.View.MapGrid
             };
         }
 
+        private static NeedBarRow MakeCompactNeedBarRow(Transform parent, string label)
+        {
+            var rowGo = new GameObject("NeedMini_" + label);
+            rowGo.transform.SetParent(parent, false);
+
+            var hl = rowGo.AddComponent<HorizontalLayoutGroup>();
+            hl.childControlHeight = true;
+            hl.childControlWidth = true;
+            hl.childForceExpandHeight = false;
+            hl.childForceExpandWidth = false;
+            hl.spacing = 2;
+
+            // Label abbreviata: nella micro-card ogni pixel serve a mostrare lo
+            // stato, non a ripetere nomenclature lunghe gia' presenti nella card
+            // completa dell'NPC selezionato.
+            var labelGo = new GameObject("Label");
+            labelGo.transform.SetParent(rowGo.transform, false);
+            var labelTxt = labelGo.AddComponent<Text>();
+            labelTxt.font = GetUiFont();
+            labelTxt.fontSize = 9;
+            labelTxt.fontStyle = FontStyle.Bold;
+            labelTxt.alignment = TextAnchor.MiddleLeft;
+            labelTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            labelTxt.verticalOverflow = VerticalWrapMode.Truncate;
+            labelTxt.raycastTarget = false;
+            labelTxt.text = label;
+            var labelLe = labelGo.AddComponent<LayoutElement>();
+            labelLe.preferredWidth = 21f;
+            labelLe.preferredHeight = 12f;
+
+            var barBgGo = new GameObject("BarBg");
+            barBgGo.transform.SetParent(rowGo.transform, false);
+            var barBgImg = barBgGo.AddComponent<Image>();
+            barBgImg.color = new Color(0.10f, 0.10f, 0.10f, 0.90f);
+            barBgImg.raycastTarget = false;
+            var barBgLe = barBgGo.AddComponent<LayoutElement>();
+            barBgLe.preferredWidth = 33f;
+            barBgLe.preferredHeight = 8f;
+
+            var barFillGo = new GameObject("BarFill");
+            barFillGo.transform.SetParent(barBgGo.transform, false);
+            var barFillImg = barFillGo.AddComponent<Image>();
+            barFillImg.color = new Color(0.22f, 0.75f, 0.22f, 1f);
+            barFillImg.raycastTarget = false;
+            var barFillRt = barFillGo.GetComponent<RectTransform>();
+            barFillRt.anchorMin = Vector2.zero;
+            barFillRt.anchorMax = Vector2.one;
+            barFillRt.offsetMin = Vector2.zero;
+            barFillRt.offsetMax = Vector2.zero;
+
+            var valueGo = new GameObject("Value");
+            valueGo.transform.SetParent(rowGo.transform, false);
+            var valueTxt = valueGo.AddComponent<Text>();
+            valueTxt.font = GetUiFont();
+            valueTxt.fontSize = 8;
+            valueTxt.alignment = TextAnchor.MiddleRight;
+            valueTxt.horizontalOverflow = HorizontalWrapMode.Overflow;
+            valueTxt.verticalOverflow = VerticalWrapMode.Truncate;
+            valueTxt.supportRichText = true;
+            valueTxt.raycastTarget = false;
+            var valueLe = valueGo.AddComponent<LayoutElement>();
+            valueLe.preferredWidth = 22f;
+            valueLe.preferredHeight = 12f;
+
+            return new NeedBarRow
+            {
+                LabelText = labelTxt,
+                BarFill = barFillImg,
+                ValueText = valueTxt,
+                CompactValueText = true
+            };
+        }
+
         /// <summary>
         /// Aggiorna le barre dei bisogni (v0.04.13).
         ///
@@ -697,11 +907,19 @@ namespace Arcontio.View.MapGrid
         /// </summary>
         public void UpdateNeedsBars(NpcNeeds needs)
         {
-            if (_needBars == null) return;
-            for (int i = 0; i < _needBars.Length; i++)
+            UpdateNeedBarArray(_needBars, needs);
+            UpdateNeedBarArray(_compactNeedBars, needs);
+        }
+
+        private static void UpdateNeedBarArray(NeedBarRow[] rows, NpcNeeds needs)
+        {
+            if (rows == null)
+                return;
+
+            for (int i = 0; i < rows.Length; i++)
             {
                 var kind = (NeedKind)i;
-                _needBars[i]?.Set(needs.GetValue(kind), needs.IsAlert(kind), needs.IsCritical(kind));
+                rows[i]?.Set(needs.GetValue(kind), needs.IsAlert(kind), needs.IsCritical(kind));
             }
         }
 
