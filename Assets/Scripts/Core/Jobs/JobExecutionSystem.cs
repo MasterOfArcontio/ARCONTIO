@@ -120,7 +120,17 @@ namespace Arcontio.Core
                 return StepResult.Failed(JobFailureReason.MissingTarget, "NpcPositionMissing");
 
             if (action.Kind == JobActionKind.WaitTicks)
-                return ExecuteRunningWaitAction(runtime, runningActionExecutor, npcId, in npcState, job, phase, action, tick);
+                return ExecuteRunningWaitAction(
+                    runtime,
+                    runningActionExecutor,
+                    npcId,
+                    in npcState,
+                    job,
+                    phase,
+                    action,
+                    tick,
+                    explainabilityConfig,
+                    explainabilityRegistry);
 
             if (action.Kind == JobActionKind.MoveToCell)
                 return ExecuteMoveTo(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
@@ -145,7 +155,9 @@ namespace Arcontio.Core
             Job job,
             JobPhase phase,
             JobAction action,
-            int tick)
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
         {
             if (runtime == null || runningActionExecutor == null || job == null)
                 return StepResult.Failed(JobFailureReason.StepFailed, "RunningActionRuntimeMissing");
@@ -177,11 +189,32 @@ namespace Arcontio.Core
 
                 if (!runtime.RunningActions.Register(key, runningAction, out var registerReason))
                     return StepResult.Failed(JobFailureReason.StepFailed, registerReason);
+
+                // La trace "Started" nasce nel punto in cui lo stato volatile entra
+                // nello store Job. Non e' una transizione simulativa: rende solo
+                // leggibile l'inizio del progress interno richiesto da ARC-DEC-020.
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteRunningActionTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionRunningActionOperation.Started,
+                    in key,
+                    runningAction.ToSnapshot(),
+                    "WaitTicksRunningActionStarted");
             }
 
             var executorResult = runningActionExecutor.Tick(
                 runningAction,
                 RunningActionExecutorTickRequest.Advance(1, tick, "WaitTicksRunningActionTick"));
+
+            EmitRunningActionExecutionTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                in key,
+                executorResult);
 
             if (executorResult.Kind == RunningActionExecutorResultKind.Completed)
             {
@@ -210,6 +243,50 @@ namespace Arcontio.Core
             }
 
             return StepResult.Running("WaitTicksRunningActionPending");
+        }
+
+        private static void EmitRunningActionExecutionTrace(
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick,
+            in RunningActionKey key,
+            RunningActionExecutorResult executorResult)
+        {
+            // Questo bridge diagnostico mappa il risultato dell'executor su un
+            // vocabolario EL stabile. La mappatura non decide cosa fare del job:
+            // la semantica operativa resta nel blocco chiamante e nella state
+            // machine. Qui non vengono emessi command e non viene toccato il World.
+            var operation = ResolveRunningActionOperation(executorResult.Kind);
+            if (operation == MemoryBeliefDecisionRunningActionOperation.Unknown)
+                return;
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteRunningActionTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                operation,
+                in key,
+                executorResult.After,
+                executorResult.Reason);
+        }
+
+        private static MemoryBeliefDecisionRunningActionOperation ResolveRunningActionOperation(
+            RunningActionExecutorResultKind kind)
+        {
+            return kind switch
+            {
+                RunningActionExecutorResultKind.Advanced => MemoryBeliefDecisionRunningActionOperation.Progress,
+                RunningActionExecutorResultKind.NoProgress => MemoryBeliefDecisionRunningActionOperation.Progress,
+                RunningActionExecutorResultKind.Completed => MemoryBeliefDecisionRunningActionOperation.Completed,
+                RunningActionExecutorResultKind.TimedOut => MemoryBeliefDecisionRunningActionOperation.TimedOut,
+                RunningActionExecutorResultKind.Failed => MemoryBeliefDecisionRunningActionOperation.Failed,
+                RunningActionExecutorResultKind.Interrupted => MemoryBeliefDecisionRunningActionOperation.Interrupted,
+                RunningActionExecutorResultKind.AlreadyTerminal => MemoryBeliefDecisionRunningActionOperation.Failed,
+                RunningActionExecutorResultKind.InvalidState => MemoryBeliefDecisionRunningActionOperation.Failed,
+                _ => MemoryBeliefDecisionRunningActionOperation.Unknown
+            };
         }
 
         private static StepResult ExecuteMoveTo(

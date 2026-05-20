@@ -1,6 +1,7 @@
 using Arcontio.Core;
 using Arcontio.Core.Config;
 using Arcontio.Core.Diagnostics;
+using System.Collections.Generic;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -125,6 +126,57 @@ namespace Arcontio.Tests
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
         }
 
+        // =============================================================================
+        // WaitTicksWritesRunningActionLifecycleExplainability
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il path produttivo controllato WaitTicks scriva trace
+        /// Started/Progress/Completed nel registry EL-MBQD senza introdurre command o
+        /// mutazioni World.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void WaitTicksWritesRunningActionLifecycleExplainability()
+        {
+            // Arrange: abilitiamo solo il registry diagnostico gia' esistente. Il
+            // job resta un WaitTicks no-target, quindi non puo' toccare MovementSystem
+            // o produrre una mutazione world-mutating.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableRunningActionExplainability(world);
+            var job = MakeWaitJob(npcId, "job-wait-el", durationTicks: 2);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+            var startCell = world.GridPos[npcId];
+
+            // Act: primo tick start+progress, secondo tick completion.
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            // Assert: le trace sono nello store EL-MBQD per-NPC e copiano key,
+            // lifecycle e progress interno; lo store running action e il command
+            // buffer restano coerenti con il no-world-mutation contract.
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.RunningActionTraceCount, Is.EqualTo(3));
+
+            var traces = new List<MemoryBeliefDecisionTrace>();
+            store.CopyRunningActionTracesTo(traces);
+            Assert.That(traces[0].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Started));
+            Assert.That(traces[1].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Progress));
+            Assert.That(traces[2].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Completed));
+            Assert.That(traces[2].RunningAction.JobId, Is.EqualTo(job.JobId));
+            Assert.That(traces[2].RunningAction.OwnerNpcId, Is.EqualTo(npcId));
+            Assert.That(traces[2].RunningAction.PhaseIndex, Is.EqualTo(0));
+            Assert.That(traces[2].RunningAction.ActionIndex, Is.EqualTo(0));
+            Assert.That(traces[2].RunningAction.ActionKind, Is.EqualTo(RunningActionKind.Wait));
+            Assert.That(traces[2].RunningAction.ElapsedTicks, Is.EqualTo(2));
+            Assert.That(traces[2].RunningAction.RequiredTicks, Is.EqualTo(2));
+            Assert.That(traces[2].RunningAction.IsTerminal, Is.True);
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+        }
+
         private static World MakeWorldWithNpc(out int npcId)
         {
             // World minimale: abbastanza runtime per JobExecutionSystem, senza
@@ -139,6 +191,16 @@ namespace Arcontio.Tests
                 x: 1,
                 y: 1);
             return world;
+        }
+
+        private static void EnableRunningActionExplainability(World world)
+        {
+            // La config abilita soltanto emissione diagnostica. I test non attivano
+            // JSONL, non scrivono file e non cambiano il runtime produttivo.
+            var config = world.Config.Sim.memory_belief_decision_explainability;
+            config.enabled = true;
+            config.writeJsonLog = false;
+            config.logRunningAction = true;
         }
 
         private static Job MakeWaitJob(int npcId, string jobId, int durationTicks)
