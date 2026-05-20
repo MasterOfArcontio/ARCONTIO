@@ -133,7 +133,7 @@ namespace Arcontio.Core
                     explainabilityRegistry);
 
             if (action.Kind == JobActionKind.MoveToCell)
-                return ExecuteMoveTo(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
+                return ExecuteMoveTo(world, runtime, runningActionExecutor, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.Consume)
                 return ExecuteConsumeKnownFood(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
@@ -292,6 +292,7 @@ namespace Arcontio.Core
         private static StepResult ExecuteMoveTo(
             World world,
             JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
             int npcId,
             Job job,
             JobAction action,
@@ -305,6 +306,21 @@ namespace Arcontio.Core
 
             if (npcCell.X == action.TargetCell.x && npcCell.Y == action.TargetCell.y)
                 return StepResult.Succeeded("MoveTargetReached");
+
+            if (CanUseRunningActionCellTraversal(world, npcCell, action.TargetCell))
+            {
+                return ExecuteRunningCellTraversalAction(
+                    world,
+                    runtime,
+                    runningActionExecutor,
+                    npcId,
+                    job,
+                    action,
+                    npcCell,
+                    tick,
+                    explainabilityConfig,
+                    explainabilityRegistry);
+            }
 
             bool alreadyMovingToTarget =
                 world.NpcMoveIntents.TryGetValue(npcId, out var currentIntent)
@@ -337,6 +353,176 @@ namespace Arcontio.Core
             }
 
             return StepResult.Running(alreadyMovingToTarget ? "MoveAlreadyRequested" : "MoveCommandEnqueued");
+        }
+
+        private static StepResult ExecuteRunningCellTraversalAction(
+            World world,
+            JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
+            int npcId,
+            Job job,
+            JobAction action,
+            GridPosition npcCell,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            if (world == null || runtime == null || job == null)
+                return StepResult.Failed(JobFailureReason.MovementFailed, "TraversalRuntimeMissing");
+
+            if (!CanEnterTraversalTarget(world, npcId, action.TargetCell, out var blockedReason))
+                return StepResult.Failed(JobFailureReason.MovementFailed, blockedReason);
+
+            // La chiave resta agganciata al cursore job corrente: il progress
+            // volatile non diventa una seconda authority su destinazione o path.
+            var key = ResolveRunningActionKey(runtime, npcId, job.JobId);
+            if (!runtime.RunningActions.TryGet(key, out var runningAction) || runningAction == null)
+            {
+                int requiredTicks = ResolveBaseWalkCellDurationTicks(world);
+                var policy = new RunningActionCompletionPolicy(
+                    requiredTicks,
+                    timeoutTicks: 0,
+                    failureReason: JobFailureReason.MovementFailed,
+                    interruptionReason: JobFailureReason.Cancelled);
+
+                runningAction = RunningActionRuntimeState.Start(
+                    $"move_{job.JobId}_{key.PhaseIndex}_{key.ActionIndex}_{npcCell.X}_{npcCell.Y}_{action.TargetCell.x}_{action.TargetCell.y}",
+                    RunningActionKind.Movement,
+                    npcId,
+                    job.JobId,
+                    ResolveActivePhaseId(job, key.PhaseIndex),
+                    action.ActionId,
+                    tick,
+                    policy);
+
+                if (!runtime.RunningActions.Register(key, runningAction, out var registerReason))
+                    return StepResult.Failed(JobFailureReason.MovementFailed, registerReason);
+
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteRunningActionTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionRunningActionOperation.Started,
+                    in key,
+                    runningAction.ToSnapshot(),
+                    "MoveToCellTraversalStarted");
+            }
+
+            var executorResult = runningActionExecutor != null
+                ? runningActionExecutor.Tick(runningAction, RunningActionExecutorTickRequest.Advance(1, tick, "MoveToCellTraversalTick"))
+                : new RunningActionExecutor().Tick(runningAction, RunningActionExecutorTickRequest.Advance(1, tick, "MoveToCellTraversalTick"));
+
+            EmitRunningActionExecutionTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                in key,
+                executorResult);
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.Completed)
+            {
+                if (!CanEnterTraversalTarget(world, npcId, action.TargetCell, out var completionBlockedReason))
+                {
+                    runtime.RunningActions.Clear(key);
+                    return StepResult.Failed(JobFailureReason.MovementFailed, completionBlockedReason);
+                }
+
+                // Questa e' la sola mutazione World introdotta dal path 02g: avviene
+                // dopo completion del progress interno e sposta l'NPC direttamente
+                // dalla cella sorgente alla cella destinazione. Non esistono celle
+                // intermedie, non viene toccato MovementSystem e non viene emesso
+                // alcun command durante i tick di progress.
+                world.SetNpcPos(npcId, action.TargetCell.x, action.TargetCell.y);
+                world.NotifyNpcMovedForLandmarkLearning(
+                    npcId,
+                    npcCell.X,
+                    npcCell.Y,
+                    action.TargetCell.x,
+                    action.TargetCell.y);
+                runtime.RunningActions.Clear(key);
+                return StepResult.Succeeded("MoveToCellTraversalCompleted");
+            }
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.Advanced)
+                return StepResult.Running("MoveToCellTraversalRunning");
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.NoProgress)
+                return StepResult.Running("MoveToCellTraversalNoProgress");
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.TimedOut
+                || executorResult.Kind == RunningActionExecutorResultKind.Failed
+                || executorResult.Kind == RunningActionExecutorResultKind.Interrupted
+                || executorResult.Kind == RunningActionExecutorResultKind.AlreadyTerminal
+                || executorResult.Kind == RunningActionExecutorResultKind.InvalidState)
+            {
+                runtime.RunningActions.Clear(key);
+                return StepResult.Failed(JobFailureReason.MovementFailed, executorResult.Reason);
+            }
+
+            return StepResult.Running("MoveToCellTraversalPending");
+        }
+
+        private static bool CanUseRunningActionCellTraversal(World world, GridPosition npcCell, Vector2Int targetCell)
+        {
+            if (world?.Config?.Sim?.movement == null || !world.Config.Sim.movement.enableJobRunningActionTraversal)
+                return false;
+
+            // Foundation volutamente stretta: solo una cella cardinale. Target
+            // lontani, diagonali e pathfinding reale restano nel path legacy
+            // SetMoveIntentCommand + MovementSystem.
+            int dx = Mathf.Abs(targetCell.x - npcCell.X);
+            int dy = Mathf.Abs(targetCell.y - npcCell.Y);
+            return (dx + dy) == 1;
+        }
+
+        private static bool CanEnterTraversalTarget(World world, int npcId, Vector2Int targetCell, out string reason)
+        {
+            reason = string.Empty;
+
+            if (!world.InBounds(targetCell.x, targetCell.y))
+            {
+                reason = "TraversalTargetOutOfBounds";
+                return false;
+            }
+
+            if (world.IsMovementBlocked(targetCell.x, targetCell.y))
+            {
+                reason = "TraversalTargetBlocked";
+                return false;
+            }
+
+            if (world.TryGetNpcAt(targetCell.x, targetCell.y, out var occupyingNpcId) && occupyingNpcId != npcId)
+            {
+                reason = "TraversalTargetOccupied";
+                return false;
+            }
+
+            return true;
+        }
+
+        private static int ResolveBaseWalkCellDurationTicks(World world)
+        {
+            // Il default tipizzato vive in MovementParams. Non leggiamo direttamente
+            // game_params.json qui: JsonUtility popola world.Config e mantiene il
+            // fallback se il campo non e' presente nel file dell'operatore.
+            return Mathf.Max(1, world?.Config?.Sim?.movement?.baseWalkCellDurationTicks ?? 2);
+        }
+
+        private static RunningActionKey ResolveRunningActionKey(JobRuntimeState runtime, int npcId, string jobId)
+        {
+            if (runtime != null && runtime.TryGetActiveJob(npcId, out var npcState, out _))
+                return new RunningActionKey(npcId, jobId, npcState.ActivePhaseIndex, npcState.ActiveActionIndex);
+
+            return new RunningActionKey(npcId, jobId, 0, 0);
+        }
+
+        private static string ResolveActivePhaseId(Job job, int phaseIndex)
+        {
+            return job != null && job.Plan.TryGetPhase(phaseIndex, out var phase)
+                ? phase.PhaseId
+                : string.Empty;
         }
 
         private static MoveIntentReason ResolveMoveIntentReason(DecisionIntentKind intentKind)

@@ -127,6 +127,51 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // OneCellMoveTraversalUsesRunningActionAndMutatesWorldOnlyAtCompletion
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il primo path controllato MoveToCell -> running action traversal
+        /// -> completion -> mutazione posizione finale.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void OneCellMoveTraversalUsesRunningActionAndMutatesWorldOnlyAtCompletion()
+        {
+            // Arrange: abilitiamo il gate v0.11c.02g solo nel test. Il target e'
+            // cardinale e adiacente, quindi non serve pathfinding e non si tocca
+            // MovementSystem.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            var startCell = world.GridPos[npcId];
+            var targetCell = new Vector2Int(startCell.X + 1, startCell.Y);
+            var job = MakeMoveJob(npcId, "job-move-one-cell-running", targetCell);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            // Act 1: primo tick, progress interno ma posizione ancora sorgente.
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            // Assert 1: nessuna posizione intermedia e nessun command durante il progress.
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+
+            // Act 2: secondo tick, completion interna e mutazione finale atomica.
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            // Assert 2: lo store volatile e' pulito e l'NPC arriva direttamente in B.
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Completed));
+        }
+
+        // =============================================================================
         // WaitTicksWritesRunningActionLifecycleExplainability
         // =============================================================================
         /// <summary>
@@ -177,6 +222,51 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
         }
 
+        // =============================================================================
+        // OneCellMoveTraversalWritesLifecycleExplainability
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il traversal one-cell gated riusi le trace lifecycle
+        /// Started/Progress/Completed gia' introdotte per le running action.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void OneCellMoveTraversalWritesLifecycleExplainability()
+        {
+            // Arrange: il gate movement e il gate EL sono abilitati solo in memoria.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            EnableRunningActionExplainability(world);
+            var startCell = world.GridPos[npcId];
+            var targetCell = new Vector2Int(startCell.X + 1, startCell.Y);
+            var job = MakeMoveJob(npcId, "job-move-one-cell-el", targetCell);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            // Act: due tick completano il traversal.
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            // Assert: lifecycle e key sono osservabili senza command e senza
+            // posizioni frazionarie.
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            var traces = new List<MemoryBeliefDecisionTrace>();
+            store.CopyRunningActionTracesTo(traces);
+            Assert.That(traces.Count, Is.EqualTo(3));
+            Assert.That(traces[0].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Started));
+            Assert.That(traces[1].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Progress));
+            Assert.That(traces[2].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Completed));
+            Assert.That(traces[2].RunningAction.ActionKind, Is.EqualTo(RunningActionKind.Movement));
+            Assert.That(traces[2].RunningAction.JobId, Is.EqualTo(job.JobId));
+            Assert.That(traces[2].RunningAction.OwnerNpcId, Is.EqualTo(npcId));
+            Assert.That(traces[2].RunningAction.ElapsedTicks, Is.EqualTo(2));
+            Assert.That(traces[2].RunningAction.RequiredTicks, Is.EqualTo(2));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
+        }
+
         private static World MakeWorldWithNpc(out int npcId)
         {
             // World minimale: abbastanza runtime per JobExecutionSystem, senza
@@ -201,6 +291,14 @@ namespace Arcontio.Tests
             config.enabled = true;
             config.writeJsonLog = false;
             config.logRunningAction = true;
+        }
+
+        private static void EnableOneCellTraversal(World world, int durationTicks)
+        {
+            // Gate produttivo del traversal 02g. Lasciarlo spento di default
+            // preserva le vertical slice legacy che si aspettano SetMoveIntentCommand.
+            world.Config.Sim.movement.enableJobRunningActionTraversal = true;
+            world.Config.Sim.movement.baseWalkCellDurationTicks = durationTicks;
         }
 
         private static Job MakeWaitJob(int npcId, string jobId, int durationTicks)

@@ -186,6 +186,20 @@ namespace Arcontio.Core.Config
         // Se false, usa solo IsMovementBlocked per l'attraversabilità (legacy).
         public bool directCheckFovOnAcquisition = true;
 
+        // ── JOB RUNNING ACTION TRAVERSAL FOUNDATION (v0.11c.02g) ─────────────
+        //
+        // Gate esplicito per il primo ponte controllato MoveToCell -> running action
+        // -> completion -> mutazione World finale. Default false per preservare il
+        // comportamento storico: i job esistenti continuano a produrre MoveIntent e
+        // a lasciare il movimento reale al MovementSystem.
+        public bool enableJobRunningActionTraversal = false;
+
+        // Durata base del traversal cardinale di una singola cella quando il gate
+        // sopra e' attivo. ARC-DEC-020 richiede che le durate base siano
+        // configurabili, ma questa patch non modifica game_params.json per evitare
+        // di includere override locali dell'operatore.
+        public int baseWalkCellDurationTicks = 2;
+
         // ── FAILURE LADDER: BACK-OFF / REPLAN (v0.03.05-FailureLadder) ──────
         //
         // Quando un NPC è bloccato per intentStuckTicksDefault tick consecutivi,
