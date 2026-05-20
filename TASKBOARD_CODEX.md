@@ -218,23 +218,24 @@ Validazione aggregata:
 * `JobSystemEndToEndQaTests`: passed quando eseguiti nel blocco 01a;
 * `MemoryBeliefDecisionRuntimeJobScenarioQaTests`: passed nei blocchi di recovery/01c/01d/01e.
 
-### Prossimo checkpoint operativo: v0.11c.02 — Multi-Tick Action Runtime
+### Prossimo checkpoint operativo: v0.11c.02e — RunningAction productive ticking integration
 
 STATUS:
-NEXT / PENDING
+NEXT / READ-ONLY AUDIT FIRST
 
 Branch previsto:
-`ai-task/v0.11c.02a-multitick-action-audit`
+`ai-task/v0.11c.02e-running-action-productive-ticking`
 
 Modalità richiesta:
 READ ONLY FORENSIC AUDIT FIRST
 
 Obiettivo iniziale:
-auditare il passaggio da intent/job single-step osservabile a runtime di azioni multi-tick,
-preservando la separazione tra cognitive decision cadence, job execution tick e world tick.
+auditare il cablaggio produttivo minimo tra `JobExecutionSystem`, `RunningActionStore`
+e `RunningActionExecutor`, preservando lo stato attuale di `MovementSystem` e senza
+introdurre ancora movement multi-tick reale.
 
-Work/Social/Dormant Systems restano fuori scope finché `v0.11c.02` non avrà chiarito
-la foundation temporale minima.
+Work/Social/Dormant Systems restano fuori scope finché `v0.11c.02` non avrà completato
+la foundation temporale minima e la QA deterministica multi-tick.
 
 ---
 

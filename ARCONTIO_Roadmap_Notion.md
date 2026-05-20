@@ -23,7 +23,7 @@
 | v0.10 | World Persistence Closure & Save/Load Completion | Maggio 2026 | Completata |
 | v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
 | v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
-| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11c.02 |
+| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11c.02e |
 | v0.11D | Work/Social/Dormant Systems Forensic Audit | Giugno 2026 | Future |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
@@ -375,9 +375,17 @@ necessario per l'apertura della campagna tecnica v0.09.
 
 ### v0.11C — Decision Orchestrator & Temporal Runtime Foundation
 
-**Status:** IN CORSO / NEXT: v0.11c.02
+**Status:** IN CORSO / NEXT: v0.11c.02e
 
 **Scopo:** separare progressivamente orchestration decisionale, costruzione del contesto, routing intenzione→esecuzione, explainability decisionale e cadence runtime, senza trasformare `NeedsDecisionRule` in nuovo monolite e senza spostare nel Decision Layer autorità di preemption.
+
+La v0.11C è la fase di fondazione che collega la nuova architettura decisionale al runtime temporale. I checkpoint sono volutamente piccoli: prima si separano responsabilità e confini, poi si introduce stato temporale volatile, poi si cabla il tick produttivo, e solo dopo si potrà trasformare movimento, reservation e lifecycle multi-tick reale.
+
+#### v0.11c.01 — Decision Orchestrator Skeleton Audit / Foundation
+
+**Stato:** COMPLETATA / ✅
+
+Questo checkpoint ha chiuso la decomposizione iniziale di `NeedsDecisionRule` senza rimuoverlo e senza cablare il nuovo orchestrator come primary runtime. L'obiettivo non era cambiare comportamento, ma rendere espliciti i confini tra contesto decisionale, selezione intenzione, routing verso JobRequest ed explainability.
 
 | Checkpoint | Task | Stato |
 |---|---|---|
@@ -386,7 +394,7 @@ necessario per l'apertura della campagna tecnica v0.09.
 | v0.11c.01c | IntentExecutionRouter / JobRequestBuilder extraction | ✅ |
 | v0.11c.01d | DecisionExplainabilityBridge extraction | ✅ |
 | v0.11c.01e | NeedsDecisionRule compatibility shim | ✅ |
-| v0.11c.02 | Multi-Tick Action Runtime | NEXT |
+| v0.11c.01f | Orchestrator audit post-extraction / readiness | ✅ Assorbita in closeout v0.11c.01 |
 
 **Esito consolidato v0.11c.01:**
 
@@ -420,12 +428,87 @@ necessario per l'apertura della campagna tecnica v0.09.
 - `JobSystemEndToEndQaTests`: passed quando eseguiti nel blocco 01a;
 - `MemoryBeliefDecisionRuntimeJobScenarioQaTests`: passed nei blocchi di recovery/01c/01d/01e.
 
+#### v0.11c.02 — Multi-Tick Action Runtime
+
+**Stato:** IN CORSO / NEXT: v0.11c.02e
+
+Questo checkpoint implementa progressivamente la foundation temporale fissata da `ARC-DEC-020`: tick globale unico, progress interno volatile, distinzione tra atomic action e running action, nessuna posizione intermedia tra celle e mutazione del World solo a completamento. Gli step completati finora hanno costruito stato, executor e store, ma non hanno ancora modificato `MovementSystem` e non hanno ancora introdotto movement multi-tick reale.
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11c.02a | Multi-Tick Runtime Audit + ARC-DEC-020 | ✅ |
+| v0.11c.02b | RunningActionRuntimeState Skeleton | ✅ |
+| v0.11c.02c | RunningActionExecutor Skeleton | ✅ |
+| v0.11c.02d | RunningActionStore introduction | ✅ |
+| v0.11c.02e | RunningAction productive ticking integration | NEXT / ⏳ |
+| v0.11c.02f | RunningAction lifecycle explainability traces | Pending |
+| v0.11c.02g | Multi-tick cell traversal foundation | Pending |
+| v0.11c.02h | Temporal reservation robustness | Pending |
+| v0.11c.02i | Deterministic multi-tick QA sweep | Pending |
+
+**Nota runtime v0.11c.02:**
+
+- `v0.11c.02b` ha introdotto il vocabolario e lo stato volatile delle running action;
+- `v0.11c.02c` ha introdotto un executor generico e passivo, senza cablaggio produttivo;
+- `v0.11c.02d` ha introdotto lo storage produttivo volatile sotto `JobRuntimeState`;
+- il movimento multi-tick reale non è ancora implementato;
+- `MovementSystem` resta invariato;
+- `SimulationHost`, save/load, scene e config restano fuori scope finché non sarà pronto il cablaggio produttivo controllato.
+
+#### v0.11c.03 — Runtime Cadence Separation
+
+**Stato:** FUTURA / PENDING
+
+Questo checkpoint separerà le frequenze operative senza introdurre timeline parallele. La decision cadence, l'execution cadence e la futura planning cadence devono restare derivate dal tick globale canonico, con override emergenziali espliciti e tracciabili.
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11c.03a | Tick phase audit | Pending |
+| v0.11c.03b | Cognitive decision cadence config | Pending |
+| v0.11c.03c | Execution cadence separation | Pending |
+| v0.11c.03d | Emergency override cadence | Pending |
+| v0.11c.03e | Long-term planning placeholder cadence | Pending |
+| v0.11c.03f | Cadence explainability traces | Pending |
+| v0.11c.03g | Cadence QA matrix | Pending |
+
+#### v0.11c.04 — Job Runtime Stabilization
+
+**Stato:** FUTURA / PENDING
+
+Questo checkpoint consoliderà il Job Layer dopo l'introduzione delle running action. Il focus non è spostare decisione nel Job System, ma rendere più robuste accettazione/rifiuto delle JobRequest, cleanup, failure learning, preemption e osservabilità runtime.
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11c.04a | JobArbiter audit post ARC-DEC-019/020 | Pending |
+| v0.11c.04b | JobRequest acceptance/rejection reason normalization | Pending |
+| v0.11c.04c | Preemption result types hardening | Pending |
+| v0.11c.04d | Reservation cleanup/release guarantees | Pending |
+| v0.11c.04e | Failure → cognition consistency | Pending |
+| v0.11c.04f | Job lifecycle EL coverage completeness | Pending |
+| v0.11c.04g | Active job / running action / preemption QA matrix | Pending |
+
+#### v0.11c.05 — Legacy Decision Layer Removal Path
+
+**Stato:** FUTURA / PENDING
+
+Questo checkpoint preparerà la rimozione graduale del ruolo operativo di `NeedsDecisionRule` come bridge legacy. La regola non va rimossa brutalmente: le routine esistenti devono passare attraverso Orchestrator, JobRequest e Job Layer in modo incrementale, con fallback legacy quarantinati e testati.
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11c.05a | Audit responsabilità residue NeedsDecisionRule | Pending |
+| v0.11c.05b | Fame/SearchFood/EatKnownFood through Orchestrator | Pending |
+| v0.11c.05c | Sleep routine migration plan | Pending |
+| v0.11c.05d | Thirst routine migration plan | Pending |
+| v0.11c.05e | Legacy fallback quarantine | Pending |
+| v0.11c.05f | Orchestrator primary config gate | Pending |
+| v0.11c.05g | Removal readiness report | Pending |
+
 **Prossimo checkpoint operativo:**
 
-`v0.11c.02 — Multi-Tick Action Runtime`
+`v0.11c.02e — RunningAction productive ticking integration`
 
 Branch previsto:
-`ai-task/v0.11c.02a-multitick-action-audit`
+`ai-task/v0.11c.02e-running-action-productive-ticking`
 
 Modalità:
 READ ONLY FORENSIC AUDIT FIRST
