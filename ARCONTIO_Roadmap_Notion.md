@@ -23,7 +23,7 @@
 | v0.10 | World Persistence Closure & Save/Load Completion | Maggio 2026 | Completata |
 | v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
 | v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
-| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11c.02e |
+| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11c.03a |
 | v0.11D | Work/Social/Dormant Systems Forensic Audit | Giugno 2026 | Future |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
@@ -375,7 +375,7 @@ necessario per l'apertura della campagna tecnica v0.09.
 
 ### v0.11C — Decision Orchestrator & Temporal Runtime Foundation
 
-**Status:** IN CORSO / NEXT: v0.11c.02e
+**Status:** IN CORSO / NEXT: v0.11c.03a
 
 **Scopo:** separare progressivamente orchestration decisionale, costruzione del contesto, routing intenzione→esecuzione, explainability decisionale e cadence runtime, senza trasformare `NeedsDecisionRule` in nuovo monolite e senza spostare nel Decision Layer autorità di preemption.
 
@@ -428,32 +428,36 @@ Questo checkpoint ha chiuso la decomposizione iniziale di `NeedsDecisionRule` se
 - `JobSystemEndToEndQaTests`: passed quando eseguiti nel blocco 01a;
 - `MemoryBeliefDecisionRuntimeJobScenarioQaTests`: passed nei blocchi di recovery/01c/01d/01e.
 
-#### v0.11c.02 — Multi-Tick Action Runtime
+#### v0.11c.02 - Multi-Tick Action Runtime
 
-**Stato:** IN CORSO / NEXT: v0.11c.02e
+**Stato:** COMPLETATA / DONE
 
-Questo checkpoint implementa progressivamente la foundation temporale fissata da `ARC-DEC-020`: tick globale unico, progress interno volatile, distinzione tra atomic action e running action, nessuna posizione intermedia tra celle e mutazione del World solo a completamento. Gli step completati finora hanno costruito stato, executor e store, ma non hanno ancora modificato `MovementSystem` e non hanno ancora introdotto movement multi-tick reale.
+Questo checkpoint ha implementato la foundation temporale fissata da `ARC-DEC-020`: tick globale unico, progress interno volatile, distinzione tra atomic action e running action, nessuna posizione intermedia tra celle e mutazione del World solo a completamento. La chiusura 02i ha aggiunto la QA deterministica finale per assicurare che il gate traversal resti stretto, che il path legacy sia preservato quando il gate non si applica, e che cleanup running action/reservation resti stabile.
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.11c.02a | Multi-Tick Runtime Audit + ARC-DEC-020 | ✅ |
-| v0.11c.02b | RunningActionRuntimeState Skeleton | ✅ |
-| v0.11c.02c | RunningActionExecutor Skeleton | ✅ |
-| v0.11c.02d | RunningActionStore introduction | ✅ |
-| v0.11c.02e | RunningAction productive ticking integration | NEXT / ⏳ |
-| v0.11c.02f | RunningAction lifecycle explainability traces | Pending |
-| v0.11c.02g | Multi-tick cell traversal foundation | Pending |
-| v0.11c.02h | Temporal reservation robustness | Pending |
-| v0.11c.02i | Deterministic multi-tick QA sweep | Pending |
+| v0.11c.02a | Multi-Tick Runtime Audit + ARC-DEC-020 | COMPLETATA |
+| v0.11c.02b | RunningActionRuntimeState Skeleton | COMPLETATA |
+| v0.11c.02c | RunningActionExecutor Skeleton | COMPLETATA |
+| v0.11c.02d | RunningActionStore introduction | COMPLETATA |
+| v0.11c.02e | RunningAction productive ticking integration | COMPLETATA |
+| v0.11c.02f | RunningAction lifecycle explainability traces | COMPLETATA |
+| v0.11c.02g | Multi-tick cell traversal foundation | COMPLETATA |
+| v0.11c.02h | Temporal reservation robustness | COMPLETATA |
+| v0.11c.02i | Deterministic multi-tick QA sweep | COMPLETATA |
 
-**Nota runtime v0.11c.02:**
+**Esito consolidato v0.11c.02:**
 
 - `v0.11c.02b` ha introdotto il vocabolario e lo stato volatile delle running action;
-- `v0.11c.02c` ha introdotto un executor generico e passivo, senza cablaggio produttivo;
+- `v0.11c.02c` ha introdotto un executor generico e passivo;
 - `v0.11c.02d` ha introdotto lo storage produttivo volatile sotto `JobRuntimeState`;
-- il movimento multi-tick reale non è ancora implementato;
-- `MovementSystem` resta invariato;
-- `SimulationHost`, save/load, scene e config restano fuori scope finché non sarà pronto il cablaggio produttivo controllato.
+- `v0.11c.02e` ha cablato ticking produttivo controllato su `WaitTicks`;
+- `v0.11c.02f` ha reso osservabile il lifecycle delle running action;
+- `v0.11c.02g` ha introdotto il traversal one-cell gated senza posizioni intermedie;
+- `v0.11c.02h` ha aggiunto reservation temporale minima della destination cell e contention deterministica;
+- `v0.11c.02i` ha chiuso la matrice QA deterministica con 81/81 test passed;
+- `MovementSystem`, `SimulationHost`, save/load, scene e config restano fuori scope e invariati;
+- il movimento multi-step, avoidance avanzata, reservation temporali complete e cadence separation restano futuri.
 
 #### v0.11c.03 — Runtime Cadence Separation
 
@@ -505,10 +509,10 @@ Questo checkpoint preparerà la rimozione graduale del ruolo operativo di `Needs
 
 **Prossimo checkpoint operativo:**
 
-`v0.11c.02e — RunningAction productive ticking integration`
+`v0.11c.03a - Tick phase audit`
 
 Branch previsto:
-`ai-task/v0.11c.02e-running-action-productive-ticking`
+`ai-task/v0.11c.03a-runtime-cadence-audit`
 
 Modalità:
 READ ONLY FORENSIC AUDIT FIRST

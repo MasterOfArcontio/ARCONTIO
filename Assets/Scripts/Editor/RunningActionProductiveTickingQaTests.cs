@@ -127,6 +127,73 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // TraversalGateOnKeepsDistantTargetOnLegacyPath
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il gate produttivo del traversal non allarghi per errore il
+        /// perimetro oltre la singola cella cardinale adiacente.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void TraversalGateOnKeepsDistantTargetOnLegacyPath()
+        {
+            // Arrange: gate acceso, ma target distante. Questo resta un path
+            // MovementSystem/SetMoveIntentCommand legacy e non una running action.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            var startCell = world.GridPos[npcId];
+            var distantTarget = new Vector2Int(startCell.X + 2, startCell.Y);
+            var job = MakeMoveJob(npcId, "job-move-distant-legacy", distantTarget);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            // Act: il job execution produce il command legacy e non progress interno.
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            // Assert: nessun traversal multi-tick viene attivato fuori perimetro.
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(1));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+        }
+
+        // =============================================================================
+        // TraversalGateOnKeepsDiagonalTargetOnLegacyPath
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che un target diagonale non venga trattato come traversal
+        /// one-cell, anche quando il gate sperimentale e' abilitato.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void TraversalGateOnKeepsDiagonalTargetOnLegacyPath()
+        {
+            // Arrange: il target diagonale resta fuori dal traversal 02g/02h. Non
+            // introduciamo rifiuti o pathfinding nuovo: preserviamo il path legacy.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            var startCell = world.GridPos[npcId];
+            var diagonalTarget = new Vector2Int(startCell.X + 1, startCell.Y + 1);
+            var job = MakeMoveJob(npcId, "job-move-diagonal-legacy", diagonalTarget);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            // Act: resta command legacy, quindi niente running action e niente
+            // mutazione anticipata della posizione.
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            // Assert: il gate e' stretto e deterministicamente non-cardinale.
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(1));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+        }
+
+        // =============================================================================
         // OneCellMoveTraversalUsesRunningActionAndMutatesWorldOnlyAtCompletion
         // =============================================================================
         /// <summary>

@@ -218,24 +218,63 @@ Validazione aggregata:
 * `JobSystemEndToEndQaTests`: passed quando eseguiti nel blocco 01a;
 * `MemoryBeliefDecisionRuntimeJobScenarioQaTests`: passed nei blocchi di recovery/01c/01d/01e.
 
-### Prossimo checkpoint operativo: v0.11c.02e — RunningAction productive ticking integration
+### Checkpoint corrente completato: v0.11c.02 - Multi-Tick Action Runtime
 
 STATUS:
-NEXT / READ-ONLY AUDIT FIRST
+COMPLETED / DONE
+
+PR incluse:
+
+* PR #16 - `v0.11c.02b` RunningActionRuntimeState Skeleton;
+* PR #17 - `v0.11c.02c` RunningAction Executor Integration;
+* PR #19 - `v0.11c.02d` RunningActionStore introduction;
+* PR #21 - `v0.11c.02e` RunningAction productive ticking integration;
+* PR #22 - `v0.11c.02f` RunningAction lifecycle explainability traces;
+* PR #23 - `v0.11c.02g` Multi-tick cell traversal foundation;
+* PR #24 - `v0.11c.02h` Temporal reservation robustness;
+* PR corrente - `v0.11c.02i` Deterministic multi-tick QA sweep / hardening finale.
+
+Esito tecnico:
+
+* introdotto stato runtime volatile per running action sotto `JobRuntimeState`;
+* introdotto executor generico per progress/completion/failure/interruption senza side effect;
+* cablato ticking produttivo controllato su `WaitTicks`;
+* aggiunte trace lifecycle running action;
+* introdotto traversal one-cell gated senza posizioni intermedie;
+* aggiunta reservation temporale minima della destination cell per traversal gated;
+* completata QA deterministica su gate off/on, target distante/diagonale, cleanup running action, cleanup reservation, contention e vertical slice food/search;
+* `MovementSystem`, `SimulationHost`, save/load e Decision Layer restano invariati.
+
+Validazione aggregata v0.11c.02i:
+
+* `RunningActionProductiveTickingQaTests`: passed;
+* `RunningActionRuntimeStateQaTests`: passed;
+* `RunningActionExecutorQaTests`: passed;
+* `RunningActionStoreQaTests`: passed;
+* `ReservationStoreQaTests`: passed;
+* `FoodJobVerticalSliceQaTests`: passed;
+* `SearchFoodJobVerticalSliceQaTests`: passed;
+* `JobSystemEndToEndQaTests`: passed;
+* matrice aggregata eseguita nel closeout 02i: 81/81 passed.
+
+### Prossimo checkpoint operativo: v0.11c.03a - Tick phase audit
+
+STATUS:
+NEXT / READ-ONLY FORENSIC AUDIT FIRST
 
 Branch previsto:
-`ai-task/v0.11c.02e-running-action-productive-ticking`
+`ai-task/v0.11c.03a-runtime-cadence-audit`
 
-Modalità richiesta:
+Modalita richiesta:
 READ ONLY FORENSIC AUDIT FIRST
 
 Obiettivo iniziale:
-auditare il cablaggio produttivo minimo tra `JobExecutionSystem`, `RunningActionStore`
-e `RunningActionExecutor`, preservando lo stato attuale di `MovementSystem` e senza
-introdurre ancora movement multi-tick reale.
+auditare l'ordine delle fasi tick e i punti di aggancio necessari alla futura separazione
+tra world tick, execution cadence, cognitive decision cadence e planning cadence, senza
+introdurre ancora scheduler produttivi nuovi.
 
-Work/Social/Dormant Systems restano fuori scope finché `v0.11c.02` non avrà completato
-la foundation temporale minima e la QA deterministica multi-tick.
+Work/Social/Dormant Systems restano fuori scope finche `v0.11c.03` non avra chiarito
+la separazione delle cadence runtime.
 
 ---
 
