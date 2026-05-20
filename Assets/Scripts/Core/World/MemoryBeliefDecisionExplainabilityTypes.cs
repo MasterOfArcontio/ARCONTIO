@@ -61,7 +61,8 @@ namespace Arcontio.Core
         JobArbitration = 11,
         Reservation = 12,
         Command = 13,
-        FailureLearning = 14
+        FailureLearning = 14,
+        RunningAction = 15
     }
 
     // =============================================================================
@@ -168,6 +169,41 @@ namespace Arcontio.Core
         Unknown = 0,
         Enqueued = 1,
         Snapshot = 2
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionRunningActionOperation
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Operazione diagnostica osservata sul lifecycle volatile di una running action.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: progress runtime osservabile ma non autoritativo</b></para>
+    /// <para>
+    /// ARC-DEC-020 richiede che le azioni multi-tick espongano started, progress,
+    /// completed, failed e interrupted senza confondere il progresso interno con una
+    /// mutazione del World. Questa enum e' quindi puro vocabolario EL: non abilita
+    /// traversal, non decide preemption, non emette command e non cambia job.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Started</b>: stato volatile registrato nello store.</item>
+    ///   <item><b>Progress</b>: stato avanzato dall'executor ma non terminale.</item>
+    ///   <item><b>Completed</b>: stato arrivato a completamento interno.</item>
+    ///   <item><b>Failed/Interrupted/TimedOut</b>: stati terminali diagnostici quando il path runtime li produce.</item>
+    /// </list>
+    /// </summary>
+    public enum MemoryBeliefDecisionRunningActionOperation
+    {
+        Unknown = 0,
+        Started = 1,
+        Progress = 2,
+        Completed = 3,
+        Failed = 4,
+        Interrupted = 5,
+        TimedOut = 6
     }
 
     // =============================================================================
@@ -847,6 +883,56 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // MemoryBeliefDecisionRunningActionRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Payload diagnostica del lifecycle interno di una running action.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: separazione progress interno / mutazione world</b></para>
+    /// <para>
+    /// Il record copia soltanto valori primitivi da <c>RunningActionKey</c> e
+    /// <c>RunningActionProgressSnapshot</c>. Non contiene riferimenti live allo
+    /// store, non permette di tickare l'action e non rappresenta un command finale:
+    /// serve a rendere osservabile il runtime volatile prima del futuro traversal
+    /// multi-tick.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Key</b>: NPC, job, phase/action index usati dallo store volatile.</item>
+    ///   <item><b>Identity</b>: kind, phase id e action id dell'action osservata.</item>
+    ///   <item><b>Progress</b>: started/updated/elapsed/duration e status lifecycle.</item>
+    ///   <item><b>Reason</b>: reason diagnostica prodotta dal punto runtime legittimo.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionRunningActionRecord
+    {
+        public MemoryBeliefDecisionRunningActionOperation Operation;
+        public string ActionInstanceId = string.Empty;
+        public RunningActionKind ActionKind;
+        public RunningActionLifecycleStatus Status;
+        public int OwnerNpcId;
+        public string JobId = string.Empty;
+        public int PhaseIndex;
+        public int ActionIndex;
+        public string PhaseId = string.Empty;
+        public string JobActionId = string.Empty;
+        public int StartedTick;
+        public int UpdatedTick;
+        public int ElapsedTicks;
+        public int RequiredTicks;
+        public int TimeoutTicks;
+        public JobFailureReason FailureReason;
+        public bool IsTerminal;
+        public bool CanComplete;
+        public bool IsTimedOut;
+        public string Reason = string.Empty;
+    }
+
+    // =============================================================================
     // MemoryBeliefDecisionFailureLearningRecord
     // =============================================================================
     /// <summary>
@@ -908,5 +994,6 @@ namespace Arcontio.Core
         public MemoryBeliefDecisionReservationRecord Reservation;
         public MemoryBeliefDecisionCommandRecord Command;
         public MemoryBeliefDecisionFailureLearningRecord FailureLearning;
+        public MemoryBeliefDecisionRunningActionRecord RunningAction;
     }
 }

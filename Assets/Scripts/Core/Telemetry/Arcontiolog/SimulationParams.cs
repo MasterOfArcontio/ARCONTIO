@@ -354,6 +354,7 @@ namespace Arcontio.Core.Config
         public bool logReservation = true;
         public bool logCommand = true;
         public bool logFailureLearning = true;
+        public bool logRunningAction = true;
 
         public bool includeCandidates = true;
         public bool includeScoreBreakdown = true;
@@ -373,6 +374,7 @@ namespace Arcontio.Core.Config
         public int ringBuffer_reservation = 32;
         public int ringBuffer_command = 32;
         public int ringBuffer_failureLearning = 24;
+        public int ringBuffer_runningAction = 64;
     }
 
 

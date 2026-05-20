@@ -194,6 +194,7 @@ namespace Arcontio.Core
         private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _reservationTraces;
         private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _commandTraces;
         private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _failureLearningTraces;
+        private readonly MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace> _runningActionTraces;
 
         public int NpcId { get; }
         public long LatestTick { get; private set; }
@@ -211,6 +212,7 @@ namespace Arcontio.Core
         public int ReservationTraceCount => _reservationTraces.Count;
         public int CommandTraceCount => _commandTraces.Count;
         public int FailureLearningTraceCount => _failureLearningTraces.Count;
+        public int RunningActionTraceCount => _runningActionTraces.Count;
 
         // =============================================================================
         // MemoryBeliefDecisionExplainabilityNpcStore
@@ -235,7 +237,8 @@ namespace Arcontio.Core
             int jobArbitrationCapacity,
             int reservationCapacity,
             int commandCapacity,
-            int failureLearningCapacity)
+            int failureLearningCapacity,
+            int runningActionCapacity)
         {
             NpcId = npcId;
             LatestTick = 0;
@@ -254,6 +257,7 @@ namespace Arcontio.Core
             _reservationTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(reservationCapacity);
             _commandTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(commandCapacity);
             _failureLearningTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(failureLearningCapacity);
+            _runningActionTraces = new MemoryBeliefDecisionExplainabilityRingBuffer<MemoryBeliefDecisionTrace>(runningActionCapacity);
         }
 
         // =============================================================================
@@ -317,6 +321,9 @@ namespace Arcontio.Core
                 case MemoryBeliefDecisionTraceKind.FailureLearning:
                     _failureLearningTraces.Add(trace);
                     break;
+                case MemoryBeliefDecisionTraceKind.RunningAction:
+                    _runningActionTraces.Add(trace);
+                    break;
             }
         }
 
@@ -362,6 +369,9 @@ namespace Arcontio.Core
         public void CopyFailureLearningTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
             => _failureLearningTraces.CopyTo(output, clearOutput);
 
+        public void CopyRunningActionTracesTo(List<MemoryBeliefDecisionTrace> output, bool clearOutput = true)
+            => _runningActionTraces.CopyTo(output, clearOutput);
+
         public bool TryGetLatestMemoryTrace(out MemoryBeliefDecisionTrace trace)
             => _memoryTraces.TryGetNewest(out trace);
 
@@ -403,6 +413,9 @@ namespace Arcontio.Core
 
         public bool TryGetLatestFailureLearningTrace(out MemoryBeliefDecisionTrace trace)
             => _failureLearningTraces.TryGetNewest(out trace);
+
+        public bool TryGetLatestRunningActionTrace(out MemoryBeliefDecisionTrace trace)
+            => _runningActionTraces.TryGetNewest(out trace);
     }
 
     // =============================================================================
@@ -444,6 +457,7 @@ namespace Arcontio.Core
         public const int DefaultReservationCapacity = 32;
         public const int DefaultCommandCapacity = 32;
         public const int DefaultFailureLearningCapacity = 24;
+        public const int DefaultRunningActionCapacity = 64;
 
         private readonly Dictionary<int, MemoryBeliefDecisionExplainabilityNpcStore> _stores;
         private readonly int _memoryCapacity;
@@ -460,6 +474,7 @@ namespace Arcontio.Core
         private readonly int _reservationCapacity;
         private readonly int _commandCapacity;
         private readonly int _failureLearningCapacity;
+        private readonly int _runningActionCapacity;
 
         public int StoreCount => _stores.Count;
 
@@ -485,7 +500,8 @@ namespace Arcontio.Core
             int jobArbitrationCapacity = DefaultJobArbitrationCapacity,
             int reservationCapacity = DefaultReservationCapacity,
             int commandCapacity = DefaultCommandCapacity,
-            int failureLearningCapacity = DefaultFailureLearningCapacity)
+            int failureLearningCapacity = DefaultFailureLearningCapacity,
+            int runningActionCapacity = DefaultRunningActionCapacity)
         {
             _memoryCapacity = Math.Max(1, memoryCapacity);
             _beliefCapacity = Math.Max(1, beliefCapacity);
@@ -501,6 +517,7 @@ namespace Arcontio.Core
             _reservationCapacity = Math.Max(1, reservationCapacity);
             _commandCapacity = Math.Max(1, commandCapacity);
             _failureLearningCapacity = Math.Max(1, failureLearningCapacity);
+            _runningActionCapacity = Math.Max(1, runningActionCapacity);
             _stores = new Dictionary<int, MemoryBeliefDecisionExplainabilityNpcStore>(64);
         }
 
@@ -589,7 +606,8 @@ namespace Arcontio.Core
                 _jobArbitrationCapacity,
                 _reservationCapacity,
                 _commandCapacity,
-                _failureLearningCapacity);
+                _failureLearningCapacity,
+                _runningActionCapacity);
 
             _stores[npcId] = store;
             return store;
@@ -613,6 +631,7 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Reservation => config.logReservation,
                 MemoryBeliefDecisionTraceKind.Command => config.logCommand,
                 MemoryBeliefDecisionTraceKind.FailureLearning => config.logFailureLearning,
+                MemoryBeliefDecisionTraceKind.RunningAction => config.logRunningAction,
                 _ => false
             };
         }
