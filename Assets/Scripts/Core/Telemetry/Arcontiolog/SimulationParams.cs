@@ -216,6 +216,36 @@ namespace Arcontio.Core.Config
 
             return movement != null && movement.enableJobRunningActionTraversal;
         }
+
+        // =============================================================================
+        // ResolveDecisionEveryTicks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la cadence legacy con cui il bridge decisionale needs-based viene
+        /// rivalutato dal runtime attuale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: config cognitiva passiva e compatibile</b></para>
+        /// <para>
+        /// Il valore resta un parametro transitorio del vecchio
+        /// <c>NeedsDecisionRule</c>: non cabla <c>NpcDecisionScheduler</c>, non crea
+        /// eventi di soglia, non decide preemption e non introduce politiche future
+        /// su multi-reason, deduplica, batching o cooldown. Il default conserva il
+        /// comportamento osservabile gia' presente nel callsite produttivo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Decision config</b>: legge <c>decision.decisionEveryTicks</c> se presente.</item>
+        ///   <item><b>Clamp</b>: valori nulli o negativi vengono normalizzati a 1.</item>
+        ///   <item><b>Default legacy</b>: in assenza di sezione usa 25 tick, come l'hardcode storico.</item>
+        /// </list>
+        /// </summary>
+        public int ResolveDecisionEveryTicks()
+        {
+            return Mathf.Max(1, decision?.decisionEveryTicks ?? DecisionRuntimeParams.DefaultDecisionEveryTicks);
+        }
     }
 
     // =============================================================================
@@ -269,6 +299,7 @@ namespace Arcontio.Core.Config
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
+    ///   <item><b>decisionEveryTicks</b>: cadence legacy-compatible del bridge needs-decision.</item>
     ///   <item><b>selectionMode</b>: <c>WeightedRandomTopN</c> oppure <c>DeterministicTop1</c>.</item>
     ///   <item><b>topN</b>: numero massimo di candidati ammessi alla selezione probabilistica.</item>
     ///   <item><b>noise01</b>: rumore base della roulette weighted random.</item>
@@ -279,6 +310,12 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class DecisionRuntimeParams
     {
+        public const int DefaultDecisionEveryTicks = 25;
+
+        // Nome legacy-compatible e transitorio: rappresenta l'hardcode produttivo
+        // gia' esistente in SimulationHost, senza fissare una nomenclatura canonica
+        // futura per la cognitive cadence.
+        public int decisionEveryTicks = DefaultDecisionEveryTicks;
         public string selectionMode = "WeightedRandomTopN";
         public int topN = 3;
         public float noise01 = 0.15f;

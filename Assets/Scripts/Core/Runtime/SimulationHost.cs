@@ -772,7 +772,8 @@ namespace Arcontio.Core
             _rules.Add(new DebugEventLogRule());
             //     _rules.Add(new BasicSurvivalRule());
             _rules.Add(new NeedsDecisionRule(
-                decisionEveryTicks: 25,
+                decisionEveryTicks: _world?.Config?.Sim?.ResolveDecisionEveryTicks()
+                    ?? DecisionRuntimeParams.DefaultDecisionEveryTicks,
                 maxSeekRangeCells: _world.Global.NpcOperationalRangeCells,
                 enableFoodJobVerticalSlice: enableFoodJobVerticalSlice,
                 jobTemplateRegistry: _jobTemplateRegistry));
