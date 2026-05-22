@@ -109,6 +109,54 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // CadenceNotDueBlocksOnlyCognitiveEligibility
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che una cadence non ancora matura blocchi soltanto
+        /// l'eleggibilita' cognitiva no-op.
+        /// </para>
+        ///
+        /// <para><b>Nessuna policy di bypass cadence</b></para>
+        /// <para>
+        /// Il test usa un caso ordinario senza job attivo e senza segnali speciali.
+        /// Non copre emergenze o priorita' superiori con cadence non matura, per
+        /// evitare di fissare una policy futura non ancora decisa.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Input</b>: tick 12, ultimo tick decisionale 10, cadence 5.</item>
+        ///   <item><b>Eligibility</b>: il gate restituisce CadenceNotDue.</item>
+        ///   <item><b>No-op</b>: nessuna pipeline, intent o JobRequest viene prodotto.</item>
+        /// </list>
+        /// </summary>
+        [Test]
+        public void CadenceNotDueBlocksOnlyCognitiveEligibility()
+        {
+            // Arrange: input dichiarativo ordinario con cadence non ancora matura.
+            var orchestrator = new DecisionOrchestratorSystem();
+            var input = new NpcDecisionSchedulerInput(
+                npcId: 1,
+                tick: 12,
+                lastDecisionTick: 10,
+                decisionCadenceTicks: 5,
+                hasActiveJob: false,
+                hasHigherPriorityIntentSignal: false,
+                hasEmergencyIntentSignal: false);
+
+            // Act: l'orchestrator resta nel path no-op e valuta solo eligibility.
+            var result = orchestrator.EvaluateNoOp(input);
+
+            // Assert: la cadence blocca la sola valutazione cognitiva produttiva.
+            Assert.That(result.Eligibility.AllowsEvaluation, Is.False);
+            Assert.That(result.Eligibility.Reason, Is.EqualTo(NpcDecisionEligibilityReason.CadenceNotDue));
+            Assert.That(result.PipelineInvoked, Is.False);
+            Assert.That(result.HasSelectedIntent, Is.False);
+            Assert.That(result.HasJobRequestProposal, Is.False);
+        }
+
+        // =============================================================================
         // DecisionOrchestratorSystemDoesNotModifyWorld
         // =============================================================================
         /// <summary>
