@@ -55,17 +55,20 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // JobStepFailureKindDoesNotReplaceRuntimeFailureReason
+        // JobStepFailureKindNoneIsNotAConcreteFailure
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che il nuovo lessico non sostituisca il motivo terminale di job
-        /// gia' usato dal runtime.
+        /// Verifica che il valore neutro resti distinto dai fallimenti reali senza
+        /// attribuire recuperabilita' o policy produttiva ad alcuna categoria.
         /// </para>
         /// </summary>
         [Test]
-        public void JobStepFailureKindDoesNotReplaceRuntimeFailureReason()
+        public void JobStepFailureKindNoneIsNotAConcreteFailure()
         {
+            Assert.That(JobStepFailureKind.None, Is.EqualTo((JobStepFailureKind)0));
+            Assert.That(JobStepFailureKind.None, Is.Not.EqualTo(JobStepFailureKind.TargetInvalid));
+            Assert.That(JobStepFailureKind.None, Is.Not.EqualTo(JobStepFailureKind.Timeout));
             Assert.That(typeof(JobStepFailureKind), Is.Not.EqualTo(typeof(JobFailureReason)));
             Assert.That((object)JobStepFailureKind.ReservationConflict, Is.Not.AssignableTo<ICommand>());
         }
