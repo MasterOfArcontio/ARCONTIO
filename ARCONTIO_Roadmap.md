@@ -494,10 +494,10 @@ Questo checkpoint ha consolidato una foundation passiva per il recupero locale l
 
 > **Nota closeout v0.11c.04h (2026-05-24):** il piano operativo reale di `v0.11c.04` e' stato riallineato a `Job Runtime Stabilization & Local Step Recovery Foundation` dopo l'introduzione di `ARC-DEC-021`. Il checkpoint e' chiuso come foundation passiva: audit recovery, `JobStepFailureKind`, `StepRecoveryStrategy`, `StepRecoveryPolicy`, `JobRecoveryResult`, boundary audit e Recovery QA matrix. Nessun recovery runtime reale e' stato introdotto; `StepResultStatus.Failed` resta terminale per il job e `Blocked` / `Waiting` restano wait gate tecnico. Dettaglio: `v0.11c.04_Closeout_Report.md`.
 
-#### v0.11c.05 - Fondazione Valutazione Recovery
+#### v0.11c.05 - Recovery Evaluation Foundation
 
 ## Stato
-🔄 IN CORSO
+COMPLETATA / DONE
 
 ## Obiettivo
 
@@ -528,11 +528,13 @@ La recovery deve restare:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.11c.05a | Audit classificazione fallimenti | ✅ COMPLETATA |
-| v0.11c.05b | Modello passivo StepFailureClassification | ✅ COMPLETATA |
-| v0.11c.05c | Skeleton evaluator recovery no-op | 🔄 IN CORSO |
-| v0.11c.05d | QA evaluator recovery | ⏳ PENDING |
-| v0.11c.05e | Closeout recovery evaluation | ⏳ PENDING |
+| v0.11c.05a | Audit classificazione fallimenti | DONE |
+| v0.11c.05b | Modello passivo StepFailureClassification | DONE |
+| v0.11c.05c | Skeleton evaluator recovery no-op | DONE |
+| v0.11c.05d | QA evaluator recovery | DONE |
+| v0.11c.05e | Closeout recovery evaluation | DONE |
+
+> **Nota closeout v0.11c.05e (2026-05-24):** il checkpoint `v0.11c.05` e' chiuso come Recovery Evaluation Foundation passiva. Sono stati completati audit classificazione failure, `StepFailureClassification`, `StepRecoveryEvaluator` no-op e matrice QA evaluator. Il runtime recovery reale NON e' implementato: `JobExecutionSystem` non usa l'evaluator, `JobStateMachine` mantiene `Failed -> JobFailed`, `Blocked` / `Waiting` restano wait gate tecnici e non esistono mapping produttivi. Dettaglio: `v0.11c.05_Closeout_Report.md`.
 
 ---
 
