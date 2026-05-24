@@ -257,24 +257,40 @@ Validazione aggregata v0.11c.02i:
 * `JobSystemEndToEndQaTests`: passed;
 * matrice aggregata eseguita nel closeout 02i: 81/81 passed.
 
-### Prossimo checkpoint operativo: v0.11c.03a - Tick phase audit
+### Checkpoint corrente completato: v0.11c.03 - Runtime Cadence Separation
 
 STATUS:
-NEXT / READ-ONLY FORENSIC AUDIT FIRST
+COMPLETED / DONE
 
-Branch previsto:
-`ai-task/v0.11c.03a-runtime-cadence-audit`
+Esito tecnico:
 
-Modalita richiesta:
-READ ONLY FORENSIC AUDIT FIRST
+* introdotto modello passivo dei motivi di rivalutazione decisionale;
+* resa configurabile la cadence decisionale ordinaria legacy-compatible `decisionEveryTicks`;
+* protetta con QA la separazione tra avanzamento esecutivo e cadence decisionale;
+* protetta con QA l'eligibility decisionale ordinaria;
+* confermato che non sono stati introdotti eventi soglia produttivi, bypass cadence, cooldown, debounce, batching o scheduler produttivo.
 
-Obiettivo iniziale:
-auditare l'ordine delle fasi tick e i punti di aggancio necessari alla futura separazione
-tra world tick, execution cadence, cognitive decision cadence e planning cadence, senza
-introdurre ancora scheduler produttivi nuovi.
+### Checkpoint corrente completato: v0.11c.04 - Job Runtime Stabilization & Local Step Recovery Foundation
 
-Work/Social/Dormant Systems restano fuori scope finche `v0.11c.03` non avra chiarito
-la separazione delle cadence runtime.
+STATUS:
+COMPLETED / DONE
+
+Esito tecnico:
+
+* completato audit Job step failure/recovery;
+* introdotti vocabolari e DTO passivi `JobStepFailureKind`, `StepRecoveryStrategy`, `StepRecoveryPolicy`, `JobRecoveryResult`;
+* confermato boundary futuro `ExecuteCurrentAction(...) -> StepResult -> recovery boundary futuro -> JobStateMachine.ApplyStepResult(...)`;
+* aggiunta Recovery QA matrix;
+* nessun recovery runtime reale introdotto;
+* `StepResultStatus.Failed` resta terminale per il job;
+* `Blocked` e `Waiting` restano wait gate tecnico;
+* nessun mapping produttivo, nessuna escalation cognitiva reale, nessuna preemption nuova.
+
+Report closeout root:
+`v0.11c.04_Closeout_Report.md`
+
+Prossimo checkpoint operativo:
+NON DECISO in questa patch. Ogni step successivo deve restare audit-first.
 
 ---
 
