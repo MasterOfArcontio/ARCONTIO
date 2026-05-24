@@ -475,21 +475,24 @@ Questo checkpoint separerà le frequenze operative senza introdurre timeline par
 | v0.11c.03f | Cadence explainability traces | Pending |
 | v0.11c.03g | Cadence QA matrix | Pending |
 
-#### v0.11c.04 — Job Runtime Stabilization
+#### v0.11c.04 — Job Runtime Stabilization & Local Step Recovery Foundation
 
-**Stato:** FUTURA / PENDING
+**Stato:** COMPLETATA / DONE
 
-Questo checkpoint consoliderà il Job Layer dopo l'introduzione delle running action. Il focus non è spostare decisione nel Job System, ma rendere più robuste accettazione/rifiuto delle JobRequest, cleanup, failure learning, preemption e osservabilità runtime.
+Questo checkpoint ha consolidato una foundation passiva per il recupero locale limitato degli step Job. Il focus non e' spostare decisione nel Job System, ma preparare vocabolario, DTO, boundary audit e QA prima di qualsiasi recovery produttivo.
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.11c.04a | JobArbiter audit post ARC-DEC-019/020 | Pending |
-| v0.11c.04b | JobRequest acceptance/rejection reason normalization | Pending |
-| v0.11c.04c | Preemption result types hardening | Pending |
-| v0.11c.04d | Reservation cleanup/release guarantees | Pending |
-| v0.11c.04e | Failure → cognition consistency | Pending |
-| v0.11c.04f | Job lifecycle EL coverage completeness | Pending |
-| v0.11c.04g | Active job / running action / preemption QA matrix | Pending |
+| v0.11c.04a | Job step failure/recovery audit | COMPLETATA |
+| v0.11c.04b | JobStepFailureKind vocabulary skeleton | COMPLETATA |
+| v0.11c.04c | StepRecoveryStrategy vocabulary skeleton | COMPLETATA |
+| v0.11c.04d | StepRecoveryPolicy passive model | COMPLETATA |
+| v0.11c.04e | JobRecoveryResult passive model | COMPLETATA |
+| v0.11c.04f | No-op recovery boundary audit | COMPLETATA |
+| v0.11c.04g | Recovery QA matrix | COMPLETATA |
+| v0.11c.04h | Closeout report | COMPLETATA |
+
+> **Nota closeout v0.11c.04h (2026-05-24):** il piano operativo reale di `v0.11c.04` e' stato riallineato a `Job Runtime Stabilization & Local Step Recovery Foundation` dopo l'introduzione di `ARC-DEC-021`. Il checkpoint e' chiuso come foundation passiva: audit recovery, `JobStepFailureKind`, `StepRecoveryStrategy`, `StepRecoveryPolicy`, `JobRecoveryResult`, boundary audit e Recovery QA matrix. Nessun recovery runtime reale e' stato introdotto; `StepResultStatus.Failed` resta terminale per il job e `Blocked` / `Waiting` restano wait gate tecnico. Dettaglio: `v0.11c.04_Closeout_Report.md`.
 
 #### v0.11c.05 — Legacy Decision Layer Removal Path
 
