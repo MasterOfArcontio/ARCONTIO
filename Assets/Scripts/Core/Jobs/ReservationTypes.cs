@@ -214,6 +214,90 @@ namespace Arcontio.Core
             return _records.TryGetValue(reservationId, out record);
         }
 
+        // =============================================================================
+        // TryGetByTarget
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca una reservation usando il target logico invece della chiave tecnica.
+        /// </para>
+        /// </summary>
+        public bool TryGetByTarget(ReservationTargetKind kind, Vector2Int cell, int objectId, out ReservationRecord record)
+        {
+            // Lettura per target logico, non per chiave stringa. Serve ai runtime
+            // multi-tick per distinguere "la destinazione e' gia' tenuta da questo
+            // job" da "la destinazione e' contesa da un altro job" senza creare
+            // duplicati artificiali nello store.
+            foreach (var pair in _records)
+            {
+                if (!pair.Value.MatchesTarget(kind, cell, objectId))
+                    continue;
+
+                record = pair.Value;
+                return true;
+            }
+
+            record = default;
+            return false;
+        }
+
+        // =============================================================================
+        // Release
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rilascia una singola reservation per id senza toccare le altre reservation
+        /// dello stesso job.
+        /// </para>
+        /// </summary>
+        public bool Release(string reservationId, out ReservationRecord released)
+        {
+            // Rilascio puntuale per reservation temporali action-scoped. Non sostituisce
+            // ReleaseByJob: serve quando un running action deve liberare la propria
+            // cella di destinazione al completion tick senza smontare eventuali
+            // reservation job-level ancora legittime.
+            released = default;
+            if (string.IsNullOrWhiteSpace(reservationId))
+                return false;
+
+            if (!_records.TryGetValue(reservationId, out released))
+                return false;
+
+            _records.Remove(reservationId);
+            return true;
+        }
+
+        // =============================================================================
+        // Release
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Overload EL-aware del rilascio puntuale di una singola reservation.
+        /// </para>
+        /// </summary>
+        public bool Release(
+            string reservationId,
+            out ReservationRecord released,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int tick,
+            int npcId)
+        {
+            bool didRelease = Release(reservationId, out released);
+            if (!didRelease || explainabilityConfig == null)
+                return didRelease;
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteReservationTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                MemoryBeliefDecisionReservationOperation.Released,
+                in released,
+                "ReservationReleased");
+            return true;
+        }
+
         public int ReleaseByJob(string jobId)
         {
             // Raccogliamo prima le chiavi da rimuovere per non mutare il dizionario

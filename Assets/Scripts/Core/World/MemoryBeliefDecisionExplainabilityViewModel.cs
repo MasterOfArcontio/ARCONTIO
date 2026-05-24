@@ -925,6 +925,7 @@ namespace Arcontio.Core
             store.CopyReservationTracesTo(TimelineBuffer, clearOutput: false);
             store.CopyCommandTracesTo(TimelineBuffer, clearOutput: false);
             store.CopyFailureLearningTracesTo(TimelineBuffer, clearOutput: false);
+            store.CopyRunningActionTracesTo(TimelineBuffer, clearOutput: false);
             TimelineBuffer.Sort((a, b) => a.Tick.CompareTo(b.Tick));
 
             int safeMax = Math.Max(0, maxTimelineRows);
@@ -1050,6 +1051,7 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Reservation => trace.Reservation == null ? "reservation vuota" : $"{trace.Reservation.Operation} {trace.Reservation.TargetKind} {FormatCell(trace.Reservation.TargetCell)}",
                 MemoryBeliefDecisionTraceKind.Command => trace.Command == null ? "command vuoto" : $"{trace.Command.Operation} {trace.Command.CommandName} queue={trace.Command.QueueCount}",
                 MemoryBeliefDecisionTraceKind.FailureLearning => trace.FailureLearning == null ? "failure vuoto" : $"{trace.FailureLearning.FailureReason} penalty={trace.FailureLearning.Penalty01:0.00}",
+                MemoryBeliefDecisionTraceKind.RunningAction => trace.RunningAction == null ? "running action vuota" : $"{trace.RunningAction.Operation} {trace.RunningAction.ActionKind} elapsed={trace.RunningAction.ElapsedTicks}/{trace.RunningAction.RequiredTicks}",
                 _ => "unknown"
             };
         }
@@ -1075,6 +1077,7 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Reservation => trace.Reservation != null ? ResolveReservationColor(trace.Reservation.Operation.ToString()) : MemoryBeliefDecisionColorRole.Muted,
                 MemoryBeliefDecisionTraceKind.Command => MemoryBeliefDecisionColorRole.Info,
                 MemoryBeliefDecisionTraceKind.FailureLearning => MemoryBeliefDecisionColorRole.Warning,
+                MemoryBeliefDecisionTraceKind.RunningAction => trace.RunningAction != null && trace.RunningAction.Operation == MemoryBeliefDecisionRunningActionOperation.Failed ? MemoryBeliefDecisionColorRole.Error : MemoryBeliefDecisionColorRole.Info,
                 _ => MemoryBeliefDecisionColorRole.Muted
             };
         }

@@ -1,6 +1,11 @@
 {
   "worldWidth": 64,
   "worldHeight": 64,
+  "tick": {
+    "ticksPerSecond": 5,
+    "baseWalkCellDurationTicks": 3,
+    "enableJobRunningActionTraversal": false
+  },
   "Language": "it",
   "npcVisionRangeCells": 17,
   "npcOperationalRangeCells": 20,
@@ -125,12 +130,12 @@
     "max_traces_per_npc": 128
   },
   "memory_belief_decision_explainability": {
-    "enabled": false,
+    "enabled": true,
     "defaultVerbosity": 3,
     "maxTrackedNpcs": 5,
     "trackedNpcIds": [],
     "trackActiveNpcOnly": false,
-    "writeJsonLog": true,
+    "writeJsonLog": false,
     "jsonLogFileNamePattern": "arcontio_el_mbd_runtime.jsonl",
     "logMemory": true,
     "logBelief": true,

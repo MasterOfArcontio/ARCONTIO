@@ -30,6 +30,7 @@ namespace Arcontio.Core
     {
         public const string DefaultResourcePath = "Arcontio/Jobs/job_templates";
         public const string FoodKnownCommunityStockTemplateId = "food.eat_known_community_stock.v1";
+        public const string SearchFoodLocalProbeTemplateId = "food.search_local_probe.v1";
         public const string GenericMoveToCellTemplateId = "generic.move_to_cell.v1";
         public const string TransportObjectToCellTemplateId = "transport.object_to_cell.v1";
 

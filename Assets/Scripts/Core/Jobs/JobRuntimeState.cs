@@ -110,6 +110,7 @@ namespace Arcontio.Core
     ///   <item><b>NpcStates</b>: cursore job per ogni NPC registrato nel mondo.</item>
     ///   <item><b>Jobs</b>: istanze di job runtime indicizzate per job id.</item>
     ///   <item><b>Reservations</b>: store condiviso delle reservation del job layer.</item>
+    ///   <item><b>RunningActions</b>: progress volatile multi-tick, non persistito e non tickato qui.</item>
     ///   <item><b>CommandBuffer</b>: buffer dei command prodotti dagli step e pompati da <c>SimulationHost</c>.</item>
     /// </list>
     /// </summary>
@@ -120,6 +121,7 @@ namespace Arcontio.Core
         private readonly JobArbiter _arbiter = new();
 
         public ReservationStore Reservations { get; } = new();
+        public RunningActionStore RunningActions { get; } = new();
         public JobCommandBuffer CommandBuffer { get; } = new();
 
         public int ActiveJobCount => _jobs.Count;
@@ -352,6 +354,7 @@ namespace Arcontio.Core
 
             job.MarkCompleted(tick);
             Reservations.ReleaseByJob(job.JobId);
+            RunningActions.ClearByJob(job.JobId);
             _jobs.Remove(job.JobId);
             state.Clear(JobFailureReason.None);
             _npcStates[npcId] = state;
@@ -371,6 +374,7 @@ namespace Arcontio.Core
 
             job.MarkFailed(failureReason, tick);
             Reservations.ReleaseByJob(job.JobId);
+            RunningActions.ClearByJob(job.JobId);
             _jobs.Remove(job.JobId);
             state.Clear(failureReason);
             _npcStates[npcId] = state;
@@ -393,6 +397,11 @@ namespace Arcontio.Core
                 Reservations.ReleaseByJob(state.ActiveJobId);
                 _jobs.Remove(state.ActiveJobId);
             }
+
+            // ClearNpcJob e' il cleanup esplicito per NPC: rimuove anche eventuali
+            // progress running action orfani dello stesso NPC, perche' quel progress
+            // e' volatile e non deve sopravvivere al reset del cursore job.
+            RunningActions.ClearByNpc(npcId);
 
             state.Clear(clearReason);
             _npcStates[npcId] = state;
@@ -454,6 +463,7 @@ namespace Arcontio.Core
         public void ClearTransientJobs()
         {
             _jobs.Clear();
+            RunningActions.ClearAll();
             CommandBuffer.Clear();
             Reservations.PruneExpired(int.MaxValue);
 

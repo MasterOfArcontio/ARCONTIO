@@ -121,10 +121,11 @@ La campagna originaria:
 
 `v0.11` — Domain Reintegration: Jobs · Work · Social · Dormant Systems
 
-è stata splittata in tre sottofasi per evitare di mescolare Job runtime, Decision architecture e Work/Social audit.
+è stata splittata in sottofasi per evitare di mescolare Job runtime,
+Decision architecture, temporal runtime e Work/Social audit.
 
 La v0.11 NON è chiusa integralmente.
-È chiusa solo la fase `v0.11A`.
+Sono chiuse le fasi `v0.11A`, `v0.11B` e il checkpoint `v0.11c.01`.
 
 ## v0.11A — Job Backbone Reintegration
 
@@ -154,34 +155,126 @@ Consolidato:
 ## v0.11B — Decision Architecture (MBQD) Foundation
 
 STATUS:
-IN PREPARAZIONE / PENDING
+COMPLETED / DONE
 
 SCOPE:
-progettare e avviare la pipeline:
+rendere osservabile il primo loop runtime:
 
-`Memory → Belief → Query → Decision → Job`
+`Decision → JobRequest → Job → Step → Command → World → Perception → Memory → Belief → next decision`
 
-Prerequisiti consolidati:
+Consolidato:
 
-* Job Backbone `v0.11A` completed
-* `ARC-CON-011` Memory Architecture completed
-* `ARC-DEC-010` → `ARC-DEC-017` consolidated
+* recovery QA `v0.11b.05` reintegrata con PR #10;
+* SearchFood perception-to-belief closure testata;
+* `ARC-CON-014` MBQD v1.0 consolidato;
+* `ARC-DEC-018` apre la fase multi-tick e separazione cadence runtime.
 
-Regole operative:
-
-* `NeedsDecisionRule` resta legacy/transitorio.
-* `NeedsDecisionRule` non va rimosso senza checkpoint dedicato.
-* La prossima apertura tecnica deve partire da architettura decisionale, non da Work/Social patch diretta.
-
-## v0.11C — Work/Social/Dormant Systems Forensic Audit
+## v0.11C — Decision Orchestrator & Temporal Runtime Foundation
 
 STATUS:
-FUTURA / PENDING
+IN PROGRESS
 
-SCOPE:
-auditare WorkSystem, SocialSystem e sistemi dormant/placeholder dopo la foundation decisionale.
+### Checkpoint corrente completato: v0.11c.01 — Decision Orchestrator Skeleton Audit / Foundation
 
-Non procedere a patch Work/Social finché `v0.11B` non ha definito il backbone decisionale minimo.
+STATUS:
+COMPLETED / DONE
+
+PR incluse:
+
+* PR #9 — `v0.11c.01a` Decision Orchestrator skeleton no-op;
+* PR #11 — `v0.11c.01b` DecisionContextBuilder extraction;
+* PR #12 — `v0.11c.01c` IntentExecutionRouter / JobRequestBuilder extraction;
+* PR #13 — `v0.11c.01d` DecisionExplainabilityBridge extraction;
+* PR #14 — `v0.11c.01e` NeedsDecisionRule compatibility shim.
+
+Commit / merge principali:
+
+* `a6b999a`
+* `0ab8fb3`
+* `5315714`
+* `6fc25a5`
+* `c7fc548`
+
+Esito tecnico:
+
+* introdotto skeleton no-op del futuro Decision Orchestrator;
+* estratta la costruzione del contesto decisionale in `DecisionContextBuilder`;
+* estratto il boundary SelectedDecision → JobRequest in `IntentExecutionRouter` / `JobRequestBuilder`;
+* estratto il boundary di trace decisionale in `DecisionExplainabilityBridge`;
+* marcato `NeedsDecisionRule` come compatibility shim / legacy transitional bridge;
+* nessun cablaggio runtime nuovo dell'Orchestrator come primary;
+* nessuna modifica a JobArbiter, JobRuntimeState o SimulationHost;
+* nessuna implementazione di preemption o migrazione fallback legacy.
+
+Validazione aggregata:
+
+* `DecisionOrchestratorNoOpQaTests`: passed;
+* `DecisionContextBuilderQaTests`: passed;
+* `IntentExecutionRouterQaTests`: passed;
+* `DecisionExplainabilityBridgeQaTests`: passed;
+* `DecisionLayerQaTests`: passed;
+* `SearchFoodJobVerticalSliceQaTests`: passed;
+* `FoodJobVerticalSliceQaTests`: passed;
+* `JobSystemEndToEndQaTests`: passed quando eseguiti nel blocco 01a;
+* `MemoryBeliefDecisionRuntimeJobScenarioQaTests`: passed nei blocchi di recovery/01c/01d/01e.
+
+### Checkpoint corrente completato: v0.11c.02 - Multi-Tick Action Runtime
+
+STATUS:
+COMPLETED / DONE
+
+PR incluse:
+
+* PR #16 - `v0.11c.02b` RunningActionRuntimeState Skeleton;
+* PR #17 - `v0.11c.02c` RunningAction Executor Integration;
+* PR #19 - `v0.11c.02d` RunningActionStore introduction;
+* PR #21 - `v0.11c.02e` RunningAction productive ticking integration;
+* PR #22 - `v0.11c.02f` RunningAction lifecycle explainability traces;
+* PR #23 - `v0.11c.02g` Multi-tick cell traversal foundation;
+* PR #24 - `v0.11c.02h` Temporal reservation robustness;
+* PR corrente - `v0.11c.02i` Deterministic multi-tick QA sweep / hardening finale.
+
+Esito tecnico:
+
+* introdotto stato runtime volatile per running action sotto `JobRuntimeState`;
+* introdotto executor generico per progress/completion/failure/interruption senza side effect;
+* cablato ticking produttivo controllato su `WaitTicks`;
+* aggiunte trace lifecycle running action;
+* introdotto traversal one-cell gated senza posizioni intermedie;
+* aggiunta reservation temporale minima della destination cell per traversal gated;
+* completata QA deterministica su gate off/on, target distante/diagonale, cleanup running action, cleanup reservation, contention e vertical slice food/search;
+* `MovementSystem`, `SimulationHost`, save/load e Decision Layer restano invariati.
+
+Validazione aggregata v0.11c.02i:
+
+* `RunningActionProductiveTickingQaTests`: passed;
+* `RunningActionRuntimeStateQaTests`: passed;
+* `RunningActionExecutorQaTests`: passed;
+* `RunningActionStoreQaTests`: passed;
+* `ReservationStoreQaTests`: passed;
+* `FoodJobVerticalSliceQaTests`: passed;
+* `SearchFoodJobVerticalSliceQaTests`: passed;
+* `JobSystemEndToEndQaTests`: passed;
+* matrice aggregata eseguita nel closeout 02i: 81/81 passed.
+
+### Prossimo checkpoint operativo: v0.11c.03a - Tick phase audit
+
+STATUS:
+NEXT / READ-ONLY FORENSIC AUDIT FIRST
+
+Branch previsto:
+`ai-task/v0.11c.03a-runtime-cadence-audit`
+
+Modalita richiesta:
+READ ONLY FORENSIC AUDIT FIRST
+
+Obiettivo iniziale:
+auditare l'ordine delle fasi tick e i punti di aggancio necessari alla futura separazione
+tra world tick, execution cadence, cognitive decision cadence e planning cadence, senza
+introdurre ancora scheduler produttivi nuovi.
+
+Work/Social/Dormant Systems restano fuori scope finche `v0.11c.03` non avra chiarito
+la separazione delle cadence runtime.
 
 ---
 

@@ -6,7 +6,42 @@ using UnityEngine;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // NeedsDecisionRule
+    // =============================================================================
     /// <summary>
+    /// <para>
+    /// Compatibility shim runtime per il vecchio ciclo decisionale basato sui bisogni.
+    /// </para>
+    ///
+    /// <para><b>v0.11c.01e - Legacy Transitional Decision Bridge</b></para>
+    /// <para>
+    /// Questa classe non rappresenta il modello architetturale target del Decision
+    /// Layer. Resta viva per compatibilita' con il runtime osservabile v0.11B/v0.11C:
+    /// riceve il tick, attraversa il primo MBQD reale quando possibile, e mantiene
+    /// ancora i fallback storici verso <c>ICommand</c> finche' il futuro
+    /// <c>DecisionOrchestratorSystem</c> non diventera' il punto primario.
+    /// </para>
+    ///
+    /// <para><b>Boundary temporaneo dichiarato</b></para>
+    /// <para>
+    /// Le responsabilita' gia' estratte non devono rientrare qui: costruzione del
+    /// contesto, routing intent-to-JobRequest ed emissione explainability vivono nei
+    /// componenti dedicati. Le scansioni su <c>World</c>, i fallback food/rest e i
+    /// command legacy rimasti in questa classe sono debito transitorio esplicito, non
+    /// pattern da copiare nel nuovo orchestrator.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Cadence legacy</b>: usa ancora <c>TickPulseEvent</c> e throttle locale.</item>
+    ///   <item><b>MBQD callsite</b>: invoca generator/scoring/selection e route estratte.</item>
+    ///   <item><b>Job bridge</b>: tenta Food/SearchFood job vertical slice senza preemption diretta.</item>
+    ///   <item><b>Fallback legacy</b>: conserva command storici per compatibilita' runtime.</item>
+    ///   <item><b>Feedback food</b>: mantiene il feedback cognitivo minimo dei failure food.</item>
+    /// </list>
+    /// </summary>
+    /// <remarks>
     /// NeedsDecisionRule (Day9):
     /// Rule alto livello, coerente col tuo stile:
     /// - Reagisce a eventi (TickPulseEvent) e produce Commands.
@@ -30,18 +65,28 @@ namespace Arcontio.Core
     ///   (es. lo hai visto un secondo fa, ti giri, ecc.).
     /// - Se in futuro vuoi coerenza totale col pipeline Range?Cone?LOS, il posto giusto
     ///   è far sì che NeedsDecisionRule consulti Memory/ObjectPerception, non il World "nudo".
-    /// </summary>
+    /// </remarks>
     public sealed class NeedsDecisionRule : IRule
     {
         private readonly BeliefUpdater _beliefUpdater = new();
         private readonly BeliefQueryService _beliefQueryService = new();
+
+        // Componenti gia' estratti dalla rule durante v0.11c.01. Restano iniettati
+        // come callsite interni per preservare il comportamento runtime, ma indicano
+        // il confine target: il futuro orchestrator dovra' comporli senza assorbire
+        // fallback legacy, scansioni World o command adapter storici.
         private readonly DecisionCandidateGenerator _decisionCandidateGenerator = new();
         private readonly DecisionScoringService _decisionScoringService = new();
         private readonly DecisionSelectionService _decisionSelectionService = new();
+        private readonly DecisionContextBuilder _decisionContextBuilder = new();
+        private readonly IntentExecutionRouter _intentExecutionRouter = new();
+        private readonly DecisionExplainabilityBridge _decisionExplainabilityBridge = new();
         private readonly List<DecisionCandidate> _decisionCandidates = new(16);
         private readonly System.Random _decisionRandom = new(1505);
 
-        // Throttle: decidiamo ogni N tick-pulse (per log leggibile)
+        // Throttle legacy: decide ogni N tick-pulse per contenere il rumore del
+        // vecchio bridge. Non e' ancora la cognitive cadence target descritta da
+        // ARC-DEC-018/019 e non deve diventare NpcDecisionScheduler.
         private readonly int _decisionEveryTicks;
 
         // Range di ricerca "decisionale" per cibo/letto.
@@ -65,6 +110,10 @@ namespace Arcontio.Core
 
         public void Handle(World world, ISimEvent e, List<ICommand> outCommands, Telemetry telemetry)
         {
+            // Entry point legacy del bridge: il futuro DecisionOrchestratorSystem non
+            // deve essere cablato qui in modo implicito. Fino alla migrazione
+            // dedicata, questa rule resta l'adapter compatibile che puo' ancora
+            // produrre ICommand tramite fallback storici.
             // Usiamo TickPulseEvent come clock decisionale.
             if (e is not TickPulseEvent pulse)
                 return;
@@ -206,12 +255,13 @@ namespace Arcontio.Core
         /// bisogni.
         /// </para>
         ///
-        /// <para><b>Integrazione progressiva Decision -> Command</b></para>
+        /// <para><b>Compatibility shim, non modello target</b></para>
         /// <para>
-        /// Il metodo usa il nuovo Decision Layer per scegliere un'intenzione, ma lascia
-        /// ancora alla rule legacy la traduzione concreta verso i command esistenti.
-        /// Questo evita di introdurre il Job System in anticipo e riduce il rischio di
-        /// rompere fame/riposo mentre il layer di esecuzione non e' ancora pronto.
+        /// Il metodo usa i componenti MBQD gia' estratti per scegliere un'intenzione,
+        /// poi resta nel vecchio bridge per preservare route Job vertical slice e
+        /// fallback command legacy. La presenza di <c>ICommand</c> in questa firma e'
+        /// debito compatibile: non deve essere copiata nel futuro orchestrator e non
+        /// assegna autorita' di preemption al Decision Layer.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -219,7 +269,8 @@ namespace Arcontio.Core
         ///   <item><b>Gate</b>: attiva il ponte solo per fame/riposo, non per sete ancora priva di command.</item>
         ///   <item><b>Context</b>: costruisce un <c>DecisionEvaluationContext</c> con input per-NPC e belief soggettivi.</item>
         ///   <item><b>Pipeline</b>: genera candidati, calcola score e seleziona weighted random.</item>
-        ///   <item><b>Adapter</b>: traduce solo intenzioni MVP in command legacy o in attesa/ricerca.</item>
+        ///   <item><b>Adapter</b>: delega Food/SearchFood ai job route estratti dove possibile.</item>
+        ///   <item><b>Fallback</b>: conserva command legacy e no-op transitori senza cambiare policy.</item>
         /// </list>
         /// </summary>
         private bool TryPlanFromDecisionLayer(
@@ -248,7 +299,7 @@ namespace Arcontio.Core
 
             var explainabilityConfig = world.Config?.Sim?.memory_belief_decision_explainability;
 
-            if (!TryBuildDecisionContext(world, npcId, in needs, nowTick, out var context))
+            if (!_decisionContextBuilder.TryBuild(world, npcId, in needs, nowTick, out var context))
                 return false;
 
             var audit = DecisionInputAudit.Audit(context);
@@ -265,6 +316,13 @@ namespace Arcontio.Core
             {
                 cmd = new EatPrivateFoodCommand(npcId);
                 handled = true;
+                _decisionExplainabilityBridge.TryLogDecisionBridgeFallback(
+                    nowTick,
+                    npcId,
+                    DecisionIntentKind.EatKnownFood,
+                    cmd,
+                    LegacyFallbackKind.CompatibilityFallback,
+                    "PrivateCarriedFoodLegacyCommand");
                 return true;
             }
 
@@ -284,7 +342,7 @@ namespace Arcontio.Core
 
             handled = true;
             telemetry?.Counter("DecisionBridge.IntentSelected", 1);
-            TryEmitDecisionTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, context, true, _decisionCandidates, selection, selectionConfig);
+            _decisionExplainabilityBridge.TryEmitDecisionTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, context, true, _decisionCandidates, selection, selectionConfig);
 
             ArcontioLogger.Info(
                 new LogContext(tick: nowTick, channel: "DecisionBridge", npcId: npcId),
@@ -292,13 +350,6 @@ namespace Arcontio.Core
                     .AddField("intent", selection.Candidate.Kind.ToString())
                     .AddField("score", selection.Candidate.FinalScore.ToString("0.000"))
                     .AddField("candidateCount", _decisionCandidates.Count));
-
-            TryEmitJobRequestTrace(
-                explainabilityConfig,
-                world.MemoryBeliefDecisionExplainability,
-                nowTick,
-                npcId,
-                selection.Candidate);
 
             switch (selection.Candidate.Kind)
             {
@@ -315,19 +366,22 @@ namespace Arcontio.Core
                         cmd = null;
                         didSteal = false;
                         didMove = false;
-                        TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, "FoodJobRouteAccepted:" + jobRouteReason);
+                        _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, LegacyFallbackKind.None, "FoodJobRouteAccepted:" + jobRouteReason);
                         return true;
                     }
 
                     bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    var fallbackKind = ResolveFoodJobRouteFallbackKind(jobRouteReason, planned);
+                    string fallbackReason = BuildFoodJobRouteFallbackReason(jobRouteReason, planned);
+                    ApplyFoodRouteFailureCognitiveFeedback(world, npcId, nowTick, selection.Candidate, jobRouteReason, explainabilityConfig, telemetry);
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, fallbackKind, fallbackReason);
                     return planned;
                 }
 
                 case DecisionIntentKind.TakeRestrictedFood:
                 {
                     bool planned = TryPlanEatOrMove(world, npcId, in needs, nowTick, telemetry, out cmd, out didSteal, out didMove);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, LegacyFallbackKind.TransitionalDebtFallback, planned ? "RestrictedFoodLegacyCommandAdapter" : "RestrictedFoodLegacyAdapterNoCommand");
                     return planned;
                 }
 
@@ -335,11 +389,47 @@ namespace Arcontio.Core
                 case DecisionIntentKind.UseRestrictedRestPlace:
                 {
                     bool planned = TryPlanSleep(world, npcId, needs, out cmd, out didSteal);
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, !planned, planned ? "CommandEmittedByLegacyAdapter" : "LegacyAdapterNoCommand");
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, planned, true, LegacyFallbackKind.TransitionalDebtFallback, planned ? "RestLegacyCommandAdapter" : "RestLegacyAdapterNoCommand");
                     return planned;
                 }
 
                 case DecisionIntentKind.SearchFood:
+                {
+                    if (TryStartSearchFoodJobVerticalSlice(
+                        world,
+                        npcId,
+                        nowTick,
+                        selection.Candidate,
+                        telemetry,
+                        out string searchJobRouteReason))
+                    {
+                        cmd = null;
+                        didSteal = false;
+                        didMove = false;
+                        _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, true, false, LegacyFallbackKind.None, "SearchFoodJobRouteAccepted:" + searchJobRouteReason);
+                        return true;
+                    }
+
+                    cmd = null;
+                    didSteal = false;
+                    didMove = false;
+                    handled = false;
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(
+                        explainabilityConfig,
+                        world.MemoryBeliefDecisionExplainability,
+                        nowTick,
+                        npcId,
+                        selection.Candidate,
+                        cmd,
+                        didSteal,
+                        didMove,
+                        false,
+                        true,
+                        ResolveSearchFoodJobRouteFallbackKind(searchJobRouteReason),
+                        "NonExecutableIntentFallback:SearchFoodJobRouteRejected:" + searchJobRouteReason);
+                    return false;
+                }
+
                 case DecisionIntentKind.SearchRestPlace:
                 case DecisionIntentKind.WaitAndObserve:
                     // Ricerca/attesa non hanno ancora un Job/Step dedicato. Il ponte
@@ -350,353 +440,161 @@ namespace Arcontio.Core
                     didSteal = false;
                     didMove = false;
                     handled = false;
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "LegacyFallbackForNonExecutableIntent");
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, LegacyFallbackKind.NonExecutableIntentFallback, "NonExecutableIntentLegacyFallback");
                     return false;
 
                 default:
                     handled = false;
-                    TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, "UnsupportedIntent");
+                    _decisionExplainabilityBridge.TryEmitBridgeTrace(explainabilityConfig, world.MemoryBeliefDecisionExplainability, nowTick, npcId, selection.Candidate, cmd, didSteal, didMove, false, true, LegacyFallbackKind.NoOpFallback, "UnsupportedIntentNoOp");
                     return false;
             }
         }
 
         // =============================================================================
-        // TryEmitJobRequestTrace
+        // ResolveFoodJobRouteFallbackKind
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Esporta il nuovo boundary diagnostico `Decision -> JobRequest` senza
-        /// modificare il comportamento legacy della rule.
+        /// Classifica il motivo per cui la route <c>EatKnownFood -> Job</c> e' tornata
+        /// al percorso legacy.
         /// </para>
         ///
-        /// <para><b>Nuovo path osservabile, esecuzione invariata</b></para>
+        /// <para><b>Classificazione diagnostica, non routing</b></para>
         /// <para>
-        /// La v0.07 richiede di distinguere il futuro path verso il Job System dal
-        /// bridge provvisorio Decision -> Command. In questa fase la rule continua a
-        /// produrre command legacy, ma emette anche una richiesta job passiva e
-        /// spiegabile, cosi' registry e JSONL possono mostrare entrambi i confini.
+        /// Questo helper non decide se emettere command e non assegna job. Traduce una
+        /// reason gia' prodotta dal boundary food-job in una categoria stabile per EL e
+        /// log strutturato, lasciando invariato il comportamento runtime v0.11B.
+        /// </para>
+        /// </summary>
+        private static LegacyFallbackKind ResolveFoodJobRouteFallbackKind(string jobRouteReason, bool planned)
+        {
+            if (!planned)
+                return LegacyFallbackKind.SafetyFallback;
+
+            if (string.Equals(jobRouteReason, "GateDisabled", System.StringComparison.OrdinalIgnoreCase))
+                return LegacyFallbackKind.CompatibilityFallback;
+
+            if (string.Equals(jobRouteReason, "ReservationDenied", System.StringComparison.OrdinalIgnoreCase))
+                return LegacyFallbackKind.CompatibilityFallback;
+
+            if (string.Equals(jobRouteReason, "SameOrLowerPriority", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentJobPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentStillPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentPhaseProtected", System.StringComparison.OrdinalIgnoreCase))
+                return LegacyFallbackKind.CompatibilityFallback;
+
+            if (string.IsNullOrWhiteSpace(jobRouteReason)
+                || jobRouteReason.StartsWith("FoodJobRouteFailed", System.StringComparison.OrdinalIgnoreCase)
+                || jobRouteReason.StartsWith("ResolvedTargetMismatch", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "KnownCommunityFoodMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "JobRuntimeMissing", System.StringComparison.OrdinalIgnoreCase))
+                return LegacyFallbackKind.SafetyFallback;
+
+            return LegacyFallbackKind.TransitionalDebtFallback;
+        }
+
+        private static LegacyFallbackKind ResolveSearchFoodJobRouteFallbackKind(string jobRouteReason)
+        {
+            if (string.Equals(jobRouteReason, "SearchFoodProbeUnavailable", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "NpcPositionMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "JobRuntimeMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "RegistryMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "MissingSearchFoodProbeCell", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "InvalidSearchFoodJobIntent", System.StringComparison.OrdinalIgnoreCase))
+            {
+                return LegacyFallbackKind.SafetyFallback;
+            }
+
+            return LegacyFallbackKind.NonExecutableIntentFallback;
+        }
+
+        // =============================================================================
+        // BuildFoodJobRouteFallbackReason
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce reason string stabili per il log di fallback della route food-job.
+        /// </para>
+        /// </summary>
+        private static string BuildFoodJobRouteFallbackReason(string jobRouteReason, bool planned)
+        {
+            string normalizedReason = string.IsNullOrWhiteSpace(jobRouteReason) ? "Unknown" : jobRouteReason;
+
+            if (string.Equals(normalizedReason, "GateDisabled", System.StringComparison.OrdinalIgnoreCase))
+                normalizedReason = "FoodJobGateDisabled";
+            else if (string.Equals(normalizedReason, "ReservationDenied", System.StringComparison.OrdinalIgnoreCase))
+                normalizedReason = "ReservationDeniedLegacyFoodFallback";
+            else if (string.Equals(normalizedReason, "SameOrLowerPriority", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "CurrentJobPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "CurrentStillPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "CurrentPhaseProtected", System.StringComparison.OrdinalIgnoreCase))
+                normalizedReason = "JobArbiterRejectedLegacyFoodFallback";
+            else if (string.Equals(normalizedReason, "KnownCommunityFoodMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(normalizedReason, "JobRuntimeMissing", System.StringComparison.OrdinalIgnoreCase)
+                || normalizedReason.StartsWith("ResolvedTargetMismatch", System.StringComparison.OrdinalIgnoreCase))
+                normalizedReason = "FoodJobRouteFailed:" + normalizedReason;
+
+            return planned
+                ? "FoodJobRouteRejectedThenLegacyFood:" + normalizedReason
+                : "FoodJobRouteFailed:" + normalizedReason;
+        }
+
+        // =============================================================================
+        // LogSearchFoodJobRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Emette diagnostica strutturata per la sola route SearchFood -> Job.
+        /// </para>
+        ///
+        /// <para><b>Diagnostica senza cambio di comportamento</b></para>
+        /// <para>
+        /// Questo helper non decide, non costruisce job, non assegna job e non modifica
+        /// fallback. Serve solo a rendere osservabile il punto esatto in cui la catena
+        /// <c>SearchFood -> JobRequest -> Job -> TryAssignJob</c> si interrompe oppure
+        /// conferma il successo. Il successo non passa da <c>DecisionBridgeFallback</c>
+        /// perche' usa <c>FallbackKind.None</c>, quindi senza questo log positivo lo
+        /// smoke runtime non puo' distinguere tra route accettata e pannello UI vuoto.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>JobRequest</b>: creato localmente dal candidato gia' selezionato.</item>
-        ///   <item><b>Target</b>: usa il belief target gia' scelto, se presente.</item>
-        ///   <item><b>Legacy flag</b>: resta true perche' il path esecutivo reale e' ancora il bridge legacy.</item>
+        ///   <item><b>stage</b>: punto della route raggiunto.</item>
+        ///   <item><b>reason</b>: reason stabile o reason runtime specifica prefissata.</item>
+        ///   <item><b>probe/request/factory/assignment</b>: booleane diagnostiche additive.</item>
         /// </list>
         /// </summary>
-        private static void TryEmitJobRequestTrace(
-            MemoryBeliefDecisionExplainabilityParams config,
-            MemoryBeliefDecisionExplainabilityRegistry registry,
+        private static void LogSearchFoodJobRoute(
             int tick,
             int npcId,
-            DecisionCandidate candidate)
+            string stage,
+            string reason,
+            bool gateEnabled,
+            bool probeFound = false,
+            Vector2Int probeCell = default,
+            bool requestBuilt = false,
+            bool factoryCreated = false,
+            string jobId = "",
+            bool assigned = false,
+            string assignReason = "")
         {
-            if (config == null)
-                return;
-
-            var request = BuildDiagnosticJobRequest(tick, npcId, candidate);
-            MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobRequestTrace(
-                config,
-                registry,
-                npcId,
-                tick,
-                request,
-                string.Empty,
-                "DecisionCandidateProjectedToJobRequest",
-                legacyBridgeStillUsed: true);
-        }
-
-        // =============================================================================
-        // BuildDiagnosticJobRequest
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce una <c>JobRequest</c> puramente diagnostica a partire dal
-        /// candidato selezionato dal Decision Layer.
-        /// </para>
-        ///
-        /// <para><b>Contratto dati senza side effect</b></para>
-        /// <para>
-        /// La funzione non iscrive job, non consulta il World e non lancia alcuna
-        /// esecuzione. Traduce soltanto il candidato in un formato compatibile con il
-        /// futuro Job System, usando il target belief gia' determinato dal QuerySystem
-        /// quando disponibile.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Priority</b>: mappa minima intent/criticita' -> classe job.</item>
-        ///   <item><b>Target</b>: presente solo quando il candidato possiede un belief target valido.</item>
-        ///   <item><b>BeliefKey</b>: chiave diagnostica stabile per correlare decisione e richiesta.</item>
-        /// </list>
-        /// </summary>
-        private static JobRequest BuildDiagnosticJobRequest(int tick, int npcId, DecisionCandidate candidate)
-        {
-            string beliefKey = string.Empty;
-            bool hasTargetCell = false;
-            Vector2Int targetCell = Vector2Int.zero;
-
-            if (candidate.Metadata.RequiresBeliefTarget && !candidate.BeliefResult.IsEmpty)
-            {
-                hasTargetCell = true;
-                targetCell = candidate.BeliefResult.Belief.EstimatedPosition;
-                beliefKey = BuildBeliefKey(candidate.BeliefResult.Belief);
-            }
-
-            string requestId = $"jobreq_{npcId}_{tick}_{candidate.Kind}";
-            string debugLabel = $"EL:{candidate.Kind}";
-            var priorityClass = ResolveJobPriorityClass(candidate);
-
-            if (hasTargetCell)
-            {
-                return JobRequest.FromDecision(
-                    requestId,
-                    npcId,
-                    candidate.Kind,
-                    priorityClass,
-                    candidate.NeedUrgency01,
-                    tick,
-                    targetCell,
-                    beliefKey,
-                    debugLabel);
-            }
-
-            return JobRequest.WithoutTarget(
-                requestId,
-                npcId,
-                candidate.Kind,
-                priorityClass,
-                candidate.NeedUrgency01,
-                tick,
-                debugLabel);
-        }
-
-        // =============================================================================
-        // ResolveJobPriorityClass
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Mappa il candidato decisionale in una classe di priorita' minima per la
-        /// trace diagnostica del Job System.
-        /// </para>
-        ///
-        /// <para><b>Mappatura conservativa e leggibile</b></para>
-        /// <para>
-        /// La policy completa appartiene al futuro boundary Decision -> Job. Qui ci
-        /// serve solo una classificazione coerente e spiegabile per il log runtime.
-        /// </para>
-        /// </summary>
-        private static JobPriorityClass ResolveJobPriorityClass(DecisionCandidate candidate)
-        {
-            if (candidate.IsCritical)
-                return JobPriorityClass.Critical;
-
-            if (candidate.NeedUrgency01 >= 0.8f)
-                return JobPriorityClass.Important;
-
-            if (candidate.Kind == DecisionIntentKind.WaitAndObserve)
-                return JobPriorityClass.Idle;
-
-            return JobPriorityClass.Normal;
-        }
-
-        // =============================================================================
-        // BuildBeliefKey
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce una chiave diagnostica compatta per correlare la richiesta job
-        /// alla belief che l'ha motivata.
-        /// </para>
-        /// </summary>
-        private static string BuildBeliefKey(BeliefEntry belief)
-        {
-            return $"{belief.Category}:{belief.BeliefId}@{belief.EstimatedPosition.x},{belief.EstimatedPosition.y}";
-        }
-
-        // =============================================================================
-        // TryEmitDecisionTrace
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Esporta uno snapshot EL della selezione del Decision Layer appena calcolata.
-        /// </para>
-        ///
-        /// <para><b>Decision Layer auditabile</b></para>
-        /// <para>
-        /// Il metodo non rigenera candidati, non ricalcola score e non interroga il
-        /// World. Riceve context, candidati e selezione dal punto della pipeline che
-        /// li possiede gia', poi li copia in record passivi per il sink JSONL.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Guard config</b>: se EL e' spento il sink fara' comunque no-op.</item>
-        ///   <item><b>Selection</b>: salva intenzione, score e indice selezionato.</item>
-        ///   <item><b>Candidates</b>: copia i candidati gia' score-ati con breakdown.</item>
-        /// </list>
-        /// </summary>
-        private static void TryEmitDecisionTrace(
-            MemoryBeliefDecisionExplainabilityParams config,
-            MemoryBeliefDecisionExplainabilityRegistry registry,
-            in DecisionEvaluationContext context,
-            bool auditValid,
-            List<DecisionCandidate> candidates,
-            DecisionSelectionResult selection,
-            DecisionSelectionConfig selectionConfig)
-        {
-            if (config == null)
-                return;
-
-            // L'effettivo rumore di selezione e' calcolato nello stesso modo del
-            // SelectionService, ma senza rieseguire la roulette o riordinare candidati.
-            float impulsivity01 = context.Dna != null ? context.Dna.CognitiveModulators.Impulsivity01 : 0f;
-            float effectiveNoise01 = Clamp01(selectionConfig.noise01 + (impulsivity01 * selectionConfig.impulsivityNoiseBonus));
-
-            var trace = new MemoryBeliefDecisionTrace
-            {
-                Kind = MemoryBeliefDecisionTraceKind.Decision,
-                Tick = context.Tick,
-                NpcId = context.NpcId,
-                Decision = new MemoryBeliefDecisionDecisionRecord
-                {
-                    AuditValid = auditValid,
-                    CandidateCount = candidates != null ? candidates.Count : 0,
-                    SelectedIntent = selection.IsEmpty ? DecisionIntentKind.None : selection.Candidate.Kind,
-                    SelectedScore = selection.IsEmpty ? 0f : selection.Candidate.FinalScore,
-                    SelectedIndex = selection.SelectedIndex,
-                    SelectionTopN = selectionConfig.topN,
-                    SelectionNoise01 = selectionConfig.noise01,
-                    Impulsivity01 = impulsivity01,
-                    EffectiveNoise01 = effectiveNoise01,
-                    Candidates = ToDecisionCandidateRecords(candidates),
-                },
-            };
-
-            MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(config, registry, trace);
-        }
-
-        // =============================================================================
-        // TryEmitBridgeTrace
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Esporta il record EL del ponte provvisorio tra intenzione decisionale e
-        /// command legacy.
-        /// </para>
-        ///
-        /// <para><b>Decision / Execution Bridge</b></para>
-        /// <para>
-        /// La funzione rende visibile se l'intenzione selezionata e' diventata un
-        /// command, se ha richiesto movimento o furto, oppure se la rule legacy deve
-        /// ancora proseguire perche' l'intenzione non ha Job eseguibile.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Command</b>: nome del command prodotto, se esiste.</item>
-        ///   <item><b>Target</b>: cella del belief vincitore quando disponibile.</item>
-        ///   <item><b>Fallback</b>: flag esplicito per intenzioni non ancora eseguibili.</item>
-        /// </list>
-        /// </summary>
-        private static void TryEmitBridgeTrace(
-            MemoryBeliefDecisionExplainabilityParams config,
-            MemoryBeliefDecisionExplainabilityRegistry registry,
-            int tick,
-            int npcId,
-            DecisionCandidate candidate,
-            ICommand command,
-            bool didSteal,
-            bool didMove,
-            bool handled,
-            bool legacyFallbackUsed,
-            string reason)
-        {
-            if (config == null)
-                return;
-
-            var targetCell = Vector2Int.zero;
-            var targetSource = MemoryBeliefDecisionTargetSource.None;
-            if (candidate.Metadata.RequiresBeliefTarget && !candidate.BeliefResult.IsEmpty)
-            {
-                // Il bridge non cerca un nuovo target: copia quello gia' scelto dal
-                // QuerySystem per il candidato decisionale.
-                targetCell = candidate.BeliefResult.Belief.EstimatedPosition;
-                targetSource = MemoryBeliefDecisionTargetSource.BeliefQuery;
-            }
-            else if (command != null)
-            {
-                targetSource = MemoryBeliefDecisionTargetSource.LegacyFallback;
-            }
-
-            MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
-            {
-                Kind = MemoryBeliefDecisionTraceKind.Bridge,
-                Tick = tick,
-                NpcId = npcId,
-                Bridge = new MemoryBeliefDecisionBridgeRecord
-                {
-                    SelectedIntent = candidate.Kind,
-                    CommandName = command != null ? command.Name : string.Empty,
-                    Handled = handled,
-                    DidMove = didMove,
-                    DidSteal = didSteal,
-                    TargetCell = targetCell,
-                    TargetSource = targetSource,
-                    LegacyFallbackUsed = legacyFallbackUsed,
-                    Reason = reason ?? string.Empty,
-                },
-            });
-        }
-
-        // =============================================================================
-        // ToDecisionCandidateRecords
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Copia i candidati decisionali in record EL serializzabili.
-        /// </para>
-        ///
-        /// <para><b>Candidati come snapshot</b></para>
-        /// <para>
-        /// La conversione non cambia disponibilita', score o belief target. Serve solo
-        /// a rendere analizzabile dopo il tick l'insieme che ha partecipato alla
-        /// selezione.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>Null guard</b>: array vuoto quando non esistono candidati.</item>
-        ///   <item><b>Belief</b>: snapshot del target scelto dal QuerySystem, se presente.</item>
-        ///   <item><b>Score</b>: breakdown decisionale copiato voce per voce.</item>
-        /// </list>
-        /// </summary>
-        private static MemoryBeliefDecisionCandidateRecord[] ToDecisionCandidateRecords(List<DecisionCandidate> candidates)
-        {
-            if (candidates == null || candidates.Count == 0)
-                return System.Array.Empty<MemoryBeliefDecisionCandidateRecord>();
-
-            var records = new MemoryBeliefDecisionCandidateRecord[candidates.Count];
-            for (int i = 0; i < candidates.Count; i++)
-            {
-                var candidate = candidates[i];
-                records[i] = new MemoryBeliefDecisionCandidateRecord
-                {
-                    Intent = candidate.Kind,
-                    Available = candidate.IsAvailable,
-                    Need = candidate.Metadata.PrimaryNeed,
-                    NeedUrgency01 = candidate.NeedUrgency01,
-                    IsCritical = candidate.IsCritical,
-                    RequiresBeliefTarget = candidate.Metadata.RequiresBeliefTarget,
-                    BeliefResultEmpty = candidate.BeliefResult.IsEmpty,
-                    Belief = candidate.BeliefResult.IsEmpty ? default : ToBeliefRef(candidate.BeliefResult.Belief),
-                    Score = candidate.FinalScore,
-                    FilteredReason = candidate.FilteredReason ?? string.Empty,
-                    ScoreContributions = ToScoreContributionRefs(candidate.ScoreContributions),
-                };
-            }
-
-            return records;
+            ArcontioLogger.Debug(
+                new LogContext(tick: tick, channel: "DecisionBridgeJobRoute", npcId: npcId),
+                new LogBlock(LogLevel.Debug, "log.decision.bridge.job_route")
+                    .AddField("tick", tick)
+                    .AddField("npcId", npcId)
+                    .AddField("intent", DecisionIntentKind.SearchFood.ToString())
+                    .AddField("stage", stage ?? string.Empty)
+                    .AddField("reason", reason ?? string.Empty)
+                    .AddField("gateEnabled", gateEnabled)
+                    .AddField("probeFound", probeFound)
+                    .AddField("probeX", probeFound ? probeCell.x : 0)
+                    .AddField("probeY", probeFound ? probeCell.y : 0)
+                    .AddField("requestBuilt", requestBuilt)
+                    .AddField("factoryCreated", factoryCreated)
+                    .AddField("jobId", jobId ?? string.Empty)
+                    .AddField("assigned", assigned)
+                    .AddField("assignReason", assignReason ?? string.Empty));
         }
 
         // =============================================================================
@@ -736,42 +634,262 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
-        // ToScoreContributionRefs
+        // ApplyFoodRouteFailureCognitiveFeedback
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Converte i contributi dello scoring decisionale in payload EL.
+        /// Traduce i fallimenti significativi del path food runtime in un feedback
+        /// cognitivo minimo, mantenendo invariati fallback legacy e job semantics.
         /// </para>
         ///
-        /// <para><b>Breakdown esplicito</b></para>
+        /// <para><b>Failure operativo != sempre belief falsa</b></para>
         /// <para>
-        /// Le label prodotte da <c>DecisionScoringService</c> restano inalterate, in
-        /// modo che il file JSONL possa spiegare il ranking senza log testuali fragili.
+        /// ARC-CON-014 richiede che i fallimenti significativi non restino muti per la
+        /// cognizione dell'NPC. Questo pero' non significa invalidare sempre il target:
+        /// una reservation negata o un job rifiutato dall'arbitro indicano contesa o
+        /// scheduling, non necessariamente una credenza falsa. Solo i casi in cui il
+        /// target ricordato manca o non coincide piu' generano una contradiction.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>Guard</b>: array vuoto per candidati non score-ati.</item>
-        ///   <item><b>Copia</b>: ogni contributo mantiene label e valore.</item>
-        ///   <item><b>Output</b>: array passivo pronto per il sink.</item>
+        ///   <item><b>Contradiction</b>: cibo ricordato mancante o target mismatch, con update BeliefStore.</item>
+        ///   <item><b>Operational trace</b>: reservation denied o assignment rejected, senza invalidare belief.</item>
+        ///   <item><b>Anti-spam</b>: non riemette contradiction se la belief e' gia' Discarded.</item>
         /// </list>
         /// </summary>
-        private static MemoryBeliefDecisionScoreContributionRef[] ToScoreContributionRefs(DecisionScoreContribution[] contributions)
+        private void ApplyFoodRouteFailureCognitiveFeedback(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            string jobRouteReason,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            Telemetry telemetry)
         {
-            if (contributions == null || contributions.Length == 0)
-                return System.Array.Empty<MemoryBeliefDecisionScoreContributionRef>();
+            if (world == null || candidate.Kind != DecisionIntentKind.EatKnownFood || candidate.BeliefResult.IsEmpty)
+                return;
 
-            var records = new MemoryBeliefDecisionScoreContributionRef[contributions.Length];
-            for (int i = 0; i < contributions.Length; i++)
+            if (string.Equals(jobRouteReason, "KnownCommunityFoodMissing", System.StringComparison.OrdinalIgnoreCase))
             {
-                records[i] = new MemoryBeliefDecisionScoreContributionRef
-                {
-                    Label = contributions[i].Label,
-                    Value = contributions[i].Value,
-                };
+                ApplyFoodBeliefContradictionFromCandidate(
+                    world,
+                    npcId,
+                    nowTick,
+                    candidate,
+                    "BeliefContradiction:RememberedFoodMissing",
+                    telemetry);
+                return;
             }
 
-            return records;
+            if (!string.IsNullOrWhiteSpace(jobRouteReason)
+                && jobRouteReason.StartsWith("ResolvedTargetMismatch", System.StringComparison.OrdinalIgnoreCase))
+            {
+                ApplyFoodBeliefContradictionFromCandidate(
+                    world,
+                    npcId,
+                    nowTick,
+                    candidate,
+                    "BeliefContradiction:FoodTargetMismatch",
+                    telemetry);
+                return;
+            }
+
+            if (string.Equals(jobRouteReason, "ReservationDenied", System.StringComparison.OrdinalIgnoreCase))
+            {
+                EmitFoodOperationalFailureTrace(
+                    world,
+                    npcId,
+                    nowTick,
+                    candidate,
+                    JobFailureReason.ReservationDenied,
+                    "OperationalFailure:ReservationDenied",
+                    explainabilityConfig);
+                return;
+            }
+
+            if (IsFoodJobAssignmentRejected(jobRouteReason))
+            {
+                EmitFoodOperationalFailureTrace(
+                    world,
+                    npcId,
+                    nowTick,
+                    candidate,
+                    JobFailureReason.Unknown,
+                    "OperationalFailure:JobAssignmentRejected",
+                    explainabilityConfig);
+            }
+        }
+
+        // =============================================================================
+        // ApplyFoodBeliefContradictionFromCandidate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica una contradiction locale alla belief Food che ha guidato il
+        /// candidato EatKnownFood selezionato.
+        /// </para>
+        ///
+        /// <para><b>Feedback cognitivo minimo e localizzato</b></para>
+        /// <para>
+        /// Il metodo non cerca nuovi target e non decide una nuova azione. Usa solo la
+        /// belief gia' trasportata dal candidato MBQD, delega la mutazione al
+        /// <c>BeliefUpdater</c> e produce una trace Belief esplicita quando lo store
+        /// e' stato davvero aggiornato.
+        /// </para>
+        /// </summary>
+        private void ApplyFoodBeliefContradictionFromCandidate(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            string reason,
+            Telemetry telemetry)
+        {
+            if (!world.Beliefs.TryGetValue(npcId, out var store) || store == null)
+                return;
+
+            var selectedBelief = candidate.BeliefResult.Belief;
+            if (selectedBelief.Status == BeliefStatus.Discarded)
+            {
+                telemetry?.Counter("BeliefUpdater.FoodRouteContradictionAlreadyDiscarded", 1);
+                return;
+            }
+
+            var signal = new BeliefFailureSignal(
+                npcId: npcId,
+                beliefId: selectedBelief.BeliefId,
+                category: BeliefCategory.Food,
+                estimatedPosition: selectedBelief.EstimatedPosition,
+                failureKind: BeliefFailureKind.DirectLocalContradiction,
+                penalty01: 1f,
+                tick: nowTick);
+
+            bool updated = _beliefUpdater.UpdateFromOperationalFailure(signal, store);
+            telemetry?.Counter(updated ? "BeliefUpdater.FoodRouteContradictionApplied" : "BeliefUpdater.FoodRouteContradictionNoMatch", 1);
+
+            if (updated && TryFindBeliefById(store, selectedBelief.BeliefId, out var updatedBelief))
+            {
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(
+                    world.Config?.Sim?.memory_belief_decision_explainability,
+                    world.MemoryBeliefDecisionExplainability,
+                    new MemoryBeliefDecisionTrace
+                    {
+                        Kind = MemoryBeliefDecisionTraceKind.Belief,
+                        Tick = nowTick,
+                        NpcId = npcId,
+                        Belief = new MemoryBeliefDecisionBeliefRecord
+                        {
+                            Operation = MemoryBeliefDecisionBeliefOperation.Discarded,
+                            HasSourceTrace = false,
+                            SourceTraceType = default,
+                            Belief = ToBeliefRef(updatedBelief),
+                            Reason = reason ?? string.Empty,
+                        },
+                    });
+            }
+        }
+
+        // =============================================================================
+        // EmitFoodOperationalFailureTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un fallimento operativo del food path senza invalidare la belief
+        /// che ha motivato la decisione.
+        /// </para>
+        ///
+        /// <para><b>Trace operativa senza mutazione cognitiva forte</b></para>
+        /// <para>
+        /// Reservation denied e assignment rejected sono segnali utili per audit e
+        /// futuro scoring, ma non provano che il cibo non esista. Per questo la patch
+        /// li rende osservabili come failure learning EL e lascia intatto il
+        /// BeliefStore.
+        /// </para>
+        /// </summary>
+        private static void EmitFoodOperationalFailureTrace(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            JobFailureReason failureReason,
+            string reason,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig)
+        {
+            if (world == null || explainabilityConfig == null)
+                return;
+
+            var targetCell = candidate.BeliefResult.IsEmpty
+                ? Vector2Int.zero
+                : candidate.BeliefResult.Belief.EstimatedPosition;
+
+            if (HasLatestEquivalentFailureTrace(world, npcId, targetCell, failureReason, reason))
+                return;
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteFailureLearningTrace(
+                explainabilityConfig,
+                world.MemoryBeliefDecisionExplainability,
+                npcId,
+                nowTick,
+                string.Empty,
+                targetCell,
+                failureReason,
+                nowTick,
+                0f,
+                reason);
+        }
+
+        private static bool IsFoodJobAssignmentRejected(string jobRouteReason)
+        {
+            return string.Equals(jobRouteReason, "CurrentStillPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentJobPreferred", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "SameOrLowerPriority", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentPhaseProtected", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "CurrentPhaseNotInterruptible", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "NewJobMissing", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "InvalidNpcId", System.StringComparison.OrdinalIgnoreCase)
+                || string.Equals(jobRouteReason, "JobMissing", System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool TryFindBeliefById(BeliefStore store, int beliefId, out BeliefEntry belief)
+        {
+            belief = default;
+
+            if (store == null || beliefId <= 0)
+                return false;
+
+            var entries = store.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                if (entries[i].BeliefId != beliefId)
+                    continue;
+
+                belief = entries[i];
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasLatestEquivalentFailureTrace(
+            World world,
+            int npcId,
+            Vector2Int targetCell,
+            JobFailureReason failureReason,
+            string reason)
+        {
+            if (world?.MemoryBeliefDecisionExplainability == null)
+                return false;
+
+            if (!world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store) || store == null)
+                return false;
+
+            if (!store.TryGetLatestFailureLearningTrace(out var trace) || trace?.FailureLearning == null)
+                return false;
+
+            return trace.FailureLearning.TargetCell == targetCell
+                && trace.FailureLearning.FailureReason == failureReason
+                && string.Equals(trace.FailureLearning.Reason, reason, System.StringComparison.Ordinal);
         }
 
         // =============================================================================
@@ -850,63 +968,276 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
-        // TryBuildDecisionContext
+        // TryStartSearchFoodJobVerticalSlice
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce il contesto minimo ammesso dal Decision Layer per un singolo NPC.
+        /// Devia il solo intent <c>SearchFood</c> verso un job eseguibile minimale:
+        /// movimento verso una probe cell locale.
         /// </para>
         ///
-        /// <para><b>Whitelist input Decision Layer</b></para>
+        /// <para><b>Probe locale, non conoscenza del cibo</b></para>
         /// <para>
-        /// Anche se questa rule legacy riceve ancora <c>World</c>, il contesto passato
-        /// al Decision Layer contiene solo componenti per-NPC gia' risolti e il
-        /// <c>BeliefStore</c> soggettivo. Il Decision Layer non riceve mai il World.
+        /// La probe cell e' una destinazione operativa esplorativa scelta vicino
+        /// all'NPC. Non rappresenta una belief Food, non deriva da <c>World.Objects</c>
+        /// o <c>FoodStocks</c> e non aggiorna direttamente memoria o belief. Il suo
+        /// unico scopo e' far muovere fisicamente l'NPC in modo che, nei tick
+        /// successivi, <c>ObjectPerceptionSystem</c>, <c>MemoryEncodingSystem</c> e
+        /// <c>BeliefUpdater</c> possano eventualmente scoprire cibo tramite la
+        /// pipeline percettiva reale.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>Dna/Profile</b>: identita' cognitiva e profilo runtime dell'NPC.</item>
-        ///   <item><b>Position</b>: posizione necessaria al QuerySystem per la distanza.</item>
-        ///   <item><b>Beliefs</b>: store soggettivo usato solo via BeliefQueryService.</item>
-        ///   <item><b>Schedule/Norm</b>: contesti MVP inattivi o permissivi in questa integrazione.</item>
+        ///   <item><b>Probe</b>: risolta in modo deterministico da posizione NPC e vincoli fisici locali.</item>
+        ///   <item><b>Request</b>: <c>SearchFood</c>, target cell presente, target object assente.</item>
+        ///   <item><b>Factory</b>: materializza il template <c>food.search_local_probe.v1</c>.</item>
+        ///   <item><b>Assign</b>: consegna il job a <c>JobRuntimeState</c> senza emettere command legacy.</item>
         /// </list>
         /// </summary>
-        private static bool TryBuildDecisionContext(
+        private bool TryStartSearchFoodJobVerticalSlice(
             World world,
             int npcId,
-            in NpcNeeds needs,
             int nowTick,
-            out DecisionEvaluationContext context)
+            DecisionCandidate candidate,
+            Telemetry telemetry,
+            out string reason)
         {
-            context = default;
+            reason = string.Empty;
 
-            if (!world.NpcDna.TryGetValue(npcId, out var dna) || dna == null)
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                "EnterSearchFoodRoute",
+                "EnterSearchFoodRoute",
+                _enableFoodJobVerticalSlice);
+
+            if (!_enableFoodJobVerticalSlice)
+            {
+                reason = "GateDisabled";
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "GateDisabled",
+                    reason,
+                    _enableFoodJobVerticalSlice);
+                return false;
+            }
+
+            if (world?.JobRuntimeState == null)
+            {
+                reason = "JobRuntimeMissing";
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "JobRuntimeMissing",
+                    reason,
+                    _enableFoodJobVerticalSlice);
+                return false;
+            }
+
+            if (!TryResolveSearchFoodProbeCell(world, npcId, out var probeCell, out reason))
+            {
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "ProbeUnavailable",
+                    reason,
+                    _enableFoodJobVerticalSlice);
+                return false;
+            }
+
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                "ProbeResolved",
+                reason,
+                _enableFoodJobVerticalSlice,
+                probeFound: true,
+                probeCell: probeCell);
+
+            if (!_intentExecutionRouter.TryRouteSearchFood(
+                nowTick,
+                npcId,
+                candidate,
+                probeCell,
+                out var route))
+            {
+                reason = route.Reason;
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "RequestBuildFailed",
+                    "SearchFoodRequestBuildFailed:" + reason,
+                    _enableFoodJobVerticalSlice,
+                    probeFound: true,
+                    probeCell: probeCell);
+                return false;
+            }
+
+            var request = route.Request;
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                "RequestBuilt",
+                "SearchFoodRequestBuilt",
+                _enableFoodJobVerticalSlice,
+                probeFound: true,
+                probeCell: probeCell,
+                requestBuilt: true);
+
+            bool created = SearchFoodJobFactory.TryCreateSearchFoodLocalProbeJob(
+                _jobTemplateRegistry,
+                request,
+                out var job,
+                out reason);
+
+            if (!created)
+            {
+                LogSearchFoodJobRoute(
+                    nowTick,
+                    npcId,
+                    "FactoryFailed",
+                    "SearchFoodFactoryFailed:" + reason,
+                    _enableFoodJobVerticalSlice,
+                    probeFound: true,
+                    probeCell: probeCell,
+                    requestBuilt: true);
+                return false;
+            }
+
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                "FactoryCreated",
+                "SearchFoodFactoryCreated",
+                _enableFoodJobVerticalSlice,
+                probeFound: true,
+                probeCell: probeCell,
+                requestBuilt: true,
+                factoryCreated: true,
+                jobId: job.JobId);
+
+            _decisionExplainabilityBridge.TryEmitJobRequestTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                world.MemoryBeliefDecisionExplainability,
+                nowTick,
+                npcId,
+                request,
+                job.JobId,
+                legacyBridgeStillUsed: false);
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(npcId, job, nowTick, out reason);
+            LogSearchFoodJobRoute(
+                nowTick,
+                npcId,
+                assigned ? "AssignmentAccepted" : "AssignmentRejected",
+                assigned ? "SearchFoodJobRouteAccepted:" + reason : "SearchFoodAssignmentRejected:" + reason,
+                _enableFoodJobVerticalSlice,
+                probeFound: true,
+                probeCell: probeCell,
+                requestBuilt: true,
+                factoryCreated: true,
+                jobId: job.JobId,
+                assigned: assigned,
+                assignReason: reason);
+
+            telemetry?.Counter(assigned ? "SearchFoodJobVerticalSlice.Assigned" : "SearchFoodJobVerticalSlice.AssignFailed", 1);
+            return assigned;
+        }
+
+        // =============================================================================
+        // TryResolveSearchFoodProbeCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sceglie una cella locale esplorativa per SearchFood senza trasformarla in
+        /// conoscenza cognitiva di una fonte di cibo.
+        /// </para>
+        ///
+        /// <para><b>Anti-telepatia nella probe policy</b></para>
+        /// <para>
+        /// Questo helper usa solo posizione NPC e vincoli fisici locali: bounds,
+        /// blocco movimento e occupazione. Non legge oggetti per categoria, non
+        /// consulta stock alimentari, non mantiene memoria di celle visitate e non
+        /// introduce random policy. La scelta e' deterministica per rendere la slice
+        /// testabile e compatibile col tick runtime.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Origine</b>: posizione corrente dell'NPC da <c>GridPos</c>.</item>
+        ///   <item><b>Ordine stabile</b>: cardinali a raggio 1, poi diagonali/cardinali a raggio 2.</item>
+        ///   <item><b>Gate fisici</b>: in bounds, non movement-blocked, non occupata da NPC o oggetto.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryResolveSearchFoodProbeCell(World world, int npcId, out Vector2Int probeCell, out string reason)
+        {
+            probeCell = default;
+            reason = string.Empty;
+
+            if (world == null || !world.GridPos.TryGetValue(npcId, out var position))
+            {
+                reason = "NpcPositionMissing";
+                return false;
+            }
+
+            var origin = new Vector2Int(position.X, position.Y);
+            var offsets = SearchFoodProbeOffsets;
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                var candidate = origin + offsets[i];
+                if (!IsValidSearchFoodProbeCell(world, npcId, candidate))
+                    continue;
+
+                probeCell = candidate;
+                reason = "SearchFoodProbeResolved";
+                return true;
+            }
+
+            reason = "SearchFoodProbeUnavailable";
+            return false;
+        }
+
+        private static readonly Vector2Int[] SearchFoodProbeOffsets =
+        {
+            new Vector2Int(1, 0),
+            new Vector2Int(0, 1),
+            new Vector2Int(-1, 0),
+            new Vector2Int(0, -1),
+            new Vector2Int(2, 0),
+            new Vector2Int(0, 2),
+            new Vector2Int(-2, 0),
+            new Vector2Int(0, -2),
+            new Vector2Int(1, 1),
+            new Vector2Int(-1, 1),
+            new Vector2Int(-1, -1),
+            new Vector2Int(1, -1),
+        };
+
+        private static bool IsValidSearchFoodProbeCell(World world, int npcId, Vector2Int cell)
+        {
+            if (!world.InBounds(cell.x, cell.y))
                 return false;
 
-            if (!world.NpcProfiles.TryGetValue(npcId, out var profile) || profile == null)
+            if (world.IsMovementBlocked(cell.x, cell.y))
                 return false;
 
-            if (!world.GridPos.TryGetValue(npcId, out var position))
+            if (world.GetObjectAt(cell.x, cell.y) >= 0)
                 return false;
 
-            if (!world.Beliefs.TryGetValue(npcId, out var beliefs) || beliefs == null)
-                return false;
+            foreach (var kv in world.GridPos)
+            {
+                if (kv.Key == npcId)
+                    continue;
 
-            context = new DecisionEvaluationContext(
-                npcId: npcId,
-                tick: nowTick,
-                needs: needs,
-                dna: dna,
-                profile: profile,
-                npcPosition: new Vector2Int(position.X, position.Y),
-                beliefs: beliefs,
-                beliefQueryConfig: world.Global.BeliefQuery,
-                explainabilityConfig: world.Config?.Sim?.memory_belief_decision_explainability,
-                explainabilityRegistry: world.MemoryBeliefDecisionExplainability,
-                scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
-                normContext: new DecisionNormContext(false, 1f, true));
+                if (kv.Value.X == cell.x && kv.Value.Y == cell.y)
+                    return false;
+            }
 
+            // TODO ARC-CON-014: preferire celle non attualmente visibili solo quando
+            // esistera' un helper canonico "cell currently visible by NPC" riusabile
+            // senza duplicare la semantica di ObjectPerceptionSystem/FOV debug.
             return true;
         }
 
@@ -964,23 +1295,47 @@ namespace Arcontio.Core
                 return false;
             }
 
-            string beliefKey = !candidate.BeliefResult.IsEmpty
-                ? BuildBeliefKey(candidate.BeliefResult.Belief)
-                : targetSource;
+            if (!_intentExecutionRouter.TryRouteEatKnownFood(
+                nowTick,
+                npcId,
+                candidate,
+                foodObjectId,
+                out var route))
+            {
+                reason = route.Reason;
+                return false;
+            }
+
+            var request = route.Request;
+            // Il boundary reale di questa patch resta intenzionalmente stretto:
+            // il Decision Layer seleziona EatKnownFood e produce un JobRequest dati,
+            // mentre la verifica legacy del target operativo resta qui nel bridge.
+            // Se la cella risolta dal path storico diverge dalla belief selezionata,
+            // non inventiamo una nuova semantica: lasciamo proseguire i fallback
+            // legacy gia' presenti e compatibili con v0.11B.
+            if (request.TargetCell.x != targetX || request.TargetCell.y != targetY)
+            {
+                reason = "ResolvedTargetMismatch:" + targetSource;
+                return false;
+            }
 
             bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
                 _jobTemplateRegistry,
-                npcId,
-                foodObjectId,
-                new Vector2Int(targetX, targetY),
-                nowTick,
-                candidate.NeedUrgency01,
-                beliefKey,
+                request,
                 out var job,
                 out reason);
 
             if (!created)
                 return false;
+
+            _decisionExplainabilityBridge.TryEmitJobRequestTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                world.MemoryBeliefDecisionExplainability,
+                nowTick,
+                npcId,
+                request,
+                job.JobId,
+                legacyBridgeStillUsed: false);
 
             bool assigned = world.JobRuntimeState.TryAssignJob(npcId, job, nowTick, out reason);
             telemetry?.Counter(assigned ? "FoodJobVerticalSlice.Assigned" : "FoodJobVerticalSlice.AssignFailed", 1);

@@ -576,6 +576,73 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // TryWriteRunningActionTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esporta una trace EL del lifecycle volatile di una running action.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: osservabilita' ARC-DEC-020 senza authority</b></para>
+        /// <para>
+        /// Il producer legittimo passa gia' key e snapshot costruiti dal Job runtime.
+        /// L'emitter copia valori primitivi verso registry/JSONL e non legge il
+        /// <c>World</c>, non ticka l'action, non muta store runtime, non emette
+        /// <c>ICommand</c> e non decide completion o preemption.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Operation</b>: started/progress/completed/failure/interruption.</item>
+        ///   <item><b>Key</b>: identita' NPC/job/fase/action dello store volatile.</item>
+        ///   <item><b>Snapshot</b>: progresso interno gia' calcolato dall'executor.</item>
+        /// </list>
+        /// </summary>
+        public static void TryWriteRunningActionTrace(
+            MemoryBeliefDecisionExplainabilityParams config,
+            MemoryBeliefDecisionExplainabilityRegistry registry,
+            int npcId,
+            long tick,
+            MemoryBeliefDecisionRunningActionOperation operation,
+            in RunningActionKey key,
+            in RunningActionProgressSnapshot snapshot,
+            string reason)
+        {
+            if (config == null)
+                return;
+
+            TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
+            {
+                Kind = MemoryBeliefDecisionTraceKind.RunningAction,
+                Tick = tick,
+                NpcId = npcId,
+                RunningAction = new MemoryBeliefDecisionRunningActionRecord
+                {
+                    Operation = operation,
+                    ActionInstanceId = snapshot.ActionInstanceId,
+                    ActionKind = snapshot.Kind,
+                    Status = snapshot.Status,
+                    OwnerNpcId = snapshot.NpcId,
+                    JobId = snapshot.JobId,
+                    PhaseIndex = key.PhaseIndex,
+                    ActionIndex = key.ActionIndex,
+                    PhaseId = snapshot.PhaseId,
+                    JobActionId = snapshot.JobActionId,
+                    StartedTick = snapshot.StartedTick,
+                    UpdatedTick = snapshot.UpdatedTick,
+                    ElapsedTicks = snapshot.ElapsedTicks,
+                    RequiredTicks = snapshot.RequiredTicks,
+                    TimeoutTicks = snapshot.TimeoutTicks,
+                    FailureReason = snapshot.FailureReason,
+                    IsTerminal = snapshot.IsTerminal,
+                    CanComplete = snapshot.CanComplete,
+                    IsTimedOut = snapshot.IsTimedOut,
+                    Reason = reason ?? string.Empty,
+                },
+            });
+        }
+
+        // =============================================================================
         // ToBeliefRef
         // =============================================================================
         /// <summary>

@@ -1,5 +1,6 @@
 // Assets/Scripts/Core/Runtime/SimulationHost.cs
 using Arcontio.Core.Diagnostics;
+using Arcontio.Core.Config;
 using Arcontio.Core.Logging;
 using Arcontio.Core.Save;
 using System.Collections.Generic;
@@ -24,9 +25,6 @@ namespace Arcontio.Core
     /// </summary>
     public sealed class SimulationHost : MonoBehaviour
     {
-        [Header("Tick")]
-        [SerializeField] private float tickDeltaTime = 1f; // tempo simulato per tick (es. 1 = 1 minuto)
-        [SerializeField] private int ticksPerSecond = 10;  // velocità simulazione (tick/secondo reali)
 
         [Header("Debug Scenarios")]
         [SerializeField] private bool enableLegacyDebugScenarioBootstrap = false;
@@ -37,7 +35,33 @@ namespace Arcontio.Core
         [SerializeField] private string worldSnapshotSlotName = "default";
 
         [Header("Job Runtime Experimental Gates")]
-        [SerializeField] private bool enableFoodJobVerticalSlice = false;
+        // =============================================================================
+        // enableFoodJobVerticalSlice
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita il routing Job della vertical slice food/search nel runtime
+        /// bootstrap ordinario.
+        /// </para>
+        ///
+        /// <para><b>ARC-CON-014 - Decisione -> Job come default operativo</b></para>
+        /// <para>
+        /// Dopo le slice v0.11b.01-v0.11b.04 questo gate non rappresenta piu' un
+        /// esperimento spento di default: <c>EatKnownFood</c> e <c>SearchFood</c>
+        /// possiedono un percorso reale <c>DecisionCandidate -> JobRequest -> Job</c>.
+        /// Tenerlo disattivato impedisce a <c>SearchFood</c> selezionato di creare
+        /// un job e lascia il runtime nel fallback <c>GateDisabled</c>.
+        /// </para>
+        ///
+        /// <para>
+        /// Questa opzione NON rimuove i fallback legacy e non rende obbligatorio il
+        /// successo del Job System: se una route fallisce, <c>NeedsDecisionRule</c>
+        /// conserva i fallback classificati e osservabili gia' esistenti. Una scena
+        /// o un test che voglia tornare al comportamento legacy puo' ancora
+        /// disabilitare esplicitamente il flag via Inspector.
+        /// </para>
+        /// </summary>
+        [SerializeField] private bool enableFoodJobVerticalSlice = true;
 
         private enum DebugScenario
         {
@@ -620,8 +644,24 @@ namespace Arcontio.Core
             // ******************************************************************************************************************************
             // v0.11.01 introduce un registry volutamente piccolo: il JSON descrive
             // solo template/fasi/action, mentre target e logica reale restano nel
-            // codice C# e nel decision layer. Il gate food resta default false.
+            // codice C# e nel decision layer. Dopo v0.11b.01-v0.11b.04 il gate food
+            // e' acceso di default, quindi questo log di bootstrap serve a verificare
+            // che la scena runtime stia usando davvero il valore e i template attesi.
             _jobTemplateRegistry = JobTemplateRegistry.LoadDefault();
+            ArcontioLogger.Info(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "SimulationHost"),
+                new LogBlock(LogLevel.Info, "log.simulationhost.food_job_vertical_slice_config")
+                    .AddField("enableFoodJobVerticalSlice", enableFoodJobVerticalSlice)
+                    .AddField("jobTemplateRegistryLoaded", _jobTemplateRegistry != null)
+                    .AddField("templateCount", _jobTemplateRegistry?.Count ?? 0)
+                    .AddField(
+                        "hasSearchFoodTemplate",
+                        _jobTemplateRegistry != null
+                        && _jobTemplateRegistry.TryGetTemplate(JobTemplateRegistry.SearchFoodLocalProbeTemplateId, out _))
+                    .AddField(
+                        "hasEatKnownFoodTemplate",
+                        _jobTemplateRegistry != null
+                        && _jobTemplateRegistry.TryGetTemplate(JobTemplateRegistry.FoodKnownCommunityStockTemplateId, out _)));
 
             // ******************************************************************************************************************************
             // 5) ISCRIVO I SISTEMI ALLO SCHEDULER
@@ -732,7 +772,8 @@ namespace Arcontio.Core
             _rules.Add(new DebugEventLogRule());
             //     _rules.Add(new BasicSurvivalRule());
             _rules.Add(new NeedsDecisionRule(
-                decisionEveryTicks: 25,
+                decisionEveryTicks: _world?.Config?.Sim?.ResolveDecisionEveryTicks()
+                    ?? DecisionRuntimeParams.DefaultDecisionEveryTicks,
                 maxSeekRangeCells: _world.Global.NpcOperationalRangeCells,
                 enableFoodJobVerticalSlice: enableFoodJobVerticalSlice,
                 jobTemplateRegistry: _jobTemplateRegistry));
@@ -771,13 +812,72 @@ namespace Arcontio.Core
             float dt = Time.unscaledDeltaTime;
             _accum += dt;
 
-            float tickInterval = 1f / Mathf.Max(1, ticksPerSecond);
+            float tickInterval = ResolveTickIntervalSeconds(_world?.Config?.Sim);
 
             while (_accum >= tickInterval)
             {
                 _accum -= tickInterval;
                 StepOneTick();
             }
+        }
+
+        // =============================================================================
+        // ResolveTickIntervalSeconds
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola l'intervallo reale tra due tick usando i parametri caricati da
+        /// <c>game_params.json</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: game_params come fonte primaria del tick</b></para>
+        /// <para>
+        /// ARC-DEC-006 e ARC-DEC-020 fissano il tick globale come tempo canonico.
+        /// La frequenza runtime deve quindi arrivare dalla pipeline dati
+        /// <c>game_params.json -> SimulationParams -> SimulationHost</c>, non da campi
+        /// serializzati sull'Inspector del GameObject <c>ArcontioRuntime</c>. Questo
+        /// metodo e' pubblico e puro per permettere ai test EditMode di verificare il
+        /// calcolo senza avviare una scena Unity.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Input</b>: DTO tipizzato dei parametri di simulazione.</item>
+        ///   <item><b>Clamp</b>: frequenze nulle o negative cadono al default sicuro.</item>
+        ///   <item><b>Output</b>: secondi reali per tick del loop host.</item>
+        /// </list>
+        /// </summary>
+        public static float ResolveTickIntervalSeconds(SimulationParams simParams)
+        {
+            return 1f / Mathf.Max(1, simParams?.ResolveTicksPerSecond() ?? TickParams.DefaultTicksPerSecond);
+        }
+
+        // =============================================================================
+        // ResolveTickDeltaTime
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il delta temporale associato al <see cref="Tick"/> corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: nessuna doppia authority tickDeltaTime</b></para>
+        /// <para>
+        /// Il vecchio campo Inspector <c>tickDeltaTime</c> duplicava la frequenza
+        /// runtime e poteva divergere da <c>ticksPerSecond</c>. Nella foundation
+        /// v0.11c.03-prep il delta del tick e' derivato dallo stesso parametro
+        /// canonico, cosi' la cadence reale e il dato passato ai sistemi restano
+        /// leggibili e testabili da una sola sorgente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Derivazione</b>: delega a <see cref="ResolveTickIntervalSeconds"/>.</item>
+        ///   <item><b>Fallback</b>: se la config manca, usa il default tipizzato di SimulationParams.</item>
+        /// </list>
+        /// </summary>
+        public static float ResolveTickDeltaTime(SimulationParams simParams)
+        {
+            return ResolveTickIntervalSeconds(simParams);
         }
 
         // =============================================================================
@@ -879,7 +979,7 @@ namespace Arcontio.Core
             // Rende il tick disponibile globalmente per logging in comandi ecc.
             TickContext.BeginTick(_tickIndex);
 
-            var tick = new Tick(_tickIndex, tickDeltaTime);
+            var tick = new Tick(_tickIndex, ResolveTickDeltaTime(_world?.Config?.Sim));
 
             // ******************************************************************************************************************************
             // 1) Scheduler decide quali systems girano in questo tick

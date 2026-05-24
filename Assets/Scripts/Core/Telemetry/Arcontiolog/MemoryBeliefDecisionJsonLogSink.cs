@@ -210,6 +210,16 @@ namespace Arcontio.Core
                         failureLearning = BuildFailureLearning(trace.FailureLearning),
                     });
                     break;
+                case MemoryBeliefDecisionTraceKind.RunningAction:
+                    TryWriteRecord(config, new RunningActionJsonLogRecord
+                    {
+                        schema = SchemaVersion,
+                        kind = ToKindString(trace.Kind),
+                        tick = trace.Tick,
+                        npcId = trace.NpcId,
+                        runningAction = BuildRunningAction(trace.RunningAction),
+                    });
+                    break;
                 default:
                     return;
             }
@@ -233,6 +243,7 @@ namespace Arcontio.Core
                 MemoryBeliefDecisionTraceKind.Reservation => config.logReservation,
                 MemoryBeliefDecisionTraceKind.Command => config.logCommand,
                 MemoryBeliefDecisionTraceKind.FailureLearning => config.logFailureLearning,
+                MemoryBeliefDecisionTraceKind.RunningAction => config.logRunningAction,
                 _ => false
             };
         }
@@ -547,6 +558,36 @@ namespace Arcontio.Core
                 failureTick = failure.FailureTick,
                 penalty01 = failure.Penalty01,
                 reason = failure.Reason ?? string.Empty,
+            };
+        }
+
+        private static RunningActionLogPayload BuildRunningAction(MemoryBeliefDecisionRunningActionRecord runningAction)
+        {
+            if (runningAction == null)
+                return null;
+
+            return new RunningActionLogPayload
+            {
+                operation = runningAction.Operation.ToString(),
+                actionInstanceId = runningAction.ActionInstanceId ?? string.Empty,
+                actionKind = runningAction.ActionKind.ToString(),
+                status = runningAction.Status.ToString(),
+                ownerNpcId = runningAction.OwnerNpcId,
+                jobId = runningAction.JobId ?? string.Empty,
+                phaseIndex = runningAction.PhaseIndex,
+                actionIndex = runningAction.ActionIndex,
+                phaseId = runningAction.PhaseId ?? string.Empty,
+                jobActionId = runningAction.JobActionId ?? string.Empty,
+                startedTick = runningAction.StartedTick,
+                updatedTick = runningAction.UpdatedTick,
+                elapsedTicks = runningAction.ElapsedTicks,
+                requiredTicks = runningAction.RequiredTicks,
+                timeoutTicks = runningAction.TimeoutTicks,
+                failureReason = runningAction.FailureReason.ToString(),
+                isTerminal = runningAction.IsTerminal,
+                canComplete = runningAction.CanComplete,
+                isTimedOut = runningAction.IsTimedOut,
+                reason = runningAction.Reason ?? string.Empty,
             };
         }
 
@@ -953,6 +994,16 @@ namespace Arcontio.Core
         }
 
         [Serializable]
+        private sealed class RunningActionJsonLogRecord
+        {
+            public string schema = string.Empty;
+            public string kind = string.Empty;
+            public long tick;
+            public int npcId;
+            public RunningActionLogPayload runningAction;
+        }
+
+        [Serializable]
         private sealed class MemoryLogPayload
         {
             public string eventType = string.Empty;
@@ -1130,6 +1181,31 @@ namespace Arcontio.Core
             public string failureReason = string.Empty;
             public int failureTick;
             public float penalty01;
+            public string reason = string.Empty;
+        }
+
+        [Serializable]
+        private sealed class RunningActionLogPayload
+        {
+            public string operation = string.Empty;
+            public string actionInstanceId = string.Empty;
+            public string actionKind = string.Empty;
+            public string status = string.Empty;
+            public int ownerNpcId;
+            public string jobId = string.Empty;
+            public int phaseIndex;
+            public int actionIndex;
+            public string phaseId = string.Empty;
+            public string jobActionId = string.Empty;
+            public int startedTick;
+            public int updatedTick;
+            public int elapsedTicks;
+            public int requiredTicks;
+            public int timeoutTicks;
+            public string failureReason = string.Empty;
+            public bool isTerminal;
+            public bool canComplete;
+            public bool isTimedOut;
             public string reason = string.Empty;
         }
 
