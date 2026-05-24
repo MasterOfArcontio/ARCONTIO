@@ -436,15 +436,15 @@ Questo checkpoint ha implementato la foundation temporale fissata da `ARC-DEC-02
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.11c.02a | Multi-Tick Runtime Audit + ARC-DEC-020 | COMPLETATA |
-| v0.11c.02b | RunningActionRuntimeState Skeleton | COMPLETATA |
-| v0.11c.02c | RunningActionExecutor Skeleton | COMPLETATA |
-| v0.11c.02d | RunningActionStore introduction | COMPLETATA |
-| v0.11c.02e | RunningAction productive ticking integration | COMPLETATA |
-| v0.11c.02f | RunningAction lifecycle explainability traces | COMPLETATA |
-| v0.11c.02g | Multi-tick cell traversal foundation | COMPLETATA |
-| v0.11c.02h | Temporal reservation robustness | COMPLETATA |
-| v0.11c.02i | Deterministic multi-tick QA sweep | COMPLETATA |
+| v0.11c.02a | Multi-Tick Runtime Audit + ARC-DEC-020 | ✅ |
+| v0.11c.02b | RunningActionRuntimeState Skeleton | ✅ |
+| v0.11c.02c | RunningActionExecutor Skeleton | ✅ |
+| v0.11c.02d | RunningActionStore introduction | ✅ |
+| v0.11c.02e | RunningAction productive ticking integration | ✅ |
+| v0.11c.02f | RunningAction lifecycle explainability traces | ✅ |
+| v0.11c.02g | Multi-tick cell traversal foundation | ✅ |
+| v0.11c.02h | Temporal reservation robustness | ✅ |
+| v0.11c.02i | Deterministic multi-tick QA sweep | ✅ |
 
 **Esito consolidato v0.11c.02:**
 
@@ -483,92 +483,170 @@ Questo checkpoint ha consolidato una foundation passiva per il recupero locale l
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.11c.04a | Job step failure/recovery audit | COMPLETATA |
-| v0.11c.04b | JobStepFailureKind vocabulary skeleton | COMPLETATA |
-| v0.11c.04c | StepRecoveryStrategy vocabulary skeleton | COMPLETATA |
-| v0.11c.04d | StepRecoveryPolicy passive model | COMPLETATA |
-| v0.11c.04e | JobRecoveryResult passive model | COMPLETATA |
-| v0.11c.04f | No-op recovery boundary audit | COMPLETATA |
-| v0.11c.04g | Recovery QA matrix | COMPLETATA |
-| v0.11c.04h | Closeout report | COMPLETATA |
+| v0.11c.04a | Job step failure/recovery audit | ✅ |
+| v0.11c.04b | JobStepFailureKind vocabulary skeleton | ✅ |
+| v0.11c.04c | StepRecoveryStrategy vocabulary skeleton | ✅ |
+| v0.11c.04d | StepRecoveryPolicy passive model | ✅ |
+| v0.11c.04e | JobRecoveryResult passive model | ✅ |
+| v0.11c.04f | No-op recovery boundary audit | ✅ |
+| v0.11c.04g | Recovery QA matrix | ✅ |
+| v0.11c.04h | Closeout report | ✅ |
 
 > **Nota closeout v0.11c.04h (2026-05-24):** il piano operativo reale di `v0.11c.04` e' stato riallineato a `Job Runtime Stabilization & Local Step Recovery Foundation` dopo l'introduzione di `ARC-DEC-021`. Il checkpoint e' chiuso come foundation passiva: audit recovery, `JobStepFailureKind`, `StepRecoveryStrategy`, `StepRecoveryPolicy`, `JobRecoveryResult`, boundary audit e Recovery QA matrix. Nessun recovery runtime reale e' stato introdotto; `StepResultStatus.Failed` resta terminale per il job e `Blocked` / `Waiting` restano wait gate tecnico. Dettaglio: `v0.11c.04_Closeout_Report.md`.
 
-#### v0.11c.05 — Legacy Decision Layer Removal Path
+#### v0.11c.05 - Fondazione Valutazione Recovery
+
+## Stato
+🔄 IN CORSO
+
+## Obiettivo
+
+Preparare il futuro sistema di:
+
+- classificazione fallimenti;
+- valutazione recovery;
+- retry locale limitato;
+- escalation decisionale eventuale;
+
+senza introdurre recovery reale.
+
+---
+
+## Filosofia architetturale
+
+La recovery deve restare:
+
+- locale;
+- limitata;
+- explainable;
+- tipizzata;
+- non onnisciente;
+- non globale;
+- non cognitiva.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11c.05a | Audit classificazione fallimenti | ✅ COMPLETATA |
+| v0.11c.05b | Modello passivo StepFailureClassification | ✅ COMPLETATA |
+| v0.11c.05c | Skeleton evaluator recovery no-op | 🔄 IN CORSO |
+| v0.11c.05d | QA evaluator recovery | ⏳ PENDING |
+| v0.11c.05e | Closeout recovery evaluation | ⏳ PENDING |
+
+---
+
+#### v0.12 — Pulizia Logging, Explainability e Diagnostica Runtime
+
+## Stato
+⏳ PENDING
+
+## Obiettivo
+
+Ripulire e consolidare:
+
+- logging runtime;
+- explainability;
+- sink JSONL;
+- registry diagnostici;
+- payload runtime;
+- separazione debug/runtime;
+- governance emission trace.
 
 **Stato:** FUTURA / PENDING
+
+---
+
+#### v0.13 - Rimozione Progressiva del Legacy Decision Layer
 
 Questo checkpoint preparerà la rimozione graduale del ruolo operativo di `NeedsDecisionRule` come bridge legacy. La regola non va rimossa brutalmente: le routine esistenti devono passare attraverso Orchestrator, JobRequest e Job Layer in modo incrementale, con fallback legacy quarantinati e testati.
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.11c.05a | Audit responsabilità residue NeedsDecisionRule | Pending |
-| v0.11c.05b | Fame/SearchFood/EatKnownFood through Orchestrator | Pending |
-| v0.11c.05c | Sleep routine migration plan | Pending |
-| v0.11c.05d | Thirst routine migration plan | Pending |
-| v0.11c.05e | Legacy fallback quarantine | Pending |
-| v0.11c.05f | Orchestrator primary config gate | Pending |
-| v0.11c.05g | Removal readiness report | Pending |
-
-**Prossimo checkpoint operativo:**
-
-`v0.11c.03a - Tick phase audit`
-
-Branch previsto:
-`ai-task/v0.11c.03a-runtime-cadence-audit`
-
-Modalità:
-READ ONLY FORENSIC AUDIT FIRST
-
-### v0.11D — Work/Social/Dormant Systems Forensic Audit
-
-**Status:** FUTURA / PENDING
-
-**Scopo:** auditare WorkSystem, SocialSystem e sistemi dormant/placeholder dopo la foundation decisionale e temporale.
-
-**Nota:** Work/Social/Dormant restano fuori scope finché v0.11C non chiarisce la pipeline decisionale e temporale minima.
+| v0.13a | Audit responsabilità residue NeedsDecisionRule | ⏳ PENDING |
+| v0.13b | Fame/SearchFood/EatKnownFood via Orchestrator | ⏳ PENDING |
+| v0.13c | Piano migrazione sonno | ⏳ PENDING |
+| v0.13d | Piano migrazione sete | ⏳ PENDING |
+| v0.13e | Quarantena fallback legacy | ⏳ PENDING |
+| v0.13f | Config gate orchestrator primario | ⏳ PENDING |
+| v0.13g | Report readiness rimozione legacy | ⏳ PENDING |
+| Checkpoint | Task | Stato |
+|---|---|---|
 
 ---
 
-## v0.12 — NPC Subjective Cognition Deepening
+## v0.14 — Cognizione Soggettiva Avanzata
 
-### Tabella sessioni v0.12
+## Obiettivo
 
-| # | Giorno | Sistema | Task | Stato |
-|---|--------|---------|------|-------|
-| 1 | Lun | Cognition | Rimozione scansioni onniscienti residue | Pending |
-| 2 | Mer | Belief | Confidence refinement | Pending |
-| 3 | Gio | Communication | Distorsione token ampliata | Pending |
-| 4 | Lun | Decision | Local verification loops | Pending |
-| 5 | Mer | QA | Audit anti-telepatia completo | Pending |
+Espandere:
 
----
-
-## v0.13 — Social Consequence & Normative Emergence
-
-### Tabella sessioni v0.13
-
-| # | Giorno | Sistema | Task | Stato |
-|---|--------|---------|------|-------|
-| 1 | Lun | Reputation | Tracce reputazionali | Pending |
-| 2 | Mer | Suspicion | Catene sospetto/furto | Pending |
-| 3 | Gio | Social | Giudizio di gruppo | Pending |
-| 4 | Lun | Norms | Prime norme emergenti | Pending |
-| 5 | Mer | QA | Scenario sociale osservabile | Pending |
-
----
-
-## v0.14 — Explainability Public Layer / Observer Tools
+- ragionamento NPC;
+- query cognitive;
+- memoria dinamica;
+- pianificazione soggettiva;
+- conflitti cognitivi;
+- apprendimento.
 
 ### Tabella sessioni v0.14
 
 | # | Giorno | Sistema | Task | Stato |
 |---|--------|---------|------|-------|
-| 1 | Lun | Observer | Timeline eventi mondo | Pending |
-| 2 | Mer | Observer | Reason graph NPC | Pending |
-| 3 | Gio | UI | Pannelli observer leggibili | Pending |
-| 4 | Lun | Explainability | Reinserimento v0.07 job traces | Pending |
-| 5 | Mer | QA | Observer end-to-end | Pending |
+| 1 | Lun | Cognition | Rimozione scansioni onniscienti residue | ⏳ |
+| 2 | Mer | Belief | Confidence refinement | ⏳ |
+| 3 | Gio | Communication | Distorsione token ampliata | ⏳ |
+| 4 | Lun | Decision | Local verification loops | ⏳ |
+| 5 | Mer | QA | Audit anti-telepatia completo | ⏳ |
+
+---
+
+## v0.15 — Conseguenze Sociali Emergenti
+
+## Obiettivo
+
+Introdurre:
+
+- reputazione;
+- istituzioni;
+- conseguenze sociali;
+- propagazione informazione;
+- conflitti emergenti;
+- strutture normative.
+
+### Tabella sessioni v0.15
+
+| # | Giorno | Sistema | Task | Stato |
+|---|--------|---------|------|-------|
+| 1 | Lun | Reputation | Tracce reputazionali | ⏳ |
+| 2 | Mer | Suspicion | Catene sospetto/furto | ⏳ |
+| 3 | Gio | Social | Giudizio di gruppo | ⏳ |
+| 4 | Lun | Norms | Prime norme emergenti | ⏳ |
+| 5 | Mer | QA | Scenario sociale osservabile | ⏳ |
+
+---
+
+## v0.16 — Observer Layer Pubblico ed Explainability Esterna
+
+## Obiettivo
+
+Costruire:
+
+- observer layer;
+- explainability pubblica;
+- strumenti osservazione simulazione;
+- timeline causali;
+- replay explainability;
+- debugging osservabile.
+
+### Tabella sessioni v0.14
+
+| # | Giorno | Sistema | Task | Stato |
+|---|--------|---------|------|-------|
+| 1 | Lun | Observer | Timeline eventi mondo | ⏳ |
+| 2 | Mer | Observer | Reason graph NPC | ⏳ |
+| 3 | Gio | UI | Pannelli observer leggibili | ⏳ |
+| 4 | Lun | Explainability | Reinserimento v0.07 job traces | ⏳ |
+| 5 | Mer | QA | Observer end-to-end | ⏳ |
 
 > **Nota:** questa fase riassorbe la vecchia v0.07 e la porta a uno strato observer realmente utile.
 
@@ -600,4 +678,37 @@ READ ONLY FORENSIC AUDIT FIRST
 
 ---
 
+# Stato Runtime Reale Attuale
+
+Il sistema oggi possiede già:
+
+- Job runtime vivo;
+- esecuzione multi-tick;
+- RunningAction;
+- state machine;
+- traversal temporale;
+- explainability runtime;
+- foundation recovery passiva;
+- classificazione failure passiva.
+
+---
+
+# Funzionalità NON ancora implementate
+
+NON esistono ancora:
+
+- recovery locale reale;
+- retry runtime;
+- replanning locale;
+- escalation cognitiva produttiva;
+- evaluator recovery produttivo;
+- planner globale;
+- recovery automatico intelligente.
+
+Questi aspetti verranno introdotti solo dopo la chiusura delle foundation passive.
+
+---
+
 *ARCONTIO Development Roadmap — documento vivo full fidelity — aggiornato Aprile 2026*
+
+
