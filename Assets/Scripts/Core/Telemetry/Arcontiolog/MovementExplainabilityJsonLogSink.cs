@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Arcontio.Core.Config;
+using Arcontio.Core.Logging;
 using UnityEngine;
 
 namespace Arcontio.Core
@@ -51,7 +52,7 @@ namespace Arcontio.Core
         /// </summary>
         public static void TryWriteIntent(MovementExplainabilityParams config, MovementIntentTrace trace)
         {
-            if (trace == null)
+            if (trace == null || !IsJsonLogEnabled(config))
                 return;
 
             TryWriteRecord(config, new MovementExplainabilityJsonLogRecord
@@ -77,7 +78,7 @@ namespace Arcontio.Core
         /// </summary>
         public static void TryWritePlan(MovementExplainabilityParams config, PathPlanTrace trace)
         {
-            if (trace == null)
+            if (trace == null || !IsJsonLogEnabled(config))
                 return;
 
             TryWriteRecord(config, new MovementExplainabilityJsonLogRecord
@@ -104,7 +105,7 @@ namespace Arcontio.Core
         /// </summary>
         public static void TryWriteExecutionEvent(MovementExplainabilityParams config, PathExecutionEvent evt)
         {
-            if (evt == null)
+            if (evt == null || !IsJsonLogEnabled(config))
                 return;
 
             TryWriteRecord(config, new MovementExplainabilityJsonLogRecord
@@ -131,7 +132,7 @@ namespace Arcontio.Core
         /// </summary>
         private static void TryWriteRecord(MovementExplainabilityParams config, MovementExplainabilityJsonLogRecord record)
         {
-            if (config == null || !config.writeJsonLog || record == null)
+            if (!IsJsonLogEnabled(config) || record == null)
                 return;
 
             string path = ResolveLogPath(config);
@@ -141,7 +142,7 @@ namespace Arcontio.Core
             try
             {
                 string json = JsonUtility.ToJson(record, prettyPrint: false);
-                File.AppendAllText(path, json + Environment.NewLine);
+                JsonlRuntimeLogHub.EnqueueLine("movement", path, json);
             }
             catch (Exception ex)
             {
@@ -177,13 +178,17 @@ namespace Arcontio.Core
                 safeFileName += ".jsonl";
 
             string directory = Path.Combine(Application.persistentDataPath, DefaultDirectoryName);
-            Directory.CreateDirectory(directory);
 
             _resolvedPattern = pattern;
             _resolvedPath = Path.Combine(directory, safeFileName);
             _hasReportedWriteError = false;
 
             return _resolvedPath;
+        }
+
+        private static bool IsJsonLogEnabled(MovementExplainabilityParams config)
+        {
+            return config != null && config.writeJsonLog;
         }
 
         // =============================================================================

@@ -71,6 +71,7 @@ namespace Arcontio.Core.Logging
         public static void Shutdown()
         {
             if (!_initialized) return;
+            try { JsonlRuntimeLogHub.Shutdown(); } catch { }
             try { _htmlSink?.Dispose(); } catch { }
             try { _fileSink?.Dispose(); } catch { }
             try { _unitySink?.Dispose(); } catch { }
@@ -85,6 +86,7 @@ namespace Arcontio.Core.Logging
 
         public static void Flush()
         {
+            JsonlRuntimeLogHub.FlushAll();
             _htmlSink?.Flush();
             _fileSink?.Flush();
         }

@@ -1,6 +1,7 @@
 using System.IO;
 using Arcontio.Core;
 using Arcontio.Core.Config;
+using Arcontio.Core.Logging;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -77,7 +78,7 @@ namespace Arcontio.Tests
 
             // Act: il sink scrive una singola riga JSONL, senza passare dal movimento.
             MovementExplainabilityJsonLogSink.TryWritePlan(config, trace);
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             // Assert: il log deve essere leggibile senza mappare manualmente enum int.
             Assert.That(jsonl, Does.Contain("\"kind\":\"plan\""));
@@ -132,7 +133,7 @@ namespace Arcontio.Tests
 
             // Act: scriviamo la riga intent nel file JSONL di test.
             MovementExplainabilityJsonLogSink.TryWriteIntent(config, trace);
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             // Assert: purpose, target e belief devono essere stringhe autoesplicative.
             Assert.That(jsonl, Does.Contain("\"kind\":\"intent\""));
@@ -188,7 +189,7 @@ namespace Arcontio.Tests
 
             // Act: scriviamo la riga evento nel file JSONL di test.
             MovementExplainabilityJsonLogSink.TryWriteExecutionEvent(config, evt);
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             // Assert: event type e failure type devono essere leggibili senza mapping.
             Assert.That(jsonl, Does.Contain("\"kind\":\"event\""));
@@ -233,6 +234,8 @@ namespace Arcontio.Tests
         /// </summary>
         private static string ResetLogFile(string fileName)
         {
+            JsonlRuntimeLogHub.Shutdown();
+
             string directory = Path.Combine(Application.persistentDataPath, DirectoryName);
             Directory.CreateDirectory(directory);
 
@@ -241,6 +244,14 @@ namespace Arcontio.Tests
                 File.Delete(path);
 
             return path;
+        }
+
+        private static string ReadFlushedLog(string path)
+        {
+            JsonlRuntimeLogHub.FlushAll(force: true);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
         }
     }
 }

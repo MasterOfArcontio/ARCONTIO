@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Arcontio.Core.Config;
+using Arcontio.Core.Logging;
 using UnityEngine;
 
 namespace Arcontio.Core
@@ -257,7 +258,7 @@ namespace Arcontio.Core
             try
             {
                 string json = JsonUtility.ToJson(record, prettyPrint: false);
-                File.AppendAllText(path, json + Environment.NewLine);
+                JsonlRuntimeLogHub.EnqueueLine("mbqd", path, json);
             }
             catch (Exception ex)
             {
@@ -283,7 +284,6 @@ namespace Arcontio.Core
                 safeFileName += ".jsonl";
 
             string directory = Path.Combine(Application.persistentDataPath, DefaultDirectoryName);
-            Directory.CreateDirectory(directory);
 
             _resolvedPattern = pattern;
             _resolvedPath = Path.Combine(directory, safeFileName);
