@@ -12,6 +12,7 @@ namespace Arcontio.Core.Logging
 
         private static bool _initialized;
         private static GameParams _params;
+        private static LoggerDiagnosticsParams _logging;
         private static LocalizationDb _loc;
         private static LogTheme _theme;
 
@@ -33,12 +34,14 @@ namespace Arcontio.Core.Logging
             if (_initialized) return;
 
             _params = GameParamsLoader.LoadFromResources(gameParamsPathNoExt);
+            _logging = _params.ResolveLogging();
             _loc = LocalizationDb.LoadFromResources(localizationPathNoExt);
             _theme = new LogTheme();
 
-            _minLevel = ParseLevel(_params.Logging.MinLevel, LogLevel.Warn);
+            _minLevel = ParseLevel(_logging.general.minimum_level, LogLevel.Warn);
+            JsonlRuntimeLogHub.Configure(_logging.jsonl);
 
-            if (LegacyUnityConsoleSinkEnabled && _params.Logging.WriteUnityConsole)
+            if (LegacyUnityConsoleSinkEnabled && _logging.legacy_channels.unity_console_enabled)
             {
                 _unitySink = new UnityConsoleSink();
 
@@ -47,14 +50,14 @@ namespace Arcontio.Core.Logging
             }
             //_unitySink = new UnityConsoleSink();
 
-            if (LegacyTextOrHtmlFileSinkEnabled && _params.Logging.WriteFile)
+            if (LegacyTextOrHtmlFileSinkEnabled &&
+                (_logging.legacy_channels.html_file_enabled || _logging.legacy_channels.txt_file_enabled))
             {
-                var fileName = BuildFileName(_params.Logging.FileNamePattern);
+                var fileName = BuildFileName(_logging.legacy_channels.file_name_pattern);
                 var folder = Path.Combine(Application.persistentDataPath, "Logs");
                 var path = Path.Combine(folder, fileName);
 
-                var fmt = (_params.Logging.FileFormat ?? "txt").Trim().ToLowerInvariant();
-                if (fmt == "html")
+                if (_logging.legacy_channels.html_file_enabled)
                 {
                     _htmlSink = new HtmlFileSink(path);
                 }
@@ -84,6 +87,7 @@ namespace Arcontio.Core.Logging
             _htmlSink = null;
             _fileSink = null;
             _unitySink = null;
+            _logging = null;
             _initialized = false;
         }
 
@@ -105,6 +109,7 @@ namespace Arcontio.Core.Logging
         private static void Write(LogLevel lvl, LogContext ctx, LogBlock block)
         {
             if (!_initialized) InitFromResources(); // fallback safe
+            if (_logging != null && !_logging.general.enabled) return;
             if (lvl < _minLevel) return;
 
             block.Level = lvl;
@@ -113,8 +118,8 @@ namespace Arcontio.Core.Logging
                 ? block.MessageFallback
                 : _loc.Get(block.MessageKey, CurrentLanguage);
 
-            var includeTs = _params.Logging.IncludeTimestamp;
-            var includeTick = _params.Logging.IncludeTick;
+            var includeTs = _logging.general.include_timestamp;
+            var includeTick = _logging.general.include_tick;
 
             // Unity (rich)
             if (_unitySink != null)

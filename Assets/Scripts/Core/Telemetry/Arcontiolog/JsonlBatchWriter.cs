@@ -39,6 +39,25 @@ namespace Arcontio.Core.Logging
         private const double DefaultFlushIntervalSeconds = 0.25;
 
         private static readonly Dictionary<string, JsonlBatchWriter> _writers = new();
+        private static bool _enabled = true;
+        private static int _maxQueuedLines = DefaultMaxQueuedLines;
+        private static int _maxLinesPerFlush = DefaultMaxLinesPerFlush;
+        private static TimeSpan _flushInterval = TimeSpan.FromSeconds(DefaultFlushIntervalSeconds);
+
+        public static void Configure(LoggerJsonlParams config)
+        {
+            _enabled = config == null || config.enabled;
+            _maxQueuedLines = config != null && config.max_queue_size > 0
+                ? config.max_queue_size
+                : DefaultMaxQueuedLines;
+            _maxLinesPerFlush = config != null && config.max_batch_size > 0
+                ? config.max_batch_size
+                : DefaultMaxLinesPerFlush;
+            double seconds = config != null && config.flush_interval_seconds > 0
+                ? config.flush_interval_seconds
+                : DefaultFlushIntervalSeconds;
+            _flushInterval = TimeSpan.FromSeconds(seconds);
+        }
 
         // =============================================================================
         // EnqueueLine
@@ -54,7 +73,8 @@ namespace Arcontio.Core.Logging
         {
             if (string.IsNullOrWhiteSpace(channelId) ||
                 string.IsNullOrWhiteSpace(filePath) ||
-                string.IsNullOrWhiteSpace(jsonLine))
+                string.IsNullOrWhiteSpace(jsonLine) ||
+                !_enabled)
             {
                 return false;
             }
@@ -65,9 +85,9 @@ namespace Arcontio.Core.Logging
                 writer = new JsonlBatchWriter(
                     channelId,
                     filePath,
-                    DefaultMaxQueuedLines,
-                    DefaultMaxLinesPerFlush,
-                    TimeSpan.FromSeconds(DefaultFlushIntervalSeconds));
+                    _maxQueuedLines,
+                    _maxLinesPerFlush,
+                    _flushInterval);
 
                 _writers[key] = writer;
             }
