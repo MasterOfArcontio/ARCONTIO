@@ -289,27 +289,28 @@ Esito tecnico:
 Report closeout root:
 `v0.11c.04_Closeout_Report.md`
 
-### Checkpoint corrente completato: v0.11c.05 - Recovery Evaluation Foundation
+### Checkpoint corrente completato: v0.11c.06 - Stabilizzazione Movimento Multi-Tick
 
 STATUS:
 COMPLETED / DONE
 
 Esito tecnico:
 
-* completato audit classificazione fallimenti step-local;
-* introdotto DTO passivo `StepFailureClassification`;
-* introdotto skeleton no-op `StepRecoveryEvaluator`;
-* aggiunta QA matrix evaluator recovery;
-* `StepRecoveryEvaluator.EvaluateNoOp(...)` restituisce sempre `JobRecoveryResult.None()`;
-* nessun recovery runtime reale introdotto;
-* nessun retry runtime, target replacement, replanning, escalation cognitiva o strategy application;
-* `JobExecutionSystem` non usa l'evaluator;
-* `JobStateMachine` mantiene `Failed -> JobFailed`;
-* `Blocked` e `Waiting` restano wait gate tecnico;
-* nessun mapping produttivo tra `StepResult`, `StepFailureClassification`, `StepRecoveryPolicy` e `JobRecoveryResult`.
+* completato audit movimento legacy vs movimento temporale;
+* confermato movimento Job multi-tick reale per target cardinale adiacente;
+* aggiunta QA che dimostra N tick configurabili per attraversare una cella;
+* posizione NPC aggiornata solo a completion della running action;
+* reservation cella destinazione mantenuta durante la traversata;
+* reservation traversal allineata alla durata reale configurata;
+* completato audit riduzione movimento legacy senza patch runtime;
+* aggiunta QA inventory dei path legacy e Job;
+* `MovementSystem` resta attivo e necessario;
+* `MoveIntent` resta attivo e necessario;
+* target lontani, diagonali o con gate spento restano fallback legacy;
+* nessuna migrazione completa movimento, nessun path lungo Job-native, nessun recovery movimento.
 
 Report closeout root:
-`v0.11c.05_Closeout_Report.md`
+`v0.11c.06_Closeout_Report.md`
 
 Prossimo checkpoint operativo:
 NON DECISO in questa patch. Ogni step successivo deve restare audit-first.
