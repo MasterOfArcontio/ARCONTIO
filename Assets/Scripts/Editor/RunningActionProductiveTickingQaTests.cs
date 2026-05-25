@@ -36,6 +36,31 @@ namespace Arcontio.Tests
     public sealed class RunningActionProductiveTickingQaTests
     {
         // =============================================================================
+        // RunFromCommandLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Entry point diagnostico per eseguire il QA mirato 06b da Unity batchmode
+        /// quando il runner standard non produce XML.
+        /// </para>
+        /// </summary>
+        public static void RunFromCommandLine()
+        {
+            try
+            {
+                new RunningActionProductiveTickingQaTests().OneCellMoveTraversalHonorsConfiguredFourTickDuration();
+
+                Debug.Log("[RunningActionProductiveTickingQaTests] PASS OneCellMoveTraversalHonorsConfiguredFourTickDuration");
+                UnityEditor.EditorApplication.Exit(0);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("[RunningActionProductiveTickingQaTests] FAIL OneCellMoveTraversalHonorsConfiguredFourTickDuration\n" + ex);
+                UnityEditor.EditorApplication.Exit(1);
+            }
+        }
+
+        // =============================================================================
         // RuntimeTimingParamsLoadFromJsonAndDeriveTickInterval
         // =============================================================================
         /// <summary>
@@ -385,6 +410,60 @@ namespace Arcontio.Tests
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
             Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Completed));
+        }
+
+        // =============================================================================
+        // OneCellMoveTraversalHonorsConfiguredFourTickDuration
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica esplicitamente che il traversal one-cell del Job Layer rispetti
+        /// la durata configurata e non ricada nel movimento legacy immediato.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void OneCellMoveTraversalHonorsConfiguredFourTickDuration()
+        {
+            // Arrange: la durata cella e' 4 tick. Il target e' cardinale adiacente,
+            // quindi il path temporale running-action e' eleggibile e MovementSystem
+            // non deve essere necessario per mutare la posizione.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 4);
+            var startCell = world.GridPos[npcId];
+            var targetCell = new Vector2Int(startCell.X + 1, startCell.Y);
+            var job = MakeObjectTargetMoveJob(npcId, "job-move-four-tick-duration", targetObjectId: 7201, targetCell);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            // Act/Assert: i primi tre tick avanzano solo il progress interno. La
+            // posizione resta sorgente, la running action resta viva e la cella
+            // destinazione resta riservata al job corrente.
+            for (int tick = 0; tick < 3; tick++)
+            {
+                system.Update(world, new Tick(tick, 1f), new MessageBus(), new Telemetry());
+
+                Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+                Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+                Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+                Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+                Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+                Assert.That(world.JobRuntimeState.Reservations.TryGetByTarget(ReservationTargetKind.Cell, targetCell, -1, out var held), Is.True);
+                Assert.That(held.JobId, Is.EqualTo(job.JobId));
+            }
+
+            // Act: il quarto tick completa la running action e applica la sola
+            // mutazione finale della posizione.
+            system.Update(world, new Tick(3, 1f), new MessageBus(), new Telemetry());
+
+            // Assert: il job e' chiuso, lo stato volatile e le reservation sono
+            // ripulite, e nessun comando di movimento legacy e' stato emesso.
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.Reservations.Count, Is.EqualTo(0));
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
             Assert.That(job.Status, Is.EqualTo(JobStatus.Completed));
