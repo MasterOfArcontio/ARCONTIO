@@ -388,6 +388,7 @@ namespace Arcontio.Core
             }
 
             if (!TryEnsureTraversalDestinationReservation(
+                    world,
                     runtime,
                     npcId,
                     job,
@@ -514,6 +515,7 @@ namespace Arcontio.Core
         }
 
         private static bool TryEnsureTraversalDestinationReservation(
+            World world,
             JobRuntimeState runtime,
             int npcId,
             Job job,
@@ -542,7 +544,7 @@ namespace Arcontio.Core
                 targetCell,
                 -1,
                 tick,
-                tick + ResolveTraversalReservationDurationTicks(action));
+                tick + ResolveTraversalReservationDurationTicks(world, action));
 
             // ARC-DEC-020 richiede che la cella destinazione sia riservata prima
             // dell'inizio del movimento multi-tick e resti protetta durante il
@@ -610,15 +612,13 @@ namespace Arcontio.Core
             return "traversal:" + key.JobId + ":" + key.NpcId + ":" + key.PhaseIndex + ":" + key.ActionIndex + ":" + targetCell.x + ":" + targetCell.y;
         }
 
-        private static int ResolveTraversalReservationDurationTicks(JobAction action)
+        private static int ResolveTraversalReservationDurationTicks(World world, JobAction action)
         {
-            // La reservation temporale action-scoped viene tenuta abbastanza a lungo
-            // da coprire il prossimo tick di progress anche se il chiamante usa un
-            // DurationTicks esplicito in futuro. Per il MoveToCell 02g la durata
-            // effettiva resta nella config movement, quindi qui manteniamo solo una
-            // finestra difensiva e il refresh al tick successivo avviene dal path
-            // TryEnsureTraversalDestinationReservation.
-            return Mathf.Max(2, action.DurationTicks + 2);
+            // La reservation temporale action-scoped deve coprire la stessa finestra
+            // del traversal reale. Per MoveToCell la durata produttiva non vive in
+            // JobAction.DurationTicks ma nella config tick.baseWalkCellDurationTicks;
+            // usare quella durata evita una scadenza anticipata prima della completion.
+            return Mathf.Max(1, Mathf.Max(ResolveBaseWalkCellDurationTicks(world), action.DurationTicks));
         }
 
         private static bool CanUseRunningActionCellTraversal(World world, GridPosition npcCell, Vector2Int targetCell)
