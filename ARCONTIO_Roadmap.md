@@ -538,6 +538,37 @@ La recovery deve restare:
 
 ---
 
+#### v0.11c.06 - Stabilizzazione Movimento Multi-Tick
+
+## Stato
+COMPLETATA / DONE
+
+## Obiettivo
+
+Stabilizzare il primo movimento Job multi-tick reale senza spegnere il movimento legacy.
+
+La fase ha consolidato:
+
+- traversal Job one-cell multi-tick;
+- durata cella configurabile;
+- mutazione posizione solo a completion;
+- reservation cella destinazione durante progress;
+- inventario dei path legacy ancora necessari.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11c.06a | Audit movimento legacy vs movimento temporale | DONE |
+| v0.11c.06b | QA N tick per attraversamento cella | DONE |
+| v0.11c.06c | Allineamento prenotazione cella e durata movimento | DONE |
+| v0.11c.06d | Audit riduzione movimento legacy | DONE |
+| v0.11c.06e | Inventario QA movimento legacy | DONE |
+| v0.11c.06f | Closeout stabilizzazione movimento multi-tick | DONE |
+
+> **Nota closeout v0.11c.06f (2026-05-25):** il checkpoint `v0.11c.06` e' chiuso come Stabilizzazione Movimento Multi-Tick. Il Job Layer puo' attraversare una cella in N tick configurabili, aggiornando la posizione solo a completion e mantenendo una reservation cella allineata alla durata reale. `MovementSystem` e `MoveIntent` restano attivi e necessari per path lunghi, landmark, local search, backoff, porte, debug movement e fallback legacy. La migrazione completa del movimento NON e' implementata. Dettaglio: `v0.11c.06_Closeout_Report.md`.
+
+---
 #### v0.12 — Pulizia Logging, Explainability e Diagnostica Runtime
 
 ## Stato
