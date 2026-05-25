@@ -289,6 +289,28 @@ Esito tecnico:
 Report closeout root:
 `v0.11c.04_Closeout_Report.md`
 
+### Checkpoint corrente completato: v0.11c.05 - Recovery Evaluation Foundation
+
+STATUS:
+COMPLETED / DONE
+
+Esito tecnico:
+
+* completato audit classificazione fallimenti step-local;
+* introdotto DTO passivo `StepFailureClassification`;
+* introdotto skeleton no-op `StepRecoveryEvaluator`;
+* aggiunta QA matrix evaluator recovery;
+* `StepRecoveryEvaluator.EvaluateNoOp(...)` restituisce sempre `JobRecoveryResult.None()`;
+* nessun recovery runtime reale introdotto;
+* nessun retry runtime, target replacement, replanning, escalation cognitiva o strategy application;
+* `JobExecutionSystem` non usa l'evaluator;
+* `JobStateMachine` mantiene `Failed -> JobFailed`;
+* `Blocked` e `Waiting` restano wait gate tecnico;
+* nessun mapping produttivo tra `StepResult`, `StepFailureClassification`, `StepRecoveryPolicy` e `JobRecoveryResult`.
+
+Report closeout root:
+`v0.11c.05_Closeout_Report.md`
+
 Prossimo checkpoint operativo:
 NON DECISO in questa patch. Ogni step successivo deve restare audit-first.
 
