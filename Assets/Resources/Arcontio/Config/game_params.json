@@ -19,11 +19,11 @@
     "activeNpcOnly": true
   },
   "Logging": {
-    "MinLevel": "Trace",
-    "WriteUnityConsole": true,
-    "WriteFile": true,
-    "FileFormat": "html",
-    "FileNamePattern": "arcontio_{yyyyMMdd_HHmmss}.html",
+    "MinLevel": "Warn",
+    "WriteUnityConsole": false,
+    "WriteFile": false,
+    "FileFormat": "txt",
+    "FileNamePattern": "arcontio_{yyyyMMdd_HHmmss}.txt",
     "IncludeTimestamp": true,
     "IncludeTick": true
   },

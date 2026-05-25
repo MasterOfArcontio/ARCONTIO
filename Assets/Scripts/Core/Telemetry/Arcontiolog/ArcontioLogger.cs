@@ -7,6 +7,9 @@ namespace Arcontio.Core.Logging
 {
     public static class ArcontioLogger
     {
+        private const bool LegacyUnityConsoleSinkEnabled = false;
+        private const bool LegacyTextOrHtmlFileSinkEnabled = false;
+
         private static bool _initialized;
         private static GameParams _params;
         private static LocalizationDb _loc;
@@ -33,9 +36,9 @@ namespace Arcontio.Core.Logging
             _loc = LocalizationDb.LoadFromResources(localizationPathNoExt);
             _theme = new LogTheme();
 
-            _minLevel = ParseLevel(_params.Logging.MinLevel, LogLevel.Info);
+            _minLevel = ParseLevel(_params.Logging.MinLevel, LogLevel.Warn);
 
-            if (_params.Logging.WriteUnityConsole)
+            if (LegacyUnityConsoleSinkEnabled && _params.Logging.WriteUnityConsole)
             {
                 _unitySink = new UnityConsoleSink();
 
@@ -44,7 +47,7 @@ namespace Arcontio.Core.Logging
             }
             //_unitySink = new UnityConsoleSink();
 
-            if (_params.Logging.WriteFile)
+            if (LegacyTextOrHtmlFileSinkEnabled && _params.Logging.WriteFile)
             {
                 var fileName = BuildFileName(_params.Logging.FileNamePattern);
                 var folder = Path.Combine(Application.persistentDataPath, "Logs");

@@ -13,9 +13,9 @@ namespace Arcontio.Core.Logging
     [Serializable]
     public sealed class LoggingParams
     {
-        public string MinLevel = "Info";
-        public bool WriteUnityConsole = true;
-        public bool WriteFile = true;
+        public string MinLevel = "Warn";
+        public bool WriteUnityConsole = false;
+        public bool WriteFile = false;
 
         public string FileFormat = "txt"; // "txt" | "html"
         public string FileNamePattern = "arcontio_{yyyyMMdd_HHmmss}.txt";
