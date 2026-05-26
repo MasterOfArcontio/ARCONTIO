@@ -443,6 +443,7 @@ namespace Arcontio.Core
         private const int DefaultMaxTimelineRows = 48;
         private static readonly List<MemoryBeliefDecisionTrace> TraceBuffer = new(128);
         private static readonly List<MemoryBeliefDecisionTrace> TimelineBuffer = new(128);
+        private static readonly Dictionary<string, int> CountsBuffer = new(StringComparer.Ordinal);
 
         public static bool BuildForNpc(
             World world,
@@ -862,19 +863,19 @@ namespace Arcontio.Core
             TraceBuffer.Clear();
             store.CopyMemoryTracesTo(TraceBuffer);
 
-            var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+            CountsBuffer.Clear();
             for (int i = 0; i < TraceBuffer.Count; i++)
             {
                 string key = TraceBuffer[i]?.Memory != null ? TraceBuffer[i].Memory.TraceType.ToString() : "Unknown";
-                counts.TryGetValue(key, out int count);
-                counts[key] = count + 1;
+                CountsBuffer.TryGetValue(key, out int count);
+                CountsBuffer[key] = count + 1;
             }
 
             int max = 1;
-            foreach (var kv in counts)
+            foreach (var kv in CountsBuffer)
                 max = Math.Max(max, kv.Value);
 
-            foreach (var kv in counts)
+            foreach (var kv in CountsBuffer)
             {
                 output.Add(new MemoryBeliefDecisionMetricView
                 {

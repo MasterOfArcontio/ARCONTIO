@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using Arcontio.Core.Logging;
 using NUnit.Framework;
@@ -72,6 +73,60 @@ namespace Arcontio.Tests
             Assert.That(jsonl, Does.Contain("\"dropped\":1"));
             Assert.That(jsonl, Does.Contain("\"frozen\":true"));
             Assert.That(jsonl, Does.Not.Contain("\"kind\":\"third\""));
+        }
+
+        // =============================================================================
+        // RuntimeHubReportsQueuedDroppedAndFrozenStatus
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica la diagnostica leggera esposta dal centro JSONL: gli strumenti
+        /// runtime devono poter leggere righe in coda, righe perse e stato congelato
+        /// senza aprire file e senza forzare uno scarico.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void RuntimeHubReportsQueuedDroppedAndFrozenStatus()
+        {
+            JsonlRuntimeLogHub.Shutdown();
+
+            string directory = Path.Combine(Application.persistentDataPath, "Arcontio_QA_JsonlBatchWriter");
+            Directory.CreateDirectory(directory);
+
+            string path = Path.Combine(directory, "qa_jsonl_runtime_hub_status.jsonl");
+            if (File.Exists(path))
+                File.Delete(path);
+
+            JsonlRuntimeLogHub.Configure(new LoggerJsonlParams
+            {
+                enabled = true,
+                max_queue_size = 1,
+                max_batch_size = 10,
+                flush_interval_seconds = 60
+            });
+
+            try
+            {
+                Assert.That(JsonlRuntimeLogHub.EnqueueLine("qa_status", path, "{\"kind\":\"first\"}"), Is.True);
+                Assert.That(JsonlRuntimeLogHub.EnqueueLine("qa_status", path, "{\"kind\":\"second\"}"), Is.False);
+
+                var statuses = new List<JsonlRuntimeLogStatus>();
+                JsonlRuntimeLogHub.GetStatus(statuses);
+
+                Assert.That(statuses.Count, Is.EqualTo(1));
+                Assert.That(statuses[0].ChannelId, Is.EqualTo("qa_status"));
+                Assert.That(statuses[0].FilePath, Is.EqualTo(path));
+                Assert.That(statuses[0].QueuedLines, Is.EqualTo(1));
+                Assert.That(statuses[0].DroppedLines, Is.EqualTo(1));
+                Assert.That(statuses[0].Frozen, Is.True);
+
+                Assert.That(File.Exists(path), Is.False);
+            }
+            finally
+            {
+                JsonlRuntimeLogHub.Shutdown();
+                JsonlRuntimeLogHub.Configure(new LoggerJsonlParams());
+            }
         }
     }
 }

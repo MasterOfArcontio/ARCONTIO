@@ -7,6 +7,34 @@ using System.Text;
 namespace Arcontio.Core.Logging
 {
     // =============================================================================
+    // JsonlRuntimeLogStatus
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot leggero dello stato di un canale JSONL runtime. Serve alla
+    /// diagnostica per leggere coda, saturazione e righe perse senza accedere allo
+    /// scrittore interno e senza aprire file.
+    /// </para>
+    /// </summary>
+    public readonly struct JsonlRuntimeLogStatus
+    {
+        public readonly string ChannelId;
+        public readonly string FilePath;
+        public readonly int QueuedLines;
+        public readonly long DroppedLines;
+        public readonly bool Frozen;
+
+        public JsonlRuntimeLogStatus(string channelId, string filePath, int queuedLines, long droppedLines, bool frozen)
+        {
+            ChannelId = channelId;
+            FilePath = filePath;
+            QueuedLines = queuedLines;
+            DroppedLines = droppedLines;
+            Frozen = frozen;
+        }
+    }
+
+    // =============================================================================
     // JsonlRuntimeLogHub
     // =============================================================================
     /// <summary>
@@ -114,6 +142,33 @@ namespace Arcontio.Core.Logging
         }
 
         // =============================================================================
+        // GetStatus
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia lo stato dei canali JSONL attualmente vivi in una lista fornita dal
+        /// chiamante. La funzione e' pensata per strumenti diagnostici: non forza
+        /// flush, non apre file e non modifica le code.
+        /// </para>
+        /// </summary>
+        public static void GetStatus(List<JsonlRuntimeLogStatus> output)
+        {
+            if (output == null)
+                return;
+
+            output.Clear();
+            foreach (var writer in _writers.Values)
+            {
+                if (writer == null)
+                    continue;
+
+                output.Add(writer.CreateStatus());
+            }
+        }
+
+        public static int WriterCount => _writers.Count;
+
+        // =============================================================================
         // Shutdown
         // =============================================================================
         /// <summary>
@@ -170,6 +225,8 @@ namespace Arcontio.Core.Logging
         public bool Frozen => _frozen;
         public long DroppedLines => _droppedLines;
         public int QueuedLines => _queue.Count;
+        public string ChannelId => _channelId;
+        public string FilePath => _filePath;
 
         // =============================================================================
         // JsonlBatchWriter
@@ -295,6 +352,11 @@ namespace Arcontio.Core.Logging
 
             _writer = null;
             _disposed = true;
+        }
+
+        public JsonlRuntimeLogStatus CreateStatus()
+        {
+            return new JsonlRuntimeLogStatus(_channelId, _filePath, _queue.Count, _droppedLines, _frozen);
         }
 
         private void EnsureWriter()

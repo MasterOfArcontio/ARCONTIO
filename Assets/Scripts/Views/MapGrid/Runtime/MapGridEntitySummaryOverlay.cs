@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Arcontio.Core;
+using Arcontio.Core.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -216,8 +217,10 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbMbqdJobCurrent = new(2048);
         private readonly StringBuilder _sbMbqdJobPhaseStep = new(2048);
         private readonly StringBuilder _sbMbqdJobRuntime = new(3072);
+        private readonly StringBuilder _sbJsonlStatus = new(128);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
+        private readonly List<JsonlRuntimeLogStatus> _jsonlStatuses = new(8);
         private readonly MovementExplainabilityViewModel _movementExplainabilityViewModel = new();
         private readonly MemoryBeliefDecisionExplainabilityViewModel _mbqdExplainabilityViewModel = new();
 
@@ -225,6 +228,7 @@ namespace Arcontio.View.MapGrid
         private float _lastMovementPanelRefreshRealtime = -999f;
         private int _lastMovementPanelSelectedNpcId = int.MinValue;
         private long _lastMovementPanelWorldTick = long.MinValue;
+        private int _lastMovementPanelPageVersion = -1;
 
         private const float MovementPanelRefreshIntervalSeconds = 0.25f;
 
@@ -1199,15 +1203,18 @@ namespace Arcontio.View.MapGrid
 
             int selectedNpcId = SocialViewer.UI.NPCSelection.SelectedNpcId;
             long worldTick = world != null ? Arcontio.Core.TickContext.CurrentTickIndex : -1;
+            MapGridExplainabilityPanelPage activePage = _movementExplainabilityPanel.ActivePage;
             bool selectionChanged = selectedNpcId != _lastMovementPanelSelectedNpcId;
             bool tickChanged = worldTick != _lastMovementPanelWorldTick;
+            bool pageChanged = _movementExplainabilityPanel.ActivePageVersion != _lastMovementPanelPageVersion;
             bool refreshWindowExpired = Time.unscaledTime - _lastMovementPanelRefreshRealtime >= MovementPanelRefreshIntervalSeconds;
 
-            if (!selectionChanged && (!tickChanged || !refreshWindowExpired))
+            if (!selectionChanged && !pageChanged && (!tickChanged || !refreshWindowExpired))
                 return;
 
             _lastMovementPanelSelectedNpcId = selectedNpcId;
             _lastMovementPanelWorldTick = worldTick;
+            _lastMovementPanelPageVersion = _movementExplainabilityPanel.ActivePageVersion;
             _lastMovementPanelRefreshRealtime = Time.unscaledTime;
 
             if (selectedNpcId <= 0)
@@ -1238,17 +1245,69 @@ namespace Arcontio.View.MapGrid
                 return;
             }
 
-            string headerMeta = BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityIntentPlan, _sbExplainabilityEvents, maxEvents: 32);
-            string mbqdHeaderMeta = BuildMemoryBeliefDecisionExplainabilityText(world, selectedNpcId);
-            _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", string.IsNullOrWhiteSpace(mbqdHeaderMeta) ? headerMeta : mbqdHeaderMeta);
+            if (activePage == MapGridExplainabilityPanelPage.Pathfinding)
+            {
+                string headerMeta = BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityIntentPlan, _sbExplainabilityEvents, maxEvents: 32);
+                _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", headerMeta);
+                _movementExplainabilityPanel.SetDiagnostics($"selectedNpc={selectedNpcId} | worldTick={worldTick} | pagina=Pathfinding | {BuildJsonlStatusText()}");
+                _movementExplainabilityPanel.SetPathfindingText(_sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
+                _movementExplainabilityPanel.SetVisible(true);
+                return;
+            }
+
+            string mbqdHeaderMeta = BuildMemoryBeliefDecisionExplainabilityText(world, selectedNpcId, activePage);
+            _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", mbqdHeaderMeta);
             _movementExplainabilityPanel.SetDiagnostics(
-                $"selectedNpc={selectedNpcId} | worldTick={worldTick} | registryNpc={_mbqdExplainabilityViewModel.HasNpc} | MBQD M{_mbqdExplainabilityViewModel.MemoryCount} B{_mbqdExplainabilityViewModel.BeliefCount} Q{_mbqdExplainabilityViewModel.QueryCount} D{_mbqdExplainabilityViewModel.DecisionCount} J{_mbqdExplainabilityViewModel.JobRequestCount}/{_mbqdExplainabilityViewModel.JobLifecycleCount}/{_mbqdExplainabilityViewModel.StepCount}");
-            _movementExplainabilityPanel.SetPathfindingText(_sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
-            _movementExplainabilityPanel.SetMemoryText(_sbMbqdMemoryStore.ToString(), _sbMbqdMemoryLatest.ToString(), _sbMbqdMemoryTimeline.ToString());
-            _movementExplainabilityPanel.SetBeliefText(_sbMbqdBeliefEntries.ToString(), _sbMbqdBeliefQuery.ToString(), _sbMbqdBeliefMutation.ToString());
-            _movementExplainabilityPanel.SetDecisionText(_sbMbqdDecisionSelected.ToString(), _sbMbqdDecisionCandidates.ToString(), _sbMbqdDecisionBridge.ToString());
-            _movementExplainabilityPanel.SetJobText(_sbMbqdJobCurrent.ToString(), _sbMbqdJobPhaseStep.ToString(), _sbMbqdJobRuntime.ToString());
+                $"selectedNpc={selectedNpcId} | worldTick={worldTick} | pagina={activePage} | registryNpc={_mbqdExplainabilityViewModel.HasNpc} | MBQD M{_mbqdExplainabilityViewModel.MemoryCount} B{_mbqdExplainabilityViewModel.BeliefCount} Q{_mbqdExplainabilityViewModel.QueryCount} D{_mbqdExplainabilityViewModel.DecisionCount} J{_mbqdExplainabilityViewModel.JobRequestCount}/{_mbqdExplainabilityViewModel.JobLifecycleCount}/{_mbqdExplainabilityViewModel.StepCount} | {BuildJsonlStatusText()}");
+
+            switch (activePage)
+            {
+                case MapGridExplainabilityPanelPage.Memory:
+                    _movementExplainabilityPanel.SetMemoryText(_sbMbqdMemoryStore.ToString(), _sbMbqdMemoryLatest.ToString(), _sbMbqdMemoryTimeline.ToString());
+                    break;
+                case MapGridExplainabilityPanelPage.Belief:
+                    _movementExplainabilityPanel.SetBeliefText(_sbMbqdBeliefEntries.ToString(), _sbMbqdBeliefQuery.ToString(), _sbMbqdBeliefMutation.ToString());
+                    break;
+                case MapGridExplainabilityPanelPage.Decision:
+                    _movementExplainabilityPanel.SetDecisionText(_sbMbqdDecisionSelected.ToString(), _sbMbqdDecisionCandidates.ToString(), _sbMbqdDecisionBridge.ToString());
+                    break;
+                case MapGridExplainabilityPanelPage.Job:
+                    _movementExplainabilityPanel.SetJobText(_sbMbqdJobCurrent.ToString(), _sbMbqdJobPhaseStep.ToString(), _sbMbqdJobRuntime.ToString());
+                    break;
+            }
+
             _movementExplainabilityPanel.SetVisible(true);
+        }
+
+        private string BuildJsonlStatusText()
+        {
+            JsonlRuntimeLogHub.GetStatus(_jsonlStatuses);
+            if (_jsonlStatuses.Count <= 0)
+                return "jsonl=idle";
+
+            int queued = 0;
+            long dropped = 0;
+            int frozen = 0;
+            for (int i = 0; i < _jsonlStatuses.Count; i++)
+            {
+                queued += _jsonlStatuses[i].QueuedLines;
+                dropped += _jsonlStatuses[i].DroppedLines;
+                if (_jsonlStatuses[i].Frozen)
+                    frozen++;
+            }
+
+            _sbJsonlStatus.Clear();
+            _sbJsonlStatus
+                .Append("jsonl=")
+                .Append(_jsonlStatuses.Count)
+                .Append(" q")
+                .Append(queued)
+                .Append(" drop")
+                .Append(dropped)
+                .Append(" frozen")
+                .Append(frozen);
+
+            return _sbJsonlStatus.ToString();
         }
 
         // =============================================================================
@@ -1267,7 +1326,7 @@ namespace Arcontio.View.MapGrid
         /// UI-friendly, allineando pannello e JSONL.
         /// </para>
         /// </summary>
-        private string BuildMemoryBeliefDecisionExplainabilityText(Arcontio.Core.World world, int npcId)
+        private string BuildMemoryBeliefDecisionExplainabilityText(Arcontio.Core.World world, int npcId, MapGridExplainabilityPanelPage activePage)
         {
             ClearMbqdBuffers();
 
@@ -1283,26 +1342,50 @@ namespace Arcontio.View.MapGrid
                     ? "EL-MBQD non disponibile per questo NPC"
                     : _mbqdExplainabilityViewModel.HeaderSubtitle;
 
-                _sbMbqdMemoryStore.Append("<color=#6E7681>").Append(message).Append("</color>");
-                _sbMbqdMemoryLatest.Append("<color=#6E7681>(nessuna ultima memory trace)</color>");
-                _sbMbqdMemoryTimeline.Append("<color=#6E7681>(nessuna timeline memory)</color>");
-                _sbMbqdBeliefEntries.Append("<color=#6E7681>").Append(message).Append("</color>");
-                _sbMbqdBeliefQuery.Append("<color=#6E7681>(nessuna query belief)</color>");
-                _sbMbqdBeliefMutation.Append("<color=#6E7681>(nessuna mutazione belief)</color>");
-                _sbMbqdDecisionSelected.Append("<color=#6E7681>").Append(message).Append("</color>");
-                _sbMbqdDecisionCandidates.Append("<color=#6E7681>(nessun candidato decisionale)</color>");
-                _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge decisione-comando)</color>");
-                _sbMbqdJobCurrent.Append("<color=#6E7681>").Append(message).Append("</color>");
-                _sbMbqdJobPhaseStep.Append("<color=#6E7681>(nessuna phase/step trace)</color>");
-                _sbMbqdJobRuntime.Append("<color=#6E7681>(nessuna runtime job trace)</color>");
+                switch (activePage)
+                {
+                    case MapGridExplainabilityPanelPage.Memory:
+                        _sbMbqdMemoryStore.Append("<color=#6E7681>").Append(message).Append("</color>");
+                        _sbMbqdMemoryLatest.Append("<color=#6E7681>(nessuna ultima memory trace)</color>");
+                        _sbMbqdMemoryTimeline.Append("<color=#6E7681>(nessuna timeline memory)</color>");
+                        break;
+                    case MapGridExplainabilityPanelPage.Belief:
+                        _sbMbqdBeliefEntries.Append("<color=#6E7681>").Append(message).Append("</color>");
+                        _sbMbqdBeliefQuery.Append("<color=#6E7681>(nessuna query belief)</color>");
+                        _sbMbqdBeliefMutation.Append("<color=#6E7681>(nessuna mutazione belief)</color>");
+                        break;
+                    case MapGridExplainabilityPanelPage.Decision:
+                        _sbMbqdDecisionSelected.Append("<color=#6E7681>").Append(message).Append("</color>");
+                        _sbMbqdDecisionCandidates.Append("<color=#6E7681>(nessun candidato decisionale)</color>");
+                        _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge decisione-comando)</color>");
+                        break;
+                    case MapGridExplainabilityPanelPage.Job:
+                        _sbMbqdJobCurrent.Append("<color=#6E7681>").Append(message).Append("</color>");
+                        _sbMbqdJobPhaseStep.Append("<color=#6E7681>(nessuna phase/step trace)</color>");
+                        _sbMbqdJobRuntime.Append("<color=#6E7681>(nessuna runtime job trace)</color>");
+                        break;
+                }
+
                 return $"NPC #{npcId}";
             }
 
             var model = _mbqdExplainabilityViewModel;
-            AppendMbqdMemory(model);
-            AppendMbqdBelief(model);
-            AppendMbqdDecision(model);
-            AppendMbqdJob(model);
+            switch (activePage)
+            {
+                case MapGridExplainabilityPanelPage.Memory:
+                    AppendMbqdMemory(model);
+                    break;
+                case MapGridExplainabilityPanelPage.Belief:
+                    AppendMbqdBelief(model);
+                    break;
+                case MapGridExplainabilityPanelPage.Decision:
+                    AppendMbqdDecision(model);
+                    break;
+                case MapGridExplainabilityPanelPage.Job:
+                    AppendMbqdJob(model);
+                    break;
+            }
+
             return model.HeaderSubtitle;
         }
 

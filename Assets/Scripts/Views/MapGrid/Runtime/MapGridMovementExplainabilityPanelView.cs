@@ -89,6 +89,7 @@ namespace Arcontio.View.MapGrid
         private Text _pathEventsText;
 
         private MapGridExplainabilityPanelPage _activePage = MapGridExplainabilityPanelPage.Memory;
+        private int _activePageVersion;
 
         private const int MaxSectionTextChars = 6000;
         private const int EstimatedCharsPerLine = 52;
@@ -99,6 +100,8 @@ namespace Arcontio.View.MapGrid
 
         public RectTransform RootRectTransform => _rootRt;
         public MapGridExplainabilityPanelPage ActivePage => _activePage;
+        public int ActivePageVersion => _activePageVersion;
+        public bool IsVisible => _root != null && _root.activeInHierarchy;
 
         // =============================================================================
         // AttachTo
@@ -265,7 +268,10 @@ namespace Arcontio.View.MapGrid
         /// </summary>
         public void SetActivePage(MapGridExplainabilityPanelPage page)
         {
+            bool pageChanged = _activePage != page;
             _activePage = page;
+            if (pageChanged)
+                _activePageVersion++;
 
             for (int i = 0; i < _pageRoots.Length; i++)
             {

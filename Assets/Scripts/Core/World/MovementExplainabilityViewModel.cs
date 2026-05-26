@@ -219,6 +219,7 @@ namespace Arcontio.Core
     public static class MovementExplainabilityViewModelBuilder
     {
         private const int DefaultMaxEvents = 32;
+        private static readonly List<PathExecutionEvent> EventBuffer = new(64);
 
         // =============================================================================
         // BuildForNpc
@@ -274,22 +275,22 @@ namespace Arcontio.Core
             if (store.TryGetLatestPlanTrace(out var planTrace))
                 FillPlan(output.Plan, planTrace);
 
-            var events = new List<PathExecutionEvent>(Math.Max(1, Math.Min(store.ExecutionEventCount, maxEvents)));
-            store.CopyExecutionEventsTo(events);
+            EventBuffer.Clear();
+            store.CopyExecutionEventsTo(EventBuffer);
 
             int safeMaxEvents = Math.Max(0, maxEvents);
-            int startIndex = safeMaxEvents <= 0 ? events.Count : Math.Max(0, events.Count - safeMaxEvents);
+            int startIndex = safeMaxEvents <= 0 ? EventBuffer.Count : Math.Max(0, EventBuffer.Count - safeMaxEvents);
 
             // La copia conserva l'ordine cronologico, ma applica un limite finale per
             // impedire alla UI di renderizzare piu' righe di quante ne abbia richieste.
-            for (int i = startIndex; i < events.Count; i++)
+            for (int i = startIndex; i < EventBuffer.Count; i++)
             {
                 var eventView = new MovementExplainabilityEventView();
-                FillEvent(eventView, events[i]);
+                FillEvent(eventView, EventBuffer[i]);
                 output.Events.Add(eventView);
             }
 
-            output.Tick = ResolveLatestTick(intentTrace, planTrace, events);
+            output.Tick = ResolveLatestTick(intentTrace, planTrace, EventBuffer);
             return true;
         }
 
