@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using Arcontio.Core;
+using Arcontio.Core.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
@@ -216,8 +217,10 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbMbqdJobCurrent = new(2048);
         private readonly StringBuilder _sbMbqdJobPhaseStep = new(2048);
         private readonly StringBuilder _sbMbqdJobRuntime = new(3072);
+        private readonly StringBuilder _sbJsonlStatus = new(128);
 
         private readonly List<Arcontio.Core.MemoryTrace> _topMem = new(32);
+        private readonly List<JsonlRuntimeLogStatus> _jsonlStatuses = new(8);
         private readonly MovementExplainabilityViewModel _movementExplainabilityViewModel = new();
         private readonly MemoryBeliefDecisionExplainabilityViewModel _mbqdExplainabilityViewModel = new();
 
@@ -225,6 +228,7 @@ namespace Arcontio.View.MapGrid
         private float _lastMovementPanelRefreshRealtime = -999f;
         private int _lastMovementPanelSelectedNpcId = int.MinValue;
         private long _lastMovementPanelWorldTick = long.MinValue;
+        private int _lastMovementPanelPageVersion = -1;
 
         private const float MovementPanelRefreshIntervalSeconds = 0.25f;
 
@@ -668,6 +672,14 @@ namespace Arcontio.View.MapGrid
                 if (!isSelectedNpc)
                     continue;
 
+                bool buildAction = card.ShouldBuildActionSection();
+                bool buildInventory = card.ShouldBuildInventorySection();
+                bool buildComms = card.ShouldBuildCommsSection();
+                bool buildLandmarks = card.ShouldBuildLandmarksSection();
+                bool buildMemoryTraces = card.ShouldBuildMemoryTracesSection();
+                bool buildKnownObjects = card.ShouldBuildKnownObjectsSection();
+                bool buildDnaDrift = card.ShouldBuildDnaDriftSection();
+
                 // ============================================================
                 // HEADER / IDENTITY / STATE
                 // ============================================================
@@ -714,64 +726,67 @@ namespace Arcontio.View.MapGrid
                 // Ora li spostiamo in una sezione dedicata nella card, per:
                 // - maggiore leggibilità
                 // - supportare il collapse/expand per gruppo
-                _sbLandmarks.Clear();
-                _sbLandmarks.Append("Navigation / MacroRoute\n");
-
-                if (world.TryGetNpcLandmarkDebugReport(npcId, out var lmReport))
+                if (buildLandmarks)
                 {
-                    _sbLandmarks.Append("[NAV]\n");
+                    _sbLandmarks.Clear();
+                    _sbLandmarks.Append("Navigation / MacroRoute\n");
 
-                    if (world.TryGetNpcMacroRouteDebugReport(npcId, out var routeReport))
+                    if (world.TryGetNpcLandmarkDebugReport(npcId, out var lmReport))
                     {
-                        string execPhase;
-                        if (routeReport.ExecutionActive)
-                            execPhase = "EXECUTING";
-                        else if (!string.IsNullOrEmpty(routeReport.ExecutionFailureReason))
-                            execPhase = "FAILED";
-                        else if (string.Equals(routeReport.LastModeSwitchReason, "MoveIntentCompleted", System.StringComparison.Ordinal) || string.Equals(routeReport.LastModeSwitchReason, "LocalSearchCompletedTargetReached", System.StringComparison.Ordinal))
-                            execPhase = "COMPLETED";
-                        else
-                            execPhase = "NONE";
+                        _sbLandmarks.Append("[NAV]\n");
 
-                        _sbLandmarks.Append("NavMode = ").Append(routeReport.NavigationMode).Append('\n')
-                            .Append("ExecActive = ").Append(routeReport.ExecutionActive ? "YES" : "NO").Append('\n')
-                            .Append("ExecPhase = ").Append(execPhase).Append('\n')
-                            .Append("TargetCell = (").Append(routeReport.TargetCellX).Append(',').Append(routeReport.TargetCellY).Append(')').Append('\n')
-                            .Append("ImmediateTarget = (").Append(routeReport.ImmediateTargetX).Append(',').Append(routeReport.ImmediateTargetY).Append(')').Append('\n');
+                        if (world.TryGetNpcMacroRouteDebugReport(npcId, out var routeReport))
+                        {
+                            string execPhase;
+                            if (routeReport.ExecutionActive)
+                                execPhase = "EXECUTING";
+                            else if (!string.IsNullOrEmpty(routeReport.ExecutionFailureReason))
+                                execPhase = "FAILED";
+                            else if (string.Equals(routeReport.LastModeSwitchReason, "MoveIntentCompleted", System.StringComparison.Ordinal) || string.Equals(routeReport.LastModeSwitchReason, "LocalSearchCompletedTargetReached", System.StringComparison.Ordinal))
+                                execPhase = "COMPLETED";
+                            else
+                                execPhase = "NONE";
 
-                        if (routeReport.LastModeSwitchTick >= 0)
-                            _sbLandmarks.Append("ModeSwitchTick = ").Append(routeReport.LastModeSwitchTick).Append('\n');
-                        if (!string.IsNullOrEmpty(routeReport.LastModeSwitchReason))
-                            _sbLandmarks.Append("ModeSwitchWhy = ").Append(routeReport.LastModeSwitchReason).Append('\n');
+                            _sbLandmarks.Append("NavMode = ").Append(routeReport.NavigationMode).Append('\n')
+                                .Append("ExecActive = ").Append(routeReport.ExecutionActive ? "YES" : "NO").Append('\n')
+                                .Append("ExecPhase = ").Append(execPhase).Append('\n')
+                                .Append("TargetCell = (").Append(routeReport.TargetCellX).Append(',').Append(routeReport.TargetCellY).Append(')').Append('\n')
+                                .Append("ImmediateTarget = (").Append(routeReport.ImmediateTargetX).Append(',').Append(routeReport.ImmediateTargetY).Append(')').Append('\n');
 
-                        _sbLandmarks.Append('\n').Append("[LM PLAN]\n")
-                            .Append("MacroRoute = ").Append(routeReport.HasRoute ? "OK" : "FAIL").Append('\n')
-                            .Append("RouteNodes = ").Append(routeReport.RouteNodeCount).Append('\n')
-                            .Append("StartLM = ").Append(routeReport.StartNodeId).Append('\n')
-                            .Append("TargetLM = ").Append(routeReport.TargetNodeId).Append('\n')
-                            .Append("NextLMIndex = ").Append(routeReport.NextRouteNodeIndex).Append('\n')
-                            .Append("NextLM = ").Append(routeReport.NextRouteNodeId).Append('\n')
-                            .Append("LastMileFlag = ").Append(routeReport.IsDoingLastMile ? "YES" : "NO").Append('\n')
-                            .Append("GoalLocalSearch = ").Append(routeReport.GoalLocalSearchActive ? "ON" : "OFF")
-                            .Append("   Budget = ").Append(routeReport.GoalLocalSearchBudgetRemaining);
+                            if (routeReport.LastModeSwitchTick >= 0)
+                                _sbLandmarks.Append("ModeSwitchTick = ").Append(routeReport.LastModeSwitchTick).Append('\n');
+                            if (!string.IsNullOrEmpty(routeReport.LastModeSwitchReason))
+                                _sbLandmarks.Append("ModeSwitchWhy = ").Append(routeReport.LastModeSwitchReason).Append('\n');
 
-                        if (!string.IsNullOrEmpty(routeReport.FailureReason))
-                            _sbLandmarks.Append('\n').Append("RouteFail = ").Append(routeReport.FailureReason);
-                        if (!string.IsNullOrEmpty(routeReport.ExecutionFailureReason))
-                            _sbLandmarks.Append('\n').Append("ExecFail = ").Append(routeReport.ExecutionFailureReason);
+                            _sbLandmarks.Append('\n').Append("[LM PLAN]\n")
+                                .Append("MacroRoute = ").Append(routeReport.HasRoute ? "OK" : "FAIL").Append('\n')
+                                .Append("RouteNodes = ").Append(routeReport.RouteNodeCount).Append('\n')
+                                .Append("StartLM = ").Append(routeReport.StartNodeId).Append('\n')
+                                .Append("TargetLM = ").Append(routeReport.TargetNodeId).Append('\n')
+                                .Append("NextLMIndex = ").Append(routeReport.NextRouteNodeIndex).Append('\n')
+                                .Append("NextLM = ").Append(routeReport.NextRouteNodeId).Append('\n')
+                                .Append("LastMileFlag = ").Append(routeReport.IsDoingLastMile ? "YES" : "NO").Append('\n')
+                                .Append("GoalLocalSearch = ").Append(routeReport.GoalLocalSearchActive ? "ON" : "OFF")
+                                .Append("   Budget = ").Append(routeReport.GoalLocalSearchBudgetRemaining);
+
+                            if (!string.IsNullOrEmpty(routeReport.FailureReason))
+                                _sbLandmarks.Append('\n').Append("RouteFail = ").Append(routeReport.FailureReason);
+                            if (!string.IsNullOrEmpty(routeReport.ExecutionFailureReason))
+                                _sbLandmarks.Append('\n').Append("ExecFail = ").Append(routeReport.ExecutionFailureReason);
+                        }
+
+                        _sbLandmarks.Append('\n').Append('\n').Append("[LM KNOWLEDGE]\n")
+                            .Append("KnownLandmarks = ").Append(lmReport.KnownLandmarksCount).Append('\n')
+                            .Append("KnownEdges = ").Append(lmReport.KnownEdgesCount).Append('\n')
+                            .Append("PoiAnchors = ").Append(lmReport.PoiAnchorCount).Append('\n')
+                            .Append("Replans/min = ").Append(lmReport.ReplansPerMin.ToString("0.0")).Append('\n')
+                            .Append("Failures/min = ").Append(lmReport.FailuresPerMin.ToString("0.0")).Append('\n')
+                            .Append("Blacklist = ").Append(lmReport.BlacklistSize);
                     }
-
-                    _sbLandmarks.Append('\n').Append('\n').Append("[LM KNOWLEDGE]\n")
-                        .Append("KnownLandmarks = ").Append(lmReport.KnownLandmarksCount).Append('\n')
-                        .Append("KnownEdges = ").Append(lmReport.KnownEdgesCount).Append('\n')
-                        .Append("PoiAnchors = ").Append(lmReport.PoiAnchorCount).Append('\n')
-                        .Append("Replans/min = ").Append(lmReport.ReplansPerMin.ToString("0.0")).Append('\n')
-                        .Append("Failures/min = ").Append(lmReport.FailuresPerMin.ToString("0.0")).Append('\n')
-                        .Append("Blacklist = ").Append(lmReport.BlacklistSize);
-                }
-                else
-                {
-                    _sbLandmarks.Append("<color=#aaaaaa>(no landmark report)</color>");
+                    else
+                    {
+                        _sbLandmarks.Append("<color=#aaaaaa>(no landmark report)</color>");
+                    }
                 }
 
                 // ============================================================
@@ -784,7 +799,7 @@ namespace Arcontio.View.MapGrid
                 // - l'azione NON viene inferita dalla view.
                 // - viene letta da world.NpcAction (NpcActionState).
                 string actionRich = string.Empty;
-                if (world.TryGetNpcAction(npcId, out var action))
+                if (buildAction && world.TryGetNpcAction(npcId, out var action))
                 {
                     int age = nowTick - action.StartedTick;
                     if (age < 0) age = 0;
@@ -871,7 +886,7 @@ namespace Arcontio.View.MapGrid
 
                     actionRich = sbGoal.ToString();
                 }
-                else
+                else if (buildAction)
                 {
                     actionRich = "Action = <color=#AAAAAA>Unknown</color>";
                 }
@@ -887,9 +902,12 @@ namespace Arcontio.View.MapGrid
                 //
                 // Nota:
                 // - Se in futuro aggiungerai un Inventory component reale, sposteremo qui la lettura.
-                int carriedFood = 0;
-                if (world.NpcPrivateFood != null && world.NpcPrivateFood.TryGetValue(npcId, out var pf))
-                    carriedFood = pf;
+                string invText = string.Empty;
+                if (buildInventory)
+                {
+                    int carriedFood = 0;
+                    if (world.NpcPrivateFood != null && world.NpcPrivateFood.TryGetValue(npcId, out var pf))
+                        carriedFood = pf;
 
                 // IMPORTANT (Day10/Day11 UX):
                 // In ARCONTIO oggi esistono DUE "forme" di cibo privato:
@@ -898,51 +916,52 @@ namespace Arcontio.View.MapGrid
                 //
                 // L'utente vede la proprietà dagli overlay numerici sulle pile, quindi
                 // qui dobbiamo mostrare entrambe le quantità, altrimenti la card sembra "buggata".
-                int ownedStockUnits = 0;
-                int ownedStockPiles = 0;
-                if (world.FoodStocks != null)
-                {
-                    foreach (var sKv in world.FoodStocks)
+                    int ownedStockUnits = 0;
+                    int ownedStockPiles = 0;
+                    if (world.FoodStocks != null)
                     {
-                        var s = sKv.Value;
-                        if (s.OwnerKind == Arcontio.Core.OwnerKind.Npc && s.OwnerId == npcId && s.Units > 0)
+                        foreach (var sKv in world.FoodStocks)
                         {
-                            ownedStockUnits += s.Units;
-                            ownedStockPiles++;
+                            var s = sKv.Value;
+                            if (s.OwnerKind == Arcontio.Core.OwnerKind.Npc && s.OwnerId == npcId && s.Units > 0)
+                            {
+                                ownedStockUnits += s.Units;
+                                ownedStockPiles++;
+                            }
                         }
                     }
-                }
 
-                long lastEatTick = -1;
-                if (world.NpcLastPrivateFoodConsumeTick != null && world.NpcLastPrivateFoodConsumeTick.TryGetValue(npcId, out var lt))
-                    lastEatTick = lt;
+                    long lastEatTick = -1;
+                    if (world.NpcLastPrivateFoodConsumeTick != null && world.NpcLastPrivateFoodConsumeTick.TryGetValue(npcId, out var lt))
+                        lastEatTick = lt;
 
                 // UX:
                 // - "Carried" = cibo in inventario (spendibile subito).
                 // - "Owned in world" = scorte a terra di proprietà (possono essere rubate da altri).
                 // - "Total" = somma, utile per ragionare sullo stato generale.
-                int totalOwned = carriedFood + ownedStockUnits;
+                    int totalOwned = carriedFood + ownedStockUnits;
 
-                int visibleCommunityFoodDbg = 0;
-                int rememberedCommunityFoodDbg = 0;
-                ComputeFoodTargetDebug(world, npcId, out visibleCommunityFoodDbg, out rememberedCommunityFoodDbg);
+                    int visibleCommunityFoodDbg = 0;
+                    int rememberedCommunityFoodDbg = 0;
+                    ComputeFoodTargetDebug(world, npcId, out visibleCommunityFoodDbg, out rememberedCommunityFoodDbg);
 
-                // [NEEDS] rimosso: ora visualizzato come barre nella sezione "Needs" della card
-                var sb = new StringBuilder(512);
-                sb.AppendLine("[INVENTORY]")
-                  .AppendLine($"PrivateFood (carried) = {carriedFood}")
-                  .AppendLine($"PrivateFood (owned in world) = {ownedStockUnits}  (piles={ownedStockPiles})")
-                  .AppendLine($"Total private food = {totalOwned}");
+                    // [NEEDS] rimosso: ora visualizzato come barre nella sezione "Needs" della card
+                    var sb = new StringBuilder(512);
+                    sb.AppendLine("[INVENTORY]")
+                      .AppendLine($"PrivateFood (carried) = {carriedFood}")
+                      .AppendLine($"PrivateFood (owned in world) = {ownedStockUnits}  (piles={ownedStockPiles})")
+                      .AppendLine($"Total private food = {totalOwned}");
 
-                if (lastEatTick >= 0)
-                    sb.AppendLine($"Last private consume tick = {lastEatTick}");
+                    if (lastEatTick >= 0)
+                        sb.AppendLine($"Last private consume tick = {lastEatTick}");
 
-                sb.AppendLine()
-                  .AppendLine("[FOOD KNOWLEDGE]")
-                  .AppendLine($"Visible community food = {(visibleCommunityFoodDbg != 0 ? visibleCommunityFoodDbg.ToString() : "None")}")
-                  .AppendLine($"Remembered community food = {(rememberedCommunityFoodDbg != 0 ? rememberedCommunityFoodDbg.ToString() : "None")}");
+                    sb.AppendLine()
+                      .AppendLine("[FOOD KNOWLEDGE]")
+                      .AppendLine($"Visible community food = {(visibleCommunityFoodDbg != 0 ? visibleCommunityFoodDbg.ToString() : "None")}")
+                      .AppendLine($"Remembered community food = {(rememberedCommunityFoodDbg != 0 ? rememberedCommunityFoodDbg.ToString() : "None")}");
 
-                string invText = sb.ToString();
+                    invText = sb.ToString();
+                }
 
                 // ============================================================
                 // COMUNICAZIONI SIMBOLICHE (Patch 0.01P2)
@@ -960,8 +979,10 @@ namespace Arcontio.View.MapGrid
                 // Nota UX:
                 // - Mostriamo poche righe per non rendere la card illeggibile.
                 // - Usiamo RichText per colorare le direzioni.
-                _sbComms.Clear();
-                _sbComms.Append("Comms (tokens)\n");
+                if (buildComms)
+                {
+                    _sbComms.Clear();
+                    _sbComms.Append("Comms (tokens)\n");
 
                 if (world.DebugNpcTokens != null && world.DebugNpcTokens.TryGetValue(npcId, out var tlog) && tlog != null)
                 {
@@ -1058,9 +1079,13 @@ namespace Arcontio.View.MapGrid
                     _sbComms.Append("<color=#aaaaaa>(no token log)</color>\n");
                 }
 
+                }
+
                 // Memory traces
-                _sbMem.Clear();
-                _sbMem.Append("Memory traces:\n");
+                if (buildMemoryTraces)
+                {
+                    _sbMem.Clear();
+                    _sbMem.Append("Memory traces:\n");
 
                 if (world.Memory.TryGetValue(npcId, out var mem) && mem != null)
                 {
@@ -1077,10 +1102,13 @@ namespace Arcontio.View.MapGrid
                             .Append('\n');
                     }
                 }
+                }
 
                 // Known entities (NpcObjectMemoryStore.Slots)
-                _sbObjMem.Clear();
-                _sbObjMem.Append("Perception / Knowledge\n");
+                if (buildKnownObjects)
+                {
+                    _sbObjMem.Clear();
+                    _sbObjMem.Append("Perception / Knowledge\n");
 
                 if (world.NpcMoveIntents.TryGetValue(npcId, out var dbgMi) && dbgMi.Active)
                 {
@@ -1138,19 +1166,27 @@ namespace Arcontio.View.MapGrid
                         }
                     }
                 }
+                }
 
-                card.SetTexts(_sbHeader.ToString(), _sbMem.ToString(), _sbObjMem.ToString());
+                card.SetTexts(
+                    _sbHeader.ToString(),
+                    buildMemoryTraces ? _sbMem.ToString() : string.Empty,
+                    buildKnownObjects ? _sbObjMem.ToString() : string.Empty);
 
                 // Sezioni extra (action + inventory) introdotte in MapGridNpcSummaryCardView.
                 // Nota difensiva:
                 // - la card potrebbe essere vecchia (se in qualche branch non aggiorni i file),
                 //   quindi usiamo chiamate dirette ma lasciamo che i null-check dentro la view gestiscano.
-                card.SetActionText(actionRich);
-                card.SetInventoryText(invText);
-                card.SetCommsText(_sbComms.ToString());
+                if (buildAction)
+                    card.SetActionText(actionRich);
+                if (buildInventory)
+                    card.SetInventoryText(invText);
+                if (buildComms)
+                    card.SetCommsText(_sbComms.ToString());
 
                 // Patch 0.02.03: landmark/edge conosciuti.
-                card.SetLandmarksText(_sbLandmarks.ToString());
+                if (buildLandmarks)
+                    card.SetLandmarksText(_sbLandmarks.ToString());
 
                 // Bisogni (v0.04.13) — barre invertite (piena=ok, vuota=critico).
                 // Sessione 13:
@@ -1160,7 +1196,7 @@ namespace Arcontio.View.MapGrid
                 card.UpdateNeedsBars(needs);
 
                 // DNA DRIFT (v0.04.07.b) — barre proporzionali
-                if (world.NpcProfiles.TryGetValue(npcId, out var profile))
+                if (buildDnaDrift && world.NpcProfiles.TryGetValue(npcId, out var profile))
                 {
                     var driftResult = NpcDnaDistance.Compute(dna, profile);
                     card.UpdateDnaDrift(dna, profile, driftResult);
@@ -1199,15 +1235,18 @@ namespace Arcontio.View.MapGrid
 
             int selectedNpcId = SocialViewer.UI.NPCSelection.SelectedNpcId;
             long worldTick = world != null ? Arcontio.Core.TickContext.CurrentTickIndex : -1;
+            MapGridExplainabilityPanelPage activePage = _movementExplainabilityPanel.ActivePage;
             bool selectionChanged = selectedNpcId != _lastMovementPanelSelectedNpcId;
             bool tickChanged = worldTick != _lastMovementPanelWorldTick;
+            bool pageChanged = _movementExplainabilityPanel.ActivePageVersion != _lastMovementPanelPageVersion;
             bool refreshWindowExpired = Time.unscaledTime - _lastMovementPanelRefreshRealtime >= MovementPanelRefreshIntervalSeconds;
 
-            if (!selectionChanged && (!tickChanged || !refreshWindowExpired))
+            if (!selectionChanged && !pageChanged && (!tickChanged || !refreshWindowExpired))
                 return;
 
             _lastMovementPanelSelectedNpcId = selectedNpcId;
             _lastMovementPanelWorldTick = worldTick;
+            _lastMovementPanelPageVersion = _movementExplainabilityPanel.ActivePageVersion;
             _lastMovementPanelRefreshRealtime = Time.unscaledTime;
 
             if (selectedNpcId <= 0)
@@ -1238,17 +1277,69 @@ namespace Arcontio.View.MapGrid
                 return;
             }
 
-            string headerMeta = BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityIntentPlan, _sbExplainabilityEvents, maxEvents: 32);
-            string mbqdHeaderMeta = BuildMemoryBeliefDecisionExplainabilityText(world, selectedNpcId);
-            _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", string.IsNullOrWhiteSpace(mbqdHeaderMeta) ? headerMeta : mbqdHeaderMeta);
+            if (activePage == MapGridExplainabilityPanelPage.Pathfinding)
+            {
+                string headerMeta = BuildMovementExplainabilityText(world, selectedNpcId, _sbExplainabilityIntentPlan, _sbExplainabilityEvents, maxEvents: 32);
+                _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", headerMeta);
+                _movementExplainabilityPanel.SetDiagnostics($"selectedNpc={selectedNpcId} | worldTick={worldTick} | pagina=Pathfinding | {BuildJsonlStatusText()}");
+                _movementExplainabilityPanel.SetPathfindingText(_sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
+                _movementExplainabilityPanel.SetVisible(true);
+                return;
+            }
+
+            string mbqdHeaderMeta = BuildMemoryBeliefDecisionExplainabilityText(world, selectedNpcId, activePage);
+            _movementExplainabilityPanel.SetHeader($"Explainability Layer - NPC #{selectedNpcId}", mbqdHeaderMeta);
             _movementExplainabilityPanel.SetDiagnostics(
-                $"selectedNpc={selectedNpcId} | worldTick={worldTick} | registryNpc={_mbqdExplainabilityViewModel.HasNpc} | MBQD M{_mbqdExplainabilityViewModel.MemoryCount} B{_mbqdExplainabilityViewModel.BeliefCount} Q{_mbqdExplainabilityViewModel.QueryCount} D{_mbqdExplainabilityViewModel.DecisionCount} J{_mbqdExplainabilityViewModel.JobRequestCount}/{_mbqdExplainabilityViewModel.JobLifecycleCount}/{_mbqdExplainabilityViewModel.StepCount}");
-            _movementExplainabilityPanel.SetPathfindingText(_sbExplainabilityIntentPlan.ToString(), _sbExplainabilityEvents.ToString());
-            _movementExplainabilityPanel.SetMemoryText(_sbMbqdMemoryStore.ToString(), _sbMbqdMemoryLatest.ToString(), _sbMbqdMemoryTimeline.ToString());
-            _movementExplainabilityPanel.SetBeliefText(_sbMbqdBeliefEntries.ToString(), _sbMbqdBeliefQuery.ToString(), _sbMbqdBeliefMutation.ToString());
-            _movementExplainabilityPanel.SetDecisionText(_sbMbqdDecisionSelected.ToString(), _sbMbqdDecisionCandidates.ToString(), _sbMbqdDecisionBridge.ToString());
-            _movementExplainabilityPanel.SetJobText(_sbMbqdJobCurrent.ToString(), _sbMbqdJobPhaseStep.ToString(), _sbMbqdJobRuntime.ToString());
+                $"selectedNpc={selectedNpcId} | worldTick={worldTick} | pagina={activePage} | registryNpc={_mbqdExplainabilityViewModel.HasNpc} | MBQD M{_mbqdExplainabilityViewModel.MemoryCount} B{_mbqdExplainabilityViewModel.BeliefCount} Q{_mbqdExplainabilityViewModel.QueryCount} D{_mbqdExplainabilityViewModel.DecisionCount} J{_mbqdExplainabilityViewModel.JobRequestCount}/{_mbqdExplainabilityViewModel.JobLifecycleCount}/{_mbqdExplainabilityViewModel.StepCount} | {BuildJsonlStatusText()}");
+
+            switch (activePage)
+            {
+                case MapGridExplainabilityPanelPage.Memory:
+                    _movementExplainabilityPanel.SetMemoryText(_sbMbqdMemoryStore.ToString(), _sbMbqdMemoryLatest.ToString(), _sbMbqdMemoryTimeline.ToString());
+                    break;
+                case MapGridExplainabilityPanelPage.Belief:
+                    _movementExplainabilityPanel.SetBeliefText(_sbMbqdBeliefEntries.ToString(), _sbMbqdBeliefQuery.ToString(), _sbMbqdBeliefMutation.ToString());
+                    break;
+                case MapGridExplainabilityPanelPage.Decision:
+                    _movementExplainabilityPanel.SetDecisionText(_sbMbqdDecisionSelected.ToString(), _sbMbqdDecisionCandidates.ToString(), _sbMbqdDecisionBridge.ToString());
+                    break;
+                case MapGridExplainabilityPanelPage.Job:
+                    _movementExplainabilityPanel.SetJobText(_sbMbqdJobCurrent.ToString(), _sbMbqdJobPhaseStep.ToString(), _sbMbqdJobRuntime.ToString());
+                    break;
+            }
+
             _movementExplainabilityPanel.SetVisible(true);
+        }
+
+        private string BuildJsonlStatusText()
+        {
+            JsonlRuntimeLogHub.GetStatus(_jsonlStatuses);
+            if (_jsonlStatuses.Count <= 0)
+                return "jsonl=idle";
+
+            int queued = 0;
+            long dropped = 0;
+            int frozen = 0;
+            for (int i = 0; i < _jsonlStatuses.Count; i++)
+            {
+                queued += _jsonlStatuses[i].QueuedLines;
+                dropped += _jsonlStatuses[i].DroppedLines;
+                if (_jsonlStatuses[i].Frozen)
+                    frozen++;
+            }
+
+            _sbJsonlStatus.Clear();
+            _sbJsonlStatus
+                .Append("jsonl=")
+                .Append(_jsonlStatuses.Count)
+                .Append(" q")
+                .Append(queued)
+                .Append(" drop")
+                .Append(dropped)
+                .Append(" frozen")
+                .Append(frozen);
+
+            return _sbJsonlStatus.ToString();
         }
 
         // =============================================================================
@@ -1267,7 +1358,7 @@ namespace Arcontio.View.MapGrid
         /// UI-friendly, allineando pannello e JSONL.
         /// </para>
         /// </summary>
-        private string BuildMemoryBeliefDecisionExplainabilityText(Arcontio.Core.World world, int npcId)
+        private string BuildMemoryBeliefDecisionExplainabilityText(Arcontio.Core.World world, int npcId, MapGridExplainabilityPanelPage activePage)
         {
             ClearMbqdBuffers();
 
@@ -1283,26 +1374,50 @@ namespace Arcontio.View.MapGrid
                     ? "EL-MBQD non disponibile per questo NPC"
                     : _mbqdExplainabilityViewModel.HeaderSubtitle;
 
-                _sbMbqdMemoryStore.Append("<color=#6E7681>").Append(message).Append("</color>");
-                _sbMbqdMemoryLatest.Append("<color=#6E7681>(nessuna ultima memory trace)</color>");
-                _sbMbqdMemoryTimeline.Append("<color=#6E7681>(nessuna timeline memory)</color>");
-                _sbMbqdBeliefEntries.Append("<color=#6E7681>").Append(message).Append("</color>");
-                _sbMbqdBeliefQuery.Append("<color=#6E7681>(nessuna query belief)</color>");
-                _sbMbqdBeliefMutation.Append("<color=#6E7681>(nessuna mutazione belief)</color>");
-                _sbMbqdDecisionSelected.Append("<color=#6E7681>").Append(message).Append("</color>");
-                _sbMbqdDecisionCandidates.Append("<color=#6E7681>(nessun candidato decisionale)</color>");
-                _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge decisione-comando)</color>");
-                _sbMbqdJobCurrent.Append("<color=#6E7681>").Append(message).Append("</color>");
-                _sbMbqdJobPhaseStep.Append("<color=#6E7681>(nessuna phase/step trace)</color>");
-                _sbMbqdJobRuntime.Append("<color=#6E7681>(nessuna runtime job trace)</color>");
+                switch (activePage)
+                {
+                    case MapGridExplainabilityPanelPage.Memory:
+                        _sbMbqdMemoryStore.Append("<color=#6E7681>").Append(message).Append("</color>");
+                        _sbMbqdMemoryLatest.Append("<color=#6E7681>(nessuna ultima memory trace)</color>");
+                        _sbMbqdMemoryTimeline.Append("<color=#6E7681>(nessuna timeline memory)</color>");
+                        break;
+                    case MapGridExplainabilityPanelPage.Belief:
+                        _sbMbqdBeliefEntries.Append("<color=#6E7681>").Append(message).Append("</color>");
+                        _sbMbqdBeliefQuery.Append("<color=#6E7681>(nessuna query belief)</color>");
+                        _sbMbqdBeliefMutation.Append("<color=#6E7681>(nessuna mutazione belief)</color>");
+                        break;
+                    case MapGridExplainabilityPanelPage.Decision:
+                        _sbMbqdDecisionSelected.Append("<color=#6E7681>").Append(message).Append("</color>");
+                        _sbMbqdDecisionCandidates.Append("<color=#6E7681>(nessun candidato decisionale)</color>");
+                        _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge decisione-comando)</color>");
+                        break;
+                    case MapGridExplainabilityPanelPage.Job:
+                        _sbMbqdJobCurrent.Append("<color=#6E7681>").Append(message).Append("</color>");
+                        _sbMbqdJobPhaseStep.Append("<color=#6E7681>(nessuna phase/step trace)</color>");
+                        _sbMbqdJobRuntime.Append("<color=#6E7681>(nessuna runtime job trace)</color>");
+                        break;
+                }
+
                 return $"NPC #{npcId}";
             }
 
             var model = _mbqdExplainabilityViewModel;
-            AppendMbqdMemory(model);
-            AppendMbqdBelief(model);
-            AppendMbqdDecision(model);
-            AppendMbqdJob(model);
+            switch (activePage)
+            {
+                case MapGridExplainabilityPanelPage.Memory:
+                    AppendMbqdMemory(model);
+                    break;
+                case MapGridExplainabilityPanelPage.Belief:
+                    AppendMbqdBelief(model);
+                    break;
+                case MapGridExplainabilityPanelPage.Decision:
+                    AppendMbqdDecision(model);
+                    break;
+                case MapGridExplainabilityPanelPage.Job:
+                    AppendMbqdJob(model);
+                    break;
+            }
+
             return model.HeaderSubtitle;
         }
 

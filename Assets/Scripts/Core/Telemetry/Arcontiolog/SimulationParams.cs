@@ -48,6 +48,12 @@ namespace Arcontio.Core.Config
         // ---------------- Localizzazione (usata anche dal logger) ----------------
         public string Language = "it";
 
+        // ---------------- Diagnostica runtime / logging ----------------
+        // Layout canonico v0.11d.00d. I vecchi gruppi root restano presenti sotto
+        // come fallback compatibile, ma il file JSON vivo deve concentrare qui le
+        // impostazioni diagnostiche accendibili o spegnibili.
+        public RuntimeDiagnosticsParams logging;
+
         // ---------------- Inventario / Carry capacity ----------------
         public InventoryParams inventory = new InventoryParams();
 
@@ -246,6 +252,25 @@ namespace Arcontio.Core.Config
         {
             return Mathf.Max(1, decision?.decisionEveryTicks ?? DecisionRuntimeParams.DefaultDecisionEveryTicks);
         }
+
+        public void ApplyRuntimeDiagnosticsLayout()
+        {
+            if (logging == null)
+                return;
+
+            if (logging.devtools != null && logging.devtools.debug_fov != null)
+                debug_fov = logging.devtools.debug_fov;
+
+            if (logging.movement_explainability != null)
+                explainability = logging.movement_explainability.ToMovementExplainabilityParams(explainability);
+
+            if (logging.memory_belief_decision_explainability != null)
+            {
+                memory_belief_decision_explainability =
+                    logging.memory_belief_decision_explainability.ToMemoryBeliefDecisionExplainabilityParams(
+                        memory_belief_decision_explainability);
+            }
+        }
     }
 
     // =============================================================================
@@ -342,6 +367,156 @@ namespace Arcontio.Core.Config
         public int window_ticks = 8;
         public bool use_los = true;
         public bool activeNpcOnly = true;
+    }
+
+    [Serializable]
+    public sealed class RuntimeDiagnosticsParams
+    {
+        public DiagnosticsDevtoolParams devtools = new DiagnosticsDevtoolParams();
+        public DiagnosticsMovementExplainabilityParams movement_explainability = new DiagnosticsMovementExplainabilityParams();
+        public DiagnosticsMemoryBeliefDecisionExplainabilityParams memory_belief_decision_explainability =
+            new DiagnosticsMemoryBeliefDecisionExplainabilityParams();
+    }
+
+    [Serializable]
+    public sealed class DiagnosticsDevtoolParams
+    {
+        public bool overlay_enabled = false;
+        public bool verbose_debug_enabled = false;
+        public DebugFovParams debug_fov = new DebugFovParams();
+    }
+
+    [Serializable]
+    public sealed class DiagnosticsMovementExplainabilityParams
+    {
+        public bool enabled = false;
+        public bool runtime_registry_enabled = true;
+        public bool file_logging_enabled = false;
+        public int defaultVerbosity = 0;
+        public int maxTrackedNpcs = 3;
+        public int[] trackedNpcIds = Array.Empty<int>();
+        public bool trackActiveNpcOnly = true;
+        public int ringBuffer_intent = 10;
+        public int ringBuffer_plan = 10;
+        public int ringBuffer_events_low = 60;
+        public int ringBuffer_events_high = 200;
+        public int verbosityHighThreshold = 3;
+        public string jsonLogFileNamePattern = "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl";
+
+        public MovementExplainabilityParams ToMovementExplainabilityParams(MovementExplainabilityParams fallback)
+        {
+            var current = fallback ?? new MovementExplainabilityParams();
+            current.enabled = enabled && runtime_registry_enabled;
+            current.defaultVerbosity = defaultVerbosity;
+            current.maxTrackedNpcs = maxTrackedNpcs;
+            current.trackedNpcIds = trackedNpcIds ?? Array.Empty<int>();
+            current.trackActiveNpcOnly = trackActiveNpcOnly;
+            current.ringBuffer_intent = ringBuffer_intent;
+            current.ringBuffer_plan = ringBuffer_plan;
+            current.ringBuffer_events_low = ringBuffer_events_low;
+            current.ringBuffer_events_high = ringBuffer_events_high;
+            current.verbosityHighThreshold = verbosityHighThreshold;
+            current.writeJsonLog = enabled && file_logging_enabled;
+            current.jsonLogFileNamePattern = string.IsNullOrWhiteSpace(jsonLogFileNamePattern)
+                ? current.jsonLogFileNamePattern
+                : jsonLogFileNamePattern;
+            return current;
+        }
+    }
+
+    [Serializable]
+    public sealed class DiagnosticsMemoryBeliefDecisionExplainabilityParams
+    {
+        public bool enabled = false;
+        public bool runtime_registry_enabled = true;
+        public bool file_logging_enabled = false;
+        public int defaultVerbosity = 0;
+        public int maxTrackedNpcs = 5;
+        public int[] trackedNpcIds = Array.Empty<int>();
+        public bool trackActiveNpcOnly = false;
+        public string jsonLogFileNamePattern = "arcontio_el_mbd_{yyyyMMdd_HHmmss}.jsonl";
+        public bool logMemory = true;
+        public bool logBelief = true;
+        public bool logQuery = true;
+        public bool logDecision = true;
+        public bool logBridge = true;
+        public bool logJobRequest = true;
+        public bool logJobLifecycle = true;
+        public bool logJobPhase = true;
+        public bool logStep = true;
+        public bool logJobState = true;
+        public bool logJobArbitration = true;
+        public bool logReservation = true;
+        public bool logCommand = true;
+        public bool logFailureLearning = true;
+        public bool logRunningAction = true;
+        public bool includeCandidates = true;
+        public bool includeScoreBreakdown = true;
+        public bool includeRejectedCandidates = false;
+        public int ringBuffer_memory = 80;
+        public int ringBuffer_belief = 80;
+        public int ringBuffer_query = 40;
+        public int ringBuffer_decision = 24;
+        public int ringBuffer_bridge = 24;
+        public int ringBuffer_jobRequest = 24;
+        public int ringBuffer_jobLifecycle = 32;
+        public int ringBuffer_jobPhase = 40;
+        public int ringBuffer_step = 64;
+        public int ringBuffer_jobState = 40;
+        public int ringBuffer_jobArbitration = 32;
+        public int ringBuffer_reservation = 40;
+        public int ringBuffer_command = 48;
+        public int ringBuffer_failureLearning = 32;
+        public int ringBuffer_runningAction = 48;
+
+        public MemoryBeliefDecisionExplainabilityParams ToMemoryBeliefDecisionExplainabilityParams(
+            MemoryBeliefDecisionExplainabilityParams fallback)
+        {
+            var current = fallback ?? new MemoryBeliefDecisionExplainabilityParams();
+            current.enabled = enabled && runtime_registry_enabled;
+            current.defaultVerbosity = defaultVerbosity;
+            current.maxTrackedNpcs = maxTrackedNpcs;
+            current.trackedNpcIds = trackedNpcIds ?? Array.Empty<int>();
+            current.trackActiveNpcOnly = trackActiveNpcOnly;
+            current.writeJsonLog = enabled && file_logging_enabled;
+            current.jsonLogFileNamePattern = string.IsNullOrWhiteSpace(jsonLogFileNamePattern)
+                ? current.jsonLogFileNamePattern
+                : jsonLogFileNamePattern;
+            current.logMemory = logMemory;
+            current.logBelief = logBelief;
+            current.logQuery = logQuery;
+            current.logDecision = logDecision;
+            current.logBridge = logBridge;
+            current.logJobRequest = logJobRequest;
+            current.logJobLifecycle = logJobLifecycle;
+            current.logJobPhase = logJobPhase;
+            current.logStep = logStep;
+            current.logJobState = logJobState;
+            current.logJobArbitration = logJobArbitration;
+            current.logReservation = logReservation;
+            current.logCommand = logCommand;
+            current.logFailureLearning = logFailureLearning;
+            current.logRunningAction = logRunningAction;
+            current.includeCandidates = includeCandidates;
+            current.includeScoreBreakdown = includeScoreBreakdown;
+            current.includeRejectedCandidates = includeRejectedCandidates;
+            current.ringBuffer_memory = ringBuffer_memory;
+            current.ringBuffer_belief = ringBuffer_belief;
+            current.ringBuffer_query = ringBuffer_query;
+            current.ringBuffer_decision = ringBuffer_decision;
+            current.ringBuffer_bridge = ringBuffer_bridge;
+            current.ringBuffer_jobRequest = ringBuffer_jobRequest;
+            current.ringBuffer_jobLifecycle = ringBuffer_jobLifecycle;
+            current.ringBuffer_jobPhase = ringBuffer_jobPhase;
+            current.ringBuffer_step = ringBuffer_step;
+            current.ringBuffer_jobState = ringBuffer_jobState;
+            current.ringBuffer_jobArbitration = ringBuffer_jobArbitration;
+            current.ringBuffer_reservation = ringBuffer_reservation;
+            current.ringBuffer_command = ringBuffer_command;
+            current.ringBuffer_failureLearning = ringBuffer_failureLearning;
+            current.ringBuffer_runningAction = ringBuffer_runningAction;
+            return current;
+        }
     }
 
     // ============================================================
@@ -913,7 +1088,9 @@ namespace Arcontio.Core.Config
 
             try
             {
-                return JsonUtility.FromJson<SimulationParams>(ta.text) ?? new SimulationParams();
+                var parameters = JsonUtility.FromJson<SimulationParams>(ta.text) ?? new SimulationParams();
+                parameters.ApplyRuntimeDiagnosticsLayout();
+                return parameters;
             }
             catch (Exception ex)
             {

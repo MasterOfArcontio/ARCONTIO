@@ -7,26 +7,83 @@
     "enableJobRunningActionTraversal": false
   },
   "Language": "it",
+  "logging": {
+    "general": {
+      "enabled": true,
+      "minimum_level": "Warn",
+      "include_timestamp": true,
+      "include_tick": true
+    },
+    "legacy_channels": {
+      "unity_console_enabled": false,
+      "html_file_enabled": false,
+      "txt_file_enabled": false,
+      "file_name_pattern": "arcontio_{yyyyMMdd_HHmmss}.txt"
+    },
+    "jsonl": {
+      "enabled": true,
+      "flush_interval_seconds": 0.25,
+      "max_queue_size": 4096,
+      "max_batch_size": 512
+    },
+    "movement_explainability": {
+      "enabled": true,
+      "runtime_registry_enabled": true,
+      "file_logging_enabled": true,
+      "defaultVerbosity": 2,
+      "maxTrackedNpcs": 3,
+      "trackedNpcIds": [],
+      "trackActiveNpcOnly": true,
+      "ringBuffer_intent": 10,
+      "ringBuffer_plan": 10,
+      "ringBuffer_events_low": 60,
+      "ringBuffer_events_high": 200,
+      "verbosityHighThreshold": 3,
+      "jsonLogFileNamePattern": "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl"
+    },
+    "memory_belief_decision_explainability": {
+      "enabled": true,
+      "runtime_registry_enabled": true,
+      "file_logging_enabled": false,
+      "defaultVerbosity": 3,
+      "maxTrackedNpcs": 5,
+      "trackedNpcIds": [],
+      "trackActiveNpcOnly": false,
+      "jsonLogFileNamePattern": "arcontio_el_mbd_runtime.jsonl",
+      "logMemory": true,
+      "logBelief": true,
+      "logQuery": true,
+      "logDecision": true,
+      "logBridge": true,
+      "includeCandidates": true,
+      "includeScoreBreakdown": true,
+      "includeRejectedCandidates": true,
+      "ringBuffer_memory": 80,
+      "ringBuffer_belief": 80,
+      "ringBuffer_query": 40,
+      "ringBuffer_decision": 24,
+      "ringBuffer_bridge": 24
+    },
+    "telemetry": {
+      "enabled": true,
+      "dump_to_console_enabled": false
+    },
+    "devtools": {
+      "overlay_enabled": false,
+      "verbose_debug_enabled": false,
+      "debug_fov": {
+        "enabled": true,
+        "window_ticks": 8,
+        "use_los": true,
+        "activeNpcOnly": true
+      }
+    }
+  },
   "npcVisionRangeCells": 17,
   "npcOperationalRangeCells": 20,
   "npcVisionUseCone": true,
   "npcVisionConeSlope": 1.0,
   "npcVisionFovDegrees": 90,
-  "debug_fov": {
-    "enabled": true,
-    "window_ticks": 8,
-    "use_los": true,
-    "activeNpcOnly": true
-  },
-  "Logging": {
-    "MinLevel": "Trace",
-    "WriteUnityConsole": true,
-    "WriteFile": true,
-    "FileFormat": "html",
-    "FileNamePattern": "arcontio_{yyyyMMdd_HHmmss}.html",
-    "IncludeTimestamp": true,
-    "IncludeTick": true
-  },
   "inventory": {
     "inventory_max_units": 30
   },
@@ -48,20 +105,6 @@
     "noise01": 0.0,
     "impulsivityNoiseBonus": 0.0,
     "minimumWeight": 0.001
-  },
-  "explainability": {
-    "enabled": true,
-    "defaultVerbosity": 2,
-    "maxTrackedNpcs": 3,
-    "trackedNpcIds": [],
-    "trackActiveNpcOnly": true,
-    "ringBuffer_intent": 10,
-    "ringBuffer_plan": 10,
-    "ringBuffer_events_low": 60,
-    "ringBuffer_events_high": 200,
-    "verbosityHighThreshold": 3,
-    "writeJsonLog": true,
-    "jsonLogFileNamePattern": "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl"
   },
   "landmarks": {
     "enableLandmarkSystem": true,
@@ -128,27 +171,5 @@
   },
   "memory": {
     "max_traces_per_npc": 128
-  },
-  "memory_belief_decision_explainability": {
-    "enabled": true,
-    "defaultVerbosity": 3,
-    "maxTrackedNpcs": 5,
-    "trackedNpcIds": [],
-    "trackActiveNpcOnly": false,
-    "writeJsonLog": false,
-    "jsonLogFileNamePattern": "arcontio_el_mbd_runtime.jsonl",
-    "logMemory": true,
-    "logBelief": true,
-    "logQuery": true,
-    "logDecision": true,
-    "logBridge": true,
-    "includeCandidates": true,
-    "includeScoreBreakdown": true,
-    "includeRejectedCandidates": true,
-    "ringBuffer_memory": 80,
-    "ringBuffer_belief": 80,
-    "ringBuffer_query": 40,
-    "ringBuffer_decision": 24,
-    "ringBuffer_bridge": 24
   }
 }

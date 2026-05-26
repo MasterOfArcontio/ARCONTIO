@@ -583,12 +583,9 @@ namespace Arcontio.Core
                     .AddField("path", Application.persistentDataPath)
             );
 
-            // Creo la finestra per visualizzare il log personalizzato a schermo
-            if (FindFirstObjectByType<Arcontio.View.ArcontioLogOverlay>() == null)
-            {
-                new GameObject("ArcontioLogOverlay")
-                    .AddComponent<Arcontio.View.ArcontioLogOverlay>();
-            }
+            // Il vecchio overlay del logger viene mantenuto come codice legacy, ma non viene
+            // piu' creato automaticamente durante il runtime ordinario: senza sink console/overlay
+            // attivo generava solo costo UI e memoria diagnostica ridondante.
 
             // ******************************************************************************************************************************
             // 3) INIZIALIZZO IL MONDO 
@@ -1219,7 +1216,6 @@ namespace Arcontio.Core
                         .AddField("food", _world.FoodStocks.Count)
                         .AddField("npc", _world.NpcDna.Count)
                 );
-                _telemetry.DumpToConsole();
             }
         }
 

@@ -39,6 +39,9 @@ namespace Arcontio.Core
         // ============================================================
         private readonly Dictionary<int, int[]> _writeHeatByNpc = new(256);
         private readonly Dictionary<int, int[]> _readHeatByNpc = new(256);
+        private readonly Dictionary<int, int[]> _oldReadRecycle = new(256);
+        private readonly List<int> _writeKeysBuffer = new(256);
+        private readonly List<int> _cleanupKeysBuffer = new(256);
 
         public int WindowTicks => _windowTicks;
 
@@ -113,24 +116,29 @@ namespace Arcontio.Core
             // Questo mantiene stabili le allocazioni una volta "riscaldato".
 
             // 1) Mettiamo da parte i vecchi read, così possiamo riciclarli.
-            var oldRead = new Dictionary<int, int[]>(_readHeatByNpc);
+            _oldReadRecycle.Clear();
+            foreach (var kv in _readHeatByNpc)
+                _oldReadRecycle[kv.Key] = kv.Value;
+
             _readHeatByNpc.Clear();
 
             // 2) Snapshot delle chiavi del write.
             //    IMPORTANTISSIMO: non possiamo modificare un Dictionary mentre lo enumeriamo.
-            var writeKeys = new List<int>(_writeHeatByNpc.Keys);
+            _writeKeysBuffer.Clear();
+            foreach (var key in _writeHeatByNpc.Keys)
+                _writeKeysBuffer.Add(key);
 
             // 3) Per ogni npc presente nel write, promuoviamo a read.
-            for (int i = 0; i < writeKeys.Count; i++)
+            for (int i = 0; i < _writeKeysBuffer.Count; i++)
             {
-                int npcId = writeKeys[i];
+                int npcId = _writeKeysBuffer[i];
                 if (!_writeHeatByNpc.TryGetValue(npcId, out var write) || write == null)
                     continue;
 
                 _readHeatByNpc[npcId] = write;
 
                 // Riciclo: se avevo un vecchio read, lo riuso come nuovo write (clear).
-                if (oldRead.TryGetValue(npcId, out var recycled) && recycled != null)
+                if (_oldReadRecycle.TryGetValue(npcId, out var recycled) && recycled != null)
                 {
                     ClearArray(recycled);
                     _writeHeatByNpc[npcId] = recycled;
@@ -151,10 +159,13 @@ namespace Arcontio.Core
             // 5) Importantissimo: il write era stato sovrascritto con array riciclati,
             //    ma potrebbero esserci ancora chiavi "extra" rimaste nel dict.
             //    Le rimuoviamo.
-            var keys = new List<int>(_writeHeatByNpc.Keys);
-            for (int i = 0; i < keys.Count; i++)
+            _cleanupKeysBuffer.Clear();
+            foreach (var key in _writeHeatByNpc.Keys)
+                _cleanupKeysBuffer.Add(key);
+
+            for (int i = 0; i < _cleanupKeysBuffer.Count; i++)
             {
-                int npcId = keys[i];
+                int npcId = _cleanupKeysBuffer[i];
                 if (!_readHeatByNpc.ContainsKey(npcId))
                     _writeHeatByNpc.Remove(npcId);
             }

@@ -1,6 +1,7 @@
 using System.IO;
 using Arcontio.Core;
 using Arcontio.Core.Config;
+using Arcontio.Core.Logging;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -76,7 +77,7 @@ namespace Arcontio.Tests
             };
 
             MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, trace);
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             Assert.That(jsonl, Does.Contain("\"schema\":\"arcontio_el_mbd.v1\""));
             Assert.That(jsonl, Does.Contain("\"kind\":\"query\""));
@@ -146,7 +147,7 @@ namespace Arcontio.Tests
                 9,
                 222);
 
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             // Assert: il risultato resta quello normale del QuerySystem e il file
             // contiene il payload EL necessario per analizzare la scelta.
@@ -218,7 +219,7 @@ namespace Arcontio.Tests
             };
 
             MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, trace);
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             Assert.That(jsonl, Does.Contain("\"kind\":\"decision\""));
             Assert.That(jsonl, Does.Contain("\"selectedIntent\":\"EatKnownFood\""));
@@ -268,7 +269,7 @@ namespace Arcontio.Tests
             };
 
             MemoryBeliefDecisionJsonLogSink.TryWriteTrace(config, trace);
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             Assert.That(jsonl, Does.Contain("\"kind\":\"bridge\""));
             Assert.That(jsonl, Does.Contain("\"selectedIntent\":\"EatKnownFood\""));
@@ -330,7 +331,7 @@ namespace Arcontio.Tests
                 },
             });
 
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             Assert.That(jsonl, Does.Contain("\"kind\":\"memory\""));
             Assert.That(jsonl, Does.Contain("\"traceType\":\"ObjectSpotted\""));
@@ -390,7 +391,7 @@ namespace Arcontio.Tests
             MemoryBeliefDecisionExplainabilityEmitter.TryWriteMemoryTrace(config, 12, 333, trace, result, "ObjectSpottedEvent");
             bool updated = updater.UpdateFromTrace(trace, beliefStore, 333, config, 12);
 
-            string jsonl = File.ReadAllText(path);
+            string jsonl = ReadFlushedLog(path);
 
             Assert.That(result, Is.EqualTo(AddOrMergeResult.Inserted));
             Assert.That(updated, Is.True);
@@ -433,6 +434,8 @@ namespace Arcontio.Tests
 
         private static string ResetLogFile(string fileName)
         {
+            JsonlRuntimeLogHub.Shutdown();
+
             string directory = Path.Combine(Application.persistentDataPath, DirectoryName);
             Directory.CreateDirectory(directory);
 
@@ -441,6 +444,14 @@ namespace Arcontio.Tests
                 File.Delete(path);
 
             return path;
+        }
+
+        private static string ReadFlushedLog(string path)
+        {
+            JsonlRuntimeLogHub.FlushAll(force: true);
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream);
+            return reader.ReadToEnd();
         }
     }
 }
