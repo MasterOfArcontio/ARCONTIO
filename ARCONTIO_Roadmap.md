@@ -24,7 +24,7 @@
 | v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
 | v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
 | v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11c.03a |
-| v0.11D | Work/Social/Dormant Systems Forensic Audit | Giugno 2026 | Future |
+| v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Giugno 2026 | Future |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
 | v0.14 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
@@ -538,37 +538,438 @@ La recovery deve restare:
 
 ---
 
-#### v0.11c.06 - Stabilizzazione Movimento Multi-Tick
+### v0.11D - Runtime Infrastructure & Dormant Systems Forensic Reintegration
+
+**Status:** FUTURA / PREPARATORIA STRUTTURALE
+
+**Scopo:** trasformare la vecchia fase `Work/Social/Dormant Systems Forensic Audit` in una campagna infrastrutturale pre-espansione, dedicata a stabilizzare il runtime prima di aumentare volume, complessita temporale, sistemi sociali, sistemi lavoro, explainability profonda e crescita degli NPC.
+
+La v0.11D NON introduce nuove feature gameplay importanti.
+
+La fase serve a:
+
+- mappare sistemi legacy, dormienti, parzialmente vivi o scollegati;
+- stabilizzare logging, diagnostica runtime ed explainability;
+- ridurre accoppiamenti nascosti;
+- isolare debito legacy prima della reintegrazione dei sistemi lavoro e sociali;
+- preparare multi-tick, tracing temporale, orchestrazione cognitiva e crescita del numero di NPC;
+- rendere esplicite le policy runtime prima dell'espansione sistemica futura.
+
+> **Nota architetturale:** il logging/runtime tracing non e' piu un tema di comodita diagnostica. Il freeze emerso durante la simulazione dimostra che la diagnostica runtime e' diventata infrastruttura critica: se non viene resa limitata, batchata, congelabile e governata da canali espliciti, ogni espansione futura aumentera il rischio di stall, saturazione disco, crescita file non controllata e perdita di osservabilita proprio nei momenti in cui l'audit diventa piu necessario.
+
+> **Nota di riallineamento storico:** il checkpoint gia chiuso come `v0.11d.01 - Stabilizzazione Movimento Multi-Tick` resta memoria tecnica del lavoro completato sul traversal multi-tick. La presente sezione ridefinisce la roadmap futura di v0.11D come campagna infrastrutturale organica; eventuali riferimenti documentali al vecchio checkpoint vanno trattati come closeout storico gia consolidato, non come nuova attivita pendente.
+
+---
+
+## Ordine operativo v0.11D
+
+```text
+v0.11d.00 -> stabilizzazione urgente logging/runtime
+v0.11d.01 -> audit diagnostica runtime
+v0.11d.02 -> consolidamento diagnostica sostenibile
+v0.11d.03 -> audit sistemi dormienti
+v0.11d.04 -> audit sistemi lavoro
+v0.11d.05 -> audit sistemi sociali
+v0.11d.06 -> cleanup autorita runtime
+v0.11d.07 -> stabilizzazione scheduler/prestazioni
+v0.11d.08 -> chiusura costituzionale infrastruttura runtime
+```
+
+---
+
+#### v0.11d.00 - Stabilizzazione urgente logging e diagnostica runtime
 
 ## Stato
-COMPLETATA / DONE
+FUTURA / PRIORITA ALTA
 
 ## Obiettivo
 
-Stabilizzare il primo movimento Job multi-tick reale senza spegnere il movimento legacy.
+Eliminare le cause immediate di freeze e runtime stall legate alla diagnostica, senza introdurre gameplay e senza cambiare il comportamento simulativo.
 
-La fase ha consolidato:
+Questa fase ponte deve rendere sicuro l'audit successivo:
 
-- traversal Job one-cell multi-tick;
-- durata cella configurabile;
-- mutazione posizione solo a completion;
-- reservation cella destinazione durante progress;
-- inventario dei path legacy ancora necessari.
+- rimuovendo i canali runtime piu fragili;
+- stabilizzando la scrittura JSONL;
+- separando registry runtime e file export;
+- impedendo che logging, explainability o tracing possano bloccare Unity;
+- preparando una configurazione logging provvisoria, leggibile e non piu blob.
+
+---
+
+## Filosofia architetturale
+
+La diagnostica runtime deve diventare:
+
+- limitata;
+- congelabile;
+- batchata;
+- strutturata;
+- separata dal comportamento simulativo;
+- incapace di bloccare il tick;
+- disattivabile senza costi residui significativi.
 
 ---
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.11c.06a | Audit movimento legacy vs movimento temporale | DONE |
-| v0.11c.06b | QA N tick per attraversamento cella | DONE |
-| v0.11c.06c | Allineamento prenotazione cella e durata movimento | DONE |
-| v0.11c.06d | Audit riduzione movimento legacy | DONE |
-| v0.11c.06e | Inventario QA movimento legacy | DONE |
-| v0.11c.06f | Closeout stabilizzazione movimento multi-tick | DONE |
+| v0.11d.00a | Rimozione Console Unity / HTML / TXT dal logger runtime | Pending |
+| v0.11d.00b | Introduzione scrittore JSONL batchato, limitato e congelabile | Pending |
+| v0.11d.00c | Conversione sink JSONL movimento e MBQD | Pending |
+| v0.11d.00d | Configurazione logging runtime provvisoria pulita | Pending |
+| v0.11d.00e | QA stress freeze/logging/saturazione | Pending |
 
-> **Nota closeout v0.11c.06f (2026-05-25):** il checkpoint `v0.11c.06` e' chiuso come Stabilizzazione Movimento Multi-Tick. Il Job Layer puo' attraversare una cella in N tick configurabili, aggiornando la posizione solo a completion e mantenendo una reservation cella allineata alla durata reale. `MovementSystem` e `MoveIntent` restano attivi e necessari per path lunghi, landmark, local search, backoff, porte, debug movement e fallback legacy. La migrazione completa del movimento NON e' implementata. Dettaglio: `v0.11c.06_Closeout_Report.md`.
+### Definition of Done v0.11d.00
+
+| Criterio | Stato |
+|----------|-------|
+| Nessun log runtime massivo passa da Console Unity | Pending |
+| HTML e TXT non sono piu canali runtime principali | Pending |
+| La scrittura JSONL non usa append diretto per singolo evento | Pending |
+| Le code diagnostiche hanno limiti espliciti e policy di saturazione | Pending |
+| Il sistema di scrittura file e' congelabile quando inattivo | Pending |
+| Esiste una QA di stress per logging, saturazione e freeze | Pending |
 
 ---
+
+#### v0.11d.01 - Audit infrastruttura diagnostica runtime
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Capire completamente:
+
+- chi genera log;
+- chi legge log;
+- chi dipende dai registri runtime;
+- chi dipende dalla spiegabilita;
+- dove esistono effetti collaterali invisibili;
+- quali pannelli diagnostici consumano registry, file, sink o stato diretto del World.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.01a | Audit `Debug.Log` globale | Pending |
+| v0.11d.01b | Audit scritture file runtime | Pending |
+| v0.11d.01c | Audit sistemi JSONL | Pending |
+| v0.11d.01d | Audit registri runtime explainability | Pending |
+| v0.11d.01e | Audit dipendenze pannelli diagnostici | Pending |
+| v0.11d.01f | Mappa completa pipeline diagnostica | Pending |
+
+### Definition of Done v0.11d.01
+
+| Criterio | Stato |
+|----------|-------|
+| Tutti i produttori di log runtime sono mappati | Pending |
+| Tutte le scritture file runtime sono classificate | Pending |
+| Tutti i consumatori UI/debug della diagnostica sono identificati | Pending |
+| Le dipendenze tra logging, telemetry, explainability e pannelli sono esplicite | Pending |
+| Esiste una mappa leggibile della pipeline diagnostica completa | Pending |
+
+---
+
+#### v0.11d.02 - Consolidamento diagnostica sostenibile
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Costruire infrastruttura runtime sostenibile per:
+
+- explainability;
+- multi-tick;
+- tracing temporale;
+- audit futuri;
+- esecuzioni con piu NPC;
+- diagnostica continua senza collasso prestazionale.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.02a | Centro log condiviso | Pending |
+| v0.11d.02b | Scrittura batch JSONL | Pending |
+| v0.11d.02c | Code limitate e saturazione | Pending |
+| v0.11d.02d | Configurazione canali runtime | Pending |
+| v0.11d.02e | Separazione registri/file | Pending |
+| v0.11d.02f | Rotazione e cleanup file | Pending |
+| v0.11d.02g | QA stress logging | Pending |
+
+### Definition of Done v0.11d.02
+
+| Criterio | Stato |
+|----------|-------|
+| Esiste un percorso condiviso e governato per la scrittura diagnostica su file | Pending |
+| I registry runtime restano distinti dai file export | Pending |
+| I canali diagnostici hanno configurazione esplicita | Pending |
+| La saturazione diagnostica non blocca la simulazione | Pending |
+| La rotazione file impedisce crescita indefinita | Pending |
+| Le prove di stress dimostrano stabilita del runtime con diagnostica attiva | Pending |
+
+---
+
+#### v0.11d.03 - Audit forense sistemi dormienti
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Classificare tutti i sistemi:
+
+- morti;
+- incompleti;
+- scollegati;
+- parzialmente vivi;
+- legacy;
+- ancora recuperabili.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.03a | Inventory completo systems/rules | Pending |
+| v0.11d.03b | Classificazione runtime reale | Pending |
+| v0.11d.03c | Audit side effects nascosti | Pending |
+| v0.11d.03d | Audit authority duplicate | Pending |
+| v0.11d.03e | Mappa debito legacy | Pending |
+| v0.11d.03f | Report recuperabilita sistemi | Pending |
+
+### Definition of Done v0.11d.03
+
+| Criterio | Stato |
+|----------|-------|
+| Ogni sistema e regola compilata ha una classificazione runtime | Pending |
+| I sistemi dormienti sono separati da quelli realmente attivi | Pending |
+| I side effect nascosti sono documentati | Pending |
+| Le authority duplicate sono elencate | Pending |
+| Esiste una raccomandazione keep/refactor/isolate/remove per ogni area critica | Pending |
+
+---
+
+#### v0.11d.04 - Audit reintegrazione sistemi lavoro
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Capire cosa esiste davvero del layer:
+
+- produzione;
+- trasporto;
+- workstation;
+- crafting;
+- ruoli lavorativi;
+- reservation dedicate al lavoro.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.04a | Audit WorkSystem reale | Pending |
+| v0.11d.04b | Audit workstation runtime | Pending |
+| v0.11d.04c | Audit job produttivi esistenti | Pending |
+| v0.11d.04d | Audit reservation lavoro | Pending |
+| v0.11d.04e | Audit authority crafting/use | Pending |
+| v0.11d.04f | Report foundation produttiva | Pending |
+
+### Definition of Done v0.11d.04
+
+| Criterio | Stato |
+|----------|-------|
+| I sistemi produttivi reali sono distinti dai prototipi | Pending |
+| Le workstation sono classificate come runtime vive, passive o dormienti | Pending |
+| I job produttivi esistenti sono mappati | Pending |
+| Le reservation collegate al lavoro sono documentate | Pending |
+| Il boundary tra crafting/use/world mutation e Job layer e' esplicito | Pending |
+
+---
+
+#### v0.11d.05 - Audit reintegrazione sistemi sociali
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Capire cosa esiste davvero del layer:
+
+- reputazione;
+- norme;
+- relazioni;
+- sospetto;
+- comunicazione;
+- istituzioni.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.05a | Audit SocialSystem | Pending |
+| v0.11d.05b | Audit pipeline comunicazione | Pending |
+| v0.11d.05c | Audit reputazione/sospetto | Pending |
+| v0.11d.05d | Audit norme/istituzioni | Pending |
+| v0.11d.05e | Audit world events sociali | Pending |
+| v0.11d.05f | Report foundation sociale | Pending |
+
+### Definition of Done v0.11d.05
+
+| Criterio | Stato |
+|----------|-------|
+| La pipeline comunicativa NPC-NPC e' mappata | Pending |
+| Reputazione, sospetto e relazioni sono classificati per stato runtime reale | Pending |
+| Norme e istituzioni sono distinte tra dati, prototipi e sistemi vivi | Pending |
+| Gli eventi sociali di mondo sono verificati rispetto alla causalita runtime | Pending |
+| Le letture onniscienti o non soggettive sono evidenziate | Pending |
+
+---
+
+#### v0.11d.06 - Cleanup autorita runtime
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Eliminare o isolare:
+
+- mutazioni duplicate;
+- authority spurie;
+- scorciatoie legacy;
+- bypass del Job layer;
+- bypass eventi;
+- letture o scritture dirette non coerenti con il percorso canonico.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.06a | Audit mutazioni dirette World | Pending |
+| v0.11d.06b | Audit bypass ICommand | Pending |
+| v0.11d.06c | Audit bypass Job layer | Pending |
+| v0.11d.06d | Audit eventi mancanti | Pending |
+| v0.11d.06e | Cleanup authority duplicate | Pending |
+| v0.11d.06f | QA causalita runtime | Pending |
+
+### Definition of Done v0.11d.06
+
+| Criterio | Stato |
+|----------|-------|
+| Le mutazioni dirette del World sono inventariate | Pending |
+| I bypass di ICommand e Job layer sono documentati | Pending |
+| Gli eventi mancanti o incoerenti sono classificati | Pending |
+| Le authority duplicate hanno una proposta di cleanup | Pending |
+| La QA conferma che la causalita runtime resta osservabile | Pending |
+
+---
+
+#### v0.11d.07 - Stabilizzazione scheduler e prestazioni runtime
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Preparare il runtime a:
+
+- multi-tick;
+- tracing pesante;
+- molti NPC;
+- explainability continua;
+- scheduler piu carico;
+- maggiore complessita temporale.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.07a | Audit catch-up tick | Pending |
+| v0.11d.07b | Audit limiti scheduler | Pending |
+| v0.11d.07c | Audit allocazioni runtime | Pending |
+| v0.11d.07d | Audit GC spikes | Pending |
+| v0.11d.07e | Introduzione limiti emergenza | Pending |
+| v0.11d.07f | QA stress runtime | Pending |
+
+### Definition of Done v0.11d.07
+
+| Criterio | Stato |
+|----------|-------|
+| Il comportamento catch-up tick e' documentato | Pending |
+| I limiti scheduler sono espliciti | Pending |
+| Le allocazioni runtime piu critiche sono identificate | Pending |
+| I picchi GC principali sono mappati | Pending |
+| Esiste una proposta di limiti emergenziali per evitare spiral of death | Pending |
+| La QA stress copre runtime, scheduler e diagnostica attiva | Pending |
+
+---
+
+#### v0.11d.08 - Chiusura costituzionale infrastruttura runtime
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Formalizzare:
+
+- regole runtime;
+- policy diagnostica;
+- policy explainability;
+- policy scheduler;
+- policy authority;
+- confini tra debug, osservabilita e comportamento simulativo.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.08a | Decision records runtime instrumentation | Pending |
+| v0.11d.08b | Decision records scheduler/runtime | Pending |
+| v0.11d.08c | Riallineamento roadmap | Pending |
+| v0.11d.08d | Sync documentazione | Pending |
+| v0.11d.08e | QA finale infrastrutturale | Pending |
+
+### Definition of Done v0.11d.08
+
+| Criterio | Stato |
+|----------|-------|
+| Le decisioni architetturali sulla diagnostica runtime sono formalizzate | Pending |
+| Le decisioni su scheduler e prestazioni runtime sono formalizzate | Pending |
+| La roadmap e' riallineata alla fase infrastrutturale completata | Pending |
+| La documentazione estesa e' sincronizzata dove necessario | Pending |
+| La QA finale conferma readiness per espansione lavoro/sociale/multi-tick profondo | Pending |
+
+---
+
+## Nota architetturale v0.11D
+
+La v0.11D deve diventare l'ultima grande fase di stabilizzazione infrastrutturale prima dell'esplosione sistemica futura.
+
+Multi-tick, sistemi sociali, sistemi lavoro, explainability profonda e simulazione emergente aumenteranno enormemente:
+
+- volume runtime;
+- coupling;
+- complessita temporale;
+- numero di trace prodotte;
+- numero di authority coinvolte;
+- frequenza delle interazioni tra NPC e sistemi.
+
+Se il runtime resta morbido, la crescita futura rischia di produrre:
+
+- sistemi ingestibili;
+- spiegabilita costosissima;
+- effetti collaterali invisibili;
+- degrado prestazionale progressivo;
+- debug non affidabile proprio nei casi emergenti piu importanti.
+
+Per questo motivo la v0.11D non deve essere trattata come una pausa tecnica minore, ma come una fase preparatoria strutturale necessaria per rendere sostenibile la prossima espansione cognitiva e sociale.
+
+---
+
 #### v0.12 — Pulizia Logging, Explainability e Diagnostica Runtime
 
 ## Stato

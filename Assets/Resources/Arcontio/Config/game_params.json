@@ -2,14 +2,14 @@
   "worldWidth": 64,
   "worldHeight": 64,
   "tick": {
-    "ticksPerSecond": 5,
+    "ticksPerSecond": 25,
     "baseWalkCellDurationTicks": 3,
     "enableJobRunningActionTraversal": false
   },
   "Language": "it",
   "logging": {
     "general": {
-      "enabled": true,
+      "enabled": false,
       "minimum_level": "Warn",
       "include_timestamp": true,
       "include_tick": true
@@ -21,15 +21,15 @@
       "file_name_pattern": "arcontio_{yyyyMMdd_HHmmss}.txt"
     },
     "jsonl": {
-      "enabled": true,
+      "enabled": false,
       "flush_interval_seconds": 0.25,
       "max_queue_size": 4096,
       "max_batch_size": 512
     },
     "movement_explainability": {
-      "enabled": true,
+      "enabled": false,
       "runtime_registry_enabled": true,
-      "file_logging_enabled": true,
+      "file_logging_enabled": false,
       "defaultVerbosity": 2,
       "maxTrackedNpcs": 3,
       "trackedNpcIds": [],
@@ -42,7 +42,7 @@
       "jsonLogFileNamePattern": "arcontio_el_pathfinding_{yyyyMMdd_HHmmss}.jsonl"
     },
     "memory_belief_decision_explainability": {
-      "enabled": true,
+      "enabled": false,
       "runtime_registry_enabled": true,
       "file_logging_enabled": false,
       "defaultVerbosity": 3,
@@ -65,7 +65,7 @@
       "ringBuffer_bridge": 24
     },
     "telemetry": {
-      "enabled": true,
+      "enabled": false,
       "dump_to_console_enabled": false
     },
     "devtools": {
