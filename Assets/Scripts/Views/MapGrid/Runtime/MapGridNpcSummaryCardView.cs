@@ -349,6 +349,22 @@ namespace Arcontio.View.MapGrid
                 _compactNeedsRoot.SetActive(compactNeedsOnly);
         }
 
+        public bool ShouldBuildActionSection() => ShouldBuildExpandedSection(KeyAction);
+        public bool ShouldBuildInventorySection() => ShouldBuildExpandedSection(KeyInventory);
+        public bool ShouldBuildCommsSection() => ShouldBuildExpandedSection(KeyComms);
+        public bool ShouldBuildLandmarksSection() => ShouldBuildExpandedSection(KeyLandmarks);
+        public bool ShouldBuildMemoryTracesSection() => ShouldBuildExpandedSection(KeyMemoryTraces);
+        public bool ShouldBuildKnownObjectsSection() => ShouldBuildExpandedSection(KeyKnownObjects);
+        public bool ShouldBuildDnaDriftSection() => ShouldBuildExpandedSection(KeyDnaDrift);
+
+        private bool ShouldBuildExpandedSection(string key)
+        {
+            // Il controller dell'overlay usa questa guardia prima di comporre testo
+            // diagnostico. La view resta proprietaria dello stato collassato, mentre
+            // la costruzione pesante viene evitata a monte quando la sezione e' chiusa.
+            return !_compactNeedsOnly && !IsSectionCollapsed(key);
+        }
+
         private static void SetSectionVisible(SectionView section, bool visible)
         {
             if (section?.Root != null)
