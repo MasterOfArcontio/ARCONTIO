@@ -160,6 +160,8 @@ namespace Arcontio.Tests
 
             var game = JsonUtility.FromJson<GameParams>(json);
             var logging = game.ResolveLogging();
+            var sim = JsonUtility.FromJson<SimulationParams>(json);
+            var loggingFromSimulationParams = sim.ResolveLoggerDiagnostics();
 
             Assert.That(logging.general.enabled, Is.True);
             Assert.That(logging.general.minimum_level, Is.EqualTo("Warn"));
@@ -169,6 +171,15 @@ namespace Arcontio.Tests
             Assert.That(logging.jsonl.enabled, Is.True);
             Assert.That(logging.jsonl.max_queue_size, Is.EqualTo(4096));
             Assert.That(logging.jsonl.max_batch_size, Is.EqualTo(512));
+
+            Assert.That(loggingFromSimulationParams.general.enabled, Is.True);
+            Assert.That(loggingFromSimulationParams.general.minimum_level, Is.EqualTo("Warn"));
+            Assert.That(loggingFromSimulationParams.legacy_channels.unity_console_enabled, Is.False);
+            Assert.That(loggingFromSimulationParams.legacy_channels.html_file_enabled, Is.False);
+            Assert.That(loggingFromSimulationParams.legacy_channels.txt_file_enabled, Is.False);
+            Assert.That(loggingFromSimulationParams.jsonl.enabled, Is.True);
+            Assert.That(loggingFromSimulationParams.jsonl.max_queue_size, Is.EqualTo(4096));
+            Assert.That(loggingFromSimulationParams.jsonl.max_batch_size, Is.EqualTo(512));
         }
 
         // =============================================================================

@@ -1,4 +1,5 @@
 using System;
+using Arcontio.Core.Logging;
 using UnityEngine;
 
 namespace Arcontio.Core.Config
@@ -53,6 +54,10 @@ namespace Arcontio.Core.Config
         // come fallback compatibile, ma il file JSON vivo deve concentrare qui le
         // impostazioni diagnostiche accendibili o spegnibili.
         public RuntimeDiagnosticsParams logging;
+
+        // Sezione legacy mantenuta solo come ponte per vecchi game_params.json.
+        // Il layout canonico dalla v0.11d.00d e' "logging".
+        public LegacyLoggingParams Logging;
 
         // ---------------- Inventario / Carry capacity ----------------
         public InventoryParams inventory = new InventoryParams();
@@ -271,6 +276,25 @@ namespace Arcontio.Core.Config
                         memory_belief_decision_explainability);
             }
         }
+
+        public LoggerDiagnosticsParams ResolveLoggerDiagnostics()
+        {
+            if (logging == null)
+                return LoggerDiagnosticsParams.FromLegacy(Logging);
+
+            var resolved = new LoggerDiagnosticsParams
+            {
+                general = logging.general ?? new LoggerGeneralParams(),
+                legacy_channels = logging.legacy_channels ?? new LoggerLegacyChannelParams(),
+                jsonl = logging.jsonl ?? new LoggerJsonlParams(),
+                telemetry = logging.telemetry ?? new LoggerTelemetryParams(),
+                devtools = logging.devtools != null
+                    ? logging.devtools.ToLoggerDevtoolParams()
+                    : new LoggerDevtoolParams()
+            };
+
+            return resolved;
+        }
     }
 
     // =============================================================================
@@ -372,6 +396,10 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class RuntimeDiagnosticsParams
     {
+        public LoggerGeneralParams general = new LoggerGeneralParams();
+        public LoggerLegacyChannelParams legacy_channels = new LoggerLegacyChannelParams();
+        public LoggerJsonlParams jsonl = new LoggerJsonlParams();
+        public LoggerTelemetryParams telemetry = new LoggerTelemetryParams();
         public DiagnosticsDevtoolParams devtools = new DiagnosticsDevtoolParams();
         public DiagnosticsMovementExplainabilityParams movement_explainability = new DiagnosticsMovementExplainabilityParams();
         public DiagnosticsMemoryBeliefDecisionExplainabilityParams memory_belief_decision_explainability =
@@ -384,6 +412,15 @@ namespace Arcontio.Core.Config
         public bool overlay_enabled = false;
         public bool verbose_debug_enabled = false;
         public DebugFovParams debug_fov = new DebugFovParams();
+
+        public LoggerDevtoolParams ToLoggerDevtoolParams()
+        {
+            return new LoggerDevtoolParams
+            {
+                overlay_enabled = overlay_enabled,
+                verbose_debug_enabled = verbose_debug_enabled
+            };
+        }
     }
 
     [Serializable]
