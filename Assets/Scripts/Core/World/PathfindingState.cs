@@ -180,6 +180,15 @@ namespace Arcontio.Core
         public readonly Dictionary<int, List<GridPosition>> DebugJumpPathCells
             = new Dictionary<int, List<GridPosition>>(256);
 
+        public int MacroRouteExecutionCount => MacroRouteExecution.Count;
+        public int DirectCommitExecutionCount => DirectCommitExecution.Count;
+        public int GoalLocalSearchExecutionCount => GoalLocalSearchExecution.Count;
+        public int MoveBackOffCount => MoveBackOff.Count;
+        public int FailureLearningNpcCount => FailureLearning.Count;
+        public int DebugLmPathNpcCount => DebugLmPathCells.Count;
+        public int DebugDirectPathNpcCount => DebugDirectPathCells.Count;
+        public int DebugJumpPathNpcCount => DebugJumpPathCells.Count;
+
         // =====================================================================
         // API: MACRO-ROUTE EXECUTION
         // =====================================================================
@@ -687,6 +696,30 @@ namespace Arcontio.Core
         {
             macroRoutes.Remove(npcId);
             MacroRouteExecution.Remove(npcId);
+        }
+
+        /// <summary>
+        /// Cancella tutto lo stato pathfinding indicizzato per NPC.
+        /// Questo metodo e' pensato per la rimozione dev di un NPC dal mondo: non
+        /// decide un nuovo path, non modifica authority movimento e non produce
+        /// comandi. Elimina soltanto stati temporanei/debug che non possono piu'
+        /// essere osservati legittimamente dopo la cancellazione dell'NPC.
+        /// </summary>
+        public void ClearNpc(int npcId, Dictionary<int, NpcMacroRoutePlan> macroRoutes)
+        {
+            if (npcId <= 0)
+                return;
+
+            ClearDebugNavigationPaths(npcId);
+
+            if (macroRoutes != null)
+                macroRoutes.Remove(npcId);
+
+            MacroRouteExecution.Remove(npcId);
+            DirectCommitExecution.Remove(npcId);
+            GoalLocalSearchExecution.Remove(npcId);
+            MoveBackOff.Remove(npcId);
+            FailureLearning.Remove(npcId);
         }
 
         /// <summary>

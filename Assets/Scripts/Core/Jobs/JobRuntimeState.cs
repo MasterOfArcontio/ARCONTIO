@@ -409,6 +409,33 @@ namespace Arcontio.Core
             return true;
         }
 
+        public bool RemoveNpcState(int npcId, JobFailureReason clearReason, out string reason)
+        {
+            reason = string.Empty;
+
+            if (npcId <= 0)
+            {
+                reason = "InvalidNpcId";
+                return false;
+            }
+
+            if (_npcStates.TryGetValue(npcId, out var state) && state.HasActiveJob)
+            {
+                Reservations.ReleaseByJob(state.ActiveJobId);
+                _jobs.Remove(state.ActiveJobId);
+            }
+
+            // Rimozione dev-only: se l'NPC non esiste piu' nel World, conservare uno
+            // slot idle nel JobRuntimeState diventa solo retention diagnostica. Le
+            // azioni in corso vengono cancellate nello stesso modo di ClearNpcJob,
+            // poi lo slot per-NPC viene rimosso del tutto.
+            Reservations.ReleaseByNpc(npcId);
+            RunningActions.ClearByNpc(npcId);
+            _npcStates.Remove(npcId);
+            reason = "NpcJobStateRemoved";
+            return true;
+        }
+
         public bool HasActiveJob(int npcId)
         {
             return _npcStates.TryGetValue(npcId, out var state) && state.HasActiveJob;

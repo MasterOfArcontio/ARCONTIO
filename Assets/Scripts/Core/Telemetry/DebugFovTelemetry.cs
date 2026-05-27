@@ -44,6 +44,24 @@ namespace Arcontio.Core
         private readonly List<int> _cleanupKeysBuffer = new(256);
 
         public int WindowTicks => _windowTicks;
+        public int WriteTrackedNpcCount => _writeHeatByNpc.Count;
+        public int ReadTrackedNpcCount => _readHeatByNpc.Count;
+        public int TrackedNpcCount
+        {
+            get
+            {
+                int count = _readHeatByNpc.Count;
+                foreach (var npcId in _writeHeatByNpc.Keys)
+                {
+                    if (!_readHeatByNpc.ContainsKey(npcId))
+                        count++;
+                }
+
+                return count;
+            }
+        }
+        public int AllocatedHeatArrayCount => _writeHeatByNpc.Count + _readHeatByNpc.Count;
+        public long EstimatedHeatBytes => (long)AllocatedHeatArrayCount * _size * sizeof(int);
 
         public DebugFovTelemetry(int width, int height, int windowTicks)
         {
@@ -101,6 +119,36 @@ namespace Arcontio.Core
         public int Width => _width;
         public int Height => _height;
         public int Size => _size;
+
+        /// <summary>
+        /// Rimuove tutti i buffer diagnostici associati a un singolo NPC.
+        /// E' usato dai DevTools quando un NPC viene cancellato dal mondo: la FOV
+        /// telemetry non possiede gameplay state, quindi eliminare questi array
+        /// evita solo retention diagnostica orfana senza cambiare la simulazione.
+        /// </summary>
+        public void ClearNpc(int npcId)
+        {
+            if (npcId <= 0) return;
+
+            _writeHeatByNpc.Remove(npcId);
+            _readHeatByNpc.Remove(npcId);
+            _oldReadRecycle.Remove(npcId);
+        }
+
+        /// <summary>
+        /// Reset completo dei buffer diagnostici FOV.
+        /// Non modifica il mondo, non modifica percezione e non modifica output
+        /// simulativo: svuota soltanto dati visuali accumulati.
+        /// </summary>
+        public void ClearAll()
+        {
+            _writeHeatByNpc.Clear();
+            _readHeatByNpc.Clear();
+            _oldReadRecycle.Clear();
+            _writeKeysBuffer.Clear();
+            _cleanupKeysBuffer.Clear();
+            _ticksIntoWindow = 0;
+        }
 
         // ============================================================
         // Internals
@@ -169,6 +217,12 @@ namespace Arcontio.Core
                 if (!_readHeatByNpc.ContainsKey(npcId))
                     _writeHeatByNpc.Remove(npcId);
             }
+
+            // Il dizionario di riciclo serve solo durante lo swap. Lasciarlo pieno
+            // fino alla finestra successiva trattiene riferimenti ad array di NPC che
+            // potrebbero essere spariti dal mondo nel frattempo. Svuotarlo qui non
+            // cambia il doppio buffer attivo: read e write sono gia' stati assegnati.
+            _oldReadRecycle.Clear();
         }
 
         private static void ClearArray(int[] arr)

@@ -73,6 +73,8 @@ namespace Arcontio.Core.Commands.DevTools
             world.Memory.Remove(npcId);
             world.Beliefs.Remove(npcId);
             world.NpcObjectMemory.Remove(npcId);
+            world.NpcLandmarkMemory.Remove(npcId);
+            world.NpcComplexEdgeMemories.Remove(npcId);
 
             // Ownership pinned belief
             world.NpcPinnedFoodStockBeliefs.Remove(npcId);
@@ -90,6 +92,17 @@ namespace Arcontio.Core.Commands.DevTools
 
             world.NpcMoveIntents.Remove(npcId);
             world.NpcScanStates.Remove(npcId);
+            world.Pathfinding?.ClearNpc(npcId, world.NpcMacroRoutes);
+
+            // ============================================================
+            // JOB / DEBUG RUNTIME / EXPLAINABILITY
+            // ============================================================
+
+            world.JobRuntimeState?.RemoveNpcState(npcId, JobFailureReason.Cancelled, out _);
+            world.DebugNpcTokens.Remove(npcId);
+            world.MovementExplainability?.ClearNpc(npcId);
+            world.MemoryBeliefDecisionExplainability?.ClearNpc(npcId);
+            world.DebugFovTelemetry?.ClearNpc(npcId);
 
             // Nota:
             // - Non chiamiamo rebuild cache globale: NPC non modifica occlusion.

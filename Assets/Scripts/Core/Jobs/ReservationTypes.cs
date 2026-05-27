@@ -315,6 +315,27 @@ namespace Arcontio.Core
             return keys.Count;
         }
 
+        public int ReleaseByNpc(int npcId)
+        {
+            if (npcId <= 0)
+                return 0;
+
+            // Usato da cleanup dev/recovery: rimuove prenotazioni rimaste agganciate
+            // a un NPC che non esiste piu'. Non decide nuovi job e non crea eventi:
+            // libera solo stato volatile posseduto dal job runtime.
+            var keys = new List<string>();
+            foreach (var pair in _records)
+            {
+                if (pair.Value.NpcId == npcId)
+                    keys.Add(pair.Key);
+            }
+
+            for (var i = 0; i < keys.Count; i++)
+                _records.Remove(keys[i]);
+
+            return keys.Count;
+        }
+
         // =============================================================================
         // ReleaseByJob
         // =============================================================================

@@ -54,6 +54,9 @@ namespace Arcontio.Core
         /// La UI legge .Outgoing.
         /// </summary>
         public IReadOnlyList<Entry> Outgoing => _outgoing;
+        public int IncomingCount => _incoming.Count;
+        public int OutgoingCount => _outgoing.Count;
+        public int TotalCount => _incoming.Count + _outgoing.Count;
 
         /// <summary>
         /// Chiamata dal TokenDeliveryPipeline:
