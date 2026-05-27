@@ -563,14 +563,14 @@ namespace Arcontio.Core
             Instance = this;
 
             // ******************************************************************************************************************************
-            // 2) INIZIALIZZO IL LOG PERSONALIZZATO (ArcontioLogger)
+            // 2) INIZIALIZZO DIAGNOSTICA RUNTIME E PONTE LOG LEGACY
             // ******************************************************************************************************************************
             // ============================================================
             // NOTE (pulizia lettura config):
             // In precedenza il logger e il mondo caricavano entrambi game_params.json
             // da Resources. Da v0.12c.03 il TextAsset viene letto una sola volta qui
             // e SimulationParams diventa il modello principale anche per risolvere
-            // la configurazione logger usata nel bootstrap.
+            // la configurazione diagnostica usata nel bootstrap.
             //
             // GameParams resta come ponte compatibile per test o strumenti isolati,
             // ma il percorso ordinario del runtime non dipende piu' da un secondo
@@ -582,9 +582,8 @@ namespace Arcontio.Core
                 gameParamsAsset,
                 gameParamsPathNoExt);
 
-            ArcontioLogger.InitFromSimulationParams(
-                simParams,
-                localizationPathNoExt: "Arcontio/Config/localization_logs");
+            RuntimeDiagnosticsLifecycle.InitFromSimulationParams(simParams);
+            ArcontioLogger.InitFromSimulationParams(simParams);
             ArcontioLogger.Info(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Core"),
                 new LogBlock(LogLevel.Info, "log.core.persistent_path")
@@ -2362,11 +2361,12 @@ namespace Arcontio.Core
         private void LateUpdate()
         {
             // flush ?soft? a fine frame (evita I/O per log write singolo)
-            ArcontioLogger.Flush();
+            RuntimeDiagnosticsLifecycle.Flush();
         }
 
         private void OnApplicationQuit()
         {
+            RuntimeDiagnosticsLifecycle.Shutdown();
             ArcontioLogger.Shutdown();
         }
     }

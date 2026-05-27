@@ -25,47 +25,36 @@ namespace Arcontio.Core.Logging
             return level >= _minLevel;
         }
 
-        public static void InitFromResources(
-            string gameParamsPathNoExt = "Arcontio/Config/game_params",
-            string localizationPathNoExt = "Arcontio/Config/localization_logs")
+        public static void InitFromResources(string gameParamsPathNoExt = "Arcontio/Config/game_params")
         {
             if (_initialized) return;
 
-            InitFromParams(
-                GameParamsLoader.LoadFromResources(gameParamsPathNoExt),
-                localizationPathNoExt);
+            InitFromParams(GameParamsLoader.LoadFromResources(gameParamsPathNoExt));
         }
 
-        public static void InitFromParams(
-            GameParams gameParams,
-            string localizationPathNoExt = "Arcontio/Config/localization_logs")
+        public static void InitFromParams(GameParams gameParams)
         {
             if (_initialized) return;
 
             _params = gameParams ?? new GameParams();
             InitFromConfig(
                 _params.Language,
-                _params.ResolveLogging(),
-                localizationPathNoExt);
+                _params.ResolveLogging());
         }
 
-        public static void InitFromSimulationParams(
-            SimulationParams simulationParams,
-            string localizationPathNoExt = "Arcontio/Config/localization_logs")
+        public static void InitFromSimulationParams(SimulationParams simulationParams)
         {
             if (_initialized) return;
 
             _params = null;
             InitFromConfig(
                 simulationParams?.Language ?? "it",
-                simulationParams?.ResolveLoggerDiagnostics() ?? new LoggerDiagnosticsParams(),
-                localizationPathNoExt);
+                simulationParams?.ResolveLoggerDiagnostics() ?? new LoggerDiagnosticsParams());
         }
 
         private static void InitFromConfig(
             string language,
-            LoggerDiagnosticsParams logging,
-            string localizationPathNoExt)
+            LoggerDiagnosticsParams logging)
         {
             if (_initialized) return;
 
@@ -73,7 +62,6 @@ namespace Arcontio.Core.Logging
             _logging = logging ?? new LoggerDiagnosticsParams();
 
             _minLevel = ParseLevel(_logging.general.minimum_level, LogLevel.Warn);
-            JsonlRuntimeLogHub.Configure(_logging.jsonl);
 
             _initialized = true;
 
@@ -88,7 +76,6 @@ namespace Arcontio.Core.Logging
         public static void Shutdown()
         {
             if (!_initialized) return;
-            try { JsonlRuntimeLogHub.Shutdown(); } catch { }
             _params = null;
             _logging = null;
             _language = "it";
@@ -97,7 +84,6 @@ namespace Arcontio.Core.Logging
 
         public static void Flush()
         {
-            JsonlRuntimeLogHub.FlushAll();
         }
 
         // API rapida
