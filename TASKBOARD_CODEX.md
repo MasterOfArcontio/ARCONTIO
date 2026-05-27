@@ -28,14 +28,14 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
 
 CHECKPOINT CORRENTE:
-v0.12d - Rimozione canali legacy console / TXT / HTML / overlay
+v0.12e - Decisione ArcontioLogger: rimozione o ponte JSONL/EL
 
 STATUS:
 IN PROGRESS
 
 OUTPUT ATTESO:
-audit e patch controllata dei canali legacy:
-`[v0.12d] remove legacy runtime log channels`
+audit e decisione controllata su `ArcontioLogger`:
+`[v0.12e] decide arcontio logger bridge or removal`
 
 DOC SYNC:
 root taskboard e roadmap aggiornate all'apertura tecnica di `v0.12`;
@@ -88,6 +88,14 @@ Nota `v0.12c`:
 - `SimulationHost` legge il file una sola volta;
 - `SimulationParams` e' il modello principale del bootstrap;
 - `GameParams.cs` resta ponte compatibile, ma non e' piu' il percorso ordinario del runtime.
+
+Checkpoint v0.12d completato:
+
+- rimossi fisicamente `UnityConsoleSink`, `FileSink` TXT, `HtmlFileSink`, `UnityOverlaySink` e `ArcontioLogOverlay`;
+- rimossi i relativi `.meta` Unity per evitare asset orfani;
+- `ArcontioLogger` non apre piu' canali console, TXT, HTML o overlay;
+- `JsonlRuntimeLogHub` e i sink JSONL EL restano preservati;
+- prossimo nodo: decidere se `ArcontioLogger` va eliminato o trasformato in ponte leggero sopra JSONL/EL.
 
 ---
 
