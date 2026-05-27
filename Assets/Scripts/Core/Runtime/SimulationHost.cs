@@ -566,17 +566,23 @@ namespace Arcontio.Core
             // 2) INIZIALIZZO IL LOG PERSONALIZZATO (ArcontioLogger)
             // ******************************************************************************************************************************
             // ============================================================
-            // NOTE (pulizia path):
-            // In precedenza qui c'era "Config/game_params" mentre il resto del progetto
-            // usa "Arcontio/Config/game_params".
+            // NOTE (pulizia lettura config):
+            // In precedenza il logger e il mondo caricavano entrambi game_params.json
+            // da Resources. Da v0.12c.02 il TextAsset viene letto una sola volta qui,
+            // poi deserializzato in due DTO diversi finche' GameParams e
+            // SimulationParams restano modelli separati.
             //
-            // Per evitare di avere DUE copie del file (una per logger e una per sim),
-            // usiamo lo stesso path canonico "Arcontio/Config/...".
+            // Questo non fonde ancora i modelli di configurazione: elimina soltanto
+            // la doppia lettura del file e mantiene il fallback storico del logger
+            // per test o strumenti che lo inizializzano fuori da SimulationHost.
             // ============================================================
-            ArcontioLogger.InitFromResources(
-               gameParamsPathNoExt: "Arcontio/Config/game_params",
-               localizationPathNoExt: "Arcontio/Config/localization_logs"
-           );
+            const string gameParamsPathNoExt = "Arcontio/Config/game_params";
+            var gameParamsAsset = Resources.Load<TextAsset>(gameParamsPathNoExt);
+            var gameParams = GameParamsLoader.LoadFromTextAsset(gameParamsAsset, gameParamsPathNoExt);
+
+            ArcontioLogger.InitFromParams(
+                gameParams,
+                localizationPathNoExt: "Arcontio/Config/localization_logs");
             ArcontioLogger.Info(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Core"),
                 new LogBlock(LogLevel.Info, "log.core.persistent_path")
@@ -595,7 +601,7 @@ namespace Arcontio.Core
             // 3.1) Leggo da file game_params.json i dati di simulazione, che finiscono in simParams.
             // Con quello creo l'istanza di world
             // ******************************************************************************************************************************
-            _world = CreateWorldFromGameParams();
+            _world = CreateWorldFromGameParams(gameParamsAsset);
 
             // ******************************************************************************************************************************
             // 3.2) INIZIALIZZO IL MESSAGE BUS
@@ -1449,9 +1455,11 @@ namespace Arcontio.Core
         /// confinati in <see cref="EnsureSeeded"/>.
         /// </para>
         /// </summary>
-        private World CreateWorldFromGameParams()
+        private World CreateWorldFromGameParams(TextAsset gameParamsAsset = null)
         {
-            var simParams = Arcontio.Core.Config.SimulationParamsLoader.LoadFromResources("Arcontio/Config/game_params");
+            var simParams = gameParamsAsset != null
+                ? Arcontio.Core.Config.SimulationParamsLoader.LoadFromTextAsset(gameParamsAsset, "Arcontio/Config/game_params")
+                : Arcontio.Core.Config.SimulationParamsLoader.LoadFromResources("Arcontio/Config/game_params");
             return new World(new WorldConfig(simParams));
         }
 
