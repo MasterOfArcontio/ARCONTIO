@@ -1381,7 +1381,7 @@ namespace Arcontio.Core
                 if (NpcComplexEdgeMemories.TryGetValue(npcId, out var recMem) && recMem != null)
                 {
                     recMem.RecordStep(toX, toY);
-                    if (recMem.IsRecording)
+                    if (recMem.IsRecording && ArcontioLogger.ShouldWrite(LogLevel.Trace))
                     {
                         ArcontioLogger.Trace(
                             new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (toX, toY)),
@@ -1420,45 +1420,54 @@ namespace Arcontio.Core
                     var complexMem = EnsureNpcComplexEdgeMemory(npcId);
                     int beforeCount = complexMem.Count;
                     bool completed = complexMem.TryCompleteRecording(nodeId, now, out var completedEdge);
-                    ArcontioLogger.Trace(
-                        new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId, cell: (toX, toY)),
-                        new LogBlock(LogLevel.Trace, "log.lm.recording_debug")
-                            .AddField("phase", "complete_physical_recording")
-                            .AddField("fromNodeId", prev)
-                            .AddField("toNodeId", nodeId)
-                            .AddField("completed", completed)
-                            .AddField("edgeCountBefore", beforeCount)
-                            .AddField("edgeCountAfter", complexMem.Count)
-                            .AddField("edgeCost", completedEdge != null ? completedEdge.BaseCost : 0)
-                            .AddField("edgeHasSegments", completedEdge != null && completedEdge.Segments != null && completedEdge.Segments.Count > 0)
-                    );
+                    if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                    {
+                        ArcontioLogger.Trace(
+                            new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId, cell: (toX, toY)),
+                            new LogBlock(LogLevel.Trace, "log.lm.recording_debug")
+                                .AddField("phase", "complete_physical_recording")
+                                .AddField("fromNodeId", prev)
+                                .AddField("toNodeId", nodeId)
+                                .AddField("completed", completed)
+                                .AddField("edgeCountBefore", beforeCount)
+                                .AddField("edgeCountAfter", complexMem.Count)
+                                .AddField("edgeCost", completedEdge != null ? completedEdge.BaseCost : 0)
+                                .AddField("edgeHasSegments", completedEdge != null && completedEdge.Segments != null && completedEdge.Segments.Count > 0)
+                        );
+                    }
                 }
                 // In ogni caso: avvia un nuovo recording dal nodo corrente.
                 // Patch 0.02.09.A: anche dopo un edge semplice, partiamo a registrare
                 // il prossimo tratto (potrebbe non avere un edge nel registry).
                 EnsureNpcComplexEdgeMemory(npcId).StartPathRecording(nodeId, toX, toY);
-                ArcontioLogger.Trace(
-                    new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId, cell: (toX, toY)),
-                    new LogBlock(LogLevel.Trace, "log.lm.recording_debug")
-                        .AddField("phase", "start_recording")
-                        .AddField("fromNodeId", nodeId)
-                        .AddField("x", toX)
-                        .AddField("y", toY)
-                );
+                if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                {
+                    ArcontioLogger.Trace(
+                        new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId, cell: (toX, toY)),
+                        new LogBlock(LogLevel.Trace, "log.lm.recording_debug")
+                            .AddField("phase", "start_recording")
+                            .AddField("fromNodeId", nodeId)
+                            .AddField("x", toX)
+                            .AddField("y", toY)
+                    );
+                }
             }
             else if (prev == 0)
             {
                 // Primo landmark visto: avvia il recording.
                 // Patch 0.02.09.A
                 EnsureNpcComplexEdgeMemory(npcId).StartPathRecording(nodeId, toX, toY);
-                ArcontioLogger.Trace(
-                    new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId, cell: (toX, toY)),
-                    new LogBlock(LogLevel.Trace, "log.lm.recording_debug")
-                        .AddField("phase", "start_recording_first_landmark")
-                        .AddField("fromNodeId", nodeId)
-                        .AddField("x", toX)
-                        .AddField("y", toY)
-                );
+                if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                {
+                    ArcontioLogger.Trace(
+                        new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId, cell: (toX, toY)),
+                        new LogBlock(LogLevel.Trace, "log.lm.recording_debug")
+                            .AddField("phase", "start_recording_first_landmark")
+                            .AddField("fromNodeId", nodeId)
+                            .AddField("x", toX)
+                            .AddField("y", toY)
+                    );
+                }
             }
 
             // Aggiorniamo sempre l'ultimo landmark visitato quando ne vediamo uno.
@@ -1605,30 +1614,36 @@ namespace Arcontio.Core
             // Entrambi i nodi devono essere già noti all'NPC (stessa regola di NotifyNpcSeenLandmarkPair).
             if (!NpcLandmarkMemory.TryGetValue(npcId, out var lmMem))
             {
-                ArcontioLogger.Trace(
-                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
-                    new LogBlock(LogLevel.Trace, "log.lm.complex_edge_debug")
-                        .AddField("phase", "skip_visual_edge")
-                        .AddField("why", "NoLandmarkMemory")
-                        .AddField("nodeA", nodeA)
-                        .AddField("nodeB", nodeB)
-                );
+                if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                {
+                    ArcontioLogger.Trace(
+                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
+                        new LogBlock(LogLevel.Trace, "log.lm.complex_edge_debug")
+                            .AddField("phase", "skip_visual_edge")
+                            .AddField("why", "NoLandmarkMemory")
+                            .AddField("nodeA", nodeA)
+                            .AddField("nodeB", nodeB)
+                    );
+                }
                 return;
             }
             bool knowsA = lmMem.ContainsLandmark(nodeA);
             bool knowsB = lmMem.ContainsLandmark(nodeB);
             if (!knowsA || !knowsB)
             {
-                ArcontioLogger.Trace(
-                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
-                    new LogBlock(LogLevel.Trace, "log.lm.complex_edge_debug")
-                        .AddField("phase", "skip_visual_edge")
-                        .AddField("why", "EndpointNotKnown")
-                        .AddField("nodeA", nodeA)
-                        .AddField("nodeB", nodeB)
-                        .AddField("knowsA", knowsA)
-                        .AddField("knowsB", knowsB)
-                );
+                if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                {
+                    ArcontioLogger.Trace(
+                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
+                        new LogBlock(LogLevel.Trace, "log.lm.complex_edge_debug")
+                            .AddField("phase", "skip_visual_edge")
+                            .AddField("why", "EndpointNotKnown")
+                            .AddField("nodeA", nodeA)
+                            .AddField("nodeB", nodeB)
+                            .AddField("knowsA", knowsA)
+                            .AddField("knowsB", knowsB)
+                    );
+                }
                 return;
             }
 
@@ -1647,7 +1662,7 @@ namespace Arcontio.Core
                 || beforeCost != edgeCostAfter
                 || beforeHasSegments != edgeHasSegmentsAfter;
 
-            if (materialChange)
+            if (materialChange && ArcontioLogger.ShouldWrite(LogLevel.Trace))
             {
                 ArcontioLogger.Trace(
                     new LogContext(tick: (int)now, channel: "Landmark", npcId: npcId),
@@ -1873,6 +1888,9 @@ namespace Arcontio.Core
             int selectedDistance,
             bool selectedReachable)
         {
+            if (!ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                return;
+
             ArcontioLogger.Trace(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (currentX, currentY)),
                 new LogBlock(LogLevel.Trace, "log.lm.start_resolution_debug")
@@ -2096,20 +2114,26 @@ namespace Arcontio.Core
             var gScore = new Dictionary<int, float>(32) { [startNodeId] = 0f };
             var fScore = new Dictionary<int, float>(32) { [startNodeId] = HeuristicCost(startNodeId, targetNodeId) };
             var neighborBuffer = new List<NpcLandmarkMemory.KnownNeighbor>(8);
-            var complexNeighborDebugBuffer = new List<NpcLandmarkMemory.KnownNeighbor>(8);
+            bool traceLoggingEnabled = ArcontioLogger.ShouldWrite(LogLevel.Trace);
+            var complexNeighborDebugBuffer = traceLoggingEnabled
+                ? new List<NpcLandmarkMemory.KnownNeighbor>(8)
+                : null;
             var closed = new HashSet<int>();
             NpcComplexEdgeMemories.TryGetValue(npcId, out var complexMemForDebug);
 
-            ArcontioLogger.Trace(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
-                new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
-                    .AddField("phase", "planner_start")
-                    .AddField("startNodeId", startNodeId)
-                    .AddField("targetNodeId", targetNodeId)
-                    .AddField("knownLandmarks", mem.KnownLandmarksCount)
-                    .AddField("knownEdges", mem.KnownEdgesCount)
-                    .AddField("complexEdges", complexMemForDebug != null ? complexMemForDebug.Count : 0)
-            );
+            if (traceLoggingEnabled)
+            {
+                ArcontioLogger.Trace(
+                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
+                    new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
+                        .AddField("phase", "planner_start")
+                        .AddField("startNodeId", startNodeId)
+                        .AddField("targetNodeId", targetNodeId)
+                        .AddField("knownLandmarks", mem.KnownLandmarksCount)
+                        .AddField("knownEdges", mem.KnownEdgesCount)
+                        .AddField("complexEdges", complexMemForDebug != null ? complexMemForDebug.Count : 0)
+                );
+            }
 
             while (open.Count > 0)
             {
@@ -2125,19 +2149,25 @@ namespace Arcontio.Core
                 closed.Add(current);
                 mem.FillKnownNeighbors(current, neighborBuffer);
                 int simpleNeighborCount = neighborBuffer.Count;
-                complexNeighborDebugBuffer.Clear();
-                complexMemForDebug?.FillKnownComplexNeighbors(current, mem, complexNeighborDebugBuffer);
+                if (traceLoggingEnabled)
+                {
+                    complexNeighborDebugBuffer.Clear();
+                    complexMemForDebug?.FillKnownComplexNeighbors(current, mem, complexNeighborDebugBuffer);
+                }
                 complexMemForDebug?.FillKnownComplexNeighbors(current, mem, neighborBuffer);
-                ArcontioLogger.Trace(
-                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
-                    new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
-                        .AddField("phase", "expand_node")
-                        .AddField("currentNodeId", current)
-                        .AddField("simpleNeighborCount", simpleNeighborCount)
-                        .AddField("complexNeighborCount", complexNeighborDebugBuffer.Count)
-                        .AddField("totalNeighborCount", neighborBuffer.Count)
-                        .AddField("complexEdgesAvailable", complexMemForDebug != null ? complexMemForDebug.Count : 0)
-                );
+                if (traceLoggingEnabled)
+                {
+                    ArcontioLogger.Trace(
+                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
+                        new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
+                            .AddField("phase", "expand_node")
+                            .AddField("currentNodeId", current)
+                            .AddField("simpleNeighborCount", simpleNeighborCount)
+                            .AddField("complexNeighborCount", complexNeighborDebugBuffer.Count)
+                            .AddField("totalNeighborCount", neighborBuffer.Count)
+                            .AddField("complexEdgesAvailable", complexMemForDebug != null ? complexMemForDebug.Count : 0)
+                    );
+                }
 
                 for (int i = 0; i < neighborBuffer.Count; i++)
                 {
@@ -2160,15 +2190,18 @@ namespace Arcontio.Core
             }
 
             plan.FailureReason = "NoMacroRoute";
-            ArcontioLogger.Trace(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
-                new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
-                    .AddField("phase", "planner_failed")
-                    .AddField("failureReason", plan.FailureReason)
-                    .AddField("startNodeId", startNodeId)
-                    .AddField("targetNodeId", targetNodeId)
-                    .AddField("complexEdges", complexMemForDebug != null ? complexMemForDebug.Count : 0)
-            );
+            if (traceLoggingEnabled)
+            {
+                ArcontioLogger.Trace(
+                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId),
+                    new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
+                        .AddField("phase", "planner_failed")
+                        .AddField("failureReason", plan.FailureReason)
+                        .AddField("startNodeId", startNodeId)
+                        .AddField("targetNodeId", targetNodeId)
+                        .AddField("complexEdges", complexMemForDebug != null ? complexMemForDebug.Count : 0)
+                );
+            }
             return false;
         }
 
@@ -2303,19 +2336,22 @@ namespace Arcontio.Core
                 }
             }
 
-            ArcontioLogger.Trace(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (targetX, targetY)),
-                new LogBlock(LogLevel.Trace, "log.lm.target_resolution_debug")
-                    .AddField("startNodeId", startNodeId)
-                    .AddField("targetX", targetX)
-                    .AddField("targetY", targetY)
-                    .AddField("knownLandmarks", mem.KnownLandmarksCount)
-                    .AddField("nearestNodeId", nearestId)
-                    .AddField("nearestDistance", nearestDist == int.MaxValue ? -1 : nearestDist)
-                    .AddField("nearestReachable", nearestId != 0 && IsKnownLandmarkReachableForNpc(npcId, startNodeId, nearestId))
-                    .AddField("reachableKnownLandmarks", reachableCount)
-                    .AddField("bestReachableNodeId", bestReachableId)
-                    .AddField("bestReachableDistance", bestReachableDist == int.MaxValue ? -1 : bestReachableDist));
+            if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+            {
+                ArcontioLogger.Trace(
+                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (targetX, targetY)),
+                    new LogBlock(LogLevel.Trace, "log.lm.target_resolution_debug")
+                        .AddField("startNodeId", startNodeId)
+                        .AddField("targetX", targetX)
+                        .AddField("targetY", targetY)
+                        .AddField("knownLandmarks", mem.KnownLandmarksCount)
+                        .AddField("nearestNodeId", nearestId)
+                        .AddField("nearestDistance", nearestDist == int.MaxValue ? -1 : nearestDist)
+                        .AddField("nearestReachable", nearestId != 0 && IsKnownLandmarkReachableForNpc(npcId, startNodeId, nearestId))
+                        .AddField("reachableKnownLandmarks", reachableCount)
+                        .AddField("bestReachableNodeId", bestReachableId)
+                        .AddField("bestReachableDistance", bestReachableDist == int.MaxValue ? -1 : bestReachableDist));
+            }
         }
 
         /// <summary>
@@ -2341,14 +2377,17 @@ namespace Arcontio.Core
             if (!TryResolveStartLandmark(npcId, pos.X, pos.Y, out int startNodeId, out string startFail))
             {
                 plan.FailureReason = startFail;
-                ArcontioLogger.Trace(
-                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (pos.X, pos.Y)),
-                    new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
-                        .AddField("phase", "resolve_start_failed")
-                        .AddField("failureReason", startFail)
-                        .AddField("targetX", targetX)
-                        .AddField("targetY", targetY)
-                );
+                if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                {
+                    ArcontioLogger.Trace(
+                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (pos.X, pos.Y)),
+                        new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
+                            .AddField("phase", "resolve_start_failed")
+                            .AddField("failureReason", startFail)
+                            .AddField("targetX", targetX)
+                            .AddField("targetY", targetY)
+                    );
+                }
                 return false;
             }
 
@@ -2357,15 +2396,18 @@ namespace Arcontio.Core
             if (!TryResolveTargetLandmark(npcId, startNodeId, targetX, targetY, out int targetNodeId, out string targetFail))
             {
                 plan.FailureReason = targetFail;
-                ArcontioLogger.Trace(
-                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (targetX, targetY)),
-                    new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
-                        .AddField("phase", "resolve_target_failed")
-                        .AddField("failureReason", targetFail)
-                        .AddField("startNodeId", startNodeId)
-                        .AddField("targetX", targetX)
-                        .AddField("targetY", targetY)
-                );
+                if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                {
+                    ArcontioLogger.Trace(
+                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Landmark", npcId: npcId, cell: (targetX, targetY)),
+                        new LogBlock(LogLevel.Trace, "log.lm.planner_debug")
+                            .AddField("phase", "resolve_target_failed")
+                            .AddField("failureReason", targetFail)
+                            .AddField("startNodeId", startNodeId)
+                            .AddField("targetX", targetX)
+                            .AddField("targetY", targetY)
+                    );
+                }
                 return false;
             }
 

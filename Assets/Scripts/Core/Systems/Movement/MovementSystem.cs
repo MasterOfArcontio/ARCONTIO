@@ -79,11 +79,14 @@ namespace Arcontio.Core
             int dist = FovUtils.Manhattan(pos.X, pos.Y, finalTargetX, finalTargetY);
             bool overVision = checkFov && dist > visionRange;
             bool suspiciousDirect = pathClear && overVision;
+            LogLevel level = suspiciousDirect ? LogLevel.Warn : LogLevel.Trace;
+            if (!ArcontioLogger.ShouldWrite(level))
+                return;
 
             if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                 facing = CardinalDirection.North;
 
-            var block = new LogBlock(suspiciousDirect ? LogLevel.Warn : LogLevel.Trace, "log.move.direct_commit_debug")
+            var block = new LogBlock(level, "log.move.direct_commit_debug")
                 .AddField("phase", phase)
                 .AddField("npcX", pos.X)
                 .AddField("npcY", pos.Y)
@@ -144,6 +147,9 @@ namespace Arcontio.Core
             bool inPrefixCommitment,
             bool isInLastMile)
         {
+            if (!ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                return;
+
             var block = new LogBlock(LogLevel.Trace, "log.move.debug_segment_step")
                 .AddField("segmentKind", segmentKind)
                 .AddField("fromX", fromX)
@@ -183,6 +189,9 @@ namespace Arcontio.Core
             bool inPrefixCommitment,
             bool isInLastMile)
         {
+            if (!ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                return;
+
             var block = new LogBlock(LogLevel.Trace, "log.move.local_search_attempt")
                 .AddField("startX", startX)
                 .AddField("startY", startY)
@@ -224,6 +233,9 @@ namespace Arcontio.Core
             bool found,
             System.Collections.Generic.List<Vector2Int> path)
         {
+            if (!ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                return;
+
             int pathCount = path?.Count ?? 0;
             int firstStepX = pathCount >= 2 ? path[1].x : 0;
             int firstStepY = pathCount >= 2 ? path[1].y : 0;
@@ -549,13 +561,16 @@ namespace Arcontio.Core
                             minVerbosity: 2,
                             summary: "replanned_after_backoff_stage_" + expiredStage);
 
-                        ArcontioLogger.Trace(
-                            new LogContext(tick: (int)nowTick, channel: "Move", npcId: npcId, cell: (pos.X, pos.Y)),
-                            new LogBlock(LogLevel.Trace, "log.move.backoff_replan")
-                                .AddField("targetX", intent.TargetX)
-                                .AddField("targetY", intent.TargetY)
-                                .AddField("expiredStage", expiredStage)
-                        );
+                        if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                        {
+                            ArcontioLogger.Trace(
+                                new LogContext(tick: (int)nowTick, channel: "Move", npcId: npcId, cell: (pos.X, pos.Y)),
+                                new LogBlock(LogLevel.Trace, "log.move.backoff_replan")
+                                    .AddField("targetX", intent.TargetX)
+                                    .AddField("targetY", intent.TargetY)
+                                    .AddField("expiredStage", expiredStage)
+                            );
+                        }
                     }
                 }
 
@@ -1367,18 +1382,21 @@ namespace Arcontio.Core
                                 backOffStage: currentStage,
                                 summary: "failure_ladder_exhausted");
 
-                            ArcontioLogger.Trace(
-                                new LogContext(tick: (int)nowTickLong, channel: "Move", npcId: npcId, cell: (x, y)),
-                                new LogBlock(LogLevel.Trace, "log.move.intent_cancelled_stuck")
-                                    .AddField("targetX", intent.TargetX)
-                                    .AddField("targetY", intent.TargetY)
-                                    .AddField("effectiveTargetX", effectiveTargetX)
-                                    .AddField("effectiveTargetY", effectiveTargetY)
-                                    .AddField("usingMacroImmediate", usingMacroImmediate)
-                                    .AddField("effectiveTargetHasDirectPath", effectiveTargetHasDirectPath)
-                                    .AddField("reason", intent.Reason.ToString())
-                                    .AddField("failureLadderStage", currentStage)
-                            );
+                            if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                            {
+                                ArcontioLogger.Trace(
+                                    new LogContext(tick: (int)nowTickLong, channel: "Move", npcId: npcId, cell: (x, y)),
+                                    new LogBlock(LogLevel.Trace, "log.move.intent_cancelled_stuck")
+                                        .AddField("targetX", intent.TargetX)
+                                        .AddField("targetY", intent.TargetY)
+                                        .AddField("effectiveTargetX", effectiveTargetX)
+                                        .AddField("effectiveTargetY", effectiveTargetY)
+                                        .AddField("usingMacroImmediate", usingMacroImmediate)
+                                        .AddField("effectiveTargetHasDirectPath", effectiveTargetHasDirectPath)
+                                        .AddField("reason", intent.Reason.ToString())
+                                        .AddField("failureLadderStage", currentStage)
+                                );
+                            }
                         }
                         else
                         {
@@ -1410,14 +1428,17 @@ namespace Arcontio.Core
                                     world.BlacklistBlockedMacroEdge(npcId, fromNodeId, macroNextNodeId, currentStage);
                             }
 
-                            ArcontioLogger.Trace(
-                                new LogContext(tick: (int)nowTickLong, channel: "Move", npcId: npcId, cell: (x, y)),
-                                new LogBlock(LogLevel.Trace, "log.move.backoff_started")
-                                    .AddField("targetX", intent.TargetX)
-                                    .AddField("targetY", intent.TargetY)
-                                    .AddField("stage", currentStage)
-                                    .AddField("reason", intent.Reason.ToString())
-                            );
+                            if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                            {
+                                ArcontioLogger.Trace(
+                                    new LogContext(tick: (int)nowTickLong, channel: "Move", npcId: npcId, cell: (x, y)),
+                                    new LogBlock(LogLevel.Trace, "log.move.backoff_started")
+                                        .AddField("targetX", intent.TargetX)
+                                        .AddField("targetY", intent.TargetY)
+                                        .AddField("stage", currentStage)
+                                        .AddField("reason", intent.Reason.ToString())
+                                );
+                            }
                         }
                     }
                     else
@@ -1785,15 +1806,18 @@ namespace Arcontio.Core
                 backOffStage: world.Pathfinding.GetMoveBackOffStage(npcId),
                 summary: "target_invalid_" + why);
 
-            ArcontioLogger.Trace(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: default),
-                new LogBlock(LogLevel.Trace, "log.move.intent_cancelled_target_invalid")
-                    .AddField("why", why)
-                    .AddField("targetX", intent.TargetX)
-                    .AddField("targetY", intent.TargetY)
-                    .AddField("targetObjectId", intent.TargetObjectId)
-                    .AddField("reason", intent.Reason.ToString())
-            );
+            if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+            {
+                ArcontioLogger.Trace(
+                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: default),
+                    new LogBlock(LogLevel.Trace, "log.move.intent_cancelled_target_invalid")
+                        .AddField("why", why)
+                        .AddField("targetX", intent.TargetX)
+                        .AddField("targetY", intent.TargetY)
+                        .AddField("targetObjectId", intent.TargetObjectId)
+                        .AddField("reason", intent.Reason.ToString())
+                );
+            }
         }
 
         private static bool TryMoveTo(World world, int npcId, int tx, int ty, MessageBus bus)
@@ -1826,13 +1850,16 @@ namespace Arcontio.Core
                         accessGranted: true,
                         summary: "door_opened_on_try_move_to");
 
-                    ArcontioLogger.Trace(
-                        new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (tx, ty)),
-                        new LogBlock(LogLevel.Trace, "log.move.door_opened_trymoveto")
-                            .AddField("x", tx)
-                            .AddField("y", ty)
-                            .AddField("doorId", doorObjId)
-                    );
+                    if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+                    {
+                        ArcontioLogger.Trace(
+                            new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (tx, ty)),
+                            new LogBlock(LogLevel.Trace, "log.move.door_opened_trymoveto")
+                                .AddField("x", tx)
+                                .AddField("y", ty)
+                                .AddField("doorId", doorObjId)
+                        );
+                    }
                 }
 
                 // Dopo l'apertura la cella potrebbe essere ancora bloccata (porta locked, altro oggetto ecc.).
@@ -1847,12 +1874,15 @@ namespace Arcontio.Core
             // Muovi
             world.GridPos[npcId] = new GridPosition(tx, ty);
 
-            ArcontioLogger.Trace(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (tx, ty)),
-                new LogBlock(LogLevel.Trace, "log.move.step")
-                    .AddField("x", tx)
-                    .AddField("y", ty)
-            );
+            if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
+            {
+                ArcontioLogger.Trace(
+                    new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Move", npcId: npcId, cell: (tx, ty)),
+                    new LogBlock(LogLevel.Trace, "log.move.step")
+                        .AddField("x", tx)
+                        .AddField("y", ty)
+                );
+            }
 
             return true;
         }
