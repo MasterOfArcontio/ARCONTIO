@@ -12,8 +12,8 @@ namespace Arcontio.Core
     /// - riduce Hunger01 usando NeedsConfig.eatSatietyGain
     ///
     /// Nota:
-    /// - Non pubblichiamo eventi qui per ora (scelta minimal).
-    /// - Se vuoi: puoi pubblicare un evento FoodConsumedEvent per memorie/telemetria.
+    /// - Pubblica un evento world-level minimale solo dopo una mutazione riuscita.
+    /// - L'evento non introduce memoria, sospetto o nuove decisioni automatiche.
     /// </summary>
     public sealed class EatFromStockCommand : ICommand
     {
@@ -37,6 +37,14 @@ namespace Arcontio.Core
             if (stock.Units <= 0)
                 return;
 
+            int stockX = 0;
+            int stockY = 0;
+            if (world.Objects.TryGetValue(_foodObjId, out var stockObject) && stockObject != null)
+            {
+                stockX = stockObject.CellX;
+                stockY = stockObject.CellY;
+            }
+
             // ACTION TRACE (debug/overlay): l'NPC sta consumando cibo da uno stock visibile.
             world.SetNpcAction(_npcId, NpcActionState.Eat("EatFromStock", _foodObjId));
 
@@ -53,14 +61,6 @@ namespace Arcontio.Core
 
             if (depleted)
             {
-                // Salva le coordinate dello stock PRIMA di rimuoverlo da world.Objects.
-                int stockX = 0, stockY = 0;
-                if (world.Objects.TryGetValue(_foodObjId, out var stockInst) && stockInst != null)
-                {
-                    stockX = stockInst.CellX;
-                    stockY = stockInst.CellY;
-                }
-
                 // IMPORTANTE:
                 // Il command NON deve conoscere tutti i registri derivati del lifecycle oggetti.
                 // Quando lo stock si esaurisce deleghiamo la rimozione al punto canonico del World,
@@ -133,6 +133,18 @@ namespace Arcontio.Core
             var cfg = world.Global.Needs;
             needs.AddValue(NeedKind.Hunger, -cfg.eatSatietyGain);
             world.Needs[_npcId] = needs;
+
+            bus?.Publish(new FoodConsumedEvent(
+                TickContext.CurrentTickIndex,
+                _npcId,
+                "Stock",
+                _foodObjId,
+                units: 1,
+                remainingUnits: depleted ? 0 : stock.Units,
+                depleted: depleted,
+                cellX: stockX,
+                cellY: stockY,
+                hungerAfter: needs.GetValue(NeedKind.Hunger)));
 
             ArcontioLogger.Debug(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T9", npcId: _npcId),
