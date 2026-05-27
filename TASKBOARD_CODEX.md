@@ -25,26 +25,26 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB COMPLETED: v0.11D - Runtime Infrastructure & Dormant Systems Forensic Reintegration
+## MACRO JOB ACTIVE: v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
 
 CHECKPOINT CORRENTE:
-v0.11d.08 - Runtime Infrastructure Closeout
+v0.12b - Riallineamento roadmap e definizione fase diagnostica
 
 STATUS:
-COMPLETED
+IN PROGRESS
 
 OUTPUT ATTESO:
-closeout root locale della fase `v0.11D`:
-`[v0.11d.08] close runtime infrastructure phase`
+riallineamento root locale della fase `v0.12`:
+`[v0.12b] realign roadmap for logging explainability cleanup`
 
 DOC SYNC:
-root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.11D`;
-allineamento esteso `ARCONTIO_docs` raccomandato prima o insieme alla chiusura documentale lunga
+root taskboard e roadmap aggiornate all'apertura tecnica di `v0.12`;
+allineamento esteso `ARCONTIO_docs` raccomandato dopo validazione umana della nuova sequenza
 
 OBIETTIVO:
-Chiudere la fase infrastrutturale preparatoria prima dell'ingresso in `v0.12`.
+Aprire la fase di pulizia logging, explainability e diagnostica runtime prima dell'espansione cognitiva e sociale.
 
-Esito tecnico corrente:
+Esito tecnico ereditato da `v0.11D`:
 
 - logging runtime stabilizzato con JSONL batchato, limitato e congelabile;
 - canali patologici console, HTML e TXT isolati o spenti;
@@ -55,14 +55,25 @@ Esito tecnico corrente:
 - memoria/debug e churn overlay mitigati dove sicuro;
 - audit residui `v0.11d.07` completato senza micro-fix bloccanti.
 
-Residual follow-ups / future hardening:
+Obiettivo tecnico corrente `v0.12`:
 
-- `v0.12`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
-- `v0.13`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
-- `v0.14+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+- rendere `game_params` e `simulation params` una configurazione chiara e non sparsa;
+- portare i log persistenti verso un'unica uscita JSONL;
+- mantenere i pannelli EL come visualizzazione viva, ma ridurne il costo quando chiusi o non necessari;
+- rimuovere davvero i canali legacy non piu' utili: console, TXT, HTML, overlay logger;
+- decidere se eliminare `ArcontioLogger` o trasformarlo in ponte leggero sopra JSONL/EL;
+- eliminare o assorbire `Telemetry`, perche' oggi e' poco utile rispetto al costo e alla confusione architetturale;
+- rendere EL modulare su Memory, Belief, Query, Decision, Job, Running Action, Step e Movement;
+- garantire che EL spento non produca nulla.
 
 Prossimo macro job consigliato:
-`v0.12 - NPC Subjective Cognition Deepening`
+`v0.12c - Consolidamento GameParams / SimulationParams`
+
+Residual follow-ups / future hardening:
+
+- `v0.13`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
+- `v0.14`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
+- `v0.15+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
 ---
 
