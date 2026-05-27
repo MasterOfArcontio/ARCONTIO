@@ -162,8 +162,16 @@ namespace Arcontio.View.MapGrid
             UpdateNpcPositions(world, cam, tileSizeWorld);
             UpdateObjectPositions(world, cam, tileSizeWorld);
 
-            RefreshNpcTexts(world);
-            RefreshObjectTexts(world);
+            // Le posizioni delle card restano aggiornate ogni frame; il testo
+            // diagnostico invece e' la parte piu' allocativa. Limitarlo a 4 Hz
+            // mantiene leggibile l'overlay e riduce GC churn da stringhe/UI.
+            if (Time.unscaledTime - _lastSummaryTextRefreshRealtime >= SummaryTextRefreshIntervalSeconds)
+            {
+                _lastSummaryTextRefreshRealtime = Time.unscaledTime;
+                RefreshNpcTexts(world);
+                RefreshObjectTexts(world);
+            }
+
             if (MovementExplainabilitySidePanelEnabled)
                 RefreshMovementExplainabilityPanel(world);
         }
@@ -203,6 +211,8 @@ namespace Arcontio.View.MapGrid
         private readonly StringBuilder _sbObjMem = new(1024);
         private readonly StringBuilder _sbComms = new(1024);
         private readonly StringBuilder _sbLandmarks = new(256);
+        private readonly StringBuilder _sbAction = new(512);
+        private readonly StringBuilder _sbInventory = new(512);
         private readonly StringBuilder _sbExplainabilityIntentPlan = new(2048);
         private readonly StringBuilder _sbExplainabilityEvents = new(4096);
         private readonly StringBuilder _sbMbqdMemoryStore = new(1024);
@@ -225,11 +235,13 @@ namespace Arcontio.View.MapGrid
         private readonly MemoryBeliefDecisionExplainabilityViewModel _mbqdExplainabilityViewModel = new();
 
         private bool _needsInitialLayout;
+        private float _lastSummaryTextRefreshRealtime = -999f;
         private float _lastMovementPanelRefreshRealtime = -999f;
         private int _lastMovementPanelSelectedNpcId = int.MinValue;
         private long _lastMovementPanelWorldTick = long.MinValue;
         private int _lastMovementPanelPageVersion = -1;
 
+        private const float SummaryTextRefreshIntervalSeconds = 0.25f;
         private const float MovementPanelRefreshIntervalSeconds = 0.25f;
 
         // ============================================================
@@ -868,23 +880,23 @@ namespace Arcontio.View.MapGrid
                         needTargetReason = "SuppressedByManualControl";
                     }
 
-                    var sbGoal = new StringBuilder(256);
-                    sbGoal.Append("Action = <color=#").Append(hex).Append('>').Append(action.Kind).Append("</color>\n")
+                    _sbAction.Clear();
+                    _sbAction.Append("Action = <color=#").Append(hex).Append('>').Append(action.Kind).Append("</color>\n")
                         .Append("ActionLabel = ").Append(action).Append("   age=").Append(age).Append("t\n")
                         .Append("MoveIntent = ").Append(moveIntentState).Append("   Reason = ").Append(moveReason).Append('\n');
 
                     if (moveIntentState == "YES")
-                        sbGoal.Append("TargetCell = (").Append(moveTargetX).Append(',').Append(moveTargetY).Append(")   TargetObject = ").Append(moveTargetObjectId).Append("   BlockedTicks = ").Append(blockedTicks).Append('\n');
+                        _sbAction.Append("TargetCell = (").Append(moveTargetX).Append(',').Append(moveTargetY).Append(")   TargetObject = ").Append(moveTargetObjectId).Append("   BlockedTicks = ").Append(blockedTicks).Append('\n');
                     else if (action.HasTargetCell)
-                        sbGoal.Append("TargetCell = (").Append(action.TargetX).Append(',').Append(action.TargetY).Append(")\n");
+                        _sbAction.Append("TargetCell = (").Append(action.TargetX).Append(',').Append(action.TargetY).Append(")\n");
 
                     if (action.TargetObjectId != 0)
-                        sbGoal.Append("ActionTargetObject = ").Append(action.TargetObjectId).Append('\n');
+                        _sbAction.Append("ActionTargetObject = ").Append(action.TargetObjectId).Append('\n');
 
-                    sbGoal.Append("NeedTargetSource = ").Append(needTargetSource).Append('\n')
+                    _sbAction.Append("NeedTargetSource = ").Append(needTargetSource).Append('\n')
                         .Append("NeedTargetReason = ").Append(needTargetReason);
 
-                    actionRich = sbGoal.ToString();
+                    actionRich = _sbAction.ToString();
                 }
                 else if (buildAction)
                 {
@@ -946,21 +958,32 @@ namespace Arcontio.View.MapGrid
                     ComputeFoodTargetDebug(world, npcId, out visibleCommunityFoodDbg, out rememberedCommunityFoodDbg);
 
                     // [NEEDS] rimosso: ora visualizzato come barre nella sezione "Needs" della card
-                    var sb = new StringBuilder(512);
-                    sb.AppendLine("[INVENTORY]")
-                      .AppendLine($"PrivateFood (carried) = {carriedFood}")
-                      .AppendLine($"PrivateFood (owned in world) = {ownedStockUnits}  (piles={ownedStockPiles})")
-                      .AppendLine($"Total private food = {totalOwned}");
+                    _sbInventory.Clear();
+                    _sbInventory.AppendLine("[INVENTORY]")
+                      .Append("PrivateFood (carried) = ").Append(carriedFood).Append('\n')
+                      .Append("PrivateFood (owned in world) = ").Append(ownedStockUnits).Append("  (piles=").Append(ownedStockPiles).Append(")\n")
+                      .Append("Total private food = ").Append(totalOwned).Append('\n');
 
                     if (lastEatTick >= 0)
-                        sb.AppendLine($"Last private consume tick = {lastEatTick}");
+                        _sbInventory.Append("Last private consume tick = ").Append(lastEatTick).Append('\n');
 
-                    sb.AppendLine()
+                    _sbInventory.AppendLine()
                       .AppendLine("[FOOD KNOWLEDGE]")
-                      .AppendLine($"Visible community food = {(visibleCommunityFoodDbg != 0 ? visibleCommunityFoodDbg.ToString() : "None")}")
-                      .AppendLine($"Remembered community food = {(rememberedCommunityFoodDbg != 0 ? rememberedCommunityFoodDbg.ToString() : "None")}");
+                      .Append("Visible community food = ");
 
-                    invText = sb.ToString();
+                    if (visibleCommunityFoodDbg != 0)
+                        _sbInventory.Append(visibleCommunityFoodDbg);
+                    else
+                        _sbInventory.Append("None");
+
+                    _sbInventory.Append('\n').Append("Remembered community food = ");
+
+                    if (rememberedCommunityFoodDbg != 0)
+                        _sbInventory.Append(rememberedCommunityFoodDbg);
+                    else
+                        _sbInventory.Append("None");
+
+                    invText = _sbInventory.ToString();
                 }
 
                 // ============================================================
