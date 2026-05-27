@@ -28,14 +28,14 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
 
 CHECKPOINT CORRENTE:
-v0.12b - Riallineamento roadmap e definizione fase diagnostica
+v0.12d - Rimozione canali legacy console / TXT / HTML / overlay
 
 STATUS:
 IN PROGRESS
 
 OUTPUT ATTESO:
-riallineamento root locale della fase `v0.12`:
-`[v0.12b] realign roadmap for logging explainability cleanup`
+audit e patch controllata dei canali legacy:
+`[v0.12d] remove legacy runtime log channels`
 
 DOC SYNC:
 root taskboard e roadmap aggiornate all'apertura tecnica di `v0.12`;
@@ -74,6 +74,20 @@ Residual follow-ups / future hardening:
 - `v0.13`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
 - `v0.14`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
 - `v0.15+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+
+Checkpoint v0.12 completati:
+
+- `v0.12a`: audit logging, explainability e diagnostica runtime;
+- `v0.12b`: roadmap riallineata alla nuova fase diagnostica;
+- `v0.12c`: configurazione runtime consolidata senza modificare `game_params.json`.
+
+Nota `v0.12c`:
+
+- `game_params.json` resta il file portante della configurazione;
+- `SimulationParams` e `GameParams` vivono sotto `Core/Config`;
+- `SimulationHost` legge il file una sola volta;
+- `SimulationParams` e' il modello principale del bootstrap;
+- `GameParams.cs` resta ponte compatibile, ma non e' piu' il percorso ordinario del runtime.
 
 ---
 
