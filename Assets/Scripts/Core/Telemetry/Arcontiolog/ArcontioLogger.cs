@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using Arcontio.Core.Config;
 using UnityEngine;
 
 namespace Arcontio.Core.Logging
@@ -22,9 +23,10 @@ namespace Arcontio.Core.Logging
 
         private static LogLevel _minLevel = LogLevel.Info;
         private static HtmlFileSink _htmlSink;
+        private static string _language = "it";
 
         public static bool Initialized => _initialized;
-        public static string CurrentLanguage => _params?.Language ?? "it";
+        public static string CurrentLanguage => _params?.Language ?? _language;
         public static string CurrentLogFilePath => _htmlSink?.FilePath ?? _fileSink?.FilePath;
 
         public static void InitFromResources(
@@ -45,7 +47,34 @@ namespace Arcontio.Core.Logging
             if (_initialized) return;
 
             _params = gameParams ?? new GameParams();
-            _logging = _params.ResolveLogging();
+            InitFromConfig(
+                _params.Language,
+                _params.ResolveLogging(),
+                localizationPathNoExt);
+        }
+
+        public static void InitFromSimulationParams(
+            SimulationParams simulationParams,
+            string localizationPathNoExt = "Arcontio/Config/localization_logs")
+        {
+            if (_initialized) return;
+
+            _params = null;
+            InitFromConfig(
+                simulationParams?.Language ?? "it",
+                simulationParams?.ResolveLoggerDiagnostics() ?? new LoggerDiagnosticsParams(),
+                localizationPathNoExt);
+        }
+
+        private static void InitFromConfig(
+            string language,
+            LoggerDiagnosticsParams logging,
+            string localizationPathNoExt)
+        {
+            if (_initialized) return;
+
+            _language = string.IsNullOrWhiteSpace(language) ? "it" : language;
+            _logging = logging ?? new LoggerDiagnosticsParams();
             _loc = LocalizationDb.LoadFromResources(localizationPathNoExt);
             _theme = new LogTheme();
 
@@ -98,7 +127,9 @@ namespace Arcontio.Core.Logging
             _htmlSink = null;
             _fileSink = null;
             _unitySink = null;
+            _params = null;
             _logging = null;
+            _language = "it";
             _initialized = false;
         }
 

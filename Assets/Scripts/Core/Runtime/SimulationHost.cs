@@ -568,20 +568,22 @@ namespace Arcontio.Core
             // ============================================================
             // NOTE (pulizia lettura config):
             // In precedenza il logger e il mondo caricavano entrambi game_params.json
-            // da Resources. Da v0.12c.02 il TextAsset viene letto una sola volta qui,
-            // poi deserializzato in due DTO diversi finche' GameParams e
-            // SimulationParams restano modelli separati.
+            // da Resources. Da v0.12c.03 il TextAsset viene letto una sola volta qui
+            // e SimulationParams diventa il modello principale anche per risolvere
+            // la configurazione logger usata nel bootstrap.
             //
-            // Questo non fonde ancora i modelli di configurazione: elimina soltanto
-            // la doppia lettura del file e mantiene il fallback storico del logger
-            // per test o strumenti che lo inizializzano fuori da SimulationHost.
+            // GameParams resta come ponte compatibile per test o strumenti isolati,
+            // ma il percorso ordinario del runtime non dipende piu' da un secondo
+            // modello C# per leggere la sezione logging del file portante.
             // ============================================================
             const string gameParamsPathNoExt = "Arcontio/Config/game_params";
             var gameParamsAsset = Resources.Load<TextAsset>(gameParamsPathNoExt);
-            var gameParams = GameParamsLoader.LoadFromTextAsset(gameParamsAsset, gameParamsPathNoExt);
+            var simParams = Arcontio.Core.Config.SimulationParamsLoader.LoadFromTextAsset(
+                gameParamsAsset,
+                gameParamsPathNoExt);
 
-            ArcontioLogger.InitFromParams(
-                gameParams,
+            ArcontioLogger.InitFromSimulationParams(
+                simParams,
                 localizationPathNoExt: "Arcontio/Config/localization_logs");
             ArcontioLogger.Info(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Core"),
@@ -601,7 +603,7 @@ namespace Arcontio.Core
             // 3.1) Leggo da file game_params.json i dati di simulazione, che finiscono in simParams.
             // Con quello creo l'istanza di world
             // ******************************************************************************************************************************
-            _world = CreateWorldFromGameParams(gameParamsAsset);
+            _world = CreateWorldFromGameParams(simParams);
 
             // ******************************************************************************************************************************
             // 3.2) INIZIALIZZO IL MESSAGE BUS
@@ -1455,11 +1457,9 @@ namespace Arcontio.Core
         /// confinati in <see cref="EnsureSeeded"/>.
         /// </para>
         /// </summary>
-        private World CreateWorldFromGameParams(TextAsset gameParamsAsset = null)
+        private World CreateWorldFromGameParams(Arcontio.Core.Config.SimulationParams simParams = null)
         {
-            var simParams = gameParamsAsset != null
-                ? Arcontio.Core.Config.SimulationParamsLoader.LoadFromTextAsset(gameParamsAsset, "Arcontio/Config/game_params")
-                : Arcontio.Core.Config.SimulationParamsLoader.LoadFromResources("Arcontio/Config/game_params");
+            simParams ??= Arcontio.Core.Config.SimulationParamsLoader.LoadFromResources("Arcontio/Config/game_params");
             return new World(new WorldConfig(simParams));
         }
 
