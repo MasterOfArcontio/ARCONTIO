@@ -23,6 +23,49 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 ---
 
+# 0. Stato operativo corrente
+
+## MACRO JOB COMPLETED: v0.11D - Runtime Infrastructure & Dormant Systems Forensic Reintegration
+
+CHECKPOINT CORRENTE:
+v0.11d.08 - Runtime Infrastructure Closeout
+
+STATUS:
+COMPLETED
+
+OUTPUT ATTESO:
+closeout root locale della fase `v0.11D`:
+`[v0.11d.08] close runtime infrastructure phase`
+
+DOC SYNC:
+root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.11D`;
+allineamento esteso `ARCONTIO_docs` raccomandato prima o insieme alla chiusura documentale lunga
+
+OBIETTIVO:
+Chiudere la fase infrastrutturale preparatoria prima dell'ingresso in `v0.12`.
+
+Esito tecnico corrente:
+
+- logging runtime stabilizzato con JSONL batchato, limitato e congelabile;
+- canali patologici console, HTML e TXT isolati o spenti;
+- diagnostica runtime e pannelli consolidati;
+- sistemi dormienti, lavoro e sociale mappati con audit;
+- authority runtime needs rinforzata con `FoodConsumedEvent` e `BedRestedEvent`;
+- `.meta` Unity dei nuovi eventi recuperati;
+- memoria/debug e churn overlay mitigati dove sicuro;
+- audit residui `v0.11d.07` completato senza micro-fix bloccanti.
+
+Residual follow-ups / future hardening:
+
+- `v0.12`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
+- `v0.13`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
+- `v0.14+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+
+Prossimo macro job consigliato:
+`v0.12 - NPC Subjective Cognition Deepening`
+
+---
+
 # 1. Macro campagna corrente completata
 
 ## MACRO JOB COMPLETED: v0.10 — World Persistence Closure & Save/Load Completion
