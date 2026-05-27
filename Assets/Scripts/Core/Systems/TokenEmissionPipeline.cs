@@ -24,6 +24,7 @@ namespace Arcontio.Core
         // Rate limit state
         private readonly Dictionary<int, int> _tokensEmittedToday = new();   // speaker -> count
         private readonly Dictionary<ShareKey, long> _lastShareTick = new();  // cooldown
+        private readonly List<ShareKey> _lastShareTickPruneBuffer = new(64);
 
         // Parametri "base"
         private readonly int _contactRadius;
@@ -53,6 +54,8 @@ namespace Arcontio.Core
 
             int cooldownTicks = world.Global.RepeatShareCooldownTicks;
             if (cooldownTicks < 0) cooldownTicks = 0;
+
+            PruneExpiredShareCooldowns(tick.Index, cooldownTicks);
 
             // Reset "giornaliero" semplice:
             // Assunzione: 1 tick = 1 minuto => 1440 tick = 1 giorno.
@@ -177,6 +180,46 @@ namespace Arcontio.Core
                 _tokensEmittedToday[speakerId] = emittedToday;
 
             return emittedThisEncounter;
+        }
+
+        // =============================================================================
+        // PruneExpiredShareCooldowns
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove dal dizionario dei cooldown comunicativi le entry ormai incapaci
+        /// di influenzare l'emissione corrente. La regola replica il controllo usato
+        /// durante l'emissione: una condivisione blocca solo se
+        /// <c>currentTick - lastShareTick &lt; cooldownTicks</c>. Quando la distanza e'
+        /// maggiore del cooldown, conservare la chiave non cambia piu' il comportamento
+        /// osservabile e produce solo crescita memoria nel lungo periodo.
+        /// </para>
+        ///
+        /// <para><b>Micro-hardening memoria v0.11d.MEMORY-FIX-01</b></para>
+        /// <para>
+        /// La potatura usa un buffer riutilizzato per evitare allocazioni per tick e
+        /// rimuove le chiavi solo dopo l'enumerazione del dizionario, preservando la
+        /// sicurezza dell'iterazione C#.
+        /// </para>
+        /// </summary>
+        private void PruneExpiredShareCooldowns(long currentTick, int cooldownTicks)
+        {
+            if (_lastShareTick.Count == 0)
+                return;
+
+            _lastShareTickPruneBuffer.Clear();
+
+            foreach (var pair in _lastShareTick)
+            {
+                long age = currentTick - pair.Value;
+                if (age > cooldownTicks)
+                    _lastShareTickPruneBuffer.Add(pair.Key);
+            }
+
+            for (int i = 0; i < _lastShareTickPruneBuffer.Count; i++)
+                _lastShareTick.Remove(_lastShareTickPruneBuffer[i]);
+
+            _lastShareTickPruneBuffer.Clear();
         }
 
         private static int Manhattan(int ax, int ay, int bx, int by)
