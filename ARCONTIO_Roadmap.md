@@ -733,13 +733,15 @@ Questa fase deve anche verificare se la struttura attuale dei pannelli EL consum
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.12a | Audit logging, explainability e diagnostica runtime | ✅ |
-| v0.12b | Riallineamento roadmap e definizione fase diagnostica | ⏳ |
-| v0.12c | Consolidamento GameParams / SimulationParams | ⏳ |
+| v0.12b | Riallineamento roadmap e definizione fase diagnostica | ✅ |
+| v0.12c | Consolidamento GameParams / SimulationParams | ✅ |
 | v0.12d | Rimozione canali legacy console / TXT / HTML / overlay | ⏳ |
 | v0.12e | Decisione ArcontioLogger: rimozione o ponte JSONL/EL | ⏳ |
 | v0.12f | Eliminazione o assorbimento Telemetry | ⏳ |
 | v0.12g | EL modulare leggero e produzione zero quando disattivo | ⏳ |
 | v0.12h | Ottimizzazione pannelli EL e closeout diagnostica runtime | ⏳ |
+
+> **Nota closeout v0.12c (2026-05-27):** il checkpoint `v0.12c` e' chiuso come consolidamento della configurazione runtime. `game_params.json` resta il file portante e non e' stato modificato. `SimulationParams` e `GameParams` sono stati ricollocati sotto `Core/Config`; `SimulationHost` legge il file una sola volta; `SimulationParams` e' ora il modello principale del bootstrap e risolve anche la configurazione logger ordinaria. `GameParams.cs` resta temporaneamente come ponte compatibile, ma il percorso runtime ordinario non dipende piu' da lui. Dettaglio: `v0.12c_Closeout_Report.md`.
 
 > **Nota architetturale v0.12:** questa fase assorbe il debito emerso dal Profiler e dagli audit `v0.11D`. Non deve costruire nuova cognizione NPC. Prima di espandere memoria, belief, sociale e observer layer pubblico, bisogna rendere la diagnostica sostenibile: pochi canali, configurazione unica, JSONL come uscita persistente, pannelli EL come lettura viva, nessun costo nascosto quando il sistema e' spento.
 
