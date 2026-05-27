@@ -26,6 +26,18 @@ Componenti dati per NPC, gruppi, oggetti, memoria, comunicazione, percezione e a
 
 Reader di configurazione e strutture config tipizzate.
 
+Da `v0.12c` questa cartella e' anche la casa esplicita dei parametri runtime letti da
+`Assets/Resources/Arcontio/Config/game_params.json`.
+
+Contiene quindi:
+
+- `SimulationParams`: parametri di simulazione, tick, movimento, percezione, memoria, decisione e diagnostica EL letti da `game_params.json`;
+- `GameParams`: ponte temporaneo per la sezione logging letta dallo stesso `game_params.json`.
+
+Questa scelta evita che i parametri principali della simulazione risultino nascosti sotto
+`Telemetry/Arcontiolog`, che deve restare una famiglia di logging/diagnostica e non una
+cartella proprietaria della configurazione runtime.
+
 ### Events
 `Assets/Scripts/Core/Events`
 
@@ -96,7 +108,11 @@ Sottoaree:
 Debug counters, traces e osservabilità non invasiva.
 
 Sottoarea:
-- `Telemetry/Arcontiolog` per logging custom Arcontio.
+- `Telemetry/Arcontiolog` per logging custom Arcontio, JSONL runtime e sink legacy in corso di rimozione/assorbimento.
+
+Nota `v0.12c`: i parametri `SimulationParams` e `GameParams` non vivono piu' qui. La
+configurazione tipizzata appartiene a `Assets/Scripts/Core/Config`; questa cartella deve
+contenere solo infrastruttura diagnostica, non la fonte dati generale della simulazione.
 
 ### World
 `Assets/Scripts/Core/World`
