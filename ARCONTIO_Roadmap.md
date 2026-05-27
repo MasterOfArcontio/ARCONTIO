@@ -24,7 +24,7 @@
 | v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
 | v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
 | v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio 2026 | Completata fino a v0.11c.06 |
-| v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | In corso: checkpoint v0.11d.06 |
+| v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11d.07 |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
 | v0.14 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
@@ -573,7 +573,7 @@ La fase ha consolidato:
 #### v0.11D - Runtime Infrastructure & Dormant Systems Forensic Reintegration
 
 ## Stato
-IN CORSO / CHECKPOINT ATTUALE v0.11d.06
+IN CORSO / PROSSIMO CHECKPOINT v0.11d.07
 
 ## Obiettivo
 
@@ -600,7 +600,7 @@ La fase ha lo scopo di:
 | v0.11d.03 | Audit sistemi dormienti | DONE |
 | v0.11d.04 | Audit sistemi lavoro | DONE |
 | v0.11d.05 | Audit sistemi sociali | DONE |
-| v0.11d.06 | Audit e cleanup authority runtime | IN CORSO |
+| v0.11d.06 | Audit e cleanup authority runtime | DONE |
 | v0.11d.07 | Stabilizzazione scheduler e prestazioni runtime | PENDING |
 | v0.11d.08 | Chiusura costituzionale infrastruttura runtime | PENDING |
 
@@ -630,7 +630,7 @@ Eliminare le cause immediate di freeze legate a logging runtime e I/O, mantenend
 #### v0.11d.06 - Audit e cleanup authority runtime
 
 ## Stato
-IN CORSO
+COMPLETATA / DONE
 
 ## Obiettivo
 
@@ -641,11 +641,13 @@ Mappare e ridurre mutazioni silenziose, bypass di eventi, authority duplicate e 
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.11d.06a | Audit authority runtime reale | DONE |
-| v0.11d.06b | Eventi mondo minimi per azioni needs | IN PR |
-| v0.11d.06c | QA chiusura authority/eventi needs | PENDING |
-| v0.11d.06d | Closeout cleanup authority runtime | PENDING |
+| v0.11d.06b | Eventi mondo minimi per azioni needs | DONE |
+| v0.11d.06c | QA chiusura authority/eventi needs | DONE |
+| v0.11d.06d | Closeout cleanup authority runtime | DONE |
 
 > **Nota v0.11d.06b:** `FoodConsumedEvent` e `BedRestedEvent` rendono osservabili consumo cibo e uso letto solo dopo mutazione riuscita. Non aggiungono nuovi consumatori evento, non modificano MBQD, Job, Movement, Save/Load o ordine tick.
+
+> **Nota closeout v0.11d.06d (2026-05-27):** il checkpoint `v0.11d.06` e' chiuso come Runtime Authority / Needs World Events. La fase ha completato l'audit authority reale, introdotto eventi mondo minimi per consumo cibo e uso letto, recuperato i `.meta` Unity dei nuovi eventi e confermato che la patch e' behavior-preserving: nessun nuovo consumer implicito, nessuna modifica a bisogni, inventario, uso letto, MBQD, Job, Movement, Save/Load o ordine tick. Dettaglio: `v0.11d.06_Closeout_Report.md`.
 
 ---
 
