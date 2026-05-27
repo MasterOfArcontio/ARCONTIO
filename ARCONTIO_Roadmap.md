@@ -24,8 +24,8 @@
 | v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
 | v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
 | v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio 2026 | Completata fino a v0.11c.06 |
-| v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11d.07 |
-| v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
+| v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | Completata |
+| v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Prossima fase |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
 | v0.14 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -573,7 +573,7 @@ La fase ha consolidato:
 #### v0.11D - Runtime Infrastructure & Dormant Systems Forensic Reintegration
 
 ## Stato
-IN CORSO / PROSSIMO CHECKPOINT v0.11d.07
+COMPLETATA / DONE
 
 ## Obiettivo
 
@@ -601,8 +601,10 @@ La fase ha lo scopo di:
 | v0.11d.04 | Audit sistemi lavoro | DONE |
 | v0.11d.05 | Audit sistemi sociali | DONE |
 | v0.11d.06 | Audit e cleanup authority runtime | DONE |
-| v0.11d.07 | Stabilizzazione scheduler e prestazioni runtime | PENDING |
-| v0.11d.08 | Chiusura costituzionale infrastruttura runtime | PENDING |
+| v0.11d.07 | Stabilizzazione scheduler e prestazioni runtime | DONE |
+| v0.11d.08 | Chiusura costituzionale infrastruttura runtime | DONE |
+
+> **Nota closeout v0.11d.08 (2026-05-27):** la fase `v0.11D` e' chiusa come Runtime Infrastructure & Dormant Systems Forensic Reintegration. Ha stabilizzato logging, diagnostica, explainability runtime, memoria/debug, autorita' needs/eventi e audit residui. Non chiude i debiti strutturali di movimento legacy, `NeedsDecisionRule`, dizionari pubblici del `World` o sistemi sociali: questi restano esplicitamente rinviati alle fasi `v0.12`, `v0.13` e `v0.14+`. Dettaglio: `v0.11d_Closeout_Report.md`.
 
 ---
 
@@ -654,7 +656,7 @@ Mappare e ridurre mutazioni silenziose, bypass di eventi, authority duplicate e 
 #### v0.11D - Hardening memoria e GC runtime emerso durante la fase
 
 ## Stato
-PARZIALE / INTEGRAZIONE IN CORSO
+COMPLETATA / RESIDUI RINVIATI
 
 ## Obiettivo
 
@@ -666,7 +668,7 @@ Ridurre retention runtime, dati debug orfani e churn GC osservato dal Profiler, 
 |---|---|---|
 | v0.11d.MEMORY-AUDIT | Audit crescita memoria runtime | DONE |
 | v0.11d.MEMORY-FIX-01 | Pruning cooldown token `_lastShareTick` | DONE |
-| v0.11d.MEMORY-HARDENING | Cleanup runtime debug memory retention | BRANCH / DA INTEGRARE |
+| v0.11d.MEMORY-HARDENING | Cleanup runtime debug memory retention | RINVIATO / NON BLOCCANTE |
 | v0.11d.MEMORY-GC-01 | Riduzione allocazioni overlay diagnostico | DONE |
 
 > **Nota memoria runtime:** il Profiler ha mostrato che il problema principale residuo non era piu' solo I/O logging, ma churn da overlay/debug e retention locale. La riduzione del rebuild testuale in `MapGridEntitySummaryOverlay` ha gia' mostrato un calo visibile degli spike di allocazione.
