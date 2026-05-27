@@ -117,14 +117,28 @@ namespace Arcontio.Core.Logging
         public static GameParams LoadFromResources(string resourcesPathNoExt)
         {
             var ta = Resources.Load<TextAsset>(resourcesPathNoExt);
-            if (ta == null)
+            return LoadFromTextAsset(ta, resourcesPathNoExt);
+        }
+
+        public static GameParams LoadFromTextAsset(TextAsset textAsset, string resourcesPathNoExt)
+        {
+            if (textAsset == null)
             {
                 Debug.LogWarning($"[ArcontioLog] Missing game params at Resources/{resourcesPathNoExt}.json. Using defaults.");
                 return new GameParams();
             }
+
+            return LoadFromJson(textAsset.text);
+        }
+
+        public static GameParams LoadFromJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return new GameParams();
+
             try
             {
-                return JsonUtility.FromJson<GameParams>(ta.text) ?? new GameParams();
+                return JsonUtility.FromJson<GameParams>(json) ?? new GameParams();
             }
             catch (Exception ex)
             {

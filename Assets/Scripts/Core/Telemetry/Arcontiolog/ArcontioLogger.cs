@@ -33,7 +33,18 @@ namespace Arcontio.Core.Logging
         {
             if (_initialized) return;
 
-            _params = GameParamsLoader.LoadFromResources(gameParamsPathNoExt);
+            InitFromParams(
+                GameParamsLoader.LoadFromResources(gameParamsPathNoExt),
+                localizationPathNoExt);
+        }
+
+        public static void InitFromParams(
+            GameParams gameParams,
+            string localizationPathNoExt = "Arcontio/Config/localization_logs")
+        {
+            if (_initialized) return;
+
+            _params = gameParams ?? new GameParams();
             _logging = _params.ResolveLogging();
             _loc = LocalizationDb.LoadFromResources(localizationPathNoExt);
             _theme = new LogTheme();

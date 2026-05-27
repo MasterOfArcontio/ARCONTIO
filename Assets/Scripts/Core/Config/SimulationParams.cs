@@ -1080,15 +1080,28 @@ namespace Arcontio.Core.Config
         public static SimulationParams LoadFromResources(string resourcesPathNoExt)
         {
             var ta = Resources.Load<TextAsset>(resourcesPathNoExt);
-            if (ta == null)
+            return LoadFromTextAsset(ta, resourcesPathNoExt);
+        }
+
+        public static SimulationParams LoadFromTextAsset(TextAsset textAsset, string resourcesPathNoExt)
+        {
+            if (textAsset == null)
             {
                 Debug.LogWarning($"[Arcontio] Missing sim params at Resources/{resourcesPathNoExt}.json. Using defaults.");
                 return new SimulationParams();
             }
 
+            return LoadFromJson(textAsset.text);
+        }
+
+        public static SimulationParams LoadFromJson(string json)
+        {
+            if (string.IsNullOrWhiteSpace(json))
+                return new SimulationParams();
+
             try
             {
-                var parameters = JsonUtility.FromJson<SimulationParams>(ta.text) ?? new SimulationParams();
+                var parameters = JsonUtility.FromJson<SimulationParams>(json) ?? new SimulationParams();
                 parameters.ApplyRuntimeDiagnosticsLayout();
                 return parameters;
             }
