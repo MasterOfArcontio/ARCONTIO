@@ -73,6 +73,15 @@ namespace Arcontio.Core
 
             world.Needs[_npcId] = needs;
 
+            bus?.Publish(new BedRestedEvent(
+                TickContext.CurrentTickIndex,
+                _npcId,
+                _bedObjId,
+                obj.CellX,
+                obj.CellY,
+                needs.GetValue(NeedKind.Rest),
+                _reasonTag));
+
             string tag = string.IsNullOrEmpty(_reasonTag) ? "" : $"({_reasonTag}) ";
 
             ArcontioLogger.Debug(

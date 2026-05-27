@@ -718,6 +718,81 @@ namespace Arcontio.Tests
             Assert.That(world.JobRuntimeState.HasActiveJob(thiefNpcId), Is.False);
         }
 
+        [Test]
+        public void EatFromStockCommandPublishesFoodConsumedEventAfterMutation()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(5, 5, 5, 5, out int npcId, out int foodId);
+            var bus = new MessageBus();
+
+            new EatFromStockCommand(npcId, foodId).Execute(world, bus);
+
+            Assert.That(world.FoodStocks[foodId].Units, Is.EqualTo(2));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var consumed = simEvent as FoodConsumedEvent;
+            Assert.That(consumed, Is.Not.Null);
+            Assert.That(consumed.NpcId, Is.EqualTo(npcId));
+            Assert.That(consumed.FoodObjectId, Is.EqualTo(foodId));
+            Assert.That(consumed.SourceKind, Is.EqualTo("Stock"));
+            Assert.That(consumed.RemainingUnits, Is.EqualTo(2));
+            Assert.That(consumed.CellX, Is.EqualTo(5));
+            Assert.That(consumed.CellY, Is.EqualTo(5));
+            Assert.That(bus.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void EatPrivateFoodCommandPublishesFoodConsumedEventAfterMutation()
+        {
+            var world = MakeWorldWithNpcOnly(4, 6, out int npcId);
+            world.NpcPrivateFood[npcId] = 2;
+            var bus = new MessageBus();
+
+            new EatPrivateFoodCommand(npcId).Execute(world, bus);
+
+            Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(1));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var consumed = simEvent as FoodConsumedEvent;
+            Assert.That(consumed, Is.Not.Null);
+            Assert.That(consumed.NpcId, Is.EqualTo(npcId));
+            Assert.That(consumed.SourceKind, Is.EqualTo("PrivateFood"));
+            Assert.That(consumed.FoodObjectId, Is.EqualTo(0));
+            Assert.That(consumed.RemainingUnits, Is.EqualTo(1));
+            Assert.That(consumed.CellX, Is.EqualTo(4));
+            Assert.That(consumed.CellY, Is.EqualTo(6));
+            Assert.That(bus.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void SleepInBedCommandPublishesBedRestedEventAfterMutation()
+        {
+            var world = MakeWorldWithNpcOnly(2, 3, out int npcId);
+            const int bedId = 9001;
+            world.Objects[bedId] = new WorldObjectInstance
+            {
+                ObjectId = bedId,
+                DefId = "bed",
+                CellX = 2,
+                CellY = 3,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            var bus = new MessageBus();
+
+            new SleepInBedCommand(npcId, bedId, "Community").Execute(world, bus);
+
+            var use = world.GetUseStateOrDefault(bedId);
+            Assert.That(use.IsInUse, Is.True);
+            Assert.That(use.UsingNpcId, Is.EqualTo(npcId));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var rested = simEvent as BedRestedEvent;
+            Assert.That(rested, Is.Not.Null);
+            Assert.That(rested.NpcId, Is.EqualTo(npcId));
+            Assert.That(rested.BedObjectId, Is.EqualTo(bedId));
+            Assert.That(rested.CellX, Is.EqualTo(2));
+            Assert.That(rested.CellY, Is.EqualTo(3));
+            Assert.That(rested.ReasonTag, Is.EqualTo("Community"));
+            Assert.That(bus.Count, Is.EqualTo(0));
+        }
+
         private static JobTemplateRegistry MakeRegistry()
         {
             var registry = new JobTemplateRegistry();

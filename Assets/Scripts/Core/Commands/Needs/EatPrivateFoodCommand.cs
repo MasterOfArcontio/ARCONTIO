@@ -38,7 +38,8 @@ namespace Arcontio.Core
             world.EmitNpcBalloon(_npcId, NpcBalloonKind.Eat);
 
             // 1) Mutazione inventario privato
-            world.NpcPrivateFood[_npcId] = priv - 1;
+            int remainingPrivateFood = priv - 1;
+            world.NpcPrivateFood[_npcId] = remainingPrivateFood;
             
             // Marker: "ho consumato io" in questo tick
             world.NpcLastPrivateFoodConsumeTick[_npcId] = world.Global.CurrentTickIndex;
@@ -48,6 +49,26 @@ namespace Arcontio.Core
             needs.AddValue(NeedKind.Hunger, -cfg.eatSatietyGain);
 
             world.Needs[_npcId] = needs;
+
+            int cellX = 0;
+            int cellY = 0;
+            if (world.GridPos.TryGetValue(_npcId, out var pos))
+            {
+                cellX = pos.X;
+                cellY = pos.Y;
+            }
+
+            bus?.Publish(new FoodConsumedEvent(
+                TickContext.CurrentTickIndex,
+                _npcId,
+                "PrivateFood",
+                foodObjectId: 0,
+                units: 1,
+                remainingUnits: remainingPrivateFood,
+                depleted: remainingPrivateFood <= 0,
+                cellX: cellX,
+                cellY: cellY,
+                hungerAfter: needs.GetValue(NeedKind.Hunger)));
 
             ArcontioLogger.Debug(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T9", npcId: _npcId),
