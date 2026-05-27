@@ -25,9 +25,10 @@
 | v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
 | v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio 2026 | Completata fino a v0.11c.06 |
 | v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | Completata |
-| v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Prossima fase |
-| v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
-| v0.14 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
+| v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | Prossima fase |
+| v0.13 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
+| v0.14 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
+| v0.15 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
 
 ---
@@ -604,7 +605,7 @@ La fase ha lo scopo di:
 | v0.11d.07 | Stabilizzazione scheduler e prestazioni runtime | DONE |
 | v0.11d.08 | Chiusura costituzionale infrastruttura runtime | DONE |
 
-> **Nota closeout v0.11d.08 (2026-05-27):** la fase `v0.11D` e' chiusa come Runtime Infrastructure & Dormant Systems Forensic Reintegration. Ha stabilizzato logging, diagnostica, explainability runtime, memoria/debug, autorita' needs/eventi e audit residui. Non chiude i debiti strutturali di movimento legacy, `NeedsDecisionRule`, dizionari pubblici del `World` o sistemi sociali: questi restano esplicitamente rinviati alle fasi `v0.12`, `v0.13` e `v0.14+`. Dettaglio: `v0.11d_Closeout_Report.md`.
+> **Nota closeout v0.11d.08 (2026-05-27):** la fase `v0.11D` e' chiusa come Runtime Infrastructure & Dormant Systems Forensic Reintegration. Ha stabilizzato logging, diagnostica, explainability runtime, memoria/debug, autorita' needs/eventi e audit residui. Non chiude i debiti strutturali di movimento legacy, `NeedsDecisionRule`, dizionari pubblici del `World`, pulizia completa logging/EL o sistemi sociali: questi restano esplicitamente rinviati alle fasi `v0.12`, `v0.13`, `v0.14` e `v0.15+`. Dettaglio: `v0.11d_Closeout_Report.md`.
 
 ---
 
@@ -675,7 +676,76 @@ Ridurre retention runtime, dati debug orfani e churn GC osservato dal Profiler, 
 
 ---
 
-#### v0.12 - NPC Subjective Cognition Deepening
+#### v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
+
+## Stato
+IN CORSO / PROSSIMA FASE
+
+## Obiettivo
+
+Chiudere il debito rimasto dopo la stabilizzazione infrastrutturale `v0.11D`.
+
+Questa fase NON introduce gameplay importante.
+
+Serve a trasformare logging, diagnostica ed explainability in un sistema unico, leggero, modulare e governabile.
+
+La fase deve portare ARCONTIO verso una situazione in cui:
+
+- i file JSONL siano l'unica uscita persistente dei log diagnostici runtime;
+- i pannelli EL siano l'unica visualizzazione diagnostica viva utile;
+- console Unity, TXT, HTML e overlay logger legacy vengano rimossi se non piu' necessari;
+- `Telemetry` venga eliminata o assorbita solo dove produce valore reale;
+- `ArcontioLogger` venga rimosso oppure trasformato in un ponte leggero sopra la stessa infrastruttura JSONL/EL;
+- `GameParams` e `SimulationParams` vengano ricollocati in una configurazione unica e leggibile, non sparsa sotto cartelle di telemetria;
+- EL non produca nulla quando e' disattivo;
+- EL, quando e' attivo, produca dati con costo minimo e solo nei moduli richiesti.
+
+---
+
+## Filosofia architetturale
+
+EL deve diventare un sistema complessivo, non una somma di registri isolati.
+
+Internamente deve essere modulare per dominio:
+
+- Memory;
+- Belief;
+- Query;
+- Decision;
+- Job;
+- Running Action;
+- Step;
+- Movement.
+
+I moduli Reservation, Command, Failure/Recovery e diagnostica di supporto possono restare sotto-canali collegati, se utili alla ricostruzione causale.
+
+La regola principale e':
+
+```text
+EL spento -> nessuna produzione diagnostica
+EL acceso -> produzione modulare, limitata, batchata, leggibile
+```
+
+Questa fase deve anche verificare se la struttura attuale dei pannelli EL consuma troppe risorse nel solo prodursi. Se i pannelli costruiscono stringhe, liste o viewmodel quando sono chiusi, nascosti o non selezionati, quel costo deve essere eliminato o ridotto.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.12a | Audit logging, explainability e diagnostica runtime | ✅ |
+| v0.12b | Riallineamento roadmap e definizione fase diagnostica | ⏳ |
+| v0.12c | Consolidamento GameParams / SimulationParams | ⏳ |
+| v0.12d | Rimozione canali legacy console / TXT / HTML / overlay | ⏳ |
+| v0.12e | Decisione ArcontioLogger: rimozione o ponte JSONL/EL | ⏳ |
+| v0.12f | Eliminazione o assorbimento Telemetry | ⏳ |
+| v0.12g | EL modulare leggero e produzione zero quando disattivo | ⏳ |
+| v0.12h | Ottimizzazione pannelli EL e closeout diagnostica runtime | ⏳ |
+
+> **Nota architetturale v0.12:** questa fase assorbe il debito emerso dal Profiler e dagli audit `v0.11D`. Non deve costruire nuova cognizione NPC. Prima di espandere memoria, belief, sociale e observer layer pubblico, bisogna rendere la diagnostica sostenibile: pochi canali, configurazione unica, JSONL come uscita persistente, pannelli EL come lettura viva, nessun costo nascosto quando il sistema e' spento.
+
+---
+
+#### v0.13 - NPC Subjective Cognition Deepening
 
 ## Stato
 FUTURA / PENDING
@@ -698,18 +768,18 @@ Questa fase deve lavorare su:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.12a | Audit cognition gap post-v0.11D | PENDING |
-| v0.12b | Belief lifecycle e obsolescenza cibo/oggetti | PENDING |
-| v0.12c | Memory encoding da world events needs | PENDING |
-| v0.12d | Verifica locale credenze obsolete | PENDING |
-| v0.12e | Comunicazione soggettiva dei fatti osservati | PENDING |
-| v0.12f | Decisioni con belief incerte e parziali | PENDING |
-| v0.12g | QA anti-omniscienza cognitiva | PENDING |
-| v0.12h | Closeout cognition deepening | PENDING |
+| v0.13a | Audit cognition gap post-v0.12 | ⏳ |
+| v0.13b | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
+| v0.13c | Memory encoding da world events needs | ⏳ |
+| v0.13d | Verifica locale credenze obsolete | ⏳ |
+| v0.13e | Comunicazione soggettiva dei fatti osservati | ⏳ |
+| v0.13f | Decisioni con belief incerte e parziali | ⏳ |
+| v0.13g | QA anti-omniscienza cognitiva | ⏳ |
+| v0.13h | Closeout cognition deepening | ⏳ |
 
 ---
 
-#### v0.13 - Social Consequence & Normative Emergence
+#### v0.14 - Social Consequence & Normative Emergence
 
 ## Stato
 FUTURA / PENDING
@@ -722,16 +792,16 @@ Introdurre conseguenze sociali emergenti sopra world events, memoria soggettiva 
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.13a | Audit reputazione/sospetto post-v0.12 | PENDING |
-| v0.13b | Catene sospetto/furto da eventi osservati | PENDING |
-| v0.13c | Giudizio sociale locale | PENDING |
-| v0.13d | Prime norme emergenti | PENDING |
-| v0.13e | Istituzioni runtime leggere | PENDING |
-| v0.13f | QA scenario sociale osservabile | PENDING |
+| v0.14a | Audit reputazione/sospetto post-v0.13 | ⏳ |
+| v0.14b | Catene sospetto/furto da eventi osservati | ⏳ |
+| v0.14c | Giudizio sociale locale | ⏳ |
+| v0.14d | Prime norme emergenti | ⏳ |
+| v0.14e | Istituzioni runtime leggere | ⏳ |
+| v0.14f | QA scenario sociale osservabile | ⏳ |
 
 ---
 
-#### v0.14 - Explainability Public Layer / Observer Tools
+#### v0.15 - Explainability Public Layer / Observer Tools
 
 ## Stato
 FUTURA / PENDING
@@ -744,11 +814,11 @@ Costruire uno strato observer esterno leggibile sopra eventi, memoria, decisioni
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.14a | Timeline eventi mondo | PENDING |
-| v0.14b | Reason graph NPC | PENDING |
-| v0.14c | Pannelli observer leggibili | PENDING |
-| v0.14d | Reinserimento job traces v0.07 | PENDING |
-| v0.14e | QA observer end-to-end | PENDING |
+| v0.15a | Timeline eventi mondo | ⏳ |
+| v0.15b | Reason graph NPC | ⏳ |
+| v0.15c | Pannelli observer leggibili | ⏳ |
+| v0.15d | Reinserimento job traces v0.07 | ⏳ |
+| v0.15e | QA observer end-to-end | ⏳ |
 
 > **Nota:** questa fase riassorbe la vecchia v0.07 e la porta a uno strato observer realmente utile.
 
