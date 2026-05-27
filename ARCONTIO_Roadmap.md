@@ -2,7 +2,7 @@
 
 > **Ritmo di lavoro:** 3 sessioni/settimana (Lunedì, Mercoledì, Giovedì) · 2 ore per sessione · 6 ore/settimana
 > **Target v1.00:** Prima demo giocabile pubblica
-> **Stato documento:** Aprile 2026
+> **Stato documento:** Maggio 2026
 
 ---
 
@@ -23,8 +23,8 @@
 | v0.10 | World Persistence Closure & Save/Load Completion | Maggio 2026 | Completata |
 | v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
 | v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
-| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio-Giugno 2026 | In corso: prossimo checkpoint v0.11c.03a |
-| v0.11D | Work/Social/Dormant Systems Forensic Audit | Giugno 2026 | Future |
+| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio 2026 | Completata fino a v0.11c.06 |
+| v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | In corso: checkpoint v0.11d.06 |
 | v0.12 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
 | v0.13 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
 | v0.14 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
@@ -569,117 +569,182 @@ La fase ha consolidato:
 > **Nota closeout v0.11c.06f (2026-05-25):** il checkpoint `v0.11c.06` e' chiuso come Stabilizzazione Movimento Multi-Tick. Il Job Layer puo' attraversare una cella in N tick configurabili, aggiornando la posizione solo a completion e mantenendo una reservation cella allineata alla durata reale. `MovementSystem` e `MoveIntent` restano attivi e necessari per path lunghi, landmark, local search, backoff, porte, debug movement e fallback legacy. La migrazione completa del movimento NON e' implementata. Dettaglio: `v0.11c.06_Closeout_Report.md`.
 
 ---
-#### v0.12 — Pulizia Logging, Explainability e Diagnostica Runtime
+
+#### v0.11D - Runtime Infrastructure & Dormant Systems Forensic Reintegration
 
 ## Stato
-⏳ PENDING
+IN CORSO / CHECKPOINT ATTUALE v0.11d.06
 
 ## Obiettivo
 
-Ripulire e consolidare:
+Questa fase NON introduce gameplay importante.
 
-- logging runtime;
-- explainability;
-- sink JSONL;
-- registry diagnostici;
-- payload runtime;
-- separazione debug/runtime;
-- governance emission trace.
+Serve a stabilizzare l'infrastruttura runtime prima dell'espansione sistemica futura.
 
-**Stato:** FUTURA / PENDING
+La fase ha lo scopo di:
+
+- ridurre freeze e stalli runtime;
+- stabilizzare logging, diagnostica ed explainability;
+- mappare sistemi dormienti, lavoro e sociale;
+- isolare debito legacy ancora vivo;
+- pulire authority runtime duplicate;
+- preparare multi-tick, sistemi sociali, sistemi lavoro e crescita NPC.
 
 ---
-
-#### v0.13 - Rimozione Progressiva del Legacy Decision Layer
-
-Questo checkpoint preparerà la rimozione graduale del ruolo operativo di `NeedsDecisionRule` come bridge legacy. La regola non va rimossa brutalmente: le routine esistenti devono passare attraverso Orchestrator, JobRequest e Job Layer in modo incrementale, con fallback legacy quarantinati e testati.
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.13a | Audit responsabilità residue NeedsDecisionRule | ⏳ PENDING |
-| v0.13b | Fame/SearchFood/EatKnownFood via Orchestrator | ⏳ PENDING |
-| v0.13c | Piano migrazione sonno | ⏳ PENDING |
-| v0.13d | Piano migrazione sete | ⏳ PENDING |
-| v0.13e | Quarantena fallback legacy | ⏳ PENDING |
-| v0.13f | Config gate orchestrator primario | ⏳ PENDING |
-| v0.13g | Report readiness rimozione legacy | ⏳ PENDING |
+| v0.11d.00 | Stabilizzazione urgente logging e diagnostica runtime | DONE |
+| v0.11d.01 | Audit completo diagnostica runtime ed explainability | DONE |
+| v0.11d.02 | Consolidamento diagnostica runtime e pannelli | DONE |
+| v0.11d.03 | Audit sistemi dormienti | DONE |
+| v0.11d.04 | Audit sistemi lavoro | DONE |
+| v0.11d.05 | Audit sistemi sociali | DONE |
+| v0.11d.06 | Audit e cleanup authority runtime | IN CORSO |
+| v0.11d.07 | Stabilizzazione scheduler e prestazioni runtime | PENDING |
+| v0.11d.08 | Chiusura costituzionale infrastruttura runtime | PENDING |
+
+---
+
+#### v0.11d.00 - Stabilizzazione urgente logging e diagnostica runtime
+
+## Stato
+COMPLETATA / DONE
+
+## Obiettivo
+
+Eliminare le cause immediate di freeze legate a logging runtime e I/O, mantenendo registri runtime ed explainability.
+
+---
+
 | Checkpoint | Task | Stato |
 |---|---|---|
+| v0.11d.00a | Rimozione Console Unity / HTML / TXT dal logger runtime | DONE |
+| v0.11d.00b | Introduzione scrittore JSONL batchato, limitato e congelabile | DONE |
+| v0.11d.00c | Conversione e isolamento sink JSONL movimento e MBQD | DONE |
+| v0.11d.00d | Configurazione logging runtime provvisoria pulita | DONE |
+| v0.11d.00e | QA stress freeze/logging/saturazione | DONE |
 
 ---
 
-## v0.14 — Cognizione Soggettiva Avanzata
+#### v0.11d.06 - Audit e cleanup authority runtime
+
+## Stato
+IN CORSO
 
 ## Obiettivo
 
-Espandere:
-
-- ragionamento NPC;
-- query cognitive;
-- memoria dinamica;
-- pianificazione soggettiva;
-- conflitti cognitivi;
-- apprendimento.
-
-### Tabella sessioni v0.14
-
-| # | Giorno | Sistema | Task | Stato |
-|---|--------|---------|------|-------|
-| 1 | Lun | Cognition | Rimozione scansioni onniscienti residue | ⏳ |
-| 2 | Mer | Belief | Confidence refinement | ⏳ |
-| 3 | Gio | Communication | Distorsione token ampliata | ⏳ |
-| 4 | Lun | Decision | Local verification loops | ⏳ |
-| 5 | Mer | QA | Audit anti-telepatia completo | ⏳ |
+Mappare e ridurre mutazioni silenziose, bypass di eventi, authority duplicate e letture onniscienti, senza introdurre refactor larghi.
 
 ---
 
-## v0.15 — Conseguenze Sociali Emergenti
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.06a | Audit authority runtime reale | DONE |
+| v0.11d.06b | Eventi mondo minimi per azioni needs | IN PR |
+| v0.11d.06c | QA chiusura authority/eventi needs | PENDING |
+| v0.11d.06d | Closeout cleanup authority runtime | PENDING |
 
-## Obiettivo
-
-Introdurre:
-
-- reputazione;
-- istituzioni;
-- conseguenze sociali;
-- propagazione informazione;
-- conflitti emergenti;
-- strutture normative.
-
-### Tabella sessioni v0.15
-
-| # | Giorno | Sistema | Task | Stato |
-|---|--------|---------|------|-------|
-| 1 | Lun | Reputation | Tracce reputazionali | ⏳ |
-| 2 | Mer | Suspicion | Catene sospetto/furto | ⏳ |
-| 3 | Gio | Social | Giudizio di gruppo | ⏳ |
-| 4 | Lun | Norms | Prime norme emergenti | ⏳ |
-| 5 | Mer | QA | Scenario sociale osservabile | ⏳ |
+> **Nota v0.11d.06b:** `FoodConsumedEvent` e `BedRestedEvent` rendono osservabili consumo cibo e uso letto solo dopo mutazione riuscita. Non aggiungono nuovi consumatori evento, non modificano MBQD, Job, Movement, Save/Load o ordine tick.
 
 ---
 
-## v0.16 — Observer Layer Pubblico ed Explainability Esterna
+#### v0.11D - Hardening memoria e GC runtime emerso durante la fase
+
+## Stato
+PARZIALE / INTEGRAZIONE IN CORSO
 
 ## Obiettivo
 
-Costruire:
+Ridurre retention runtime, dati debug orfani e churn GC osservato dal Profiler, senza refactor larghi.
 
-- observer layer;
-- explainability pubblica;
-- strumenti osservazione simulazione;
-- timeline causali;
-- replay explainability;
-- debugging osservabile.
+---
 
-### Tabella sessioni v0.14
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.11d.MEMORY-AUDIT | Audit crescita memoria runtime | DONE |
+| v0.11d.MEMORY-FIX-01 | Pruning cooldown token `_lastShareTick` | DONE |
+| v0.11d.MEMORY-HARDENING | Cleanup runtime debug memory retention | BRANCH / DA INTEGRARE |
+| v0.11d.MEMORY-GC-01 | Riduzione allocazioni overlay diagnostico | DONE |
 
-| # | Giorno | Sistema | Task | Stato |
-|---|--------|---------|------|-------|
-| 1 | Lun | Observer | Timeline eventi mondo | ⏳ |
-| 2 | Mer | Observer | Reason graph NPC | ⏳ |
-| 3 | Gio | UI | Pannelli observer leggibili | ⏳ |
-| 4 | Lun | Explainability | Reinserimento v0.07 job traces | ⏳ |
-| 5 | Mer | QA | Observer end-to-end | ⏳ |
+> **Nota memoria runtime:** il Profiler ha mostrato che il problema principale residuo non era piu' solo I/O logging, ma churn da overlay/debug e retention locale. La riduzione del rebuild testuale in `MapGridEntitySummaryOverlay` ha gia' mostrato un calo visibile degli spike di allocazione.
+
+---
+
+#### v0.12 - NPC Subjective Cognition Deepening
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Approfondire la cognizione soggettiva degli NPC usando l'infrastruttura stabilizzata in v0.11D.
+
+Questa fase deve lavorare su:
+
+- memoria soggettiva;
+- belief lifecycle;
+- freshness e obsolescenza;
+- verifica locale delle credenze;
+- reazione a eventi mondo;
+- comunicazione non onnisciente;
+- decisioni basate su conoscenza imperfetta.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.12a | Audit cognition gap post-v0.11D | PENDING |
+| v0.12b | Belief lifecycle e obsolescenza cibo/oggetti | PENDING |
+| v0.12c | Memory encoding da world events needs | PENDING |
+| v0.12d | Verifica locale credenze obsolete | PENDING |
+| v0.12e | Comunicazione soggettiva dei fatti osservati | PENDING |
+| v0.12f | Decisioni con belief incerte e parziali | PENDING |
+| v0.12g | QA anti-omniscienza cognitiva | PENDING |
+| v0.12h | Closeout cognition deepening | PENDING |
+
+---
+
+#### v0.13 - Social Consequence & Normative Emergence
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Introdurre conseguenze sociali emergenti sopra world events, memoria soggettiva e comunicazione.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.13a | Audit reputazione/sospetto post-v0.12 | PENDING |
+| v0.13b | Catene sospetto/furto da eventi osservati | PENDING |
+| v0.13c | Giudizio sociale locale | PENDING |
+| v0.13d | Prime norme emergenti | PENDING |
+| v0.13e | Istituzioni runtime leggere | PENDING |
+| v0.13f | QA scenario sociale osservabile | PENDING |
+
+---
+
+#### v0.14 - Explainability Public Layer / Observer Tools
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Costruire uno strato observer esterno leggibile sopra eventi, memoria, decisioni e conseguenze sociali.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.14a | Timeline eventi mondo | PENDING |
+| v0.14b | Reason graph NPC | PENDING |
+| v0.14c | Pannelli observer leggibili | PENDING |
+| v0.14d | Reinserimento job traces v0.07 | PENDING |
+| v0.14e | QA observer end-to-end | PENDING |
 
 > **Nota:** questa fase riassorbe la vecchia v0.07 e la porta a uno strato observer realmente utile.
 
@@ -742,6 +807,6 @@ Questi aspetti verranno introdotti solo dopo la chiusura delle foundation passiv
 
 ---
 
-*ARCONTIO Development Roadmap — documento vivo full fidelity — aggiornato Aprile 2026*
+*ARCONTIO Development Roadmap — documento vivo full fidelity — aggiornato Maggio 2026*
 
 
