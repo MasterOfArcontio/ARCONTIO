@@ -14,6 +14,16 @@ namespace Arcontio.Core.Logging
         public static bool Initialized => _initialized;
         public static string CurrentLanguage => _params?.Language ?? _language;
         public static string CurrentLogFilePath => null;
+        public static bool ShouldWrite(LogLevel level)
+        {
+            if (!_initialized)
+                return true;
+
+            if (_logging != null && !_logging.general.enabled)
+                return false;
+
+            return level >= _minLevel;
+        }
 
         public static void InitFromResources(
             string gameParamsPathNoExt = "Arcontio/Config/game_params",
@@ -67,9 +77,12 @@ namespace Arcontio.Core.Logging
 
             _initialized = true;
 
-            Info(new LogContext(0, "Core"), new LogBlock(LogLevel.Info, "log.sim.start")
-                .AddField("lang", CurrentLanguage)
-                .AddField("file", "disabled"));
+            if (ShouldWrite(LogLevel.Info))
+            {
+                Info(new LogContext(0, "Core"), new LogBlock(LogLevel.Info, "log.sim.start")
+                    .AddField("lang", CurrentLanguage)
+                    .AddField("file", "disabled"));
+            }
         }
 
         public static void Shutdown()
@@ -98,8 +111,8 @@ namespace Arcontio.Core.Logging
         private static void Write(LogLevel lvl, LogContext ctx, LogBlock block)
         {
             if (!_initialized) InitFromResources(); // fallback safe
-            if (_logging != null && !_logging.general.enabled) return;
-            if (lvl < _minLevel) return;
+            if (!ShouldWrite(lvl)) return;
+            if (block == null) return;
 
             block.Level = lvl;
         }

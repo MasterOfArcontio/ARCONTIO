@@ -1169,7 +1169,7 @@ namespace Arcontio.Core
             // - non assumiamo piu' che esistano le chiavi 1 e 2;
             // - iteriamo invece su TUTTI gli NPC presenti nel mondo in questo tick;
             // - per ciascuno logghiamo il numero di trace presenti nel suo MemoryStore.
-            if (_tickIndex % 20 == 0)
+            if (_tickIndex % 20 == 0 && ArcontioLogger.ShouldWrite(LogLevel.Debug))
             {
                 var block = new LogBlock(LogLevel.Debug, "log.memorytest.traces")
                     .AddField("npcCount", _world.NpcDna.Count)
@@ -1216,7 +1216,7 @@ namespace Arcontio.Core
             _tickIndex++;
 
             // Debug: verifica che l'host resti vivo cambiando scena
-            if (_tickIndex % 50 == 0)
+            if (_tickIndex % 50 == 0 && ArcontioLogger.ShouldWrite(LogLevel.Debug))
             {
                 ArcontioLogger.Debug(
                     new LogContext(tick: _tickIndex, channel: "Arcontio"),
