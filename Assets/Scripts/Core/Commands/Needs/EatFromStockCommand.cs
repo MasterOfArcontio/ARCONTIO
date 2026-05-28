@@ -145,15 +145,6 @@ namespace Arcontio.Core
                 cellX: stockX,
                 cellY: stockY,
                 hungerAfter: needs.GetValue(NeedKind.Hunger)));
-
-            ArcontioLogger.Debug(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T9", npcId: _npcId),
-                new LogBlock(LogLevel.Debug, "log.t9.eat.stock")
-                    .AddField("obj", _foodObjId)
-                    .AddField("stockLeft", depleted ? 0 : stock.Units)
-                    .AddField("hungerNow", needs.GetValue(NeedKind.Hunger).ToString("0.00"))
-                    .AddField("depleted", depleted.ToString())
-            );
         }
     }
 }

@@ -69,13 +69,6 @@ namespace Arcontio.Core
                 cellX: cellX,
                 cellY: cellY,
                 hungerAfter: needs.GetValue(NeedKind.Hunger)));
-
-            ArcontioLogger.Debug(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T9", npcId: _npcId),
-                new LogBlock(LogLevel.Debug, "log.t9.eat.private")
-                    .AddField("privLeft", world.NpcPrivateFood[_npcId])
-                    .AddField("hungerNow", needs.GetValue(NeedKind.Hunger).ToString("0.00"))
-            );
         }
     }
 }

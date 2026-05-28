@@ -82,21 +82,6 @@ namespace Arcontio.Core
             }
 
             world.Global.BeliefDecay = BeliefDecayConfig.WithFallbackDefaults(db.BeliefDecay);
-
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "BeliefDecayConfig"),
-                new LogBlock(LogLevel.Info, "log.beliefdecayconfig.loaded")
-                    .AddField("food",      world.Global.BeliefDecay.foodConfidenceDecayPerTick.ToString("0.0000"))
-                    .AddField("rest",      world.Global.BeliefDecay.restConfidenceDecayPerTick.ToString("0.0000"))
-                    .AddField("danger",    world.Global.BeliefDecay.dangerConfidenceDecayPerTick.ToString("0.0000"))
-                    .AddField("social",    world.Global.BeliefDecay.socialConfidenceDecayPerTick.ToString("0.0000"))
-                    .AddField("ownership", world.Global.BeliefDecay.ownershipConfidenceDecayPerTick.ToString("0.0000"))
-                    .AddField("situation", world.Global.BeliefDecay.situationConfidenceDecayPerTick.ToString("0.0000"))
-                    .AddField("structure", world.Global.BeliefDecay.structureConfidenceDecayPerTick.ToString("0.0000"))
-                    .AddField("freshMult", world.Global.BeliefDecay.freshnessDecayMultiplier.ToString("0.00"))
-                    .AddField("weakTh",    world.Global.BeliefDecay.weakConfidenceThreshold.ToString("0.00"))
-                    .AddField("staleTh",   world.Global.BeliefDecay.staleFreshnessThreshold.ToString("0.00"))
-            );
         }
     }
 }

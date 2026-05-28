@@ -1,5 +1,4 @@
 using Arcontio.Core.Diagnostics;
-using Arcontio.Core.Logging;
 using System.Collections.Generic;
 
 namespace Arcontio.Core
@@ -61,14 +60,6 @@ namespace Arcontio.Core
                     ));
 
                     suspected++;
-
-                    ArcontioLogger.Info(
-                        new LogContext(tick: (int)tick.Index, channel: "T9", npcId: npcId),
-                        new LogBlock(LogLevel.Info, "log.t9.suspect.missing_private_food")
-                            .AddField("missingUnits", missingUnits)
-                            .AddField("prev", prev)
-                            .AddField("cur", cur)
-                    );
                 }
 
                 // Update snapshot sempre

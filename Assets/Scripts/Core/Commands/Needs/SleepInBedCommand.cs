@@ -81,16 +81,6 @@ namespace Arcontio.Core
                 obj.CellY,
                 needs.GetValue(NeedKind.Rest),
                 _reasonTag));
-
-            string tag = string.IsNullOrEmpty(_reasonTag) ? "" : $"({_reasonTag}) ";
-
-            ArcontioLogger.Debug(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T9", npcId: _npcId),
-                new LogBlock(LogLevel.Debug, "log.t9.sleep")
-                    .AddField("tag", tag)
-                    .AddField("bedObj", _bedObjId)
-                    .AddField("restNow", needs.GetValue(NeedKind.Rest).ToString("0.00"))
-            );
         }
     }
 }
