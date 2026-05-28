@@ -28,14 +28,14 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
 
 CHECKPOINT CORRENTE:
-v0.12e - Decisione ArcontioLogger: rimozione o ponte JSONL/EL
+v0.12f - Eliminazione o assorbimento Telemetry
 
 STATUS:
 IN PROGRESS
 
 OUTPUT ATTESO:
-audit e decisione controllata su `ArcontioLogger`:
-`[v0.12e] decide arcontio logger bridge or removal`
+audit e riduzione controllata di `Telemetry`:
+`[v0.12f] eliminate or absorb telemetry`
 
 DOC SYNC:
 root taskboard e roadmap aggiornate all'apertura tecnica di `v0.12`;
@@ -67,7 +67,7 @@ Obiettivo tecnico corrente `v0.12`:
 - garantire che EL spento non produca nulla.
 
 Prossimo macro job consigliato:
-`v0.12c - Consolidamento GameParams / SimulationParams`
+`v0.12f - Eliminazione o assorbimento Telemetry`
 
 Residual follow-ups / future hardening:
 
@@ -79,7 +79,9 @@ Checkpoint v0.12 completati:
 
 - `v0.12a`: audit logging, explainability e diagnostica runtime;
 - `v0.12b`: roadmap riallineata alla nuova fase diagnostica;
-- `v0.12c`: configurazione runtime consolidata senza modificare `game_params.json`.
+- `v0.12c`: configurazione runtime consolidata senza modificare `game_params.json`;
+- `v0.12d`: canali legacy runtime rimossi;
+- `v0.12e`: `ArcontioLogger` chiuso come ponte transitorio, con ciclo vita JSONL spostato su servizio dedicato.
 
 Nota `v0.12c`:
 
@@ -95,7 +97,16 @@ Checkpoint v0.12d completato:
 - rimossi i relativi `.meta` Unity per evitare asset orfani;
 - `ArcontioLogger` non apre piu' canali console, TXT, HTML o overlay;
 - `JsonlRuntimeLogHub` e i sink JSONL EL restano preservati;
-- prossimo nodo: decidere se `ArcontioLogger` va eliminato o trasformato in ponte leggero sopra JSONL/EL.
+- nodo successivo completato in `v0.12e`: `ArcontioLogger` resta ponte transitorio, non logger runtime futuro.
+
+Checkpoint v0.12e completato:
+
+- `ArcontioLogger` mantenuto solo come ponte transitorio di compatibilita';
+- ciclo vita JSONL spostato nel servizio dedicato `RuntimeDiagnosticsLifecycle`;
+- rimossi `LocalizationDb` e `localization_logs.json`;
+- potate le chiamate legacy sicure da comandi needs, loader configurazione e audit/debug evento;
+- restano fuori scope i log movimento/landmark, scenario seed e sociali/furto, da gestire con step piu' mirati;
+- prossimo nodo operativo: audit e riduzione di `Telemetry` in `v0.12f`.
 
 ---
 
