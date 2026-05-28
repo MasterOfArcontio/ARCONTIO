@@ -87,17 +87,6 @@ namespace Arcontio.Core
             // I campi assenti restano a zero con JsonUtility: il merge con fallback
             // rende la configurazione robusta a file parziali o versioni intermedie.
             world.Global.BeliefQuery = BeliefQueryConfig.WithFallbackDefaults(db.BeliefQuery);
-
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "BeliefQueryConfig"),
-                new LogBlock(LogLevel.Info, "log.beliefqueryconfig.loaded")
-                    .AddField("confidence", world.Global.BeliefQuery.confidenceWeight.ToString("0.00"))
-                    .AddField("freshness", world.Global.BeliefQuery.freshnessWeight.ToString("0.00"))
-                    .AddField("distance", world.Global.BeliefQuery.distanceWeight.ToString("0.00"))
-                    .AddField("maxDist", world.Global.BeliefQuery.maxDistanceCells.ToString("0.0"))
-                    .AddField("urgentDistMult", world.Global.BeliefQuery.highUrgencyDistancePenaltyMultiplier.ToString("0.00"))
-                    .AddField("minConfidence", world.Global.BeliefQuery.defaultMinConfidence.ToString("0.00"))
-            );
         }
     }
 }

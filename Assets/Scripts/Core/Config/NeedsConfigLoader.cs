@@ -53,7 +53,6 @@ namespace Arcontio.Core
         ///   <item><b>Caricamento</b>: usa <c>Resources.Load&lt;TextAsset&gt;</c> con path Unity.</item>
         ///   <item><b>Parsing</b>: usa <c>JsonUtility.FromJson</c> sul wrapper <c>NeedsConfigDatabase</c>.</item>
         ///   <item><b>Normalizzazione</b>: completa eventuali JSON parziali con <c>NeedsConfig.WithFallbackDefaults</c>.</item>
-        ///   <item><b>Telemetria</b>: logga i parametri attivi per diagnosi rapida del runtime.</item>
         /// </list>
         /// </summary>
         public static void LoadIntoWorld(World world)
@@ -90,24 +89,6 @@ namespace Arcontio.Core
             // espliciti invece di lasciare decay/gain/soglie a 0.
             world.Global.Needs = NeedsConfig.WithFallbackDefaults(db.Needs);
 
-            // Log dei parametri attivi: serve a distinguere velocemente una config JSON caricata
-            // da un fallback e a controllare che i nuovi needs psicologici non siano rimasti a 0.
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "NeedsConfig"),
-                new LogBlock(LogLevel.Info, "log.needsconfig.loaded")
-                    .AddField("hungerDecay",   world.Global.Needs.satietyDecayPerTick.ToString("0.0000"))
-                    .AddField("eatGain",        world.Global.Needs.eatSatietyGain.ToString("0.00"))
-                    .AddField("hungryTh",       world.Global.Needs.hungryThreshold.ToString("0.00"))
-                    .AddField("thirstDecay",    world.Global.Needs.thirstDecayPerTick.ToString("0.0000"))
-                    .AddField("drinkGain",      world.Global.Needs.drinkThirstGain.ToString("0.00"))
-                    .AddField("thirstyTh",      world.Global.Needs.thirstyThreshold.ToString("0.00"))
-                    .AddField("restDecay",      world.Global.Needs.restDecayPerTick.ToString("0.0000"))
-                    .AddField("sleepGain",      world.Global.Needs.sleepRestGainPerTick.ToString("0.00"))
-                    .AddField("tiredTh",        world.Global.Needs.tiredThreshold.ToString("0.00"))
-                    .AddField("securityDecay",  world.Global.Needs.securityDecayPerTick.ToString("0.0000"))
-                    .AddField("stabilityDecay", world.Global.Needs.stabilityDecayPerTick.ToString("0.0000"))
-                    .AddField("socialityDecay", world.Global.Needs.socialityDecayPerTick.ToString("0.0000"))
-            );
         }
     }
 }
