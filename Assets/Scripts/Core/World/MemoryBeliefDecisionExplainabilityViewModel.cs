@@ -104,6 +104,15 @@ namespace Arcontio.Core
         Info = 5
     }
 
+    public enum MemoryBeliefDecisionViewModelBuildScope
+    {
+        All = 0,
+        Memory = 1,
+        Belief = 2,
+        Decision = 3,
+        Job = 4
+    }
+
     [Serializable]
     public sealed class MemoryBeliefDecisionMetricView
     {
@@ -449,7 +458,8 @@ namespace Arcontio.Core
             World world,
             int npcId,
             MemoryBeliefDecisionExplainabilityViewModel output,
-            int maxTimelineRows = DefaultMaxTimelineRows)
+            int maxTimelineRows = DefaultMaxTimelineRows,
+            MemoryBeliefDecisionViewModelBuildScope buildScope = MemoryBeliefDecisionViewModelBuildScope.All)
         {
             if (output == null)
                 return false;
@@ -485,51 +495,63 @@ namespace Arcontio.Core
             output.HeaderTitle = $"NPC #{npcId}";
             output.HeaderSubtitle = $"tick {store.LatestTick} | M {store.MemoryTraceCount} | B {store.BeliefTraceCount} | Q {store.QueryTraceCount} | D {store.DecisionTraceCount} | bridge {store.BridgeTraceCount} | J {store.JobLifecycleTraceCount} | step {store.StepTraceCount}";
 
-            if (store.TryGetLatestMemoryTrace(out var memoryTrace))
+            bool buildAll = buildScope == MemoryBeliefDecisionViewModelBuildScope.All;
+            bool buildMemory = buildAll || buildScope == MemoryBeliefDecisionViewModelBuildScope.Memory;
+            bool buildBelief = buildAll || buildScope == MemoryBeliefDecisionViewModelBuildScope.Belief;
+            bool buildDecision = buildAll || buildScope == MemoryBeliefDecisionViewModelBuildScope.Decision;
+            bool buildJob = buildAll || buildScope == MemoryBeliefDecisionViewModelBuildScope.Job;
+
+            if (buildMemory && store.TryGetLatestMemoryTrace(out var memoryTrace))
                 FillMemory(output.LatestMemory, memoryTrace);
 
-            if (store.TryGetLatestBeliefTrace(out var beliefTrace))
+            if (buildBelief && store.TryGetLatestBeliefTrace(out var beliefTrace))
                 FillBeliefMutation(output.LatestBeliefMutation, beliefTrace);
 
-            if (store.TryGetLatestQueryTrace(out var queryTrace))
+            if (buildBelief && store.TryGetLatestQueryTrace(out var queryTrace))
                 FillQuery(output.LatestQuery, queryTrace);
 
-            if (store.TryGetLatestDecisionTrace(out var decisionTrace))
+            if (buildDecision && store.TryGetLatestDecisionTrace(out var decisionTrace))
                 FillDecision(output.LatestDecision, decisionTrace);
 
-            if (store.TryGetLatestBridgeTrace(out var bridgeTrace))
+            if (buildDecision && store.TryGetLatestBridgeTrace(out var bridgeTrace))
                 FillBridge(output.LatestBridge, bridgeTrace);
 
-            if (store.TryGetLatestJobRequestTrace(out var jobRequestTrace))
+            if (buildJob && store.TryGetLatestJobRequestTrace(out var jobRequestTrace))
                 FillJobRequest(output.LatestJobRequest, jobRequestTrace);
 
-            if (store.TryGetLatestJobLifecycleTrace(out var jobLifecycleTrace))
+            if (buildJob && store.TryGetLatestJobLifecycleTrace(out var jobLifecycleTrace))
                 FillJobLifecycle(output.LatestJobLifecycle, jobLifecycleTrace);
 
-            if (store.TryGetLatestJobPhaseTrace(out var jobPhaseTrace))
+            if (buildJob && store.TryGetLatestJobPhaseTrace(out var jobPhaseTrace))
                 FillJobPhase(output.LatestJobPhase, jobPhaseTrace);
 
-            if (store.TryGetLatestStepTrace(out var stepTrace))
+            if (buildJob && store.TryGetLatestStepTrace(out var stepTrace))
                 FillStep(output.LatestStep, stepTrace);
 
-            if (store.TryGetLatestJobStateTrace(out var jobStateTrace))
+            if (buildJob && store.TryGetLatestJobStateTrace(out var jobStateTrace))
                 FillJobState(output.CurrentNpcJobState, jobStateTrace);
 
-            if (store.TryGetLatestJobArbitrationTrace(out var arbitrationTrace))
+            if (buildJob && store.TryGetLatestJobArbitrationTrace(out var arbitrationTrace))
                 FillJobArbitration(output.LatestJobArbitration, arbitrationTrace);
 
-            if (store.TryGetLatestReservationTrace(out var reservationTrace))
+            if (buildJob && store.TryGetLatestReservationTrace(out var reservationTrace))
                 FillReservation(output.LatestReservation, reservationTrace);
 
-            if (store.TryGetLatestCommandTrace(out var commandTrace))
+            if (buildJob && store.TryGetLatestCommandTrace(out var commandTrace))
                 FillCommand(output.LatestCommand, commandTrace);
 
-            if (store.TryGetLatestFailureLearningTrace(out var failureTrace))
+            if (buildJob && store.TryGetLatestFailureLearningTrace(out var failureTrace))
                 FillFailureLearning(output.LatestFailureLearning, failureTrace);
 
-            BuildMemoryBars(store, output.MemoryBars);
-            BuildBeliefRows(store, output.BeliefRows);
-            BuildTimeline(store, output.Timeline, maxTimelineRows);
+            if (buildMemory)
+                BuildMemoryBars(store, output.MemoryBars);
+
+            if (buildBelief)
+                BuildBeliefRows(store, output.BeliefRows);
+
+            if (buildAll || buildMemory)
+                BuildTimeline(store, output.Timeline, maxTimelineRows, buildScope);
+
             return true;
         }
 
@@ -908,25 +930,35 @@ namespace Arcontio.Core
             }
         }
 
-        private static void BuildTimeline(MemoryBeliefDecisionExplainabilityNpcStore store, List<MemoryBeliefDecisionTimelineView> output, int maxTimelineRows)
+        private static void BuildTimeline(
+            MemoryBeliefDecisionExplainabilityNpcStore store,
+            List<MemoryBeliefDecisionTimelineView> output,
+            int maxTimelineRows,
+            MemoryBeliefDecisionViewModelBuildScope buildScope)
         {
             output.Clear();
             TimelineBuffer.Clear();
+            bool buildAll = buildScope == MemoryBeliefDecisionViewModelBuildScope.All;
+
             store.CopyMemoryTracesTo(TimelineBuffer);
-            store.CopyBeliefTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyQueryTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyDecisionTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyBridgeTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyJobRequestTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyJobLifecycleTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyJobPhaseTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyStepTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyJobStateTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyJobArbitrationTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyReservationTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyCommandTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyFailureLearningTracesTo(TimelineBuffer, clearOutput: false);
-            store.CopyRunningActionTracesTo(TimelineBuffer, clearOutput: false);
+            if (buildAll)
+            {
+                store.CopyBeliefTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyQueryTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyDecisionTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyBridgeTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyJobRequestTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyJobLifecycleTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyJobPhaseTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyStepTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyJobStateTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyJobArbitrationTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyReservationTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyCommandTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyFailureLearningTracesTo(TimelineBuffer, clearOutput: false);
+                store.CopyRunningActionTracesTo(TimelineBuffer, clearOutput: false);
+            }
+
             TimelineBuffer.Sort((a, b) => a.Tick.CompareTo(b.Tick));
 
             int safeMax = Math.Max(0, maxTimelineRows);

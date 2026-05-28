@@ -31,10 +31,10 @@ CHECKPOINT CORRENTE:
 v0.12h - Ottimizzazione pannelli EL e closeout diagnostica runtime
 
 STATUS:
-IN PROGRESS
+COMPLETED
 
 OUTPUT ATTESO:
-audit e patch controllata sui pannelli EL:
+closeout completato della pulizia logging, explainability e diagnostica runtime:
 `[v0.12h] optimize EL panels and close diagnostics runtime`
 
 DOC SYNC:
@@ -67,7 +67,7 @@ Obiettivo tecnico corrente `v0.12`:
 - garantire che EL spento non produca nulla.
 
 Prossimo macro job consigliato:
-`v0.12h - Ottimizzazione pannelli EL e closeout diagnostica runtime`
+`v0.13a - Audit cognition gap post-v0.12`
 
 Residual follow-ups / future hardening:
 
@@ -83,7 +83,8 @@ Checkpoint v0.12 completati:
 - `v0.12d`: canali legacy runtime rimossi;
 - `v0.12e`: `ArcontioLogger` chiuso come ponte transitorio, con ciclo vita JSONL spostato su servizio dedicato;
 - `v0.12f`: `Telemetry` assorbita come ponte diagnostico inerte quando disattiva;
-- `v0.12g`: EL runtime reso piu' leggero quando disattivo.
+- `v0.12g`: EL runtime reso piu' leggero quando disattivo;
+- `v0.12h`: pannelli EL ottimizzati e fase diagnostica chiusa.
 
 Nota `v0.12c`:
 
@@ -128,6 +129,14 @@ Checkpoint v0.12g completato:
 - gli helper MBQD interni escono prima di creare record quando il modulo o il kind sono spenti;
 - Movement EL non considera piu' un registry assente come tracciabile;
 - prossimo nodo operativo: ridurre il costo dei pannelli EL e chiudere la fase `v0.12h`.
+
+Checkpoint v0.12h completato:
+
+- il builder UI MBQD puo' costruire solo la famiglia diagnostica richiesta dalla pagina visibile;
+- il pannello laterale aggiorna solo la pagina attiva quando non c'e' selezione valida;
+- le card NPC estese restano costruite solo per NPC selezionato e sezioni aperte;
+- aggiunta QA sullo scope del ViewModel MBQD per evitare regressioni;
+- la fase `v0.12` e' pronta al merge/closeout e il prossimo lavoro consigliato e' `v0.13a`.
 
 ---
 
