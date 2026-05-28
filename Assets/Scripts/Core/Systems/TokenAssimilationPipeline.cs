@@ -128,7 +128,9 @@ namespace Arcontio.Core
 
                 if (!handled)
                 {
-                    telemetry.Counter($"TokenAssimilation.Unhandled.{env.Token.Type}", 1);
+                    if (telemetry.Enabled)
+                        telemetry.Counter($"TokenAssimilation.Unhandled.{env.Token.Type}", 1);
+
                     ArcontioLogger.Warn(
                         new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "TokenAssim", npcId: env.ListenerId),
                         new LogBlock(LogLevel.Warn, "log.tokenassim.unhandled")

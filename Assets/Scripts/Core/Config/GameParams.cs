@@ -86,7 +86,7 @@ namespace Arcontio.Core.Logging
     [Serializable]
     public sealed class LoggerTelemetryParams
     {
-        public bool enabled = true;
+        public bool enabled = false;
         public bool dump_to_console_enabled = false;
     }
 

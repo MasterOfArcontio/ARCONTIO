@@ -28,14 +28,14 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
 
 CHECKPOINT CORRENTE:
-v0.12f - Eliminazione o assorbimento Telemetry
+v0.12g - EL modulare leggero e produzione zero quando disattivo
 
 STATUS:
 IN PROGRESS
 
 OUTPUT ATTESO:
-audit e riduzione controllata di `Telemetry`:
-`[v0.12f] eliminate or absorb telemetry`
+audit e patch controllata su EL modulare e costo zero quando disattivo:
+`[v0.12g] harden modular EL disabled path`
 
 DOC SYNC:
 root taskboard e roadmap aggiornate all'apertura tecnica di `v0.12`;
@@ -67,7 +67,7 @@ Obiettivo tecnico corrente `v0.12`:
 - garantire che EL spento non produca nulla.
 
 Prossimo macro job consigliato:
-`v0.12f - Eliminazione o assorbimento Telemetry`
+`v0.12g - EL modulare leggero e produzione zero quando disattivo`
 
 Residual follow-ups / future hardening:
 
@@ -81,7 +81,8 @@ Checkpoint v0.12 completati:
 - `v0.12b`: roadmap riallineata alla nuova fase diagnostica;
 - `v0.12c`: configurazione runtime consolidata senza modificare `game_params.json`;
 - `v0.12d`: canali legacy runtime rimossi;
-- `v0.12e`: `ArcontioLogger` chiuso come ponte transitorio, con ciclo vita JSONL spostato su servizio dedicato.
+- `v0.12e`: `ArcontioLogger` chiuso come ponte transitorio, con ciclo vita JSONL spostato su servizio dedicato;
+- `v0.12f`: `Telemetry` assorbita come ponte diagnostico inerte quando disattiva.
 
 Nota `v0.12c`:
 
@@ -107,6 +108,16 @@ Checkpoint v0.12e completato:
 - potate le chiamate legacy sicure da comandi needs, loader configurazione e audit/debug evento;
 - restano fuori scope i log movimento/landmark, scenario seed e sociali/furto, da gestire con step piu' mirati;
 - prossimo nodo operativo: audit e riduzione di `Telemetry` in `v0.12f`.
+
+Checkpoint v0.12f completato:
+
+- `Telemetry` resta temporaneamente nelle firme di `ISystem` e `IRule`;
+- il runtime ordinario la costruisce leggendo `logging.telemetry.enabled`;
+- default sicuro: Telemetry spenta;
+- quando e' spenta non crea dizionari e non accumula contatori;
+- rimosso lo scarico console `DumpToConsole`;
+- protetto l'unico contatore con nome dinamico per evitare costruzione stringa quando Telemetry e' spenta;
+- prossimo nodo operativo: rendere EL modulare e a produzione zero quando disattivo in `v0.12g`.
 
 ---
 
