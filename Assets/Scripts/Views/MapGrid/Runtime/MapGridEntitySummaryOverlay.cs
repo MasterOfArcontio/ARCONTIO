@@ -1276,11 +1276,8 @@ namespace Arcontio.View.MapGrid
             {
                 _movementExplainabilityPanel.SetHeader("Explainability Layer", string.Empty);
                 _movementExplainabilityPanel.SetDiagnostics("selectedNpc=-1 | nessuna selezione");
-                _movementExplainabilityPanel.SetMemoryText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
-                _movementExplainabilityPanel.SetBeliefText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
-                _movementExplainabilityPanel.SetDecisionText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
-                _movementExplainabilityPanel.SetJobText("<color=#6E7681>Nessun NPC selezionato.</color>", string.Empty, string.Empty);
-                _movementExplainabilityPanel.SetPathfindingText(
+                SetActiveExplainabilityPageMessage(
+                    activePage,
                     "<color=#6E7681>Nessun NPC selezionato.</color>",
                     "<color=#6E7681>Click sinistro su un NPC nella MapGrid per aprire la diagnostica EL.</color>");
                 _movementExplainabilityPanel.SetVisible(true);
@@ -1291,11 +1288,10 @@ namespace Arcontio.View.MapGrid
             {
                 _movementExplainabilityPanel.SetHeader("Explainability Layer", $"NPC #{selectedNpcId}");
                 _movementExplainabilityPanel.SetDiagnostics($"selectedNpc={selectedNpcId} | world/npc non valido");
-                _movementExplainabilityPanel.SetMemoryText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
-                _movementExplainabilityPanel.SetBeliefText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
-                _movementExplainabilityPanel.SetDecisionText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
-                _movementExplainabilityPanel.SetJobText("<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>", string.Empty, string.Empty);
-                _movementExplainabilityPanel.SetPathfindingText(string.Empty, "<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>");
+                SetActiveExplainabilityPageMessage(
+                    activePage,
+                    "<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>",
+                    "<color=#F85149>L'NPC selezionato non esiste piu' nel World.</color>");
                 _movementExplainabilityPanel.SetVisible(true);
                 return;
             }
@@ -1389,7 +1385,8 @@ namespace Arcontio.View.MapGrid
                 world,
                 npcId,
                 _mbqdExplainabilityViewModel,
-                maxTimelineRows: 48);
+                maxTimelineRows: 48,
+                buildScope: ResolveMbqdBuildScope(activePage));
 
             if (!hasModel)
             {
@@ -1442,6 +1439,40 @@ namespace Arcontio.View.MapGrid
             }
 
             return model.HeaderSubtitle;
+        }
+
+        private void SetActiveExplainabilityPageMessage(MapGridExplainabilityPanelPage activePage, string primary, string secondary)
+        {
+            switch (activePage)
+            {
+                case MapGridExplainabilityPanelPage.Pathfinding:
+                    _movementExplainabilityPanel.SetPathfindingText(primary, secondary);
+                    break;
+                case MapGridExplainabilityPanelPage.Memory:
+                    _movementExplainabilityPanel.SetMemoryText(primary, string.Empty, string.Empty);
+                    break;
+                case MapGridExplainabilityPanelPage.Belief:
+                    _movementExplainabilityPanel.SetBeliefText(primary, string.Empty, string.Empty);
+                    break;
+                case MapGridExplainabilityPanelPage.Decision:
+                    _movementExplainabilityPanel.SetDecisionText(primary, string.Empty, string.Empty);
+                    break;
+                case MapGridExplainabilityPanelPage.Job:
+                    _movementExplainabilityPanel.SetJobText(primary, string.Empty, string.Empty);
+                    break;
+            }
+        }
+
+        private static MemoryBeliefDecisionViewModelBuildScope ResolveMbqdBuildScope(MapGridExplainabilityPanelPage activePage)
+        {
+            return activePage switch
+            {
+                MapGridExplainabilityPanelPage.Memory => MemoryBeliefDecisionViewModelBuildScope.Memory,
+                MapGridExplainabilityPanelPage.Belief => MemoryBeliefDecisionViewModelBuildScope.Belief,
+                MapGridExplainabilityPanelPage.Decision => MemoryBeliefDecisionViewModelBuildScope.Decision,
+                MapGridExplainabilityPanelPage.Job => MemoryBeliefDecisionViewModelBuildScope.Job,
+                _ => MemoryBeliefDecisionViewModelBuildScope.All,
+            };
         }
 
         private void ClearMbqdBuffers()

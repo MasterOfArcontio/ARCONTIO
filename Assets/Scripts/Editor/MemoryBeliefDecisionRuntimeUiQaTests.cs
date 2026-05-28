@@ -1,6 +1,8 @@
 using Arcontio.Core;
 using Arcontio.Core.Config;
 using NUnit.Framework;
+using System;
+using UnityEditor;
 using UnityEngine;
 
 namespace Arcontio.Tests
@@ -32,6 +34,36 @@ namespace Arcontio.Tests
     public sealed class MemoryBeliefDecisionRuntimeUiQaTests
     {
         // =============================================================================
+        // RunFromCommandLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Entry point minimo per validare questi QA test da Unity batchmode anche
+        /// quando il Test Runner CLI non produce il file XML dei risultati.
+        /// </para>
+        /// </summary>
+        public static void RunFromCommandLine()
+        {
+            try
+            {
+                var tests = new MemoryBeliefDecisionRuntimeUiQaTests();
+
+                tests.RegistryAndViewModelExposeJsonlFieldsForSelectedNpc();
+                tests.ScopedViewModelBuildsOnlyVisibleDiagnosticFamily();
+                tests.DisabledConfigDoesNotPopulateRegistry();
+                tests.JobExplainabilityTraceKindsPopulateRegistryViewModelAndTimeline();
+
+                Debug.Log("[MemoryBeliefDecisionRuntimeUiQaTests] PASS");
+                EditorApplication.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[MemoryBeliefDecisionRuntimeUiQaTests] FAIL\n" + ex);
+                EditorApplication.Exit(1);
+            }
+        }
+
+        // =============================================================================
         // RegistryAndViewModelExposeJsonlFieldsForSelectedNpc
         // =============================================================================
         /// <summary>
@@ -60,7 +92,7 @@ namespace Arcontio.Tests
             Assert.That(store.DecisionTraceCount, Is.EqualTo(1));
             Assert.That(store.BridgeTraceCount, Is.EqualTo(1));
 
-            var worldConfig = new WorldConfig(new SimulationParams());
+            var worldConfig = MakeWorldConfigWithMbqdEnabled();
             var world = new World(worldConfig);
             world.MemoryBeliefDecisionExplainability.AddTrace(config, MakeMemoryTrace(npcId));
             world.MemoryBeliefDecisionExplainability.AddTrace(config, MakeBeliefTrace(npcId));
@@ -101,6 +133,52 @@ namespace Arcontio.Tests
             Assert.That(viewModel.LatestBridge.TargetSource, Is.EqualTo("BeliefQuery"));
             Assert.That(viewModel.LatestBridge.LegacyFallbackUsed, Is.False);
             Assert.That(viewModel.Timeline.Count, Is.EqualTo(5));
+        }
+
+        // =============================================================================
+        // ScopedViewModelBuildsOnlyVisibleDiagnosticFamily
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il builder possa costruire solo la famiglia diagnostica
+        /// richiesta dal pannello visibile, preservando i conteggi generali ma
+        /// evitando liste e payload delle tab non aperte.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void ScopedViewModelBuildsOnlyVisibleDiagnosticFamily()
+        {
+            var config = MakeConfig();
+            int npcId = 9;
+            var worldConfig = MakeWorldConfigWithMbqdEnabled();
+            var world = new World(worldConfig);
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, MakeMemoryTrace(npcId));
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, MakeBeliefTrace(npcId));
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, MakeQueryTrace(npcId));
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, MakeDecisionTrace(npcId));
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, MakeBridgeTrace(npcId));
+
+            var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
+            bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(
+                world,
+                npcId,
+                viewModel,
+                buildScope: MemoryBeliefDecisionViewModelBuildScope.Decision);
+
+            Assert.That(built, Is.True);
+            Assert.That(viewModel.MemoryCount, Is.EqualTo(1));
+            Assert.That(viewModel.BeliefCount, Is.EqualTo(1));
+            Assert.That(viewModel.QueryCount, Is.EqualTo(1));
+            Assert.That(viewModel.DecisionCount, Is.EqualTo(1));
+            Assert.That(viewModel.BridgeCount, Is.EqualTo(1));
+            Assert.That(viewModel.LatestDecision.SelectedIntent, Is.EqualTo("EatKnownFood"));
+            Assert.That(viewModel.LatestBridge.CommandName, Is.EqualTo("SetMoveIntentCommand"));
+            Assert.That(viewModel.LatestMemory.HasValue, Is.False);
+            Assert.That(viewModel.LatestBeliefMutation.HasValue, Is.False);
+            Assert.That(viewModel.LatestQuery.HasValue, Is.False);
+            Assert.That(viewModel.MemoryBars.Count, Is.EqualTo(0));
+            Assert.That(viewModel.BeliefRows.Count, Is.EqualTo(0));
+            Assert.That(viewModel.Timeline.Count, Is.EqualTo(0));
         }
 
         // =============================================================================
@@ -185,7 +263,7 @@ namespace Arcontio.Tests
             Assert.That(store.CommandTraceCount, Is.EqualTo(1));
             Assert.That(store.FailureLearningTraceCount, Is.EqualTo(1));
 
-            var worldConfig = new WorldConfig(new SimulationParams());
+            var worldConfig = MakeWorldConfigWithMbqdEnabled();
             var world = new World(worldConfig);
             for (int i = 0; i < traces.Length; i++)
                 MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(config, world.MemoryBeliefDecisionExplainability, traces[i]);
@@ -270,6 +348,13 @@ namespace Arcontio.Tests
                 includeCandidates = true,
                 includeScoreBreakdown = true,
             };
+        }
+
+        private static WorldConfig MakeWorldConfigWithMbqdEnabled()
+        {
+            var simulationParams = new SimulationParams();
+            simulationParams.memory_belief_decision_explainability.enabled = true;
+            return new WorldConfig(simulationParams);
         }
 
         private static MemoryBeliefDecisionTrace MakeMemoryTrace(int npcId)

@@ -679,7 +679,7 @@ Ridurre retention runtime, dati debug orfani e churn GC osservato dal Profiler, 
 #### v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
 
 ## Stato
-IN CORSO / PROSSIMA FASE
+COMPLETATA / ✅
 
 ## Obiettivo
 
@@ -739,7 +739,7 @@ Questa fase deve anche verificare se la struttura attuale dei pannelli EL consum
 | v0.12e | Decisione ArcontioLogger: rimozione o ponte JSONL/EL | ✅ |
 | v0.12f | Eliminazione o assorbimento Telemetry | ✅ |
 | v0.12g | EL modulare leggero e produzione zero quando disattivo | ✅ |
-| v0.12h | Ottimizzazione pannelli EL e closeout diagnostica runtime | ⏳ |
+| v0.12h | Ottimizzazione pannelli EL e closeout diagnostica runtime | ✅ |
 
 > **Nota closeout v0.12c (2026-05-27):** il checkpoint `v0.12c` e' chiuso come consolidamento della configurazione runtime. `game_params.json` resta il file portante e non e' stato modificato. `SimulationParams` e `GameParams` sono stati ricollocati sotto `Core/Config`; `SimulationHost` legge il file una sola volta; `SimulationParams` e' ora il modello principale del bootstrap e risolve anche la configurazione logger ordinaria. `GameParams.cs` resta temporaneamente come ponte compatibile, ma il percorso runtime ordinario non dipende piu' da lui. Dettaglio: `v0.12c_Closeout_Report.md`.
 
@@ -750,6 +750,8 @@ Questa fase deve anche verificare se la struttura attuale dei pannelli EL consum
 > **Nota closeout v0.12f (2026-05-29):** il checkpoint `v0.12f` e' chiuso come assorbimento controllato di `Telemetry`. Il tipo resta temporaneamente nelle firme `ISystem` e `IRule` per evitare una migrazione larga, ma nel runtime ordinario viene inizializzato leggendo `logging.telemetry.enabled` e, con il default spento, non crea dizionari, non accumula contatori e non espone piu' scarico console. L'unico contatore con nome dinamico e' stato protetto per evitare costruzione stringa quando Telemetry e' spenta. La rimozione fisica completa dalle firme runtime resta un debito futuro, da affrontare solo quando EL modulare avra' una destinazione diagnostica sostitutiva. Dettaglio: `v0.12f_Closeout_Report.md`.
 
 > **Nota closeout v0.12g (2026-05-29):** il checkpoint `v0.12g` e' chiuso come hardening del percorso EL disattivo. I registri Movement EL e MBQD non vengono piu' creati quando i rispettivi moduli sono spenti; l'emitter MBQD espone un gate economico per kind diagnostico e i producer principali lo usano prima di costruire trace, record o liste diagnostiche. Movement EL mantiene il gate esistente e non considera piu' un registry assente come tracciabile. Il comportamento simulativo non cambia: viene ridotta solo la produzione diagnostica quando EL non e' attivo. Dettaglio: `v0.12g_Closeout_Report.md`.
+
+> **Nota closeout v0.12h (2026-05-29):** il checkpoint `v0.12h` chiude la fase `v0.12` come pulizia logging, explainability e diagnostica runtime. I pannelli EL restano vivi e leggibili, ma il pannello MBQD costruisce ora solo la famiglia diagnostica della pagina visibile; le card NPC estese restano costruite solo per NPC selezionato e sezioni aperte; gli stati senza selezione aggiornano solo la pagina attiva. Questo riduce churn UI e produzione testuale nascosta senza cambiare simulazione, tick, Job, Decision, Movement o Save/Load. Dettaglio: `v0.12h_Closeout_Report.md`.
 
 > **Nota architetturale v0.12:** questa fase assorbe il debito emerso dal Profiler e dagli audit `v0.11D`. Non deve costruire nuova cognizione NPC. Prima di espandere memoria, belief, sociale e observer layer pubblico, bisogna rendere la diagnostica sostenibile: pochi canali, configurazione unica, JSONL come uscita persistente, pannelli EL come lettura viva, nessun costo nascosto quando il sistema e' spento.
 
