@@ -770,8 +770,14 @@ namespace Arcontio.Core
 
             if (updated && TryFindBeliefById(store, selectedBelief.BeliefId, out var updatedBelief))
             {
+                var explainabilityConfig = world.Config?.Sim?.memory_belief_decision_explainability;
+                if (!MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                        explainabilityConfig,
+                        MemoryBeliefDecisionTraceKind.Belief))
+                    return;
+
                 MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(
-                    world.Config?.Sim?.memory_belief_decision_explainability,
+                    explainabilityConfig,
                     world.MemoryBeliefDecisionExplainability,
                     new MemoryBeliefDecisionTrace
                     {

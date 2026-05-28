@@ -28,14 +28,14 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
 
 CHECKPOINT CORRENTE:
-v0.12g - EL modulare leggero e produzione zero quando disattivo
+v0.12h - Ottimizzazione pannelli EL e closeout diagnostica runtime
 
 STATUS:
 IN PROGRESS
 
 OUTPUT ATTESO:
-audit e patch controllata su EL modulare e costo zero quando disattivo:
-`[v0.12g] harden modular EL disabled path`
+audit e patch controllata sui pannelli EL:
+`[v0.12h] optimize EL panels and close diagnostics runtime`
 
 DOC SYNC:
 root taskboard e roadmap aggiornate all'apertura tecnica di `v0.12`;
@@ -67,7 +67,7 @@ Obiettivo tecnico corrente `v0.12`:
 - garantire che EL spento non produca nulla.
 
 Prossimo macro job consigliato:
-`v0.12g - EL modulare leggero e produzione zero quando disattivo`
+`v0.12h - Ottimizzazione pannelli EL e closeout diagnostica runtime`
 
 Residual follow-ups / future hardening:
 
@@ -82,7 +82,8 @@ Checkpoint v0.12 completati:
 - `v0.12c`: configurazione runtime consolidata senza modificare `game_params.json`;
 - `v0.12d`: canali legacy runtime rimossi;
 - `v0.12e`: `ArcontioLogger` chiuso come ponte transitorio, con ciclo vita JSONL spostato su servizio dedicato;
-- `v0.12f`: `Telemetry` assorbita come ponte diagnostico inerte quando disattiva.
+- `v0.12f`: `Telemetry` assorbita come ponte diagnostico inerte quando disattiva;
+- `v0.12g`: EL runtime reso piu' leggero quando disattivo.
 
 Nota `v0.12c`:
 
@@ -118,6 +119,15 @@ Checkpoint v0.12f completato:
 - rimosso lo scarico console `DumpToConsole`;
 - protetto l'unico contatore con nome dinamico per evitare costruzione stringa quando Telemetry e' spenta;
 - prossimo nodo operativo: rendere EL modulare e a produzione zero quando disattivo in `v0.12g`.
+
+Checkpoint v0.12g completato:
+
+- i registri Movement EL e MBQD non vengono creati se i rispettivi moduli sono spenti;
+- `MemoryBeliefDecisionExplainabilityEmitter` espone un gate economico per kind diagnostico;
+- query, decision, bridge, needs e job usano il gate prima di costruire trace dirette;
+- gli helper MBQD interni escono prima di creare record quando il modulo o il kind sono spenti;
+- Movement EL non considera piu' un registry assente come tracciabile;
+- prossimo nodo operativo: ridurre il costo dei pannelli EL e chiudere la fase `v0.12h`.
 
 ---
 

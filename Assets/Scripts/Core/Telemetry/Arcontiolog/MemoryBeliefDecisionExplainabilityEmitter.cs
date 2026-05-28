@@ -29,6 +29,49 @@ namespace Arcontio.Core
     public static class MemoryBeliefDecisionExplainabilityEmitter
     {
         // =============================================================================
+        // ShouldWriteTrace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica economica da usare prima di costruire oggetti diagnostici EL-MBQD.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: EL spento non produce nulla</b></para>
+        /// <para>
+        /// Questo gate deve essere chiamato il piu' possibile vicino al producer:
+        /// quando il modulo o il kind sono spenti, il chiamante deve uscire prima di
+        /// creare trace, record, liste di contributi o stringhe diagnostiche.
+        /// </para>
+        /// </summary>
+        public static bool ShouldWriteTrace(
+            MemoryBeliefDecisionExplainabilityParams config,
+            MemoryBeliefDecisionTraceKind kind)
+        {
+            if (config == null || !config.enabled)
+                return false;
+
+            return kind switch
+            {
+                MemoryBeliefDecisionTraceKind.Memory => config.logMemory,
+                MemoryBeliefDecisionTraceKind.Belief => config.logBelief,
+                MemoryBeliefDecisionTraceKind.Query => config.logQuery,
+                MemoryBeliefDecisionTraceKind.Decision => config.logDecision,
+                MemoryBeliefDecisionTraceKind.Bridge => config.logBridge,
+                MemoryBeliefDecisionTraceKind.JobRequest => config.logJobRequest,
+                MemoryBeliefDecisionTraceKind.JobLifecycle => config.logJobLifecycle,
+                MemoryBeliefDecisionTraceKind.JobPhase => config.logJobPhase,
+                MemoryBeliefDecisionTraceKind.Step => config.logStep,
+                MemoryBeliefDecisionTraceKind.JobState => config.logJobState,
+                MemoryBeliefDecisionTraceKind.JobArbitration => config.logJobArbitration,
+                MemoryBeliefDecisionTraceKind.Reservation => config.logReservation,
+                MemoryBeliefDecisionTraceKind.Command => config.logCommand,
+                MemoryBeliefDecisionTraceKind.FailureLearning => config.logFailureLearning,
+                MemoryBeliefDecisionTraceKind.RunningAction => config.logRunningAction,
+                _ => false
+            };
+        }
+
+        // =============================================================================
         // TryWriteTrace
         // =============================================================================
         /// <summary>
@@ -57,7 +100,7 @@ namespace Arcontio.Core
             MemoryBeliefDecisionExplainabilityRegistry registry,
             MemoryBeliefDecisionTrace trace)
         {
-            if (config == null || trace == null)
+            if (trace == null || !ShouldWriteTrace(config, trace.Kind))
                 return;
 
             // Il registry applica gli stessi gate di abilitazione/kind della config,
@@ -121,7 +164,7 @@ namespace Arcontio.Core
             AddOrMergeResult storeResult,
             string eventType)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.Memory))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -200,7 +243,7 @@ namespace Arcontio.Core
             BeliefEntry belief,
             string reason)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.Belief))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -245,7 +288,7 @@ namespace Arcontio.Core
             string reason,
             bool legacyBridgeStillUsed)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.JobRequest))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -288,7 +331,7 @@ namespace Arcontio.Core
             Job job,
             string reason)
         {
-            if (config == null || job == null)
+            if (job == null || !ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.JobLifecycle))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -324,7 +367,7 @@ namespace Arcontio.Core
             int phaseIndex,
             string reason)
         {
-            if (config == null || job == null)
+            if (job == null || !ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.JobPhase))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -363,7 +406,7 @@ namespace Arcontio.Core
             StepResult result,
             string reason)
         {
-            if (config == null || job == null)
+            if (job == null || !ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.Step))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -398,7 +441,7 @@ namespace Arcontio.Core
             in NpcJobState jobState,
             string reason)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.JobState))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -437,7 +480,7 @@ namespace Arcontio.Core
             Job proposedJob,
             JobArbitrationResult arbitration)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.JobArbitration))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -473,7 +516,7 @@ namespace Arcontio.Core
             in ReservationRecord reservation,
             string reason)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.Reservation))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -516,7 +559,7 @@ namespace Arcontio.Core
             int queueCount,
             string reason)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.Command))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -555,7 +598,7 @@ namespace Arcontio.Core
             float penalty01,
             string reason)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.FailureLearning))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace
@@ -608,7 +651,7 @@ namespace Arcontio.Core
             in RunningActionProgressSnapshot snapshot,
             string reason)
         {
-            if (config == null)
+            if (!ShouldWriteTrace(config, MemoryBeliefDecisionTraceKind.RunningAction))
                 return;
 
             TryWriteTrace(config, registry, new MemoryBeliefDecisionTrace

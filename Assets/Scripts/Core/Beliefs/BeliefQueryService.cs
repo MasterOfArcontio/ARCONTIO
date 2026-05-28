@@ -431,7 +431,9 @@ namespace Arcontio.Core
             int usableCandidateCount,
             string emptyReason)
         {
-            if (explainabilityConfig == null)
+            if (!MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                    explainabilityConfig,
+                    MemoryBeliefDecisionTraceKind.Query))
                 return;
 
             // La normalizzazione in strutture EL avviene qui, vicino al QuerySystem,

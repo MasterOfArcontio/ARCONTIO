@@ -915,33 +915,49 @@ namespace Arcontio.Core
             // ============================================================
             // MOVEMENT EXPLAINABILITY REGISTRY (v0.04.1.e)
             // ============================================================
-            // Lo store viene creato sempre, ma gli emitter lo popolano solo quando la
-            // sezione explainability lo abilita. Questo evita null-check nella futura
-            // UI e mantiene comunque zero side-effect se l'EL resta spento.
+            // v0.12g: lo store non nasce piu' quando il modulo EL e' spento. I
+            // consumer UI leggono in modo difensivo e gli emitter escono prima di
+            // costruire trace; cosi' il percorso disattivo non alloca registry vuoti.
             var el = Config?.Sim?.explainability;
-            int elVerbosity = el != null ? el.defaultVerbosity : 0;
-            int elEventCapacity = el != null && elVerbosity >= el.verbosityHighThreshold
-                ? el.ringBuffer_events_high
-                : (el?.ringBuffer_events_low ?? MovementExplainabilityRegistry.DefaultEventCapacity);
+            if (el != null && el.enabled)
+            {
+                int elVerbosity = el.defaultVerbosity;
+                int elEventCapacity = elVerbosity >= el.verbosityHighThreshold
+                    ? el.ringBuffer_events_high
+                    : el.ringBuffer_events_low;
 
-            MovementExplainability = new MovementExplainabilityRegistry(
-                el?.ringBuffer_intent ?? MovementExplainabilityRegistry.DefaultIntentCapacity,
-                el?.ringBuffer_plan ?? MovementExplainabilityRegistry.DefaultPlanCapacity,
-                elEventCapacity);
+                MovementExplainability = new MovementExplainabilityRegistry(
+                    el.ringBuffer_intent,
+                    el.ringBuffer_plan,
+                    elEventCapacity);
+            }
 
             // ============================================================
             // MEMORY / BELIEF / QUERY / DECISION EXPLAINABILITY REGISTRY
             // ============================================================
-            // Come per il pathfinding, lo store nasce sempre ma viene popolato solo
-            // quando la configurazione EL-MBQD e' abilitata. In questo modo la UI puo'
-            // chiedere snapshot in modo difensivo senza introdurre null-reference.
+            // Come per il pathfinding, lo store nasce solo quando il modulo EL-MBQD e'
+            // attivo. Se e' spento, viewmodel ed emitter trattano il null come stato
+            // diagnostico assente e non come errore simulativo.
             var mbqd = Config?.Sim?.memory_belief_decision_explainability;
-            MemoryBeliefDecisionExplainability = new MemoryBeliefDecisionExplainabilityRegistry(
-                mbqd?.ringBuffer_memory ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultMemoryCapacity,
-                mbqd?.ringBuffer_belief ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultBeliefCapacity,
-                mbqd?.ringBuffer_query ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultQueryCapacity,
-                mbqd?.ringBuffer_decision ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultDecisionCapacity,
-                mbqd?.ringBuffer_bridge ?? MemoryBeliefDecisionExplainabilityRegistry.DefaultBridgeCapacity);
+            if (mbqd != null && mbqd.enabled)
+            {
+                MemoryBeliefDecisionExplainability = new MemoryBeliefDecisionExplainabilityRegistry(
+                    mbqd.ringBuffer_memory,
+                    mbqd.ringBuffer_belief,
+                    mbqd.ringBuffer_query,
+                    mbqd.ringBuffer_decision,
+                    mbqd.ringBuffer_bridge,
+                    mbqd.ringBuffer_jobRequest,
+                    mbqd.ringBuffer_jobLifecycle,
+                    mbqd.ringBuffer_jobPhase,
+                    mbqd.ringBuffer_step,
+                    mbqd.ringBuffer_jobState,
+                    mbqd.ringBuffer_jobArbitration,
+                    mbqd.ringBuffer_reservation,
+                    mbqd.ringBuffer_command,
+                    mbqd.ringBuffer_failureLearning,
+                    mbqd.ringBuffer_runningAction);
+            }
 
             // Store passivo del Job System. Nasce sempre per evitare null-check nei
             // sistemi runtime, ma resta vuoto finche' il gate opt-in food job non
