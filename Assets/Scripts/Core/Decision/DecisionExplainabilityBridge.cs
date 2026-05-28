@@ -60,7 +60,9 @@ namespace Arcontio.Core
             string jobId,
             bool legacyBridgeStillUsed)
         {
-            if (config == null)
+            if (!MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                    config,
+                    MemoryBeliefDecisionTraceKind.JobRequest))
                 return;
 
             MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobRequestTrace(
@@ -98,7 +100,9 @@ namespace Arcontio.Core
             DecisionSelectionResult selection,
             DecisionSelectionConfig selectionConfig)
         {
-            if (config == null)
+            if (!MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                    config,
+                    MemoryBeliefDecisionTraceKind.Decision))
                 return;
 
             // L'effettivo rumore di selezione e' calcolato nello stesso modo del
@@ -152,7 +156,9 @@ namespace Arcontio.Core
             LegacyFallbackKind fallbackKind,
             string reason)
         {
-            if (config == null)
+            if (!MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                    config,
+                    MemoryBeliefDecisionTraceKind.Bridge))
             {
                 TryLogDecisionBridgeFallback(tick, npcId, candidate, command, fallbackKind, reason);
                 return;

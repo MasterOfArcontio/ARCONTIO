@@ -319,8 +319,8 @@ namespace Arcontio.Core
                 && world.MovementExplainability.TryGetNpcStore(npcId, out _))
                 return true;
 
-            return world.MovementExplainability == null
-                   || world.MovementExplainability.StoreCount < maxTracked;
+            return world.MovementExplainability != null
+                   && world.MovementExplainability.StoreCount < maxTracked;
         }
 
         // =============================================================================

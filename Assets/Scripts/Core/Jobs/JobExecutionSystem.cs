@@ -885,8 +885,14 @@ namespace Arcontio.Core
 
             if (updated && TryFindFoodBeliefByPosition(store, job.Request.TargetCell, out var updatedBelief))
             {
+                var explainabilityConfig = world.Config?.Sim?.memory_belief_decision_explainability;
+                if (!MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                        explainabilityConfig,
+                        MemoryBeliefDecisionTraceKind.Belief))
+                    return;
+
                 MemoryBeliefDecisionExplainabilityEmitter.TryWriteTrace(
-                    world.Config?.Sim?.memory_belief_decision_explainability,
+                    explainabilityConfig,
                     world.MemoryBeliefDecisionExplainability,
                     new MemoryBeliefDecisionTrace
                     {
