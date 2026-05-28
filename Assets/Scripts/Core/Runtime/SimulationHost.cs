@@ -615,9 +615,13 @@ namespace Arcontio.Core
             _scheduler = new Scheduler();
 
             // ******************************************************************************************************************************
-            // 3.4) INIZIALIZZO L'OGGETTO TELEMETRY (DEBUG)
+            // 3.4) INIZIALIZZO L'OGGETTO TELEMETRY (DEBUG LEGACY)
             // ******************************************************************************************************************************
-            _telemetry = new Telemetry();
+            // v0.12f: Telemetry resta nelle firme runtime come ponte transitorio,
+            // ma viene resa realmente inerte quando la configurazione la tiene
+            // spenta. In questo modo i systems possono continuare a ricevere il
+            // parametro senza accumulare dizionari o contatori nel runtime ordinario.
+            _telemetry = CreateTelemetryFromSimulationParams(simParams);
 
             // ******************************************************************************************************************************
             // 4) CARICAMENTO DA FILE JSON
@@ -1462,6 +1466,11 @@ namespace Arcontio.Core
             return new World(new WorldConfig(simParams));
         }
 
+        private static Telemetry CreateTelemetryFromSimulationParams(Arcontio.Core.Config.SimulationParams simParams)
+        {
+            var diagnostics = simParams?.ResolveLoggerDiagnostics();
+            return new Telemetry(diagnostics?.telemetry != null && diagnostics.telemetry.enabled);
+        }
         // =============================================================================
         // LoadWorldRuntimeJsonConfig
         // =============================================================================
@@ -1515,7 +1524,7 @@ namespace Arcontio.Core
             _eventBuffer.Clear();
             _accum = 0f;
             _bus = new MessageBus();
-            _telemetry = new Telemetry();
+            _telemetry = CreateTelemetryFromSimulationParams(_world?.Config?.Sim);
             _npcCommunication = new NpcCommunicationPipeline(contactRadius: 2, topN: 6);
 
             // v0.11.01: i job attivi sono runtime transitorio, non snapshot state.

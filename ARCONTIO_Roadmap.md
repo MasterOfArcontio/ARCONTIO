@@ -737,7 +737,7 @@ Questa fase deve anche verificare se la struttura attuale dei pannelli EL consum
 | v0.12c | Consolidamento GameParams / SimulationParams | ✅ |
 | v0.12d | Rimozione canali legacy console / TXT / HTML / overlay | ✅ |
 | v0.12e | Decisione ArcontioLogger: rimozione o ponte JSONL/EL | ✅ |
-| v0.12f | Eliminazione o assorbimento Telemetry | ⏳ |
+| v0.12f | Eliminazione o assorbimento Telemetry | ✅ |
 | v0.12g | EL modulare leggero e produzione zero quando disattivo | ⏳ |
 | v0.12h | Ottimizzazione pannelli EL e closeout diagnostica runtime | ⏳ |
 
@@ -746,6 +746,8 @@ Questa fase deve anche verificare se la struttura attuale dei pannelli EL consum
 > **Nota v0.12d (2026-05-27):** rimossi fisicamente i canali legacy di output runtime `UnityConsoleSink`, `FileSink` TXT, `HtmlFileSink`, `UnityOverlaySink` e `ArcontioLogOverlay`, inclusi i relativi `.meta` Unity. `ArcontioLogger` non conosce piu' console, TXT, HTML o overlay; resta solo come ponte configurabile/no-op verso il consolidamento successivo `v0.12e`.
 
 > **Nota closeout v0.12e (2026-05-29):** il checkpoint `v0.12e` e' chiuso come decisione controllata su `ArcontioLogger`. La scelta corrente e' mantenerlo come ponte transitorio per compatibilita' con chiamate storiche, ma non come logger runtime futuro. Il ciclo vita JSONL e' stato spostato nel servizio dedicato `RuntimeDiagnosticsLifecycle`; la localizzazione legacy del logger (`LocalizationDb` e `localization_logs.json`) e' stata rimossa; un primo gruppo di chiamate legacy sicure e' stato potato da comandi needs, loader config e audit/debug evento. Restano intenzionalmente fuori da questa chiusura i log movimento/landmark, i log scenario seed e i log sociali/furto, da assorbire in step successivi piu' mirati. Dettaglio: `v0.12e_Closeout_Report.md`.
+
+> **Nota closeout v0.12f (2026-05-29):** il checkpoint `v0.12f` e' chiuso come assorbimento controllato di `Telemetry`. Il tipo resta temporaneamente nelle firme `ISystem` e `IRule` per evitare una migrazione larga, ma nel runtime ordinario viene inizializzato leggendo `logging.telemetry.enabled` e, con il default spento, non crea dizionari, non accumula contatori e non espone piu' scarico console. L'unico contatore con nome dinamico e' stato protetto per evitare costruzione stringa quando Telemetry e' spenta. La rimozione fisica completa dalle firme runtime resta un debito futuro, da affrontare solo quando EL modulare avra' una destinazione diagnostica sostitutiva. Dettaglio: `v0.12f_Closeout_Report.md`.
 
 > **Nota architetturale v0.12:** questa fase assorbe il debito emerso dal Profiler e dagli audit `v0.11D`. Non deve costruire nuova cognizione NPC. Prima di espandere memoria, belief, sociale e observer layer pubblico, bisogna rendere la diagnostica sostenibile: pochi canali, configurazione unica, JSONL come uscita persistente, pannelli EL come lettura viva, nessun costo nascosto quando il sistema e' spento.
 
