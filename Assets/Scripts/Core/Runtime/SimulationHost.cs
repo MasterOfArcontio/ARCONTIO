@@ -54,11 +54,9 @@ namespace Arcontio.Core
         /// </para>
         ///
         /// <para>
-        /// Questa opzione NON rimuove i fallback legacy e non rende obbligatorio il
-        /// successo del Job System: se una route fallisce, <c>NeedsDecisionRule</c>
-        /// conserva i fallback classificati e osservabili gia' esistenti. Una scena
-        /// o un test che voglia tornare al comportamento legacy puo' ancora
-        /// disabilitare esplicitamente il flag via Inspector.
+        /// Questa opzione mantiene attivo il primo ponte food/search verso il Job
+        /// System. Dopo v0.13g non esiste piu' un fallback rule-based needs: se una
+        /// route non produce job, il sistema resta senza command legacy diretto.
         /// </para>
         /// </summary>
         [SerializeField] private bool enableFoodJobVerticalSlice = true;
@@ -773,8 +771,7 @@ namespace Arcontio.Core
             // contro il World.
             _scheduler.AddSystem(new JobExecutionSystem());
 
-            if (_world?.Config?.Sim?.decision?.enableLegacyNeedsDecisionRule != true
-                && _world?.Config?.Sim?.decision?.enableJobDecisionOrchestrator == true)
+            if (_world?.Config?.Sim?.decision?.enableJobDecisionOrchestrator == true)
             {
                 _scheduler.AddSystem(new DecisionOrchestratorSystem(
                     decisionEveryTicks: _world.Config.Sim.ResolveDecisionEveryTicks(),
@@ -789,19 +786,6 @@ namespace Arcontio.Core
             // ATTENZIONE: le Rules della memoria sono inizializzate in MemoryEncodingSystem
             _rules.Add(new DebugEventLogRule());
             //     _rules.Add(new BasicSurvivalRule());
-
-            // v0.13c: NeedsDecisionRule non e' piu' autorita' runtime ordinaria.
-            // Resta compilata come ponte/test harness finche' i servizi utili non
-            // sono stati estratti tutti, ma deve essere riattivata in modo esplicito
-            // da game_params.json se serve una sessione di confronto legacy.
-            if (_world?.Config?.Sim?.decision?.enableLegacyNeedsDecisionRule == true)
-            {
-                _rules.Add(new NeedsDecisionRule(
-                    decisionEveryTicks: _world.Config.Sim.ResolveDecisionEveryTicks(),
-                    maxSeekRangeCells: _world.Global.NpcOperationalRangeCells,
-                    enableFoodJobVerticalSlice: enableFoodJobVerticalSlice,
-                    jobTemplateRegistry: _jobTemplateRegistry));
-            }
 
             // ******************************************************************************************************************************
             // 9) SEED (Selettore dei casi di test)

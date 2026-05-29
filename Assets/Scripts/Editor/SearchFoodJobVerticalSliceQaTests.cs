@@ -67,26 +67,24 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             EnableMbdBridgeExplainability(world);
-            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
 
-            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            RunDecisionOrchestrator(world, tick: 0);
 
             Assert.That(commands.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
             Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
             Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
             Assert.That(job.Request.HasTargetCell, Is.True);
-            AssertLatestBridge(world, npcId, LegacyFallbackKind.None, "SearchFoodJobRouteAccepted:JobAssigned");
+            AssertLatestJobRequest(world, npcId, DecisionIntentKind.SearchFood, job.JobId);
         }
 
         [Test]
         public void SearchFoodJobEnqueuesSeekFoodMoveIntent()
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
-            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
-            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            RunDecisionOrchestrator(world, tick: 0);
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
             var probe = job.Request.TargetCell;
             var system = new JobExecutionSystem();
@@ -110,9 +108,8 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             EnableMbdJobLifecycleExplainability(world);
-            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
-            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            RunDecisionOrchestrator(world, tick: 0);
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out _), Is.True);
 
             var system = new JobExecutionSystem();
@@ -145,9 +142,8 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             EnableMbdJobLifecycleExplainability(world);
-            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
-            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            RunDecisionOrchestrator(world, tick: 0);
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
             var probe = job.Request.TargetCell;
 
@@ -200,10 +196,9 @@ namespace Arcontio.Tests
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
             };
-            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
 
-            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            RunDecisionOrchestrator(world, tick: 0);
 
             Assert.That(commands.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
@@ -218,18 +213,13 @@ namespace Arcontio.Tests
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             EnableMbdBridgeExplainability(world);
             OccupySearchProbeCells(world, npcId, 5, 5);
-            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
 
-            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            RunDecisionOrchestrator(world, tick: 0);
 
             Assert.That(commands.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
-            AssertLatestBridge(
-                world,
-                npcId,
-                LegacyFallbackKind.SafetyFallback,
-                "NonExecutableIntentFallback:SearchFoodJobRouteRejected:SearchFoodProbeUnavailable");
+            AssertNoJobRequest(world, npcId);
         }
 
         [Test]
@@ -238,10 +228,9 @@ namespace Arcontio.Tests
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             RegisterInteractableFoodStock(world, objectId: 501, x: 7, y: 5);
             world.NpcFacing[npcId] = CardinalDirection.East;
-            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
 
-            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            RunDecisionOrchestrator(world, tick: 0);
 
             Assert.That(commands.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var searchJob), Is.True);
@@ -273,10 +262,9 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             world.NpcFacing[npcId] = CardinalDirection.East;
-            var rule = new NeedsDecisionRule(1, 8, enableFoodJobVerticalSlice: true, jobTemplateRegistry: MakeRegistry());
             var commands = new List<ICommand>();
 
-            rule.Handle(world, new TickPulseEvent(0), commands, new Telemetry());
+            RunDecisionOrchestrator(world, tick: 0);
 
             Assert.That(commands.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var searchJob), Is.True);
@@ -296,6 +284,17 @@ namespace Arcontio.Tests
             var registry = new JobTemplateRegistry();
             registry.LoadFromJson(TemplateJson);
             return registry;
+        }
+
+        private static void RunDecisionOrchestrator(World world, int tick)
+        {
+            var orchestrator = new DecisionOrchestratorSystem(
+                decisionEveryTicks: 1,
+                maxSeekRangeCells: 8,
+                enableFoodJobVerticalSlice: true,
+                jobTemplateRegistry: MakeRegistry());
+
+            orchestrator.Update(world, new Tick(tick, 1f), new MessageBus(), new Telemetry());
         }
 
         private static JobRequest MakeSearchFoodRequest(int npcId, Vector2Int targetCell, int tick, float urgency01)
@@ -588,13 +587,20 @@ namespace Arcontio.Tests
             world.Config.Sim.memory_belief_decision_explainability.logCommand = true;
         }
 
-        private static void AssertLatestBridge(World world, int npcId, LegacyFallbackKind expectedKind, string expectedReason)
+        private static void AssertLatestJobRequest(World world, int npcId, DecisionIntentKind expectedIntent, string expectedJobId)
         {
             Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
-            Assert.That(store.TryGetLatestBridgeTrace(out var trace), Is.True);
-            Assert.That(trace.Bridge, Is.Not.Null);
-            Assert.That(trace.Bridge.FallbackKind, Is.EqualTo(expectedKind));
-            Assert.That(trace.Bridge.Reason, Is.EqualTo(expectedReason));
+            Assert.That(store.TryGetLatestJobRequestTrace(out var trace), Is.True);
+            Assert.That(trace.Kind, Is.EqualTo(MemoryBeliefDecisionTraceKind.JobRequest));
+            Assert.That(trace.JobRequest.Intent, Is.EqualTo(expectedIntent));
+            Assert.That(trace.JobRequest.JobId, Is.EqualTo(expectedJobId));
+            Assert.That(trace.JobRequest.LegacyBridgeStillUsed, Is.False);
+        }
+
+        private static void AssertNoJobRequest(World world, int npcId)
+        {
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestJobRequestTrace(out _), Is.False);
         }
 
         private static void OccupySearchProbeCells(World world, int excludedNpcId, int originX, int originY)

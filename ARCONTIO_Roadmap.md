@@ -833,13 +833,13 @@ In questa fase NON si deve:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.13a | Audit responsabilita' residue NeedsDecisionRule | ⏳ PENDING |
-| v0.13b | Estrazione servizi utili da NeedsDecisionRule | ⏳ PENDING |
-| v0.13c | Scollegamento NeedsDecisionRule come autorita' runtime | ⏳ PENDING |
-| v0.13d | Ricostruzione bisogni principali minimi via JobRequest/Job | ⏳ PENDING |
-| v0.13e | Configurazione fallback/recovery locale da matrice Job | ⏳ PENDING |
-| v0.13f | Fallimenti minimi e ritorno cognitivo leggero | ⏳ PENDING |
-| v0.13g | Eliminazione definitiva NeedsDecisionRule legacy | ⏳ PENDING |
+| v0.13a | Audit responsabilita' residue NeedsDecisionRule | ✅ DONE |
+| v0.13b | Estrazione servizi utili da NeedsDecisionRule | ✅ DONE |
+| v0.13c | Scollegamento NeedsDecisionRule come autorita' runtime | ✅ DONE |
+| v0.13d | Ricostruzione bisogni principali minimi via JobRequest/Job | ✅ DONE |
+| v0.13e | Configurazione fallback/recovery locale da matrice Job | ✅ DONE |
+| v0.13f | Fallimenti minimi e ritorno cognitivo leggero | ✅ DONE |
+| v0.13g | Eliminazione definitiva NeedsDecisionRule legacy | ✅ DONE |
 | v0.13h | QA e closeout pensionamento legacy | ⏳ PENDING |
 
 ---
