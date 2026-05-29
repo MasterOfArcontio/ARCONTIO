@@ -1,0 +1,85 @@
+{
+  "policies": [
+    {
+      "failureKind": "PathBlocked",
+      "strategies": [ "Repath", "FindAlternateCell", "WaitAndRetry", "FailPhase" ],
+      "maxRetryCount": 2,
+      "maxRecoveryTicks": 24,
+      "maxSearchRadius": 3,
+      "maxAlternativeTargets": 2,
+      "maxRepathAttempts": 2
+    },
+    {
+      "failureKind": "TargetInvalid",
+      "strategies": [ "FindEquivalentTarget", "FindAlternateCell", "FailPhase", "FailJob" ],
+      "maxRetryCount": 1,
+      "maxRecoveryTicks": 12,
+      "maxSearchRadius": 3,
+      "maxAlternativeTargets": 2,
+      "maxRepathAttempts": 0
+    },
+    {
+      "failureKind": "TargetUnavailable",
+      "strategies": [ "WaitAndRetry", "FindEquivalentTarget", "FailPhase" ],
+      "maxRetryCount": 2,
+      "maxRecoveryTicks": 20,
+      "maxSearchRadius": 2,
+      "maxAlternativeTargets": 2,
+      "maxRepathAttempts": 0
+    },
+    {
+      "failureKind": "ReservationConflict",
+      "strategies": [ "WaitAndRetry", "FindEquivalentTarget", "FailPhase" ],
+      "maxRetryCount": 2,
+      "maxRecoveryTicks": 20,
+      "maxSearchRadius": 2,
+      "maxAlternativeTargets": 1,
+      "maxRepathAttempts": 0
+    },
+    {
+      "failureKind": "ResourceMissing",
+      "strategies": [ "FindEquivalentTarget", "FailJob" ],
+      "maxRetryCount": 1,
+      "maxRecoveryTicks": 12,
+      "maxSearchRadius": 3,
+      "maxAlternativeTargets": 2,
+      "maxRepathAttempts": 0
+    },
+    {
+      "failureKind": "Timeout",
+      "strategies": [ "RetrySameAction", "WaitAndRetry", "FailPhase", "EscalateToDecision" ],
+      "maxRetryCount": 1,
+      "maxRecoveryTicks": 30,
+      "maxSearchRadius": 0,
+      "maxAlternativeTargets": 0,
+      "maxRepathAttempts": 1
+    },
+    {
+      "failureKind": "InsufficientInformation",
+      "strategies": [ "RelaxLocalCriteria", "FindEquivalentTarget", "EscalateToDecision" ],
+      "maxRetryCount": 1,
+      "maxRecoveryTicks": 18,
+      "maxSearchRadius": 4,
+      "maxAlternativeTargets": 3,
+      "maxRepathAttempts": 0
+    },
+    {
+      "failureKind": "OutputBlocked",
+      "strategies": [ "FindAlternateCell", "FailPhase" ],
+      "maxRetryCount": 1,
+      "maxRecoveryTicks": 12,
+      "maxSearchRadius": 3,
+      "maxAlternativeTargets": 2,
+      "maxRepathAttempts": 0
+    },
+    {
+      "failureKind": "AccessDenied",
+      "strategies": [ "FindAlternateCell", "FailPhase" ],
+      "maxRetryCount": 0,
+      "maxRecoveryTicks": 8,
+      "maxSearchRadius": 2,
+      "maxAlternativeTargets": 1,
+      "maxRepathAttempts": 0
+    }
+  ]
+}

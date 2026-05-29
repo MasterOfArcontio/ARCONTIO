@@ -90,6 +90,9 @@ namespace Arcontio.Core
     public sealed class JobFailureLearningStore
     {
         private readonly Dictionary<string, int> _counts = new();
+        private readonly List<string> _keysToRemove = new();
+
+        public int PatternCount => _counts.Count;
 
         // =============================================================================
         // Record
@@ -148,6 +151,54 @@ namespace Arcontio.Core
             if (count <= 0) return 0f;
             if (count >= 3) return 1f;
             return count / 3f;
+        }
+
+        // =============================================================================
+        // ClearNpc
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove i pattern associati a un NPC senza toccare gli altri conteggi.
+        /// </para>
+        ///
+        /// <para><b>Cleanup runtime locale</b></para>
+        /// <para>
+        /// Lo store non possiede riferimenti al mondo: la pulizia e' quindi basata
+        /// sulla chiave soggettiva <c>npcId|intent|reason</c>. Il buffer interno evita
+        /// di modificare il dizionario mentre viene enumerato.
+        /// </para>
+        /// </summary>
+        public void ClearNpc(int npcId)
+        {
+            if (npcId <= 0 || _counts.Count == 0)
+                return;
+
+            string prefix = npcId + "|";
+            _keysToRemove.Clear();
+
+            foreach (var pair in _counts)
+            {
+                if (pair.Key.StartsWith(prefix, System.StringComparison.Ordinal))
+                    _keysToRemove.Add(pair.Key);
+            }
+
+            for (int i = 0; i < _keysToRemove.Count; i++)
+                _counts.Remove(_keysToRemove[i]);
+
+            _keysToRemove.Clear();
+        }
+
+        // =============================================================================
+        // ClearAll
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Svuota tutti i pattern volatili dello store.
+        /// </para>
+        /// </summary>
+        public void ClearAll()
+        {
+            _counts.Clear();
         }
 
         private static string BuildKey(int npcId, DecisionIntentKind intentKind, JobFailureReason reason)

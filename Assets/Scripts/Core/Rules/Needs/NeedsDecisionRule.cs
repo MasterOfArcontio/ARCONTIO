@@ -81,6 +81,7 @@ namespace Arcontio.Core
         private readonly DecisionContextBuilder _decisionContextBuilder = new();
         private readonly IntentExecutionRouter _intentExecutionRouter = new();
         private readonly DecisionExplainabilityBridge _decisionExplainabilityBridge = new();
+        private readonly FoodDecisionJobOrchestrator _foodDecisionJobOrchestrator = new();
         private readonly List<DecisionCandidate> _decisionCandidates = new(16);
         private readonly System.Random _decisionRandom = new(1505);
 
@@ -166,11 +167,14 @@ namespace Arcontio.Core
                     // comunque proteggere il caso supportato "community known stock"
                     // dal vecchio bypass NeedsDecisionRule -> ICommand. Se la route
                     // job accetta, non emettiamo command legacy nello stesso tick.
-                    if (TryStartFoodJobVerticalSliceFromLegacyFallback(
+                    if (_foodDecisionJobOrchestrator.TryStartKnownCommunityFoodJobFromLegacyFallback(
                         world,
                         npcId,
                         (int)pulse.TickIndex,
                         in needs,
+                        _enableFoodJobVerticalSlice,
+                        _maxSeekRangeCells,
+                        _jobTemplateRegistry,
                         telemetry,
                         out _))
                     {
@@ -355,11 +359,16 @@ namespace Arcontio.Core
             {
                 case DecisionIntentKind.EatKnownFood:
                 {
-                    if (TryStartFoodJobVerticalSlice(
+                    if (_foodDecisionJobOrchestrator.TryStartKnownCommunityFoodJob(
                         world,
                         npcId,
                         nowTick,
                         selection.Candidate,
+                        _enableFoodJobVerticalSlice,
+                        _maxSeekRangeCells,
+                        _jobTemplateRegistry,
+                        _intentExecutionRouter,
+                        _decisionExplainabilityBridge,
                         telemetry,
                         out string jobRouteReason))
                     {
@@ -395,11 +404,15 @@ namespace Arcontio.Core
 
                 case DecisionIntentKind.SearchFood:
                 {
-                    if (TryStartSearchFoodJobVerticalSlice(
+                    if (_foodDecisionJobOrchestrator.TryStartSearchFoodJob(
                         world,
                         npcId,
                         nowTick,
                         selection.Candidate,
+                        _enableFoodJobVerticalSlice,
+                        _jobTemplateRegistry,
+                        _intentExecutionRouter,
+                        _decisionExplainabilityBridge,
                         telemetry,
                         out string searchJobRouteReason))
                     {
