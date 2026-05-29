@@ -878,7 +878,7 @@ Il recupero deve restare locale, configurabile, osservabile e limitato. Se un in
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.14a | Audit recovery Job post-NeedsDecisionRule | ✅ DONE |
-| v0.14b | Mappa fallimenti step -> strategie recovery | ⏳ |
+| v0.14b | Mappa fallimenti step -> strategie recovery | ✅ DONE |
 | v0.14c | Integrazione policy recovery nel Job runtime | ⏳ |
 | v0.14d | Retry locale controllato e limiti anti-loop | ⏳ |
 | v0.14e | Fallback per target non valido o risorsa sparita | ⏳ |
