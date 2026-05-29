@@ -123,6 +123,7 @@ namespace Arcontio.Core
         public ReservationStore Reservations { get; } = new();
         public RunningActionStore RunningActions { get; } = new();
         public JobCommandBuffer CommandBuffer { get; } = new();
+        public JobFailureLearningStore FailureLearning { get; } = new();
 
         public int ActiveJobCount => _jobs.Count;
         public int NpcStateCount => _npcStates.Count;
@@ -269,7 +270,15 @@ namespace Arcontio.Core
             }
 
             if (!TryReserveJobTarget(job, tick, out reason))
+            {
+                RecordFailureLearning(
+                    npcId,
+                    job,
+                    ResolveAssignmentFailureReason(reason),
+                    tick,
+                    "JobAssignment:" + reason);
                 return false;
+            }
 
             if (arbitration.Decision == JobArbitrationDecision.SuspendCurrentForNew
                 || arbitration.Decision == JobArbitrationDecision.CancelCurrentForNew)
@@ -373,6 +382,7 @@ namespace Arcontio.Core
             }
 
             job.MarkFailed(failureReason, tick);
+            RecordFailureLearning(npcId, job, failureReason, tick, "JobRuntimeState.FailCurrentJob");
             Reservations.ReleaseByJob(job.JobId);
             RunningActions.ClearByJob(job.JobId);
             _jobs.Remove(job.JobId);
@@ -402,6 +412,7 @@ namespace Arcontio.Core
             // progress running action orfani dello stesso NPC, perche' quel progress
             // e' volatile e non deve sopravvivere al reset del cursore job.
             RunningActions.ClearByNpc(npcId);
+            FailureLearning.ClearNpc(npcId);
 
             state.Clear(clearReason);
             _npcStates[npcId] = state;
@@ -465,11 +476,60 @@ namespace Arcontio.Core
             _jobs.Clear();
             RunningActions.ClearAll();
             CommandBuffer.Clear();
+            FailureLearning.ClearAll();
             Reservations.PruneExpired(int.MaxValue);
 
             var keys = new List<int>(_npcStates.Keys);
             for (int i = 0; i < keys.Count; i++)
                 _npcStates[keys[i]] = NpcJobState.Empty();
+        }
+
+        // =============================================================================
+        // RecordFailureLearning
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un fallimento operativo nel piccolo store passivo del Job layer.
+        /// </para>
+        ///
+        /// <para><b>Ritorno cognitivo leggero ma non decisionale</b></para>
+        /// <para>
+        /// Questo helper non cambia punteggi, non rischedula e non emette comandi.
+        /// Conserva soltanto il pattern per NPC/intenzione/motivo affinche' future
+        /// patch possano usarlo in modo esplicito, senza ricostruire fallimenti dai
+        /// log o dai pannelli.
+        /// </para>
+        /// </summary>
+        private void RecordFailureLearning(int npcId, Job job, JobFailureReason reason, int tick, string diagnosticKey)
+        {
+            if (npcId <= 0 || job == null)
+                return;
+
+            FailureLearning.Record(
+                new JobFailureObservation(
+                    npcId,
+                    job.JobId,
+                    job.Request.IntentKind,
+                    reason,
+                    tick,
+                    diagnosticKey,
+                    job.Request.HasTargetCell,
+                    job.Request.TargetCell));
+        }
+
+        // =============================================================================
+        // ResolveAssignmentFailureReason
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte il motivo testuale di mancata assegnazione in motivo normalizzato.
+        /// </para>
+        /// </summary>
+        private static JobFailureReason ResolveAssignmentFailureReason(string reason)
+        {
+            return string.Equals(reason, "ReservationDenied", System.StringComparison.Ordinal)
+                ? JobFailureReason.ReservationDenied
+                : JobFailureReason.InvalidRequest;
         }
     }
 }
