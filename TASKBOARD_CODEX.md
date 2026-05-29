@@ -25,23 +25,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ACTIVE: v0.14 - Cognizione Soggettiva Avanzata
+## MACRO JOB ACTIVE: v0.14 - Job Recovery Runtime e fallback degli incarichi
 
 CHECKPOINT CORRENTE:
-v0.14a - Audit cognition gap post-v0.13
+v0.14a - Audit recovery Job post-NeedsDecisionRule
 
 STATUS:
 READY / PENDING
 
 OUTPUT ATTESO:
-audit iniziale dei gap cognitivi dopo chiusura MBQD/Incarichi
+audit iniziale dei fallimenti Job, delle policy recovery e dei fallback locali dopo rimozione di NeedsDecisionRule
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.13`;
-allineamento esteso `ARCONTIO_docs` / Notion raccomandato prima di consolidare la fase cognitiva profonda
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza `v0.14`
 
 OBIETTIVO:
-Aprire la cognizione soggettiva avanzata sopra il tratto MBQD/Incarichi appena chiuso.
+Stabilizzare il recupero locale degli incarichi prima di aprire la cognizione soggettiva avanzata.
 
 Esito tecnico ereditato da `v0.12`:
 
@@ -63,14 +63,24 @@ Esito tecnico ereditato da `v0.13`:
 - classificare fallimenti minimi e ritorno cognitivo leggero;
 - eliminare definitivamente `NeedsDecisionRule` dopo estrazione e ricostruzione dei percorsi minimi.
 
+Obiettivo tecnico corrente `v0.14`:
+
+- verificare come falliscono oggi Job, Phase e Step;
+- collegare le classificazioni di fallimento alle policy di recovery gia' introdotte;
+- introdurre retry locale controllato senza creare loop;
+- gestire fallback per target non valido, risorsa sparita, reservation negata e movimento bloccato;
+- produrre ritorno minimo verso memoria/credenze quando l'incarico fallisce;
+- mantenere `JobExecutionSystem` come esecutore, non come secondo decisore;
+- rendere osservabile recovery/fallimento tramite EL.
+
 Prossimo macro job consigliato:
-`v0.14a - Audit cognition gap post-v0.13`
+`v0.14a - Audit recovery Job post-NeedsDecisionRule`
 
 Residual follow-ups / future hardening:
 
-- `v0.14`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
-- `v0.15`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
-- `v0.16+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+- `v0.15`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
+- `v0.16`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
+- `v0.17+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
 Checkpoint v0.13 pianificati:
 
@@ -85,14 +95,25 @@ Checkpoint v0.13 pianificati:
 
 Checkpoint v0.14 pianificati:
 
-- `v0.14a`: audit cognition gap post-v0.13;
-- `v0.14b`: lifecycle credenze e obsolescenza cibo/oggetti;
-- `v0.14c`: memoria da eventi needs;
-- `v0.14d`: verifica locale credenze;
-- `v0.14e`: decisione su conoscenza incerta;
-- `v0.14f`: comunicazione soggettiva minima;
-- `v0.14g`: QA anti-onniscienza cognitiva;
-- `v0.14h`: closeout cognizione soggettiva avanzata.
+- `v0.14a`: audit recovery Job post-NeedsDecisionRule;
+- `v0.14b`: mappa fallimenti step -> strategie recovery;
+- `v0.14c`: integrazione policy recovery nel Job runtime;
+- `v0.14d`: retry locale controllato e limiti anti-loop;
+- `v0.14e`: fallback per target non valido o risorsa sparita;
+- `v0.14f`: failure learning minimo verso memoria/credenze;
+- `v0.14g`: explainability recovery Job;
+- `v0.14h`: QA e closeout Job Recovery Runtime.
+
+Checkpoint v0.15 pianificati:
+
+- `v0.15a`: audit cognition gap post-v0.14;
+- `v0.15b`: lifecycle credenze e obsolescenza cibo/oggetti;
+- `v0.15c`: memoria da eventi needs;
+- `v0.15d`: verifica locale credenze;
+- `v0.15e`: decisione su conoscenza incerta;
+- `v0.15f`: comunicazione soggettiva minima;
+- `v0.15g`: QA anti-onniscienza cognitiva;
+- `v0.15h`: closeout cognizione soggettiva avanzata.
 
 Checkpoint v0.12 completati:
 
