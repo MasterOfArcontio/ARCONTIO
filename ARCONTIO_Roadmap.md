@@ -769,7 +769,7 @@ Chiudere il debito tra MBQD e Job prima di aprire la cognizione soggettiva profo
 
 Questa fase NON introduce nuove feature sociali o cognitive importanti.
 
-Serve a rendere il percorso Decisione -> Richiesta di incarico -> Incarico il percorso ordinario unico, stabilizzare fallback/fallimenti minimi e ridurre `NeedsDecisionRule` fino a compatibility shim/no-op prima della rimozione.
+Serve a rendere il percorso Decisione -> Richiesta di incarico -> Incarico il percorso ordinario unico, estrarre da `NeedsDecisionRule` solo le parti ancora utili, scollegare il vecchio ponte come autorita' runtime e ricostruire i bisogni minimi sopra JobRequest, Job scriptati a fasi e recovery locale configurabile.
 
 La fase deve chiarire:
 
@@ -778,17 +778,37 @@ La fase deve chiarire:
 - chi accetta o rifiuta l'incarico;
 - come viene gestito il fallimento;
 - come il fallimento torna verso memoria e credenze;
-- dove finiscono i fallback legacy;
-- quando `NeedsDecisionRule` smette di essere autorita' reale.
+- quali parti di `NeedsDecisionRule` vanno conservate come servizi dedicati;
+- quali fallback legacy vanno cancellati invece di preservati;
+- come i fallback futuri vengono descritti da configurazione;
+- quando `NeedsDecisionRule` smette di essere autorita' reale;
+- quando il file puo' essere rimosso senza trascinare logica utile.
 
 ---
 
 ## Scopo architetturale
 
 Questa fase chiude il tratto MBQD -> Job prima della cognizione soggettiva profonda.
-Il focus non e' introdurre nuove feature sociali o cognitive, ma rendere il percorso Decisione -> JobRequest -> Job il percorso ordinario, confinare i fallback legacy, classificare i fallimenti minimi e portare `NeedsDecisionRule` da bridge operativo a guscio di compatibilita'.
+Il focus non e' introdurre nuove feature sociali o cognitive, ma rendere il percorso Decisione -> JobRequest -> Job il percorso ordinario, estrarre da `NeedsDecisionRule` i servizi ancora utili, scollegare il ponte legacy come autorita' runtime, ricostruire i bisogni minimi sopra Job e introdurre la base configurabile per fallback e recupero locale degli step.
 
 La motivazione e' strutturale: non conviene costruire lifecycle credenze, obsolescenza, conflitti cognitivi e apprendimento soggettivo sopra un bridge Decision/Job ancora incompleto.
+
+La scelta operativa aggiornata e' accettare una transizione in cui il simulatore puo' non restare pienamente funzionante nel vecchio percorso legacy. Questo permette di eliminare piu' presto l'autorita' reale di `NeedsDecisionRule`, invece di mantenerla come paracadute indefinito. La rimozione deve comunque essere chirurgica: prima si conservano gli helper utili in servizi dedicati, poi si scollega la rule, poi si ricostruiscono i bisogni principali come incarichi.
+
+La fase deve inoltre tenere conto dei documenti di supporto Notion letti il 2026-05-29:
+
+- `ARCONTIO - Operational Job Step & Local Recovery Matrix`;
+- `Belief Category e Intenzioni Decisionali`;
+- `Reference: Funzionamento del Sistema Decisione, Query e Belief`;
+- `Le Sorgenti delle Intenzioni`;
+- `CENSIMENTO CATALOGHI`;
+- `ARCHITETTURA SCALABILITA' PERCETTIVA`;
+- `Ottimizzazioni del Catalogo delle Intenzioni per il Runtime`;
+- `Cosa c'e' e cosa manca nel MBQD + JOB`;
+- `Livello Narrativo per ARCONTIO`;
+- `Azione sul Medio Periodo per ARCONTIO`.
+
+Questi documenti non diventano automaticamente decisioni runtime produttive, ma orientano la sequenza: prima il tratto MBQD/Incarichi, poi fallback configurabili e recupero locale limitato, poi ottimizzazioni del catalogo intenzioni e solo dopo cognizione soggettiva profonda, sociale e narrativa.
 
 ---
 
@@ -802,6 +822,9 @@ In questa fase NON si deve:
 - introdurre planner globale;
 - introdurre recovery intelligente completa;
 - introdurre belief lifecycle profondo;
+- introdurre sorgenti intenzionali proattive complete;
+- introdurre Goal di medio periodo;
+- introdurre narrative layer produttivo;
 - emettere `ICommand` dal Decision Layer;
 - spostare autorita' di preemption nel Decision Layer;
 - trasformare `JobExecutionSystem` in un secondo sistema decisionale.
@@ -811,12 +834,12 @@ In questa fase NON si deve:
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.13a | Audit responsabilita' residue NeedsDecisionRule | ⏳ PENDING |
-| v0.13b | Fame/SearchFood/EatKnownFood via Orchestrator e JobRequest | ⏳ PENDING |
-| v0.13c | Copertura bisogni principali minimi via JobRequest | ⏳ PENDING |
-| v0.13d | Quarantena fallback legacy | ⏳ PENDING |
-| v0.13e | Fallimenti minimi e ritorno cognitivo leggero | ⏳ PENDING |
-| v0.13f | Orchestratore primario dietro configurazione | ⏳ PENDING |
-| v0.13g | NeedsDecisionRule come compatibility shim/no-op | ⏳ PENDING |
+| v0.13b | Estrazione servizi utili da NeedsDecisionRule | ⏳ PENDING |
+| v0.13c | Scollegamento NeedsDecisionRule come autorita' runtime | ⏳ PENDING |
+| v0.13d | Ricostruzione bisogni principali minimi via JobRequest/Job | ⏳ PENDING |
+| v0.13e | Configurazione fallback/recovery locale da matrice Job | ⏳ PENDING |
+| v0.13f | Fallimenti minimi e ritorno cognitivo leggero | ⏳ PENDING |
+| v0.13g | Eliminazione definitiva NeedsDecisionRule legacy | ⏳ PENDING |
 | v0.13h | QA e closeout pensionamento legacy | ⏳ PENDING |
 
 ---

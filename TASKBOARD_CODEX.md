@@ -57,11 +57,12 @@ Obiettivo tecnico corrente `v0.13`:
 
 - rendere il percorso Decisione -> JobRequest -> Job il percorso ordinario;
 - verificare dove `NeedsDecisionRule` e' ancora autorita' reale;
-- spostare Fame/SearchFood/EatKnownFood verso Orchestrator e JobRequest;
-- coprire i bisogni principali minimi senza introdurre planner globale;
-- confinare i fallback legacy;
+- estrarre da `NeedsDecisionRule` solo gli helper ancora utili come servizi dedicati;
+- scollegare `NeedsDecisionRule` come autorita' runtime anche se il simulatore perde temporaneamente compatibilita' legacy;
+- ricostruire i bisogni principali minimi sopra JobRequest e Job scriptati a fasi;
+- introdurre configurazione fallback/recovery locale coerente con la matrice Job;
 - classificare fallimenti minimi e ritorno cognitivo leggero;
-- portare `NeedsDecisionRule` verso compatibility shim/no-op prima della rimozione.
+- eliminare definitivamente `NeedsDecisionRule` dopo estrazione e ricostruzione dei percorsi minimi.
 
 Prossimo macro job consigliato:
 `v0.13a - Audit responsabilita' residue NeedsDecisionRule`
@@ -75,12 +76,12 @@ Residual follow-ups / future hardening:
 Checkpoint v0.13 pianificati:
 
 - `v0.13a`: audit responsabilita' residue NeedsDecisionRule;
-- `v0.13b`: Fame/SearchFood/EatKnownFood via Orchestrator e JobRequest;
-- `v0.13c`: copertura bisogni principali minimi via JobRequest;
-- `v0.13d`: quarantena fallback legacy;
-- `v0.13e`: fallimenti minimi e ritorno cognitivo leggero;
-- `v0.13f`: orchestratore primario dietro configurazione;
-- `v0.13g`: NeedsDecisionRule come compatibility shim/no-op;
+- `v0.13b`: estrazione servizi utili da NeedsDecisionRule;
+- `v0.13c`: scollegamento NeedsDecisionRule come autorita' runtime;
+- `v0.13d`: ricostruzione bisogni principali minimi via JobRequest/Job;
+- `v0.13e`: configurazione fallback/recovery locale da matrice Job;
+- `v0.13f`: fallimenti minimi e ritorno cognitivo leggero;
+- `v0.13g`: eliminazione definitiva NeedsDecisionRule legacy;
 - `v0.13h`: QA e closeout pensionamento legacy.
 
 Checkpoint v0.12 completati:
