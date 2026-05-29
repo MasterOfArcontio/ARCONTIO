@@ -26,8 +26,8 @@
 | v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio 2026 | Completata fino a v0.11c.06 |
 | v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | Completata |
 | v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | Completata |
-| v0.13 | Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule | Giugno 2026 | Prossima fase |
-| v0.14 | Cognizione Soggettiva Avanzata | Giugno-Luglio 2026 | Pending |
+| v0.13 | Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule | Giugno 2026 | Completata |
+| v0.14 | Cognizione Soggettiva Avanzata | Giugno-Luglio 2026 | Prossima fase |
 | v0.15 | Conseguenze Sociali Emergenti | Luglio 2026 | Pending |
 | v0.16 | Observer Layer Pubblico ed Explainability Esterna | Luglio-Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -840,7 +840,9 @@ In questa fase NON si deve:
 | v0.13e | Configurazione fallback/recovery locale da matrice Job | ✅ DONE |
 | v0.13f | Fallimenti minimi e ritorno cognitivo leggero | ✅ DONE |
 | v0.13g | Eliminazione definitiva NeedsDecisionRule legacy | ✅ DONE |
-| v0.13h | QA e closeout pensionamento legacy | ⏳ PENDING |
+| v0.13h | QA e closeout pensionamento legacy | ✅ DONE |
+
+> **Nota closeout v0.13h (2026-05-30):** la fase `v0.13` e' chiusa come Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule. Il percorso ordinario per Fame/SearchFood/EatKnownFood passa da Decisione -> Richiesta di incarico -> Incarico, i servizi utili sono stati estratti dal vecchio ponte, il fallback legacy needs e' stato rimosso e `NeedsDecisionRule` non esiste piu' come file runtime. Restano fuori scope la cognizione soggettiva profonda, l'obsolescenza delle credenze, la memoria da eventi needs, il sociale e la rimozione completa di tutti i concetti diagnostici legacy legati al bridge. Dettaglio: `v0.13h_Closeout_Report.md`.
 
 ---
 

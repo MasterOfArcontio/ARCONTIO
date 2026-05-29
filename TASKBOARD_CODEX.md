@@ -25,23 +25,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ACTIVE: v0.13 - Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule
+## MACRO JOB ACTIVE: v0.14 - Cognizione Soggettiva Avanzata
 
 CHECKPOINT CORRENTE:
-v0.13h - QA e closeout pensionamento legacy
+v0.14a - Audit cognition gap post-v0.13
 
 STATUS:
-IN PROGRESS / QA PENDING
+READY / PENDING
 
 OUTPUT ATTESO:
-QA finale del pensionamento legacy e chiusura della fase v0.13
+audit iniziale dei gap cognitivi dopo chiusura MBQD/Incarichi
 
 DOC SYNC:
-root taskboard e roadmap aggiornate all'apertura tecnica di `v0.13`;
-allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza
+root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.13`;
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato prima di consolidare la fase cognitiva profonda
 
 OBIETTIVO:
-Chiudere il debito tra MBQD e Job prima di aprire la cognizione soggettiva profonda.
+Aprire la cognizione soggettiva avanzata sopra il tratto MBQD/Incarichi appena chiuso.
 
 Esito tecnico ereditato da `v0.12`:
 
@@ -53,19 +53,18 @@ Esito tecnico ereditato da `v0.12`:
 - EL modulare reso piu' leggero quando disattivo;
 - pannelli EL ottimizzati per ridurre produzione nascosta di stringhe, liste e viewmodel.
 
-Obiettivo tecnico corrente `v0.13`:
+Esito tecnico ereditato da `v0.13`:
 
 - rendere il percorso Decisione -> JobRequest -> Job il percorso ordinario;
-- verificare dove `NeedsDecisionRule` e' ancora autorita' reale;
 - estrarre da `NeedsDecisionRule` solo gli helper ancora utili come servizi dedicati;
-- scollegare `NeedsDecisionRule` come autorita' runtime anche se il simulatore perde temporaneamente compatibilita' legacy;
+- scollegare `NeedsDecisionRule` come autorita' runtime;
 - ricostruire i bisogni principali minimi sopra JobRequest e Job scriptati a fasi;
 - introdurre configurazione fallback/recovery locale coerente con la matrice Job;
 - classificare fallimenti minimi e ritorno cognitivo leggero;
 - eliminare definitivamente `NeedsDecisionRule` dopo estrazione e ricostruzione dei percorsi minimi.
 
 Prossimo macro job consigliato:
-`v0.13h - QA e closeout pensionamento legacy`
+`v0.14a - Audit cognition gap post-v0.13`
 
 Residual follow-ups / future hardening:
 
@@ -82,7 +81,18 @@ Checkpoint v0.13 pianificati:
 - `v0.13e`: configurazione fallback/recovery locale da matrice Job - DONE;
 - `v0.13f`: fallimenti minimi e ritorno cognitivo leggero - DONE;
 - `v0.13g`: eliminazione definitiva NeedsDecisionRule legacy - DONE;
-- `v0.13h`: QA e closeout pensionamento legacy.
+- `v0.13h`: QA e closeout pensionamento legacy - DONE.
+
+Checkpoint v0.14 pianificati:
+
+- `v0.14a`: audit cognition gap post-v0.13;
+- `v0.14b`: lifecycle credenze e obsolescenza cibo/oggetti;
+- `v0.14c`: memoria da eventi needs;
+- `v0.14d`: verifica locale credenze;
+- `v0.14e`: decisione su conoscenza incerta;
+- `v0.14f`: comunicazione soggettiva minima;
+- `v0.14g`: QA anti-onniscienza cognitiva;
+- `v0.14h`: closeout cognizione soggettiva avanzata.
 
 Checkpoint v0.12 completati:
 
