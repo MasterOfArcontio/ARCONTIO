@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.14 - Job Recovery Runtime e fallback degli incarichi
 
 CHECKPOINT CORRENTE:
-v0.14c - Integrazione policy recovery nel Job runtime
+v0.14d - Retry locale controllato e limiti anti-loop
 
 STATUS:
 READY / PENDING
 
 OUTPUT ATTESO:
-cablaggio passivo di StepRecoveryPolicyRegistry e StepRecoveryEvaluator nel Job runtime senza applicare ancora recovery produttiva
+primo retry locale controllato da policy fallback, con limiti espliciti anti-loop e senza nuova autorita' decisionale
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.13`;
@@ -74,7 +74,7 @@ Obiettivo tecnico corrente `v0.14`:
 - rendere osservabile recovery/fallimento tramite EL.
 
 Prossimo macro job consigliato:
-`v0.14c - Integrazione policy recovery nel Job runtime`
+`v0.14d - Retry locale controllato e limiti anti-loop`
 
 Residual follow-ups / future hardening:
 
@@ -97,7 +97,7 @@ Checkpoint v0.14 pianificati:
 
 - `v0.14a`: audit recovery Job post-NeedsDecisionRule - DONE;
 - `v0.14b`: mappa fallimenti step -> strategie recovery - DONE;
-- `v0.14c`: integrazione policy recovery nel Job runtime;
+- `v0.14c`: integrazione policy recovery nel Job runtime - DONE;
 - `v0.14d`: retry locale controllato e limiti anti-loop;
 - `v0.14e`: fallback per target non valido o risorsa sparita;
 - `v0.14f`: failure learning minimo verso memoria/credenze;

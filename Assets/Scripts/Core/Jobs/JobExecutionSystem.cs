@@ -35,8 +35,23 @@ namespace Arcontio.Core
         private readonly JobStateMachine _stateMachine = new();
         private readonly RunningActionExecutor _runningActionExecutor = new();
         private readonly BeliefUpdater _beliefUpdater = new();
+        private readonly StepRecoveryPolicyRegistry _recoveryPolicyRegistry;
+        private readonly StepRecoveryEvaluator _recoveryEvaluator;
 
         public int Period => 1;
+
+        public JobExecutionSystem()
+            : this(StepRecoveryPolicyRegistry.LoadDefault(), new StepRecoveryEvaluator())
+        {
+        }
+
+        internal JobExecutionSystem(
+            StepRecoveryPolicyRegistry recoveryPolicyRegistry,
+            StepRecoveryEvaluator recoveryEvaluator)
+        {
+            _recoveryPolicyRegistry = recoveryPolicyRegistry ?? new StepRecoveryPolicyRegistry();
+            _recoveryEvaluator = recoveryEvaluator ?? new StepRecoveryEvaluator();
+        }
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
@@ -66,6 +81,8 @@ namespace Arcontio.Core
                     explainabilityConfig,
                     explainabilityRegistry);
                 var updatedState = npcState;
+
+                EvaluateRecoveryPolicyNoOp(job, in npcState, result);
 
                 // La state machine possiede gia' la semantica di avanzamento
                 // lifecycle/phase/step/state. Usare l'overload EL-aware non cambia
@@ -97,6 +114,70 @@ namespace Arcontio.Core
 
                 runtime.SetNpcState(npcId, in updatedState);
             }
+        }
+
+        // =============================================================================
+        // EvaluateRecoveryPolicyNoOp
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega in modo passivo il risultato dello step corrente alla matrice
+        /// configurabile di recupero locale degli incarichi.
+        /// </para>
+        ///
+        /// <para><b>Policy recovery consultata, non applicata</b></para>
+        /// <para>
+        /// Questo metodo e' il ponte v0.14c tra runtime Job e configurazione in
+        /// <c>Resources/Arcontio/Jobs/job_recovery_policies.json</c>. Classifica il
+        /// fallimento con <c>StepFailureClassifier</c>, cerca la policy dichiarata e
+        /// passa i dati a <c>StepRecoveryEvaluator</c>, che in questa fase resta
+        /// volutamente no-op. Non modifica cursore, job, reservation, command buffer,
+        /// world, memoria o tick order.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate cursore</b>: legge solo fase e azione gia' attive nel job.</item>
+        ///   <item><b>Classificazione</b>: produce dati passivi dal risultato step.</item>
+        ///   <item><b>Policy lookup</b>: consulta il registry configurabile da Resources.</item>
+        ///   <item><b>Evaluator no-op</b>: conserva comportamento terminale esistente.</item>
+        /// </list>
+        /// </summary>
+        private void EvaluateRecoveryPolicyNoOp(
+            Job job,
+            in NpcJobState npcState,
+            StepResult stepResult)
+        {
+            if (job == null)
+                return;
+
+            // Il ponte recovery deve osservare lo stesso step che verra' consegnato
+            // alla state machine. Se il piano non espone piu' fase o azione, non
+            // inventiamo coordinate di recupero: il fallimento resta terminale come
+            // prima della patch.
+            if (!job.Plan.TryGetPhase(npcState.ActivePhaseIndex, out var phase))
+                return;
+
+            if (!phase.TryGetAction(npcState.ActiveActionIndex, out var action))
+                return;
+
+            var classification = StepFailureClassifier.Classify(
+                stepResult,
+                action,
+                npcState.ActivePhaseIndex,
+                npcState.ActiveActionIndex);
+
+            if (!classification.HasClassification)
+                return;
+
+            if (!_recoveryPolicyRegistry.TryGetPolicy(classification.FailureKind, out var policy))
+                return;
+
+            // In v0.14c il risultato viene deliberatamente scartato: il valutatore
+            // restituisce sempre None e quindi non puo' programmare retry,
+            // sostituire target, ricostruire fasi o impedire alla state machine di
+            // chiudere il job secondo la semantica gia' esistente.
+            _ = _recoveryEvaluator.EvaluateNoOp(classification, policy);
         }
 
         private static StepResult ExecuteCurrentAction(
