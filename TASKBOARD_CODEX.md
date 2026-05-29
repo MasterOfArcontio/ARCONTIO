@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.13 - Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule
 
 CHECKPOINT CORRENTE:
-v0.13a - Audit responsabilita' residue NeedsDecisionRule
+v0.13h - QA e closeout pensionamento legacy
 
 STATUS:
-READY / PENDING
+IN PROGRESS / QA PENDING
 
 OUTPUT ATTESO:
-audit iniziale del ponte MBQD -> Job e mappa delle responsabilita' residue di `NeedsDecisionRule`
+QA finale del pensionamento legacy e chiusura della fase v0.13
 
 DOC SYNC:
 root taskboard e roadmap aggiornate all'apertura tecnica di `v0.13`;
@@ -65,7 +65,7 @@ Obiettivo tecnico corrente `v0.13`:
 - eliminare definitivamente `NeedsDecisionRule` dopo estrazione e ricostruzione dei percorsi minimi.
 
 Prossimo macro job consigliato:
-`v0.13a - Audit responsabilita' residue NeedsDecisionRule`
+`v0.13h - QA e closeout pensionamento legacy`
 
 Residual follow-ups / future hardening:
 
@@ -75,13 +75,13 @@ Residual follow-ups / future hardening:
 
 Checkpoint v0.13 pianificati:
 
-- `v0.13a`: audit responsabilita' residue NeedsDecisionRule;
-- `v0.13b`: estrazione servizi utili da NeedsDecisionRule;
-- `v0.13c`: scollegamento NeedsDecisionRule come autorita' runtime;
-- `v0.13d`: ricostruzione bisogni principali minimi via JobRequest/Job;
-- `v0.13e`: configurazione fallback/recovery locale da matrice Job;
-- `v0.13f`: fallimenti minimi e ritorno cognitivo leggero;
-- `v0.13g`: eliminazione definitiva NeedsDecisionRule legacy;
+- `v0.13a`: audit responsabilita' residue NeedsDecisionRule - DONE;
+- `v0.13b`: estrazione servizi utili da NeedsDecisionRule - DONE;
+- `v0.13c`: scollegamento NeedsDecisionRule come autorita' runtime - DONE;
+- `v0.13d`: ricostruzione bisogni principali minimi via JobRequest/Job - DONE;
+- `v0.13e`: configurazione fallback/recovery locale da matrice Job - DONE;
+- `v0.13f`: fallimenti minimi e ritorno cognitivo leggero - DONE;
+- `v0.13g`: eliminazione definitiva NeedsDecisionRule legacy - DONE;
 - `v0.13h`: QA e closeout pensionamento legacy.
 
 Checkpoint v0.12 completati:

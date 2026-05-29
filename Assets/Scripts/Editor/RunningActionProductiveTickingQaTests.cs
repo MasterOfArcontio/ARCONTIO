@@ -236,10 +236,9 @@ namespace Arcontio.Tests
         /// <para><b>v0.11c.03c - Cadence esecutiva separata da cadence decisionale</b></para>
         /// <para>
         /// Il test protegge il confine tra <c>JobExecutionSystem</c> e
-        /// <c>NeedsDecisionRule</c>: la rule viene invocata con
-        /// <c>decisionEveryTicks</c> molto alto su un tick non ammesso, ma il job
-        /// gia' assegnato completa comunque tramite il progress di
-        /// <c>RunningActionExecutor</c>. Nessuna command decisionale viene emessa.
+        /// decisione ordinaria: il job gia' assegnato completa comunque tramite il
+        /// progress di <c>RunningActionExecutor</c>, senza bisogno di una rule legacy.
+        /// Nessuna command decisionale viene emessa.
         /// </para>
         /// </summary>
         [Test]
@@ -252,7 +251,6 @@ namespace Arcontio.Tests
             var job = MakeWaitJob(npcId, "job-wait-decision-cadence", durationTicks: 2);
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
             var jobExecution = new JobExecutionSystem();
-            var decisionRule = new NeedsDecisionRule(decisionEveryTicks: 999);
             var decisionCommands = new List<ICommand>();
             var telemetry = new Telemetry();
 
@@ -261,10 +259,8 @@ namespace Arcontio.Tests
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
             Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
 
-            // Act 2: al tick 1 la decision cadence non e' dovuta, ma il job
-            // esecutivo deve comunque completare. La rule viene chiamata nello
-            // stesso tick per verificare che non emetta command decisionali.
-            decisionRule.Handle(world, new TickPulseEvent(1), decisionCommands, telemetry);
+            // Act 2: al tick 1 non serve alcuna rivalutazione decisionale: il job
+            // esecutivo deve comunque completare.
             jobExecution.Update(world, new Tick(1, 1f), new MessageBus(), telemetry);
 
             // Assert: il job completa grazie alla cadence esecutiva tick-based, non
