@@ -348,6 +348,7 @@ namespace Arcontio.Core.Config
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
+    ///   <item><b>enableJobDecisionOrchestrator</b>: abilita il nuovo percorso Decisione -> JobRequest -> Job per i bisogni gia' migrati.</item>
     ///   <item><b>enableLegacyNeedsDecisionRule</b>: riaccende esplicitamente il vecchio bridge needs, spento di default.</item>
     ///   <item><b>decisionEveryTicks</b>: cadence legacy-compatible del bridge needs-decision quando il bridge e' riattivato.</item>
     ///   <item><b>selectionMode</b>: <c>WeightedRandomTopN</c> oppure <c>DeterministicTop1</c>.</item>
@@ -365,6 +366,7 @@ namespace Arcontio.Core.Config
         // Nome legacy-compatible e transitorio: rappresenta l'hardcode produttivo
         // gia' esistente in SimulationHost, senza fissare una nomenclatura canonica
         // futura per la cognitive cadence.
+        public bool enableJobDecisionOrchestrator = true;
         public bool enableLegacyNeedsDecisionRule = false;
         public int decisionEveryTicks = DefaultDecisionEveryTicks;
         public string selectionMode = "WeightedRandomTopN";

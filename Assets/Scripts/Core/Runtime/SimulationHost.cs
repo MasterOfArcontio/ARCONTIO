@@ -773,6 +773,16 @@ namespace Arcontio.Core
             // contro il World.
             _scheduler.AddSystem(new JobExecutionSystem());
 
+            if (_world?.Config?.Sim?.decision?.enableLegacyNeedsDecisionRule != true
+                && _world?.Config?.Sim?.decision?.enableJobDecisionOrchestrator == true)
+            {
+                _scheduler.AddSystem(new DecisionOrchestratorSystem(
+                    decisionEveryTicks: _world.Config.Sim.ResolveDecisionEveryTicks(),
+                    maxSeekRangeCells: _world.Global.NpcOperationalRangeCells,
+                    enableFoodJobVerticalSlice: enableFoodJobVerticalSlice,
+                    jobTemplateRegistry: _jobTemplateRegistry));
+            }
+
             // ******************************************************************************************************************************
             // 8) INIZIALIZZO LE RULES
             // ******************************************************************************************************************************
