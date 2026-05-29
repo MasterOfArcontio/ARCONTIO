@@ -25,55 +25,63 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ACTIVE: v0.12 - Pulizia Logging, Explainability e Diagnostica Runtime
+## MACRO JOB ACTIVE: v0.13 - Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule
 
 CHECKPOINT CORRENTE:
-v0.12h - Ottimizzazione pannelli EL e closeout diagnostica runtime
+v0.13a - Audit responsabilita' residue NeedsDecisionRule
 
 STATUS:
-COMPLETED
+READY / PENDING
 
 OUTPUT ATTESO:
-closeout completato della pulizia logging, explainability e diagnostica runtime:
-`[v0.12h] optimize EL panels and close diagnostics runtime`
+audit iniziale del ponte MBQD -> Job e mappa delle responsabilita' residue di `NeedsDecisionRule`
 
 DOC SYNC:
-root taskboard e roadmap aggiornate all'apertura tecnica di `v0.12`;
-allineamento esteso `ARCONTIO_docs` raccomandato dopo validazione umana della nuova sequenza
+root taskboard e roadmap aggiornate all'apertura tecnica di `v0.13`;
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza
 
 OBIETTIVO:
-Aprire la fase di pulizia logging, explainability e diagnostica runtime prima dell'espansione cognitiva e sociale.
+Chiudere il debito tra MBQD e Job prima di aprire la cognizione soggettiva profonda.
 
-Esito tecnico ereditato da `v0.11D`:
+Esito tecnico ereditato da `v0.12`:
 
-- logging runtime stabilizzato con JSONL batchato, limitato e congelabile;
-- canali patologici console, HTML e TXT isolati o spenti;
-- diagnostica runtime e pannelli consolidati;
-- sistemi dormienti, lavoro e sociale mappati con audit;
-- authority runtime needs rinforzata con `FoodConsumedEvent` e `BedRestedEvent`;
-- `.meta` Unity dei nuovi eventi recuperati;
-- memoria/debug e churn overlay mitigati dove sicuro;
-- audit residui `v0.11d.07` completato senza micro-fix bloccanti.
+- logging e diagnostica runtime consolidati;
+- console, TXT, HTML e overlay logger legacy rimossi;
+- `Telemetry` assorbita come ponte inerte quando disattiva;
+- `ArcontioLogger` ridotto a ponte transitorio;
+- `SimulationParams` e `GameParams` ricollocati sotto `Core/Config`;
+- EL modulare reso piu' leggero quando disattivo;
+- pannelli EL ottimizzati per ridurre produzione nascosta di stringhe, liste e viewmodel.
 
-Obiettivo tecnico corrente `v0.12`:
+Obiettivo tecnico corrente `v0.13`:
 
-- rendere `game_params` e `simulation params` una configurazione chiara e non sparsa;
-- portare i log persistenti verso un'unica uscita JSONL;
-- mantenere i pannelli EL come visualizzazione viva, ma ridurne il costo quando chiusi o non necessari;
-- rimuovere davvero i canali legacy non piu' utili: console, TXT, HTML, overlay logger;
-- decidere se eliminare `ArcontioLogger` o trasformarlo in ponte leggero sopra JSONL/EL;
-- eliminare o assorbire `Telemetry`, perche' oggi e' poco utile rispetto al costo e alla confusione architetturale;
-- rendere EL modulare su Memory, Belief, Query, Decision, Job, Running Action, Step e Movement;
-- garantire che EL spento non produca nulla.
+- rendere il percorso Decisione -> JobRequest -> Job il percorso ordinario;
+- verificare dove `NeedsDecisionRule` e' ancora autorita' reale;
+- spostare Fame/SearchFood/EatKnownFood verso Orchestrator e JobRequest;
+- coprire i bisogni principali minimi senza introdurre planner globale;
+- confinare i fallback legacy;
+- classificare fallimenti minimi e ritorno cognitivo leggero;
+- portare `NeedsDecisionRule` verso compatibility shim/no-op prima della rimozione.
 
 Prossimo macro job consigliato:
-`v0.13a - Audit cognition gap post-v0.12`
+`v0.13a - Audit responsabilita' residue NeedsDecisionRule`
 
 Residual follow-ups / future hardening:
 
-- `v0.13`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
-- `v0.14`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
-- `v0.15+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+- `v0.14`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
+- `v0.15`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
+- `v0.16+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+
+Checkpoint v0.13 pianificati:
+
+- `v0.13a`: audit responsabilita' residue NeedsDecisionRule;
+- `v0.13b`: Fame/SearchFood/EatKnownFood via Orchestrator e JobRequest;
+- `v0.13c`: copertura bisogni principali minimi via JobRequest;
+- `v0.13d`: quarantena fallback legacy;
+- `v0.13e`: fallimenti minimi e ritorno cognitivo leggero;
+- `v0.13f`: orchestratore primario dietro configurazione;
+- `v0.13g`: NeedsDecisionRule come compatibility shim/no-op;
+- `v0.13h`: QA e closeout pensionamento legacy.
 
 Checkpoint v0.12 completati:
 

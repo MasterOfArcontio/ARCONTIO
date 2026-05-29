@@ -25,10 +25,11 @@
 | v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
 | v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio 2026 | Completata fino a v0.11c.06 |
 | v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | Completata |
-| v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | Prossima fase |
-| v0.13 | NPC Subjective Cognition Deepening | Giugno-Luglio 2026 | Pending |
-| v0.14 | Social Consequence & Normative Emergence | Luglio 2026 | Pending |
-| v0.15 | Explainability Public Layer / Observer Tools | Luglio-Agosto 2026 | Pending |
+| v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | Completata |
+| v0.13 | Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule | Giugno 2026 | Prossima fase |
+| v0.14 | Cognizione Soggettiva Avanzata | Giugno-Luglio 2026 | Pending |
+| v0.15 | Conseguenze Sociali Emergenti | Luglio 2026 | Pending |
+| v0.16 | Observer Layer Pubblico ed Explainability Esterna | Luglio-Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
 
 ---
@@ -605,7 +606,7 @@ La fase ha lo scopo di:
 | v0.11d.07 | Stabilizzazione scheduler e prestazioni runtime | DONE |
 | v0.11d.08 | Chiusura costituzionale infrastruttura runtime | DONE |
 
-> **Nota closeout v0.11d.08 (2026-05-27):** la fase `v0.11D` e' chiusa come Runtime Infrastructure & Dormant Systems Forensic Reintegration. Ha stabilizzato logging, diagnostica, explainability runtime, memoria/debug, autorita' needs/eventi e audit residui. Non chiude i debiti strutturali di movimento legacy, `NeedsDecisionRule`, dizionari pubblici del `World`, pulizia completa logging/EL o sistemi sociali: questi restano esplicitamente rinviati alle fasi `v0.12`, `v0.13`, `v0.14` e `v0.15+`. Dettaglio: `v0.11d_Closeout_Report.md`.
+> **Nota closeout v0.11d.08 (2026-05-27):** la fase `v0.11D` e' chiusa come Runtime Infrastructure & Dormant Systems Forensic Reintegration. Ha stabilizzato logging, diagnostica, explainability runtime, memoria/debug, autorita' needs/eventi e audit residui. Non chiude i debiti strutturali di movimento legacy, `NeedsDecisionRule`, dizionari pubblici del `World`, pulizia completa logging/EL o sistemi sociali: questi restano esplicitamente rinviati alle fasi `v0.12`, `v0.13`, `v0.14`, `v0.15` e `v0.16+`. Dettaglio: `v0.11d_Closeout_Report.md`.
 
 ---
 
@@ -757,14 +758,77 @@ Questa fase deve anche verificare se la struttura attuale dei pannelli EL consum
 
 ---
 
-#### v0.13 - NPC Subjective Cognition Deepening
+#### v0.13 - Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule
 
 ## Stato
 FUTURA / PENDING
 
 ## Obiettivo
 
-Approfondire la cognizione soggettiva degli NPC usando l'infrastruttura stabilizzata in v0.11D.
+Chiudere il debito tra MBQD e Job prima di aprire la cognizione soggettiva profonda.
+
+Questa fase NON introduce nuove feature sociali o cognitive importanti.
+
+Serve a rendere il percorso Decisione -> Richiesta di incarico -> Incarico il percorso ordinario unico, stabilizzare fallback/fallimenti minimi e ridurre `NeedsDecisionRule` fino a compatibility shim/no-op prima della rimozione.
+
+La fase deve chiarire:
+
+- chi decide;
+- chi costruisce la richiesta di incarico;
+- chi accetta o rifiuta l'incarico;
+- come viene gestito il fallimento;
+- come il fallimento torna verso memoria e credenze;
+- dove finiscono i fallback legacy;
+- quando `NeedsDecisionRule` smette di essere autorita' reale.
+
+---
+
+## Scopo architetturale
+
+Questa fase chiude il tratto MBQD -> Job prima della cognizione soggettiva profonda.
+Il focus non e' introdurre nuove feature sociali o cognitive, ma rendere il percorso Decisione -> JobRequest -> Job il percorso ordinario, confinare i fallback legacy, classificare i fallimenti minimi e portare `NeedsDecisionRule` da bridge operativo a guscio di compatibilita'.
+
+La motivazione e' strutturale: non conviene costruire lifecycle credenze, obsolescenza, conflitti cognitivi e apprendimento soggettivo sopra un bridge Decision/Job ancora incompleto.
+
+---
+
+## Fuori scope
+
+In questa fase NON si deve:
+
+- introdurre nuove feature sociali;
+- cambiare Save/Load;
+- cambiare Movement salvo necessita' strettamente collegata;
+- introdurre planner globale;
+- introdurre recovery intelligente completa;
+- introdurre belief lifecycle profondo;
+- emettere `ICommand` dal Decision Layer;
+- spostare autorita' di preemption nel Decision Layer;
+- trasformare `JobExecutionSystem` in un secondo sistema decisionale.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.13a | Audit responsabilita' residue NeedsDecisionRule | ⏳ PENDING |
+| v0.13b | Fame/SearchFood/EatKnownFood via Orchestrator e JobRequest | ⏳ PENDING |
+| v0.13c | Copertura bisogni principali minimi via JobRequest | ⏳ PENDING |
+| v0.13d | Quarantena fallback legacy | ⏳ PENDING |
+| v0.13e | Fallimenti minimi e ritorno cognitivo leggero | ⏳ PENDING |
+| v0.13f | Orchestratore primario dietro configurazione | ⏳ PENDING |
+| v0.13g | NeedsDecisionRule come compatibility shim/no-op | ⏳ PENDING |
+| v0.13h | QA e closeout pensionamento legacy | ⏳ PENDING |
+
+---
+
+#### v0.14 - Cognizione Soggettiva Avanzata
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Approfondire la cognizione soggettiva degli NPC usando l'infrastruttura stabilizzata in v0.11D e il tratto MBQD/Incarichi chiuso in v0.13.
 
 Questa fase deve lavorare su:
 
@@ -780,18 +844,18 @@ Questa fase deve lavorare su:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.13a | Audit cognition gap post-v0.12 | ⏳ |
-| v0.13b | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
-| v0.13c | Memory encoding da world events needs | ⏳ |
-| v0.13d | Verifica locale credenze obsolete | ⏳ |
-| v0.13e | Comunicazione soggettiva dei fatti osservati | ⏳ |
-| v0.13f | Decisioni con belief incerte e parziali | ⏳ |
-| v0.13g | QA anti-omniscienza cognitiva | ⏳ |
-| v0.13h | Closeout cognition deepening | ⏳ |
+| v0.14a | Audit cognition gap post-v0.13 | ⏳ |
+| v0.14b | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
+| v0.14c | Memory encoding da world events needs | ⏳ |
+| v0.14d | Verifica locale credenze obsolete | ⏳ |
+| v0.14e | Comunicazione soggettiva dei fatti osservati | ⏳ |
+| v0.14f | Decisioni con belief incerte e parziali | ⏳ |
+| v0.14g | QA anti-omniscienza cognitiva | ⏳ |
+| v0.14h | Closeout cognition deepening | ⏳ |
 
 ---
 
-#### v0.14 - Social Consequence & Normative Emergence
+#### v0.15 - Conseguenze Sociali Emergenti
 
 ## Stato
 FUTURA / PENDING
@@ -804,16 +868,16 @@ Introdurre conseguenze sociali emergenti sopra world events, memoria soggettiva 
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.14a | Audit reputazione/sospetto post-v0.13 | ⏳ |
-| v0.14b | Catene sospetto/furto da eventi osservati | ⏳ |
-| v0.14c | Giudizio sociale locale | ⏳ |
-| v0.14d | Prime norme emergenti | ⏳ |
-| v0.14e | Istituzioni runtime leggere | ⏳ |
-| v0.14f | QA scenario sociale osservabile | ⏳ |
+| v0.15a | Audit reputazione/sospetto post-v0.14 | ⏳ |
+| v0.15b | Catene sospetto/furto da eventi osservati | ⏳ |
+| v0.15c | Giudizio sociale locale | ⏳ |
+| v0.15d | Prime norme emergenti | ⏳ |
+| v0.15e | Istituzioni runtime leggere | ⏳ |
+| v0.15f | QA scenario sociale osservabile | ⏳ |
 
 ---
 
-#### v0.15 - Explainability Public Layer / Observer Tools
+#### v0.16 - Observer Layer Pubblico ed Explainability Esterna
 
 ## Stato
 FUTURA / PENDING
@@ -826,11 +890,11 @@ Costruire uno strato observer esterno leggibile sopra eventi, memoria, decisioni
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.15a | Timeline eventi mondo | ⏳ |
-| v0.15b | Reason graph NPC | ⏳ |
-| v0.15c | Pannelli observer leggibili | ⏳ |
-| v0.15d | Reinserimento job traces v0.07 | ⏳ |
-| v0.15e | QA observer end-to-end | ⏳ |
+| v0.16a | Timeline eventi mondo | ⏳ |
+| v0.16b | Reason graph NPC | ⏳ |
+| v0.16c | Pannelli observer leggibili | ⏳ |
+| v0.16d | Reinserimento job traces v0.07 | ⏳ |
+| v0.16e | QA observer end-to-end | ⏳ |
 
 > **Nota:** questa fase riassorbe la vecchia v0.07 e la porta a uno strato observer realmente utile.
 
