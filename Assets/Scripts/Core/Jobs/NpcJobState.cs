@@ -26,6 +26,7 @@ namespace Arcontio.Core
     ///   <item><b>ActivePhaseIndex</b>: indice della fase corrente nel piano.</item>
     ///   <item><b>ActiveActionIndex</b>: indice dello step corrente nella fase.</item>
     ///   <item><b>WaitUntilTick</b>: tick fino a cui lo step resta in attesa.</item>
+    ///   <item><b>Recovery*</b>: contatori minimi per retry locale controllato dello step corrente.</item>
     ///   <item><b>SuspendedJobId</b>: job parcheggiato da preemption recuperabile.</item>
     ///   <item><b>LastFailureReason</b>: ultimo motivo diagnostico registrato.</item>
     /// </list>
@@ -37,6 +38,11 @@ namespace Arcontio.Core
         public int ActivePhaseIndex;
         public int ActiveActionIndex;
         public int WaitUntilTick;
+        public JobStepFailureKind RecoveryFailureKind;
+        public int RecoveryPhaseIndex;
+        public int RecoveryActionIndex;
+        public int RecoveryRetryCount;
+        public int RecoveryStartedTick;
         public string SuspendedJobId;
         public JobFailureReason LastFailureReason;
 
@@ -51,6 +57,11 @@ namespace Arcontio.Core
                 ActivePhaseIndex = 0,
                 ActiveActionIndex = 0,
                 WaitUntilTick = 0,
+                RecoveryFailureKind = JobStepFailureKind.None,
+                RecoveryPhaseIndex = -1,
+                RecoveryActionIndex = -1,
+                RecoveryRetryCount = 0,
+                RecoveryStartedTick = 0,
                 SuspendedJobId = string.Empty,
                 LastFailureReason = JobFailureReason.None
             };
@@ -66,6 +77,7 @@ namespace Arcontio.Core
             ActiveActionIndex = 0;
             WaitUntilTick = Math.Max(0, tick);
             LastFailureReason = JobFailureReason.None;
+            ClearRecovery();
         }
 
         public void Clear(JobFailureReason reason)
@@ -78,6 +90,7 @@ namespace Arcontio.Core
             ActiveActionIndex = 0;
             WaitUntilTick = 0;
             LastFailureReason = reason;
+            ClearRecovery();
         }
 
         public void AdvanceAction()
@@ -86,6 +99,7 @@ namespace Arcontio.Core
             // fase e' completata e chiamera' AdvancePhase.
             ActiveActionIndex = Math.Max(0, ActiveActionIndex + 1);
             WaitUntilTick = 0;
+            ClearRecovery();
         }
 
         public void AdvancePhase()
@@ -95,6 +109,7 @@ namespace Arcontio.Core
             ActivePhaseIndex = Math.Max(0, ActivePhaseIndex + 1);
             ActiveActionIndex = 0;
             WaitUntilTick = 0;
+            ClearRecovery();
         }
 
         public void SetWaitingUntil(int tick)
@@ -121,6 +136,99 @@ namespace Arcontio.Core
             ActivePhaseIndex = 0;
             ActiveActionIndex = 0;
             WaitUntilTick = 0;
+            ClearRecovery();
+        }
+
+        // =============================================================================
+        // GetRecoveryRetryCount
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il numero di retry gia' registrati per la stessa combinazione
+        /// fallimento/fase/step.
+        /// </para>
+        ///
+        /// <para><b>Contatore locale, non scheduler</b></para>
+        /// <para>
+        /// Il metodo non decide se il retry sia ammesso e non modifica lo stato.
+        /// Serve al recovery evaluator per confrontare il contatore corrente con i
+        /// limiti dichiarati dalla policy configurabile.
+        /// </para>
+        /// </summary>
+        public int GetRecoveryRetryCount(JobStepFailureKind failureKind, int phaseIndex, int actionIndex)
+        {
+            return MatchesRecoveryCursor(failureKind, phaseIndex, actionIndex)
+                ? RecoveryRetryCount
+                : 0;
+        }
+
+        // =============================================================================
+        // GetRecoveryElapsedTicks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola da quanti tick dura il tentativo di recupero locale dello stesso
+        /// step, se il cursore recovery corrisponde ancora.
+        /// </para>
+        /// </summary>
+        public int GetRecoveryElapsedTicks(JobStepFailureKind failureKind, int phaseIndex, int actionIndex, int tick)
+        {
+            if (!MatchesRecoveryCursor(failureKind, phaseIndex, actionIndex))
+                return 0;
+
+            return Math.Max(0, Math.Max(0, tick) - Math.Max(0, RecoveryStartedTick));
+        }
+
+        // =============================================================================
+        // RegisterRecoveryRetry
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un retry locale per lo step corrente mantenendo un contatore
+        /// bounded dal chiamante.
+        /// </para>
+        ///
+        /// <para><b>Stato recovery agganciato al cursore Job</b></para>
+        /// <para>
+        /// Il contatore viene riusato solo se fallimento, fase e action coincidono.
+        /// Quando cambia una di queste coordinate, la finestra recovery riparte da
+        /// zero. Questo evita che un retry vecchio contamini uno step successivo.
+        /// </para>
+        /// </summary>
+        public void RegisterRecoveryRetry(JobStepFailureKind failureKind, int phaseIndex, int actionIndex, int tick)
+        {
+            if (failureKind == JobStepFailureKind.None)
+            {
+                ClearRecovery();
+                return;
+            }
+
+            if (!MatchesRecoveryCursor(failureKind, phaseIndex, actionIndex))
+            {
+                RecoveryFailureKind = failureKind;
+                RecoveryPhaseIndex = Math.Max(0, phaseIndex);
+                RecoveryActionIndex = Math.Max(0, actionIndex);
+                RecoveryRetryCount = 0;
+                RecoveryStartedTick = Math.Max(0, tick);
+            }
+
+            RecoveryRetryCount = Math.Max(0, RecoveryRetryCount + 1);
+        }
+
+        private bool MatchesRecoveryCursor(JobStepFailureKind failureKind, int phaseIndex, int actionIndex)
+        {
+            return RecoveryFailureKind == failureKind
+                && RecoveryPhaseIndex == Math.Max(0, phaseIndex)
+                && RecoveryActionIndex == Math.Max(0, actionIndex);
+        }
+
+        private void ClearRecovery()
+        {
+            RecoveryFailureKind = JobStepFailureKind.None;
+            RecoveryPhaseIndex = -1;
+            RecoveryActionIndex = -1;
+            RecoveryRetryCount = 0;
+            RecoveryStartedTick = 0;
         }
     }
 }

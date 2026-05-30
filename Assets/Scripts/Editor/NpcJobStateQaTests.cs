@@ -21,6 +21,7 @@ namespace Arcontio.Tests
     /// <list type="bullet">
     ///   <item><b>Assign</b>: apertura di un job corrente.</item>
     ///   <item><b>Advance</b>: avanzamento action e fase.</item>
+    ///   <item><b>Recovery</b>: contatori locali per retry bounded dello step corrente.</item>
     ///   <item><b>Wait/Suspend</b>: stati transitori senza side effect globali.</item>
     /// </list>
     /// </summary>
@@ -116,6 +117,41 @@ namespace Arcontio.Tests
             Assert.That(suspended.HasActiveJob, Is.False);
             Assert.That(suspended.ActiveJobId, Is.Empty);
             Assert.That(suspended.SuspendedJobId, Is.EqualTo("job-work-01"));
+        }
+
+        // =============================================================================
+        // NpcJobStateTracksRecoveryRetryPerCurrentStep
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che i retry recovery siano contati solo per la stessa coppia
+        /// fase/action e per lo stesso tipo di fallimento.
+        /// </para>
+        ///
+        /// <para><b>Anti-loop locale</b></para>
+        /// <para>
+        /// Il contatore non decide recovery da solo, ma impedisce al runtime di
+        /// confondere tentativi appartenenti a step diversi. Quando cambia il cursore
+        /// operativo il conteggio viene azzerato.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void NpcJobStateTracksRecoveryRetryPerCurrentStep()
+        {
+            var state = NpcJobState.Empty();
+            state.AssignJob("job-retry-01", 10);
+
+            state.RegisterRecoveryRetry(JobStepFailureKind.PathBlocked, 0, 0, 12);
+            state.RegisterRecoveryRetry(JobStepFailureKind.PathBlocked, 0, 0, 13);
+
+            Assert.That(state.GetRecoveryRetryCount(JobStepFailureKind.PathBlocked, 0, 0), Is.EqualTo(2));
+            Assert.That(state.GetRecoveryElapsedTicks(JobStepFailureKind.PathBlocked, 0, 0, 20), Is.EqualTo(8));
+            Assert.That(state.GetRecoveryRetryCount(JobStepFailureKind.ResourceMissing, 0, 0), Is.EqualTo(0));
+
+            state.AdvanceAction();
+
+            Assert.That(state.GetRecoveryRetryCount(JobStepFailureKind.PathBlocked, 0, 0), Is.EqualTo(0));
+            Assert.That(state.RecoveryFailureKind, Is.EqualTo(JobStepFailureKind.None));
         }
     }
 }
