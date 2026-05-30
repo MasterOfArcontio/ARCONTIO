@@ -392,6 +392,61 @@ namespace Arcontio.Core
             return true;
         }
 
+        // =============================================================================
+        // ReplaceCurrentJobForRecovery
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce il job corrente con un job equivalente prodotto da recovery
+        /// locale.
+        /// </para>
+        ///
+        /// <para><b>Recovery locale, non nuovo arbitraggio decisionale</b></para>
+        /// <para>
+        /// Questo helper e' usato quando il job corrente ha gia' fallito su uno step
+        /// recuperabile e il runtime ha trovato un target equivalente lecito. Non
+        /// chiama il Decision Layer, non confronta priorita' e non crea code: libera
+        /// reservation/running action del vecchio job e assegna il job sostitutivo
+        /// allo stesso NPC dopo averne prenotato il target.
+        /// </para>
+        /// </summary>
+        public bool ReplaceCurrentJobForRecovery(int npcId, Job replacementJob, int tick, out string reason)
+        {
+            reason = string.Empty;
+
+            if (!TryGetActiveJob(npcId, out var state, out var currentJob) || currentJob == null)
+            {
+                reason = "NoActiveJob";
+                return false;
+            }
+
+            if (replacementJob == null || replacementJob.Request.NpcId != npcId)
+            {
+                reason = "InvalidRecoveryJob";
+                return false;
+            }
+
+            if (!TryReserveJobTarget(replacementJob, tick, out reason))
+            {
+                RecordFailureLearning(
+                    npcId,
+                    replacementJob,
+                    ResolveAssignmentFailureReason(reason),
+                    tick,
+                    "JobRecoveryReplacement:" + reason);
+                return false;
+            }
+
+            Reservations.ReleaseByJob(currentJob.JobId);
+            RunningActions.ClearByJob(currentJob.JobId);
+            _jobs.Remove(currentJob.JobId);
+            _jobs[replacementJob.JobId] = replacementJob;
+            state.AssignJob(replacementJob.JobId, tick);
+            _npcStates[npcId] = state;
+            reason = "RecoveryJobReplaced";
+            return true;
+        }
+
         public bool ClearNpcJob(int npcId, JobFailureReason clearReason, out string reason)
         {
             reason = string.Empty;

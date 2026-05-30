@@ -143,8 +143,10 @@ namespace Arcontio.Tests
 
             state.RegisterRecoveryRetry(JobStepFailureKind.PathBlocked, 0, 0, 12);
             state.RegisterRecoveryRetry(JobStepFailureKind.PathBlocked, 0, 0, 13);
+            state.RegisterRecoveryAlternativeTarget(JobStepFailureKind.PathBlocked, 0, 0, 14);
 
             Assert.That(state.GetRecoveryRetryCount(JobStepFailureKind.PathBlocked, 0, 0), Is.EqualTo(2));
+            Assert.That(state.GetRecoveryAlternativeTargetCount(JobStepFailureKind.PathBlocked, 0, 0), Is.EqualTo(1));
             Assert.That(state.GetRecoveryElapsedTicks(JobStepFailureKind.PathBlocked, 0, 0, 20), Is.EqualTo(8));
             Assert.That(state.GetRecoveryRetryCount(JobStepFailureKind.ResourceMissing, 0, 0), Is.EqualTo(0));
 

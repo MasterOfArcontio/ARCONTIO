@@ -37,20 +37,23 @@ namespace Arcontio.Core
         private readonly BeliefUpdater _beliefUpdater = new();
         private readonly StepRecoveryPolicyRegistry _recoveryPolicyRegistry;
         private readonly StepRecoveryEvaluator _recoveryEvaluator;
+        private readonly JobTemplateRegistry _jobTemplateRegistry;
 
         public int Period => 1;
 
         public JobExecutionSystem()
-            : this(StepRecoveryPolicyRegistry.LoadDefault(), new StepRecoveryEvaluator())
+            : this(StepRecoveryPolicyRegistry.LoadDefault(), new StepRecoveryEvaluator(), JobTemplateRegistry.LoadDefault())
         {
         }
 
         internal JobExecutionSystem(
             StepRecoveryPolicyRegistry recoveryPolicyRegistry,
-            StepRecoveryEvaluator recoveryEvaluator)
+            StepRecoveryEvaluator recoveryEvaluator,
+            JobTemplateRegistry jobTemplateRegistry = null)
         {
             _recoveryPolicyRegistry = recoveryPolicyRegistry ?? new StepRecoveryPolicyRegistry();
             _recoveryEvaluator = recoveryEvaluator ?? new StepRecoveryEvaluator();
+            _jobTemplateRegistry = jobTemplateRegistry ?? new JobTemplateRegistry();
         }
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
@@ -83,10 +86,17 @@ namespace Arcontio.Core
                 var updatedState = npcState;
 
                 result = EvaluateLocalRecovery(
+                    world,
+                    runtime,
+                    npcId,
                     job,
                     ref updatedState,
                     result,
-                    (int)tick.Index);
+                    (int)tick.Index,
+                    out bool replacedByRecoveryJob);
+
+                if (replacedByRecoveryJob)
+                    continue;
 
                 // La state machine possiede gia' la semantica di avanzamento
                 // lifecycle/phase/step/state. Usare l'overload EL-aware non cambia
@@ -149,11 +159,17 @@ namespace Arcontio.Core
         /// </list>
         /// </summary>
         private StepResult EvaluateLocalRecovery(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
             Job job,
             ref NpcJobState npcState,
             StepResult stepResult,
-            int tick)
+            int tick,
+            out bool replacedByRecoveryJob)
         {
+            replacedByRecoveryJob = false;
+
             if (job == null)
                 return stepResult;
 
@@ -188,11 +204,18 @@ namespace Arcontio.Core
                 classification.PhaseIndex,
                 classification.ActionIndex,
                 tick);
-            var recovery = _recoveryEvaluator.EvaluateLocalRetry(
+            var recovery = EvaluateConfiguredRecoveryStrategy(
+                world,
+                runtime,
+                npcId,
+                job,
+                ref npcState,
                 classification,
                 policy,
                 retryCount,
-                elapsedTicks);
+                elapsedTicks,
+                tick,
+                out replacedByRecoveryJob);
 
             if (recovery.Kind != JobRecoveryResultKind.RetryScheduled)
                 return stepResult;
@@ -205,6 +228,201 @@ namespace Arcontio.Core
             return StepResult.Blocked(
                 recovery.SuggestedWaitTicks,
                 "RecoveryRetryScheduled:" + classification.FailureKind + ":" + recovery.AppliedStrategy);
+        }
+
+        private JobRecoveryResult EvaluateConfiguredRecoveryStrategy(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
+            Job job,
+            ref NpcJobState npcState,
+            StepFailureClassification classification,
+            StepRecoveryPolicy policy,
+            int retryCount,
+            int elapsedTicks,
+            int tick,
+            out bool replacedByRecoveryJob)
+        {
+            replacedByRecoveryJob = false;
+
+            if (policy.Strategies == null)
+                return JobRecoveryResult.None();
+
+            for (int i = 0; i < policy.Strategies.Length; i++)
+            {
+                var strategy = policy.Strategies[i];
+
+                if (strategy == StepRecoveryStrategy.FindEquivalentTarget)
+                {
+                    var targetRecovery = TryReplaceWithEquivalentFoodTarget(
+                        world,
+                        runtime,
+                        npcId,
+                        job,
+                        ref npcState,
+                        classification,
+                        policy,
+                        elapsedTicks,
+                        tick,
+                        out replacedByRecoveryJob);
+
+                    if (targetRecovery.HasDeclaredResult)
+                        return targetRecovery;
+
+                    continue;
+                }
+
+                if (strategy == StepRecoveryStrategy.RetrySameAction
+                    || strategy == StepRecoveryStrategy.WaitAndRetry)
+                {
+                    var retryRecovery = _recoveryEvaluator.EvaluateLocalRetry(
+                        classification,
+                        policy,
+                        retryCount,
+                        elapsedTicks,
+                        strategy);
+
+                    if (retryRecovery.HasDeclaredResult)
+                        return retryRecovery;
+                }
+            }
+
+            return JobRecoveryResult.None();
+        }
+
+        private JobRecoveryResult TryReplaceWithEquivalentFoodTarget(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
+            Job job,
+            ref NpcJobState npcState,
+            StepFailureClassification classification,
+            StepRecoveryPolicy policy,
+            int elapsedTicks,
+            int tick,
+            out bool replacedByRecoveryJob)
+        {
+            replacedByRecoveryJob = false;
+
+            int alternativeCount = npcState.GetRecoveryAlternativeTargetCount(
+                classification.FailureKind,
+                classification.PhaseIndex,
+                classification.ActionIndex);
+
+            bool hasCandidate = TryResolveEquivalentCommunityFoodTarget(
+                world,
+                npcId,
+                job,
+                policy.MaxSearchRadius,
+                out int replacementFoodObjectId,
+                out var replacementCell);
+            var recovery = _recoveryEvaluator.EvaluateEquivalentTarget(
+                classification,
+                policy,
+                alternativeCount,
+                elapsedTicks,
+                hasCandidate);
+
+            if (recovery.Kind != JobRecoveryResultKind.TargetReplaced)
+                return recovery;
+
+            if (!TryCreateReplacementFoodJob(job, npcId, replacementFoodObjectId, replacementCell, tick, out var replacementJob))
+                return JobRecoveryResult.None();
+
+            if (!runtime.ReplaceCurrentJobForRecovery(npcId, replacementJob, tick, out _))
+                return JobRecoveryResult.None();
+
+            if (runtime.TryGetNpcState(npcId, out var replacementState))
+            {
+                replacementState.RegisterRecoveryAlternativeTarget(
+                    classification.FailureKind,
+                    classification.PhaseIndex,
+                    classification.ActionIndex,
+                    tick);
+                runtime.SetNpcState(npcId, in replacementState);
+            }
+
+            replacedByRecoveryJob = true;
+            return recovery;
+        }
+
+        private bool TryCreateReplacementFoodJob(
+            Job currentJob,
+            int npcId,
+            int replacementFoodObjectId,
+            Vector2Int replacementCell,
+            int tick,
+            out Job replacementJob)
+        {
+            replacementJob = null;
+
+            if (currentJob == null || currentJob.Request.IntentKind != DecisionIntentKind.EatKnownFood)
+                return false;
+
+            var request = new JobRequest(
+                "jobreq_food_recovery_" + npcId + "_" + replacementFoodObjectId + "_" + tick,
+                npcId,
+                DecisionIntentKind.EatKnownFood,
+                currentJob.Request.PriorityClass,
+                currentJob.Request.Urgency01,
+                tick,
+                true,
+                replacementCell,
+                replacementFoodObjectId,
+                "RecoveryEquivalentFood:" + replacementFoodObjectId,
+                "JobRecoveryEquivalentFood");
+
+            return FoodJobFactory.TryCreateKnownCommunityFoodJob(
+                _jobTemplateRegistry,
+                request,
+                out replacementJob,
+                out _);
+        }
+
+        private static bool TryResolveEquivalentCommunityFoodTarget(
+            World world,
+            int npcId,
+            Job job,
+            int maxSearchRadius,
+            out int replacementFoodObjectId,
+            out Vector2Int replacementCell)
+        {
+            replacementFoodObjectId = 0;
+            replacementCell = default;
+
+            if (world == null || job == null || job.Request.IntentKind != DecisionIntentKind.EatKnownFood)
+                return false;
+
+            if (maxSearchRadius <= 0 || !world.GridPos.TryGetValue(npcId, out var npcCell))
+                return false;
+
+            int bestDistance = int.MaxValue;
+            foreach (var pair in world.FoodStocks)
+            {
+                int objectId = pair.Key;
+                if (objectId == job.Request.TargetObjectId)
+                    continue;
+
+                var stock = pair.Value;
+                if (stock.Units <= 0 || stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
+                    continue;
+
+                if (!world.Objects.TryGetValue(objectId, out var obj) || obj == null)
+                    continue;
+
+                int distance = Mathf.Abs(obj.CellX - npcCell.X) + Mathf.Abs(obj.CellY - npcCell.Y);
+                if (distance > maxSearchRadius || distance >= bestDistance)
+                    continue;
+
+                if (!world.HasLineOfSight(npcCell.X, npcCell.Y, obj.CellX, obj.CellY))
+                    continue;
+
+                bestDistance = distance;
+                replacementFoodObjectId = objectId;
+                replacementCell = new Vector2Int(obj.CellX, obj.CellY);
+            }
+
+            return replacementFoodObjectId > 0;
         }
 
         private static StepResult ExecuteCurrentAction(

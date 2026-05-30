@@ -43,6 +43,8 @@ namespace Arcontio.Tests
                 tests.LocalRetryStopsWhenRetryCountLimitIsReached();
                 tests.LocalRetryStopsWhenRecoveryWindowIsExceeded();
                 tests.LocalRetryDoesNotApplyNonRetryStrategies();
+                tests.EquivalentTargetProducesTargetReplacedWhenPolicyAllowsIt();
+                tests.EquivalentTargetStopsWhenAlternativeLimitIsReached();
 
                 Debug.Log("[StepRecoveryEvaluatorLocalRetryQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -108,6 +110,35 @@ namespace Arcontio.Tests
             Assert.That(result.AppliedStrategy, Is.EqualTo(StepRecoveryStrategy.None));
         }
 
+        [Test]
+        public void EquivalentTargetProducesTargetReplacedWhenPolicyAllowsIt()
+        {
+            var result = new StepRecoveryEvaluator().EvaluateEquivalentTarget(
+                MakeClassification(JobStepFailureKind.ResourceMissing, suggestedWaitTicks: 0),
+                MakePolicy(JobStepFailureKind.ResourceMissing, 1, 12, StepRecoveryStrategy.FindEquivalentTarget),
+                currentAlternativeTargetCount: 0,
+                recoveryElapsedTicks: 3,
+                hasEquivalentTarget: true);
+
+            Assert.That(result.Kind, Is.EqualTo(JobRecoveryResultKind.TargetReplaced));
+            Assert.That(result.AppliedStrategy, Is.EqualTo(StepRecoveryStrategy.FindEquivalentTarget));
+            Assert.That(result.FailureKind, Is.EqualTo(JobStepFailureKind.ResourceMissing));
+        }
+
+        [Test]
+        public void EquivalentTargetStopsWhenAlternativeLimitIsReached()
+        {
+            var result = new StepRecoveryEvaluator().EvaluateEquivalentTarget(
+                MakeClassification(JobStepFailureKind.TargetInvalid, suggestedWaitTicks: 0),
+                MakePolicy(JobStepFailureKind.TargetInvalid, 1, 12, StepRecoveryStrategy.FindEquivalentTarget),
+                currentAlternativeTargetCount: 1,
+                recoveryElapsedTicks: 3,
+                hasEquivalentTarget: true);
+
+            Assert.That(result.Kind, Is.EqualTo(JobRecoveryResultKind.None));
+            Assert.That(result.HasDeclaredResult, Is.False);
+        }
+
         private static StepFailureClassification MakeClassification(JobStepFailureKind failureKind, int suggestedWaitTicks)
         {
             return StepFailureClassification.FromData(
@@ -133,7 +164,7 @@ namespace Arcontio.Tests
                 maxRetryCount,
                 maxRecoveryTicks,
                 maxSearchRadius: 0,
-                maxAlternativeTargets: 0,
+                maxAlternativeTargets: 1,
                 maxRepathAttempts: 0);
         }
     }
