@@ -346,6 +346,34 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void AssignedFoodJobConsumeFoodUnavailableCanReplaceWithVisibleEquivalentFood()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            int replacementFoodId = AddCommunityFoodStock(world, 88, 6, 5, units: 3);
+
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 0,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+
+            var system = new JobExecutionSystem();
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out var state, out var activeJob), Is.True);
+            Assert.That(activeJob.Request.TargetObjectId, Is.EqualTo(replacementFoodId));
+            Assert.That(activeJob.Request.TargetCell, Is.EqualTo(new Vector2Int(6, 5)));
+            Assert.That(state.GetRecoveryAlternativeTargetCount(JobStepFailureKind.ResourceMissing, 1, 0), Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.Reservations.TryGetByTarget(
+                ReservationTargetKind.Object,
+                new Vector2Int(6, 5),
+                replacementFoodId,
+                out _), Is.True);
+        }
+
+        [Test]
         public void AssignedFoodJobConsumeFoodObjectMissingUpdatesFoodBelief()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
@@ -778,6 +806,28 @@ namespace Arcontio.Tests
                 Units = 3,
                 OwnerKind = OwnerKind.Npc,
                 OwnerId = ownerNpcId
+            };
+
+            return foodId;
+        }
+
+        private static int AddCommunityFoodStock(World world, int foodId, int x, int y, int units)
+        {
+            world.Objects[foodId] = new WorldObjectInstance
+            {
+                ObjectId = foodId,
+                DefId = "food_stock",
+                CellX = x,
+                CellY = y,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = units,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
             };
 
             return foodId;

@@ -42,6 +42,7 @@ namespace Arcontio.Core
         public int RecoveryPhaseIndex;
         public int RecoveryActionIndex;
         public int RecoveryRetryCount;
+        public int RecoveryAlternativeTargetCount;
         public int RecoveryStartedTick;
         public string SuspendedJobId;
         public JobFailureReason LastFailureReason;
@@ -61,6 +62,7 @@ namespace Arcontio.Core
                 RecoveryPhaseIndex = -1,
                 RecoveryActionIndex = -1,
                 RecoveryRetryCount = 0,
+                RecoveryAlternativeTargetCount = 0,
                 RecoveryStartedTick = 0,
                 SuspendedJobId = string.Empty,
                 LastFailureReason = JobFailureReason.None
@@ -162,6 +164,13 @@ namespace Arcontio.Core
                 : 0;
         }
 
+        public int GetRecoveryAlternativeTargetCount(JobStepFailureKind failureKind, int phaseIndex, int actionIndex)
+        {
+            return MatchesRecoveryCursor(failureKind, phaseIndex, actionIndex)
+                ? RecoveryAlternativeTargetCount
+                : 0;
+        }
+
         // =============================================================================
         // GetRecoveryElapsedTicks
         // =============================================================================
@@ -215,6 +224,27 @@ namespace Arcontio.Core
             RecoveryRetryCount = Math.Max(0, RecoveryRetryCount + 1);
         }
 
+        public void RegisterRecoveryAlternativeTarget(JobStepFailureKind failureKind, int phaseIndex, int actionIndex, int tick)
+        {
+            if (failureKind == JobStepFailureKind.None)
+            {
+                ClearRecovery();
+                return;
+            }
+
+            if (!MatchesRecoveryCursor(failureKind, phaseIndex, actionIndex))
+            {
+                RecoveryFailureKind = failureKind;
+                RecoveryPhaseIndex = Math.Max(0, phaseIndex);
+                RecoveryActionIndex = Math.Max(0, actionIndex);
+                RecoveryRetryCount = 0;
+                RecoveryAlternativeTargetCount = 0;
+                RecoveryStartedTick = Math.Max(0, tick);
+            }
+
+            RecoveryAlternativeTargetCount = Math.Max(0, RecoveryAlternativeTargetCount + 1);
+        }
+
         private bool MatchesRecoveryCursor(JobStepFailureKind failureKind, int phaseIndex, int actionIndex)
         {
             return RecoveryFailureKind == failureKind
@@ -228,6 +258,7 @@ namespace Arcontio.Core
             RecoveryPhaseIndex = -1;
             RecoveryActionIndex = -1;
             RecoveryRetryCount = 0;
+            RecoveryAlternativeTargetCount = 0;
             RecoveryStartedTick = 0;
         }
     }

@@ -22,6 +22,7 @@ namespace Arcontio.Core
     /// <list type="bullet">
     ///   <item><b>EvaluateNoOp</b>: riceve dati passivi e restituisce sempre nessun risultato recovery.</item>
     ///   <item><b>EvaluateLocalRetry</b>: produce solo retry locale bounded quando la policy lo dichiara.</item>
+    ///   <item><b>EvaluateEquivalentTarget</b>: autorizza sostituzione target solo se gia' risolta dal chiamante.</item>
     /// </list>
     /// </summary>
     public sealed class StepRecoveryEvaluator
@@ -73,6 +74,21 @@ namespace Arcontio.Core
             int currentRetryCount,
             int recoveryElapsedTicks)
         {
+            return EvaluateLocalRetry(
+                classification,
+                policy,
+                currentRetryCount,
+                recoveryElapsedTicks,
+                StepRecoveryStrategy.None);
+        }
+
+        public JobRecoveryResult EvaluateLocalRetry(
+            StepFailureClassification classification,
+            StepRecoveryPolicy policy,
+            int currentRetryCount,
+            int recoveryElapsedTicks,
+            StepRecoveryStrategy requestedStrategy)
+        {
             if (!classification.HasClassification || !policy.HasDeclaredData)
                 return JobRecoveryResult.None();
 
@@ -82,7 +98,7 @@ namespace Arcontio.Core
             if (policy.MaxRecoveryTicks > 0 && recoveryElapsedTicks > policy.MaxRecoveryTicks)
                 return JobRecoveryResult.None();
 
-            if (!TryResolveRetryStrategy(policy, out var strategy))
+            if (!TryResolveRetryStrategy(policy, requestedStrategy, out var strategy))
                 return JobRecoveryResult.None();
 
             int waitTicks = ResolveRetryWaitTicks(classification, policy, recoveryElapsedTicks);
@@ -94,12 +110,53 @@ namespace Arcontio.Core
                 "LocalRetryScheduled");
         }
 
-        private static bool TryResolveRetryStrategy(StepRecoveryPolicy policy, out StepRecoveryStrategy strategy)
+        public JobRecoveryResult EvaluateEquivalentTarget(
+            StepFailureClassification classification,
+            StepRecoveryPolicy policy,
+            int currentAlternativeTargetCount,
+            int recoveryElapsedTicks,
+            bool hasEquivalentTarget)
+        {
+            if (!classification.HasClassification || !policy.HasDeclaredData)
+                return JobRecoveryResult.None();
+
+            if (!hasEquivalentTarget)
+                return JobRecoveryResult.None();
+
+            if (!policy.ContainsStrategy(StepRecoveryStrategy.FindEquivalentTarget))
+                return JobRecoveryResult.None();
+
+            if (policy.MaxAlternativeTargets <= 0 || currentAlternativeTargetCount >= policy.MaxAlternativeTargets)
+                return JobRecoveryResult.None();
+
+            if (policy.MaxRecoveryTicks > 0 && recoveryElapsedTicks > policy.MaxRecoveryTicks)
+                return JobRecoveryResult.None();
+
+            return JobRecoveryResult.FromData(
+                JobRecoveryResultKind.TargetReplaced,
+                StepRecoveryStrategy.FindEquivalentTarget,
+                classification.FailureKind,
+                0,
+                "EquivalentTargetSelected");
+        }
+
+        private static bool TryResolveRetryStrategy(
+            StepRecoveryPolicy policy,
+            StepRecoveryStrategy requestedStrategy,
+            out StepRecoveryStrategy strategy)
         {
             strategy = StepRecoveryStrategy.None;
 
             if (policy.Strategies == null)
                 return false;
+
+            if ((requestedStrategy == StepRecoveryStrategy.RetrySameAction
+                    || requestedStrategy == StepRecoveryStrategy.WaitAndRetry)
+                && policy.ContainsStrategy(requestedStrategy))
+            {
+                strategy = requestedStrategy;
+                return true;
+            }
 
             for (int i = 0; i < policy.Strategies.Length; i++)
             {
