@@ -82,7 +82,11 @@ namespace Arcontio.Core
                     explainabilityRegistry);
                 var updatedState = npcState;
 
-                EvaluateRecoveryPolicyNoOp(job, in npcState, result);
+                result = EvaluateLocalRecovery(
+                    job,
+                    ref updatedState,
+                    result,
+                    (int)tick.Index);
 
                 // La state machine possiede gia' la semantica di avanzamento
                 // lifecycle/phase/step/state. Usare l'overload EL-aware non cambia
@@ -117,22 +121,23 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
-        // EvaluateRecoveryPolicyNoOp
+        // EvaluateLocalRecovery
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Collega in modo passivo il risultato dello step corrente alla matrice
-        /// configurabile di recupero locale degli incarichi.
+        /// Collega il risultato dello step corrente alla matrice configurabile di
+        /// recupero locale degli incarichi.
         /// </para>
         ///
-        /// <para><b>Policy recovery consultata, non applicata</b></para>
+        /// <para><b>Retry locale bounded, non nuova decisione</b></para>
         /// <para>
-        /// Questo metodo e' il ponte v0.14c tra runtime Job e configurazione in
+        /// Questo metodo e' il primo uso produttivo limitato della configurazione in
         /// <c>Resources/Arcontio/Jobs/job_recovery_policies.json</c>. Classifica il
-        /// fallimento con <c>StepFailureClassifier</c>, cerca la policy dichiarata e
-        /// passa i dati a <c>StepRecoveryEvaluator</c>, che in questa fase resta
-        /// volutamente no-op. Non modifica cursore, job, reservation, command buffer,
-        /// world, memoria o tick order.
+        /// fallimento, consulta la policy e permette soltanto di trasformare un
+        /// <c>Failed</c> recuperabile in <c>Blocked</c> per riprovare lo stesso step.
+        /// Non sostituisce target, non ricostruisce fasi, non emette command, non
+        /// legge nuovi dati dal <c>World</c> e non sposta autorita' decisionale dentro
+        /// il Job runtime.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -143,23 +148,24 @@ namespace Arcontio.Core
         ///   <item><b>Evaluator no-op</b>: conserva comportamento terminale esistente.</item>
         /// </list>
         /// </summary>
-        private void EvaluateRecoveryPolicyNoOp(
+        private StepResult EvaluateLocalRecovery(
             Job job,
-            in NpcJobState npcState,
-            StepResult stepResult)
+            ref NpcJobState npcState,
+            StepResult stepResult,
+            int tick)
         {
             if (job == null)
-                return;
+                return stepResult;
 
             // Il ponte recovery deve osservare lo stesso step che verra' consegnato
             // alla state machine. Se il piano non espone piu' fase o azione, non
             // inventiamo coordinate di recupero: il fallimento resta terminale come
             // prima della patch.
             if (!job.Plan.TryGetPhase(npcState.ActivePhaseIndex, out var phase))
-                return;
+                return stepResult;
 
             if (!phase.TryGetAction(npcState.ActiveActionIndex, out var action))
-                return;
+                return stepResult;
 
             var classification = StepFailureClassifier.Classify(
                 stepResult,
@@ -168,16 +174,37 @@ namespace Arcontio.Core
                 npcState.ActiveActionIndex);
 
             if (!classification.HasClassification)
-                return;
+                return stepResult;
 
             if (!_recoveryPolicyRegistry.TryGetPolicy(classification.FailureKind, out var policy))
-                return;
+                return stepResult;
 
-            // In v0.14c il risultato viene deliberatamente scartato: il valutatore
-            // restituisce sempre None e quindi non puo' programmare retry,
-            // sostituire target, ricostruire fasi o impedire alla state machine di
-            // chiudere il job secondo la semantica gia' esistente.
-            _ = _recoveryEvaluator.EvaluateNoOp(classification, policy);
+            int retryCount = npcState.GetRecoveryRetryCount(
+                classification.FailureKind,
+                classification.PhaseIndex,
+                classification.ActionIndex);
+            int elapsedTicks = npcState.GetRecoveryElapsedTicks(
+                classification.FailureKind,
+                classification.PhaseIndex,
+                classification.ActionIndex,
+                tick);
+            var recovery = _recoveryEvaluator.EvaluateLocalRetry(
+                classification,
+                policy,
+                retryCount,
+                elapsedTicks);
+
+            if (recovery.Kind != JobRecoveryResultKind.RetryScheduled)
+                return stepResult;
+
+            npcState.RegisterRecoveryRetry(
+                classification.FailureKind,
+                classification.PhaseIndex,
+                classification.ActionIndex,
+                tick);
+            return StepResult.Blocked(
+                recovery.SuggestedWaitTicks,
+                "RecoveryRetryScheduled:" + classification.FailureKind + ":" + recovery.AppliedStrategy);
         }
 
         private static StepResult ExecuteCurrentAction(

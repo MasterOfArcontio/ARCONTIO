@@ -12,26 +12,26 @@ namespace Arcontio.Tests
     // =============================================================================
     /// <summary>
     /// <para>
-    /// QA EditMode per il ponte passivo tra runtime degli incarichi e policy di
+    /// QA EditMode per il ponte controllato tra runtime degli incarichi e policy di
     /// recupero locale configurate nelle Resources.
     /// </para>
     ///
-    /// <para><b>v0.14c - Policy recovery consultate senza recovery produttiva</b></para>
+    /// <para><b>v0.14d - Retry locale controllato da policy recovery</b></para>
     /// <para>
     /// Questi test verificano che la configurazione fallback viva nella cartella
     /// <c>Assets/Resources/Arcontio/Jobs</c> sia caricabile e che
-    /// <c>JobExecutionSystem</c> contenga solo un cablaggio passivo verso
+    /// <c>JobExecutionSystem</c> contenga un cablaggio limitato verso
     /// <c>StepRecoveryPolicyRegistry</c>, <c>StepFailureClassifier</c> e
-    /// <c>StepRecoveryEvaluator.EvaluateNoOp</c>. Non autorizzano retry, non
-    /// sostituiscono target, non emettono command e non trasformano il runtime Job
-    /// in un secondo decisore.
+    /// <c>StepRecoveryEvaluator.EvaluateLocalRetry</c>. Autorizzano solo retry dello
+    /// stesso step entro limiti espliciti; non sostituiscono target, non emettono
+    /// command e non trasformano il runtime Job in un secondo decisore.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Resource config</b>: valida che il JSON fallback sia caricato da Resources.</item>
     ///   <item><b>Policy bridge</b>: controlla il cablaggio passivo nel runtime Job.</item>
-    ///   <item><b>No-op guard</b>: conferma che il valutatore non produce ancora recovery.</item>
+    ///   <item><b>Retry guard</b>: conferma che il runtime passa da policy a retry bounded.</item>
     /// </list>
     /// </summary>
     public sealed class JobRecoveryRuntimePolicyBridgeQaTests
@@ -43,7 +43,7 @@ namespace Arcontio.Tests
                 var tests = new JobRecoveryRuntimePolicyBridgeQaTests();
 
                 tests.DefaultRecoveryPolicyRegistryLoadsResourcesJobConfig();
-                tests.JobExecutionSystemBridgesClassifierPolicyAndNoOpEvaluator();
+                tests.JobExecutionSystemBridgesClassifierPolicyAndLocalRetryEvaluator();
                 tests.ConfiguredPolicyStillProducesNoRuntimeRecoveryInNoOpEvaluator();
 
                 Debug.Log("[JobRecoveryRuntimePolicyBridgeQaTests] PASS");
@@ -70,15 +70,16 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void JobExecutionSystemBridgesClassifierPolicyAndNoOpEvaluator()
+        public void JobExecutionSystemBridgesClassifierPolicyAndLocalRetryEvaluator()
         {
             var source = File.ReadAllText("Assets/Scripts/Core/Jobs/JobExecutionSystem.cs");
 
             Assert.That(source, Does.Contain("StepRecoveryPolicyRegistry.LoadDefault()"));
             Assert.That(source, Does.Contain("StepFailureClassifier.Classify"));
             Assert.That(source, Does.Contain("TryGetPolicy(classification.FailureKind"));
-            Assert.That(source, Does.Contain("EvaluateNoOp(classification, policy)"));
-            Assert.That(source, Does.Contain("EvaluateRecoveryPolicyNoOp(job, in npcState, result)"));
+            Assert.That(source, Does.Contain("EvaluateLocalRetry("));
+            Assert.That(source, Does.Contain("RegisterRecoveryRetry("));
+            Assert.That(source, Does.Contain("RecoveryRetryScheduled:"));
         }
 
         [Test]
