@@ -2,7 +2,7 @@
   "policies": [
     {
       "failureKind": "PathBlocked",
-      "strategies": [ "Repath", "FindAlternateCell", "WaitAndRetry", "FailPhase" ],
+      "strategies": [ "WaitAndRetry", "Repath", "FindAlternateCell", "FailPhase" ],
       "maxRetryCount": 2,
       "maxRecoveryTicks": 24,
       "maxSearchRadius": 3,
@@ -47,7 +47,7 @@
     },
     {
       "failureKind": "Timeout",
-      "strategies": [ "RetrySameAction", "WaitAndRetry", "FailPhase", "EscalateToDecision" ],
+      "strategies": [ "WaitAndRetry", "RetrySameAction", "FailPhase", "EscalateToDecision" ],
       "maxRetryCount": 1,
       "maxRecoveryTicks": 30,
       "maxSearchRadius": 0,
@@ -56,11 +56,11 @@
     },
     {
       "failureKind": "InsufficientInformation",
-      "strategies": [ "RelaxLocalCriteria", "FindEquivalentTarget", "EscalateToDecision" ],
-      "maxRetryCount": 1,
+      "strategies": [ "EscalateToDecision", "FailJob" ],
+      "maxRetryCount": 0,
       "maxRecoveryTicks": 18,
-      "maxSearchRadius": 4,
-      "maxAlternativeTargets": 3,
+      "maxSearchRadius": 0,
+      "maxAlternativeTargets": 0,
       "maxRepathAttempts": 0
     },
     {
@@ -74,11 +74,11 @@
     },
     {
       "failureKind": "AccessDenied",
-      "strategies": [ "FindAlternateCell", "FailPhase" ],
+      "strategies": [ "FailPhase", "FailJob" ],
       "maxRetryCount": 0,
       "maxRecoveryTicks": 8,
-      "maxSearchRadius": 2,
-      "maxAlternativeTargets": 1,
+      "maxSearchRadius": 0,
+      "maxAlternativeTargets": 0,
       "maxRepathAttempts": 0
     }
   ]

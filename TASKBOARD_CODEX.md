@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.15 - Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime
 
 CHECKPOINT CORRENTE:
-v0.15.5 - Matrice recovery movimento in job_recovery_policies.json
+v0.15.6 - MoveTo multi-cella su route conosciuta
 
 STATUS:
 READY / NEXT STEP
 
 OUTPUT ATTESO:
-aggiornamento della matrice recovery movimento dopo specifica `v0.15.4`
+prima implementazione della running action MoveTo multi-cella su route lecita, senza fallback greedy ordinario
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.14`;
@@ -84,7 +84,7 @@ Obiettivo tecnico corrente `v0.15`:
 - preparare la cognizione soggettiva sopra movimento non onnisciente.
 
 Prossimo macro job consigliato:
-`v0.15.5 - Matrice recovery movimento in job_recovery_policies.json`
+`v0.15.6 - MoveTo multi-cella su route conosciuta`
 
 Residual follow-ups / future hardening:
 
@@ -120,7 +120,7 @@ Checkpoint v0.15 pianificati:
 - `v0.15.2`: audit movimento legacy vs RunningAction MoveTo - IN PROGRESS;
 - `v0.15.3`: bug target cibo eliminato durante movimento e belief obsoleta - QA PENDING;
 - `v0.15.4`: specifica RunningAction MoveTo e cause fallimento - DONE;
-- `v0.15.5`: matrice recovery movimento in `job_recovery_policies.json`;
+- `v0.15.5`: matrice recovery movimento in `job_recovery_policies.json` - DONE;
 - `v0.15.6`: MoveTo multi-cella su route conosciuta;
 - `v0.15.7`: porte e micro-interazioni locali in MoveTo;
 - `v0.15.8`: rimozione fallback greedy ordinario;
