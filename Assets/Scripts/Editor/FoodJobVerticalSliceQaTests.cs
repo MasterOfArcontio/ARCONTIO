@@ -349,8 +349,9 @@ namespace Arcontio.Tests
         public void AssignedFoodJobConsumeFoodUnavailableCanReplaceWithVisibleEquivalentFood()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
-            int replacementFoodId = AddCommunityFoodStock(world, 88, 6, 5, units: 3);
+            int replacementFoodId = AddCommunityFoodStock(world, 88, 5, 5, units: 3);
 
+            AddFoodBelief(world, npcId, 5, 5);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
             world.FoodStocks[foodId] = new FoodStockComponent
             {
@@ -361,16 +362,21 @@ namespace Arcontio.Tests
 
             var system = new JobExecutionSystem();
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
 
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out var state, out var activeJob), Is.True);
             Assert.That(activeJob.Request.TargetObjectId, Is.EqualTo(replacementFoodId));
-            Assert.That(activeJob.Request.TargetCell, Is.EqualTo(new Vector2Int(6, 5)));
+            Assert.That(activeJob.Request.TargetCell, Is.EqualTo(new Vector2Int(5, 5)));
             Assert.That(state.GetRecoveryAlternativeTargetCount(JobStepFailureKind.ResourceMissing, 1, 0), Is.EqualTo(1));
             Assert.That(world.JobRuntimeState.Reservations.TryGetByTarget(
                 ReservationTargetKind.Object,
-                new Vector2Int(6, 5),
+                new Vector2Int(5, 5),
                 replacementFoodId,
                 out _), Is.True);
+            Assert.That(
+                world.JobRuntimeState.FailureLearning.GetCount(npcId, DecisionIntentKind.EatKnownFood, JobFailureReason.MissingTarget),
+                Is.EqualTo(1));
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
         }
 
         [Test]
