@@ -51,6 +51,7 @@ namespace Arcontio.Tests
                 tests.RegistryAndViewModelExposeJsonlFieldsForSelectedNpc();
                 tests.ScopedViewModelBuildsOnlyVisibleDiagnosticFamily();
                 tests.DecisionScopeBuildsIntentOutcomeRowsFromExistingJobTraces();
+                tests.DecisionScopeDoesNotShowNoneIntentOutcomeRows();
                 tests.DisabledConfigDoesNotPopulateRegistry();
                 tests.JobExplainabilityTraceKindsPopulateRegistryViewModelAndTimeline();
 
@@ -239,6 +240,46 @@ namespace Arcontio.Tests
             Assert.That(viewModel.IntentOutcomeRows[1].Intent, Is.EqualTo("EatKnownFood"));
             Assert.That(viewModel.IntentOutcomeRows[1].Result, Is.EqualTo("ok"));
             Assert.That(viewModel.IntentOutcomeRows[1].ColorRole, Is.EqualTo(MemoryBeliefDecisionColorRole.Ok));
+        }
+
+        // =============================================================================
+        // DecisionScopeDoesNotShowNoneIntentOutcomeRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il pannello "ultimi intent ed esiti" non mostri la decisione
+        /// <c>None</c>, perche' rappresenta assenza di intent selezionato e non un
+        /// esito operativo leggibile.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DecisionScopeDoesNotShowNoneIntentOutcomeRows()
+        {
+            var config = MakeConfig();
+            int npcId = 12;
+            var world = new World(MakeWorldConfigWithMbqdEnabled());
+
+            var noneDecision = MakeDecisionTrace(npcId);
+            noneDecision.Tick = 330;
+            noneDecision.Decision.SelectedIntent = DecisionIntentKind.None;
+
+            var validDecision = MakeDecisionTrace(npcId);
+            validDecision.Tick = 320;
+            validDecision.Decision.SelectedIntent = DecisionIntentKind.SearchFood;
+
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, noneDecision);
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, validDecision);
+
+            var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
+            bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(
+                world,
+                npcId,
+                viewModel,
+                buildScope: MemoryBeliefDecisionViewModelBuildScope.Decision);
+
+            Assert.That(built, Is.True);
+            Assert.That(viewModel.IntentOutcomeRows.Count, Is.EqualTo(1));
+            Assert.That(viewModel.IntentOutcomeRows[0].Intent, Is.EqualTo("SearchFood"));
         }
 
         // =============================================================================

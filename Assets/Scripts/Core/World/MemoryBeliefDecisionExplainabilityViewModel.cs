@@ -1011,13 +1011,16 @@ namespace Arcontio.Core
                     continue;
 
                 var decision = decisionTrace.Decision;
+                if (decision.SelectedIntent == DecisionIntentKind.None)
+                    continue;
+
                 var row = new MemoryBeliefDecisionIntentOutcomeView
                 {
                     Tick = decisionTrace.Tick,
                     Intent = decision.SelectedIntent.ToString(),
                 };
 
-                if (decision.SelectedIntent == DecisionIntentKind.None || decision.CandidateCount <= 0)
+                if (decision.CandidateCount <= 0)
                 {
                     row.Result = "fallita";
                     row.Detail = "nessun candidato eseguibile";
