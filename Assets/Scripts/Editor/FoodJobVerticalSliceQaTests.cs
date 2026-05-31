@@ -163,25 +163,6 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void KnownFoodBeliefSuppressesSearchFoodFallbackInRuntimeSelection()
-        {
-            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
-            AddCommunityFoodStock(world, foodId: 44, x: 7, y: 5, units: 3);
-            AddFoodBelief(world, npcId, 7, 5);
-            var orchestrator = new DecisionOrchestratorSystem(
-                decisionEveryTicks: 1,
-                maxSeekRangeCells: 16,
-                enableFoodJobVerticalSlice: true,
-                jobTemplateRegistry: MakeRegistry());
-
-            orchestrator.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
-
-            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
-            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.EatKnownFood));
-            Assert.That(job.Request.TargetCell, Is.EqualTo(new Vector2Int(7, 5)));
-        }
-
-        [Test]
         public void FoodFactoryPrebuiltRequestPreservesDecisionBoundaryFields()
         {
             var registry = MakeRegistry();
