@@ -951,16 +951,17 @@ In questa fase NON si deve:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.15a | Audit movimento legacy vs RunningAction MoveTo | ⏳ |
-| v0.15b | Specifica running action MoveTo e cause fallimento | ⏳ |
-| v0.15c | Matrice recovery movimento in `job_recovery_policies.json` | ⏳ |
-| v0.15d | MoveTo multi-cella su route conosciuta | ⏳ |
-| v0.15e | Porte e micro-interazioni locali in MoveTo | ⏳ |
-| v0.15f | Rimozione fallback greedy ordinario | ⏳ |
-| v0.15g | Bug target cibo eliminato e completion errata Job | ⏳ |
-| v0.15h | Isolamento MoveIntent/MovementSystem come dev o compatibilita' | ⏳ |
-| v0.15i | EL movimento Job e QA anti-onniscienza path | ⏳ |
-| v0.15j | Closeout movimento multi-tick | ⏳ |
+| v0.15.1 | Debug riapertura job e cadenza decisionale | ⚠️ QA PENDING |
+| v0.15.2 | Audit movimento legacy vs RunningAction MoveTo | ⏳ |
+| v0.15.3 | Bug target cibo eliminato durante movimento e belief obsoleta | ⚠️ QA PENDING |
+| v0.15.4 | Specifica RunningAction MoveTo e cause fallimento | ⏳ |
+| v0.15.5 | Matrice recovery movimento in `job_recovery_policies.json` | ⏳ |
+| v0.15.6 | MoveTo multi-cella su route conosciuta | ⏳ |
+| v0.15.7 | Porte e micro-interazioni locali in MoveTo | ⏳ |
+| v0.15.8 | Rimozione fallback greedy ordinario | ⏳ |
+| v0.15.9 | Isolamento MoveIntent/MovementSystem come dev o compatibilita' | ⏳ |
+| v0.15.10 | EL movimento Job e QA anti-onniscienza path | ⏳ |
+| v0.15.11 | Closeout movimento multi-tick | ⏳ |
 
 ---
 

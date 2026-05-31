@@ -139,8 +139,9 @@ namespace Arcontio.Core
                 if (!CanEvaluateNpc(world, npcId, in needs, nowTick))
                     continue;
 
-                _lastDecisionTicks[npcId] = nowTick;
-                TryEvaluateAndStartJob(world, npcId, in needs, nowTick, telemetry);
+                var startResult = TryEvaluateAndStartJob(world, npcId, in needs, nowTick, telemetry);
+                if (ShouldConsumeDecisionCadence(startResult))
+                    _lastDecisionTicks[npcId] = nowTick;
             }
         }
 
@@ -166,10 +167,10 @@ namespace Arcontio.Core
             return _scheduler.EvaluateEligibility(input).AllowsEvaluation;
         }
 
-        private void TryEvaluateAndStartJob(World world, int npcId, in NpcNeeds needs, int nowTick, Telemetry telemetry)
+        private DecisionJobStartResult TryEvaluateAndStartJob(World world, int npcId, in NpcNeeds needs, int nowTick, Telemetry telemetry)
         {
             if (!_contextBuilder.TryBuild(world, npcId, in needs, nowTick, out var context))
-                return;
+                return DecisionJobStartResult.ContextUnavailable;
 
             _candidateGenerator.GeneratePhase1Candidates(in context, _decisionCandidates);
             RemoveNonRoutableJobCandidates(_decisionCandidates);
@@ -187,11 +188,11 @@ namespace Arcontio.Core
                 selectionConfig);
 
             if (selection.IsEmpty)
-                return;
+                return DecisionJobStartResult.NoExecutableCandidate;
 
             if (selection.Candidate.Kind == DecisionIntentKind.EatKnownFood)
             {
-                _foodDecisionJobOrchestrator.TryStartKnownCommunityFoodJob(
+                bool assigned = _foodDecisionJobOrchestrator.TryStartKnownCommunityFoodJob(
                     world,
                     npcId,
                     nowTick,
@@ -203,12 +204,14 @@ namespace Arcontio.Core
                     _explainabilityBridge,
                     telemetry,
                     out _);
-                return;
+                return assigned
+                    ? DecisionJobStartResult.JobStarted
+                    : DecisionJobStartResult.RouteRejected;
             }
 
             if (selection.Candidate.Kind == DecisionIntentKind.SearchFood)
             {
-                _foodDecisionJobOrchestrator.TryStartSearchFoodJob(
+                bool assigned = _foodDecisionJobOrchestrator.TryStartSearchFoodJob(
                     world,
                     npcId,
                     nowTick,
@@ -219,7 +222,12 @@ namespace Arcontio.Core
                     _explainabilityBridge,
                     telemetry,
                     out _);
+                return assigned
+                    ? DecisionJobStartResult.JobStarted
+                    : DecisionJobStartResult.RouteRejected;
             }
+
+            return DecisionJobStartResult.UnsupportedIntent;
         }
 
         // =============================================================================
@@ -313,11 +321,31 @@ namespace Arcontio.Core
                 || kind == DecisionIntentKind.SearchFood;
         }
 
+        private static bool ShouldConsumeDecisionCadence(DecisionJobStartResult result)
+        {
+            // La cadenza decisionale deve rappresentare l'ultima decisione che ha
+            // davvero aperto un incarico. Prima di questa guardia un tentativo senza
+            // JobRequest, senza probe cell, senza target o rifiutato dal Job Layer
+            // consumava comunque 25 tick: l'NPC restava idle pur avendo ancora bisogno
+            // attivo. I casi senza job non vengono marcati qui, cosi' il tick successivo
+            // puo' riprovare o produrre una recovery futura senza attesa artificiale.
+            return result == DecisionJobStartResult.JobStarted;
+        }
+
         private static float Clamp01(float value)
         {
             if (value < 0f) return 0f;
             if (value > 1f) return 1f;
             return value;
+        }
+
+        private enum DecisionJobStartResult
+        {
+            ContextUnavailable = 0,
+            NoExecutableCandidate = 10,
+            UnsupportedIntent = 20,
+            RouteRejected = 30,
+            JobStarted = 100
         }
     }
 }

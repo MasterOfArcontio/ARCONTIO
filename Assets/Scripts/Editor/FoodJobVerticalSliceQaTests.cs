@@ -455,6 +455,59 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void AssignedFoodJobMoveTargetDeletedFailsJobAndUpdatesFoodBelief()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            world.Objects.Remove(foodId);
+            world.FoodStocks.Remove(foodId);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.JobRuntimeState.GetSnapshot(npcId, 0).LastFailureReason, Is.EqualTo(JobFailureReason.MissingTarget));
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            AssertLatestBeliefTrace(
+                world,
+                npcId,
+                MemoryBeliefDecisionBeliefOperation.Discarded,
+                "BeliefContradiction:FoodExecutionTargetFailure:MoveFoodObjectMissing");
+            AssertLatestFailureLearning(
+                world,
+                npcId,
+                JobFailureReason.MissingTarget,
+                "OperationalFailure:FoodExecutionTargetFailure:MoveFoodObjectMissing");
+        }
+
+        [Test]
+        public void AssignedFoodJobMoveTargetEmptyCanReplaceWithVisibleEquivalentFood()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
+            int replacementFoodId = AddCommunityFoodStock(world, 88, 2, 1, units: 3);
+
+            AddFoodBelief(world, npcId, 5, 5);
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 0,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out var state, out var activeJob), Is.True);
+            Assert.That(activeJob.Request.TargetObjectId, Is.EqualTo(replacementFoodId));
+            Assert.That(activeJob.Request.TargetCell, Is.EqualTo(new Vector2Int(2, 1)));
+            Assert.That(state.GetRecoveryAlternativeTargetCount(JobStepFailureKind.ResourceMissing, 0, 0), Is.EqualTo(1));
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+        }
+
+        [Test]
         public void AssignedFoodJobMovementFailureDoesNotInvalidateFoodBelief()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
