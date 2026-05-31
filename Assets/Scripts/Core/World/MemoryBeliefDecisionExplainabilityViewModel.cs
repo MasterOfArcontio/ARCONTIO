@@ -68,6 +68,7 @@ namespace Arcontio.Core
         public readonly MemoryBeliefDecisionQueryView LatestQuery = new();
         public readonly MemoryBeliefDecisionDecisionView LatestDecision = new();
         public readonly MemoryBeliefDecisionBridgeView LatestBridge = new();
+        public readonly List<MemoryBeliefDecisionIntentOutcomeView> IntentOutcomeRows = new(8);
         public readonly MemoryBeliefDecisionJobRequestView LatestJobRequest = new();
         public readonly MemoryBeliefDecisionJobLifecycleView LatestJobLifecycle = new();
         public readonly MemoryBeliefDecisionJobPhaseView LatestJobPhase = new();
@@ -241,6 +242,36 @@ namespace Arcontio.Core
         public string TargetSource = string.Empty;
         public bool LegacyFallbackUsed;
         public string Reason = string.Empty;
+        public MemoryBeliefDecisionColorRole ColorRole;
+    }
+
+    // =============================================================================
+    // MemoryBeliefDecisionIntentOutcomeView
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Riga UI derivata che collega una intenzione decisionale recente all'esito
+    /// operativo osservabile nel confine Decisione -> Richiesta di incarico -> Incarico.
+    /// </para>
+    ///
+    /// <para><b>Diagnostica derivata, non nuova autorita'</b></para>
+    /// <para>
+    /// Questa struttura non guida la simulazione e non produce nuovi fatti runtime:
+    /// viene costruita dal ViewModel incrociando trace gia' presenti nel registro EL.
+    /// Una decisione diventa verde quando trova una richiesta di incarico coerente;
+    /// diventa rossa quando la selezione non produce un passaggio osservabile verso
+    /// il Job Layer o quando il job collegato risulta fallito.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class MemoryBeliefDecisionIntentOutcomeView
+    {
+        public long Tick;
+        public string Intent = string.Empty;
+        public string Result = string.Empty;
+        public string Detail = string.Empty;
+        public string RequestId = string.Empty;
+        public string JobId = string.Empty;
         public MemoryBeliefDecisionColorRole ColorRole;
     }
 
@@ -452,6 +483,9 @@ namespace Arcontio.Core
         private const int DefaultMaxTimelineRows = 48;
         private static readonly List<MemoryBeliefDecisionTrace> TraceBuffer = new(128);
         private static readonly List<MemoryBeliefDecisionTrace> TimelineBuffer = new(128);
+        private static readonly List<MemoryBeliefDecisionTrace> DecisionOutcomeDecisionBuffer = new(32);
+        private static readonly List<MemoryBeliefDecisionTrace> DecisionOutcomeRequestBuffer = new(32);
+        private static readonly List<MemoryBeliefDecisionTrace> DecisionOutcomeLifecycleBuffer = new(32);
         private static readonly Dictionary<string, int> CountsBuffer = new(StringComparer.Ordinal);
 
         public static bool BuildForNpc(
@@ -516,6 +550,9 @@ namespace Arcontio.Core
             if (buildDecision && store.TryGetLatestBridgeTrace(out var bridgeTrace))
                 FillBridge(output.LatestBridge, bridgeTrace);
 
+            if (buildDecision)
+                BuildIntentOutcomeRows(store, output.IntentOutcomeRows, maxRows: 8);
+
             if (buildJob && store.TryGetLatestJobRequestTrace(out var jobRequestTrace))
                 FillJobRequest(output.LatestJobRequest, jobRequestTrace);
 
@@ -578,6 +615,7 @@ namespace Arcontio.Core
             output.HeaderSubtitle = string.Empty;
             output.MemoryBars.Clear();
             output.BeliefRows.Clear();
+            output.IntentOutcomeRows.Clear();
             output.Timeline.Clear();
             ResetMemory(output.LatestMemory);
             ResetBeliefMutation(output.LatestBeliefMutation);
@@ -928,6 +966,140 @@ namespace Arcontio.Core
                 FillBelief(view, record.Belief);
                 output.Add(view);
             }
+        }
+
+        // =============================================================================
+        // BuildIntentOutcomeRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la vista "ultimi intent ed esiti" senza introdurre una nuova
+        /// trace runtime: le decisioni recenti vengono incrociate con JobRequest e
+        /// JobLifecycle gia' emessi dall'EL.
+        /// </para>
+        ///
+        /// <para><b>Behavior-preserving</b></para>
+        /// <para>
+        /// Il metodo non legge il World oggettivo, non assegna job e non corregge a
+        /// posteriori la decisione. Serve solo alla UI per sostituire il vecchio
+        /// pannello legacy Decision -> Command con un'indicazione piu' utile:
+        /// verde se l'intent ha prodotto un percorso Job osservabile, rosso se il
+        /// percorso manca o se il job collegato risulta fallito.
+        /// </para>
+        /// </summary>
+        private static void BuildIntentOutcomeRows(
+            MemoryBeliefDecisionExplainabilityNpcStore store,
+            List<MemoryBeliefDecisionIntentOutcomeView> output,
+            int maxRows)
+        {
+            output.Clear();
+            DecisionOutcomeDecisionBuffer.Clear();
+            DecisionOutcomeRequestBuffer.Clear();
+            DecisionOutcomeLifecycleBuffer.Clear();
+
+            store.CopyDecisionTracesTo(DecisionOutcomeDecisionBuffer);
+            store.CopyJobRequestTracesTo(DecisionOutcomeRequestBuffer);
+            store.CopyJobLifecycleTracesTo(DecisionOutcomeLifecycleBuffer);
+
+            DecisionOutcomeDecisionBuffer.Sort((a, b) => b.Tick.CompareTo(a.Tick));
+
+            int safeMaxRows = Math.Max(0, maxRows);
+            for (int i = 0; i < DecisionOutcomeDecisionBuffer.Count && output.Count < safeMaxRows; i++)
+            {
+                var decisionTrace = DecisionOutcomeDecisionBuffer[i];
+                if (decisionTrace?.Decision == null)
+                    continue;
+
+                var decision = decisionTrace.Decision;
+                var row = new MemoryBeliefDecisionIntentOutcomeView
+                {
+                    Tick = decisionTrace.Tick,
+                    Intent = decision.SelectedIntent.ToString(),
+                };
+
+                if (decision.SelectedIntent == DecisionIntentKind.None || decision.CandidateCount <= 0)
+                {
+                    row.Result = "fallita";
+                    row.Detail = "nessun candidato eseguibile";
+                    row.ColorRole = MemoryBeliefDecisionColorRole.Error;
+                    output.Add(row);
+                    continue;
+                }
+
+                var requestTrace = FindMatchingJobRequest(decisionTrace.Tick, decision.SelectedIntent);
+                if (requestTrace?.JobRequest == null)
+                {
+                    row.Result = "fallita";
+                    row.Detail = "nessuna richiesta job prodotta";
+                    row.ColorRole = MemoryBeliefDecisionColorRole.Error;
+                    output.Add(row);
+                    continue;
+                }
+
+                row.RequestId = requestTrace.JobRequest.RequestId ?? string.Empty;
+                row.JobId = requestTrace.JobRequest.JobId ?? string.Empty;
+
+                var lifecycleTrace = FindLatestLifecycleForJob(row.JobId, requestTrace.Tick);
+                if (lifecycleTrace?.JobLifecycle != null
+                    && lifecycleTrace.JobLifecycle.Operation == MemoryBeliefDecisionJobLifecycleOperation.Failed)
+                {
+                    row.Result = "fallita";
+                    row.Detail = string.IsNullOrWhiteSpace(lifecycleTrace.JobLifecycle.Reason)
+                        ? "job fallito"
+                        : lifecycleTrace.JobLifecycle.Reason;
+                    row.ColorRole = MemoryBeliefDecisionColorRole.Error;
+                    output.Add(row);
+                    continue;
+                }
+
+                row.Result = "ok";
+                row.Detail = lifecycleTrace?.JobLifecycle != null
+                    ? lifecycleTrace.JobLifecycle.Operation.ToString()
+                    : "richiesta job prodotta";
+                row.ColorRole = MemoryBeliefDecisionColorRole.Ok;
+                output.Add(row);
+            }
+        }
+
+        private static MemoryBeliefDecisionTrace FindMatchingJobRequest(long decisionTick, DecisionIntentKind intent)
+        {
+            MemoryBeliefDecisionTrace best = null;
+            for (int i = 0; i < DecisionOutcomeRequestBuffer.Count; i++)
+            {
+                var trace = DecisionOutcomeRequestBuffer[i];
+                if (trace?.JobRequest == null)
+                    continue;
+
+                if (trace.Tick != decisionTick || trace.JobRequest.Intent != intent)
+                    continue;
+
+                if (best == null || trace.Tick > best.Tick)
+                    best = trace;
+            }
+
+            return best;
+        }
+
+        private static MemoryBeliefDecisionTrace FindLatestLifecycleForJob(string jobId, long minTick)
+        {
+            if (string.IsNullOrWhiteSpace(jobId))
+                return null;
+
+            MemoryBeliefDecisionTrace best = null;
+            for (int i = 0; i < DecisionOutcomeLifecycleBuffer.Count; i++)
+            {
+                var trace = DecisionOutcomeLifecycleBuffer[i];
+                if (trace?.JobLifecycle?.Job == null)
+                    continue;
+
+                if (trace.Tick < minTick || !string.Equals(trace.JobLifecycle.Job.JobId, jobId, StringComparison.Ordinal))
+                    continue;
+
+                if (best == null || trace.Tick > best.Tick)
+                    best = trace;
+            }
+
+            return best;
         }
 
         private static void BuildTimeline(

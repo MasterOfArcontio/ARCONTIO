@@ -1409,7 +1409,7 @@ namespace Arcontio.View.MapGrid
                     case MapGridExplainabilityPanelPage.Decision:
                         _sbMbqdDecisionSelected.Append("<color=#6E7681>").Append(message).Append("</color>");
                         _sbMbqdDecisionCandidates.Append("<color=#6E7681>(nessun candidato decisionale)</color>");
-                        _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge decisione-comando)</color>");
+                        _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun esito intent)</color>");
                         break;
                     case MapGridExplainabilityPanelPage.Job:
                         _sbMbqdJobCurrent.Append("<color=#6E7681>").Append(message).Append("</color>");
@@ -1653,28 +1653,36 @@ namespace Arcontio.View.MapGrid
                 }
             }
 
-            var bridge = model.LatestBridge;
-            if (!bridge.HasValue)
+            AppendMbqdDecisionIntentOutcomes(model);
+        }
+
+        private void AppendMbqdDecisionIntentOutcomes(MemoryBeliefDecisionExplainabilityViewModel model)
+        {
+            if (model.IntentOutcomeRows.Count == 0)
             {
-                _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun bridge)</color>");
+                _sbMbqdDecisionBridge.Append("<color=#6E7681>(nessun esito intent)</color>");
+                return;
             }
-            else
+
+            for (int i = 0; i < model.IntentOutcomeRows.Count; i++)
             {
-                // Questa sezione resta dedicata al bridge legacy verso Command.
-                // Non mostra il JobRequest, che ora appartiene esplicitamente al
-                // layer Job e viene visualizzato nel tab dedicato.
+                var row = model.IntentOutcomeRows[i];
                 _sbMbqdDecisionBridge
-                    .Append(Kv("jobRequestShownInJobTab", "true", "#58A6FF")).Append('\n')
-                    .Append(Kv("tick", bridge.Tick.ToString(), "#8B949E")).Append('\n')
-                    .Append(Kv("selectedIntent", bridge.SelectedIntent, "#58A6FF")).Append('\n')
-                    .Append(Kv("commandName", EmptyMuted(bridge.CommandName), bridge.Handled ? "#3FB950" : "#6E7681")).Append('\n')
-                    .Append(Kv("handled", bridge.Handled.ToString(), bridge.Handled ? "#3FB950" : "#F85149")).Append('\n')
-                    .Append(Kv("didMove", bridge.DidMove.ToString(), bridge.DidMove ? "#58A6FF" : "#6E7681")).Append('\n')
-                    .Append(Kv("didSteal", bridge.DidSteal.ToString(), bridge.DidSteal ? "#D29922" : "#6E7681")).Append('\n')
-                    .Append(Kv("targetCell", bridge.TargetCell, "#E6EDF3")).Append('\n')
-                    .Append(Kv("targetSource", bridge.TargetSource, "#58A6FF")).Append('\n')
-                    .Append(Kv("legacyFallbackUsed", bridge.LegacyFallbackUsed.ToString(), bridge.LegacyFallbackUsed ? "#D29922" : "#3FB950")).Append('\n')
-                    .Append(Kv("reason", EmptyMuted(bridge.Reason), "#E6EDF3"));
+                    .Append("<color=").Append(ColorFor(row.ColorRole)).Append(">")
+                    .Append("tick ").Append(row.Tick)
+                    .Append("  ").Append(row.Intent)
+                    .Append("  ").Append(row.Result)
+                    .Append("</color>");
+
+                if (!string.IsNullOrWhiteSpace(row.Detail))
+                    _sbMbqdDecisionBridge.Append("  ").Append(row.Detail);
+
+                if (!string.IsNullOrWhiteSpace(row.JobId))
+                    _sbMbqdDecisionBridge.Append("  job=").Append(row.JobId);
+                else if (!string.IsNullOrWhiteSpace(row.RequestId))
+                    _sbMbqdDecisionBridge.Append("  request=").Append(row.RequestId);
+
+                _sbMbqdDecisionBridge.Append('\n');
             }
         }
 

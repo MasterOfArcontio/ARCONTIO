@@ -450,7 +450,7 @@ namespace Arcontio.View.MapGrid
             _pageRoots[(int)MapGridExplainabilityPanelPage.Decision] = CreatePage("DecisionPage");
             _decisionSelectedText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "intenzione selezionata", "#3FB950");
             _decisionCandidatesText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "candidati e score breakdown", "#D29922");
-            _decisionBridgeText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "legacy bridge decision -> command", "#58A6FF");
+            _decisionBridgeText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Decision].transform, "ultimi intent ed esiti", "#58A6FF");
 
             _pageRoots[(int)MapGridExplainabilityPanelPage.Job] = CreatePage("JobPage");
             _jobCurrentText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Job].transform, "decision -> job request e job corrente", "#3FB950");
