@@ -91,10 +91,12 @@ namespace Arcontio.Core
                     npcId,
                     job,
                     ref updatedState,
-                    result,
-                    (int)tick.Index,
-                    telemetry,
-                    out bool replacedByRecoveryJob);
+                result,
+                (int)tick.Index,
+                telemetry,
+                explainabilityConfig,
+                explainabilityRegistry,
+                out bool replacedByRecoveryJob);
 
                 if (replacedByRecoveryJob)
                     continue;
@@ -168,6 +170,8 @@ namespace Arcontio.Core
             StepResult stepResult,
             int tick,
             Telemetry telemetry,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
             out bool replacedByRecoveryJob)
         {
             replacedByRecoveryJob = false;
@@ -219,6 +223,10 @@ namespace Arcontio.Core
                 tick,
                 stepResult,
                 telemetry,
+                explainabilityConfig,
+                explainabilityRegistry,
+                phase,
+                action,
                 out replacedByRecoveryJob);
 
             if (recovery.Kind != JobRecoveryResultKind.RetryScheduled)
@@ -247,6 +255,10 @@ namespace Arcontio.Core
             int tick,
             StepResult stepResult,
             Telemetry telemetry,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            JobPhase phase,
+            JobAction action,
             out bool replacedByRecoveryJob)
         {
             replacedByRecoveryJob = false;
@@ -272,6 +284,10 @@ namespace Arcontio.Core
                         tick,
                         stepResult,
                         telemetry,
+                        explainabilityConfig,
+                        explainabilityRegistry,
+                        phase,
+                        action,
                         out replacedByRecoveryJob);
 
                     if (targetRecovery.HasDeclaredResult)
@@ -310,6 +326,10 @@ namespace Arcontio.Core
             int tick,
             StepResult stepResult,
             Telemetry telemetry,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            JobPhase phase,
+            JobAction action,
             out bool replacedByRecoveryJob)
         {
             replacedByRecoveryJob = false;
@@ -349,6 +369,18 @@ namespace Arcontio.Core
                 tick,
                 "EquivalentTarget:" + stepResult.DiagnosticMessage);
             ApplyFoodExecutionFailureCognitiveFeedback(world, npcId, job, stepResult, tick, telemetry);
+            EmitEquivalentTargetRecoveryExplainability(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job,
+                replacementJob,
+                phase,
+                action,
+                classification,
+                stepResult,
+                recovery);
 
             if (runtime.TryGetNpcState(npcId, out var replacementState))
             {
@@ -395,6 +427,62 @@ namespace Arcontio.Core
                 request,
                 out replacementJob,
                 out _);
+        }
+
+        private static void EmitEquivalentTargetRecoveryExplainability(
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            int npcId,
+            int tick,
+            Job originalJob,
+            Job replacementJob,
+            JobPhase phase,
+            JobAction action,
+            StepFailureClassification classification,
+            StepResult stepResult,
+            JobRecoveryResult recovery)
+        {
+            if (originalJob == null || replacementJob == null)
+                return;
+
+            string recoveryReason = "RecoveryTargetReplaced:"
+                + classification.FailureKind
+                + ":"
+                + recovery.AppliedStrategy
+                + ":"
+                + stepResult.DiagnosticMessage;
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteStepTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                originalJob,
+                phase,
+                classification.PhaseIndex,
+                action,
+                classification.ActionIndex,
+                stepResult,
+                recoveryReason);
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobRequestTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                replacementJob.Request,
+                replacementJob.JobId,
+                "RecoveryJobRequest:EquivalentTarget:" + recovery.Diagnostic,
+                legacyBridgeStillUsed: false);
+
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteJobLifecycleTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                MemoryBeliefDecisionJobLifecycleOperation.Activated,
+                replacementJob,
+                "RecoveryJobActivated:EquivalentTarget:" + recovery.Diagnostic);
         }
 
         private static bool TryResolveEquivalentCommunityFoodTarget(
