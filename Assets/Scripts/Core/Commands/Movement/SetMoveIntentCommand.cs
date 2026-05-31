@@ -55,6 +55,16 @@ namespace Arcontio.Core
     /// <i>"Le Rule producono comandi, non mutano direttamente il World."</i>
     /// </para>
     ///
+    /// <para><b>Stato v0.15.9: ponte compatibile / dev</b></para>
+    /// <para>
+    /// Dopo l'introduzione del movimento Job multi-tick, questo comando non deve piu'
+    /// essere considerato il percorso ordinario del movimento NPC. Resta vivo come
+    /// ponte compatibile quando il runtime movimento Job e' spento e come strumento
+    /// dev/debug per ordini espliciti. Il percorso simulativo ordinario deve migrare
+    /// verso <c>JobExecutionSystem</c> + running action <c>MoveTo</c> + recovery da
+    /// matrice configurata.
+    /// </para>
+    ///
     /// <para><b>Cosa fa questo comando:</b></para>
     /// <list type="number">
     ///   <item>Scrive il <see cref="MoveIntent"/> con <c>IsNew = true</c>,

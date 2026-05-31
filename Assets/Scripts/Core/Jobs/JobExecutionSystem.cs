@@ -784,6 +784,10 @@ namespace Arcontio.Core
             if (CanUseJobMovementRuntime(world))
                 return StepResult.Failed(JobFailureReason.MovementFailed, "MoveToKnownRouteMissing");
 
+            // Ponte compatibile v0.15.9: questo ramo resta disponibile solo quando
+            // il runtime movimento Job e' spento. In configurazione produttiva futura
+            // il target distante senza route nota deve fallire e passare dalla matrice
+            // recovery, non creare un MoveIntent nascosto.
             bool alreadyMovingToTarget =
                 world.NpcMoveIntents.TryGetValue(npcId, out var currentIntent)
                 && currentIntent.Active
