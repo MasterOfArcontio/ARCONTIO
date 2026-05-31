@@ -80,6 +80,7 @@ namespace Arcontio.Core
                     npcId,
                     in npcState,
                     job,
+                    bus,
                     (int)tick.Index,
                     explainabilityConfig,
                     explainabilityRegistry);
@@ -538,6 +539,7 @@ namespace Arcontio.Core
             int npcId,
             in NpcJobState npcState,
             Job job,
+            MessageBus bus,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
@@ -565,7 +567,7 @@ namespace Arcontio.Core
                     explainabilityRegistry);
 
             if (action.Kind == JobActionKind.MoveToCell)
-                return ExecuteMoveTo(world, runtime, runningActionExecutor, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
+                return ExecuteMoveTo(world, runtime, runningActionExecutor, npcId, job, action, npcCell, bus, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.Consume)
                 return ExecuteConsumeKnownFood(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
@@ -729,6 +731,7 @@ namespace Arcontio.Core
             Job job,
             JobAction action,
             GridPosition npcCell,
+            MessageBus bus,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
@@ -752,6 +755,7 @@ namespace Arcontio.Core
                     job,
                     action,
                     npcCell,
+                    bus,
                     tick,
                     explainabilityConfig,
                     explainabilityRegistry);
@@ -768,6 +772,7 @@ namespace Arcontio.Core
                     action,
                     npcCell,
                     nextKnownRouteCell,
+                    bus,
                     tick,
                     explainabilityConfig,
                     explainabilityRegistry);
@@ -945,6 +950,7 @@ namespace Arcontio.Core
             JobAction action,
             GridPosition npcCell,
             Vector2Int nextRouteCell,
+            MessageBus bus,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
@@ -967,6 +973,7 @@ namespace Arcontio.Core
                 job,
                 immediateAction,
                 npcCell,
+                bus,
                 tick,
                 explainabilityConfig,
                 explainabilityRegistry);
@@ -1122,6 +1129,7 @@ namespace Arcontio.Core
             Job job,
             JobAction action,
             GridPosition npcCell,
+            MessageBus bus,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
@@ -1132,6 +1140,9 @@ namespace Arcontio.Core
             // La chiave resta agganciata al cursore job corrente: il progress
             // volatile non diventa una seconda authority su destinazione o path.
             var key = ResolveRunningActionKey(runtime, npcId, job.JobId);
+
+            if (!TryOpenTraversalDoorIfNeeded(world, bus, npcId, action.TargetCell, out var doorFailure))
+                return StepResult.Failed(JobFailureReason.MovementFailed, doorFailure);
 
             if (!CanEnterTraversalTarget(world, npcId, action.TargetCell, out var blockedReason))
             {
@@ -1271,6 +1282,158 @@ namespace Arcontio.Core
             }
 
             return StepResult.Running("MoveToCellTraversalPending");
+        }
+
+        // =============================================================================
+        // TryOpenTraversalDoorIfNeeded
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Gestisce la micro-interazione locale "porta chiusa apribile" prima di
+        /// avviare il traversal multi-tick verso la cella destinazione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: micro-operazioni fisiche dentro MoveTo</b></para>
+        /// <para>
+        /// v0.15 sposta il movimento ordinario dentro la running action <c>MoveTo</c>.
+        /// Una porta chiusa e non bloccata sulla cella immediata non deve quindi
+        /// richiedere il vecchio <c>MovementSystem</c> per aprirsi. La patch resta
+        /// locale: usa <c>OpenDoorCommand</c>, pubblica lo stesso evento mondo e non
+        /// introduce chiavi, scelta sociale, pathfinding o recovery intelligente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Nessuna porta</b>: il traversal prosegue invariato.</item>
+        ///   <item><b>Porta aperta</b>: il traversal prosegue invariato.</item>
+        ///   <item><b>Porta bloccata</b>: fallimento locale esplicito.</item>
+        ///   <item><b>Porta chiusa apribile</b>: apertura tramite command esistente e trace movimento opzionale.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryOpenTraversalDoorIfNeeded(
+            World world,
+            MessageBus bus,
+            int npcId,
+            Vector2Int targetCell,
+            out string failureReason)
+        {
+            failureReason = string.Empty;
+
+            if (world == null)
+                return true;
+
+            if (!TryGetTraversalDoorAtCell(world, targetCell, out int doorObjectId, out var doorInstance, out var doorDef))
+                return true;
+
+            if (doorInstance.IsOpen)
+                return true;
+
+            if (doorInstance.IsLocked)
+            {
+                MovementExplainabilityEmitter.TryEmitDoorInteraction(
+                    world,
+                    npcId,
+                    doorObjectId,
+                    targetCell,
+                    DoorState.Locked,
+                    DoorState.Locked,
+                    commandEmitted: false,
+                    accessGranted: false,
+                    summary: "job_traversal_door_locked");
+                failureReason = "TraversalDoorLocked";
+                return false;
+            }
+
+            new OpenDoorCommand(npcId, doorObjectId).Execute(world, bus ?? new MessageBus());
+
+            MovementExplainabilityEmitter.TryEmitDoorInteraction(
+                world,
+                npcId,
+                doorObjectId,
+                targetCell,
+                DoorState.Closed,
+                DoorState.Open,
+                commandEmitted: true,
+                accessGranted: true,
+                summary: "job_traversal_door_opened");
+
+            return true;
+        }
+
+        // =============================================================================
+        // TryGetTraversalDoorAtCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca una porta nella cella di traversal usando prima la cache rapida del
+        /// World e poi, se necessario, una scansione difensiva degli oggetti.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: robustezza locale senza nuova authority</b></para>
+        /// <para>
+        /// La cache <c>GetObjectAt</c> e' il percorso normale, ma alcuni test e alcune
+        /// operazioni dev possono avere oggetti appena creati prima di un rebuild
+        /// globale delle cache derivate. La scansione di ripiego non decide movimento,
+        /// non pianifica e non muta il mondo: serve solo a riconoscere correttamente
+        /// una porta gia' presente nella cella immediata.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Cache</b>: usa <c>GetObjectAt</c> quando disponibile e coerente.</item>
+        ///   <item><b>Fallback locale</b>: scansiona <c>world.Objects</c> solo se la cache non produce una porta.</item>
+        ///   <item><b>Filtro</b>: restituisce solo oggetti non held, nella cella target e con definizione porta.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryGetTraversalDoorAtCell(
+            World world,
+            Vector2Int targetCell,
+            out int doorObjectId,
+            out WorldObjectInstance doorInstance,
+            out ObjectDef doorDef)
+        {
+            doorObjectId = 0;
+            doorInstance = null;
+            doorDef = null;
+
+            if (world == null)
+                return false;
+
+            int objectIdFromCell = world.GetObjectAt(targetCell.x, targetCell.y);
+            if (objectIdFromCell > 0
+                && world.Objects.TryGetValue(objectIdFromCell, out var cachedInstance)
+                && cachedInstance != null
+                && world.TryGetObjectDef(cachedInstance.DefId, out var cachedDef)
+                && cachedDef != null
+                && cachedDef.IsDoor)
+            {
+                doorObjectId = objectIdFromCell;
+                doorInstance = cachedInstance;
+                doorDef = cachedDef;
+                return true;
+            }
+
+            foreach (var kv in world.Objects)
+            {
+                var instance = kv.Value;
+                if (instance == null
+                    || instance.IsHeld
+                    || instance.CellX != targetCell.x
+                    || instance.CellY != targetCell.y
+                    || !world.TryGetObjectDef(instance.DefId, out var def)
+                    || def == null
+                    || !def.IsDoor)
+                {
+                    continue;
+                }
+
+                doorObjectId = kv.Key;
+                doorInstance = instance;
+                doorDef = def;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryEnsureTraversalDestinationReservation(

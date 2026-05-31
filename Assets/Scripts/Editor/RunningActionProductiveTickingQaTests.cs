@@ -50,6 +50,7 @@ namespace Arcontio.Tests
             {
                 new RunningActionProductiveTickingQaTests().OneCellMoveTraversalHonorsConfiguredFourTickDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
+                new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
 
                 Debug.Log("[RunningActionProductiveTickingQaTests] PASS targeted traversal tests");
                 UnityEditor.EditorApplication.Exit(0);
@@ -486,6 +487,80 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+        }
+
+        // =============================================================================
+        // KnownRouteMoveToOpensUnlockedDoorBeforeTraversal
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il movimento Job su route nota gestisca una porta chiusa non
+        /// bloccata come micro-operazione locale prima del traversal fisico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: il MoveTo possiede le interazioni fisiche immediate</b></para>
+        /// <para>
+        /// La porta e' nella prossima cella della route gia' nota. Il Job non deve
+        /// accodare un move intent legacy ne' delegare l'apertura a <c>MovementSystem</c>:
+        /// apre la porta con il command esistente, pubblica l'evento mondo e poi avvia
+        /// il traversal multi-tick verso quella stessa cella.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void KnownRouteMoveToOpensUnlockedDoorBeforeTraversal()
+        {
+            // Arrange: registriamo localmente una definizione porta minimale per il
+            // World di test. La porta blocca il movimento da chiusa, ma non e' locked.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            world.ObjectDefs["qa_door"] = new ObjectDef
+            {
+                Id = "qa_door",
+                DisplayName = "QA Door",
+                IsOccluder = true,
+                IsInteractable = true,
+                IsDoor = true,
+                IsLockable = true,
+                BlocksVision = true,
+                BlocksMovement = true,
+                VisionCost = 1f
+            };
+
+            var startCell = world.GridPos[npcId];
+            var doorCell = new Vector2Int(startCell.X + 1, startCell.Y);
+            var targetCell = new Vector2Int(startCell.X + 2, startCell.Y);
+            int doorObjectId = world.CreateObject("qa_door", doorCell.x, doorCell.y);
+            Assert.That(doorObjectId, Is.GreaterThan(0));
+            Assert.That(world.BlocksMovementAt(doorCell.x, doorCell.y), Is.True);
+
+            world.SetDebugDirectPathForNpc(
+                npcId,
+                new List<Vector2Int>
+                {
+                    new(startCell.X, startCell.Y),
+                    doorCell,
+                    targetCell
+                });
+
+            var job = MakeMoveJob(npcId, "job-move-known-route-door", targetCell);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var bus = new MessageBus();
+            var system = new JobExecutionSystem();
+
+            // Act: il primo tick apre la porta e avvia il traversal. La posizione
+            // resta sorgente perche' la completion richiede due tick.
+            system.Update(world, new Tick(0, 1f), bus, new Telemetry());
+
+            // Assert: la porta e' aperta, la cache movimento non blocca piu' la cella,
+            // l'evento mondo e' stato pubblicato e nessun command legacy e' stato
+            // accodato dal Job.
+            Assert.That(world.Objects[doorObjectId].IsOpen, Is.True);
+            Assert.That(world.BlocksMovementAt(doorCell.x, doorCell.y), Is.False);
+            Assert.That(bus.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
         }
 
         // =============================================================================
