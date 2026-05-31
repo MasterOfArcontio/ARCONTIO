@@ -1,4 +1,5 @@
 using Arcontio.Core;
+using Arcontio.Core.Config;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -196,6 +197,42 @@ namespace Arcontio.Tests
             Assert.That(memoryStore.Traces.Count, Is.EqualTo(1));
             Assert.That(beliefStore.Entries.Count, Is.EqualTo(1));
             AssertBelief(beliefStore.Entries[0], BeliefCategory.Food, BeliefStatus.Active, BeliefSource.Seen, new Vector2Int(1, 1), 0.90f, 0.90f, 1);
+        }
+
+        [Test]
+        public void DirectObjectSpottedTraceStartsFreshAndDecayCanMarkStale()
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("belief_freshness_qa"),
+                NpcNeeds.Make(0.80f, 0.20f),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            var rule = new ObjectSpottedMemoryRule();
+            var ev = new ObjectSpottedEvent(npcId, 77, "food_stock", 4, 4, 0.9f);
+
+            bool encoded = rule.TryEncode(world, npcId, ev, 0.9f, out var trace);
+
+            Assert.That(encoded, Is.True);
+            Assert.That(trace.Intensity01, Is.EqualTo(1.0f).Within(0.0001f));
+
+            var store = new BeliefStore();
+            var updater = new BeliefUpdater();
+            updater.UpdateFromTrace(trace, store, currentTick: 10);
+
+            AssertBelief(store.Entries[0], BeliefCategory.Food, BeliefStatus.Active, BeliefSource.Seen, new Vector2Int(4, 4), 0.9f, 1.0f, 1);
+
+            var config = BeliefDecayConfig.Default();
+            config.foodConfidenceDecayPerTick = 0.10f;
+            config.freshnessDecayMultiplier = 10.0f;
+            config.staleFreshnessThreshold = 0.50f;
+            int removed = store.TickDecay(config, tickScale: 1.0f, out _, out _, out int stale);
+
+            Assert.That(removed, Is.EqualTo(0));
+            Assert.That(stale, Is.EqualTo(1));
+            Assert.That(store.Entries[0].Status, Is.EqualTo(BeliefStatus.Stale));
+            Assert.That(store.Entries[0].Freshness, Is.EqualTo(0.0f).Within(0.0001f));
         }
 
         // =============================================================================

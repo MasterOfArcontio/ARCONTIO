@@ -80,7 +80,7 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!request.HasTargetCell || request.TargetObjectId <= 0)
+            if (!request.HasTargetCell)
             {
                 reason = "InvalidFoodJobTarget";
                 return false;

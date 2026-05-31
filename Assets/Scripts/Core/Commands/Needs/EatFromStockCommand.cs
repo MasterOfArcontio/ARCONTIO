@@ -111,6 +111,14 @@ namespace Arcontio.Core
 
                     if (!canSee) continue;
 
+                    if (world.Beliefs.TryGetValue(witnessId, out var beliefStore) && beliefStore != null)
+                    {
+                        beliefStore.TryDiscardByCategoryAndPosition(
+                            BeliefCategory.Food,
+                            new Vector2Int(stockX, stockY),
+                            (int)TickContext.CurrentTickIndex);
+                    }
+
                     for (int i = 0; i < store.Slots.Length; i++)
                     {
                         ref var slot = ref store.Slots[i];

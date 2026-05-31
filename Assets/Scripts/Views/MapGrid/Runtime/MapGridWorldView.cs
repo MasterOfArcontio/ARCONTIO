@@ -65,6 +65,10 @@ namespace Arcontio.View.MapGrid
         [Header("NPC decision flash (view-only)")]
         [Tooltip("Tinta applicata allo sprite NPC nel tick in cui il World segnala una decisione riuscita.")]
         [SerializeField] private Color npcDecisionFlashTint = Color.white;
+        [Tooltip("Durata reale minima del flash decisionale. Evita che un tick simulativo troppo rapido sparisca tra due frame grafici.")]
+        [SerializeField] private float npcDecisionFlashVisibleSeconds = 0.18f;
+        [Tooltip("Scala temporanea applicata allo sprite durante il flash. Rende visibile il segnale anche quando la tinta bianca coincide con quella normale.")]
+        [SerializeField] private float npcDecisionFlashScaleMultiplier = 1.20f;
 
         [Header("Debug overlays")]
         [Tooltip("Sprite usato per evidenziare celle viste (DebugFovTelemetry). Deve essere un Sprite in Resources.")]
@@ -97,6 +101,8 @@ namespace Arcontio.View.MapGrid
         private readonly Dictionary<int, SpriteRenderer> _npcViews = new();
         private readonly Dictionary<int, SpriteRenderer> _objectViews = new();
         private readonly Dictionary<string, Sprite> _spriteCache = new();
+        private readonly Dictionary<int, int> _npcDecisionFlashSeenTicks = new();
+        private readonly Dictionary<int, float> _npcDecisionFlashUntilTimes = new();
 
         private Sprite _defaultNpcSprite;
         private MapGridPointerInputActionsProvider _pointerProvider;
@@ -758,11 +764,22 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             if (sr == null || _world == null)
                 return;
 
-            int currentTick = (int)TickContext.CurrentTickIndex;
-            bool shouldFlash = _world.TryGetNpcDecisionFlashTick(npcId, out int flashTick)
-                && flashTick == currentTick;
+            if (_world.TryGetNpcDecisionFlashTick(npcId, out int flashTick))
+            {
+                if (!_npcDecisionFlashSeenTicks.TryGetValue(npcId, out int seenTick) || flashTick > seenTick)
+                {
+                    _npcDecisionFlashSeenTicks[npcId] = flashTick;
+                    _npcDecisionFlashUntilTimes[npcId] = Time.unscaledTime + Mathf.Max(0.01f, npcDecisionFlashVisibleSeconds);
+                }
+            }
+
+            bool shouldFlash = _npcDecisionFlashUntilTimes.TryGetValue(npcId, out float untilTime)
+                && Time.unscaledTime <= untilTime;
 
             sr.color = shouldFlash ? npcDecisionFlashTint : Color.white;
+
+            float scale = shouldFlash ? Mathf.Max(1f, npcDecisionFlashScaleMultiplier) : 1f;
+            sr.transform.localScale = new Vector3(scale, scale, 1f);
         }
 
         private void EnsureNpcBalloonComponents(GameObject npcGo, int npcId)

@@ -25,9 +25,10 @@ namespace Arcontio.Core
                 return false;
 
             // Reliability = witnessQuality (clamp)
-            // La “conoscenza” di un oggetto di solito non è traumatica:
-            // intensità bassa-media, decay lento (conoscenza tende a restare).
-            float intensity = 0.25f;
+            // Una percezione diretta deve nascere "fresca": l'intensita' qui
+            // alimenta la Freshness del BeliefStore, quindi parte da 1 e verra'
+            // poi abbassata dal BeliefDecaySystem invece di nascere gia' vecchia.
+            float intensity = 1.0f;
             float reliability = witnessQuality01;
             if (reliability < 0.05f) reliability = 0.05f;
 

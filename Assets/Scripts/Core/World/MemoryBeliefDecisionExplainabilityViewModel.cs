@@ -1324,7 +1324,7 @@ namespace Arcontio.Core
                 "Weak" => MemoryBeliefDecisionColorRole.Warning,
                 "Conflicted" => MemoryBeliefDecisionColorRole.Error,
                 "Discarded" => MemoryBeliefDecisionColorRole.Error,
-                "Stale" => MemoryBeliefDecisionColorRole.Muted,
+                "Stale" => MemoryBeliefDecisionColorRole.Warning,
                 _ => MemoryBeliefDecisionColorRole.Primary
             };
         }
