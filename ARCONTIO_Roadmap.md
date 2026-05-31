@@ -962,10 +962,13 @@ In questa fase NON si deve:
 | v0.15.8 | Rimozione fallback greedy ordinario | ⏳ |
 | v0.15.9 | Isolamento MoveIntent/MovementSystem come dev o compatibilita' | ⏳ |
 | v0.15.10 | EL movimento Job e QA anti-onniscienza path | ⏳ |
-| v0.15.11 | Flash diagnostico NPC su decisione presa | ⏳ |
-| v0.15.12 | Closeout movimento multi-tick | ⏳ |
+| v0.15.11 | Pannello Decision con ultimi intent ed esiti | ⏳ |
+| v0.15.12 | Flash diagnostico NPC su decisione presa | ⏳ |
+| v0.15.13 | Closeout movimento multi-tick | ⏳ |
 
-> **Nota diagnostica v0.15.11:** il flash decisionale deve restare puramente visivo e non simulativo. Il Decision Layer non deve mutare sprite o viste: deve esporre un segnale diagnostico leggero, consumato dalla presentazione, per colorare temporaneamente lo sprite dell'NPC quando una decisione viene prodotta. Il flash non deve cambiare bisogni, job, movimento, tick order, memoria, belief o Save/Load.
+> **Nota diagnostica v0.15.11:** il pannello Decision deve sostituire il vecchio sub pannello legacy `Decision -> Command` con una vista degli ultimi intent e degli esiti ottenuti. La vista deve restare diagnostica, derivata da trace EL gia' presenti, senza diventare nuova autorita' decisionale o runtime.
+
+> **Nota diagnostica v0.15.12:** il flash decisionale deve restare puramente visivo e non simulativo. Il Decision Layer non deve mutare sprite o viste: deve esporre un segnale diagnostico leggero, consumato dalla presentazione, per colorare temporaneamente lo sprite dell'NPC quando una decisione viene prodotta. Il flash non deve cambiare bisogni, job, movimento, tick order, memoria, belief o Save/Load.
 
 ---
 
