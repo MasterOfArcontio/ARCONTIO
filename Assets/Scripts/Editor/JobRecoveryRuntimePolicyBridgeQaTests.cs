@@ -43,6 +43,8 @@ namespace Arcontio.Tests
                 var tests = new JobRecoveryRuntimePolicyBridgeQaTests();
 
                 tests.DefaultRecoveryPolicyRegistryLoadsResourcesJobConfig();
+                tests.MovementPolicyUsesImplementedRetriesBeforeFutureStrategies();
+                tests.InsufficientInformationDoesNotPretendEquivalentTargetRecovery();
                 tests.JobExecutionSystemBridgesClassifierPolicyAndLocalRetryEvaluator();
                 tests.ConfiguredPolicyStillProducesNoRuntimeRecoveryInNoOpEvaluator();
 
@@ -67,6 +69,37 @@ namespace Arcontio.Tests
             Assert.That(pathPolicy.ContainsStrategy(StepRecoveryStrategy.WaitAndRetry), Is.True);
             Assert.That(registry.TryGetPolicy(JobStepFailureKind.ResourceMissing, out var resourcePolicy), Is.True);
             Assert.That(resourcePolicy.ContainsStrategy(StepRecoveryStrategy.FindEquivalentTarget), Is.True);
+        }
+
+        [Test]
+        public void MovementPolicyUsesImplementedRetriesBeforeFutureStrategies()
+        {
+            var registry = StepRecoveryPolicyRegistry.LoadDefault();
+
+            Assert.That(registry.TryGetPolicy(JobStepFailureKind.PathBlocked, out var pathPolicy), Is.True);
+            Assert.That(pathPolicy.Strategies.Length, Is.GreaterThanOrEqualTo(2));
+            Assert.That(pathPolicy.Strategies[0], Is.EqualTo(StepRecoveryStrategy.WaitAndRetry));
+            Assert.That(pathPolicy.ContainsStrategy(StepRecoveryStrategy.Repath), Is.True);
+            Assert.That(pathPolicy.ContainsStrategy(StepRecoveryStrategy.FindAlternateCell), Is.True);
+
+            Assert.That(registry.TryGetPolicy(JobStepFailureKind.Timeout, out var timeoutPolicy), Is.True);
+            Assert.That(timeoutPolicy.Strategies.Length, Is.GreaterThanOrEqualTo(2));
+            Assert.That(timeoutPolicy.Strategies[0], Is.EqualTo(StepRecoveryStrategy.WaitAndRetry));
+            Assert.That(timeoutPolicy.Strategies[1], Is.EqualTo(StepRecoveryStrategy.RetrySameAction));
+        }
+
+        [Test]
+        public void InsufficientInformationDoesNotPretendEquivalentTargetRecovery()
+        {
+            var registry = StepRecoveryPolicyRegistry.LoadDefault();
+
+            Assert.That(registry.TryGetPolicy(JobStepFailureKind.InsufficientInformation, out var policy), Is.True);
+            Assert.That(policy.MaxRetryCount, Is.EqualTo(0));
+            Assert.That(policy.MaxSearchRadius, Is.EqualTo(0));
+            Assert.That(policy.MaxAlternativeTargets, Is.EqualTo(0));
+            Assert.That(policy.ContainsStrategy(StepRecoveryStrategy.FindEquivalentTarget), Is.False);
+            Assert.That(policy.ContainsStrategy(StepRecoveryStrategy.EscalateToDecision), Is.True);
+            Assert.That(policy.ContainsStrategy(StepRecoveryStrategy.FailJob), Is.True);
         }
 
         [Test]
