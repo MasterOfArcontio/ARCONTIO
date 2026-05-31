@@ -1048,6 +1048,29 @@ namespace Arcontio.Tests
                 npcIdForPinLogic: npcId);
         }
 
+        private static bool HasRememberedObject(World world, int npcId, int objectId, string defId, int x, int y)
+        {
+            if (!world.NpcObjectMemory.TryGetValue(npcId, out var store) || store == null)
+                return false;
+
+            for (int i = 0; i < store.Slots.Length; i++)
+            {
+                var slot = store.Slots[i];
+                if (!slot.IsValid)
+                    continue;
+
+                if (slot.ObjectId == objectId
+                    && slot.DefId == defId
+                    && slot.CellX == x
+                    && slot.CellY == y)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
         private static void AddFoodBelief(World world, int npcId, int x, int y)
         {
             world.Beliefs[npcId].AddOrMergeByCategoryAndPosition(
