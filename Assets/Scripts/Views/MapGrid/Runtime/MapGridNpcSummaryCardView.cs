@@ -146,13 +146,8 @@ namespace Arcontio.View.MapGrid
             // ============================================================
 
             // Header: NON collassabile (se nascondi l'header perdi contesto).
-            _headerSection = BuildSection(_root.transform, KeyHeader, "Identity / State", DefaultHeaderFont, FontStyle.Bold, collapsible: false);
+            _headerSection = BuildSection(_root.transform, KeyHeader, "NPC", DefaultHeaderFont, FontStyle.Bold, collapsible: false);
             _headerSection.RootImage.color = new Color(0.15f, 0.15f, 0.15f, 0.92f);
-
-            // Action (highlight) - rich text.
-            _actionSection = BuildSection(_root.transform, KeyAction, "Goal / Decision", DefaultBodyFont, FontStyle.Bold, collapsible: true);
-            _actionSection.RootImage.color = new Color(0.10f, 0.10f, 0.10f, 0.90f);
-            if (_actionSection.BodyText != null) _actionSection.BodyText.supportRichText = true;
 
             // Inventory (cibo trasportato)
             _inventorySection = BuildSection(_root.transform, KeyInventory, "Inventory", DefaultBodyFont, FontStyle.Normal, collapsible: true);
@@ -172,18 +167,6 @@ namespace Arcontio.View.MapGrid
             _commsSection = BuildSection(_root.transform, KeyComms, "Comms", DefaultBodyFont, FontStyle.Normal, collapsible: true);
             _commsSection.RootImage.color = new Color(0.08f, 0.22f, 0.12f, 0.70f);
             if (_commsSection.BodyText != null) _commsSection.BodyText.supportRichText = true;
-
-            // Landmarks / Edges (Patch 0.02.03)
-            _landmarksSection = BuildSection(_root.transform, KeyLandmarks, "Navigation / MacroRoute", DefaultBodyFont, FontStyle.Normal, collapsible: true);
-            _landmarksSection.RootImage.color = new Color(0.12f, 0.18f, 0.28f, 0.72f);
-
-            // Memory traces (tabella A)
-            _memSection = BuildSection(_root.transform, KeyMemoryTraces, "Memory Traces", DefaultBodyFont, FontStyle.Normal, collapsible: true);
-            _memSection.RootImage.color = new Color(0.45f, 0.35f, 0.05f, 0.75f);
-
-            // Known objects (tabella B)
-            _objMemSection = BuildSection(_root.transform, KeyKnownObjects, "Perception / Knowledge", DefaultBodyFont, FontStyle.Normal, collapsible: true);
-            _objMemSection.RootImage.color = new Color(0.05f, 0.25f, 0.45f, 0.72f);
 
             // DNA DRIFT (v0.04.06 → v0.04.07.b) — barre proporzionali uGUI
             _dnaDriftSection = BuildSection(_root.transform, KeyDnaDrift, "DNA DRIFT", DefaultBodyFont, FontStyle.Normal, collapsible: true);
@@ -1114,8 +1097,8 @@ namespace Arcontio.View.MapGrid
             // - Header non collassabile: sempre aperto.
             // - Se collassabile: leggiamo lo stato globale e inizializziamo coerentemente.
             bool collapsed = false;
-            if (collapsible && s_collapsedByKey.TryGetValue(key, out var v))
-                collapsed = v;
+            if (collapsible)
+                collapsed = s_collapsedByKey.TryGetValue(key, out var v) ? v : key != KeyNeeds;
 
             SetSectionCollapsed(section, collapsed);
 

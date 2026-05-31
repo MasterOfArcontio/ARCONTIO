@@ -684,52 +684,24 @@ namespace Arcontio.View.MapGrid
                 if (!isSelectedNpc)
                     continue;
 
-                bool buildAction = card.ShouldBuildActionSection();
                 bool buildInventory = card.ShouldBuildInventorySection();
                 bool buildComms = card.ShouldBuildCommsSection();
-                bool buildLandmarks = card.ShouldBuildLandmarksSection();
-                bool buildMemoryTraces = card.ShouldBuildMemoryTracesSection();
-                bool buildKnownObjects = card.ShouldBuildKnownObjectsSection();
                 bool buildDnaDrift = card.ShouldBuildDnaDriftSection();
+                const bool buildAction = false;
+                const bool buildLandmarks = false;
+                const bool buildMemoryTraces = false;
+                const bool buildKnownObjects = false;
 
                 // ============================================================
                 // HEADER / IDENTITY / STATE
                 // ============================================================
-                string navModeHeader = "IDLE";
-                string execPhaseHeader = "NONE";
-                if (world.TryGetNpcMacroRouteDebugReport(npcId, out var routeReportHeader))
-                {
-                    navModeHeader = string.IsNullOrWhiteSpace(routeReportHeader.NavigationMode) ? "IDLE" : routeReportHeader.NavigationMode;
-                    execPhaseHeader = routeReportHeader.ExecutionActive
-                        ? "EXECUTING"
-                        : (!string.IsNullOrEmpty(routeReportHeader.ExecutionFailureReason) ? "FAILED" : "NONE");
-                }
-
-                string actionKindHeader = "Unknown";
-                if (world.TryGetNpcAction(npcId, out var actionHeader))
-                    actionKindHeader = actionHeader.Kind.ToString();
-
                 _sbHeader.Clear();
-                _sbHeader.Append("NPC #").Append(npcId);
+                _sbHeader.Append("<b>NPC #").Append(npcId);
                 if (!string.IsNullOrEmpty(dna.Identity.Name))
                     _sbHeader.Append("  ").Append(dna.Identity.Name);
-
-                // Feedback UI della selezione debug:
-                // NPCSelection vive nello strato view condiviso e non nel core
-                // simulativo. Qui lo mostriamo soltanto per rendere verificabile
-                // il click sinistro introdotto nella sessione k.
-                _sbHeader.Append('\n')
-                    .Append("Selected = ").Append(isSelectedNpc ? "YES" : "NO")
-                    .Append('\n')
+                _sbHeader.Append("</b>\n")
                     .Append("Pos = (").Append(pos.X).Append(',').Append(pos.Y).Append(")")
-                    .Append("   Facing = ").Append(facing)
-                    .Append('\n')
-                    .Append("State = ").Append(actionKindHeader)
-                    .Append("   NavMode = ").Append(navModeHeader)
-                    .Append("   Exec = ").Append(execPhaseHeader)
-                    .Append('\n')
-                    .Append("Needs: hunger=").Append(needs.GetValue(NeedKind.Hunger).ToString("0.00"))
-                    .Append("   rest=").Append(needs.GetValue(NeedKind.Rest).ToString("0.00"));
+                    .Append("   Facing = ").Append(facing);
 
                 // ============================================================
                 // LANDMARK DEBUG REPORT (v0.02.03 / Day3)
@@ -1554,9 +1526,9 @@ namespace Arcontio.View.MapGrid
                         .Append('#').Append(belief.BeliefId).Append(' ')
                         .Append(belief.Category).Append("  ").Append(belief.EstimatedCell)
                         .Append("</color>")
+                        .Append("  <b>STATUS=").Append(belief.Status).Append("</b>")
                         .Append("  conf=").Append(belief.Confidence.ToString("0.00"))
                         .Append("  fresh=").Append(belief.Freshness.ToString("0.00"))
-                        .Append("  status=").Append(belief.Status)
                         .Append("  source=").Append(belief.Source)
                         .Append("  sources=").Append(belief.SourceCount)
                         .Append('\n');
@@ -1874,7 +1846,7 @@ namespace Arcontio.View.MapGrid
             if (belief == null || belief.BeliefId == 0)
                 return "nessuna";
 
-            return $"#{belief.BeliefId} {belief.Category} {belief.EstimatedCell} conf={belief.Confidence:0.00} fresh={belief.Freshness:0.00} status={belief.Status} source={belief.Source} sources={belief.SourceCount}";
+            return $"#{belief.BeliefId} {belief.Category} {belief.EstimatedCell} STATUS={belief.Status} conf={belief.Confidence:0.00} fresh={belief.Freshness:0.00} source={belief.Source} sources={belief.SourceCount}";
         }
 
         // =============================================================================
