@@ -25,23 +25,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ACTIVE: v0.14 - Job Recovery Runtime e fallback degli incarichi
+## MACRO JOB ACTIVE: v0.15 - Cognizione Soggettiva Avanzata
 
 CHECKPOINT CORRENTE:
-v0.14h - QA e closeout Job Recovery Runtime
+v0.15a - Audit cognition gap post-v0.14
 
 STATUS:
 READY / PENDING
 
 OUTPUT ATTESO:
-QA finale e closeout del recupero locale degli incarichi
+audit iniziale del gap cognitivo dopo la chiusura del recupero locale degli incarichi
 
 DOC SYNC:
-root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.13`;
-allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza `v0.14`
+root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.14`;
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza `v0.15`
 
 OBIETTIVO:
-Stabilizzare il recupero locale degli incarichi prima di aprire la cognizione soggettiva avanzata.
+Aprire la cognizione soggettiva avanzata sopra una base MBQD/Incarichi e Job Recovery ormai stabilizzata.
 
 Esito tecnico ereditato da `v0.12`:
 
@@ -74,7 +74,7 @@ Obiettivo tecnico corrente `v0.14`:
 - rendere osservabile recovery/fallimento tramite EL.
 
 Prossimo macro job consigliato:
-`v0.14h - QA e closeout Job Recovery Runtime`
+`v0.15a - Audit cognition gap post-v0.14`
 
 Residual follow-ups / future hardening:
 
@@ -102,7 +102,7 @@ Checkpoint v0.14 pianificati:
 - `v0.14e`: fallback per target non valido o risorsa sparita - DONE;
 - `v0.14f`: failure learning minimo verso memoria/credenze - DONE;
 - `v0.14g`: explainability recovery Job - DONE;
-- `v0.14h`: QA e closeout Job Recovery Runtime.
+- `v0.14h`: QA e closeout Job Recovery Runtime - DONE.
 
 Checkpoint v0.15 pianificati:
 
