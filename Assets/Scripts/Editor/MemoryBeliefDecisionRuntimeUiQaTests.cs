@@ -52,6 +52,7 @@ namespace Arcontio.Tests
                 tests.ScopedViewModelBuildsOnlyVisibleDiagnosticFamily();
                 tests.DecisionScopeBuildsIntentOutcomeRowsFromExistingJobTraces();
                 tests.DecisionScopeDoesNotShowNoneIntentOutcomeRows();
+                tests.DecisionScopeMarksIntentOutcomeAsUnverifiableWhenJobRequestsAreNotTracked();
                 tests.DisabledConfigDoesNotPopulateRegistry();
                 tests.JobExplainabilityTraceKindsPopulateRegistryViewModelAndTimeline();
 
@@ -280,6 +281,44 @@ namespace Arcontio.Tests
             Assert.That(built, Is.True);
             Assert.That(viewModel.IntentOutcomeRows.Count, Is.EqualTo(1));
             Assert.That(viewModel.IntentOutcomeRows[0].Intent, Is.EqualTo("SearchFood"));
+        }
+
+        // =============================================================================
+        // DecisionScopeMarksIntentOutcomeAsUnverifiableWhenJobRequestsAreNotTracked
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il pannello non trasformi l'assenza globale di trace
+        /// JobRequest in un errore rosso. Se le richieste job non sono tracciate, la
+        /// UI puo' solo dichiarare l'esito non verificabile.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DecisionScopeMarksIntentOutcomeAsUnverifiableWhenJobRequestsAreNotTracked()
+        {
+            var config = MakeConfig();
+            int npcId = 12;
+            var world = new World(MakeWorldConfigWithMbqdEnabled());
+
+            var decision = MakeDecisionTrace(npcId);
+            decision.Tick = 340;
+            decision.Decision.SelectedIntent = DecisionIntentKind.EatKnownFood;
+
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, decision);
+
+            var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
+            bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(
+                world,
+                npcId,
+                viewModel,
+                buildScope: MemoryBeliefDecisionViewModelBuildScope.Decision);
+
+            Assert.That(built, Is.True);
+            Assert.That(viewModel.IntentOutcomeRows.Count, Is.EqualTo(1));
+            Assert.That(viewModel.IntentOutcomeRows[0].Intent, Is.EqualTo("EatKnownFood"));
+            Assert.That(viewModel.IntentOutcomeRows[0].Result, Is.EqualTo("non verificabile"));
+            Assert.That(viewModel.IntentOutcomeRows[0].Detail, Is.EqualTo("richieste job non tracciate"));
+            Assert.That(viewModel.IntentOutcomeRows[0].ColorRole, Is.EqualTo(MemoryBeliefDecisionColorRole.Muted));
         }
 
         // =============================================================================
