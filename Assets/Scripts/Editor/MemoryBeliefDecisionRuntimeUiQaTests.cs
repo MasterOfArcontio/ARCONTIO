@@ -50,6 +50,7 @@ namespace Arcontio.Tests
 
                 tests.RegistryAndViewModelExposeJsonlFieldsForSelectedNpc();
                 tests.ScopedViewModelBuildsOnlyVisibleDiagnosticFamily();
+                tests.DecisionScopeBuildsIntentOutcomeRowsFromExistingJobTraces();
                 tests.DisabledConfigDoesNotPopulateRegistry();
                 tests.JobExplainabilityTraceKindsPopulateRegistryViewModelAndTimeline();
 
@@ -179,6 +180,65 @@ namespace Arcontio.Tests
             Assert.That(viewModel.MemoryBars.Count, Is.EqualTo(0));
             Assert.That(viewModel.BeliefRows.Count, Is.EqualTo(0));
             Assert.That(viewModel.Timeline.Count, Is.EqualTo(0));
+        }
+
+        // =============================================================================
+        // DecisionScopeBuildsIntentOutcomeRowsFromExistingJobTraces
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il pannello Decision possa sostituire il vecchio bridge
+        /// legacy con una vista derivata degli ultimi intent e del risultato
+        /// osservato, senza richiedere nuove trace runtime.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DecisionScopeBuildsIntentOutcomeRowsFromExistingJobTraces()
+        {
+            var config = MakeConfig();
+            int npcId = 12;
+            var worldConfig = MakeWorldConfigWithMbqdEnabled();
+            var world = new World(worldConfig);
+
+            var successfulDecision = MakeDecisionTrace(npcId);
+            successfulDecision.Tick = 300;
+            successfulDecision.Decision.SelectedIntent = DecisionIntentKind.EatKnownFood;
+
+            var successfulRequest = MakeJobRequestTrace(npcId);
+            successfulRequest.Tick = 300;
+            successfulRequest.JobRequest.Intent = DecisionIntentKind.EatKnownFood;
+            successfulRequest.JobRequest.JobId = "job-intent-ok";
+            successfulRequest.JobRequest.RequestId = "req-intent-ok";
+
+            var successfulLifecycle = MakeJobLifecycleTrace(npcId);
+            successfulLifecycle.Tick = 301;
+            successfulLifecycle.JobLifecycle.Job.JobId = "job-intent-ok";
+            successfulLifecycle.JobLifecycle.Operation = MemoryBeliefDecisionJobLifecycleOperation.Activated;
+
+            var failedDecision = MakeDecisionTrace(npcId);
+            failedDecision.Tick = 320;
+            failedDecision.Decision.SelectedIntent = DecisionIntentKind.SearchFood;
+
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, successfulDecision);
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, successfulRequest);
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, successfulLifecycle);
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, failedDecision);
+
+            var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
+            bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(
+                world,
+                npcId,
+                viewModel,
+                buildScope: MemoryBeliefDecisionViewModelBuildScope.Decision);
+
+            Assert.That(built, Is.True);
+            Assert.That(viewModel.IntentOutcomeRows.Count, Is.EqualTo(2));
+            Assert.That(viewModel.IntentOutcomeRows[0].Intent, Is.EqualTo("SearchFood"));
+            Assert.That(viewModel.IntentOutcomeRows[0].Result, Is.EqualTo("fallita"));
+            Assert.That(viewModel.IntentOutcomeRows[0].ColorRole, Is.EqualTo(MemoryBeliefDecisionColorRole.Error));
+            Assert.That(viewModel.IntentOutcomeRows[1].Intent, Is.EqualTo("EatKnownFood"));
+            Assert.That(viewModel.IntentOutcomeRows[1].Result, Is.EqualTo("ok"));
+            Assert.That(viewModel.IntentOutcomeRows[1].ColorRole, Is.EqualTo(MemoryBeliefDecisionColorRole.Ok));
         }
 
         // =============================================================================
