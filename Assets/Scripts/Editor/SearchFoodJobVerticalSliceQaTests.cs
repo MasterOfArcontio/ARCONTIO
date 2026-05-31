@@ -80,6 +80,20 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void SearchFoodSelectionIgnoresUnroutableRestIntent()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            Assert.That(world.Needs.TryGetValue(npcId, out var needs), Is.True);
+            needs.SetValue(NeedKind.Rest, 1f);
+            world.Needs[npcId] = needs;
+
+            RunDecisionOrchestrator(world, tick: 0);
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+        }
+
+        [Test]
         public void SearchFoodJobEnqueuesSeekFoodMoveIntent()
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);

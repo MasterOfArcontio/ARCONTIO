@@ -172,6 +172,7 @@ namespace Arcontio.Core
                 return;
 
             _candidateGenerator.GeneratePhase1Candidates(in context, _decisionCandidates);
+            RemoveNonRoutableJobCandidates(_decisionCandidates);
             _scoringService.ScoreCandidates(in context, _decisionCandidates, DecisionScoringConfig.Default());
 
             var selectionConfig = ResolveDecisionSelectionConfig(world.Config?.Sim?.decision);
@@ -284,6 +285,32 @@ namespace Arcontio.Core
             config.impulsivityNoiseBonus = Clamp01(runtimeConfig.impulsivityNoiseBonus);
             config.minimumWeight = runtimeConfig.minimumWeight > 0f ? runtimeConfig.minimumWeight : config.minimumWeight;
             return config;
+        }
+
+        private static void RemoveNonRoutableJobCandidates(List<DecisionCandidate> candidates)
+        {
+            if (candidates == null || candidates.Count == 0)
+                return;
+
+            // Il catalogo decisionale contiene gia' intenzioni MVP future come riposo,
+            // osservazione e azioni sociali, ma questo orchestratore oggi possiede solo
+            // route operative verso Job per EatKnownFood e SearchFood. Lasciare vincere
+            // un'intenzione senza route consuma la cadenza decisionale senza aprire un
+            // incarico, producendo NPC apparentemente fermi dopo la chiusura del job
+            // precedente. Il filtro e' quindi behavior-preserving rispetto all'esecuzione:
+            // non rimuove job esistenti, impedisce solo selezioni non eseguibili da
+            // questo ponte provvisorio Decisione -> Job.
+            for (int i = candidates.Count - 1; i >= 0; i--)
+            {
+                if (!IsJobRoutableIntent(candidates[i].Kind))
+                    candidates.RemoveAt(i);
+            }
+        }
+
+        private static bool IsJobRoutableIntent(DecisionIntentKind kind)
+        {
+            return kind == DecisionIntentKind.EatKnownFood
+                || kind == DecisionIntentKind.SearchFood;
         }
 
         private static float Clamp01(float value)
