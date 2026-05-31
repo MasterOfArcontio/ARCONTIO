@@ -27,8 +27,8 @@
 | v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | Completata |
 | v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | Completata |
 | v0.13 | Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule | Giugno 2026 | Completata |
-| v0.14 | Job Recovery Runtime e fallback degli incarichi | Giugno 2026 | Prossima fase |
-| v0.15 | Cognizione Soggettiva Avanzata | Giugno-Luglio 2026 | Pending |
+| v0.14 | Job Recovery Runtime e fallback degli incarichi | Giugno 2026 | Completata |
+| v0.15 | Cognizione Soggettiva Avanzata | Giugno-Luglio 2026 | Prossima fase |
 | v0.16 | Conseguenze Sociali Emergenti | Luglio 2026 | Pending |
 | v0.17 | Observer Layer Pubblico ed Explainability Esterna | Luglio-Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -762,7 +762,7 @@ Questa fase deve anche verificare se la struttura attuale dei pannelli EL consum
 #### v0.13 - Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule
 
 ## Stato
-FUTURA / PENDING
+COMPLETATA
 
 ## Obiettivo
 
@@ -884,7 +884,9 @@ Il recupero deve restare locale, configurabile, osservabile e limitato. Se un in
 | v0.14e | Fallback per target non valido o risorsa sparita | ✅ DONE |
 | v0.14f | Failure learning minimo verso memoria/credenze | ✅ DONE |
 | v0.14g | Explainability recovery Job | ✅ DONE |
-| v0.14h | QA e closeout Job Recovery Runtime | ⏳ |
+| v0.14h | QA e closeout Job Recovery Runtime | ✅ DONE |
+
+> **Nota closeout v0.14h (2026-05-31):** la fase `v0.14` e' chiusa come Job Recovery Runtime e fallback degli incarichi. Ha trasformato la foundation recovery passiva in un recupero locale governato: classificazione dei fallimenti step, policy lette da `job_recovery_policies.json`, retry locale limitato, fallback su cibo equivalente visibile, ritorno minimo verso memoria/credenze e tracciamento EL del recupero. La fase NON introduce planner globale, ricerca attiva sulla mappa o recovery intelligente completa. Restano rinviati a `v0.15+` lifecycle credenze, obsolescenza, verifica locale, propagazione sociale e strategie recovery piu' avanzate. Dettaglio: `v0.14h_Closeout_Report.md`.
 
 ---
 
