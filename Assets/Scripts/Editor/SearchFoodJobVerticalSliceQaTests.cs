@@ -104,6 +104,7 @@ namespace Arcontio.Tests
             Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
             Assert.That(job.Request.HasTargetCell, Is.True);
             AssertLatestJobRequest(world, npcId, DecisionIntentKind.SearchFood, job.JobId);
+            AssertLatestCommittedDecision(world, npcId, DecisionIntentKind.SearchFood);
         }
 
         [Test]
@@ -285,6 +286,7 @@ namespace Arcontio.Tests
             Assert.That(commands.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
             AssertNoJobRequest(world, npcId);
+            AssertNoCommittedDecision(world, npcId);
         }
 
         [Test]
@@ -685,8 +687,26 @@ namespace Arcontio.Tests
 
         private static void AssertNoJobRequest(World world, int npcId)
         {
-            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            if (!world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store))
+                return;
+
             Assert.That(store.TryGetLatestJobRequestTrace(out _), Is.False);
+        }
+
+        private static void AssertLatestCommittedDecision(World world, int npcId, DecisionIntentKind expectedIntent)
+        {
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestDecisionTrace(out var trace), Is.True);
+            Assert.That(trace.Kind, Is.EqualTo(MemoryBeliefDecisionTraceKind.Decision));
+            Assert.That(trace.Decision.SelectedIntent, Is.EqualTo(expectedIntent));
+        }
+
+        private static void AssertNoCommittedDecision(World world, int npcId)
+        {
+            if (!world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store))
+                return;
+
+            Assert.That(store.TryGetLatestDecisionTrace(out _), Is.False);
         }
 
         private static void OccupySearchProbeCells(World world, int excludedNpcId, int originX, int originY)
