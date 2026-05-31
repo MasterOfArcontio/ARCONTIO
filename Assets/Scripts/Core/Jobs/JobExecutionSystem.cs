@@ -24,7 +24,7 @@ namespace Arcontio.Core
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>MoveToCell</b>: accoda <c>SetMoveIntentCommand</c> se serve avvicinarsi.</item>
+    ///   <item><b>MoveToCell</b>: usa una running action di traversal quando esiste gia' una route nota, altrimenti mantiene il ponte <c>SetMoveIntentCommand</c>.</item>
     ///   <item><b>Consume</b>: accoda <c>EatFromStockCommand</c> solo quando l'NPC e' sul target.</item>
     ///   <item><b>StateMachine</b>: applica <c>StepResult</c> e completa/fallisce il job.</item>
     /// </list>
@@ -80,6 +80,7 @@ namespace Arcontio.Core
                     npcId,
                     in npcState,
                     job,
+                    bus,
                     (int)tick.Index,
                     explainabilityConfig,
                     explainabilityRegistry);
@@ -538,6 +539,7 @@ namespace Arcontio.Core
             int npcId,
             in NpcJobState npcState,
             Job job,
+            MessageBus bus,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
@@ -565,7 +567,7 @@ namespace Arcontio.Core
                     explainabilityRegistry);
 
             if (action.Kind == JobActionKind.MoveToCell)
-                return ExecuteMoveTo(world, runtime, runningActionExecutor, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
+                return ExecuteMoveTo(world, runtime, runningActionExecutor, npcId, job, action, npcCell, bus, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.Consume)
                 return ExecuteConsumeKnownFood(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
@@ -729,6 +731,7 @@ namespace Arcontio.Core
             Job job,
             JobAction action,
             GridPosition npcCell,
+            MessageBus bus,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
@@ -752,11 +755,39 @@ namespace Arcontio.Core
                     job,
                     action,
                     npcCell,
+                    bus,
                     tick,
                     explainabilityConfig,
                     explainabilityRegistry);
             }
 
+            if (TryResolveKnownMoveToRouteStep(world, npcId, npcCell, action.TargetCell, out var nextKnownRouteCell, out var knownRouteFailure))
+            {
+                return ExecuteKnownRouteMoveToStep(
+                    world,
+                    runtime,
+                    runningActionExecutor,
+                    npcId,
+                    job,
+                    action,
+                    npcCell,
+                    nextKnownRouteCell,
+                    bus,
+                    tick,
+                    explainabilityConfig,
+                    explainabilityRegistry);
+            }
+
+            if (!string.IsNullOrEmpty(knownRouteFailure))
+                return StepResult.Failed(JobFailureReason.MovementFailed, knownRouteFailure);
+
+            if (CanUseJobMovementRuntime(world))
+                return StepResult.Failed(JobFailureReason.MovementFailed, "MoveToKnownRouteMissing");
+
+            // Ponte compatibile v0.15.9: questo ramo resta disponibile solo quando
+            // il runtime movimento Job e' spento. In configurazione produttiva futura
+            // il target distante senza route nota deve fallire e passare dalla matrice
+            // recovery, non creare un MoveIntent nascosto.
             bool alreadyMovingToTarget =
                 world.NpcMoveIntents.TryGetValue(npcId, out var currentIntent)
                 && currentIntent.Active
@@ -788,6 +819,272 @@ namespace Arcontio.Core
             }
 
             return StepResult.Running(alreadyMovingToTarget ? "MoveAlreadyRequested" : "MoveCommandEnqueued");
+        }
+
+        // =============================================================================
+        // TryResolveKnownMoveToRouteStep
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Tenta di leggere il prossimo passo di una route gia' presente nello stato
+        /// pathfinding, senza costruire nuovi percorsi e senza interrogare il
+        /// movimento legacy.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: route conosciuta, non pianificatore nascosto</b></para>
+        /// <para>
+        /// Lo step v0.15.6 deve permettere al Job di consumare una route cella-per-cella
+        /// tramite running action, ma non deve ancora trasformare il Job in un sistema
+        /// di ricerca globale. Per questo motivo il metodo accetta solo uno stato
+        /// <c>DirectCommitExecution</c> gia' esistente, con target finale coerente con
+        /// il target del job. Se la route non esiste, il chiamante puo' ancora usare il
+        /// ponte legacy fino agli step successivi. Se invece la route esiste ma risulta
+        /// incoerente, lo step fallisce in modo esplicito: una route nota corrotta non
+        /// deve essere mascherata da un nuovo fallback automatico.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Assenza route</b>: nessun effetto, lascia decidere il chiamante.</item>
+        ///   <item><b>Target coerente</b>: la route deve finire nella cella richiesta dal job.</item>
+        ///   <item><b>Riallineamento leggero</b>: se l'indice non punta piu' alla cella adiacente, cerca la posizione corrente dentro il path gia' noto.</item>
+        ///   <item><b>Fallimento esplicito</b>: route attiva ma desincronizzata produce errore locale.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryResolveKnownMoveToRouteStep(
+            World world,
+            int npcId,
+            GridPosition npcCell,
+            Vector2Int finalTargetCell,
+            out Vector2Int nextRouteCell,
+            out string failureReason)
+        {
+            nextRouteCell = default;
+            failureReason = string.Empty;
+
+            if (!CanUseJobMovementRuntime(world))
+                return false;
+
+            if (world.Pathfinding == null
+                || !world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var directState)
+                || directState == null
+                || !directState.Active)
+            {
+                return false;
+            }
+
+            if (directState.FinalTargetCellX != finalTargetCell.x || directState.FinalTargetCellY != finalTargetCell.y)
+                return false;
+
+            if (directState.CurrentPath == null || directState.CurrentPath.Count < 2)
+            {
+                failureReason = "MoveToKnownRouteEmpty";
+                return false;
+            }
+
+            int nextIndex = directState.NextPathIndex < 1 ? 1 : directState.NextPathIndex;
+            if (nextIndex >= directState.CurrentPath.Count
+                || Mathf.Abs(directState.CurrentPath[nextIndex].X - npcCell.X) + Mathf.Abs(directState.CurrentPath[nextIndex].Y - npcCell.Y) != 1)
+            {
+                nextIndex = -1;
+                for (int i = 0; i < directState.CurrentPath.Count - 1; i++)
+                {
+                    var cell = directState.CurrentPath[i];
+                    if (cell.X == npcCell.X && cell.Y == npcCell.Y)
+                    {
+                        nextIndex = i + 1;
+                        break;
+                    }
+                }
+            }
+
+            if (nextIndex < 1 || nextIndex >= directState.CurrentPath.Count)
+            {
+                failureReason = "MoveToKnownRouteDesynced";
+                return false;
+            }
+
+            var next = directState.CurrentPath[nextIndex];
+            if (Mathf.Abs(next.X - npcCell.X) + Mathf.Abs(next.Y - npcCell.Y) != 1)
+            {
+                failureReason = "MoveToKnownRouteNextStepInvalid";
+                return false;
+            }
+
+            directState.NextPathIndex = nextIndex;
+            directState.ImmediateTargetX = next.X;
+            directState.ImmediateTargetY = next.Y;
+            world.Pathfinding.DirectCommitExecution[npcId] = directState;
+
+            nextRouteCell = new Vector2Int(next.X, next.Y);
+            return true;
+        }
+
+        // =============================================================================
+        // CanUseJobMovementRuntime
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce true quando il runtime movimento del Job e' abilitato dalla
+        /// configurazione temporale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: pensionamento controllato del ponte legacy</b></para>
+        /// <para>
+        /// Il gate consente di mantenere il comportamento storico quando il traversal
+        /// Job e' spento, ma quando e' acceso impedisce al percorso ordinario di
+        /// ricadere silenziosamente su <c>SetMoveIntentCommand</c>. In quel caso una
+        /// route mancante diventa un fallimento esplicito e puo' essere gestita dalla
+        /// matrice recovery del Job.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Config assente</b>: false, preservando il ponte legacy.</item>
+        ///   <item><b>Gate acceso</b>: il movimento ordinario prova il runtime Job.</item>
+        /// </list>
+        /// </summary>
+        private static bool CanUseJobMovementRuntime(World world)
+        {
+            return world?.Config?.Sim != null && world.Config.Sim.ResolveEnableJobRunningActionTraversal();
+        }
+
+        // =============================================================================
+        // ExecuteKnownRouteMoveToStep
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue un singolo passo di una route multi-cella gia' nota usando la stessa
+        /// running action produttiva del traversal adiacente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: un solo passo fisico per volta</b></para>
+        /// <para>
+        /// La route multi-cella non sposta mai l'NPC direttamente al target finale.
+        /// Ogni tick produttivo lavora su una sola cella adiacente, mantiene la
+        /// reservation della destinazione immediata e aggiorna la posizione solo alla
+        /// completion della running action. Se il passo intermedio completa ma il target
+        /// finale non e' ancora raggiunto, lo step resta <c>Running</c> e il Job non
+        /// avanza fase: al tick successivo verra' consumata la cella successiva della
+        /// stessa route nota.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Action effettiva</b>: clona l'azione originale cambiando solo la cella immediata.</item>
+        ///   <item><b>Traversal</b>: delega al percorso multi-tick gia' validato per una cella.</item>
+        ///   <item><b>Avanzamento route</b>: aggiorna il cursore DirectCommit solo dopo completion fisica.</item>
+        ///   <item><b>Esito Job</b>: successo solo quando la cella finale e' davvero raggiunta.</item>
+        /// </list>
+        /// </summary>
+        private static StepResult ExecuteKnownRouteMoveToStep(
+            World world,
+            JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
+            int npcId,
+            Job job,
+            JobAction action,
+            GridPosition npcCell,
+            Vector2Int nextRouteCell,
+            MessageBus bus,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            var immediateAction = new JobAction(
+                action.ActionId,
+                action.Kind,
+                action.Label,
+                true,
+                nextRouteCell,
+                action.TargetObjectId,
+                action.DurationTicks,
+                action.PayloadKey);
+
+            var traversalResult = ExecuteRunningCellTraversalAction(
+                world,
+                runtime,
+                runningActionExecutor,
+                npcId,
+                job,
+                immediateAction,
+                npcCell,
+                bus,
+                tick,
+                explainabilityConfig,
+                explainabilityRegistry);
+
+            if (traversalResult.Status != StepResultStatus.Succeeded)
+                return traversalResult;
+
+            AdvanceKnownMoveToRouteAfterTraversal(world, npcId, npcCell, nextRouteCell);
+
+            if (nextRouteCell.x == action.TargetCell.x && nextRouteCell.y == action.TargetCell.y)
+                return StepResult.Succeeded("MoveToKnownRouteCompleted");
+
+            return StepResult.Running("MoveToKnownRouteStepCompleted");
+        }
+
+        // =============================================================================
+        // AdvanceKnownMoveToRouteAfterTraversal
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Avanza il cursore della route nota dopo un passo fisico completato dal Job.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: stato di route subordinato al movimento reale</b></para>
+        /// <para>
+        /// Il cursore non viene anticipato quando la running action parte o progredisce:
+        /// viene aggiornato solo dopo lo spostamento effettivo della posizione World.
+        /// Questo mantiene allineati diagnosi, reservation e posizione reale anche se
+        /// un passo viene bloccato, interrotto o fallisce.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Debug path</b>: registra il passo realmente completato.</item>
+        ///   <item><b>Indice</b>: consuma la cella raggiunta se coincide col prossimo nodo atteso.</item>
+        ///   <item><b>Terminale</b>: spegne la route quando il path e' esaurito.</item>
+        /// </list>
+        /// </summary>
+        private static void AdvanceKnownMoveToRouteAfterTraversal(World world, int npcId, GridPosition fromCell, Vector2Int movedToCell)
+        {
+            if (world?.Pathfinding == null)
+                return;
+
+            world.AppendDebugDirectStepForNpc(npcId, fromCell.X, fromCell.Y, movedToCell.x, movedToCell.y);
+
+            if (!world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var directState)
+                || directState == null
+                || directState.CurrentPath == null
+                || directState.CurrentPath.Count == 0)
+            {
+                return;
+            }
+
+            if (directState.NextPathIndex < directState.CurrentPath.Count)
+            {
+                var expected = directState.CurrentPath[directState.NextPathIndex];
+                if (expected.X == movedToCell.x && expected.Y == movedToCell.y)
+                    directState.NextPathIndex++;
+            }
+
+            if (directState.NextPathIndex >= directState.CurrentPath.Count)
+            {
+                directState.Active = false;
+                directState.ImmediateTargetX = movedToCell.x;
+                directState.ImmediateTargetY = movedToCell.y;
+            }
+            else
+            {
+                var next = directState.CurrentPath[directState.NextPathIndex];
+                directState.Active = true;
+                directState.ImmediateTargetX = next.X;
+                directState.ImmediateTargetY = next.Y;
+            }
+
+            world.Pathfinding.DirectCommitExecution[npcId] = directState;
         }
 
         // =============================================================================
@@ -868,6 +1165,7 @@ namespace Arcontio.Core
             Job job,
             JobAction action,
             GridPosition npcCell,
+            MessageBus bus,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
@@ -878,6 +1176,9 @@ namespace Arcontio.Core
             // La chiave resta agganciata al cursore job corrente: il progress
             // volatile non diventa una seconda authority su destinazione o path.
             var key = ResolveRunningActionKey(runtime, npcId, job.JobId);
+
+            if (!TryOpenTraversalDoorIfNeeded(world, bus, npcId, action.TargetCell, out var doorFailure))
+                return StepResult.Failed(JobFailureReason.MovementFailed, doorFailure);
 
             if (!CanEnterTraversalTarget(world, npcId, action.TargetCell, out var blockedReason))
             {
@@ -1017,6 +1318,158 @@ namespace Arcontio.Core
             }
 
             return StepResult.Running("MoveToCellTraversalPending");
+        }
+
+        // =============================================================================
+        // TryOpenTraversalDoorIfNeeded
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Gestisce la micro-interazione locale "porta chiusa apribile" prima di
+        /// avviare il traversal multi-tick verso la cella destinazione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: micro-operazioni fisiche dentro MoveTo</b></para>
+        /// <para>
+        /// v0.15 sposta il movimento ordinario dentro la running action <c>MoveTo</c>.
+        /// Una porta chiusa e non bloccata sulla cella immediata non deve quindi
+        /// richiedere il vecchio <c>MovementSystem</c> per aprirsi. La patch resta
+        /// locale: usa <c>OpenDoorCommand</c>, pubblica lo stesso evento mondo e non
+        /// introduce chiavi, scelta sociale, pathfinding o recovery intelligente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Nessuna porta</b>: il traversal prosegue invariato.</item>
+        ///   <item><b>Porta aperta</b>: il traversal prosegue invariato.</item>
+        ///   <item><b>Porta bloccata</b>: fallimento locale esplicito.</item>
+        ///   <item><b>Porta chiusa apribile</b>: apertura tramite command esistente e trace movimento opzionale.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryOpenTraversalDoorIfNeeded(
+            World world,
+            MessageBus bus,
+            int npcId,
+            Vector2Int targetCell,
+            out string failureReason)
+        {
+            failureReason = string.Empty;
+
+            if (world == null)
+                return true;
+
+            if (!TryGetTraversalDoorAtCell(world, targetCell, out int doorObjectId, out var doorInstance, out var doorDef))
+                return true;
+
+            if (doorInstance.IsOpen)
+                return true;
+
+            if (doorInstance.IsLocked)
+            {
+                MovementExplainabilityEmitter.TryEmitDoorInteraction(
+                    world,
+                    npcId,
+                    doorObjectId,
+                    targetCell,
+                    DoorState.Locked,
+                    DoorState.Locked,
+                    commandEmitted: false,
+                    accessGranted: false,
+                    summary: "job_traversal_door_locked");
+                failureReason = "TraversalDoorLocked";
+                return false;
+            }
+
+            new OpenDoorCommand(npcId, doorObjectId).Execute(world, bus ?? new MessageBus());
+
+            MovementExplainabilityEmitter.TryEmitDoorInteraction(
+                world,
+                npcId,
+                doorObjectId,
+                targetCell,
+                DoorState.Closed,
+                DoorState.Open,
+                commandEmitted: true,
+                accessGranted: true,
+                summary: "job_traversal_door_opened");
+
+            return true;
+        }
+
+        // =============================================================================
+        // TryGetTraversalDoorAtCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca una porta nella cella di traversal usando prima la cache rapida del
+        /// World e poi, se necessario, una scansione difensiva degli oggetti.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: robustezza locale senza nuova authority</b></para>
+        /// <para>
+        /// La cache <c>GetObjectAt</c> e' il percorso normale, ma alcuni test e alcune
+        /// operazioni dev possono avere oggetti appena creati prima di un rebuild
+        /// globale delle cache derivate. La scansione di ripiego non decide movimento,
+        /// non pianifica e non muta il mondo: serve solo a riconoscere correttamente
+        /// una porta gia' presente nella cella immediata.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Cache</b>: usa <c>GetObjectAt</c> quando disponibile e coerente.</item>
+        ///   <item><b>Fallback locale</b>: scansiona <c>world.Objects</c> solo se la cache non produce una porta.</item>
+        ///   <item><b>Filtro</b>: restituisce solo oggetti non held, nella cella target e con definizione porta.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryGetTraversalDoorAtCell(
+            World world,
+            Vector2Int targetCell,
+            out int doorObjectId,
+            out WorldObjectInstance doorInstance,
+            out ObjectDef doorDef)
+        {
+            doorObjectId = 0;
+            doorInstance = null;
+            doorDef = null;
+
+            if (world == null)
+                return false;
+
+            int objectIdFromCell = world.GetObjectAt(targetCell.x, targetCell.y);
+            if (objectIdFromCell > 0
+                && world.Objects.TryGetValue(objectIdFromCell, out var cachedInstance)
+                && cachedInstance != null
+                && world.TryGetObjectDef(cachedInstance.DefId, out var cachedDef)
+                && cachedDef != null
+                && cachedDef.IsDoor)
+            {
+                doorObjectId = objectIdFromCell;
+                doorInstance = cachedInstance;
+                doorDef = cachedDef;
+                return true;
+            }
+
+            foreach (var kv in world.Objects)
+            {
+                var instance = kv.Value;
+                if (instance == null
+                    || instance.IsHeld
+                    || instance.CellX != targetCell.x
+                    || instance.CellY != targetCell.y
+                    || !world.TryGetObjectDef(instance.DefId, out var def)
+                    || def == null
+                    || !def.IsDoor)
+                {
+                    continue;
+                }
+
+                doorObjectId = kv.Key;
+                doorInstance = instance;
+                doorDef = def;
+                return true;
+            }
+
+            return false;
         }
 
         private static bool TryEnsureTraversalDestinationReservation(

@@ -62,6 +62,10 @@ namespace Arcontio.View.MapGrid
         [Tooltip("[DEBUG] Balloon mostrato quando l'NPC arriva dove ricordava il cibo ma non lo trova più.")]
         [SerializeField] private string balloonFoodNotFoundSpritePath = "MapGrid/Sprites/Balloons/Balloon_FoodNotFound";
 
+        [Header("NPC decision flash (view-only)")]
+        [Tooltip("Tinta applicata allo sprite NPC nel tick in cui il World segnala una decisione riuscita.")]
+        [SerializeField] private Color npcDecisionFlashTint = Color.white;
+
         [Header("Debug overlays")]
         [Tooltip("Sprite usato per evidenziare celle viste (DebugFovTelemetry). Deve essere un Sprite in Resources.")]
         [SerializeField] private string fovOverlaySpritePath = "MapGrid/Sprites/CellHighlight";
@@ -720,7 +724,45 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
                 sr.transform.position = CellCenterWorld(pos.X, pos.Y);
                 sr.sortingOrder = sortByY ? npcBaseOrder - pos.Y : npcBaseOrder;
+                ApplyNpcDecisionFlash(sr, npcId);
             }
+        }
+
+        // =============================================================================
+        // ApplyNpcDecisionFlash
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un feedback visuale leggerissimo allo sprite dell'NPC quando il
+        /// <see cref="World"/> segnala che quello stesso NPC ha appena prodotto una
+        /// decisione eseguibile.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: diagnostica visuale senza EL</b></para>
+        /// <para>
+        /// La view non legge trace, non costruisce stringhe e non dipende dai pannelli:
+        /// confronta solo il tick corrente con un valore intero nel <see cref="World"/>.
+        /// In questo modo il flash resta disponibile anche con Explainability Layer
+        /// spento e non aggiunge costo diagnostico quando non accade nulla.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Guardia renderer</b>: se lo sprite non esiste, non fa nulla.</item>
+        ///   <item><b>Lettura World</b>: usa solo TryGetNpcDecisionFlashTick.</item>
+        ///   <item><b>Durata</b>: il colore speciale resta solo per il tick segnalato.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyNpcDecisionFlash(SpriteRenderer sr, int npcId)
+        {
+            if (sr == null || _world == null)
+                return;
+
+            int currentTick = (int)TickContext.CurrentTickIndex;
+            bool shouldFlash = _world.TryGetNpcDecisionFlashTick(npcId, out int flashTick)
+                && flashTick == currentTick;
+
+            sr.color = shouldFlash ? npcDecisionFlashTint : Color.white;
         }
 
         private void EnsureNpcBalloonComponents(GameObject npcGo, int npcId)
