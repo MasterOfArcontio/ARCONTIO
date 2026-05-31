@@ -293,7 +293,7 @@ namespace Arcontio.Tests
         [Test]
         public void JobRuntimeStateReleasesReservationWhenJobFails()
         {
-            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
             world.FoodStocks[foodId] = new FoodStockComponent
             {
@@ -314,7 +314,7 @@ namespace Arcontio.Tests
         [Test]
         public void AssignedFoodJobConsumeFoodUnavailableUpdatesFoodBelief()
         {
-            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
             AddFoodBelief(world, npcId, 5, 5);
             EnableMbdBridgeExplainability(world);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
@@ -348,7 +348,7 @@ namespace Arcontio.Tests
         [Test]
         public void AssignedFoodJobConsumeFoodUnavailableCanReplaceWithVisibleEquivalentFood()
         {
-            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
             int replacementFoodId = AddCommunityFoodStock(world, 88, 5, 5, units: 3);
 
             AddFoodBelief(world, npcId, 5, 5);
@@ -380,9 +380,54 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void EquivalentFoodRecoveryEmitsJobExplainabilityTraces()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(
+                npcX: 5,
+                npcY: 5,
+                foodX: 5,
+                foodY: 5,
+                out int npcId,
+                out int foodId,
+                enableMbdExplainability: true);
+            int replacementFoodId = AddCommunityFoodStock(world, 88, 5, 5, units: 3);
+
+            AddFoodBelief(world, npcId, 5, 5);
+            EnableMbdBridgeExplainability(world);
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 0,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+
+            var system = new JobExecutionSystem();
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestStepTrace(out var stepTrace), Is.True);
+            Assert.That(stepTrace.Step, Is.Not.Null);
+            Assert.That(stepTrace.Step.Result.DiagnosticMessage, Is.EqualTo("ConsumeFoodUnavailable"));
+            Assert.That(stepTrace.Step.Reason, Does.StartWith("RecoveryTargetReplaced:ResourceMissing:FindEquivalentTarget"));
+
+            Assert.That(store.TryGetLatestJobRequestTrace(out var requestTrace), Is.True);
+            Assert.That(requestTrace.JobRequest, Is.Not.Null);
+            Assert.That(requestTrace.JobRequest.TargetObjectId, Is.EqualTo(replacementFoodId));
+            Assert.That(requestTrace.JobRequest.Reason, Does.StartWith("RecoveryJobRequest:EquivalentTarget"));
+
+            Assert.That(store.TryGetLatestJobLifecycleTrace(out var lifecycleTrace), Is.True);
+            Assert.That(lifecycleTrace.JobLifecycle, Is.Not.Null);
+            Assert.That(lifecycleTrace.JobLifecycle.Operation, Is.EqualTo(MemoryBeliefDecisionJobLifecycleOperation.Activated));
+            Assert.That(lifecycleTrace.JobLifecycle.Job.TargetObjectId, Is.EqualTo(replacementFoodId));
+            Assert.That(lifecycleTrace.JobLifecycle.Reason, Does.StartWith("RecoveryJobActivated:EquivalentTarget"));
+        }
+
+        [Test]
         public void AssignedFoodJobConsumeFoodObjectMissingUpdatesFoodBelief()
         {
-            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
             AddFoodBelief(world, npcId, 5, 5);
             EnableMbdBridgeExplainability(world);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
@@ -704,6 +749,9 @@ namespace Arcontio.Tests
 
         private static void AssertNoBeliefTrace(World world, int npcId)
         {
+            if (world.MemoryBeliefDecisionExplainability == null)
+                return;
+
             if (!world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store))
                 return;
 
@@ -740,9 +788,9 @@ namespace Arcontio.Tests
             profile.Obligation.Set(DomainKind.Exploration, 0f);
         }
 
-        private static World MakeWorldWithNpcAndCommunityFood(int npcX, int npcY, int foodX, int foodY, out int npcId, out int foodId)
+        private static World MakeWorldWithNpcAndCommunityFood(int npcX, int npcY, int foodX, int foodY, out int npcId, out int foodId, bool enableMbdExplainability = false)
         {
-            var world = MakeWorldWithNpcOnly(npcX, npcY, out npcId);
+            var world = MakeWorldWithNpcOnly(npcX, npcY, out npcId, enableMbdExplainability);
 
             foodId = 77;
             world.Objects[foodId] = new WorldObjectInstance
@@ -765,9 +813,16 @@ namespace Arcontio.Tests
             return world;
         }
 
-        private static World MakeWorldWithNpcOnly(int npcX, int npcY, out int npcId)
+        private static World MakeWorldWithNpcOnly(int npcX, int npcY, out int npcId, bool enableMbdExplainability = false)
         {
-            var world = new World(new WorldConfig(new SimulationParams()));
+            var sim = new SimulationParams();
+            if (enableMbdExplainability)
+            {
+                sim.memory_belief_decision_explainability.enabled = true;
+                sim.memory_belief_decision_explainability.writeJsonLog = false;
+            }
+
+            var world = new World(new WorldConfig(sim));
             world.Global.Needs = NeedsConfig.Default();
             world.Global.BeliefQuery = BeliefQueryConfig.Default();
             world.Global.NpcOperationalRangeCells = 16;

@@ -883,7 +883,7 @@ Il recupero deve restare locale, configurabile, osservabile e limitato. Se un in
 | v0.14d | Retry locale controllato e limiti anti-loop | ✅ DONE |
 | v0.14e | Fallback per target non valido o risorsa sparita | ✅ DONE |
 | v0.14f | Failure learning minimo verso memoria/credenze | ✅ DONE |
-| v0.14g | Explainability recovery Job | ⏳ |
+| v0.14g | Explainability recovery Job | ✅ DONE |
 | v0.14h | QA e closeout Job Recovery Runtime | ⏳ |
 
 ---

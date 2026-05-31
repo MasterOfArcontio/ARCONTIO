@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.14 - Job Recovery Runtime e fallback degli incarichi
 
 CHECKPOINT CORRENTE:
-v0.14g - Explainability recovery Job
+v0.14h - QA e closeout Job Recovery Runtime
 
 STATUS:
 READY / PENDING
 
 OUTPUT ATTESO:
-explainability recovery Job leggibile e coerente con fallback/retry locali
+QA finale e closeout del recupero locale degli incarichi
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.13`;
@@ -74,7 +74,7 @@ Obiettivo tecnico corrente `v0.14`:
 - rendere osservabile recovery/fallimento tramite EL.
 
 Prossimo macro job consigliato:
-`v0.14g - Explainability recovery Job`
+`v0.14h - QA e closeout Job Recovery Runtime`
 
 Residual follow-ups / future hardening:
 
@@ -101,7 +101,7 @@ Checkpoint v0.14 pianificati:
 - `v0.14d`: retry locale controllato e limiti anti-loop - DONE;
 - `v0.14e`: fallback per target non valido o risorsa sparita - DONE;
 - `v0.14f`: failure learning minimo verso memoria/credenze - DONE;
-- `v0.14g`: explainability recovery Job;
+- `v0.14g`: explainability recovery Job - DONE;
 - `v0.14h`: QA e closeout Job Recovery Runtime.
 
 Checkpoint v0.15 pianificati:
