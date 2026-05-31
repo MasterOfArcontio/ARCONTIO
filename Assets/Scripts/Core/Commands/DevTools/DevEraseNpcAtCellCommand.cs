@@ -65,6 +65,7 @@ namespace Arcontio.Core.Commands.DevTools
 
             world.NpcAction.Remove(npcId);
             world.NpcBalloonSignals.Remove(npcId);
+            world.ClearNpcDecisionFlash(npcId);
 
             // ============================================================
             // MEMORY

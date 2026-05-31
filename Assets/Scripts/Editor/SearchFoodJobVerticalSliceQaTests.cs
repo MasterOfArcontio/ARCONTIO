@@ -38,6 +38,33 @@ namespace Arcontio.Tests
         private const string TemplateJson =
             "{\"templates\":[{\"templateId\":\"food.search_local_probe.v1\",\"phases\":[{\"phaseId\":\"search_food_probe\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_probe\",\"kind\":\"MoveToCell\"}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
 
+        // =============================================================================
+        // RunFromCommandLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Entry point diagnostico per eseguire il QA mirato SearchFood da Unity
+        /// batchmode quando il runner standard non produce XML.
+        /// </para>
+        /// </summary>
+        public static void RunFromCommandLine()
+        {
+            try
+            {
+                var tests = new SearchFoodJobVerticalSliceQaTests();
+                tests.DecisionFlashIsWrittenWhenSearchFoodStartsJob();
+                tests.DecisionFlashIsNotWrittenWhenSearchFoodCannotStartJob();
+
+                Debug.Log("[SearchFoodJobVerticalSliceQaTests] PASS targeted search food tests");
+                UnityEditor.EditorApplication.Exit(0);
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogError("[SearchFoodJobVerticalSliceQaTests] FAIL targeted search food tests\n" + ex);
+                UnityEditor.EditorApplication.Exit(1);
+            }
+        }
+
         [Test]
         public void SearchFoodFactoryAcceptsPrebuiltJobRequest()
         {
@@ -77,6 +104,30 @@ namespace Arcontio.Tests
             Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
             Assert.That(job.Request.HasTargetCell, Is.True);
             AssertLatestJobRequest(world, npcId, DecisionIntentKind.SearchFood, job.JobId);
+        }
+
+        [Test]
+        public void DecisionFlashIsWrittenWhenSearchFoodStartsJob()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+
+            RunDecisionOrchestrator(world, tick: 7);
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(world.TryGetNpcDecisionFlashTick(npcId, out int flashTick), Is.True);
+            Assert.That(flashTick, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void DecisionFlashIsNotWrittenWhenSearchFoodCannotStartJob()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            OccupySearchProbeCells(world, npcId, 5, 5);
+
+            RunDecisionOrchestrator(world, tick: 7);
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.TryGetNpcDecisionFlashTick(npcId, out _), Is.False);
         }
 
         [Test]

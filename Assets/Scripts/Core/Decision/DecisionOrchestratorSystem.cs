@@ -141,7 +141,10 @@ namespace Arcontio.Core
 
                 var startResult = TryEvaluateAndStartJob(world, npcId, in needs, nowTick, telemetry);
                 if (ShouldConsumeDecisionCadence(startResult))
+                {
                     _lastDecisionTicks[npcId] = nowTick;
+                    world.SignalNpcDecisionFlash(npcId, nowTick);
+                }
             }
         }
 

@@ -378,6 +378,17 @@ namespace Arcontio.Core
         /// </summary>
         public readonly Dictionary<int, NpcBalloonSignal> NpcBalloonSignals = new();
 
+        /// <summary>
+        /// Ultimo tick in cui un NPC ha prodotto una decisione eseguibile.
+        ///
+        /// Nota architetturale:
+        /// - Questo non fa parte dell'Explainability Layer e non crea trace.
+        /// - Serve solo alla view della mappa per mostrare un feedback visivo leggero
+        ///   anche quando EL e pannelli diagnostici sono spenti.
+        /// - Non influenza job, memoria, credenze, bisogni o salvataggio.
+        /// </summary>
+        private readonly Dictionary<int, int> _npcDecisionFlashTicks = new();
+
         // Movimento come "intento" eseguito da un System.
         // Le Rule scrivono qui; il MovementSystem consuma e prova ad avanzare.
         //        public readonly Dictionary<int, MoveIntent> MoveIntents = new();
@@ -3635,6 +3646,52 @@ if (!NpcAction.ContainsKey(id))
                 return false;
             }
             return NpcBalloonSignals.TryGetValue(npcId, out signal);
+        }
+
+        // =============================================================================
+        // SignalNpcDecisionFlash
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un segnale visuale minimale: "questo NPC ha appena prodotto una
+        /// decisione che ha aperto un incarico".
+        /// </para>
+        ///
+        /// <para><b>Osservabilita' leggera fuori da EL</b></para>
+        /// <para>
+        /// Il segnale non e' una trace di explainability, non viene scritto su file e
+        /// non alimenta pannelli diagnostici. E' solo un tick leggibile dalla view per
+        /// colorare temporaneamente lo sprite, quindi resta funzionante anche quando
+        /// EL e' spento e non produce allocazioni diagnostiche.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Chiave</b>: NPC che ha preso la decisione.</item>
+        ///   <item><b>Valore</b>: tick della decisione riuscita.</item>
+        ///   <item><b>Guardia</b>: NPC inesistente ignorato, per non creare entry orfane.</item>
+        /// </list>
+        /// </summary>
+        public void SignalNpcDecisionFlash(int npcId, int tick)
+        {
+            if (!ExistsNpc(npcId)) return;
+            _npcDecisionFlashTicks[npcId] = tick;
+        }
+
+        public bool TryGetNpcDecisionFlashTick(int npcId, out int tick)
+        {
+            if (!ExistsNpc(npcId))
+            {
+                tick = default;
+                return false;
+            }
+
+            return _npcDecisionFlashTicks.TryGetValue(npcId, out tick);
+        }
+
+        public void ClearNpcDecisionFlash(int npcId)
+        {
+            _npcDecisionFlashTicks.Remove(npcId);
         }
 
 
