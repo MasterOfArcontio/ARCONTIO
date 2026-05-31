@@ -25,23 +25,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ACTIVE: v0.15 - Cognizione Soggettiva Avanzata
+## MACRO JOB ACTIVE: v0.15 - Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime
 
 CHECKPOINT CORRENTE:
-v0.15a - Audit cognition gap post-v0.14
+v0.15a - Audit movimento legacy vs RunningAction MoveTo
 
 STATUS:
 READY / PENDING
 
 OUTPUT ATTESO:
-audit iniziale del gap cognitivo dopo la chiusura del recupero locale degli incarichi
+audit iniziale del movimento legacy, della running action MoveTo e del bug target cibo eliminato
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.14`;
 allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza `v0.15`
 
 OBIETTIVO:
-Aprire la cognizione soggettiva avanzata sopra una base MBQD/Incarichi e Job Recovery ormai stabilizzata.
+Chiudere il debito tra movimento legacy e Job runtime prima di aprire la cognizione soggettiva avanzata.
 
 Esito tecnico ereditato da `v0.12`:
 
@@ -63,7 +63,7 @@ Esito tecnico ereditato da `v0.13`:
 - classificare fallimenti minimi e ritorno cognitivo leggero;
 - eliminare definitivamente `NeedsDecisionRule` dopo estrazione e ricostruzione dei percorsi minimi.
 
-Obiettivo tecnico corrente `v0.14`:
+Esito tecnico ereditato da `v0.14`:
 
 - verificare come falliscono oggi Job, Phase e Step;
 - collegare le classificazioni di fallimento alle policy di recovery gia' introdotte;
@@ -73,14 +73,24 @@ Obiettivo tecnico corrente `v0.14`:
 - mantenere `JobExecutionSystem` come esecutore, non come secondo decisore;
 - rendere osservabile recovery/fallimento tramite EL.
 
+Obiettivo tecnico corrente `v0.15`:
+
+- trasformare il movimento ordinario in una RunningAction MoveTo multi-tick;
+- fare fallire il movimento quando non esiste route lecita invece di usare fallback greedy onnisciente;
+- restituire i fallimenti movimento al Job;
+- lasciare che il fallback sia deciso da `job_recovery_policies.json`;
+- isolare `MoveIntent` e `MovementSystem` come compatibilita' o dev/debug;
+- correggere il caso target cibo eliminato che oggi puo' apparire come Job completed/succeeded;
+- preparare la cognizione soggettiva sopra movimento non onnisciente.
+
 Prossimo macro job consigliato:
-`v0.15a - Audit cognition gap post-v0.14`
+`v0.15a - Audit movimento legacy vs RunningAction MoveTo`
 
 Residual follow-ups / future hardening:
 
-- `v0.15`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
-- `v0.16`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
-- `v0.17+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+- `v0.16`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
+- `v0.17`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
+- `v0.18+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
 Checkpoint v0.13 pianificati:
 
@@ -106,14 +116,27 @@ Checkpoint v0.14 pianificati:
 
 Checkpoint v0.15 pianificati:
 
-- `v0.15a`: audit cognition gap post-v0.14;
-- `v0.15b`: lifecycle credenze e obsolescenza cibo/oggetti;
-- `v0.15c`: memoria da eventi needs;
-- `v0.15d`: verifica locale credenze;
-- `v0.15e`: decisione su conoscenza incerta;
-- `v0.15f`: comunicazione soggettiva minima;
-- `v0.15g`: QA anti-onniscienza cognitiva;
-- `v0.15h`: closeout cognizione soggettiva avanzata.
+- `v0.15a`: audit movimento legacy vs RunningAction MoveTo;
+- `v0.15b`: specifica running action MoveTo e cause fallimento;
+- `v0.15c`: matrice recovery movimento in `job_recovery_policies.json`;
+- `v0.15d`: MoveTo multi-cella su route conosciuta;
+- `v0.15e`: porte e micro-interazioni locali in MoveTo;
+- `v0.15f`: rimozione fallback greedy ordinario;
+- `v0.15g`: bug target cibo eliminato e completion errata Job;
+- `v0.15h`: isolamento MoveIntent/MovementSystem come dev o compatibilita';
+- `v0.15i`: EL movimento Job e QA anti-onniscienza path;
+- `v0.15j`: closeout movimento multi-tick.
+
+Checkpoint v0.16 pianificati:
+
+- `v0.16a`: audit cognition gap post-v0.15;
+- `v0.16b`: lifecycle credenze e obsolescenza cibo/oggetti;
+- `v0.16c`: memoria da eventi needs;
+- `v0.16d`: verifica locale credenze;
+- `v0.16e`: decisione su conoscenza incerta;
+- `v0.16f`: comunicazione soggettiva minima;
+- `v0.16g`: QA anti-onniscienza cognitiva;
+- `v0.16h`: closeout cognizione soggettiva avanzata.
 
 Checkpoint v0.12 completati:
 

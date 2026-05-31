@@ -28,9 +28,10 @@
 | v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | Completata |
 | v0.13 | Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule | Giugno 2026 | Completata |
 | v0.14 | Job Recovery Runtime e fallback degli incarichi | Giugno 2026 | Completata |
-| v0.15 | Cognizione Soggettiva Avanzata | Giugno-Luglio 2026 | Prossima fase |
-| v0.16 | Conseguenze Sociali Emergenti | Luglio 2026 | Pending |
-| v0.17 | Observer Layer Pubblico ed Explainability Esterna | Luglio-Agosto 2026 | Pending |
+| v0.15 | Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime | Giugno-Luglio 2026 | Prossima fase |
+| v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Pending |
+| v0.17 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
+| v0.18 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
 
 ---
@@ -850,7 +851,7 @@ In questa fase NON si deve:
 #### v0.14 - Job Recovery Runtime e fallback degli incarichi
 
 ## Stato
-FUTURA / PENDING
+COMPLETATA
 
 ## Obiettivo
 
@@ -886,18 +887,91 @@ Il recupero deve restare locale, configurabile, osservabile e limitato. Se un in
 | v0.14g | Explainability recovery Job | ✅ DONE |
 | v0.14h | QA e closeout Job Recovery Runtime | ✅ DONE |
 
-> **Nota closeout v0.14h (2026-05-31):** la fase `v0.14` e' chiusa come Job Recovery Runtime e fallback degli incarichi. Ha trasformato la foundation recovery passiva in un recupero locale governato: classificazione dei fallimenti step, policy lette da `job_recovery_policies.json`, retry locale limitato, fallback su cibo equivalente visibile, ritorno minimo verso memoria/credenze e tracciamento EL del recupero. La fase NON introduce planner globale, ricerca attiva sulla mappa o recovery intelligente completa. Restano rinviati a `v0.15+` lifecycle credenze, obsolescenza, verifica locale, propagazione sociale e strategie recovery piu' avanzate. Dettaglio: `v0.14h_Closeout_Report.md`.
+> **Nota closeout v0.14h (2026-05-31):** la fase `v0.14` e' chiusa come Job Recovery Runtime e fallback degli incarichi. Ha trasformato la foundation recovery passiva in un recupero locale governato: classificazione dei fallimenti step, policy lette da `job_recovery_policies.json`, retry locale limitato, fallback su cibo equivalente visibile, ritorno minimo verso memoria/credenze e tracciamento EL del recupero. La fase NON introduce planner globale, ricerca attiva sulla mappa o recovery intelligente completa. Restano rinviati a `v0.15+` chiusura movimento multi-tick, lifecycle credenze, obsolescenza, verifica locale, propagazione sociale e strategie recovery piu' avanzate. Dettaglio: `v0.14h_Closeout_Report.md`.
 
 ---
 
-#### v0.15 - Cognizione Soggettiva Avanzata
+#### v0.15 - Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime
 
 ## Stato
 FUTURA / PENDING
 
 ## Obiettivo
 
-Approfondire la cognizione soggettiva degli NPC usando l'infrastruttura stabilizzata in v0.11D, il tratto MBQD/Incarichi chiuso in v0.13 e il recupero locale degli incarichi stabilizzato in v0.14.
+Chiudere il debito strutturale tra movimento legacy e Job runtime prima di aprire la cognizione soggettiva profonda.
+
+Questa fase deve trasformare il movimento ordinario degli NPC da:
+
+```text
+MoveIntent -> MovementSystem -> spostamento immediato
+```
+
+a:
+
+```text
+Job -> RunningAction MoveTo -> progress multi-tick -> completion/failure -> recovery da matrice JSON
+```
+
+La running action di movimento deve poter gestire in autonomia le micro-operazioni fisiche locali necessarie allo spostamento, come attraversamento cella, validazione prossima cella e apertura porte localmente lecite.
+
+Non deve pero' diventare un secondo sistema decisionale: se non conosce una route valida, se il target sparisce, se una porta non e' apribile o se il percorso non e' localmente risolvibile, deve fallire con causa esplicita e restituire il fallimento al Job. Il fallback successivo deve essere deciso dalle policy configurate in `job_recovery_policies.json`, non da euristiche nascoste dentro il movimento.
+
+La scelta architetturale e' intenzionale: un NPC che non conosce la strada non deve inventare un percorso greedy onnisciente. Il fallimento del movimento e' informazione utile per il Job, per le credenze e per la futura cognizione soggettiva.
+
+Questa fase deve lavorare su:
+
+- audit authority reale di `MovementSystem`, `MoveIntent` e movimento Job;
+- definizione della running action `MoveTo` come contenitore tecnico del movimento multi-tick;
+- separazione tra calcolo percorso lecito e decisione cognitiva;
+- rimozione del fallback greedy finale come comportamento ordinario;
+- gestione porte come micro-interazione locale, non come decisione globale;
+- ritorno dei fallimenti movimento al Job;
+- collegamento dei fallimenti movimento alla matrice JSON di recovery;
+- migrazione progressiva di path lunghi, landmark, local search e backoff;
+- EL movimento/Job coerente con running action e fallimenti;
+- QA dei casi target sparito, risorsa eliminata, strada ignota, porta bloccata e NPC occupante.
+
+---
+
+## Fuori scope
+
+In questa fase NON si deve:
+
+- introdurre planner globale onnisciente;
+- introdurre ricerca attiva sulla mappa come effetto collaterale del movimento;
+- trasformare la running action `MoveTo` in un mini-Job decisionale;
+- far scegliere alla running action nuovi obiettivi;
+- far cercare alla running action cibo alternativo;
+- introdurre cognizione soggettiva profonda;
+- introdurre sistemi sociali;
+- cambiare Save/Load salvo necessita' minima documentata;
+- rimuovere strumenti dev/debug prima di averli isolati.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.15a | Audit movimento legacy vs RunningAction MoveTo | ⏳ |
+| v0.15b | Specifica running action MoveTo e cause fallimento | ⏳ |
+| v0.15c | Matrice recovery movimento in `job_recovery_policies.json` | ⏳ |
+| v0.15d | MoveTo multi-cella su route conosciuta | ⏳ |
+| v0.15e | Porte e micro-interazioni locali in MoveTo | ⏳ |
+| v0.15f | Rimozione fallback greedy ordinario | ⏳ |
+| v0.15g | Bug target cibo eliminato e completion errata Job | ⏳ |
+| v0.15h | Isolamento MoveIntent/MovementSystem come dev o compatibilita' | ⏳ |
+| v0.15i | EL movimento Job e QA anti-onniscienza path | ⏳ |
+| v0.15j | Closeout movimento multi-tick | ⏳ |
+
+---
+
+#### v0.16 - Cognizione Soggettiva Avanzata
+
+## Stato
+FUTURA / PENDING
+
+## Obiettivo
+
+Approfondire la cognizione soggettiva degli NPC usando l'infrastruttura stabilizzata in v0.11D, il tratto MBQD/Incarichi chiuso in v0.13, il recupero locale degli incarichi stabilizzato in v0.14 e il movimento multi-tick chiuso in v0.15.
 
 Questa fase deve lavorare su:
 
@@ -913,18 +987,18 @@ Questa fase deve lavorare su:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.15a | Audit cognition gap post-v0.14 | ⏳ |
-| v0.15b | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
-| v0.15c | Memory encoding da world events needs | ⏳ |
-| v0.15d | Verifica locale credenze obsolete | ⏳ |
-| v0.15e | Comunicazione soggettiva dei fatti osservati | ⏳ |
-| v0.15f | Decisioni con belief incerte e parziali | ⏳ |
-| v0.15g | QA anti-omniscienza cognitiva | ⏳ |
-| v0.15h | Closeout cognition deepening | ⏳ |
+| v0.16a | Audit cognition gap post-v0.15 | ⏳ |
+| v0.16b | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
+| v0.16c | Memory encoding da world events needs | ⏳ |
+| v0.16d | Verifica locale credenze obsolete | ⏳ |
+| v0.16e | Comunicazione soggettiva dei fatti osservati | ⏳ |
+| v0.16f | Decisioni con belief incerte e parziali | ⏳ |
+| v0.16g | QA anti-omniscienza cognitiva | ⏳ |
+| v0.16h | Closeout cognition deepening | ⏳ |
 
 ---
 
-#### v0.16 - Conseguenze Sociali Emergenti
+#### v0.17 - Conseguenze Sociali Emergenti
 
 ## Stato
 FUTURA / PENDING
@@ -937,16 +1011,16 @@ Introdurre conseguenze sociali emergenti sopra world events, memoria soggettiva 
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.16a | Audit reputazione/sospetto post-v0.15 | ⏳ |
-| v0.16b | Catene sospetto/furto da eventi osservati | ⏳ |
-| v0.16c | Giudizio sociale locale | ⏳ |
-| v0.16d | Prime norme emergenti | ⏳ |
-| v0.16e | Istituzioni runtime leggere | ⏳ |
-| v0.16f | QA scenario sociale osservabile | ⏳ |
+| v0.17a | Audit reputazione/sospetto post-v0.16 | ⏳ |
+| v0.17b | Catene sospetto/furto da eventi osservati | ⏳ |
+| v0.17c | Giudizio sociale locale | ⏳ |
+| v0.17d | Prime norme emergenti | ⏳ |
+| v0.17e | Istituzioni runtime leggere | ⏳ |
+| v0.17f | QA scenario sociale osservabile | ⏳ |
 
 ---
 
-#### v0.17 - Observer Layer Pubblico ed Explainability Esterna
+#### v0.18 - Observer Layer Pubblico ed Explainability Esterna
 
 ## Stato
 FUTURA / PENDING
@@ -959,11 +1033,11 @@ Costruire uno strato observer esterno leggibile sopra eventi, memoria, decisioni
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.17a | Timeline eventi mondo | ⏳ |
-| v0.17b | Reason graph NPC | ⏳ |
-| v0.17c | Pannelli observer leggibili | ⏳ |
-| v0.17d | Reinserimento job traces v0.07 | ⏳ |
-| v0.17e | QA observer end-to-end | ⏳ |
+| v0.18a | Timeline eventi mondo | ⏳ |
+| v0.18b | Reason graph NPC | ⏳ |
+| v0.18c | Pannelli observer leggibili | ⏳ |
+| v0.18d | Reinserimento job traces v0.07 | ⏳ |
+| v0.18e | QA observer end-to-end | ⏳ |
 
 > **Nota:** questa fase riassorbe la vecchia v0.07 e la porta a uno strato observer realmente utile.
 
@@ -1005,24 +1079,34 @@ Il sistema oggi possiede già:
 - state machine;
 - traversal temporale;
 - explainability runtime;
-- foundation recovery passiva;
-- classificazione failure passiva.
+- recovery locale governata;
+- classificazione failure produttiva;
+- retry locale limitato;
+- fallback target equivalente visibile;
+- ritorno minimo verso memoria/credenze;
+- EL del recupero Job.
 
 ---
 
 # Funzionalità NON ancora implementate
 
-NON esistono ancora:
+NON esistono ancora o non sono ancora completi:
 
-- recovery locale reale;
-- retry runtime;
-- replanning locale;
+- movimento ordinario interamente governato da RunningAction multi-tick;
+- path lungo Job-native;
+- rimozione del fallback greedy ordinario;
+- isolamento finale di `MoveIntent` e `MovementSystem` come dev/compatibilita';
+- `LookAround` come Job esplicito invece di comportamento sistemico generico;
+- search attiva come Job pienamente configurato e non come effetto laterale del movimento;
+- belief lifecycle profondo;
+- obsolescenza credenze cibo/oggetti;
+- memoria completa da eventi needs;
+- verifica locale delle credenze obsolete;
 - escalation cognitiva produttiva;
-- evaluator recovery produttivo;
 - planner globale;
 - recovery automatico intelligente.
 
-Questi aspetti verranno introdotti solo dopo la chiusura delle foundation passive.
+Questi aspetti verranno introdotti solo dopo la chiusura della nuova fase `v0.15` sul movimento multi-tick e sulla authority del movimento.
 
 ---
 
