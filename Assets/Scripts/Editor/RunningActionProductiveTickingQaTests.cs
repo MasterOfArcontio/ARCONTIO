@@ -53,6 +53,7 @@ namespace Arcontio.Tests
                 new RunningActionProductiveTickingQaTests().TraversalGateOnFailsDiagonalTargetWithoutKnownRoute();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
+                new RunningActionProductiveTickingQaTests().KnownRouteMoveToWritesLifecycleExplainabilityForEachCell();
 
                 Debug.Log("[RunningActionProductiveTickingQaTests] PASS targeted traversal tests");
                 UnityEditor.EditorApplication.Exit(0);
@@ -336,6 +337,7 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
             Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.False);
         }
 
         // =============================================================================
@@ -371,6 +373,7 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
             Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.False);
         }
 
         // =============================================================================
@@ -774,9 +777,8 @@ namespace Arcontio.Tests
         {
             // Arrange: usiamo il target oggetto fittizio per forzare una reservation
             // cella specifica del traversal, poi abilitiamo solo il registry locale.
-            var world = MakeWorldWithNpc(out int npcId);
+            var world = MakeWorldWithNpcWithRunningActionExplainability(out int npcId);
             EnableOneCellTraversal(world, durationTicks: 2);
-            EnableRunningActionExplainability(world);
             var config = world.Config.Sim.memory_belief_decision_explainability;
             config.logReservation = true;
             var startCell = world.GridPos[npcId];
@@ -817,8 +819,7 @@ namespace Arcontio.Tests
             // Arrange: abilitiamo solo il registry diagnostico gia' esistente. Il
             // job resta un WaitTicks no-target, quindi non puo' toccare MovementSystem
             // o produrre una mutazione world-mutating.
-            var world = MakeWorldWithNpc(out int npcId);
-            EnableRunningActionExplainability(world);
+            var world = MakeWorldWithNpcWithRunningActionExplainability(out int npcId);
             var job = MakeWaitJob(npcId, "job-wait-el", durationTicks: 2);
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
             var system = new JobExecutionSystem();
@@ -865,9 +866,8 @@ namespace Arcontio.Tests
         public void OneCellMoveTraversalWritesLifecycleExplainability()
         {
             // Arrange: il gate movement e il gate EL sono abilitati solo in memoria.
-            var world = MakeWorldWithNpc(out int npcId);
+            var world = MakeWorldWithNpcWithRunningActionExplainability(out int npcId);
             EnableOneCellTraversal(world, durationTicks: 2);
-            EnableRunningActionExplainability(world);
             var startCell = world.GridPos[npcId];
             var targetCell = new Vector2Int(startCell.X + 1, startCell.Y);
             var job = MakeMoveJob(npcId, "job-move-one-cell-el", targetCell);
@@ -897,11 +897,88 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
         }
 
+        // =============================================================================
+        // KnownRouteMoveToWritesLifecycleExplainabilityForEachCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che una route multi-cella consumata dal Job produca trace EL di
+        /// running action per ciascun attraversamento fisico, senza introdurre un nuovo
+        /// registro diagnostico parallelo.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: spiegabilita' del movimento Job senza doppia authority</b></para>
+        /// <para>
+        /// La route resta uno stato esecutivo gia' noto, mentre il progresso fisico
+        /// viene spiegato dal lifecycle della running action: start, progress e
+        /// completion per ogni cella. Questo consente al pannello Job/RunningAction di
+        /// capire a che punto siamo senza interrogare il vecchio <c>MoveIntent</c>.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void KnownRouteMoveToWritesLifecycleExplainabilityForEachCell()
+        {
+            // Arrange: due celle di movimento, EL running action acceso e nessun
+            // MovementSystem. Il test osserva solo il registry MBQD gia' esistente.
+            var world = MakeWorldWithNpcWithRunningActionExplainability(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            var startCell = world.GridPos[npcId];
+            var targetCell = new Vector2Int(startCell.X + 2, startCell.Y);
+            world.SetDebugDirectPathForNpc(
+                npcId,
+                new List<Vector2Int>
+                {
+                    new(startCell.X, startCell.Y),
+                    new(startCell.X + 1, startCell.Y),
+                    targetCell
+                });
+
+            var job = MakeMoveJob(npcId, "job-move-known-route-el", targetCell);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            // Act: quattro tick completano due traversal da due tick ciascuno.
+            for (int tick = 0; tick < 4; tick++)
+                system.Update(world, new Tick(tick, 1f), new MessageBus(), new Telemetry());
+
+            // Assert: due cicli completi Started/Progress/Completed vengono registrati
+            // nello stesso store EL-MBQD; nessun command legacy viene generato.
+            Assert.That(world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            var traces = new List<MemoryBeliefDecisionTrace>();
+            store.CopyRunningActionTracesTo(traces);
+            Assert.That(traces.Count, Is.EqualTo(6));
+            Assert.That(traces[0].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Started));
+            Assert.That(traces[1].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Progress));
+            Assert.That(traces[2].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Completed));
+            Assert.That(traces[3].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Started));
+            Assert.That(traces[4].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Progress));
+            Assert.That(traces[5].RunningAction.Operation, Is.EqualTo(MemoryBeliefDecisionRunningActionOperation.Completed));
+            Assert.That(traces[5].RunningAction.ActionKind, Is.EqualTo(RunningActionKind.Movement));
+            Assert.That(traces[5].RunningAction.JobId, Is.EqualTo(job.JobId));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
+        }
+
         private static World MakeWorldWithNpc(out int npcId)
+        {
+            return MakeWorldWithNpc(new SimulationParams(), out npcId);
+        }
+
+        private static World MakeWorldWithNpcWithRunningActionExplainability(out int npcId)
+        {
+            var sim = new SimulationParams();
+            sim.memory_belief_decision_explainability.enabled = true;
+            sim.memory_belief_decision_explainability.writeJsonLog = false;
+            sim.memory_belief_decision_explainability.logRunningAction = true;
+            return MakeWorldWithNpc(sim, out npcId);
+        }
+
+        private static World MakeWorldWithNpc(SimulationParams simulationParams, out int npcId)
         {
             // World minimale: abbastanza runtime per JobExecutionSystem, senza
             // avviare SimulationHost o MovementSystem.
-            var world = new World(new WorldConfig(new SimulationParams()));
+            var world = new World(new WorldConfig(simulationParams ?? new SimulationParams()));
             world.Global.Needs = NeedsConfig.Default();
             world.Global.BeliefQuery = BeliefQueryConfig.Default();
             npcId = world.CreateNpc(
@@ -911,16 +988,6 @@ namespace Arcontio.Tests
                 x: 1,
                 y: 1);
             return world;
-        }
-
-        private static void EnableRunningActionExplainability(World world)
-        {
-            // La config abilita soltanto emissione diagnostica. I test non attivano
-            // JSONL, non scrivono file e non cambiano il runtime produttivo.
-            var config = world.Config.Sim.memory_belief_decision_explainability;
-            config.enabled = true;
-            config.writeJsonLog = false;
-            config.logRunningAction = true;
         }
 
         private static void EnableOneCellTraversal(World world, int durationTicks)
