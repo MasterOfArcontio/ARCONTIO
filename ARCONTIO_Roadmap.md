@@ -929,6 +929,7 @@ Questa fase deve lavorare su:
 - collegamento dei fallimenti movimento alla matrice JSON di recovery;
 - migrazione progressiva di path lunghi, landmark, local search e backoff;
 - EL movimento/Job coerente con running action e fallimenti;
+- feedback visivo diagnostico leggero quando un NPC produce una decisione;
 - QA dei casi target sparito, risorsa eliminata, strada ignota, porta bloccata e NPC occupante.
 
 ---
@@ -961,7 +962,10 @@ In questa fase NON si deve:
 | v0.15.8 | Rimozione fallback greedy ordinario | ⏳ |
 | v0.15.9 | Isolamento MoveIntent/MovementSystem come dev o compatibilita' | ⏳ |
 | v0.15.10 | EL movimento Job e QA anti-onniscienza path | ⏳ |
-| v0.15.11 | Closeout movimento multi-tick | ⏳ |
+| v0.15.11 | Flash diagnostico NPC su decisione presa | ⏳ |
+| v0.15.12 | Closeout movimento multi-tick | ⏳ |
+
+> **Nota diagnostica v0.15.11:** il flash decisionale deve restare puramente visivo e non simulativo. Il Decision Layer non deve mutare sprite o viste: deve esporre un segnale diagnostico leggero, consumato dalla presentazione, per colorare temporaneamente lo sprite dell'NPC quando una decisione viene prodotta. Il flash non deve cambiare bisogni, job, movimento, tick order, memoria, belief o Save/Load.
 
 ---
 

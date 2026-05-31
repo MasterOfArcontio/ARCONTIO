@@ -126,7 +126,8 @@ Checkpoint v0.15 pianificati:
 - `v0.15.8`: rimozione fallback greedy ordinario;
 - `v0.15.9`: isolamento MoveIntent/MovementSystem come dev o compatibilita';
 - `v0.15.10`: EL movimento Job e QA anti-onniscienza path;
-- `v0.15.11`: closeout movimento multi-tick.
+- `v0.15.11`: flash diagnostico NPC su decisione presa;
+- `v0.15.12`: closeout movimento multi-tick.
 
 Checkpoint v0.16 pianificati:
 
