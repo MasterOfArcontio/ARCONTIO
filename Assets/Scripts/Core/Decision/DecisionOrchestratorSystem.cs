@@ -181,14 +181,6 @@ namespace Arcontio.Core
 
             var selectionConfig = ResolveDecisionSelectionConfig(world.Config?.Sim?.decision);
             var selection = _selectionService.Select(in context, _decisionCandidates, selectionConfig, _decisionRandom);
-            _explainabilityBridge.TryEmitDecisionTrace(
-                world.Config?.Sim?.memory_belief_decision_explainability,
-                world.MemoryBeliefDecisionExplainability,
-                in context,
-                auditValid: true,
-                _decisionCandidates,
-                selection,
-                selectionConfig);
 
             if (selection.IsEmpty)
                 return DecisionJobStartResult.NoExecutableCandidate;
@@ -207,6 +199,15 @@ namespace Arcontio.Core
                     _explainabilityBridge,
                     telemetry,
                     out _);
+                if (assigned)
+                    _explainabilityBridge.TryEmitDecisionTrace(
+                        world.Config?.Sim?.memory_belief_decision_explainability,
+                        world.MemoryBeliefDecisionExplainability,
+                        in context,
+                        auditValid: true,
+                        _decisionCandidates,
+                        selection,
+                        selectionConfig);
                 return assigned
                     ? DecisionJobStartResult.JobStarted
                     : DecisionJobStartResult.RouteRejected;
@@ -225,6 +226,15 @@ namespace Arcontio.Core
                     _explainabilityBridge,
                     telemetry,
                     out _);
+                if (assigned)
+                    _explainabilityBridge.TryEmitDecisionTrace(
+                        world.Config?.Sim?.memory_belief_decision_explainability,
+                        world.MemoryBeliefDecisionExplainability,
+                        in context,
+                        auditValid: true,
+                        _decisionCandidates,
+                        selection,
+                        selectionConfig);
                 return assigned
                     ? DecisionJobStartResult.JobStarted
                     : DecisionJobStartResult.RouteRejected;
