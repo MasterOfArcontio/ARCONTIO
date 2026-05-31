@@ -237,6 +237,27 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void FailedSearchFoodRouteDoesNotConsumeFullDecisionCadence()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+            OccupySearchProbeCells(world, npcId, 5, 5);
+            var orchestrator = new DecisionOrchestratorSystem(
+                decisionEveryTicks: 25,
+                maxSeekRangeCells: 8,
+                enableFoodJobVerticalSlice: true,
+                jobTemplateRegistry: MakeRegistry());
+
+            orchestrator.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+
+            world.SetNpcPos(npcId, 10, 10);
+            orchestrator.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+        }
+
+        [Test]
         public void SearchFoodLocalProbeCanLeadToFoodBeliefAndEatKnownFood()
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
