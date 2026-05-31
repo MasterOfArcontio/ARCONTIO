@@ -781,6 +781,9 @@ namespace Arcontio.Core
             if (!string.IsNullOrEmpty(knownRouteFailure))
                 return StepResult.Failed(JobFailureReason.MovementFailed, knownRouteFailure);
 
+            if (CanUseJobMovementRuntime(world))
+                return StepResult.Failed(JobFailureReason.MovementFailed, "MoveToKnownRouteMissing");
+
             bool alreadyMovingToTarget =
                 world.NpcMoveIntents.TryGetValue(npcId, out var currentIntent)
                 && currentIntent.Active
@@ -855,7 +858,7 @@ namespace Arcontio.Core
             nextRouteCell = default;
             failureReason = string.Empty;
 
-            if (world?.Config?.Sim == null || !world.Config.Sim.ResolveEnableJobRunningActionTraversal())
+            if (!CanUseJobMovementRuntime(world))
                 return false;
 
             if (world.Pathfinding == null
@@ -911,6 +914,35 @@ namespace Arcontio.Core
 
             nextRouteCell = new Vector2Int(next.X, next.Y);
             return true;
+        }
+
+        // =============================================================================
+        // CanUseJobMovementRuntime
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce true quando il runtime movimento del Job e' abilitato dalla
+        /// configurazione temporale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: pensionamento controllato del ponte legacy</b></para>
+        /// <para>
+        /// Il gate consente di mantenere il comportamento storico quando il traversal
+        /// Job e' spento, ma quando e' acceso impedisce al percorso ordinario di
+        /// ricadere silenziosamente su <c>SetMoveIntentCommand</c>. In quel caso una
+        /// route mancante diventa un fallimento esplicito e puo' essere gestita dalla
+        /// matrice recovery del Job.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Config assente</b>: false, preservando il ponte legacy.</item>
+        ///   <item><b>Gate acceso</b>: il movimento ordinario prova il runtime Job.</item>
+        /// </list>
+        /// </summary>
+        private static bool CanUseJobMovementRuntime(World world)
+        {
+            return world?.Config?.Sim != null && world.Config.Sim.ResolveEnableJobRunningActionTraversal();
         }
 
         // =============================================================================

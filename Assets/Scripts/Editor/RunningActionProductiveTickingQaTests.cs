@@ -49,6 +49,8 @@ namespace Arcontio.Tests
             try
             {
                 new RunningActionProductiveTickingQaTests().OneCellMoveTraversalHonorsConfiguredFourTickDuration();
+                new RunningActionProductiveTickingQaTests().TraversalGateOnFailsDistantTargetWithoutKnownRoute();
+                new RunningActionProductiveTickingQaTests().TraversalGateOnFailsDiagonalTargetWithoutKnownRoute();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
 
@@ -302,19 +304,20 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // TraversalGateOnKeepsDistantTargetOnLegacyPath
+        // TraversalGateOnFailsDistantTargetWithoutKnownRoute
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che il gate produttivo del traversal non allarghi per errore il
-        /// perimetro oltre la singola cella cardinale adiacente.
+        /// Verifica che, con runtime movimento Job acceso, un target distante senza
+        /// route nota non ricada piu' automaticamente nel ponte legacy.
         /// </para>
         /// </summary>
         [Test]
-        public void TraversalGateOnKeepsDistantTargetOnLegacyPath()
+        public void TraversalGateOnFailsDistantTargetWithoutKnownRoute()
         {
-            // Arrange: gate acceso, ma target distante. Questo resta un path
-            // MovementSystem/SetMoveIntentCommand legacy e non una running action.
+            // Arrange: gate acceso e target distante, ma nessun DirectCommitExecution
+            // precaricato. Da v0.15.8 questo e' un fallimento esplicito che la matrice
+            // recovery potra' gestire, non un SetMoveIntent automatico.
             var world = MakeWorldWithNpc(out int npcId);
             EnableOneCellTraversal(world, durationTicks: 2);
             var startCell = world.GridPos[npcId];
@@ -323,31 +326,33 @@ namespace Arcontio.Tests
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
             var system = new JobExecutionSystem();
 
-            // Act: il job execution produce il command legacy e non progress interno.
+            // Act: il Job non trova una route nota e fallisce localmente.
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
-            // Assert: nessun traversal multi-tick viene attivato fuori perimetro.
+            // Assert: nessun traversal e nessun command legacy vengono prodotti.
             Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
-            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
-            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
         }
 
         // =============================================================================
-        // TraversalGateOnKeepsDiagonalTargetOnLegacyPath
+        // TraversalGateOnFailsDiagonalTargetWithoutKnownRoute
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che un target diagonale non venga trattato come traversal
-        /// one-cell, anche quando il gate sperimentale e' abilitato.
+        /// Verifica che un target diagonale senza route nota non venga trattato come
+        /// traversal one-cell e non ricada nel movimento legacy quando il gate Job e'
+        /// abilitato.
         /// </para>
         /// </summary>
         [Test]
-        public void TraversalGateOnKeepsDiagonalTargetOnLegacyPath()
+        public void TraversalGateOnFailsDiagonalTargetWithoutKnownRoute()
         {
-            // Arrange: il target diagonale resta fuori dal traversal 02g/02h. Non
-            // introduciamo rifiuti o pathfinding nuovo: preserviamo il path legacy.
+            // Arrange: il target diagonale resta fuori dal traversal one-cell. Senza
+            // route nota, il Job deve fallire invece di creare un intent legacy.
             var world = MakeWorldWithNpc(out int npcId);
             EnableOneCellTraversal(world, durationTicks: 2);
             var startCell = world.GridPos[npcId];
@@ -356,16 +361,16 @@ namespace Arcontio.Tests
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
             var system = new JobExecutionSystem();
 
-            // Act: resta command legacy, quindi niente running action e niente
-            // mutazione anticipata della posizione.
+            // Act: nessuna route nota, nessun traversal eleggibile.
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
-            // Assert: il gate e' stretto e deterministicamente non-cardinale.
+            // Assert: la mancanza di route diventa fallimento locale.
             Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
-            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
-            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
         }
 
         // =============================================================================
