@@ -736,6 +736,9 @@ namespace Arcontio.Core
             if (!action.HasTargetCell)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "MoveMissingTargetCell");
 
+            if (!ValidateMoveTargetObject(world, job, action, out var targetFailure))
+                return targetFailure;
+
             if (npcCell.X == action.TargetCell.x && npcCell.Y == action.TargetCell.y)
                 return StepResult.Succeeded("MoveTargetReached");
 
@@ -785,6 +788,76 @@ namespace Arcontio.Core
             }
 
             return StepResult.Running(alreadyMovingToTarget ? "MoveAlreadyRequested" : "MoveCommandEnqueued");
+        }
+
+        // =============================================================================
+        // ValidateMoveTargetObject
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Valida il target oggetto di uno step <c>MoveToCell</c> prima di accodare
+        /// o mantenere un <c>SetMoveIntentCommand</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: il Job deve vedere il fallimento del target</b></para>
+        /// <para>
+        /// Nel percorso legacy il <c>MovementSystem</c> poteva cancellare un
+        /// <c>MoveIntent</c> quando il cibo spariva, lasciando pero' il Job ancora in
+        /// stato <c>Running</c>. Questa guardia sposta la validazione minima nel
+        /// punto che possiede davvero lo step: se l'incarico sta raggiungendo un cibo
+        /// noto e quel target non e' piu' valido, lo step fallisce e la state machine
+        /// puo' chiudere o recuperare il job tramite la matrice esistente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate dominio</b>: agisce solo su <c>EatKnownFood</c> con target oggetto.</item>
+        ///   <item><b>Oggetto</b>: fallisce se l'istanza world-level non esiste piu'.</item>
+        ///   <item><b>Stock</b>: fallisce se lo stock e' assente, vuoto o non comunitario.</item>
+        ///   <item><b>Cella</b>: fallisce se l'oggetto non si trova piu' nella cella promessa dal job.</item>
+        /// </list>
+        /// </summary>
+        private static bool ValidateMoveTargetObject(World world, Job job, JobAction action, out StepResult failure)
+        {
+            failure = default;
+
+            if (world == null || job == null || action.TargetObjectId <= 0)
+                return true;
+
+            if (job.Request.IntentKind != DecisionIntentKind.EatKnownFood)
+                return true;
+
+            if (!world.Objects.TryGetValue(action.TargetObjectId, out var targetObject) || targetObject == null)
+            {
+                failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveFoodObjectMissing");
+                return false;
+            }
+
+            if (!world.FoodStocks.TryGetValue(action.TargetObjectId, out var stock))
+            {
+                failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveFoodStockMissing");
+                return false;
+            }
+
+            if (stock.Units <= 0)
+            {
+                failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveFoodUnavailable");
+                return false;
+            }
+
+            if (stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
+            {
+                failure = StepResult.Failed(JobFailureReason.InvalidRequest, "MoveFoodNotCommunityStock");
+                return false;
+            }
+
+            if (targetObject.CellX != action.TargetCell.x || targetObject.CellY != action.TargetCell.y)
+            {
+                failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveTargetNoLongerAtCell");
+                return false;
+            }
+
+            return true;
         }
 
         private static StepResult ExecuteRunningCellTraversalAction(
@@ -1350,7 +1423,11 @@ namespace Arcontio.Core
             return string.Equals(diagnosticMessage, "ConsumeFoodUnavailable", System.StringComparison.Ordinal)
                 || string.Equals(diagnosticMessage, "ConsumeFoodObjectMissing", System.StringComparison.Ordinal)
                 || string.Equals(diagnosticMessage, "ConsumeTargetNoLongerCoLocated", System.StringComparison.Ordinal)
-                || string.Equals(diagnosticMessage, "ConsumeMissingFoodObject", System.StringComparison.Ordinal);
+                || string.Equals(diagnosticMessage, "ConsumeMissingFoodObject", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "MoveFoodUnavailable", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "MoveFoodObjectMissing", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "MoveFoodStockMissing", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "MoveTargetNoLongerAtCell", System.StringComparison.Ordinal);
         }
 
         private static bool TryFindFoodBeliefByPosition(BeliefStore store, Vector2Int targetCell, out BeliefEntry belief)

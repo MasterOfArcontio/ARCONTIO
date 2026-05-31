@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.15 - Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime
 
 CHECKPOINT CORRENTE:
-v0.15.2 - Audit movimento legacy vs RunningAction MoveTo
+v0.15.3 - Bug target cibo eliminato durante movimento
 
 STATUS:
-IN PROGRESS / AUDIT-FIRST
+IN PROGRESS / PATCH QA
 
 OUTPUT ATTESO:
-audit iniziale del movimento legacy, della running action MoveTo e del bug target cibo eliminato dopo debug `v0.15.1`
+correzione del caso in cui un job `EatKnownFood` resta in movimento/running quando il target cibo sparisce prima del consumo
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.14`;
@@ -84,7 +84,7 @@ Obiettivo tecnico corrente `v0.15`:
 - preparare la cognizione soggettiva sopra movimento non onnisciente.
 
 Prossimo macro job consigliato:
-`v0.15.2 - Audit movimento legacy vs RunningAction MoveTo`
+`v0.15.3 - Bug target cibo eliminato durante movimento`
 
 Residual follow-ups / future hardening:
 
@@ -118,12 +118,12 @@ Checkpoint v0.15 pianificati:
 
 - `v0.15.1`: debug riapertura job e cadenza decisionale - QA PENDING;
 - `v0.15.2`: audit movimento legacy vs RunningAction MoveTo - IN PROGRESS;
-- `v0.15.3`: specifica RunningAction MoveTo e cause fallimento;
-- `v0.15.4`: matrice recovery movimento in `job_recovery_policies.json`;
-- `v0.15.5`: MoveTo multi-cella su route conosciuta;
-- `v0.15.6`: porte e micro-interazioni locali in MoveTo;
-- `v0.15.7`: rimozione fallback greedy ordinario;
-- `v0.15.8`: bug target cibo eliminato e completion errata Job;
+- `v0.15.3`: bug target cibo eliminato durante movimento e belief obsoleta - QA PENDING;
+- `v0.15.4`: specifica RunningAction MoveTo e cause fallimento;
+- `v0.15.5`: matrice recovery movimento in `job_recovery_policies.json`;
+- `v0.15.6`: MoveTo multi-cella su route conosciuta;
+- `v0.15.7`: porte e micro-interazioni locali in MoveTo;
+- `v0.15.8`: rimozione fallback greedy ordinario;
 - `v0.15.9`: isolamento MoveIntent/MovementSystem come dev o compatibilita';
 - `v0.15.10`: EL movimento Job e QA anti-onniscienza path;
 - `v0.15.11`: closeout movimento multi-tick.
