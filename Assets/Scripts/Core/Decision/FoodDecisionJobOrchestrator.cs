@@ -248,19 +248,27 @@ namespace Arcontio.Core
                 return false;
             }
 
-            bool targetResolved = TryResolveKnownCommunityFoodTarget(
-                world,
-                npcId,
-                maxSeekRangeCells,
-                out int foodObjectId,
-                out int targetX,
-                out int targetY,
-                out string targetSource);
+            bool targetResolved = TryResolveBeliefOnlyFoodTarget(candidate, out int targetX, out int targetY, out string targetSource);
+            int foodObjectId = targetResolved
+                ? ResolveCommunityFoodObjectAtCell(world, targetX, targetY)
+                : 0;
 
-            if (!targetResolved && !TryResolveBeliefOnlyFoodTarget(candidate, out targetX, out targetY, out targetSource))
+            if (!targetResolved)
             {
-                reason = "KnownCommunityFoodMissing";
-                return false;
+                targetResolved = TryResolveKnownCommunityFoodTarget(
+                    world,
+                    npcId,
+                    maxSeekRangeCells,
+                    out foodObjectId,
+                    out targetX,
+                    out targetY,
+                    out targetSource);
+
+                if (!targetResolved)
+                {
+                    reason = "KnownCommunityFoodMissing";
+                    return false;
+                }
             }
 
             if (intentExecutionRouter == null)
@@ -416,6 +424,31 @@ namespace Arcontio.Core
             targetY = belief.EstimatedPosition.y;
             targetSource = "BeliefOnlyFood";
             return true;
+        }
+
+        private static int ResolveCommunityFoodObjectAtCell(World world, int x, int y)
+        {
+            if (world == null)
+                return 0;
+
+            foreach (var kv in world.FoodStocks)
+            {
+                int objId = kv.Key;
+                var stock = kv.Value;
+                if (stock.Units <= 0)
+                    continue;
+
+                if (stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
+                    continue;
+
+                if (!TryGetObjectCell(world, objId, out int ox, out int oy))
+                    continue;
+
+                if (ox == x && oy == y)
+                    return objId;
+            }
+
+            return 0;
         }
 
         private static bool TryResolveSearchFoodProbeCell(World world, int npcId, out Vector2Int probeCell, out string reason)
