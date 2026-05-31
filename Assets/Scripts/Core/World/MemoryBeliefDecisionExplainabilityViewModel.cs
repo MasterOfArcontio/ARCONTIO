@@ -1003,6 +1003,7 @@ namespace Arcontio.Core
 
             DecisionOutcomeDecisionBuffer.Sort((a, b) => b.Tick.CompareTo(a.Tick));
 
+            bool hasAnyJobRequestTrace = DecisionOutcomeRequestBuffer.Count > 0;
             int safeMaxRows = Math.Max(0, maxRows);
             for (int i = 0; i < DecisionOutcomeDecisionBuffer.Count && output.Count < safeMaxRows; i++)
             {
@@ -1032,6 +1033,15 @@ namespace Arcontio.Core
                 var requestTrace = FindMatchingJobRequest(decisionTrace.Tick, decision.SelectedIntent);
                 if (requestTrace?.JobRequest == null)
                 {
+                    if (!hasAnyJobRequestTrace)
+                    {
+                        row.Result = "non verificabile";
+                        row.Detail = "richieste job non tracciate";
+                        row.ColorRole = MemoryBeliefDecisionColorRole.Muted;
+                        output.Add(row);
+                        continue;
+                    }
+
                     row.Result = "fallita";
                     row.Detail = "nessuna richiesta job prodotta";
                     row.ColorRole = MemoryBeliefDecisionColorRole.Error;
