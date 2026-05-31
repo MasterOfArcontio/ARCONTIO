@@ -177,6 +177,7 @@ namespace Arcontio.Core
 
             _candidateGenerator.GeneratePhase1Candidates(in context, _decisionCandidates);
             RemoveNonRoutableJobCandidates(_decisionCandidates);
+            RemoveSearchFoodWhenKnownFoodIsAvailable(_decisionCandidates);
             _scoringService.ScoreCandidates(in context, _decisionCandidates, DecisionScoringConfig.Default());
 
             var selectionConfig = ResolveDecisionSelectionConfig(world.Config?.Sim?.decision);
@@ -324,6 +325,39 @@ namespace Arcontio.Core
             for (int i = candidates.Count - 1; i >= 0; i--)
             {
                 if (!IsJobRoutableIntent(candidates[i].Kind))
+                    candidates.RemoveAt(i);
+            }
+        }
+
+        private static void RemoveSearchFoodWhenKnownFoodIsAvailable(List<DecisionCandidate> candidates)
+        {
+            if (candidates == null || candidates.Count <= 1)
+                return;
+
+            bool hasKnownFoodTarget = false;
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                var candidate = candidates[i];
+                if (candidate.Kind == DecisionIntentKind.EatKnownFood
+                    && candidate.IsAvailable
+                    && !candidate.BeliefResult.IsEmpty)
+                {
+                    hasKnownFoodTarget = true;
+                    break;
+                }
+            }
+
+            if (!hasKnownFoodTarget)
+                return;
+
+            // SearchFood rappresenta ricerca attiva quando manca un target soggettivo
+            // utilizzabile. Se EatKnownFood possiede gia' un belief target, lasciarlo
+            // competere nella selezione pesata permette all'NPC di "cercare cibo" pur
+            // sapendo dove andare. La rimozione e' locale al ponte food attuale: non
+            // cambia scoring generale, non legge World e non crea nuove authority.
+            for (int i = candidates.Count - 1; i >= 0; i--)
+            {
+                if (candidates[i].Kind == DecisionIntentKind.SearchFood)
                     candidates.RemoveAt(i);
             }
         }
