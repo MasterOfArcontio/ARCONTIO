@@ -447,6 +447,44 @@ namespace Arcontio.Core
             return true;
         }
 
+        // =============================================================================
+        // RecordRecoveredStepFailureLearning
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un fallimento di step che e' stato recuperato localmente senza
+        /// chiudere il job come fallito.
+        /// </para>
+        ///
+        /// <para><b>Failure learning behavior-preserving</b></para>
+        /// <para>
+        /// Il recupero equivalente puo' sostituire il job e mantenere viva
+        /// l'intenzione operativa dell'NPC. Questo non deve pero' cancellare il fatto
+        /// che il target originario ha prodotto una smentita utile per memoria,
+        /// credenze e diagnostica. Il metodo registra soltanto il pattern passivo:
+        /// non cambia cursori, reservation, running action, punteggi o decisioni.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione minima</b>: ignora NPC non validi, job mancanti e reason vuoti.</item>
+        ///   <item><b>Store passivo</b>: riusa lo stesso aggregatore dei job terminalmente falliti.</item>
+        ///   <item><b>DiagnosticKey</b>: marca il caso come recuperato per distinguerlo dai fallimenti terminali.</item>
+        /// </list>
+        /// </summary>
+        public void RecordRecoveredStepFailureLearning(int npcId, Job job, JobFailureReason reason, int tick, string diagnosticKey)
+        {
+            if (npcId <= 0 || job == null || reason == JobFailureReason.None)
+                return;
+
+            RecordFailureLearning(
+                npcId,
+                job,
+                reason,
+                tick,
+                "JobRecoveryRecoveredStepFailure:" + (diagnosticKey ?? string.Empty));
+        }
+
         public bool ClearNpcJob(int npcId, JobFailureReason clearReason, out string reason)
         {
             reason = string.Empty;

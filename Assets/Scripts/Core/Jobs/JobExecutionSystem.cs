@@ -93,6 +93,7 @@ namespace Arcontio.Core
                     ref updatedState,
                     result,
                     (int)tick.Index,
+                    telemetry,
                     out bool replacedByRecoveryJob);
 
                 if (replacedByRecoveryJob)
@@ -166,6 +167,7 @@ namespace Arcontio.Core
             ref NpcJobState npcState,
             StepResult stepResult,
             int tick,
+            Telemetry telemetry,
             out bool replacedByRecoveryJob)
         {
             replacedByRecoveryJob = false;
@@ -215,6 +217,8 @@ namespace Arcontio.Core
                 retryCount,
                 elapsedTicks,
                 tick,
+                stepResult,
+                telemetry,
                 out replacedByRecoveryJob);
 
             if (recovery.Kind != JobRecoveryResultKind.RetryScheduled)
@@ -241,6 +245,8 @@ namespace Arcontio.Core
             int retryCount,
             int elapsedTicks,
             int tick,
+            StepResult stepResult,
+            Telemetry telemetry,
             out bool replacedByRecoveryJob)
         {
             replacedByRecoveryJob = false;
@@ -264,6 +270,8 @@ namespace Arcontio.Core
                         policy,
                         elapsedTicks,
                         tick,
+                        stepResult,
+                        telemetry,
                         out replacedByRecoveryJob);
 
                     if (targetRecovery.HasDeclaredResult)
@@ -300,6 +308,8 @@ namespace Arcontio.Core
             StepRecoveryPolicy policy,
             int elapsedTicks,
             int tick,
+            StepResult stepResult,
+            Telemetry telemetry,
             out bool replacedByRecoveryJob)
         {
             replacedByRecoveryJob = false;
@@ -331,6 +341,14 @@ namespace Arcontio.Core
 
             if (!runtime.ReplaceCurrentJobForRecovery(npcId, replacementJob, tick, out _))
                 return JobRecoveryResult.None();
+
+            runtime.RecordRecoveredStepFailureLearning(
+                npcId,
+                job,
+                stepResult.FailureReason,
+                tick,
+                "EquivalentTarget:" + stepResult.DiagnosticMessage);
+            ApplyFoodExecutionFailureCognitiveFeedback(world, npcId, job, stepResult, tick, telemetry);
 
             if (runtime.TryGetNpcState(npcId, out var replacementState))
             {
