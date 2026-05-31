@@ -1,6 +1,7 @@
 using Arcontio.Core.Diagnostics;
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Arcontio.Core
 {
@@ -42,10 +43,11 @@ namespace Arcontio.Core
 
         private readonly List<int> _npcIds = new(2048);
         private readonly List<int> _objIds = new(2048);
+        private readonly List<Vector2Int> _visibleMissingFoodBeliefCells = new(64);
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
-            if (world.Objects.Count == 0 || world.NpcDna.Count == 0)
+            if (world.NpcDna.Count == 0)
                 return;
 
             int visionRange = world.Global.NpcVisionRangeCells;
@@ -108,6 +110,17 @@ namespace Arcontio.Core
                     );
                 }
 
+                InvalidateVisibleMissingFoodBeliefs(
+                    world,
+                    npcId,
+                    np.X,
+                    np.Y,
+                    facing,
+                    visionRange,
+                    useCone,
+                    coneSlope,
+                    (int)tick.Index);
+
                 for (int o = 0; o < _objIds.Count; o++)
                 {
                     int objId = _objIds[o];
@@ -161,6 +174,143 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("ObjectPerception.SpottedEvents", spotted);
+        }
+
+        // =============================================================================
+        // InvalidateVisibleMissingFoodBeliefs
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scarta le credenze di cibo quando l'NPC puo' osservare direttamente la
+        /// cella creduta e in quella cella non esiste piu' alcuno stock alimentare.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: smentita locale, non onniscienza</b></para>
+        /// <para>
+        /// Questo controllo non corregge credenze lontane o fuori vista. Interviene
+        /// solo quando la stessa pipeline percettiva dimostra che la cella e' nel
+        /// campo visivo dell'NPC. In questo modo un cibo sparito fuori percezione
+        /// resta memoria soggettiva e puo' ancora generare un job; un cibo sparito
+        /// davanti agli occhi diventa invece una contraddizione locale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Belief scan</b>: legge solo belief Food Active/Weak.</item>
+        ///   <item><b>Gate visivo</b>: range, cono e linea di vista come ObjectSpotted.</item>
+        ///   <item><b>Smentita</b>: marca il belief come Discarded e invalida lo slot pratico collegato.</item>
+        /// </list>
+        /// </summary>
+        private void InvalidateVisibleMissingFoodBeliefs(
+            World world,
+            int npcId,
+            int npcX,
+            int npcY,
+            CardinalDirection facing,
+            int visionRange,
+            bool useCone,
+            float coneSlope,
+            int tick)
+        {
+            if (world == null || !world.Beliefs.TryGetValue(npcId, out var beliefStore) || beliefStore == null)
+                return;
+
+            _visibleMissingFoodBeliefCells.Clear();
+
+            var entries = beliefStore.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var belief = entries[i];
+                if (belief.Category != BeliefCategory.Food)
+                    continue;
+
+                if (belief.Status != BeliefStatus.Active && belief.Status != BeliefStatus.Weak)
+                    continue;
+
+                var cell = belief.EstimatedPosition;
+                if (!IsCellVisibleToNpc(world, npcX, npcY, facing, cell.x, cell.y, visionRange, useCone, coneSlope))
+                    continue;
+
+                if (HasAvailableFoodAtCell(world, cell.x, cell.y))
+                    continue;
+
+                _visibleMissingFoodBeliefCells.Add(cell);
+            }
+
+            for (int i = 0; i < _visibleMissingFoodBeliefCells.Count; i++)
+            {
+                var cell = _visibleMissingFoodBeliefCells[i];
+                beliefStore.TryDiscardByCategoryAndPosition(BeliefCategory.Food, cell, tick);
+                InvalidateFoodObjectMemoryAtCell(world, npcId, cell.x, cell.y);
+            }
+        }
+
+        private static bool IsCellVisibleToNpc(
+            World world,
+            int npcX,
+            int npcY,
+            CardinalDirection facing,
+            int cellX,
+            int cellY,
+            int visionRange,
+            bool useCone,
+            float coneSlope)
+        {
+            int dist = FovUtils.Manhattan(npcX, npcY, cellX, cellY);
+            if (dist > visionRange)
+                return false;
+
+            if (useCone)
+            {
+                if (!FovUtils.IsInCone(npcX, npcY, facing, cellX, cellY, coneSlope))
+                    return false;
+            }
+            else if (!FovUtils.IsInFront(npcX, npcY, facing, cellX, cellY))
+            {
+                return false;
+            }
+
+            return world.HasLineOfSight(npcX, npcY, cellX, cellY);
+        }
+
+        private static bool HasAvailableFoodAtCell(World world, int cellX, int cellY)
+        {
+            foreach (var pair in world.FoodStocks)
+            {
+                if (pair.Value.Units <= 0)
+                    continue;
+
+                if (!world.Objects.TryGetValue(pair.Key, out var obj) || obj == null)
+                    continue;
+
+                if (obj.CellX == cellX && obj.CellY == cellY)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static void InvalidateFoodObjectMemoryAtCell(World world, int npcId, int cellX, int cellY)
+        {
+            if (!world.NpcObjectMemory.TryGetValue(npcId, out var store) || store == null)
+                return;
+
+            for (int i = 0; i < store.Slots.Length; i++)
+            {
+                ref var slot = ref store.Slots[i];
+                if (!slot.IsValid || slot.Kind != NpcObjectMemoryStore.SubjectKind.WorldObject)
+                    continue;
+
+                if (slot.CellX != cellX || slot.CellY != cellY)
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(slot.DefId)
+                    || slot.DefId.IndexOf("food", StringComparison.OrdinalIgnoreCase) < 0)
+                    continue;
+
+                slot.IsValid = false;
+                break;
+            }
         }
 
         /// <summary>

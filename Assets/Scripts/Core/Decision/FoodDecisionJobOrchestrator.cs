@@ -248,7 +248,16 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!TryResolveKnownCommunityFoodTarget(world, npcId, maxSeekRangeCells, out int foodObjectId, out int targetX, out int targetY, out string targetSource))
+            bool targetResolved = TryResolveKnownCommunityFoodTarget(
+                world,
+                npcId,
+                maxSeekRangeCells,
+                out int foodObjectId,
+                out int targetX,
+                out int targetY,
+                out string targetSource);
+
+            if (!targetResolved && !TryResolveBeliefOnlyFoodTarget(candidate, out targetX, out targetY, out targetSource))
             {
                 reason = "KnownCommunityFoodMissing";
                 return false;
@@ -384,6 +393,29 @@ namespace Arcontio.Core
             }
 
             return false;
+        }
+
+        private static bool TryResolveBeliefOnlyFoodTarget(
+            DecisionCandidate candidate,
+            out int targetX,
+            out int targetY,
+            out string targetSource)
+        {
+            targetX = 0;
+            targetY = 0;
+            targetSource = string.Empty;
+
+            if (candidate.BeliefResult.IsEmpty)
+                return false;
+
+            var belief = candidate.BeliefResult.Belief;
+            if (belief.Category != BeliefCategory.Food)
+                return false;
+
+            targetX = belief.EstimatedPosition.x;
+            targetY = belief.EstimatedPosition.y;
+            targetSource = "BeliefOnlyFood";
+            return true;
         }
 
         private static bool TryResolveSearchFoodProbeCell(World world, int npcId, out Vector2Int probeCell, out string reason)

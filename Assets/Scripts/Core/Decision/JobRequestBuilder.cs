@@ -75,12 +75,6 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (targetObjectId <= 0)
-            {
-                reason = "MissingTargetObject";
-                return false;
-            }
-
             string beliefKey = BuildBeliefKey(candidate.BeliefResult.Belief);
             request = new JobRequest(
                 $"jobreq_food_{npcId}_{targetObjectId}_{tick}",

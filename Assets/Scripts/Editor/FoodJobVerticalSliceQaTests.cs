@@ -95,6 +95,52 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void FoodFactoryAcceptsBeliefOnlyTargetWithoutObjectId()
+        {
+            var registry = MakeRegistry();
+            var request = MakeFoodJobRequest(
+                npcId: 1,
+                foodObjectId: 0,
+                targetCell: new Vector2Int(5, 5),
+                tick: 2,
+                urgency01: 0.92f,
+                beliefKey: "Food:99@5,5");
+
+            bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
+                registry,
+                request,
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
+            Assert.That(job.Request.TargetCell, Is.EqualTo(new Vector2Int(5, 5)));
+            Assert.That(job.Plan.TryGetPhase(0, out var reach), Is.True);
+            Assert.That(reach.TryGetAction(0, out var move), Is.True);
+            Assert.That(move.TargetObjectId, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void EatKnownFoodDecisionStartsJobFromBeliefOnlyTarget()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            AddFoodBelief(world, npcId, 7, 5);
+            PreferKnownFoodDecision(world, npcId);
+            var orchestrator = new DecisionOrchestratorSystem(
+                decisionEveryTicks: 1,
+                maxSeekRangeCells: 16,
+                enableFoodJobVerticalSlice: true,
+                jobTemplateRegistry: MakeRegistry());
+
+            orchestrator.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.EatKnownFood));
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
+            Assert.That(job.Request.TargetCell, Is.EqualTo(new Vector2Int(7, 5)));
+        }
+
+        [Test]
         public void FoodFactoryPrebuiltRequestPreservesDecisionBoundaryFields()
         {
             var registry = MakeRegistry();
@@ -483,6 +529,21 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void ObjectPerceptionDiscardsVisibleMissingFoodBelief()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            AddFoodBelief(world, npcId, 6, 5);
+            AddRememberedWorldObject(world, npcId, objectId: 77, x: 6, y: 5, OwnerKind.Community, ownerId: 0);
+            var perception = new ObjectPerceptionSystem();
+
+            perception.Update(world, new Tick(4, 1f), new MessageBus(), new Telemetry());
+
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            Assert.That(HasRememberedObject(world, npcId, objectId: 77, defId: "food_stock_private", x: 6, y: 5), Is.False);
+        }
+
+        [Test]
         public void AssignedFoodJobMoveTargetEmptyCanReplaceWithVisibleEquivalentFood()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
@@ -668,6 +729,27 @@ namespace Arcontio.Tests
             Assert.That(consumed.CellX, Is.EqualTo(5));
             Assert.That(consumed.CellY, Is.EqualTo(5));
             Assert.That(bus.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void EatFromStockCommandDepletedStockDiscardsVisibleFoodBelief()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(5, 5, 5, 5, out int npcId, out int foodId);
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 1,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            AddFoodBelief(world, npcId, 5, 5);
+            AddRememberedWorldObject(world, npcId, foodId, 5, 5, OwnerKind.Community, ownerId: 0);
+
+            new EatFromStockCommand(npcId, foodId).Execute(world, new MessageBus());
+
+            Assert.That(world.Objects.ContainsKey(foodId), Is.False);
+            Assert.That(world.FoodStocks.ContainsKey(foodId), Is.False);
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            Assert.That(HasRememberedObject(world, npcId, foodId, "food_stock_private", 5, 5), Is.False);
         }
 
         [Test]
