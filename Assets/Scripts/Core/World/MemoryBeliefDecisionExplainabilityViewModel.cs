@@ -1450,7 +1450,7 @@ namespace Arcontio.Core
             view.HasSourceTrace = false;
             view.SourceTraceType = string.Empty;
             view.Reason = string.Empty;
-            FillBelief(view.Belief, default);
+            FillBelief(view.Belief, default(MemoryBeliefDecisionBeliefRef));
         }
 
         private static void ResetQuery(MemoryBeliefDecisionQueryView view)
@@ -1466,7 +1466,7 @@ namespace Arcontio.Core
             view.IsEmpty = false;
             view.EmptyReason = string.Empty;
             view.FinalScore = 0f;
-            FillBelief(view.Winner, default);
+            FillBelief(view.Winner, default(MemoryBeliefDecisionBeliefRef));
             view.Contributions.Clear();
         }
 
