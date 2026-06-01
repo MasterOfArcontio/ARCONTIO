@@ -39,9 +39,13 @@ namespace Arcontio.Core
     /// </summary>
     public sealed class ObjectPerceptionSystem : ISystem
     {
+        private const int ObjectZoneSizeCells = 8;
+
         public int Period => 1;
 
         private readonly List<int> _npcIds = new(2048);
+        private readonly List<long> _objectZoneKeys = new(512);
+        private readonly Dictionary<long, List<int>> _objectIdsByZone = new(512);
         private readonly List<Vector2Int> _visibleMissingFoodBeliefCells = new(64);
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
@@ -72,6 +76,7 @@ namespace Arcontio.Core
 
             _npcIds.Clear();
             _npcIds.AddRange(world.NpcDna.Keys);
+            RebuildGroundObjectZoneIndex(world);
 
             int spotted = 0;
             int maxCandidateCellsPerNpc = world.Global.ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
@@ -204,7 +209,7 @@ namespace Arcontio.Core
         ///   <item><b>Filtro geometrico</b>: evita di chiedere oggetti fuori range o dietro l'NPC.</item>
         /// </list>
         /// </summary>
-        private static void ProcessVisibleObjectsBySpatialIndex(
+        private void ProcessVisibleObjectsBySpatialIndex(
             World world,
             MessageBus bus,
             int npcId,
@@ -227,81 +232,87 @@ namespace Arcontio.Core
             int npcSpotted = 0;
             int objectsProcessed = 0;
 
-            int minX = np.X - visionRange;
-            int maxX = np.X + visionRange;
-            int minY = np.Y - visionRange;
-            int maxY = np.Y + visionRange;
+            int minZoneX = FloorDiv(np.X - visionRange, ObjectZoneSizeCells);
+            int maxZoneX = FloorDiv(np.X + visionRange, ObjectZoneSizeCells);
+            int minZoneY = FloorDiv(np.Y - visionRange, ObjectZoneSizeCells);
+            int maxZoneY = FloorDiv(np.Y + visionRange, ObjectZoneSizeCells);
 
-            for (int y = minY; y <= maxY; y++)
+            for (int zoneY = minZoneY; zoneY <= maxZoneY; zoneY++)
             {
-                for (int x = minX; x <= maxX; x++)
+                for (int zoneX = minZoneX; zoneX <= maxZoneX; zoneX++)
                 {
-                    if (!world.InBounds(x, y))
+                    long zoneKey = MakeZoneKey(zoneX, zoneY);
+                    if (!_objectIdsByZone.TryGetValue(zoneKey, out var objectIds) || objectIds.Count == 0)
                         continue;
 
-                    int dist = FovUtils.Manhattan(np.X, np.Y, x, y);
-                    if (dist > visionRange)
-                        continue;
-
-                    if (dist > 0)
+                    for (int i = 0; i < objectIds.Count; i++)
                     {
-                        if (useCone)
-                        {
-                            if (!IsPotentiallyInFacingHalfPlane(np.X, np.Y, facing, x, y))
-                                continue;
-
-                            if (!FovUtils.IsInCone(np.X, np.Y, facing, x, y, coneSlope))
-                                continue;
-                        }
-                        else if (!FovUtils.IsInFront(np.X, np.Y, facing, x, y))
-                        {
+                        int objId = objectIds[i];
+                        if (!world.Objects.TryGetValue(objId, out var obj) || obj == null || obj.IsHeld)
                             continue;
+
+                        int x = obj.CellX;
+                        int y = obj.CellY;
+                        if (!world.InBounds(x, y))
+                            continue;
+
+                        int dist = FovUtils.Manhattan(np.X, np.Y, x, y);
+                        if (dist > visionRange)
+                            continue;
+
+                        if (dist > 0)
+                        {
+                            if (useCone)
+                            {
+                                if (!IsPotentiallyInFacingHalfPlane(np.X, np.Y, facing, x, y))
+                                    continue;
+
+                                if (!FovUtils.IsInCone(np.X, np.Y, facing, x, y, coneSlope))
+                                    continue;
+                            }
+                            else if (!FovUtils.IsInFront(np.X, np.Y, facing, x, y))
+                            {
+                                continue;
+                            }
                         }
+
+                        if (maxCandidateCellsPerNpc > 0 && npcCandidateCells >= maxCandidateCellsPerNpc)
+                            goto Done;
+
+                        npcCandidateCells++;
+                        if (costSample)
+                            costCandidateCells++;
+
+                        if (maxObjectsPerNpc > 0 && objectsProcessed >= maxObjectsPerNpc)
+                            goto Done;
+
+                        objectsProcessed++;
+                        if (costSample)
+                            costObjectChecks++;
+                        if (costPerNpc)
+                            npcObjectChecks++;
+
+                        if (!world.TryGetObjectDef(obj.DefId, out var def) || def == null)
+                            continue;
+
+                        if (!def.IsInteractable)
+                            continue;
+
+                        if (dist > 0 && !world.HasLineOfSight(np.X, np.Y, x, y))
+                            continue;
+
+                        float q = FovUtils.ObservationQuality(dist, visionRange);
+                        bus.Publish(new ObjectSpottedEvent(
+                            observerNpcId: npcId,
+                            objectId: objId,
+                            defId: obj.DefId,
+                            cellX: obj.CellX,
+                            cellY: obj.CellY,
+                            witnessQuality01: q));
+
+                        spotted++;
+                        npcSpotted++;
                     }
-
-                    int objId = world.GetObjectAt(x, y);
-                    if (objId < 0)
-                        continue;
-
-                    if (maxCandidateCellsPerNpc > 0 && npcCandidateCells >= maxCandidateCellsPerNpc)
-                        goto Done;
-
-                    npcCandidateCells++;
-                    if (costSample)
-                        costCandidateCells++;
-
-                    if (maxObjectsPerNpc > 0 && objectsProcessed >= maxObjectsPerNpc)
-                        goto Done;
-
-                    objectsProcessed++;
-                    if (costSample)
-                        costObjectChecks++;
-                    if (costPerNpc)
-                        npcObjectChecks++;
-
-                    if (!world.Objects.TryGetValue(objId, out var obj) || obj == null || obj.IsHeld)
-                        continue;
-
-                    if (!world.TryGetObjectDef(obj.DefId, out var def) || def == null)
-                        continue;
-
-                    if (!def.IsInteractable)
-                        continue;
-
-                    if (dist > 0 && !world.HasLineOfSight(np.X, np.Y, x, y))
-                        continue;
-
-                    float q = FovUtils.ObservationQuality(dist, visionRange);
-                    bus.Publish(new ObjectSpottedEvent(
-                        observerNpcId: npcId,
-                        objectId: objId,
-                        defId: obj.DefId,
-                        cellX: obj.CellX,
-                        cellY: obj.CellY,
-                        witnessQuality01: q));
-
-                    spotted++;
-                    npcSpotted++;
                 }
             }
 
@@ -310,6 +321,71 @@ namespace Arcontio.Core
                 costObserver.AddNpcWork(npcId, npcCandidateCells + npcObjectChecks + npcSpotted);
 
             return;
+        }
+
+        // =============================================================================
+        // RebuildGroundObjectZoneIndex
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce un indice temporaneo zona -> oggetti a terra per il tick
+        /// corrente.
+        /// </para>
+        ///
+        /// <para><b>Scalabilita' percettiva locale</b></para>
+        /// <para>
+        /// L'indice evita che ogni NPC attraversi tutte le celle vuote del proprio
+        /// campo visivo. Gli oggetti restano autorevoli nel <c>World</c>: questa
+        /// struttura viene svuotata e ricostruita ogni tick, quindi non introduce una
+        /// cache persistente da sincronizzare.
+        /// </para>
+        /// </summary>
+        private void RebuildGroundObjectZoneIndex(World world)
+        {
+            for (int i = 0; i < _objectZoneKeys.Count; i++)
+            {
+                if (_objectIdsByZone.TryGetValue(_objectZoneKeys[i], out var bucket))
+                    bucket.Clear();
+            }
+
+            _objectZoneKeys.Clear();
+
+            foreach (var pair in world.Objects)
+            {
+                var obj = pair.Value;
+                if (obj == null || obj.IsHeld)
+                    continue;
+
+                if (!world.InBounds(obj.CellX, obj.CellY))
+                    continue;
+
+                int zoneX = FloorDiv(obj.CellX, ObjectZoneSizeCells);
+                int zoneY = FloorDiv(obj.CellY, ObjectZoneSizeCells);
+                long zoneKey = MakeZoneKey(zoneX, zoneY);
+                if (!_objectIdsByZone.TryGetValue(zoneKey, out var bucket))
+                {
+                    bucket = new List<int>(4);
+                    _objectIdsByZone[zoneKey] = bucket;
+                }
+
+                if (bucket.Count == 0)
+                    _objectZoneKeys.Add(zoneKey);
+
+                bucket.Add(pair.Key);
+            }
+        }
+
+        private static int FloorDiv(int value, int divisor)
+        {
+            if (value >= 0)
+                return value / divisor;
+
+            return -(((-value) + divisor - 1) / divisor);
+        }
+
+        private static long MakeZoneKey(int zoneX, int zoneY)
+        {
+            return ((long)zoneX << 32) ^ (uint)zoneY;
         }
 
         // =============================================================================
