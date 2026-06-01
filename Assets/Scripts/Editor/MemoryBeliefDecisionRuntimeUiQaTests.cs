@@ -139,6 +139,52 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // BeliefScopeSeparatesCurrentBeliefsFromRecentMutations
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il pannello Belief non confonda lo stato corrente del
+        /// BeliefStore con lo storico delle mutazioni EL. Questo evita che un
+        /// decadimento molto rapido del cibo sembri produrre una lista infinita di
+        /// belief vive, quando in realta' il registry sta conservando soltanto le
+        /// ultime mutazioni diagnostiche.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void BeliefScopeSeparatesCurrentBeliefsFromRecentMutations()
+        {
+            var config = MakeConfig();
+            int npcId = 14;
+            var world = new World(MakeWorldConfigWithMbqdEnabled());
+            var beliefStore = new BeliefStore();
+            beliefStore.AddOrMergeByCategoryAndPosition(
+                BeliefCategory.Food,
+                new Vector2Int(3, 4),
+                confidence: 0.42f,
+                freshness: 0.31f,
+                currentTick: 220,
+                BeliefSource.Seen);
+            world.Beliefs[npcId] = beliefStore;
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, MakeBeliefTrace(npcId));
+
+            var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
+            bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(
+                world,
+                npcId,
+                viewModel,
+                buildScope: MemoryBeliefDecisionViewModelBuildScope.Belief);
+
+            Assert.That(built, Is.True);
+            Assert.That(viewModel.BeliefRows.Count, Is.EqualTo(1));
+            Assert.That(viewModel.BeliefRows[0].BeliefId, Is.EqualTo(1));
+            Assert.That(viewModel.BeliefRows[0].EstimatedCell, Is.EqualTo("(3, 4)"));
+            Assert.That(viewModel.BeliefRows[0].Confidence, Is.EqualTo(0.42f).Within(0.001f));
+            Assert.That(viewModel.BeliefMutationRows.Count, Is.EqualTo(1));
+            Assert.That(viewModel.BeliefMutationRows[0].BeliefId, Is.EqualTo(8));
+            Assert.That(viewModel.LatestBeliefMutation.Belief.EstimatedCell, Is.EqualTo("(12, 8)"));
+        }
+
+        // =============================================================================
         // ScopedViewModelBuildsOnlyVisibleDiagnosticFamily
         // =============================================================================
         /// <summary>
