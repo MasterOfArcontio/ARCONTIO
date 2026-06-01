@@ -952,20 +952,23 @@ In questa fase NON si deve:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.15.1 | Debug riapertura job e cadenza decisionale | ⚠️ QA PENDING |
-| v0.15.2 | Audit movimento legacy vs RunningAction MoveTo | ⏳ |
-| v0.15.3 | Bug target cibo eliminato durante movimento e belief obsoleta | ⚠️ QA PENDING |
+| v0.15.1 | Debug riapertura job e cadenza decisionale | ✅ |
+| v0.15.2 | Audit movimento legacy vs RunningAction MoveTo | ✅ |
+| v0.15.3 | Bug target cibo eliminato durante movimento e belief obsoleta | ✅ |
 | v0.15.4 | Specifica RunningAction MoveTo e cause fallimento | ✅ |
 | v0.15.5 | Matrice recovery movimento in `job_recovery_policies.json` | ✅ |
-| v0.15.6 | MoveTo multi-cella su route conosciuta | ⏳ |
-| v0.15.7 | Porte e micro-interazioni locali in MoveTo | ⏳ |
-| v0.15.8 | Rimozione fallback greedy ordinario | ⏳ |
-| v0.15.9 | Isolamento MoveIntent/MovementSystem come dev o compatibilita' | ⏳ |
-| v0.15.10 | EL movimento Job e QA anti-onniscienza path | ⏳ |
-| v0.15.11 | Flash diagnostico NPC su decisione presa | ⏳ |
-| v0.15.12 | Closeout movimento multi-tick | ⏳ |
+| v0.15.6 | MoveTo multi-cella su route conosciuta | ✅ |
+| v0.15.7 | Porte e micro-interazioni locali in MoveTo | ✅ |
+| v0.15.8 | Rimozione fallback greedy ordinario | ✅ |
+| v0.15.9 | Isolamento MoveIntent/MovementSystem come dev o compatibilita' | ⚠️ |
+| v0.15.10 | EL movimento Job e QA anti-onniscienza path | ✅ |
+| v0.15.11 | Flash diagnostico NPC su decisione presa | ✅ |
+| v0.15.12 | QA target cibo, belief food lifecycle e percezione same-cell | ✅ |
+| v0.15.13 | Closeout movimento multi-tick | ✅ |
 
 > **Nota diagnostica v0.15.11:** il flash decisionale deve restare puramente visivo e non simulativo. Il Decision Layer non deve mutare sprite o viste: deve esporre un segnale diagnostico leggero, consumato dalla presentazione, per colorare temporaneamente lo sprite dell'NPC quando una decisione viene prodotta. Il flash non deve cambiare bisogni, job, movimento, tick order, memoria, belief o Save/Load.
+
+> **Nota closeout v0.15.13 (2026-06-01):** la fase `v0.15` e' chiusa come stabilizzazione del movimento multi-tick nel Job runtime. `MoveToCell` puo' attraversare una route conosciuta cella per cella tramite running action, rispetta la durata configurata, mantiene reservation temporali e muta la posizione solo a completion. Le porte non bloccate vengono gestite come micro-interazione locale prima del traversal. Quando il runtime movimento Job e' attivo, un target distante senza route lecita non ricade piu' nel fallback greedy ordinario: fallisce e viene consegnato alla matrice recovery. `MoveIntent` e `MovementSystem` restano presenti come compatibilita' e strumenti dev/debug, non come percorso ordinario desiderato per i job. Restano da allineare in `v0.16a` i template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` alla nuova semantica multi-tick.
 
 ---
 
