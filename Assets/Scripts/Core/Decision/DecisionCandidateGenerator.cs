@@ -29,6 +29,11 @@ namespace Arcontio.Core
     public sealed class DecisionCandidateGenerator
     {
         private const float MinimumObligationForWorkIntent01 = 0.01f;
+        private static readonly DecisionIntentKind[] FoodJobIntentSubset =
+        {
+            DecisionIntentKind.EatKnownFood,
+            DecisionIntentKind.SearchFood
+        };
 
         private readonly BeliefQueryService _beliefQueryService = new();
 
@@ -68,6 +73,45 @@ namespace Arcontio.Core
                 // Ogni intenzione attraversa gli stessi gate. Questo rende la Fase 1
                 // prevedibile e facilita l'audit quando aggiungeremo filtri nuovi.
                 if (TryBuildCandidate(context, all[i], out var candidate))
+                    output.Add(candidate);
+            }
+        }
+
+        // =============================================================================
+        // GenerateFoodJobCandidates
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riempie la lista di output con il sottoinsieme minimo di intenzioni food
+        /// che l'orchestratore runtime e' davvero in grado di trasformare in job.
+        /// </para>
+        ///
+        /// <para><b>Catalogo ridotto per percorso caldo</b></para>
+        /// <para>
+        /// Il catalogo completo resta disponibile per QA e sviluppo futuro, ma il
+        /// runtime attuale non deve scandire intenzioni sociali, lavoro, acqua o
+        /// riposo quando il ponte operativo supporta solo fame -> EatKnownFood /
+        /// SearchFood. Questa funzione non cambia lo score e non forza la scelta:
+        /// riduce solo il numero di candidati costruiti prima dello scoring.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Sottoinsieme statico</b>: nessuna lista temporanea per tick.</item>
+        ///   <item><b>Gate condivisi</b>: ogni intent usa lo stesso <c>TryBuildCandidate</c>.</item>
+        ///   <item><b>Compatibilita'</b>: il metodo generale resta invariato per test e futuri domini.</item>
+        /// </list>
+        /// </summary>
+        public void GenerateFoodJobCandidates(in DecisionEvaluationContext context, List<DecisionCandidate> output)
+        {
+            if (output == null)
+                return;
+
+            output.Clear();
+
+            for (int i = 0; i < FoodJobIntentSubset.Length; i++)
+            {
+                if (TryBuildCandidate(context, FoodJobIntentSubset[i], out var candidate))
                     output.Add(candidate);
             }
         }

@@ -210,7 +210,7 @@ namespace Arcontio.Core
             if (!_contextBuilder.TryBuild(world, npcId, in needs, nowTick, out var context))
                 return DecisionJobStartResult.ContextUnavailable;
 
-            _candidateGenerator.GeneratePhase1Candidates(in context, _decisionCandidates);
+            _candidateGenerator.GenerateFoodJobCandidates(in context, _decisionCandidates);
             RemoveNonRoutableJobCandidates(_decisionCandidates);
             _scoringService.ScoreCandidates(in context, _decisionCandidates, DecisionScoringConfig.Default());
 
