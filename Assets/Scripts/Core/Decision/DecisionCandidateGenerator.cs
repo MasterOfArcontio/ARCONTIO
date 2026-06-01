@@ -197,6 +197,9 @@ namespace Arcontio.Core
                 urgency01,
                 context.NpcPosition,
                 context.BeliefQueryConfig.defaultMinConfidence);
+            bool captureQueryBreakdown = MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                context.ExplainabilityConfig,
+                MemoryBeliefDecisionTraceKind.Query);
 
             // Il Decision Layer non legge direttamente il BeliefStore per scegliere:
             // delega al QuerySystem, che applica filtro, ranking e breakdown.
@@ -208,7 +211,8 @@ namespace Arcontio.Core
                 context.NpcId,
                 context.Tick,
                 context.ExplainabilityRegistry,
-                context.RuntimeCostObserver);
+                context.RuntimeCostObserver,
+                captureQueryBreakdown);
 
             if (result.IsEmpty)
                 return false;

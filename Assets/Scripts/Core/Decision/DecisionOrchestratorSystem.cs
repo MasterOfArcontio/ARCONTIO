@@ -212,7 +212,14 @@ namespace Arcontio.Core
 
             _candidateGenerator.GenerateFoodJobCandidates(in context, _decisionCandidates);
             RemoveNonRoutableJobCandidates(_decisionCandidates);
-            _scoringService.ScoreCandidates(in context, _decisionCandidates, DecisionScoringConfig.Default());
+            bool captureDecisionBreakdown = MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                MemoryBeliefDecisionTraceKind.Decision);
+            _scoringService.ScoreCandidates(
+                in context,
+                _decisionCandidates,
+                DecisionScoringConfig.Default(),
+                captureDecisionBreakdown);
 
             var selectionConfig = ResolveDecisionSelectionConfig(world.Config?.Sim?.decision);
             var selection = _selectionService.Select(in context, _decisionCandidates, selectionConfig, _decisionRandom);

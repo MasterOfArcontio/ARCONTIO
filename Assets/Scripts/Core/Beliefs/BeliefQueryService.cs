@@ -324,7 +324,8 @@ namespace Arcontio.Core
             int npcId,
             long tick,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry = null,
-            RuntimeCostObserver runtimeCostObserver = null)
+            RuntimeCostObserver runtimeCostObserver = null,
+            bool captureContributions = true)
         {
             bool costSample = runtimeCostObserver != null && runtimeCostObserver.ShouldSample(tick);
             bool costPerNpc = costSample && runtimeCostObserver.TrackPerNpc;
@@ -392,7 +393,8 @@ namespace Arcontio.Core
                     var evaluator = _evaluators[e];
                     float contribution = evaluator.Evaluate(_scoreContext, config);
                     score += contribution;
-                    _scoreContext.Contributions.Add(new BeliefScoreContribution(evaluator.Label, contribution));
+                    if (captureContributions)
+                        _scoreContext.Contributions.Add(new BeliefScoreContribution(evaluator.Label, contribution));
                 }
 
                 if (!hasBest || score > bestScore)
@@ -402,7 +404,9 @@ namespace Arcontio.Core
                     hasBest = true;
                     bestScore = score;
                     bestBelief = belief;
-                    bestContributions = _scoreContext.Contributions.ToArray();
+                    bestContributions = captureContributions
+                        ? _scoreContext.Contributions.ToArray()
+                        : System.Array.Empty<BeliefScoreContribution>();
                 }
             }
 

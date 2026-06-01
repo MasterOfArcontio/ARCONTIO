@@ -84,6 +84,31 @@ namespace Arcontio.Core
             List<DecisionCandidate> candidates,
             DecisionScoringConfig config)
         {
+            ScoreCandidates(in context, candidates, config, captureContributions: true);
+        }
+
+        // =============================================================================
+        // ScoreCandidates
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola lo score dei candidati permettendo al chiamante runtime di saltare
+        /// la copia del breakdown quando la diagnostica decisionale e' spenta.
+        /// </para>
+        ///
+        /// <para><b>EL spento, nessuna allocazione di breakdown</b></para>
+        /// <para>
+        /// La somma numerica dello score resta identica. Cambia solo la produzione
+        /// dell'array di contributi usato da pannelli e JSONL. In questo modo il
+        /// percorso caldo evita allocazioni diagnostiche quando nessuno le consuma.
+        /// </para>
+        /// </summary>
+        public void ScoreCandidates(
+            in DecisionEvaluationContext context,
+            List<DecisionCandidate> candidates,
+            DecisionScoringConfig config,
+            bool captureContributions)
+        {
             if (candidates == null)
                 return;
 
@@ -104,7 +129,11 @@ namespace Arcontio.Core
                 score += AddCognitiveModulatorContribution(context.Dna, candidate, config);
                 score = ApplyMandatoryFloors(context.Profile, candidate, config, score);
 
-                candidate.AttachScore(score, _contributions.ToArray());
+                candidate.AttachScore(
+                    score,
+                    captureContributions
+                        ? _contributions.ToArray()
+                        : System.Array.Empty<DecisionScoreContribution>());
                 candidates[i] = candidate;
             }
         }
