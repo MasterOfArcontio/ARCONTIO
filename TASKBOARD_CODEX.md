@@ -79,6 +79,7 @@ Obiettivo tecnico corrente `v0.16`:
 - stabilizzare lifecycle, freshness, obsolescenza e stato delle belief;
 - collegare eventi mondo needs a memoria soggettiva senza onniscienza;
 - verificare localmente credenze obsolete prima di agire;
+- sviluppare SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili;
 - preparare decisioni su conoscenza incerta e parziale;
 - introdurre comunicazione soggettiva minima dei fatti osservati;
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
@@ -140,7 +141,8 @@ Checkpoint v0.16 pianificati:
 - `v0.16f`: decisione su conoscenza incerta;
 - `v0.16g`: comunicazione soggettiva minima;
 - `v0.16h`: QA anti-onniscienza cognitiva;
-- `v0.16i`: closeout cognizione soggettiva avanzata.
+- `v0.16i`: SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili;
+- `v0.16j`: closeout cognizione soggettiva avanzata.
 
 Checkpoint v0.12 completati:
 

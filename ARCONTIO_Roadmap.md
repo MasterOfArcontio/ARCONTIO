@@ -990,6 +990,7 @@ Questa fase deve lavorare su:
 - verifica locale delle credenze;
 - reazione a eventi mondo;
 - comunicazione non onnisciente;
+- ricerca attiva del cibo quando non esistono target visibili;
 - decisioni basate su conoscenza imperfetta.
 
 ---
@@ -1004,7 +1005,8 @@ Questa fase deve lavorare su:
 | v0.16f | Comunicazione soggettiva dei fatti osservati | ⏳ |
 | v0.16g | Decisioni con belief incerte e parziali | ⏳ |
 | v0.16h | QA anti-omniscienza cognitiva | ⏳ |
-| v0.16i | Closeout cognition deepening | ⏳ |
+| v0.16i | SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili | ⏳ |
+| v0.16j | Closeout cognition deepening | ⏳ |
 
 
 > **Nota closeout v0.16a (2026-06-01):** il checkpoint `v0.16a` ha allineato `generic.move_to_cell.v1` e `transport.object_to_cell.v1` alla semantica `MoveTo` multi-tick. Il movimento ordinario dei Job passa da `MoveToRunningActionDriver`, attraversa route conosciute cella per cella, usa route dichiarate da belief food senza rifare query decisionali, e fallisce quando non esiste route lecita. Il movimento debug umano da mappa viene instradato come job tecnico `generic.move_to_cell.v1` con label dev esplicita e puo' usare route fisica/greedy solo perche' rappresenta un comando dell'operatore, non conoscenza NPC.
