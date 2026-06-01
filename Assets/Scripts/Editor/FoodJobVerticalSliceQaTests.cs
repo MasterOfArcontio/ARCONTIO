@@ -566,6 +566,36 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void ObjectPerceptionSpotsFoodInNpcCurrentCell()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            world.NpcFacing[npcId] = CardinalDirection.North;
+            var bus = new MessageBus();
+            var perception = new ObjectPerceptionSystem();
+
+            perception.Update(world, new Tick(6, 1f), bus, new Telemetry());
+
+            var events = new List<ISimEvent>();
+            bus.DrainTo(events);
+            Assert.That(ContainsObjectSpottedEvent(events, npcId, foodId, "food_stock", 5, 5), Is.True);
+        }
+
+        [Test]
+        public void ObjectPerceptionDiscardsSameCellMissingFoodBelief()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            world.NpcFacing[npcId] = CardinalDirection.West;
+            AddFoodBelief(world, npcId, 5, 5);
+            AddRememberedWorldObject(world, npcId, objectId: 78, x: 5, y: 5, OwnerKind.Community, ownerId: 0);
+            var perception = new ObjectPerceptionSystem();
+
+            perception.Update(world, new Tick(7, 1f), new MessageBus(), new Telemetry());
+
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            Assert.That(HasRememberedObject(world, npcId, objectId: 78, defId: "food_stock_private", x: 5, y: 5), Is.False);
+        }
+
+        [Test]
         public void AssignedFoodJobMoveTargetEmptyCanReplaceWithVisibleEquivalentFood()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
@@ -1085,6 +1115,32 @@ namespace Arcontio.Tests
                     && slot.DefId == defId
                     && slot.CellX == x
                     && slot.CellY == y)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsObjectSpottedEvent(
+            List<ISimEvent> events,
+            int npcId,
+            int objectId,
+            string defId,
+            int x,
+            int y)
+        {
+            for (int i = 0; i < events.Count; i++)
+            {
+                if (events[i] is not ObjectSpottedEvent spotted)
+                    continue;
+
+                if (spotted.ObserverNpcId == npcId
+                    && spotted.ObjectId == objectId
+                    && spotted.DefId == defId
+                    && spotted.CellX == x
+                    && spotted.CellY == y)
                 {
                     return true;
                 }
