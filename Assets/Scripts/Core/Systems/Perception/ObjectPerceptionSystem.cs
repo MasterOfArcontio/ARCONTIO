@@ -228,8 +228,12 @@ namespace Arcontio.Core
                 if (belief.Category != BeliefCategory.Food)
                     continue;
 
-                if (belief.Status != BeliefStatus.Active && belief.Status != BeliefStatus.Weak)
+                if (belief.Status != BeliefStatus.Active
+                    && belief.Status != BeliefStatus.Weak
+                    && belief.Status != BeliefStatus.Stale)
+                {
                     continue;
+                }
 
                 var cell = belief.EstimatedPosition;
                 if (!IsCellVisibleToNpc(world, npcX, npcY, facing, cell.x, cell.y, visionRange, useCone, coneSlope))

@@ -642,6 +642,27 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void ObjectPerceptionDiscardsVisibleStaleMissingFoodBelief()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            AddFoodBelief(world, npcId, 6, 5);
+            world.Beliefs[npcId].TryReduceConfidenceByCategoryAndPosition(
+                BeliefCategory.Food,
+                new Vector2Int(6, 5),
+                0.10f,
+                4,
+                BeliefStatus.Stale);
+            AddRememberedWorldObject(world, npcId, objectId: 79, x: 6, y: 5, OwnerKind.Community, ownerId: 0);
+            var perception = new ObjectPerceptionSystem();
+
+            perception.Update(world, new Tick(8, 1f), new MessageBus(), new Telemetry());
+
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            Assert.That(HasRememberedObject(world, npcId, objectId: 79, defId: "food_stock_private", x: 6, y: 5), Is.False);
+        }
+
+        [Test]
         public void AssignedFoodJobMoveTargetEmptyCanReplaceWithVisibleEquivalentFood()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
