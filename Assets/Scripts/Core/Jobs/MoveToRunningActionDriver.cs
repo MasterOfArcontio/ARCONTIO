@@ -146,7 +146,7 @@ namespace Arcontio.Core
             if (HasUsableDirectRoute(world, npcId, action.TargetCell))
                 return;
 
-            if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell))
+            if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition: true))
                 return;
 
             if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
@@ -181,8 +181,19 @@ namespace Arcontio.Core
                 && direct.FinalTargetCellY == macro.ImmediateTargetY;
         }
 
-        private static bool TryPrepareDirectRouteToFinalTarget(World world, int npcId, JobAction action, GridPosition npcCell)
+        private static bool TryPrepareDirectRouteToFinalTarget(
+            World world,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell,
+            bool requireCurrentAcquisition)
         {
+            if (requireCurrentAcquisition
+                && !CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, GetDirectCheckFov(world)))
+            {
+                return false;
+            }
+
             RouteScratch.Clear();
             if (!MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, npcCell.X, npcCell.Y, action.TargetCell.x, action.TargetCell.y, RouteScratch)
                 || RouteScratch.Count < 2)
@@ -208,7 +219,14 @@ namespace Arcontio.Core
             }
 
             if (immediateX == finalTarget.x && immediateY == finalTarget.y)
-                return TryPrepareDirectRouteToFinalTarget(world, npcId, JobAction.MoveTo("move_to_final", finalTarget, "move_to_final"), npcCell);
+            {
+                return TryPrepareDirectRouteToFinalTarget(
+                    world,
+                    npcId,
+                    JobAction.MoveTo("move_to_final", finalTarget, "move_to_final"),
+                    npcCell,
+                    requireCurrentAcquisition: false);
+            }
 
             RouteScratch.Clear();
             int budget = ResolveLocalSearchVisitedBudget(world);

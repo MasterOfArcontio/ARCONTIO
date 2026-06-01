@@ -50,7 +50,7 @@ namespace Arcontio.Tests
             {
                 new RunningActionProductiveTickingQaTests().OneCellMoveTraversalHonorsConfiguredFourTickDuration();
                 new RunningActionProductiveTickingQaTests().DeclaredDistantMoveTargetPreparesRouteAndHonorsConfiguredDuration();
-                new RunningActionProductiveTickingQaTests().DeclaredBeliefTargetOutsideCurrentFacingStillPreparesRoute();
+                new RunningActionProductiveTickingQaTests().DeclaredTargetOutsideCurrentFacingWithoutKnownRouteFails();
                 new RunningActionProductiveTickingQaTests().EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
@@ -356,26 +356,25 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // DeclaredBeliefTargetOutsideCurrentFacingStillPreparesRoute
+        // DeclaredTargetOutsideCurrentFacingWithoutKnownRouteFails
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che MoveTo possa preparare un tragitto verso una cella gia'
-        /// dichiarata dal job anche quando quella cella non e' nel fronte percettivo
-        /// corrente dell'NPC.
+        /// Verifica che MoveTo non inventi un tragitto diretto verso una cella gia'
+        /// dichiarata dal job quando quella cella non e' acquisita localmente e non
+        /// esiste una route landmark utilizzabile.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: target deciso prima, movimento operativo dopo</b></para>
+        /// <para><b>Principio architetturale: conoscenza del target non equivale a conoscenza della strada</b></para>
         /// <para>
-        /// Un incarico <c>EatKnownFood</c> nasce da una query di belief: il movimento
-        /// non deve rifare la decisione e non deve pretendere che il target sia
-        /// visibile in quel preciso tick. Se la cella dichiarata e' percorribile, la
-        /// running action MoveTo prepara la route e prova ad arrivarci; eventuali
-        /// contraddizioni fisiche successive tornano come fallimenti del job.
+        /// Un incarico puo' nascere da una belief che indica "il cibo e' li'", ma
+        /// questo non autorizza MoveTo a conoscere automaticamente una strada verso
+        /// la cella. Senza acquisizione locale e senza landmark route soggettiva, lo
+        /// step deve fallire e consegnare il problema alla matrice dei recuperi.
         /// </para>
         /// </summary>
         [Test]
-        public void DeclaredBeliefTargetOutsideCurrentFacingStillPreparesRoute()
+        public void DeclaredTargetOutsideCurrentFacingWithoutKnownRouteFails()
         {
             var world = MakeWorldWithNpc(out int npcId);
             EnableOneCellTraversal(world, durationTicks: 3);
@@ -388,9 +387,12 @@ namespace Arcontio.Tests
 
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
-            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
+            Assert.That(job.FailureReason, Is.EqualTo(JobFailureReason.MovementFailed));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
-            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.False);
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
         }
