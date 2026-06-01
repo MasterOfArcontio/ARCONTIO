@@ -226,6 +226,7 @@ namespace Arcontio.Tests
                 new Arcontio.Core.Social { JusticePerception01 = 0.5f },
                 x: 1,
                 y: 1);
+            world.NpcFacing[npcId] = CardinalDirection.East;
             return world;
         }
 
