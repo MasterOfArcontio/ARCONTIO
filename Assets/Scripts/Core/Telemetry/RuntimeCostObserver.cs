@@ -1,7 +1,11 @@
 using Arcontio.Core.Config;
+using Arcontio.Core.Logging;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
+using System.Text;
+using UnityEngine;
 
 namespace Arcontio.Core
 {
@@ -72,13 +76,45 @@ namespace Arcontio.Core
         DecisionRouteRejected = 17,
         JobExecutionActiveNpcs = 18,
         JobExecutionSteps = 19,
-        TokenEmissionPairChecks = 20,
-        TokenEmissionTokensCreated = 21,
-        TokenDeliveryTokens = 22,
-        TokenDeliveryDelivered = 23,
-        TokenAssimilationTokens = 24,
-        TokenAssimilationTracesAdded = 25,
-        Count = 26
+        JobRecoveryEvaluated = 20,
+        JobRecoveryRetryScheduled = 21,
+        MoveToExecutions = 22,
+        MoveToRoutePreparations = 23,
+        MoveToFailures = 24,
+        ObjectPerceptionDebugFovCells = 25,
+        TokenEmissionPairChecks = 26,
+        TokenEmissionTokensCreated = 27,
+        TokenDeliveryTokens = 28,
+        TokenDeliveryDelivered = 29,
+        TokenAssimilationTokens = 30,
+        TokenAssimilationTracesAdded = 31,
+        Count = 32
+    }
+
+    public readonly struct RuntimeCostChannelSnapshot
+    {
+        public readonly RuntimeCostChannel Channel;
+        public readonly long DurationTicks;
+        public readonly long Samples;
+
+        public RuntimeCostChannelSnapshot(RuntimeCostChannel channel, long durationTicks, long samples)
+        {
+            Channel = channel;
+            DurationTicks = durationTicks;
+            Samples = samples;
+        }
+    }
+
+    public readonly struct RuntimeCostCounterSnapshot
+    {
+        public readonly RuntimeCostCounter Counter;
+        public readonly long Value;
+
+        public RuntimeCostCounterSnapshot(RuntimeCostCounter counter, long value)
+        {
+            Counter = counter;
+            Value = value;
+        }
     }
 
     // =============================================================================
@@ -141,6 +177,10 @@ namespace Arcontio.Core
         private readonly long[] _sampleCountByChannel;
         private readonly long[] _counters;
         private readonly Dictionary<int, RuntimeNpcCostRecord> _npcCosts;
+        private readonly StringBuilder _jsonBuilder;
+        private string _resolvedJsonlPath = string.Empty;
+        private string _resolvedJsonlPattern = string.Empty;
+        private long _lastJsonlTick = long.MinValue;
 
         public bool TrackPerNpc { get; }
         public bool WriteJsonl { get; }
@@ -159,6 +199,7 @@ namespace Arcontio.Core
             TrackPerNpc = config != null && config.trackPerNpc;
             _npcCosts = TrackPerNpc ? new Dictionary<int, RuntimeNpcCostRecord>(64) : null;
             WriteJsonl = config != null && config.writeJsonl;
+            _jsonBuilder = WriteJsonl ? new StringBuilder(4096) : null;
             MaxTicksInMemory = Math.Max(1, config?.maxTicksInMemory ?? 256);
             JsonlFlushIntervalTicks = Math.Max(1, config?.jsonlFlushIntervalTicks ?? 25);
             JsonlMaxQueueSize = Math.Max(1, config?.jsonlMaxQueueSize ?? 4096);
@@ -286,6 +327,133 @@ namespace Arcontio.Core
         {
             int index = (int)counter;
             return index >= 0 && index < _counters.Length ? _counters[index] : 0L;
+        }
+
+        public void CopyChannelSnapshotsTo(List<RuntimeCostChannelSnapshot> output)
+        {
+            if (output == null)
+                return;
+
+            output.Clear();
+            for (int i = 0; i < (int)RuntimeCostChannel.Count; i++)
+            {
+                var channel = (RuntimeCostChannel)i;
+                output.Add(new RuntimeCostChannelSnapshot(
+                    channel,
+                    _durationTicksByChannel[i],
+                    _sampleCountByChannel[i]));
+            }
+        }
+
+        public void CopyCounterSnapshotsTo(List<RuntimeCostCounterSnapshot> output)
+        {
+            if (output == null)
+                return;
+
+            output.Clear();
+            for (int i = 0; i < (int)RuntimeCostCounter.Count; i++)
+                output.Add(new RuntimeCostCounterSnapshot((RuntimeCostCounter)i, _counters[i]));
+        }
+
+        // =============================================================================
+        // TryWriteJsonlSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scrive una fotografia aggregata dell'osservatorio sul centro JSONL
+        /// batchato gia' usato dai log EL.
+        /// </para>
+        ///
+        /// <para>
+        /// La funzione e' volutamente fredda: se <c>writeJsonl</c> e' spento esce
+        /// subito, se il tick non rientra nella cadenza esce subito, e costruisce
+        /// stringhe solo nel momento in cui deve davvero emettere una riga. Questo
+        /// evita di trasformare lo strumento di misura in una nuova fonte di costo.
+        /// </para>
+        /// </summary>
+        public void TryWriteJsonlSnapshot(long tick)
+        {
+            if (!WriteJsonl || _jsonBuilder == null)
+                return;
+
+            if (_lastJsonlTick != long.MinValue && tick - _lastJsonlTick < JsonlFlushIntervalTicks)
+                return;
+
+            string path = ResolveJsonlPath();
+            if (string.IsNullOrWhiteSpace(path))
+                return;
+
+            _lastJsonlTick = tick;
+            BuildJsonlSnapshot(tick);
+            JsonlRuntimeLogHub.EnqueueLine("runtime_cost", path, _jsonBuilder.ToString());
+        }
+
+        private string ResolveJsonlPath()
+        {
+            string pattern = string.IsNullOrWhiteSpace(JsonLogFileNamePattern)
+                ? "arcontio_runtime_cost_{yyyyMMdd_HHmmss}.jsonl"
+                : JsonLogFileNamePattern;
+
+            if (!string.IsNullOrWhiteSpace(_resolvedJsonlPath) && string.Equals(_resolvedJsonlPattern, pattern, StringComparison.Ordinal))
+                return _resolvedJsonlPath;
+
+            string safeFileName = pattern.Replace("{yyyyMMdd_HHmmss}", DateTime.Now.ToString("yyyyMMdd_HHmmss"));
+            if (!safeFileName.EndsWith(".jsonl", StringComparison.OrdinalIgnoreCase))
+                safeFileName += ".jsonl";
+
+            _resolvedJsonlPattern = pattern;
+            _resolvedJsonlPath = Path.Combine(Application.persistentDataPath, "Arcontio_Runtime_Cost", safeFileName);
+            return _resolvedJsonlPath;
+        }
+
+        private void BuildJsonlSnapshot(long tick)
+        {
+            _jsonBuilder.Clear();
+            _jsonBuilder.Append("{\"schema\":\"runtime_cost.v1\",\"tick\":").Append(tick);
+            _jsonBuilder.Append(",\"channels\":{");
+            for (int i = 0; i < (int)RuntimeCostChannel.Count; i++)
+            {
+                if (i > 0)
+                    _jsonBuilder.Append(',');
+
+                _jsonBuilder.Append('"').Append((RuntimeCostChannel)i).Append("\":{\"durationTicks\":")
+                    .Append(_durationTicksByChannel[i])
+                    .Append(",\"samples\":")
+                    .Append(_sampleCountByChannel[i])
+                    .Append('}');
+            }
+
+            _jsonBuilder.Append("},\"counters\":{");
+            for (int i = 0; i < (int)RuntimeCostCounter.Count; i++)
+            {
+                if (i > 0)
+                    _jsonBuilder.Append(',');
+
+                _jsonBuilder.Append('"').Append((RuntimeCostCounter)i).Append("\":")
+                    .Append(_counters[i]);
+            }
+
+            _jsonBuilder.Append("},\"topNpc\":[");
+            if (_npcCosts != null && _npcCosts.Count > 0)
+            {
+                bool first = true;
+                foreach (var pair in _npcCosts)
+                {
+                    if (!first)
+                        _jsonBuilder.Append(',');
+
+                    first = false;
+                    _jsonBuilder.Append("{\"npcId\":")
+                        .Append(pair.Key)
+                        .Append(",\"score\":")
+                        .Append(pair.Value.Score)
+                        .Append(",\"samples\":")
+                        .Append(pair.Value.Samples)
+                        .Append('}');
+                }
+            }
+
+            _jsonBuilder.Append("]}");
         }
 
         // =============================================================================

@@ -220,6 +220,15 @@ namespace Arcontio.Core
             if (!_recoveryPolicyRegistry.TryGetPolicy(classification.FailureKind, out var policy))
                 return stepResult;
 
+            var costObserver = world?.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick);
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.JobRecoveryEvaluated, 1);
+                if (costObserver.TrackPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
+            }
+
             int retryCount = npcState.GetRecoveryRetryCount(
                 classification.FailureKind,
                 classification.PhaseIndex,
@@ -250,6 +259,13 @@ namespace Arcontio.Core
 
             if (recovery.Kind != JobRecoveryResultKind.RetryScheduled)
                 return stepResult;
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.JobRecoveryRetryScheduled, 1);
+                if (costObserver.TrackPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
+            }
 
             npcState.RegisterRecoveryRetry(
                 classification.FailureKind,

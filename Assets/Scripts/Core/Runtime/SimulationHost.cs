@@ -1300,6 +1300,7 @@ namespace Arcontio.Core
             // Così il batch di N tick è coerente.
             // ============================================================
             _world.DebugFovTelemetry?.AdvanceTickWindow();
+            _world.RuntimeCostObserver?.TryWriteJsonlSnapshot(_tickIndex);
 
             _tickIndex++;
 

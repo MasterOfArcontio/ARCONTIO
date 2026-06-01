@@ -1,7 +1,10 @@
 using Arcontio.Core;
 using Arcontio.Core.Config;
+using Arcontio.Core.Logging;
 using NUnit.Framework;
 using System;
+using System.Collections.Generic;
+using System.IO;
 using UnityEditor;
 using UnityEngine;
 
@@ -52,6 +55,8 @@ namespace Arcontio.Tests
                 tests.RuntimeCostObserverAccumulatesNumericSamplesAndCounters();
                 tests.RuntimeCostObserverDoesNotCreateNpcStoreWhenPerNpcTrackingIsDisabled();
                 tests.RuntimeCostObserverTracksTopNpcCostsWhenEnabled();
+                tests.RuntimeCostObserverCopiesSnapshotsWithoutAllocatingOwnedLists();
+                tests.RuntimeCostObserverWritesJsonlSnapshotOnlyWhenEnabled();
 
                 Debug.Log("[RuntimeCostObserverQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -165,6 +170,73 @@ namespace Arcontio.Tests
             Assert.That(top[0].Score, Is.EqualTo(9));
             Assert.That(top[1].NpcId, Is.EqualTo(1));
             Assert.That(top[1].Score, Is.EqualTo(7));
+        }
+
+        [Test]
+        public void RuntimeCostObserverCopiesSnapshotsWithoutAllocatingOwnedLists()
+        {
+            var observer = RuntimeCostObserver.CreateIfEnabled(new RuntimeCostObserverParams
+            {
+                enabled = true,
+                sampleEveryTicks = 1
+            });
+            var channels = new List<RuntimeCostChannelSnapshot>();
+            var counters = new List<RuntimeCostCounterSnapshot>();
+
+            long start = observer.BeginSample();
+            observer.AddCounter(RuntimeCostCounter.MoveToExecutions, 2);
+            observer.EndSample(RuntimeCostChannel.JobExecution, start);
+            observer.CopyChannelSnapshotsTo(channels);
+            observer.CopyCounterSnapshotsTo(counters);
+
+            Assert.That(channels.Count, Is.EqualTo((int)RuntimeCostChannel.Count));
+            Assert.That(counters.Count, Is.EqualTo((int)RuntimeCostCounter.Count));
+            Assert.That(observer.GetCounter(RuntimeCostCounter.MoveToExecutions), Is.EqualTo(2));
+        }
+
+        [Test]
+        public void RuntimeCostObserverWritesJsonlSnapshotOnlyWhenEnabled()
+        {
+            string path = Path.Combine(Application.temporaryCachePath, "runtime_cost_observer_qa_{yyyyMMdd_HHmmss}.jsonl");
+            JsonlRuntimeLogHub.Shutdown();
+            JsonlRuntimeLogHub.Configure(new LoggerJsonlParams
+            {
+                enabled = true,
+                flush_interval_seconds = 0.01,
+                max_queue_size = 32,
+                max_batch_size = 16
+            });
+
+            try
+            {
+                var disabled = RuntimeCostObserver.CreateIfEnabled(new RuntimeCostObserverParams
+                {
+                    enabled = true,
+                    writeJsonl = false,
+                    jsonLogFileNamePattern = path
+                });
+                disabled.TryWriteJsonlSnapshot(10);
+                Assert.That(JsonlRuntimeLogHub.WriterCount, Is.EqualTo(0));
+
+                var enabled = RuntimeCostObserver.CreateIfEnabled(new RuntimeCostObserverParams
+                {
+                    enabled = true,
+                    writeJsonl = true,
+                    jsonlFlushIntervalTicks = 5,
+                    jsonLogFileNamePattern = path
+                });
+                enabled.AddCounter(RuntimeCostCounter.ObjectPerceptionDebugFovCells, 7);
+                enabled.TryWriteJsonlSnapshot(10);
+                enabled.TryWriteJsonlSnapshot(11);
+
+                Assert.That(JsonlRuntimeLogHub.WriterCount, Is.EqualTo(1));
+                JsonlRuntimeLogHub.FlushAll(force: true);
+            }
+            finally
+            {
+                JsonlRuntimeLogHub.Shutdown();
+                JsonlRuntimeLogHub.Configure(new LoggerJsonlParams());
+            }
         }
     }
 }

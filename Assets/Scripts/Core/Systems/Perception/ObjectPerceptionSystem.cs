@@ -57,6 +57,7 @@ namespace Arcontio.Core
             int costNpcScans = 0;
             int costObjectChecks = 0;
             int costFoodBeliefChecks = 0;
+            int costDebugFovCells = 0;
 
             int visionRange = world.Global.NpcVisionRangeCells;
             if (visionRange <= 0) visionRange = 6;
@@ -112,7 +113,7 @@ namespace Arcontio.Core
                         ? world.Config.Sim.debug_fov.use_los
                         : true;
 
-                    RecordDebugFovCellsForNpc(
+                    int debugFovCells = RecordDebugFovCellsForNpc(
                         world: world,
                         npcId: npcId,
                         originX: np.X,
@@ -123,6 +124,10 @@ namespace Arcontio.Core
                         coneSlope: coneSlope,
                         useLos: debugUseLos
                     );
+                    if (costSample)
+                        costDebugFovCells += debugFovCells;
+                    if (costPerNpc)
+                        costObserver.AddNpcWork(npcId, debugFovCells);
                 }
 
                 InvalidateVisibleMissingFoodBeliefs(
@@ -216,6 +221,7 @@ namespace Arcontio.Core
                 costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionObjectChecks, costObjectChecks);
                 costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionSpottedEvents, spotted);
                 costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionFoodBeliefChecks, costFoodBeliefChecks);
+                costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionDebugFovCells, costDebugFovCells);
                 costObserver.EndSample(RuntimeCostChannel.ObjectPerception, costStart);
             }
         }
@@ -385,7 +391,7 @@ namespace Arcontio.Core
         ///   - feature disattivabile
         ///   - finestra N tick (non per forza ogni frame)
         /// </summary>
-        private static void RecordDebugFovCellsForNpc(
+        private static int RecordDebugFovCellsForNpc(
             World world,
             int npcId,
             int originX,
@@ -397,13 +403,14 @@ namespace Arcontio.Core
             bool useLos)
         {
             // Fail-safe
-            if (world == null || world.DebugFovTelemetry == null) return;
-            if (visionRange <= 0) return;
+            if (world == null || world.DebugFovTelemetry == null) return 0;
+            if (visionRange <= 0) return 0;
 
             int minX = originX - visionRange;
             int maxX = originX + visionRange;
             int minY = originY - visionRange;
             int maxY = originY + visionRange;
+            int recordedCells = 0;
 
             for (int y = minY; y <= maxY; y++)
             {
@@ -439,8 +446,11 @@ namespace Arcontio.Core
                     }
 
                     world.DebugFovTelemetry.RecordCell(npcId, x, y);
+                    recordedCells++;
                 }
             }
+
+            return recordedCells;
         }
 
         // Patch 0.02.5A: Manhattan rimosso — usa FovUtils.Manhattan

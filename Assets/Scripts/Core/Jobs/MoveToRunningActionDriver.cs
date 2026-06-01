@@ -67,11 +67,27 @@ namespace Arcontio.Core
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
         {
+            var costObserver = world?.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.MoveToExecutions, 1);
+                if (costPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
+            }
+
             if (!action.HasTargetCell)
+            {
+                TrackMoveToFailure(costObserver, costSample, costPerNpc, npcId);
                 return StepResult.Failed(JobFailureReason.MissingTarget, "MoveMissingTargetCell");
+            }
 
             if (!ValidateMoveTargetObject(world, job, action, out var targetFailure))
+            {
+                TrackMoveToFailure(costObserver, costSample, costPerNpc, npcId);
                 return targetFailure;
+            }
 
             if (npcCell.X == action.TargetCell.x && npcCell.Y == action.TargetCell.y)
                 return StepResult.Succeeded("MoveTargetReached");
@@ -93,6 +109,12 @@ namespace Arcontio.Core
             }
 
             PrepareMoveToRoute(world, npcId, job, action, npcCell);
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.MoveToRoutePreparations, 1);
+                if (costPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
+            }
 
             if (TryResolveKnownMoveToRouteStep(world, npcId, npcCell, action.TargetCell, out var nextKnownRouteCell, out var knownRouteFailure))
             {
@@ -112,10 +134,16 @@ namespace Arcontio.Core
             }
 
             if (!string.IsNullOrEmpty(knownRouteFailure))
+            {
+                TrackMoveToFailure(costObserver, costSample, costPerNpc, npcId);
                 return StepResult.Failed(JobFailureReason.MovementFailed, knownRouteFailure);
+            }
 
             if (CanUseJobMovementRuntime(world))
+            {
+                TrackMoveToFailure(costObserver, costSample, costPerNpc, npcId);
                 return StepResult.Failed(JobFailureReason.MovementFailed, "MoveToKnownRouteMissing");
+            }
 
             return EnqueueLegacyMoveIntent(
                 world,
@@ -126,6 +154,16 @@ namespace Arcontio.Core
                 tick,
                 explainabilityConfig,
                 explainabilityRegistry);
+        }
+
+        private static void TrackMoveToFailure(RuntimeCostObserver costObserver, bool costSample, bool costPerNpc, int npcId)
+        {
+            if (!costSample || costObserver == null)
+                return;
+
+            costObserver.AddCounter(RuntimeCostCounter.MoveToFailures, 1);
+            if (costPerNpc)
+                costObserver.AddNpcWork(npcId, 1);
         }
 
         // =============================================================================
