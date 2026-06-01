@@ -29,6 +29,8 @@ namespace Arcontio.Core
     /// </summary>
     public static class MoveJobFactory
     {
+        public const string DevToolsForcedMoveToCellDebugLabel = "DevToolsForcedMoveToCell";
+
         public static bool TryCreateMoveToCellJob(
             JobTemplateRegistry registry,
             int npcId,
@@ -58,7 +60,9 @@ namespace Arcontio.Core
                 $"jobreq_move_{npcId}_{targetCell.x}_{targetCell.y}_{tick}",
                 npcId,
                 DecisionIntentKind.ExploreArea,
-                urgency01 >= 0.75f ? JobPriorityClass.Important : JobPriorityClass.Normal,
+                string.Equals(debugLabel, DevToolsForcedMoveToCellDebugLabel, System.StringComparison.Ordinal)
+                    ? JobPriorityClass.Emergency
+                    : (urgency01 >= 0.75f ? JobPriorityClass.Important : JobPriorityClass.Normal),
                 urgency01,
                 tick,
                 true,

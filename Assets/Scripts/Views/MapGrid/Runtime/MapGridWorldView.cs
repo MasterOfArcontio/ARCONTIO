@@ -420,8 +420,8 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             // ============================================================
             // Regola:
             // - funziona solo se la modalita' e' attiva e abbiamo un NPC sticky valido.
-            // - il click sinistro su una cella della mappa emette un SetMoveIntentCommand
-            //   verso quella cella.
+            // - il click sinistro su una cella della mappa assegna un job tecnico
+            //   generic.move_to_cell.v1, cosi' anche il debug usa MoveTo multi-tick.
             if (!selectedNpcThisFrame && _debugClickMoveModeEnabled && _debugClickMoveNpcId > 0 && Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
             {
                 TryIssueDebugClickMoveOrder(_debugClickMoveNpcId);
@@ -680,17 +680,14 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             if (!_world.InBounds(cellX, cellY))
                 return;
 
-            var cmd = new SetMoveIntentCommand(npcId, new MoveIntent
+            string reason = "SimulationHostMissing";
+            var host = SimulationHost.Instance;
+            if (host != null && host.ForceAssignMoveToCellJobFromDevTools(npcId, new Vector2Int(cellX, cellY), out reason))
             {
-                Active = true,
-                TargetX = cellX,
-                TargetY = cellY,
-                Reason = MoveIntentReason.Wander,
-                TargetObjectId = 0,
-                BlockedTicks = 0,
-            });
+                return;
+            }
 
-            SimulationHost.Instance?.EnqueueExternalCommand(cmd);
+            Debug.LogWarning($"[DevTools][ForcedMoveToCell] Assign failed npc={npcId} target=({cellX},{cellY}) reason={reason}");
         }
 
         private static int FindNpcAtCell(World world, int x, int y)

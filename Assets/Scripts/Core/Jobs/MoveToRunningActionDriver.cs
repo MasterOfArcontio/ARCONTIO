@@ -146,8 +146,15 @@ namespace Arcontio.Core
             if (HasUsableDirectRoute(world, npcId, action.TargetCell))
                 return;
 
-            if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell))
+            bool requireCurrentAcquisition = !CanUseDeclaredBeliefTargetRoute(job);
+            if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition))
                 return;
+
+            if (CanUseDeclaredBeliefTargetRoute(job)
+                && TryPrepareDeclaredBeliefTargetRoute(world, npcId, action, npcCell))
+            {
+                return;
+            }
 
             if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
                 world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
@@ -155,7 +162,7 @@ namespace Arcontio.Core
             if (TryPrepareMacroImmediateSegment(world, npcId, action.TargetCell, npcCell))
                 return;
 
-            TryPrepareDeclaredDevTransportRoute(world, npcId, job, action, npcCell);
+            TryPrepareDeclaredDebugForcedRoute(world, npcId, job, action, npcCell);
         }
 
         private static bool HasUsableDirectRoute(World world, int npcId, Vector2Int finalTarget)
@@ -181,10 +188,27 @@ namespace Arcontio.Core
                 && direct.FinalTargetCellY == macro.ImmediateTargetY;
         }
 
-        private static bool TryPrepareDirectRouteToFinalTarget(World world, int npcId, JobAction action, GridPosition npcCell)
+        private static bool CanUseDeclaredBeliefTargetRoute(Job job)
         {
-            if (!CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, GetDirectCheckFov(world)))
+            return job != null
+                && job.Request.IntentKind == DecisionIntentKind.EatKnownFood
+                && string.Equals(job.Plan?.PlanId, JobTemplateRegistry.FoodKnownCommunityStockTemplateId, System.StringComparison.Ordinal)
+                && job.Request.HasTargetCell
+                && job.Request.TargetObjectId > 0;
+        }
+
+        private static bool TryPrepareDirectRouteToFinalTarget(
+            World world,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell,
+            bool requireCurrentAcquisition)
+        {
+            if (requireCurrentAcquisition
+                && !CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, GetDirectCheckFov(world)))
+            {
                 return false;
+            }
 
             RouteScratch.Clear();
             if (!MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, npcCell.X, npcCell.Y, action.TargetCell.x, action.TargetCell.y, RouteScratch)
@@ -192,6 +216,36 @@ namespace Arcontio.Core
             {
                 return false;
             }
+
+            world.ClearDebugMacroRouteForNpc(npcId);
+            world.SetDebugDirectPathForNpc(npcId, RouteScratch);
+            return true;
+        }
+
+        private static bool TryPrepareDeclaredBeliefTargetRoute(
+            World world,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell)
+        {
+            if (world == null || !action.HasTargetCell)
+                return false;
+
+            RouteScratch.Clear();
+            int manhattan = Mathf.Abs(action.TargetCell.x - npcCell.X) + Mathf.Abs(action.TargetCell.y - npcCell.Y);
+            int budget = Mathf.Max(ResolveLocalSearchVisitedBudget(world), manhattan * 8, 64);
+            bool found = MovementPathfinder.TryBuildBoundedMovePath(
+                world,
+                npcId,
+                npcCell.X,
+                npcCell.Y,
+                action.TargetCell.x,
+                action.TargetCell.y,
+                budget,
+                RouteScratch);
+
+            if (!found || RouteScratch.Count < 2)
+                return false;
 
             world.ClearDebugMacroRouteForNpc(npcId);
             world.SetDebugDirectPathForNpc(npcId, RouteScratch);
@@ -211,7 +265,14 @@ namespace Arcontio.Core
             }
 
             if (immediateX == finalTarget.x && immediateY == finalTarget.y)
-                return TryPrepareDirectRouteToFinalTarget(world, npcId, JobAction.MoveTo("move_to_final", finalTarget, "move_to_final"), npcCell);
+            {
+                return TryPrepareDirectRouteToFinalTarget(
+                    world,
+                    npcId,
+                    JobAction.MoveTo("move_to_final", finalTarget, "move_to_final"),
+                    npcCell,
+                    requireCurrentAcquisition: false);
+            }
 
             RouteScratch.Clear();
             int budget = ResolveLocalSearchVisitedBudget(world);
@@ -235,7 +296,7 @@ namespace Arcontio.Core
                 && macro.FinalTargetCellY == finalTarget.y;
         }
 
-        private static bool TryPrepareDeclaredDevTransportRoute(
+        private static bool TryPrepareDeclaredDebugForcedRoute(
             World world,
             int npcId,
             Job job,
@@ -245,15 +306,26 @@ namespace Arcontio.Core
             if (world == null || job == null || !action.HasTargetCell)
                 return false;
 
-            if (!string.Equals(job.Plan?.PlanId, JobTemplateRegistry.TransportObjectToCellTemplateId, System.StringComparison.Ordinal))
-                return false;
-
-            if (!string.Equals(job.Request.DebugLabel, "DevToolsForcedTransportObject", System.StringComparison.Ordinal))
+            bool isForcedMove = string.Equals(job.Plan?.PlanId, JobTemplateRegistry.GenericMoveToCellTemplateId, System.StringComparison.Ordinal)
+                && string.Equals(job.Request.DebugLabel, MoveJobFactory.DevToolsForcedMoveToCellDebugLabel, System.StringComparison.Ordinal);
+            bool isForcedTransport = string.Equals(job.Plan?.PlanId, JobTemplateRegistry.TransportObjectToCellTemplateId, System.StringComparison.Ordinal)
+                && string.Equals(job.Request.DebugLabel, "DevToolsForcedTransportObject", System.StringComparison.Ordinal);
+            if (!isForcedMove && !isForcedTransport)
                 return false;
 
             RouteScratch.Clear();
-            if (!MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, npcCell.X, npcCell.Y, action.TargetCell.x, action.TargetCell.y, RouteScratch)
-                || RouteScratch.Count < 2)
+            int manhattan = Mathf.Abs(action.TargetCell.x - npcCell.X) + Mathf.Abs(action.TargetCell.y - npcCell.Y);
+            int budget = Mathf.Max(ResolveLocalSearchVisitedBudget(world), manhattan * 8, 64);
+            bool found = MovementPathfinder.TryBuildBoundedMovePath(
+                world, npcId, npcCell.X, npcCell.Y, action.TargetCell.x, action.TargetCell.y, budget, RouteScratch);
+
+            if (!found || RouteScratch.Count < 2)
+            {
+                found = MovementPathfinder.TryBuildDebugForcedGreedyPath(
+                    world, npcId, npcCell.X, npcCell.Y, action.TargetCell.x, action.TargetCell.y, RouteScratch);
+            }
+
+            if (!found || RouteScratch.Count < 2)
             {
                 return false;
             }

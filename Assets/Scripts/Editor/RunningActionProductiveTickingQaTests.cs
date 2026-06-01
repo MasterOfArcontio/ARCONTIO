@@ -50,12 +50,16 @@ namespace Arcontio.Tests
             {
                 new RunningActionProductiveTickingQaTests().OneCellMoveTraversalHonorsConfiguredFourTickDuration();
                 new RunningActionProductiveTickingQaTests().DeclaredDistantMoveTargetPreparesRouteAndHonorsConfiguredDuration();
+                new RunningActionProductiveTickingQaTests().DeclaredTargetOutsideCurrentFacingWithoutKnownRouteFails();
                 new RunningActionProductiveTickingQaTests().EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration();
+                new RunningActionProductiveTickingQaTests().EatKnownFoodBeliefTargetOutsideCurrentFacingStillPreparesRoute();
+                new RunningActionProductiveTickingQaTests().EatKnownFoodBeliefTargetBehindObstacleUsesBoundedRoute();
                 new RunningActionProductiveTickingQaTests().DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToReturnsLockedDoorFailure();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToWritesLifecycleExplainabilityForEachCell();
+                new RunningActionProductiveTickingQaTests().DevForcedMoveToCellUsesMoveToRunningActionRoute();
                 new RunningActionProductiveTickingQaTests().DevTransportTemplatePreparesDeclaredRoutesWithoutMoveIntentFallback();
 
                 Debug.Log("[RunningActionProductiveTickingQaTests] PASS targeted traversal tests");
@@ -355,6 +359,48 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // DeclaredTargetOutsideCurrentFacingWithoutKnownRouteFails
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che MoveTo non inventi un tragitto diretto verso una cella gia'
+        /// dichiarata dal job quando quella cella non e' acquisita localmente e non
+        /// esiste una route landmark utilizzabile.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: conoscenza del target non equivale a conoscenza della strada</b></para>
+        /// <para>
+        /// Un incarico puo' nascere da una belief che indica "il cibo e' li'", ma
+        /// questo non autorizza MoveTo a conoscere automaticamente una strada verso
+        /// la cella. Senza acquisizione locale e senza landmark route soggettiva, lo
+        /// step deve fallire e consegnare il problema alla matrice dei recuperi.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DeclaredTargetOutsideCurrentFacingWithoutKnownRouteFails()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 3);
+            var startCell = world.GridPos[npcId];
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            var sideTarget = new Vector2Int(startCell.X, startCell.Y + 2);
+            var job = MakeMoveJob(npcId, "job-move-side-belief-target", sideTarget);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
+            Assert.That(job.FailureReason, Is.EqualTo(JobFailureReason.MovementFailed));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.False);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+        }
+
+        // =============================================================================
         // EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration
         // =============================================================================
         /// <summary>
@@ -400,6 +446,86 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X + 1));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+        }
+
+        // =============================================================================
+        // EatKnownFoodBeliefTargetOutsideCurrentFacingStillPreparesRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il caso runtime critico: <c>EatKnownFood</c> nasce da una belief
+        /// target gia' scelta, quindi <c>MoveTo</c> non deve pretendere che il cibo
+        /// sia acquisito nel cono visivo del tick corrente. Il target non viene
+        /// ricalcolato qui: viene solo tradotto in route operativa verso la cella
+        /// dichiarata dal Job.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void EatKnownFoodBeliefTargetOutsideCurrentFacingStillPreparesRoute()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            var startCell = world.GridPos[npcId];
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            int foodId = RegisterCommunityFoodStock(world, objectId: 8102, x: startCell.X, y: startCell.Y + 2, units: 3);
+            var job = MakeFoodJob(npcId, foodId, new Vector2Int(startCell.X, startCell.Y + 2));
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Running));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+        }
+
+        // =============================================================================
+        // EatKnownFoodBeliefTargetBehindObstacleUsesBoundedRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il caso che produceva <c>MoveToKnownRouteMissing</c> in runtime:
+        /// il target food e' gia' stato scelto dalla belief, ma il tragitto diretto
+        /// greedy e' bloccato da un ostacolo. <c>EatKnownFood</c> non deve scegliere
+        /// un altro cibo e non deve fare una nuova query; deve pero' provare una
+        /// route locale bounded verso il target gia' dichiarato.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void EatKnownFoodBeliefTargetBehindObstacleUsesBoundedRoute()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            world.ObjectDefs["qa_wall"] = new ObjectDef
+            {
+                Id = "qa_wall",
+                DisplayName = "QA Wall",
+                IsOccluder = true,
+                BlocksVision = true,
+                BlocksMovement = true,
+                VisionCost = 1f
+            };
+
+            var startCell = world.GridPos[npcId];
+            world.CreateObject("qa_wall", startCell.X + 1, startCell.Y);
+            int foodId = RegisterCommunityFoodStock(world, objectId: 8103, x: startCell.X + 2, y: startCell.Y, units: 3);
+            var job = MakeFoodJob(npcId, foodId, new Vector2Int(startCell.X + 2, startCell.Y));
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Running));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
         }
 
         // =============================================================================
@@ -1155,6 +1281,52 @@ namespace Arcontio.Tests
             Assert.That(world.Objects[objectId].IsHeld, Is.False);
             Assert.That(world.Objects[objectId].CellX, Is.EqualTo(destination.x));
             Assert.That(world.Objects[objectId].CellY, Is.EqualTo(destination.y));
+        }
+
+        // =============================================================================
+        // DevForcedMoveToCellUsesMoveToRunningActionRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il comando umano forzato equivalente a K + mouse: il target puo'
+        /// essere fuori dalla conoscenza soggettiva ordinaria, ma l'esecuzione non
+        /// deve ricadere su <c>SetMoveIntentCommand</c>. Il movimento passa invece
+        /// dal template <c>generic.move_to_cell.v1</c>, da <c>MoveTo</c> e dalle
+        /// running action multi-tick.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DevForcedMoveToCellUsesMoveToRunningActionRoute()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 1);
+            var start = world.GridPos[npcId];
+            var target = new Vector2Int(start.X, start.Y + 3);
+            bool created = MoveJobFactory.TryCreateMoveToCellJob(
+                JobTemplateRegistry.LoadDefault(),
+                npcId,
+                target,
+                tick: 0,
+                urgency01: 1f,
+                debugLabel: MoveJobFactory.DevToolsForcedMoveToCellDebugLabel,
+                out var job,
+                out var reason);
+            Assert.That(created, Is.True, reason);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out reason), Is.True, reason);
+
+            var system = new JobExecutionSystem();
+            var bus = new MessageBus();
+            for (int tick = 0; tick < 8 && world.JobRuntimeState.HasActiveJob(npcId); tick++)
+            {
+                system.Update(world, new Tick(tick, 1f), bus, new Telemetry());
+                FlushJobCommandBuffer(world, bus);
+            }
+
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Completed));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent) && intent.Active, Is.False);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(target.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(target.y));
         }
 
         private static World MakeWorldWithNpc(out int npcId)

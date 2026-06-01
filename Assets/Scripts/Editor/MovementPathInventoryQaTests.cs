@@ -1,5 +1,6 @@
 using Arcontio.Core;
 using Arcontio.Core.Config;
+using Arcontio.Core.Commands.DevTools;
 using Arcontio.Core.Diagnostics;
 using NUnit.Framework;
 using UnityEngine;
@@ -53,6 +54,7 @@ namespace Arcontio.Tests
                 tests.JobMoveToCellUsesRunningActionOnlyForAdjacentCardinalTargetWithGateEnabled();
                 tests.JobMoveToCellFallsBackToLegacyCommandWhenTraversalGateIsDisabled();
                 tests.JobMoveToCellPreparesDeclaredDistantRoutesWhenTraversalGateIsEnabled();
+                tests.DebugClickMoveIntentUsesForcedPhysicalRouteOutsideFacing();
 
                 Debug.Log("[MovementPathInventoryQaTests] PASS");
                 UnityEditor.EditorApplication.Exit(0);
@@ -110,6 +112,41 @@ namespace Arcontio.Tests
             // di MovementSystem, confermando che il path resta attivo.
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X + 1));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+        }
+
+        // =============================================================================
+        // DebugClickMoveIntentUsesForcedPhysicalRouteOutsideFacing
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il comportamento separato del devtool K + mouse: il comando debug
+        /// puo' muovere l'NPC verso una cella non acquisita soggettivamente, perche'
+        /// rappresenta un ordine esterno dell'operatore e non una decisione MBQD.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DebugClickMoveIntentUsesForcedPhysicalRouteOutsideFacing()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            var startCell = world.GridPos[npcId];
+            var targetCell = new Vector2Int(startCell.X, startCell.Y + 3);
+            var command = new DevOrderNpcMoveToCellCommand(npcId, targetCell.x, targetCell.y);
+            var bus = new MessageBus();
+
+            command.Execute(world, bus);
+
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent), Is.True);
+            Assert.That(intent.Active, Is.True);
+            Assert.That(intent.Reason, Is.EqualTo(MoveIntentReason.DebugClick));
+
+            for (int tick = 1; tick <= 6 && world.GridPos[npcId].Y != targetCell.y; tick++)
+            {
+                TickContext.BeginTick(tick);
+                new MovementSystem().Update(world, new Tick(tick, 1f), bus, new Telemetry());
+            }
+
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
         }
 
         // =============================================================================

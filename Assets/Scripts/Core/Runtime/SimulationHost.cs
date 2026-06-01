@@ -162,6 +162,90 @@ namespace Arcontio.Core
         public long TickIndex => _tickIndex;
 
         // =============================================================================
+        // ForceAssignMoveToCellJobFromDevTools
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Entry point tecnico/debug che assegna direttamente a un NPC un job runtime
+        /// <c>generic.move_to_cell.v1</c> verso una cella scelta dall'operatore.
+        /// </para>
+        ///
+        /// <para><b>Debug umano dentro Job/MoveTo</b></para>
+        /// <para>
+        /// Questo metodo sostituisce il vecchio click-to-move basato su
+        /// <c>SetMoveIntentCommand</c>. L'ordine resta una forzatura esterna, quindi
+        /// puo' usare il movimento greedy/fisico ammesso per i devtool, ma viene
+        /// eseguito come job reale: passa da <c>JobRuntimeState</c>,
+        /// <c>JobExecutionSystem</c> e running action <c>MoveTo</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: controlla world, registry, NPC e cella target.</item>
+        ///   <item><b>Factory</b>: materializza <c>generic.move_to_cell.v1</c>.</item>
+        ///   <item><b>Cleanup dev</b>: cancella movimento/job precedente dell'NPC.</item>
+        ///   <item><b>Assign</b>: assegna il job con debug label esplicita.</item>
+        /// </list>
+        /// </summary>
+        public bool ForceAssignMoveToCellJobFromDevTools(int npcId, Vector2Int targetCell, out string reason)
+        {
+            reason = string.Empty;
+
+            if (_world == null)
+            {
+                reason = "WorldMissing";
+                return false;
+            }
+
+            if (_jobTemplateRegistry == null)
+            {
+                reason = "JobTemplateRegistryMissing";
+                return false;
+            }
+
+            if (!_world.ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            if (!_world.InBounds(targetCell.x, targetCell.y))
+            {
+                reason = "TargetOutOfBounds";
+                return false;
+            }
+
+            if (!MoveJobFactory.TryCreateMoveToCellJob(
+                    _jobTemplateRegistry,
+                    npcId,
+                    targetCell,
+                    (int)_tickIndex,
+                    urgency01: 1f,
+                    debugLabel: MoveJobFactory.DevToolsForcedMoveToCellDebugLabel,
+                    out var job,
+                    out reason))
+            {
+                return false;
+            }
+
+            if (_world.JobRuntimeState.HasActiveJob(npcId))
+                _world.JobRuntimeState.ClearNpcJob(npcId, JobFailureReason.Cancelled, out _);
+
+            _world.ClearMoveIntent(npcId);
+            _world.ClearDebugNavigationPathsForNpc(npcId);
+            _world.ClearDebugMacroRouteForNpc(npcId);
+            _world.ClearNpcLocalSearchState(npcId, string.Empty);
+            _world.ClearNpcDirectCommitState(npcId, string.Empty);
+            _world.Pathfinding.ClearMoveBackOff(npcId);
+
+            if (!_world.JobRuntimeState.TryAssignJob(npcId, job, (int)_tickIndex, out reason))
+                return false;
+
+            reason = "DevToolsForcedMoveJobAssigned";
+            return true;
+        }
+
+        // =============================================================================
         // ForceAssignTransportObjectJobFromDevTools
         // =============================================================================
         /// <summary>
