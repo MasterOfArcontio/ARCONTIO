@@ -45,6 +45,10 @@ namespace Arcontio.Core
             // Furto cibo (Day9)
             _rules.Add(new FoodStolenMemoryRule());
 
+            // Eventi needs minimali -> memoria soggettiva.
+            _rules.Add(new FoodConsumedMemoryRule());
+            _rules.Add(new BedRestedMemoryRule());
+
             // Se hai una rule per FoodMissingSuspectedEvent, aggiungila qui.
             // _rules.Add(new FoodMissingSuspectedMemoryRule());
         }
@@ -594,6 +598,14 @@ namespace Arcontio.Core
 
                 case FoodStolenEvent fe:
                     x = fe.CellX; y = fe.CellY;
+                    return true;
+
+                case FoodConsumedEvent fce:
+                    x = fce.CellX; y = fce.CellY;
+                    return true;
+
+                case BedRestedEvent bre:
+                    x = bre.CellX; y = bre.CellY;
                     return true;
             }
 

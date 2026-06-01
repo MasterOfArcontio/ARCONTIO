@@ -888,6 +888,18 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void MemoryEncodingCreatesFoodConsumedTraceFromNeedsEvent()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(5, 5, 5, 5, out int npcId, out int foodId);
+            var bus = new MessageBus();
+
+            new EatFromStockCommand(npcId, foodId).Execute(world, bus);
+            EncodeQueuedEventsIntoMemory(world, bus, tick: 12);
+
+            Assert.That(HasMemoryTrace(world, npcId, MemoryType.FoodConsumed, npcId, foodId, 5, 5), Is.True);
+        }
+
+        [Test]
         public void SleepInBedCommandPublishesBedRestedEventAfterMutation()
         {
             var world = MakeWorldWithNpcOnly(2, 3, out int npcId);
@@ -917,6 +929,38 @@ namespace Arcontio.Tests
             Assert.That(rested.CellY, Is.EqualTo(3));
             Assert.That(rested.ReasonTag, Is.EqualTo("Community"));
             Assert.That(bus.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void MemoryEncodingCreatesBedRestedTraceFromNeedsEvent()
+        {
+            var world = MakeWorldWithNpcOnly(2, 3, out int npcId);
+            const int bedId = 9001;
+            world.Objects[bedId] = new WorldObjectInstance
+            {
+                ObjectId = bedId,
+                DefId = "bed",
+                CellX = 2,
+                CellY = 3,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            var bus = new MessageBus();
+
+            new SleepInBedCommand(npcId, bedId, "Community").Execute(world, bus);
+            EncodeQueuedEventsIntoMemory(world, bus, tick: 13);
+
+            Assert.That(HasMemoryTrace(world, npcId, MemoryType.BedRested, npcId, bedId, 2, 3), Is.True);
+        }
+
+        private static void EncodeQueuedEventsIntoMemory(World world, MessageBus bus, int tick)
+        {
+            var events = new List<ISimEvent>();
+            bus.DrainTo(events);
+
+            var memoryEncoding = new MemoryEncodingSystem();
+            memoryEncoding.SetEventsBuffer(events);
+            memoryEncoding.Update(world, new Tick(tick, 1f), new MessageBus(), new Telemetry());
         }
 
         private static JobTemplateRegistry MakeRegistry()
@@ -1218,6 +1262,28 @@ namespace Arcontio.Tests
                     && spotted.DefId == defId
                     && spotted.CellX == x
                     && spotted.CellY == y)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasMemoryTrace(World world, int npcId, MemoryType type, int subjectId, int secondarySubjectId, int x, int y)
+        {
+            if (!world.Memory.TryGetValue(npcId, out var store) || store == null)
+                return false;
+
+            var traces = store.Traces;
+            for (int i = 0; i < traces.Count; i++)
+            {
+                var trace = traces[i];
+                if (trace.Type == type
+                    && trace.SubjectId == subjectId
+                    && trace.SecondarySubjectId == secondarySubjectId
+                    && trace.CellX == x
+                    && trace.CellY == y)
                 {
                     return true;
                 }
