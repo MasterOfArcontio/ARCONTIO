@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.16 - Cognizione Soggettiva Avanzata
 
 CHECKPOINT CORRENTE:
-v0.16a - Allineamento template generic.move_to_cell.v1 e transport.object_to_cell.v1 al movimento multi-tick
+v0.16b - Audit cognition gap post-v0.15
 
 STATUS:
-READY / NEXT STEP
+READY / AUDIT
 
 OUTPUT ATTESO:
-allineamento dei template generici al movimento multi-tick, senza introdurre cognizione profonda o planner globale
+fotografia dei gap cognitivi residui dopo la chiusura del movimento multi-tick e dell'allineamento template v0.16a
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.15`;
@@ -73,18 +73,18 @@ Esito tecnico ereditato da `v0.14`:
 - mantenere `JobExecutionSystem` come esecutore, non come secondo decisore;
 - rendere osservabile recovery/fallimento tramite EL.
 
-Obiettivo tecnico corrente `v0.15`:
+Obiettivo tecnico corrente `v0.16`:
 
-- trasformare il movimento ordinario in una RunningAction MoveTo multi-tick;
-- fare fallire il movimento quando non esiste route lecita invece di usare fallback greedy onnisciente;
-- restituire i fallimenti movimento al Job;
-- lasciare che il fallback sia deciso da `job_recovery_policies.json`;
-- isolare `MoveIntent` e `MovementSystem` come compatibilita' o dev/debug;
-- correggere il caso target cibo eliminato che oggi puo' apparire come Job completed/succeeded;
-- preparare la cognizione soggettiva sopra movimento non onnisciente.
+- auditare i gap cognitivi rimasti dopo movimento multi-tick e Job recovery;
+- stabilizzare lifecycle, freshness, obsolescenza e stato delle belief;
+- collegare eventi mondo needs a memoria soggettiva senza onniscienza;
+- verificare localmente credenze obsolete prima di agire;
+- preparare decisioni su conoscenza incerta e parziale;
+- introdurre comunicazione soggettiva minima dei fatti osservati;
+- chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.16a - Allineamento template generic.move_to_cell.v1 e transport.object_to_cell.v1 al movimento multi-tick`
+`v0.16b - Audit cognition gap post-v0.15`
 
 Residual follow-ups / future hardening:
 
@@ -132,7 +132,7 @@ Checkpoint v0.15 pianificati:
 
 Checkpoint v0.16 pianificati:
 
-- `v0.16a`: allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick;
+- `v0.16a`: allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick - DONE;
 - `v0.16b`: audit cognition gap post-v0.15;
 - `v0.16c`: lifecycle credenze e obsolescenza cibo/oggetti;
 - `v0.16d`: memoria da eventi needs;
