@@ -150,6 +150,12 @@ namespace Arcontio.Core
             if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition))
                 return;
 
+            if (CanUseDeclaredBeliefTargetRoute(job)
+                && TryPrepareDeclaredBeliefTargetRoute(world, npcId, action, npcCell))
+            {
+                return;
+            }
+
             if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
                 world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
 
@@ -210,6 +216,36 @@ namespace Arcontio.Core
             {
                 return false;
             }
+
+            world.ClearDebugMacroRouteForNpc(npcId);
+            world.SetDebugDirectPathForNpc(npcId, RouteScratch);
+            return true;
+        }
+
+        private static bool TryPrepareDeclaredBeliefTargetRoute(
+            World world,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell)
+        {
+            if (world == null || !action.HasTargetCell)
+                return false;
+
+            RouteScratch.Clear();
+            int manhattan = Mathf.Abs(action.TargetCell.x - npcCell.X) + Mathf.Abs(action.TargetCell.y - npcCell.Y);
+            int budget = Mathf.Max(ResolveLocalSearchVisitedBudget(world), manhattan * 8, 64);
+            bool found = MovementPathfinder.TryBuildBoundedMovePath(
+                world,
+                npcId,
+                npcCell.X,
+                npcCell.Y,
+                action.TargetCell.x,
+                action.TargetCell.y,
+                budget,
+                RouteScratch);
+
+            if (!found || RouteScratch.Count < 2)
+                return false;
 
             world.ClearDebugMacroRouteForNpc(npcId);
             world.SetDebugDirectPathForNpc(npcId, RouteScratch);

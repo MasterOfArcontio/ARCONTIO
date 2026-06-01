@@ -53,6 +53,7 @@ namespace Arcontio.Tests
                 new RunningActionProductiveTickingQaTests().DeclaredTargetOutsideCurrentFacingWithoutKnownRouteFails();
                 new RunningActionProductiveTickingQaTests().EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().EatKnownFoodBeliefTargetOutsideCurrentFacingStillPreparesRoute();
+                new RunningActionProductiveTickingQaTests().EatKnownFoodBeliefTargetBehindObstacleUsesBoundedRoute();
                 new RunningActionProductiveTickingQaTests().DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
@@ -468,6 +469,51 @@ namespace Arcontio.Tests
             world.NpcFacing[npcId] = CardinalDirection.East;
             int foodId = RegisterCommunityFoodStock(world, objectId: 8102, x: startCell.X, y: startCell.Y + 2, units: 3);
             var job = MakeFoodJob(npcId, foodId, new Vector2Int(startCell.X, startCell.Y + 2));
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Running));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+        }
+
+        // =============================================================================
+        // EatKnownFoodBeliefTargetBehindObstacleUsesBoundedRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il caso che produceva <c>MoveToKnownRouteMissing</c> in runtime:
+        /// il target food e' gia' stato scelto dalla belief, ma il tragitto diretto
+        /// greedy e' bloccato da un ostacolo. <c>EatKnownFood</c> non deve scegliere
+        /// un altro cibo e non deve fare una nuova query; deve pero' provare una
+        /// route locale bounded verso il target gia' dichiarato.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void EatKnownFoodBeliefTargetBehindObstacleUsesBoundedRoute()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            world.ObjectDefs["qa_wall"] = new ObjectDef
+            {
+                Id = "qa_wall",
+                DisplayName = "QA Wall",
+                IsOccluder = true,
+                BlocksVision = true,
+                BlocksMovement = true,
+                VisionCost = 1f
+            };
+
+            var startCell = world.GridPos[npcId];
+            world.CreateObject("qa_wall", startCell.X + 1, startCell.Y);
+            int foodId = RegisterCommunityFoodStock(world, objectId: 8103, x: startCell.X + 2, y: startCell.Y, units: 3);
+            var job = MakeFoodJob(npcId, foodId, new Vector2Int(startCell.X + 2, startCell.Y));
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
             var system = new JobExecutionSystem();
 
