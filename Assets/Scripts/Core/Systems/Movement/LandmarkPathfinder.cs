@@ -412,13 +412,21 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!TryResolveStartLandmark(world, npcId, pos.X, pos.Y, out int startNodeId, out string startFail))
+            // La scelta degli estremi della macro-route passa dal risolutore storico
+            // del World, che valuta la raggiungibilita' locale dei landmark candidati.
+            // Questo impedisce a MoveTo di scegliere un landmark solo perche' vicino
+            // in distanza Manhattan quando in realta' e' separato da muri o percorsi
+            // molto piu' lunghi.
+            if (!world.TryResolveStartLandmark(npcId, pos.X, pos.Y, out int startNodeId, out string startFail))
             {
                 plan.FailureReason = startFail;
                 return false;
             }
 
-            if (!TryResolveTargetLandmark(world, npcId, targetX, targetY, out int targetNodeId, out string targetFail))
+            // Il target landmark viene scelto conoscendo gia' lo start: cosi' il
+            // risolutore puo' scartare candidati non collegati nel grafo soggettivo
+            // e preferire un last mile locale realmente costruibile verso la cella.
+            if (!world.TryResolveTargetLandmark(npcId, startNodeId, targetX, targetY, out int targetNodeId, out string targetFail))
             {
                 plan.FailureReason = targetFail;
                 return false;
