@@ -894,7 +894,7 @@ Il recupero deve restare locale, configurabile, osservabile e limitato. Se un in
 #### v0.15 - Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime
 
 ## Stato
-FUTURA / PENDING
+COMPLETATA
 
 ## Obiettivo
 
@@ -975,7 +975,7 @@ In questa fase NON si deve:
 #### v0.16 - Cognizione Soggettiva Avanzata
 
 ## Stato
-FUTURA / PENDING
+IN CORSO / ACTIVE
 
 ## Obiettivo
 
@@ -996,7 +996,7 @@ Questa fase deve lavorare su:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.16a | Allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick | ⏳ |
+| v0.16a | Allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick | ✅ |
 | v0.16b | Audit cognition gap post-v0.15 | ⏳ |
 | v0.16c | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
 | v0.16d | Memory encoding da world events needs | ⏳ |
@@ -1006,6 +1006,8 @@ Questa fase deve lavorare su:
 | v0.16h | QA anti-omniscienza cognitiva | ⏳ |
 | v0.16i | Closeout cognition deepening | ⏳ |
 
+
+> **Nota closeout v0.16a (2026-06-01):** il checkpoint `v0.16a` ha allineato `generic.move_to_cell.v1` e `transport.object_to_cell.v1` alla semantica `MoveTo` multi-tick. Il movimento ordinario dei Job passa da `MoveToRunningActionDriver`, attraversa route conosciute cella per cella, usa route dichiarate da belief food senza rifare query decisionali, e fallisce quando non esiste route lecita. Il movimento debug umano da mappa viene instradato come job tecnico `generic.move_to_cell.v1` con label dev esplicita e puo' usare route fisica/greedy solo perche' rappresenta un comando dell'operatore, non conoscenza NPC.
 ---
 
 #### v0.17 - Conseguenze Sociali Emergenti
