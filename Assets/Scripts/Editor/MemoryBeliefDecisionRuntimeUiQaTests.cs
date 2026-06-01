@@ -289,6 +289,40 @@ namespace Arcontio.Tests
             Assert.That(viewModel.IntentOutcomeRows[1].ColorRole, Is.EqualTo(MemoryBeliefDecisionColorRole.Ok));
         }
 
+        [Test]
+        public void DecisionScopeMatchesJobRequestWithinSmallTickWindow()
+        {
+            var config = MakeConfig();
+            int npcId = 12;
+            var world = new World(MakeWorldConfigWithMbqdEnabled());
+
+            var decision = MakeDecisionTrace(npcId);
+            decision.Tick = 400;
+            decision.Decision.SelectedIntent = DecisionIntentKind.EatKnownFood;
+
+            var request = MakeJobRequestTrace(npcId);
+            request.Tick = 402;
+            request.JobRequest.Intent = DecisionIntentKind.EatKnownFood;
+            request.JobRequest.JobId = "job-window-ok";
+            request.JobRequest.RequestId = "req-window-ok";
+
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, decision);
+            world.MemoryBeliefDecisionExplainability.AddTrace(config, request);
+
+            var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
+            bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(
+                world,
+                npcId,
+                viewModel,
+                buildScope: MemoryBeliefDecisionViewModelBuildScope.Decision);
+
+            Assert.That(built, Is.True);
+            Assert.That(viewModel.IntentOutcomeRows.Count, Is.EqualTo(1));
+            Assert.That(viewModel.IntentOutcomeRows[0].Intent, Is.EqualTo("EatKnownFood"));
+            Assert.That(viewModel.IntentOutcomeRows[0].Result, Is.EqualTo("ok"));
+            Assert.That(viewModel.IntentOutcomeRows[0].JobId, Is.EqualTo("job-window-ok"));
+        }
+
         // =============================================================================
         // DecisionScopeDoesNotShowNoneIntentOutcomeRows
         // =============================================================================

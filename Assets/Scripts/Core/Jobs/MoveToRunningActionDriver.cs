@@ -43,6 +43,7 @@ namespace Arcontio.Core
     public static class MoveToRunningActionDriver
     {
         private static readonly List<Vector2Int> RouteScratch = new(64);
+        private static readonly List<Vector2Int> DirectProbeScratch = new(32);
 
         // =============================================================================
         // Execute
@@ -153,6 +154,25 @@ namespace Arcontio.Core
             if (canUseDeclaredBeliefTargetRoute)
             {
                 string previousMode = MovementExplainabilityEmitter.ResolveRuntimeMode(world, npcId);
+                bool directTargetVisible = CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, GetDirectCheckFov(world));
+                bool directPathClear = TryProbeDirectRoute(world, npcId, npcCell, action.TargetCell, requireCurrentAcquisition: true);
+
+                if (directTargetVisible && directPathClear && TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition: true))
+                {
+                    TryEmitPreparedPathfindingPlan(
+                        world,
+                        npcId,
+                        job,
+                        action,
+                        npcCell,
+                        PlannerMode.Direct,
+                        SelectionReason.DirectValid,
+                        RouteScratch,
+                        directTargetVisible,
+                        directPathClear);
+                    TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, "DirectVisibleTargetPrepared");
+                    return;
+                }
 
                 // EatKnownFood segue la stessa gerarchia concettuale del vecchio
                 // movimento intenzionale: prima prova una rotta conosciuta tramite
@@ -163,7 +183,7 @@ namespace Arcontio.Core
                 if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
                     world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
 
-                if (TryPrepareMacroImmediateSegment(world, npcId, action.TargetCell, npcCell))
+                if (TryPrepareMacroImmediateSegment(world, npcId, action.TargetCell, npcCell, out bool preparedFinalDirect))
                 {
                     TryEmitPreparedPathfindingPlan(
                         world,
@@ -171,10 +191,12 @@ namespace Arcontio.Core
                         job,
                         action,
                         npcCell,
-                        PlannerMode.LandmarkAstar,
-                        SelectionReason.DirectInvalidLmChosen,
-                        RouteScratch);
-                    TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, "PreparedLandmarkRoute");
+                        preparedFinalDirect ? PlannerMode.Direct : PlannerMode.LandmarkAstar,
+                        preparedFinalDirect ? SelectionReason.DirectValid : SelectionReason.DirectInvalidLmChosen,
+                        RouteScratch,
+                        directTargetVisible: preparedFinalDirect || directTargetVisible,
+                        directPathClear: preparedFinalDirect || directPathClear);
+                    TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, preparedFinalDirect ? "LastMileDirectSegmentPrepared" : "LandmarkSegmentPrepared");
                     return;
                 }
 
@@ -188,8 +210,10 @@ namespace Arcontio.Core
                         npcCell,
                         PlannerMode.DirectFallback,
                         SelectionReason.NoLmFallbackDirect,
-                        RouteScratch);
-                    TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, "PreparedBeliefTargetRoute");
+                        RouteScratch,
+                        directTargetVisible,
+                        directPathClear);
+                    TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, "BeliefTargetLocalRoutePrepared");
                 }
                 return;
             }
@@ -205,7 +229,9 @@ namespace Arcontio.Core
                     npcCell,
                     PlannerMode.Direct,
                     SelectionReason.DirectValid,
-                    RouteScratch);
+                    RouteScratch,
+                    directTargetVisible: true,
+                    directPathClear: true);
                 TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, "PreparedDirectRoute");
                 return;
             }
@@ -215,7 +241,7 @@ namespace Arcontio.Core
             if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
                 world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
 
-            if (TryPrepareMacroImmediateSegment(world, npcId, action.TargetCell, npcCell))
+            if (TryPrepareMacroImmediateSegment(world, npcId, action.TargetCell, npcCell, out bool preparedMacroFinalDirect))
             {
                 TryEmitPreparedPathfindingPlan(
                     world,
@@ -223,10 +249,12 @@ namespace Arcontio.Core
                     job,
                     action,
                     npcCell,
-                    PlannerMode.LandmarkAstar,
-                    SelectionReason.DirectInvalidLmChosen,
-                    RouteScratch);
-                TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMacroMode, "PreparedLandmarkRoute");
+                    preparedMacroFinalDirect ? PlannerMode.Direct : PlannerMode.LandmarkAstar,
+                    preparedMacroFinalDirect ? SelectionReason.DirectValid : SelectionReason.DirectInvalidLmChosen,
+                    RouteScratch,
+                    directTargetVisible: preparedMacroFinalDirect || CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, GetDirectCheckFov(world)),
+                    directPathClear: preparedMacroFinalDirect);
+                TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMacroMode, preparedMacroFinalDirect ? "LastMileDirectSegmentPrepared" : "LandmarkSegmentPrepared");
                 return;
             }
 
@@ -240,7 +268,9 @@ namespace Arcontio.Core
                     npcCell,
                     PlannerMode.DirectFallback,
                     SelectionReason.ForcedDebug,
-                    RouteScratch);
+                    RouteScratch,
+                    directTargetVisible: true,
+                    directPathClear: RouteScratch.Count >= 2);
                 TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMacroMode, "PreparedDebugForcedRoute");
             }
         }
@@ -305,6 +335,24 @@ namespace Arcontio.Core
             return true;
         }
 
+        private static bool TryProbeDirectRoute(
+            World world,
+            int npcId,
+            GridPosition npcCell,
+            Vector2Int targetCell,
+            bool requireCurrentAcquisition)
+        {
+            if (requireCurrentAcquisition
+                && !CanAcquireDirectTarget(world, npcId, targetCell.x, targetCell.y, GetDirectCheckFov(world)))
+            {
+                return false;
+            }
+
+            DirectProbeScratch.Clear();
+            return MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, npcCell.X, npcCell.Y, targetCell.x, targetCell.y, DirectProbeScratch)
+                && DirectProbeScratch.Count >= 2;
+        }
+
         private static bool TryPrepareDeclaredBeliefTargetRoute(
             World world,
             int npcId,
@@ -335,8 +383,10 @@ namespace Arcontio.Core
             return true;
         }
 
-        private static bool TryPrepareMacroImmediateSegment(World world, int npcId, Vector2Int finalTarget, GridPosition npcCell)
+        private static bool TryPrepareMacroImmediateSegment(World world, int npcId, Vector2Int finalTarget, GridPosition npcCell, out bool preparedFinalDirect)
         {
+            preparedFinalDirect = false;
+
             if (!world.TryGetMacroExecutionImmediateTarget(npcId, out int immediateX, out int immediateY, out _, out _))
                 return false;
 
@@ -349,12 +399,14 @@ namespace Arcontio.Core
 
             if (immediateX == finalTarget.x && immediateY == finalTarget.y)
             {
-                return TryPrepareDirectRouteToFinalTarget(
+                bool prepared = TryPrepareDirectRouteToFinalTarget(
                     world,
                     npcId,
                     JobAction.MoveTo("move_to_final", finalTarget, "move_to_final"),
                     npcCell,
                     requireCurrentAcquisition: false);
+                preparedFinalDirect = prepared;
+                return prepared;
             }
 
             RouteScratch.Clear();
@@ -366,6 +418,7 @@ namespace Arcontio.Core
             }
 
             world.SetDebugDirectPathForNpc(npcId, RouteScratch);
+            MarkMacroDirectSegment(world, npcId, "LANDMARK_DIRECT_SEGMENT", "LandmarkSegmentPrepared");
             return true;
         }
 
@@ -388,6 +441,31 @@ namespace Arcontio.Core
             PlannerMode selectedMode,
             SelectionReason selectionReason,
             IReadOnlyList<Vector2Int> localPath)
+        {
+            TryEmitPreparedPathfindingPlan(
+                world,
+                npcId,
+                job,
+                action,
+                npcCell,
+                selectedMode,
+                selectionReason,
+                localPath,
+                directTargetVisible: CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, GetDirectCheckFov(world)),
+                directPathClear: selectedMode == PlannerMode.Direct);
+        }
+
+        private static void TryEmitPreparedPathfindingPlan(
+            World world,
+            int npcId,
+            Job job,
+            JobAction action,
+            GridPosition npcCell,
+            PlannerMode selectedMode,
+            SelectionReason selectionReason,
+            IReadOnlyList<Vector2Int> localPath,
+            bool directTargetVisible,
+            bool directPathClear)
         {
             if (world == null || job == null || !action.HasTargetCell)
                 return;
@@ -414,8 +492,8 @@ namespace Arcontio.Core
                 npcId,
                 in intent,
                 npcCell,
-                targetVisible: CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, checkFov: true),
-                directPathClear: selectedMode == PlannerMode.Direct,
+                targetVisible: directTargetVisible,
+                directPathClear: directPathClear,
                 selectedMode: selectedMode,
                 selectionReason: selectionReason,
                 macroPlan: macroPlan,
@@ -443,6 +521,20 @@ namespace Arcontio.Core
                 action.TargetCell,
                 minVerbosity: 1,
                 reason: reason);
+        }
+
+        private static void MarkMacroDirectSegment(World world, int npcId, string mode, string reason)
+        {
+            if (world?.Pathfinding == null)
+                return;
+
+            if (!world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macro) || macro == null)
+                return;
+
+            macro.NavigationMode = mode ?? string.Empty;
+            macro.LastModeSwitchTick = (int)TickContext.CurrentTickIndex;
+            macro.LastModeSwitchReason = reason ?? string.Empty;
+            world.Pathfinding.MacroRouteExecution[npcId] = macro;
         }
 
         private static bool TryPrepareDeclaredDebugForcedRoute(

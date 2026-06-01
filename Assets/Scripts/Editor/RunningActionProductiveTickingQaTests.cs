@@ -449,6 +449,28 @@ namespace Arcontio.Tests
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
         }
 
+        [Test]
+        public void EatKnownFoodVisibleTargetEmitsDirectPlan()
+        {
+            var world = MakeWorldWithNpcWithMovementExplainability(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 3);
+            var startCell = world.GridPos[npcId];
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            int foodId = RegisterCommunityFoodStock(world, objectId: 8121, x: startCell.X + 3, y: startCell.Y, units: 3);
+            var job = MakeFoodJob(npcId, foodId, new Vector2Int(startCell.X + 3, startCell.Y));
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.MovementExplainability.TryGetNpcStore(npcId, out var store), Is.True);
+            Assert.That(store.TryGetLatestPlanTrace(out var plan), Is.True);
+            Assert.That(plan.SelectedMode, Is.EqualTo(PlannerMode.Direct));
+            Assert.That(plan.SelectionReason, Is.EqualTo(SelectionReason.DirectValid));
+            Assert.That(plan.Candidates[0].Mode, Is.EqualTo(PlannerMode.Direct));
+            Assert.That(plan.Candidates[0].Valid, Is.True);
+        }
+
         // =============================================================================
         // EatKnownFoodBeliefTargetOutsideCurrentFacingStillPreparesRoute
         // =============================================================================
@@ -1381,6 +1403,16 @@ namespace Arcontio.Tests
             sim.memory_belief_decision_explainability.enabled = true;
             sim.memory_belief_decision_explainability.writeJsonLog = false;
             sim.memory_belief_decision_explainability.logRunningAction = true;
+            return MakeWorldWithNpc(sim, out npcId);
+        }
+
+        private static World MakeWorldWithNpcWithMovementExplainability(out int npcId)
+        {
+            var sim = new SimulationParams();
+            sim.explainability.enabled = true;
+            sim.explainability.defaultVerbosity = 2;
+            sim.explainability.maxTrackedNpcs = 3;
+            sim.explainability.writeJsonLog = false;
             return MakeWorldWithNpc(sim, out npcId);
         }
 

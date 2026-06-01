@@ -1122,11 +1122,16 @@ namespace Arcontio.Core
                 if (trace?.JobRequest == null)
                     continue;
 
-                if (trace.Tick != decisionTick || trace.JobRequest.Intent != intent)
+                long distance = Math.Abs(trace.Tick - decisionTick);
+                if (distance > 3 || trace.JobRequest.Intent != intent)
                     continue;
 
-                if (best == null || trace.Tick > best.Tick)
+                if (best == null
+                    || Math.Abs(trace.Tick - decisionTick) < Math.Abs(best.Tick - decisionTick)
+                    || (distance == Math.Abs(best.Tick - decisionTick) && trace.Tick > best.Tick))
+                {
                     best = trace;
+                }
             }
 
             return best;
