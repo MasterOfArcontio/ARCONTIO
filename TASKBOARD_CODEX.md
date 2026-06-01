@@ -25,20 +25,20 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ACTIVE: v0.16 - Cognizione Soggettiva Avanzata
+## MACRO JOB COMPLETED: v0.16 - Cognizione Soggettiva Avanzata
 
 CHECKPOINT CORRENTE:
-v0.16c - Lifecycle credenze e obsolescenza cibo/oggetti
+v0.16j - Closeout cognizione soggettiva avanzata
 
 STATUS:
-READY / PATCH
+COMPLETED / READY FOR PR
 
 OUTPUT ATTESO:
-correzione dei gap belief lifecycle emersi dall'audit v0.16b, con priorita' al caso EatKnownFood belief-only e alla gestione esplicita di credenze stale/discarded
+closeout della fase cognitiva soggettiva iniziale, con lifecycle belief, eventi needs in memoria, comunicazione soggettiva minima, decisioni su belief incerte, SearchFood esplorativo e QA anti-onniscienza consolidati
 
 DOC SYNC:
-root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.15`;
-allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza `v0.16`
+root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.16`;
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato prima dell'apertura stabile della fase sociale `v0.17`
 
 OBIETTIVO:
 Chiudere il debito tra movimento legacy e Job runtime prima di aprire la cognizione soggettiva avanzata.
@@ -85,12 +85,11 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.16c - Lifecycle credenze e obsolescenza cibo/oggetti`
+`v0.17a - Audit reputazione/sospetto post-v0.16`
 
 Residual follow-ups / future hardening:
 
-- `v0.16`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
-- `v0.17`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
+- `v0.17`: query multi-candidato food, recovery `FindEquivalentTarget` senza query interne, sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
 - `v0.18+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
 Checkpoint v0.13 pianificati:
@@ -135,14 +134,14 @@ Checkpoint v0.16 pianificati:
 
 - `v0.16a`: allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick - DONE;
 - `v0.16b`: audit cognition gap post-v0.15 - DONE;
-- `v0.16c`: lifecycle credenze e obsolescenza cibo/oggetti;
-- `v0.16d`: memoria da eventi needs;
-- `v0.16e`: verifica locale credenze;
-- `v0.16f`: decisione su conoscenza incerta;
-- `v0.16g`: comunicazione soggettiva minima;
-- `v0.16h`: QA anti-onniscienza cognitiva;
-- `v0.16i`: SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili;
-- `v0.16j`: closeout cognizione soggettiva avanzata.
+- `v0.16c`: lifecycle credenze e obsolescenza cibo/oggetti - DONE;
+- `v0.16d`: memoria da eventi needs - DONE;
+- `v0.16e`: verifica locale credenze - DONE;
+- `v0.16f`: comunicazione soggettiva minima - DONE;
+- `v0.16g`: decisione su conoscenza incerta - DONE;
+- `v0.16h`: QA anti-onniscienza cognitiva - DONE;
+- `v0.16i`: SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili - DONE;
+- `v0.16j`: closeout cognizione soggettiva avanzata - DONE.
 
 Checkpoint v0.12 completati:
 

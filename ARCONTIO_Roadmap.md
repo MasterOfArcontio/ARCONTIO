@@ -975,7 +975,7 @@ In questa fase NON si deve:
 #### v0.16 - Cognizione Soggettiva Avanzata
 
 ## Stato
-IN CORSO / ACTIVE
+COMPLETATA / DONE
 
 ## Obiettivo
 
@@ -999,19 +999,21 @@ Questa fase deve lavorare su:
 |---|---|---|
 | v0.16a | Allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick | ✅ |
 | v0.16b | Audit cognition gap post-v0.15 | ✅ |
-| v0.16c | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
-| v0.16d | Memory encoding da world events needs | ⏳ |
-| v0.16e | Verifica locale credenze obsolete | ⏳ |
-| v0.16f | Comunicazione soggettiva dei fatti osservati | ⏳ |
-| v0.16g | Decisioni con belief incerte e parziali | ⏳ |
-| v0.16h | QA anti-omniscienza cognitiva | ⏳ |
-| v0.16i | SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili | ⏳ |
-| v0.16j | Closeout cognition deepening | ⏳ |
+| v0.16c | Belief lifecycle e obsolescenza cibo/oggetti | ✅ |
+| v0.16d | Memory encoding da world events needs | ✅ |
+| v0.16e | Verifica locale credenze obsolete | ✅ |
+| v0.16f | Comunicazione soggettiva dei fatti osservati | ✅ |
+| v0.16g | Decisioni con belief incerte e parziali | ✅ |
+| v0.16h | QA anti-omniscienza cognitiva | ✅ |
+| v0.16i | SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili | ✅ |
+| v0.16j | Closeout cognition deepening | ✅ |
 
 
 > **Nota closeout v0.16a (2026-06-01):** il checkpoint `v0.16a` ha allineato `generic.move_to_cell.v1` e `transport.object_to_cell.v1` alla semantica `MoveTo` multi-tick. Il movimento ordinario dei Job passa da `MoveToRunningActionDriver`, attraversa route conosciute cella per cella, usa route dichiarate da belief food senza rifare query decisionali, e fallisce quando non esiste route lecita. Il movimento debug umano da mappa viene instradato come job tecnico `generic.move_to_cell.v1` con label dev esplicita e puo' usare route fisica/greedy solo perche' rappresenta un comando dell'operatore, non conoscenza NPC.
 
 > **Nota audit v0.16b (2026-06-01):** il checkpoint `v0.16b` ha prodotto la fotografia dei gap cognitivi residui dopo `v0.15` e `v0.16a`. Il sistema possiede gia' `BeliefStore`, decay configurabile, stati `Active/Weak/Stale/Discarded`, query soggettiva e invalidazione locale del cibo visto come mancante. Restano da chiudere: route belief-only `EatKnownFood` senza object id fisico, memoria da eventi needs, policy esplicita per credenze stale, query multi-candidato futura e riduzione della recovery `FindEquivalentTarget` che oggi legge ancora World. Dettaglio: `v0.16b_Cognition_Gap_Audit_Report.md`.
+
+> **Nota closeout v0.16j (2026-06-01):** la fase `v0.16` e' chiusa come Cognizione Soggettiva Avanzata iniziale. Ha stabilizzato lifecycle food belief, stato `Stale/Discarded`, invalidazione locale del cibo mancante, memoria da eventi needs, comunicazione soggettiva minima, uso di belief incerte ma non obsolete, QA anti-onniscienza e primo SearchFood esplorativo via MoveTo. Restano rinviati a `v0.17+`: query multi-candidato per alternative food, recovery `FindEquivalentTarget` senza nuove query interne, SearchFood esplorativo ricco a settori/copertura e riprogettazione completa del pannello EL pathfinding. Dettaglio: `v0.16j_Closeout_Report.md`.
 ---
 
 #### v0.17 - Conseguenze Sociali Emergenti
