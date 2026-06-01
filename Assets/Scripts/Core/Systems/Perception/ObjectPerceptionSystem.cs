@@ -74,6 +74,8 @@ namespace Arcontio.Core
             _npcIds.Clear();
             _npcIds.AddRange(world.NpcDna.Keys);
 
+            RebuildGroundObjectCandidates(world);
+
             int spotted = 0;
             int maxCandidateCellsPerNpc = world.Global.ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
             int maxObjectsPerNpc = world.Global.ObjectPerceptionMaxObjectsPerNpcPerTick;
@@ -150,6 +152,7 @@ namespace Arcontio.Core
                 if (!ProcessVisibleObjectsBySpatialIndex(
                     world,
                     bus,
+                    _objIds,
                     npcId,
                     np,
                     facing,
@@ -275,6 +278,7 @@ namespace Arcontio.Core
         private static bool ProcessVisibleObjectsBySpatialIndex(
             World world,
             MessageBus bus,
+            List<int> objectIds,
             int npcId,
             GridPosition np,
             CardinalDirection facing,
@@ -295,79 +299,71 @@ namespace Arcontio.Core
             int npcSpotted = 0;
             int objectsProcessed = 0;
 
-            int minX = np.X - visionRange;
-            int maxX = np.X + visionRange;
-            int minY = np.Y - visionRange;
-            int maxY = np.Y + visionRange;
-
-            for (int y = minY; y <= maxY; y++)
+            for (int i = 0; i < objectIds.Count; i++)
             {
-                for (int x = minX; x <= maxX; x++)
+                int objId = objectIds[i];
+                if (!world.Objects.TryGetValue(objId, out var obj) || obj == null || obj.IsHeld)
+                    continue;
+
+                if (!world.InBounds(obj.CellX, obj.CellY))
+                    continue;
+
+                if (maxCandidateCellsPerNpc > 0 && npcCandidateCells >= maxCandidateCellsPerNpc)
+                    goto Done;
+
+                npcCandidateCells++;
+                if (costSample)
+                    costCandidateCells++;
+
+                int dist = FovUtils.Manhattan(np.X, np.Y, obj.CellX, obj.CellY);
+                if (dist > visionRange)
+                    continue;
+
+                if (dist > 0)
                 {
-                    if (!world.InBounds(x, y))
-                        continue;
-
-                    int dist = FovUtils.Manhattan(np.X, np.Y, x, y);
-                    if (dist > visionRange)
-                        continue;
-
-                    if (dist > 0)
+                    if (useCone)
                     {
-                        if (useCone)
-                        {
-                            if (!FovUtils.IsInCone(np.X, np.Y, facing, x, y, coneSlope))
-                                continue;
-                        }
-                        else if (!FovUtils.IsInFront(np.X, np.Y, facing, x, y))
-                        {
+                        if (!IsPotentiallyInFacingHalfPlane(np.X, np.Y, facing, obj.CellX, obj.CellY))
                             continue;
-                        }
+
+                        if (!FovUtils.IsInCone(np.X, np.Y, facing, obj.CellX, obj.CellY, coneSlope))
+                            continue;
                     }
-
-                    if (maxCandidateCellsPerNpc > 0 && npcCandidateCells >= maxCandidateCellsPerNpc)
-                        goto Done;
-
-                    npcCandidateCells++;
-                    if (costSample)
-                        costCandidateCells++;
-
-                    int objId = world.GetObjectAt(x, y);
-                    if (objId < 0)
+                    else if (!FovUtils.IsInFront(np.X, np.Y, facing, obj.CellX, obj.CellY))
+                    {
                         continue;
-
-                    if (maxObjectsPerNpc > 0 && objectsProcessed >= maxObjectsPerNpc)
-                        goto Done;
-
-                    objectsProcessed++;
-                    if (costSample)
-                        costObjectChecks++;
-                    if (costPerNpc)
-                        npcObjectChecks++;
-
-                    if (!world.Objects.TryGetValue(objId, out var obj) || obj == null)
-                        continue;
-
-                    if (!world.TryGetObjectDef(obj.DefId, out var def) || def == null)
-                        continue;
-
-                    if (!def.IsInteractable)
-                        continue;
-
-                    if (dist > 0 && !world.HasLineOfSight(np.X, np.Y, obj.CellX, obj.CellY))
-                        continue;
-
-                    float q = FovUtils.ObservationQuality(dist, visionRange);
-                    bus.Publish(new ObjectSpottedEvent(
-                        observerNpcId: npcId,
-                        objectId: objId,
-                        defId: obj.DefId,
-                        cellX: obj.CellX,
-                        cellY: obj.CellY,
-                        witnessQuality01: q));
-
-                    spotted++;
-                    npcSpotted++;
+                    }
                 }
+
+                if (maxObjectsPerNpc > 0 && objectsProcessed >= maxObjectsPerNpc)
+                    goto Done;
+
+                objectsProcessed++;
+                if (costSample)
+                    costObjectChecks++;
+                if (costPerNpc)
+                    npcObjectChecks++;
+
+                if (!world.TryGetObjectDef(obj.DefId, out var def) || def == null)
+                    continue;
+
+                if (!def.IsInteractable)
+                    continue;
+
+                if (dist > 0 && !world.HasLineOfSight(np.X, np.Y, obj.CellX, obj.CellY))
+                    continue;
+
+                float q = FovUtils.ObservationQuality(dist, visionRange);
+                bus.Publish(new ObjectSpottedEvent(
+                    observerNpcId: npcId,
+                    objectId: objId,
+                    defId: obj.DefId,
+                    cellX: obj.CellX,
+                    cellY: obj.CellY,
+                    witnessQuality01: q));
+
+                spotted++;
+                npcSpotted++;
             }
 
         Done:
@@ -375,6 +371,75 @@ namespace Arcontio.Core
                 costObserver.AddNpcWork(npcId, npcCandidateCells + npcObjectChecks + npcSpotted);
 
             return true;
+        }
+
+        // =============================================================================
+        // RebuildGroundObjectCandidates
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce la lista temporanea degli oggetti presenti fisicamente sulla
+        /// griglia e quindi candidabili alla percezione visiva.
+        /// </para>
+        ///
+        /// <para><b>Indice occupato, non scansione celle vuote</b></para>
+        /// <para>
+        /// Il sistema precedente attraversava le celle del campo visivo e chiedeva al
+        /// World se contenessero un oggetto. Qui invece partiamo dagli oggetti a terra
+        /// e poi applichiamo range, orientamento, cono e linea di vista. La verita'
+        /// resta nel World: questa lista viene svuotata e ricostruita ogni tick.
+        /// </para>
+        /// </summary>
+        private void RebuildGroundObjectCandidates(World world)
+        {
+            _objIds.Clear();
+
+            foreach (var pair in world.Objects)
+            {
+                var obj = pair.Value;
+                if (obj == null || obj.IsHeld)
+                    continue;
+
+                if (!world.InBounds(obj.CellX, obj.CellY))
+                    continue;
+
+                _objIds.Add(pair.Key);
+            }
+        }
+
+        // =============================================================================
+        // IsPotentiallyInFacingHalfPlane
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un filtro direzionale economico prima del cono geometrico completo.
+        /// </para>
+        ///
+        /// <para><b>Filtro conservativo</b></para>
+        /// <para>
+        /// Il metodo elimina solo target certamente dietro l'NPC. Non sostituisce
+        /// <c>FovUtils.IsInCone</c>: serve a evitare lavoro inutile quando la direzione
+        /// basta gia' a escludere l'oggetto.
+        /// </para>
+        /// </summary>
+        private static bool IsPotentiallyInFacingHalfPlane(
+            int originX,
+            int originY,
+            CardinalDirection facing,
+            int targetX,
+            int targetY)
+        {
+            if (originX == targetX && originY == targetY)
+                return true;
+
+            switch (facing)
+            {
+                case CardinalDirection.North: return targetY > originY;
+                case CardinalDirection.South: return targetY < originY;
+                case CardinalDirection.East:  return targetX > originX;
+                case CardinalDirection.West:  return targetX < originX;
+                default:                      return false;
+            }
         }
 
         // =============================================================================
