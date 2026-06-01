@@ -553,50 +553,62 @@ namespace Arcontio.Core
                 tickScale = 1f;
 
             int removed = 0;
-            float freshnessMultiplier = config.freshnessDecayMultiplier > 0f ? config.freshnessDecayMultiplier : 2f;
 
             for (int i = _entries.Count - 1; i >= 0; i--)
             {
-                var entry = _entries[i];
-                if (entry.Status == BeliefStatus.Discarded)
-                {
-                    _entries.RemoveAt(i);
-                    MarkCategoryIndexDirty();
-                    removed++;
+                removed += TryDecayEntryAt(i, config, tickScale, out int entryUpdated, out int entryWeak, out int entryStale);
+                updated += entryUpdated;
+                weak += entryWeak;
+                stale += entryStale;
+            }
+
+            return removed;
+        }
+
+        // =============================================================================
+        // TickDecayCategory
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica decadimento solo alle credenze della categoria indicata.
+        /// </para>
+        ///
+        /// <para><b>Decadimento discreto per categoria</b></para>
+        /// <para>
+        /// Questo metodo serve al sistema runtime per distribuire il costo del decay
+        /// su intervalli configurabili. La mutazione della singola entry resta la
+        /// stessa di <c>TickDecay</c>; cambia soltanto il sottoinsieme di categorie
+        /// visitate in un dato tick.
+        /// </para>
+        /// </summary>
+        public int TickDecayCategory(
+            BeliefCategory category,
+            BeliefDecayConfig config,
+            float tickScale,
+            out int updated,
+            out int weak,
+            out int stale)
+        {
+            updated = 0;
+            weak = 0;
+            stale = 0;
+
+            if (_entries.Count == 0)
+                return 0;
+
+            if (tickScale <= 0f)
+                tickScale = 1f;
+
+            int removed = 0;
+            for (int i = _entries.Count - 1; i >= 0; i--)
+            {
+                if (_entries[i].Category != category)
                     continue;
-                }
 
-                float confidenceDecay = config.GetConfidenceDecayFor(entry.Category) * tickScale;
-                float freshnessDecay = confidenceDecay * freshnessMultiplier;
-
-                entry.Confidence = Clamp01(entry.Confidence - confidenceDecay);
-                entry.Freshness = Clamp01(entry.Freshness - freshnessDecay);
-                updated++;
-
-                if (entry.Confidence <= config.removeConfidenceThreshold)
-                {
-                    _entries.RemoveAt(i);
-                    MarkCategoryIndexDirty();
-                    removed++;
-                    continue;
-                }
-
-                if (entry.Freshness <= config.staleFreshnessThreshold)
-                {
-                    entry.Status = BeliefStatus.Stale;
-                    stale++;
-                }
-                else if (entry.Confidence <= config.weakConfidenceThreshold)
-                {
-                    entry.Status = BeliefStatus.Weak;
-                    weak++;
-                }
-                else if (entry.Status != BeliefStatus.Conflicted)
-                {
-                    entry.Status = BeliefStatus.Active;
-                }
-
-                _entries[i] = entry;
+                removed += TryDecayEntryAt(i, config, tickScale, out int entryUpdated, out int entryWeak, out int entryStale);
+                updated += entryUpdated;
+                weak += entryWeak;
+                stale += entryStale;
             }
 
             return removed;
@@ -710,6 +722,68 @@ namespace Arcontio.Core
             }
 
             _categoryIndexDirty = false;
+        }
+
+        // =============================================================================
+        // TryDecayEntryAt
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica la mutazione di decay a una singola entry dello store.
+        /// </para>
+        /// </summary>
+        private int TryDecayEntryAt(
+            int index,
+            BeliefDecayConfig config,
+            float tickScale,
+            out int updated,
+            out int weak,
+            out int stale)
+        {
+            updated = 0;
+            weak = 0;
+            stale = 0;
+
+            var entry = _entries[index];
+            if (entry.Status == BeliefStatus.Discarded)
+            {
+                _entries.RemoveAt(index);
+                MarkCategoryIndexDirty();
+                return 1;
+            }
+
+            float freshnessMultiplier = config.freshnessDecayMultiplier > 0f ? config.freshnessDecayMultiplier : 2f;
+            float confidenceDecay = config.GetConfidenceDecayFor(entry.Category) * tickScale;
+            float freshnessDecay = confidenceDecay * freshnessMultiplier;
+
+            entry.Confidence = Clamp01(entry.Confidence - confidenceDecay);
+            entry.Freshness = Clamp01(entry.Freshness - freshnessDecay);
+            updated = 1;
+
+            if (entry.Confidence <= config.removeConfidenceThreshold)
+            {
+                _entries.RemoveAt(index);
+                MarkCategoryIndexDirty();
+                return 1;
+            }
+
+            if (entry.Freshness <= config.staleFreshnessThreshold)
+            {
+                entry.Status = BeliefStatus.Stale;
+                stale = 1;
+            }
+            else if (entry.Confidence <= config.weakConfidenceThreshold)
+            {
+                entry.Status = BeliefStatus.Weak;
+                weak = 1;
+            }
+            else if (entry.Status != BeliefStatus.Conflicted)
+            {
+                entry.Status = BeliefStatus.Active;
+            }
+
+            _entries[index] = entry;
+            return 0;
         }
 
         // =============================================================================
