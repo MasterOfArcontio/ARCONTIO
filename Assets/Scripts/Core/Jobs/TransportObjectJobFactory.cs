@@ -16,7 +16,9 @@ namespace Arcontio.Core
     /// NPC, oggetto, cella origine oggetto e cella destinazione gia' risolti dalla UI
     /// debug, poi materializza il template JSON <c>transport.object_to_cell.v1</c>.
     /// L'esecuzione successiva resta nel <c>JobExecutionSystem</c>, che produce
-    /// commands invece di mutare direttamente il mondo.
+    /// commands invece di mutare direttamente il mondo. Le route tecniche necessarie
+    /// al movimento multi-tick vengono ammesse solo come eccezione dev dichiarata
+    /// dal debug label <c>DevToolsForcedTransportObject</c>.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>

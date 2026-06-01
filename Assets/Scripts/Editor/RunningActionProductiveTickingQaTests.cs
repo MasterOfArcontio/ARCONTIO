@@ -54,6 +54,7 @@ namespace Arcontio.Tests
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToWritesLifecycleExplainabilityForEachCell();
+                new RunningActionProductiveTickingQaTests().DevTransportTemplatePreparesDeclaredRoutesWithoutMoveIntentFallback();
 
                 Debug.Log("[RunningActionProductiveTickingQaTests] PASS targeted traversal tests");
                 UnityEditor.EditorApplication.Exit(0);
@@ -960,6 +961,71 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
         }
 
+        // =============================================================================
+        // DevTransportTemplatePreparesDeclaredRoutesWithoutMoveIntentFallback
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica l'eccezione dev autorizzata per <c>transport.object_to_cell.v1</c>:
+        /// il template puo' preparare route tecniche dichiarate per entrambe le tratte
+        /// del trasporto senza ricadere in <c>SetMoveIntentCommand</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dev tool dichiarato, non planner runtime</b></para>
+        /// <para>
+        /// Il test usa il debug label <c>DevToolsForcedTransportObject</c>, cioe' lo
+        /// stesso canale usato dal pannello F3. Il Job runtime resta rigoroso per i
+        /// job ordinari: questa route tecnica esiste solo per il trasporto forzato
+        /// dall'operatore e serve a validare che il template a piu' fasi consumi il
+        /// nuovo movimento multi-tick anche nella seconda tratta, dopo il pickup.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DevTransportTemplatePreparesDeclaredRoutesWithoutMoveIntentFallback()
+        {
+            // Arrange: NPC a (1,1), oggetto a (3,1), destinazione a (5,1). Nessuna
+            // route viene precaricata dal test: se il gancio dev non prepara le
+            // tratte dichiarate, il Job fallira' o ricadra' nel vecchio command.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 1);
+            world.ObjectDefs["qa_crate"] = new ObjectDef
+            {
+                Id = "qa_crate",
+                DisplayName = "QA Crate",
+                IsInteractable = true,
+                BlocksMovement = false,
+                BlocksVision = false
+            };
+            int objectId = world.CreateObject("qa_crate", 3, 1);
+            var destination = new Vector2Int(5, 1);
+            var job = MakeDevTransportJob(npcId, objectId, new Vector2Int(3, 1), destination);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+
+            var system = new JobExecutionSystem();
+            var bus = new MessageBus();
+
+            // Act: avanziamo abbastanza tick da completare due tratte di due celle,
+            // pickup e drop. Dopo ogni tick svuotiamo il command buffer, come farebbe
+            // SimulationHost nel pump ordinario.
+            for (int tick = 0; tick < 8 && world.JobRuntimeState.HasActiveJob(npcId); tick++)
+            {
+                system.Update(world, new Tick(tick, 1f), bus, new Telemetry());
+                FlushJobCommandBuffer(world, bus);
+            }
+
+            // Assert: il job ha usato il template di trasporto come sequenza reale e
+            // non ha prodotto alcun MoveIntent legacy.
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Completed));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent) && intent.Active, Is.False);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(destination.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(destination.y));
+            Assert.That(world.Objects[objectId].IsHeld, Is.False);
+            Assert.That(world.Objects[objectId].CellX, Is.EqualTo(destination.x));
+            Assert.That(world.Objects[objectId].CellY, Is.EqualTo(destination.y));
+        }
+
         private static World MakeWorldWithNpc(out int npcId)
         {
             return MakeWorldWithNpc(new SimulationParams(), out npcId);
@@ -1070,6 +1136,79 @@ namespace Arcontio.Tests
                 isInterruptible: true,
                 actions: new[] { JobAction.MoveTo("move", targetCell, "QA move") });
             return new Job(jobId, request, new JobPlan("plan-" + jobId, new[] { phase }));
+        }
+
+        private static Job MakeDevTransportJob(int npcId, int objectId, Vector2Int objectCell, Vector2Int destinationCell)
+        {
+            var request = new JobRequest(
+                "req-dev-transport",
+                npcId,
+                DecisionIntentKind.ExploreArea,
+                JobPriorityClass.Emergency,
+                urgency01: 1f,
+                createdTick: 0,
+                hasTargetCell: true,
+                targetCell: objectCell,
+                targetObjectId: objectId,
+                beliefKey: string.Empty,
+                debugLabel: "DevToolsForcedTransportObject",
+                hasSecondaryTargetCell: true,
+                secondaryTargetCell: destinationCell);
+
+            var phases = new[]
+            {
+                new JobPhase(
+                    "reach_object",
+                    JobPhaseKind.ReachTarget,
+                    "Reach object",
+                    expectedStepCount: 1,
+                    isInterruptible: true,
+                    actions: new[]
+                    {
+                        new JobAction("move_to_object", JobActionKind.MoveToCell, "move_to_object", true, objectCell, objectId, 0, string.Empty)
+                    }),
+                new JobPhase(
+                    "pickup_object",
+                    JobPhaseKind.Execute,
+                    "Pick up object",
+                    expectedStepCount: 1,
+                    isInterruptible: false,
+                    actions: new[]
+                    {
+                        new JobAction("pickup_object", JobActionKind.PickUp, "pickup_object", true, objectCell, objectId, 0, string.Empty)
+                    }),
+                new JobPhase(
+                    "reach_destination",
+                    JobPhaseKind.ReachTarget,
+                    "Reach destination",
+                    expectedStepCount: 1,
+                    isInterruptible: true,
+                    actions: new[]
+                    {
+                        new JobAction("move_to_destination", JobActionKind.MoveToCell, "move_to_destination", true, destinationCell, 0, 0, string.Empty)
+                    }),
+                new JobPhase(
+                    "drop_object",
+                    JobPhaseKind.Cleanup,
+                    "Drop object",
+                    expectedStepCount: 1,
+                    isInterruptible: false,
+                    actions: new[]
+                    {
+                        new JobAction("drop_object", JobActionKind.Drop, "drop_object", true, destinationCell, objectId, 0, string.Empty)
+                    })
+            };
+
+            return new Job("job-dev-transport", request, new JobPlan(JobTemplateRegistry.TransportObjectToCellTemplateId, phases));
+        }
+
+        private static void FlushJobCommandBuffer(World world, MessageBus bus)
+        {
+            var snapshot = world.JobRuntimeState.CommandBuffer.Snapshot();
+            for (int i = 0; i < snapshot.Length; i++)
+                snapshot[i].Execute(world, bus);
+
+            world.JobRuntimeState.CommandBuffer.Clear();
         }
     }
 }

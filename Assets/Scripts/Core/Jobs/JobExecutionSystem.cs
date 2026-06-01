@@ -761,6 +761,13 @@ namespace Arcontio.Core
                     explainabilityRegistry);
             }
 
+            TryPrepareDeclaredDevTransportRoute(
+                world,
+                npcId,
+                job,
+                action,
+                npcCell);
+
             if (TryResolveKnownMoveToRouteStep(world, npcId, npcCell, action.TargetCell, out var nextKnownRouteCell, out var knownRouteFailure))
             {
                 return ExecuteKnownRouteMoveToStep(
@@ -819,6 +826,76 @@ namespace Arcontio.Core
             }
 
             return StepResult.Running(alreadyMovingToTarget ? "MoveAlreadyRequested" : "MoveCommandEnqueued");
+        }
+
+        // =============================================================================
+        // TryPrepareDeclaredDevTransportRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara una route tecnica solo per il job debug
+        /// <c>transport.object_to_cell.v1</c>, quando il runtime multi-tick del Job e'
+        /// acceso e lo step corrente non e' adiacente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: eccezione dev dichiarata, non planner del Job</b></para>
+        /// <para>
+        /// Il percorso ordinario del simulatore non deve creare route di nascosto
+        /// dentro il Job runtime: se una decisione reale non ha preparato una route
+        /// lecita, <c>MoveToCell</c> deve fallire e lasciare spazio alla matrice di
+        /// recupero. Il trasporto forzato del pannello dev e' diverso: l'utente ha
+        /// scelto manualmente NPC, oggetto e destinazione, quindi possiamo costruire
+        /// una route tecnica dichiarata per testare il template senza riattivare
+        /// <c>SetMoveIntentCommand</c>. La guardia su template e debug label impedisce
+        /// che questa eccezione diventi un secondo planner runtime.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate config</b>: agisce solo se il movimento Job multi-tick e' acceso.</item>
+        ///   <item><b>Gate template</b>: agisce solo su <c>transport.object_to_cell.v1</c>.</item>
+        ///   <item><b>Gate debug</b>: richiede <c>DevToolsForcedTransportObject</c>.</item>
+        ///   <item><b>Route tecnica</b>: usa il path diretto gia' esposto dal World e lo registra come direct path consumabile.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryPrepareDeclaredDevTransportRoute(
+            World world,
+            int npcId,
+            Job job,
+            JobAction action,
+            GridPosition npcCell)
+        {
+            if (!CanUseJobMovementRuntime(world))
+                return false;
+
+            if (world == null || job == null || !action.HasTargetCell)
+                return false;
+
+            if (!string.Equals(job.Plan?.PlanId, JobTemplateRegistry.TransportObjectToCellTemplateId, System.StringComparison.Ordinal))
+                return false;
+
+            if (!string.Equals(job.Request.DebugLabel, "DevToolsForcedTransportObject", System.StringComparison.Ordinal))
+                return false;
+
+            if (world.Pathfinding != null
+                && world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var existing)
+                && existing != null
+                && existing.Active
+                && existing.FinalTargetCellX == action.TargetCell.x
+                && existing.FinalTargetCellY == action.TargetCell.y)
+            {
+                return true;
+            }
+
+            var route = new List<Vector2Int>(32);
+            if (!MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, npcCell.X, npcCell.Y, action.TargetCell.x, action.TargetCell.y, route)
+                || route.Count < 2)
+            {
+                return false;
+            }
+
+            world.SetDebugDirectPathForNpc(npcId, route);
+            return true;
         }
 
         // =============================================================================
