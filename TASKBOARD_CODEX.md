@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ACTIVE: v0.16 - Cognizione Soggettiva Avanzata
 
 CHECKPOINT CORRENTE:
-v0.16b - Audit cognition gap post-v0.15
+v0.16c - Lifecycle credenze e obsolescenza cibo/oggetti
 
 STATUS:
-READY / AUDIT
+READY / PATCH
 
 OUTPUT ATTESO:
-fotografia dei gap cognitivi residui dopo la chiusura del movimento multi-tick e dell'allineamento template v0.16a
+correzione dei gap belief lifecycle emersi dall'audit v0.16b, con priorita' al caso EatKnownFood belief-only e alla gestione esplicita di credenze stale/discarded
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.15`;
@@ -84,7 +84,7 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.16b - Audit cognition gap post-v0.15`
+`v0.16c - Lifecycle credenze e obsolescenza cibo/oggetti`
 
 Residual follow-ups / future hardening:
 
@@ -133,7 +133,7 @@ Checkpoint v0.15 pianificati:
 Checkpoint v0.16 pianificati:
 
 - `v0.16a`: allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick - DONE;
-- `v0.16b`: audit cognition gap post-v0.15;
+- `v0.16b`: audit cognition gap post-v0.15 - DONE;
 - `v0.16c`: lifecycle credenze e obsolescenza cibo/oggetti;
 - `v0.16d`: memoria da eventi needs;
 - `v0.16e`: verifica locale credenze;

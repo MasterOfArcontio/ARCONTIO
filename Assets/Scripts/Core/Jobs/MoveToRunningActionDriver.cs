@@ -190,11 +190,14 @@ namespace Arcontio.Core
 
         private static bool CanUseDeclaredBeliefTargetRoute(Job job)
         {
+            // EatKnownFood puo' nascere da una credenza soggettiva pura: in quel caso
+            // il Decision Layer conosce una cella stimata ma non possiede ancora un
+            // object id fisico valido. Il movimento deve comunque raggiungere la cella
+            // dichiarata; sara' poi lo step Consume a confermare o smentire il belief.
             return job != null
                 && job.Request.IntentKind == DecisionIntentKind.EatKnownFood
                 && string.Equals(job.Plan?.PlanId, JobTemplateRegistry.FoodKnownCommunityStockTemplateId, System.StringComparison.Ordinal)
-                && job.Request.HasTargetCell
-                && job.Request.TargetObjectId > 0;
+                && job.Request.HasTargetCell;
         }
 
         private static bool TryPrepareDirectRouteToFinalTarget(

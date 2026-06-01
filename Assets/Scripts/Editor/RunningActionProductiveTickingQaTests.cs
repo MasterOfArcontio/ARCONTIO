@@ -53,6 +53,7 @@ namespace Arcontio.Tests
                 new RunningActionProductiveTickingQaTests().DeclaredTargetOutsideCurrentFacingWithoutKnownRouteFails();
                 new RunningActionProductiveTickingQaTests().EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().EatKnownFoodBeliefTargetOutsideCurrentFacingStillPreparesRoute();
+                new RunningActionProductiveTickingQaTests().EatKnownFoodBeliefOnlyTargetPreparesRouteWithoutObjectId();
                 new RunningActionProductiveTickingQaTests().EatKnownFoodBeliefTargetBehindObstacleUsesBoundedRoute();
                 new RunningActionProductiveTickingQaTests().DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
@@ -469,6 +470,46 @@ namespace Arcontio.Tests
             world.NpcFacing[npcId] = CardinalDirection.East;
             int foodId = RegisterCommunityFoodStock(world, objectId: 8102, x: startCell.X, y: startCell.Y + 2, units: 3);
             var job = MakeFoodJob(npcId, foodId, new Vector2Int(startCell.X, startCell.Y + 2));
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Running));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+        }
+
+        // =============================================================================
+        // EatKnownFoodBeliefOnlyTargetPreparesRouteWithoutObjectId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il caso cognitivo puro: <c>EatKnownFood</c> nasce da una belief
+        /// che indica solo una cella stimata, senza object id fisico risolto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: credenza prima della verifica oggettiva</b></para>
+        /// <para>
+        /// Il Job non deve cercare un altro cibo e non deve pretendere che lo stock
+        /// esista gia' nel mondo oggettivo. Deve solo muovere l'NPC verso la cella
+        /// dichiarata dalla decisione; se al consumo il cibo non c'e', il fallimento
+        /// operativo produrra' la smentita cognitiva del belief.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void EatKnownFoodBeliefOnlyTargetPreparesRouteWithoutObjectId()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            var startCell = world.GridPos[npcId];
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            var believedFoodCell = new Vector2Int(startCell.X, startCell.Y + 2);
+            var job = MakeFoodJob(npcId, foodObjectId: 0, believedFoodCell);
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
             var system = new JobExecutionSystem();
 

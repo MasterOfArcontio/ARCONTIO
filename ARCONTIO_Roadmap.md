@@ -997,7 +997,7 @@ Questa fase deve lavorare su:
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.16a | Allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick | ✅ |
-| v0.16b | Audit cognition gap post-v0.15 | ⏳ |
+| v0.16b | Audit cognition gap post-v0.15 | ✅ |
 | v0.16c | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
 | v0.16d | Memory encoding da world events needs | ⏳ |
 | v0.16e | Verifica locale credenze obsolete | ⏳ |
@@ -1008,6 +1008,8 @@ Questa fase deve lavorare su:
 
 
 > **Nota closeout v0.16a (2026-06-01):** il checkpoint `v0.16a` ha allineato `generic.move_to_cell.v1` e `transport.object_to_cell.v1` alla semantica `MoveTo` multi-tick. Il movimento ordinario dei Job passa da `MoveToRunningActionDriver`, attraversa route conosciute cella per cella, usa route dichiarate da belief food senza rifare query decisionali, e fallisce quando non esiste route lecita. Il movimento debug umano da mappa viene instradato come job tecnico `generic.move_to_cell.v1` con label dev esplicita e puo' usare route fisica/greedy solo perche' rappresenta un comando dell'operatore, non conoscenza NPC.
+
+> **Nota audit v0.16b (2026-06-01):** il checkpoint `v0.16b` ha prodotto la fotografia dei gap cognitivi residui dopo `v0.15` e `v0.16a`. Il sistema possiede gia' `BeliefStore`, decay configurabile, stati `Active/Weak/Stale/Discarded`, query soggettiva e invalidazione locale del cibo visto come mancante. Restano da chiudere: route belief-only `EatKnownFood` senza object id fisico, memoria da eventi needs, policy esplicita per credenze stale, query multi-candidato futura e riduzione della recovery `FindEquivalentTarget` che oggi legge ancora World. Dettaglio: `v0.16b_Cognition_Gap_Audit_Report.md`.
 ---
 
 #### v0.17 - Conseguenze Sociali Emergenti
