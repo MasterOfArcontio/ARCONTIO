@@ -132,10 +132,12 @@ namespace Arcontio.Core
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Prepara il tragitto posseduto da MoveTo: prima prova il direct path
-        /// percettivo verso il target finale; se non basta, avvia o consuma la
-        /// macro-route landmark e costruisce un segmento immediato verso il prossimo
-        /// waypoint.
+        /// Prepara il tragitto posseduto da MoveTo. Per gli incarichi normali prova
+        /// prima il tratto diretto percettivo verso il target finale e poi consuma la
+        /// macro-route landmark. Per EatKnownFood nato da belief soggettiva, invece,
+        /// prova prima la macro-route: il cibo ricordato puo' non essere fisicamente
+        /// visibile e non deve trasformarsi in un movimento onnisciente verso la cella
+        /// finale.
         /// </para>
         /// </summary>
         private static void PrepareMoveToRoute(World world, int npcId, Job job, JobAction action, GridPosition npcCell)
@@ -143,18 +145,31 @@ namespace Arcontio.Core
             if (!CanUseJobMovementRuntime(world) || world == null || !action.HasTargetCell)
                 return;
 
+            bool canUseDeclaredBeliefTargetRoute = CanUseDeclaredBeliefTargetRoute(job);
+
             if (HasUsableDirectRoute(world, npcId, action.TargetCell))
                 return;
 
-            bool requireCurrentAcquisition = !CanUseDeclaredBeliefTargetRoute(job);
-            if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition))
-                return;
-
-            if (CanUseDeclaredBeliefTargetRoute(job)
-                && TryPrepareDeclaredBeliefTargetRoute(world, npcId, action, npcCell))
+            if (canUseDeclaredBeliefTargetRoute)
             {
+                // EatKnownFood segue la stessa gerarchia concettuale del vecchio
+                // movimento intenzionale: prima prova una rotta conosciuta tramite
+                // macro-route/landmark; solo se questa non produce un segmento utile
+                // usa una rotta locale verso la cella dichiarata dalla credenza. La
+                // rotta locale non invalida il target: l'invalidazione resta affidata
+                // alla percezione della cella attesa, quando la cella entra in vista.
+                if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
+                    world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
+
+                if (TryPrepareMacroImmediateSegment(world, npcId, action.TargetCell, npcCell))
+                    return;
+
+                TryPrepareDeclaredBeliefTargetRoute(world, npcId, action, npcCell);
                 return;
             }
+
+            if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition: true))
+                return;
 
             if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
                 world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
