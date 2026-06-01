@@ -99,6 +99,7 @@ namespace Arcontio.Core
                 beliefQueryConfig: world.Global.BeliefQuery,
                 explainabilityConfig: world.Config?.Sim?.memory_belief_decision_explainability,
                 explainabilityRegistry: world.MemoryBeliefDecisionExplainability,
+                runtimeCostObserver: world.RuntimeCostObserver,
                 scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
                 normContext: new DecisionNormContext(false, 1f, true));
 

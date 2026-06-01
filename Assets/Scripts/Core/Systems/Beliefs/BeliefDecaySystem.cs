@@ -58,6 +58,10 @@ namespace Arcontio.Core
             if (world == null || world.Beliefs == null || world.Beliefs.Count == 0)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+
             _npcIds.Clear();
             _npcIds.AddRange(world.Beliefs.Keys);
 
@@ -85,6 +89,13 @@ namespace Arcontio.Core
             telemetry.Counter("BeliefDecaySystem.EntriesWeak", weakTotal);
             telemetry.Counter("BeliefDecaySystem.EntriesStale", staleTotal);
             telemetry.Counter("BeliefDecaySystem.EntriesRemoved", removedTotal);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.BeliefDecayStores, _npcIds.Count);
+                costObserver.AddCounter(RuntimeCostCounter.BeliefDecayEntriesUpdated, updatedTotal);
+                costObserver.EndSample(RuntimeCostChannel.BeliefDecay, costStart);
+            }
         }
     }
 }

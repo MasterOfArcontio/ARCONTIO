@@ -47,6 +47,11 @@ namespace Arcontio.Core
             if (world.NpcDna.Count == 0)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costPairChecks = 0;
+
             int visionRange = world.Global.NpcVisionRangeCells;
             if (visionRange <= 0) visionRange = 6;
 
@@ -79,6 +84,9 @@ namespace Arcontio.Core
                     int targetId = _npcIds[j];
                     if (targetId == observerId)
                         continue;
+
+                    if (costSample)
+                        costPairChecks++;
 
                     if (!world.GridPos.TryGetValue(targetId, out var tp))
                         continue;
@@ -124,6 +132,13 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("NpcPerceptionSystem.NpcSpottedEvents", spotted);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.NpcPerceptionPairChecks, costPairChecks);
+                costObserver.AddCounter(RuntimeCostCounter.NpcPerceptionSpottedEvents, spotted);
+                costObserver.EndSample(RuntimeCostChannel.NpcPerception, costStart);
+            }
         }
 
         // Patch 0.02.5A: IsInCone rimosso — usa FovUtils.IsInCone

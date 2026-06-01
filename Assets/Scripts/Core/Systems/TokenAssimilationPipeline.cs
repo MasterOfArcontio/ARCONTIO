@@ -49,6 +49,11 @@ namespace Arcontio.Core
             if (tokenBuffer.Count == 0)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costTokenCount = tokenBuffer.Count;
+
             int tracesAdded = 0;
 
             // 2) Per ogni envelope, applichiamo 1 regola (prima compatibile)
@@ -146,6 +151,13 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("TokenAssimilation.TracesAdded", tracesAdded);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.TokenAssimilationTokens, costTokenCount);
+                costObserver.AddCounter(RuntimeCostCounter.TokenAssimilationTracesAdded, tracesAdded);
+                costObserver.EndSample(RuntimeCostChannel.TokenAssimilation, costStart);
+            }
         }
 
     }

@@ -46,6 +46,11 @@ namespace Arcontio.Core
         /// </summary>
         public void Emit(World world, Tick tick, TokenBus tokenBus, Telemetry telemetry)
         {
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costPairChecks = 0;
+
             // Parametri da World (configurabili)
             int maxPerEncounter = world.Global.MaxTokensPerEncounter;
             if (maxPerEncounter <= 0) maxPerEncounter = 1;
@@ -77,6 +82,9 @@ namespace Arcontio.Core
 
                 for (int j = i + 1; j < _npcIds.Count; j++)
                 {
+                    if (costSample)
+                        costPairChecks++;
+
                     int b = _npcIds[j];
                     if (!world.GridPos.TryGetValue(b, out var pb)) continue;
 
@@ -100,6 +108,13 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("TokenEmissionPipeline.EnvelopesEmitted", envelopesEmitted);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.TokenEmissionPairChecks, costPairChecks);
+                costObserver.AddCounter(RuntimeCostCounter.TokenEmissionTokensCreated, envelopesEmitted);
+                costObserver.EndSample(RuntimeCostChannel.TokenEmission, costStart);
+            }
         }
 
         private int EmitForPair(

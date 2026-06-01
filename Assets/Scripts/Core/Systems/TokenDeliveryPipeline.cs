@@ -19,6 +19,11 @@ namespace Arcontio.Core
             tokenBusOut.DrainTo(_outBuffer);
             if (_outBuffer.Count == 0) return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costTokenCount = _outBuffer.Count;
+
             int maxRange = world.Global.TokenDeliveryMaxRangeCells;
             if (maxRange <= 0) maxRange = 1;
 
@@ -147,6 +152,13 @@ namespace Arcontio.Core
             telemetry.Counter("TokenDelivery.DroppedRange", droppedRange);
             telemetry.Counter("TokenDelivery.DroppedLOS", droppedLos);
             telemetry.Counter("TokenDelivery.DroppedTooWeak", droppedTooWeak);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.TokenDeliveryTokens, costTokenCount);
+                costObserver.AddCounter(RuntimeCostCounter.TokenDeliveryDelivered, delivered);
+                costObserver.EndSample(RuntimeCostChannel.TokenDelivery, costStart);
+            }
         }
 
         /// <summary>

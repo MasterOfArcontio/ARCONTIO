@@ -50,6 +50,13 @@ namespace Arcontio.Core
             if (world.NpcDna.Count == 0)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costNpcScans = 0;
+            int costObjectChecks = 0;
+            int costFoodBeliefChecks = 0;
+
             int visionRange = world.Global.NpcVisionRangeCells;
             if (visionRange <= 0) visionRange = 6;
 
@@ -74,6 +81,9 @@ namespace Arcontio.Core
                 int npcId = _npcIds[n];
                 if (!world.GridPos.TryGetValue(npcId, out var np))
                     continue;
+
+                if (costSample)
+                    costNpcScans++;
 
                 if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                     facing = CardinalDirection.North;
@@ -119,10 +129,17 @@ namespace Arcontio.Core
                     visionRange,
                     useCone,
                     coneSlope,
-                    (int)tick.Index);
+                    (int)tick.Index,
+                    costSample,
+                    out int missingFoodBeliefChecks);
+                if (costSample)
+                    costFoodBeliefChecks += missingFoodBeliefChecks;
 
                 for (int o = 0; o < _objIds.Count; o++)
                 {
+                    if (costSample)
+                        costObjectChecks++;
+
                     int objId = _objIds[o];
                     if (!world.Objects.TryGetValue(objId, out var obj) || obj == null)
                         continue;
@@ -178,6 +195,15 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("ObjectPerception.SpottedEvents", spotted);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionNpcScans, costNpcScans);
+                costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionObjectChecks, costObjectChecks);
+                costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionSpottedEvents, spotted);
+                costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionFoodBeliefChecks, costFoodBeliefChecks);
+                costObserver.EndSample(RuntimeCostChannel.ObjectPerception, costStart);
+            }
         }
 
         // =============================================================================
@@ -214,8 +240,11 @@ namespace Arcontio.Core
             int visionRange,
             bool useCone,
             float coneSlope,
-            int tick)
+            int tick,
+            bool trackCost,
+            out int checkedBeliefs)
         {
+            checkedBeliefs = 0;
             if (world == null || !world.Beliefs.TryGetValue(npcId, out var beliefStore) || beliefStore == null)
                 return;
 
@@ -227,6 +256,9 @@ namespace Arcontio.Core
                 var belief = entries[i];
                 if (belief.Category != BeliefCategory.Food)
                     continue;
+
+                if (trackCost)
+                    checkedBeliefs++;
 
                 if (belief.Status != BeliefStatus.Active
                     && belief.Status != BeliefStatus.Weak

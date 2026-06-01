@@ -129,6 +129,13 @@ namespace Arcontio.Core
             if (world == null)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costEvaluations = 0;
+            int costJobsStarted = 0;
+            int costRouteRejected = 0;
+
             int nowTick = (int)tick.Index;
             foreach (var pair in world.NpcDna)
             {
@@ -139,12 +146,31 @@ namespace Arcontio.Core
                 if (!CanEvaluateNpc(world, npcId, in needs, nowTick))
                     continue;
 
+                if (costSample)
+                    costEvaluations++;
+
                 var startResult = TryEvaluateAndStartJob(world, npcId, in needs, nowTick, telemetry);
+                if (costSample)
+                {
+                    if (startResult == DecisionJobStartResult.JobStarted)
+                        costJobsStarted++;
+                    else if (startResult == DecisionJobStartResult.RouteRejected)
+                        costRouteRejected++;
+                }
+
                 if (ShouldConsumeDecisionCadence(startResult))
                 {
                     _lastDecisionTicks[npcId] = nowTick;
                     world.SignalNpcDecisionFlash(npcId, nowTick);
                 }
+            }
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.DecisionNpcEvaluations, costEvaluations);
+                costObserver.AddCounter(RuntimeCostCounter.DecisionJobsStarted, costJobsStarted);
+                costObserver.AddCounter(RuntimeCostCounter.DecisionRouteRejected, costRouteRejected);
+                costObserver.EndSample(RuntimeCostChannel.Decision, costStart);
             }
         }
 

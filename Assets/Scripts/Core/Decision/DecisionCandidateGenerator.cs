@@ -163,7 +163,8 @@ namespace Arcontio.Core
                 context.ExplainabilityConfig,
                 context.NpcId,
                 context.Tick,
-                context.ExplainabilityRegistry);
+                context.ExplainabilityRegistry,
+                context.RuntimeCostObserver);
 
             if (result.IsEmpty)
                 return false;

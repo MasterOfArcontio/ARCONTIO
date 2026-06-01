@@ -322,12 +322,20 @@ namespace Arcontio.Core
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             int npcId,
             long tick,
-            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry = null)
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry = null,
+            RuntimeCostObserver runtimeCostObserver = null)
         {
+            bool costSample = runtimeCostObserver != null && runtimeCostObserver.ShouldSample(tick);
+            long costStart = costSample ? runtimeCostObserver.BeginSample() : 0L;
+            int costEntriesRead = 0;
+            int costEvaluatorRuns = 0;
+
             if (store == null)
             {
                 var emptyResult = BeliefQueryResult.Empty();
                 TryEmitQueryTrace(explainabilityConfig, explainabilityRegistry, npcId, tick, query, emptyResult, 0, 0, "MissingBeliefStore");
+                if (costSample)
+                    runtimeCostObserver.EndSample(RuntimeCostChannel.BeliefQuery, costStart);
                 return BeliefQueryResult.Empty();
             }
 
@@ -337,6 +345,9 @@ namespace Arcontio.Core
             int matchingCategoryCount = 0;
             for (int i = 0; i < entries.Count; i++)
             {
+                if (costSample)
+                    costEntriesRead++;
+
                 // Primo passaggio intenzionalmente semplice: raccogliamo solo credenze
                 // soggettive coerenti con la richiesta, senza consultare dati oggettivi.
                 var belief = entries[i];
@@ -354,6 +365,11 @@ namespace Arcontio.Core
             {
                 var emptyResult = BeliefQueryResult.Empty();
                 TryEmitQueryTrace(explainabilityConfig, explainabilityRegistry, npcId, tick, query, emptyResult, matchingCategoryCount, 0, "NoUsableBelief");
+                if (costSample)
+                {
+                    runtimeCostObserver.AddCounter(RuntimeCostCounter.BeliefQueryEntriesRead, costEntriesRead);
+                    runtimeCostObserver.EndSample(RuntimeCostChannel.BeliefQuery, costStart);
+                }
                 return BeliefQueryResult.Empty();
             }
 
@@ -370,6 +386,9 @@ namespace Arcontio.Core
                 float score = 0f;
                 for (int e = 0; e < _evaluators.Count; e++)
                 {
+                    if (costSample)
+                        costEvaluatorRuns++;
+
                     // Ogni evaluator aggiunge un contributo nominato: il breakdown e'
                     // fondamentale per debug, explainability e futura tuning UI.
                     var evaluator = _evaluators[e];
@@ -394,6 +413,13 @@ namespace Arcontio.Core
                 : BeliefQueryResult.Empty();
 
             TryEmitQueryTrace(explainabilityConfig, explainabilityRegistry, npcId, tick, query, result, matchingCategoryCount, _candidates.Count, string.Empty);
+            if (costSample)
+            {
+                runtimeCostObserver.AddCounter(RuntimeCostCounter.BeliefQueryEntriesRead, costEntriesRead);
+                runtimeCostObserver.AddCounter(RuntimeCostCounter.BeliefQueryCandidatesUsable, _candidates.Count);
+                runtimeCostObserver.AddCounter(RuntimeCostCounter.BeliefQueryEvaluatorRuns, costEvaluatorRuns);
+                runtimeCostObserver.EndSample(RuntimeCostChannel.BeliefQuery, costStart);
+            }
             return result;
         }
 

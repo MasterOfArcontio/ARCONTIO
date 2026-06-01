@@ -49,6 +49,7 @@ namespace Arcontio.Tests
                 tests.RuntimeCostObserverIsNullByDefault();
                 tests.RuntimeCostObserverIsCreatedOnlyWhenExplicitlyEnabled();
                 tests.RuntimeCostObserverCanLoadFromDiagnosticsLoggingSection();
+                tests.RuntimeCostObserverAccumulatesNumericSamplesAndCounters();
 
                 Debug.Log("[RuntimeCostObserverQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -105,6 +106,25 @@ namespace Arcontio.Tests
             Assert.That(world.RuntimeCostObserver.WriteJsonl, Is.False);
             Assert.That(world.RuntimeCostObserver.ShouldSample(8), Is.True);
             Assert.That(world.RuntimeCostObserver.ShouldSample(9), Is.False);
+        }
+
+        [Test]
+        public void RuntimeCostObserverAccumulatesNumericSamplesAndCounters()
+        {
+            var observer = RuntimeCostObserver.CreateIfEnabled(new RuntimeCostObserverParams
+            {
+                enabled = true,
+                sampleEveryTicks = 1
+            });
+
+            long start = observer.BeginSample();
+            observer.AddCounter(RuntimeCostCounter.ObjectPerceptionNpcScans, 3);
+            observer.AddCounter(RuntimeCostCounter.ObjectPerceptionNpcScans, 2);
+            observer.EndSample(RuntimeCostChannel.ObjectPerception, start);
+
+            Assert.That(observer.GetSampleCount(RuntimeCostChannel.ObjectPerception), Is.EqualTo(1));
+            Assert.That(observer.GetDurationTicks(RuntimeCostChannel.ObjectPerception), Is.GreaterThanOrEqualTo(0));
+            Assert.That(observer.GetCounter(RuntimeCostCounter.ObjectPerceptionNpcScans), Is.EqualTo(5));
         }
     }
 }

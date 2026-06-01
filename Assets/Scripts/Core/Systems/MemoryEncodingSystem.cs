@@ -66,6 +66,12 @@ namespace Arcontio.Core
             if (_eventsBuffer == null || _eventsBuffer.Count == 0)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costRuleChecks = 0;
+            int costWitnessChecks = 0;
+
             // Snapshot parametri percezione dal GlobalState:
             int visionRange = world.Global.NpcVisionRangeCells;
             if (visionRange <= 0) visionRange = 6;
@@ -97,6 +103,9 @@ namespace Arcontio.Core
                 for (int r = 0; r < _rules.Count; r++)
                 {
                     var rule = _rules[r];
+                    if (costSample)
+                        costRuleChecks++;
+
                     if (!rule.Matches(e))
                         continue;
 
@@ -106,6 +115,9 @@ namespace Arcontio.Core
 
                     for (int n = 0; n < _npcIds.Count; n++)
                     {
+                        if (costSample)
+                            costWitnessChecks++;
+
                         int npcId = _npcIds[n];
 
                         if (!world.GridPos.TryGetValue(npcId, out var p))
@@ -277,6 +289,15 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("MemoryEncodingSystem.TracesAdded", tracesAdded);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.MemoryEncodingEvents, _eventsBuffer.Count);
+                costObserver.AddCounter(RuntimeCostCounter.MemoryEncodingRuleChecks, costRuleChecks);
+                costObserver.AddCounter(RuntimeCostCounter.MemoryEncodingWitnessChecks, costWitnessChecks);
+                costObserver.AddCounter(RuntimeCostCounter.MemoryEncodingTracesAdded, tracesAdded);
+                costObserver.EndSample(RuntimeCostChannel.MemoryEncoding, costStart);
+            }
         }
 
         // Patch 0.02.5A: Manhattan rimosso — usa FovUtils.Manhattan

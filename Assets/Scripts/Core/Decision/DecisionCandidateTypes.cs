@@ -159,6 +159,7 @@ namespace Arcontio.Core
         public readonly BeliefQueryConfig BeliefQueryConfig;
         public readonly MemoryBeliefDecisionExplainabilityParams ExplainabilityConfig;
         public readonly MemoryBeliefDecisionExplainabilityRegistry ExplainabilityRegistry;
+        public readonly RuntimeCostObserver RuntimeCostObserver;
         public readonly DecisionScheduleFrame ScheduleFrame;
         public readonly DecisionNormContext NormContext;
 
@@ -183,6 +184,7 @@ namespace Arcontio.Core
                 beliefs,
                 beliefQueryConfig,
                 explainabilityConfig,
+                null,
                 null,
                 scheduleFrame,
                 DecisionNormContext.Default())
@@ -212,6 +214,7 @@ namespace Arcontio.Core
                 beliefQueryConfig,
                 explainabilityConfig,
                 null,
+                null,
                 scheduleFrame,
                 normContext)
         {
@@ -228,6 +231,7 @@ namespace Arcontio.Core
             BeliefQueryConfig beliefQueryConfig,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
+            RuntimeCostObserver runtimeCostObserver,
             DecisionScheduleFrame scheduleFrame,
             DecisionNormContext normContext)
         {
@@ -241,6 +245,7 @@ namespace Arcontio.Core
             BeliefQueryConfig = beliefQueryConfig;
             ExplainabilityConfig = explainabilityConfig;
             ExplainabilityRegistry = explainabilityRegistry;
+            RuntimeCostObserver = runtimeCostObserver;
             ScheduleFrame = scheduleFrame;
             NormContext = normContext;
         }
