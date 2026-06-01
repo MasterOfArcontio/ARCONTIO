@@ -147,6 +147,7 @@ namespace Arcontio.Core
                 return;
 
             bool canUseDeclaredBeliefTargetRoute = CanUseDeclaredBeliefTargetRoute(job);
+            bool canUseSearchFoodExplorationRoute = CanUseSearchFoodExplorationRoute(job);
 
             if (HasUsableDirectRoute(world, npcId, action.TargetCell))
                 return;
@@ -258,6 +259,24 @@ namespace Arcontio.Core
                 return;
             }
 
+            if (canUseSearchFoodExplorationRoute
+                && TryPrepareSearchFoodExplorationRoute(world, npcId, action, npcCell))
+            {
+                TryEmitPreparedPathfindingPlan(
+                    world,
+                    npcId,
+                    job,
+                    action,
+                    npcCell,
+                    PlannerMode.DirectFallback,
+                    SelectionReason.SearchFoodExploration,
+                    RouteScratch,
+                    directTargetVisible: CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, GetDirectCheckFov(world)),
+                    directPathClear: RouteScratch.Count >= 2);
+                TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMacroMode, "SearchFoodExplorationRoutePrepared");
+                return;
+            }
+
             if (TryPrepareDeclaredDebugForcedRoute(world, npcId, job, action, npcCell))
             {
                 TryEmitPreparedPathfindingPlan(
@@ -310,6 +329,14 @@ namespace Arcontio.Core
                 && job.Request.HasTargetCell;
         }
 
+        private static bool CanUseSearchFoodExplorationRoute(Job job)
+        {
+            return job != null
+                && job.Request.IntentKind == DecisionIntentKind.SearchFood
+                && string.Equals(job.Plan?.PlanId, JobTemplateRegistry.SearchFoodLocalProbeTemplateId, System.StringComparison.Ordinal)
+                && job.Request.HasTargetCell;
+        }
+
         private static bool TryPrepareDirectRouteToFinalTarget(
             World world,
             int npcId,
@@ -354,6 +381,36 @@ namespace Arcontio.Core
         }
 
         private static bool TryPrepareDeclaredBeliefTargetRoute(
+            World world,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell)
+        {
+            if (world == null || !action.HasTargetCell)
+                return false;
+
+            RouteScratch.Clear();
+            int manhattan = Mathf.Abs(action.TargetCell.x - npcCell.X) + Mathf.Abs(action.TargetCell.y - npcCell.Y);
+            int budget = Mathf.Max(ResolveLocalSearchVisitedBudget(world), manhattan * 8, 64);
+            bool found = MovementPathfinder.TryBuildBoundedMovePath(
+                world,
+                npcId,
+                npcCell.X,
+                npcCell.Y,
+                action.TargetCell.x,
+                action.TargetCell.y,
+                budget,
+                RouteScratch);
+
+            if (!found || RouteScratch.Count < 2)
+                return false;
+
+            world.ClearDebugMacroRouteForNpc(npcId);
+            world.SetDebugDirectPathForNpc(npcId, RouteScratch);
+            return true;
+        }
+
+        private static bool TryPrepareSearchFoodExplorationRoute(
             World world,
             int npcId,
             JobAction action,

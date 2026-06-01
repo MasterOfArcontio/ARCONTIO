@@ -124,11 +124,26 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             OccupySearchProbeCells(world, npcId, 5, 5);
+            OccupySearchExplorationCells(world, npcId, 5, 5);
 
             RunDecisionOrchestrator(world, tick: 7);
 
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
             Assert.That(world.TryGetNpcDecisionFlashTick(npcId, out _), Is.False);
+        }
+
+        [Test]
+        public void SearchFoodWithoutVisibleFoodChoosesExplorationTargetBeyondSingleStep()
+        {
+            var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
+
+            RunDecisionOrchestrator(world, tick: 0);
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
+            int distance = Mathf.Abs(job.Request.TargetCell.x - 5) + Mathf.Abs(job.Request.TargetCell.y - 5);
+            Assert.That(distance, Is.GreaterThanOrEqualTo(3));
         }
 
         [Test]
@@ -222,7 +237,13 @@ namespace Arcontio.Tests
             world.JobRuntimeState.CommandBuffer.Clear();
 
             var movement = new MovementSystem();
-            movement.Update(world, new Tick(2, 1f), bus, new Telemetry());
+            for (int i = 0; i < 20; i++)
+            {
+                movement.Update(world, new Tick(2 + i, 1f), bus, new Telemetry());
+                if (world.GridPos[npcId].X == probe.x && world.GridPos[npcId].Y == probe.y)
+                    break;
+            }
+
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(probe.x));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(probe.y));
 
@@ -279,6 +300,7 @@ namespace Arcontio.Tests
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             EnableMbdBridgeExplainability(world);
             OccupySearchProbeCells(world, npcId, 5, 5);
+            OccupySearchExplorationCells(world, npcId, 5, 5);
             var commands = new List<ICommand>();
 
             RunDecisionOrchestrator(world, tick: 0);
@@ -294,6 +316,7 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             OccupySearchProbeCells(world, npcId, 5, 5);
+            OccupySearchExplorationCells(world, npcId, 5, 5);
             var orchestrator = new DecisionOrchestratorSystem(
                 decisionEveryTicks: 25,
                 maxSeekRangeCells: 8,
@@ -452,7 +475,7 @@ namespace Arcontio.Tests
 
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
             var probe = job.Request.TargetCell;
-            for (int i = 0; i < 4; i++)
+            for (int i = 0; i < 20; i++)
             {
                 movement.Update(world, new Tick(tick + 1 + i, 1f), bus, telemetry);
                 if (world.GridPos.TryGetValue(npcId, out var pos)
@@ -742,6 +765,44 @@ namespace Arcontio.Tests
 
                 world.Needs[blockerNpcId] = NpcNeeds.Make(0.1f, 0.1f);
                 Assert.That(blockerNpcId, Is.Not.EqualTo(excludedNpcId));
+            }
+        }
+
+        private static void OccupySearchExplorationCells(World world, int excludedNpcId, int originX, int originY)
+        {
+            var directions = new[]
+            {
+                new Vector2Int(1, 0),
+                new Vector2Int(0, 1),
+                new Vector2Int(-1, 0),
+                new Vector2Int(0, -1),
+                new Vector2Int(1, 1),
+                new Vector2Int(-1, 1),
+                new Vector2Int(-1, -1),
+                new Vector2Int(1, -1),
+            };
+
+            for (int distance = 3; distance <= 8; distance++)
+            {
+                for (int i = 0; i < directions.Length; i++)
+                {
+                    var cell = new Vector2Int(originX + directions[i].x * distance, originY + directions[i].y * distance);
+                    if (!world.InBounds(cell.x, cell.y))
+                        continue;
+
+                    if (world.TryGetNpcAt(cell.x, cell.y, out _))
+                        continue;
+
+                    int blockerNpcId = world.CreateNpc(
+                        NpcDnaProfile.CreateDefault("search_food_exploration_blocker"),
+                        NpcNeeds.Make(0.1f, 0.1f),
+                        new Arcontio.Core.Social { JusticePerception01 = 0.9f },
+                        cell.x,
+                        cell.y);
+
+                    world.Needs[blockerNpcId] = NpcNeeds.Make(0.1f, 0.1f);
+                    Assert.That(blockerNpcId, Is.Not.EqualTo(excludedNpcId));
+                }
             }
         }
     }
