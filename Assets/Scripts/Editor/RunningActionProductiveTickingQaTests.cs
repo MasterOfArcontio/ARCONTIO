@@ -49,8 +49,9 @@ namespace Arcontio.Tests
             try
             {
                 new RunningActionProductiveTickingQaTests().OneCellMoveTraversalHonorsConfiguredFourTickDuration();
-                new RunningActionProductiveTickingQaTests().TraversalGateOnFailsDistantTargetWithoutKnownRoute();
-                new RunningActionProductiveTickingQaTests().TraversalGateOnFailsDiagonalTargetWithoutKnownRoute();
+                new RunningActionProductiveTickingQaTests().DeclaredDistantMoveTargetPreparesRouteAndHonorsConfiguredDuration();
+                new RunningActionProductiveTickingQaTests().EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration();
+                new RunningActionProductiveTickingQaTests().DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToWritesLifecycleExplainabilityForEachCell();
@@ -306,56 +307,114 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // TraversalGateOnFailsDistantTargetWithoutKnownRoute
+        // DeclaredDistantMoveTargetPreparesRouteAndHonorsConfiguredDuration
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che, con runtime movimento Job acceso, un target distante senza
-        /// route nota non ricada piu' automaticamente nel ponte legacy.
+        /// Verifica che, con runtime movimento Job acceso, un target distante gia'
+        /// dichiarato dallo step prepari una route locale diretta e poi rispetti la
+        /// durata multi-tick configurata per ogni cella.
         /// </para>
         /// </summary>
         [Test]
-        public void TraversalGateOnFailsDistantTargetWithoutKnownRoute()
+        public void DeclaredDistantMoveTargetPreparesRouteAndHonorsConfiguredDuration()
         {
-            // Arrange: gate acceso e target distante, ma nessun DirectCommitExecution
-            // precaricato. Da v0.15.8 questo e' un fallimento esplicito che la matrice
-            // recovery potra' gestire, non un SetMoveIntent automatico.
+            // Arrange: gate acceso, target distante e nessun DirectCommitExecution
+            // precaricato. Il Job non sceglie un nuovo target: prepara solo una route
+            // locale verso la cella gia' dichiarata dal piano.
             var world = MakeWorldWithNpc(out int npcId);
-            EnableOneCellTraversal(world, durationTicks: 2);
+            EnableOneCellTraversal(world, durationTicks: 3);
             var startCell = world.GridPos[npcId];
             var distantTarget = new Vector2Int(startCell.X + 2, startCell.Y);
             var job = MakeMoveJob(npcId, "job-move-distant-legacy", distantTarget);
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
             var system = new JobExecutionSystem();
 
-            // Act: il Job non trova una route nota e fallisce localmente.
+            // Act 1: primo tick, route preparata e prima cella in progress.
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
-            // Assert: nessun traversal e nessun command legacy vengono prodotti.
-            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            // Assert 1: nessun command legacy; la posizione resta ferma durante il
+            // progress e il direct state e' ora consumabile dal Job runtime.
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
             Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
-            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
-            Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
-            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.False);
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+
+            // Act 2: secondo tick ancora progress, terzo tick completa solo la
+            // prima cella. Il target finale richiede un secondo traversal.
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+
+            system.Update(world, new Tick(2, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X + 1));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
         }
 
         // =============================================================================
-        // TraversalGateOnFailsDiagonalTargetWithoutKnownRoute
+        // EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che un target diagonale senza route nota non venga trattato come
-        /// traversal one-cell e non ricada nel movimento legacy quando il gate Job e'
-        /// abilitato.
+        /// Riproduce il caso runtime segnalato: l'NPC ha un job <c>EatKnownFood</c>
+        /// verso uno stock gia' scelto, il movimento Job e' acceso e non esiste una
+        /// route precaricata dal vecchio <c>MovementSystem</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: EatKnownFood non cerca cibo durante il movimento</b></para>
+        /// <para>
+        /// Il test non fa query di belief, non sceglie un target alternativo e non
+        /// passa da <c>SetMoveIntentCommand</c>. Verifica solo che il target gia'
+        /// presente nel Job possa essere tradotto in una route locale e consumato con
+        /// la durata configurata.
         /// </para>
         /// </summary>
         [Test]
-        public void TraversalGateOnFailsDiagonalTargetWithoutKnownRoute()
+        public void EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration()
         {
-            // Arrange: il target diagonale resta fuori dal traversal one-cell. Senza
-            // route nota, il Job deve fallire invece di creare un intent legacy.
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 3);
+            var startCell = world.GridPos[npcId];
+            int foodId = RegisterCommunityFoodStock(world, objectId: 8101, x: startCell.X + 2, y: startCell.Y, units: 3);
+            var job = MakeFoodJob(npcId, foodId, new Vector2Int(startCell.X + 2, startCell.Y));
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+
+            system.Update(world, new Tick(2, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X + 1));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+        }
+
+        // =============================================================================
+        // DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che un target diagonale gia' dichiarato venga normalizzato in
+        /// route cardinale cella-per-cella, senza usare il movimento legacy.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration()
+        {
+            // Arrange: il target diagonale non e' un traversal one-cell, ma puo'
+            // diventare una route dichiarata a due passi cardinali.
             var world = MakeWorldWithNpc(out int npcId);
             EnableOneCellTraversal(world, durationTicks: 2);
             var startCell = world.GridPos[npcId];
@@ -364,17 +423,22 @@ namespace Arcontio.Tests
             Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
             var system = new JobExecutionSystem();
 
-            // Act: nessuna route nota, nessun traversal eleggibile.
+            // Act: parte il primo passo della route dichiarata.
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
-            // Assert: la mancanza di route diventa fallimento locale.
-            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            // Assert: nessun command legacy e nessun salto diagonale immediato.
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
             Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
-            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
-            Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
-            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.False);
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+
+            // Act/Assert: al secondo tick completa solo il primo passo cardinale.
+            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X + 1));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
         }
 
         // =============================================================================
@@ -1136,6 +1200,45 @@ namespace Arcontio.Tests
                 isInterruptible: true,
                 actions: new[] { JobAction.MoveTo("move", targetCell, "QA move") });
             return new Job(jobId, request, new JobPlan("plan-" + jobId, new[] { phase }));
+        }
+
+        private static Job MakeFoodJob(int npcId, int foodObjectId, Vector2Int foodCell)
+        {
+            bool created = FoodJobFactory.TryCreateKnownCommunityFoodJob(
+                JobTemplateRegistry.LoadDefault(),
+                npcId,
+                foodObjectId,
+                foodCell,
+                tick: 0,
+                urgency01: 0.95f,
+                beliefKey: "FoodRouteQa",
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            return job;
+        }
+
+        private static int RegisterCommunityFoodStock(World world, int objectId, int x, int y, int units)
+        {
+            world.Objects[objectId] = new WorldObjectInstance
+            {
+                ObjectId = objectId,
+                DefId = "food_stock",
+                CellX = x,
+                CellY = y,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+
+            world.FoodStocks[objectId] = new FoodStockComponent
+            {
+                Units = units,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+
+            return objectId;
         }
 
         private static Job MakeDevTransportJob(int npcId, int objectId, Vector2Int objectCell, Vector2Int destinationCell)
