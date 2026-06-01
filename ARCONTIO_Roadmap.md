@@ -980,6 +980,7 @@ Approfondire la cognizione soggettiva degli NPC usando l'infrastruttura stabiliz
 
 Questa fase deve lavorare su:
 
+- allineamento dei template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al nuovo movimento multi-tick;
 - memoria soggettiva;
 - belief lifecycle;
 - freshness e obsolescenza;
@@ -992,14 +993,15 @@ Questa fase deve lavorare su:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.16a | Audit cognition gap post-v0.15 | ⏳ |
-| v0.16b | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
-| v0.16c | Memory encoding da world events needs | ⏳ |
-| v0.16d | Verifica locale credenze obsolete | ⏳ |
-| v0.16e | Comunicazione soggettiva dei fatti osservati | ⏳ |
-| v0.16f | Decisioni con belief incerte e parziali | ⏳ |
-| v0.16g | QA anti-omniscienza cognitiva | ⏳ |
-| v0.16h | Closeout cognition deepening | ⏳ |
+| v0.16a | Allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick | ⏳ |
+| v0.16b | Audit cognition gap post-v0.15 | ⏳ |
+| v0.16c | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
+| v0.16d | Memory encoding da world events needs | ⏳ |
+| v0.16e | Verifica locale credenze obsolete | ⏳ |
+| v0.16f | Comunicazione soggettiva dei fatti osservati | ⏳ |
+| v0.16g | Decisioni con belief incerte e parziali | ⏳ |
+| v0.16h | QA anti-omniscienza cognitiva | ⏳ |
+| v0.16i | Closeout cognition deepening | ⏳ |
 
 ---
 

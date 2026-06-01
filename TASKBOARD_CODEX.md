@@ -131,14 +131,15 @@ Checkpoint v0.15 pianificati:
 
 Checkpoint v0.16 pianificati:
 
-- `v0.16a`: audit cognition gap post-v0.15;
-- `v0.16b`: lifecycle credenze e obsolescenza cibo/oggetti;
-- `v0.16c`: memoria da eventi needs;
-- `v0.16d`: verifica locale credenze;
-- `v0.16e`: decisione su conoscenza incerta;
-- `v0.16f`: comunicazione soggettiva minima;
-- `v0.16g`: QA anti-onniscienza cognitiva;
-- `v0.16h`: closeout cognizione soggettiva avanzata.
+- `v0.16a`: allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick;
+- `v0.16b`: audit cognition gap post-v0.15;
+- `v0.16c`: lifecycle credenze e obsolescenza cibo/oggetti;
+- `v0.16d`: memoria da eventi needs;
+- `v0.16e`: verifica locale credenze;
+- `v0.16f`: decisione su conoscenza incerta;
+- `v0.16g`: comunicazione soggettiva minima;
+- `v0.16h`: QA anti-onniscienza cognitiva;
+- `v0.16i`: closeout cognizione soggettiva avanzata.
 
 Checkpoint v0.12 completati:
 
