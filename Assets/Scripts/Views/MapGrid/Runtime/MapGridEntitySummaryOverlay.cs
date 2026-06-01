@@ -1623,9 +1623,12 @@ namespace Arcontio.View.MapGrid
                 for (int i = 0; i < decision.Candidates.Count; i++)
                 {
                     var candidate = decision.Candidates[i];
+                    string candidateColor = candidate.IsSelected ? "#3FB950" : ColorFor(candidate.ColorRole);
                     _sbMbqdDecisionCandidates
-                        .Append("<color=").Append(ColorFor(candidate.ColorRole)).Append(">")
+                        .Append("<color=").Append(candidateColor).Append(">")
+                        .Append(candidate.IsSelected ? "VINCITORE " : "          ")
                         .Append(candidate.Intent).Append("</color>")
+                        .Append("  tick=").Append(candidate.Tick)
                         .Append("  score=").Append(candidate.Score.ToString("0.00"))
                         .Append("  available=").Append(candidate.Available)
                         .Append("  need=").Append(candidate.Need)

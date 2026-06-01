@@ -201,7 +201,9 @@ namespace Arcontio.Core
     [Serializable]
     public sealed class MemoryBeliefDecisionCandidateView
     {
+        public long Tick;
         public string Intent = string.Empty;
+        public bool IsSelected;
         public bool Available;
         public string Need = string.Empty;
         public float NeedUrgency01;
@@ -730,7 +732,9 @@ namespace Arcontio.Core
                 var source = decision.Candidates[i];
                 var candidate = new MemoryBeliefDecisionCandidateView
                 {
+                    Tick = trace.Tick,
                     Intent = source.Intent.ToString(),
+                    IsSelected = i == decision.SelectedIndex,
                     Available = source.Available,
                     Need = source.Need.ToString(),
                     NeedUrgency01 = source.NeedUrgency01,
