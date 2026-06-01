@@ -326,6 +326,7 @@ namespace Arcontio.Core
             RuntimeCostObserver runtimeCostObserver = null)
         {
             bool costSample = runtimeCostObserver != null && runtimeCostObserver.ShouldSample(tick);
+            bool costPerNpc = costSample && runtimeCostObserver.TrackPerNpc;
             long costStart = costSample ? runtimeCostObserver.BeginSample() : 0L;
             int costEntriesRead = 0;
             int costEvaluatorRuns = 0;
@@ -418,6 +419,8 @@ namespace Arcontio.Core
                 runtimeCostObserver.AddCounter(RuntimeCostCounter.BeliefQueryEntriesRead, costEntriesRead);
                 runtimeCostObserver.AddCounter(RuntimeCostCounter.BeliefQueryCandidatesUsable, _candidates.Count);
                 runtimeCostObserver.AddCounter(RuntimeCostCounter.BeliefQueryEvaluatorRuns, costEvaluatorRuns);
+                if (costPerNpc)
+                    runtimeCostObserver.AddNpcWork(npcId, costEntriesRead + costEvaluatorRuns);
                 runtimeCostObserver.EndSample(RuntimeCostChannel.BeliefQuery, costStart);
             }
             return result;

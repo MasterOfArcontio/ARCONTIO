@@ -1062,7 +1062,7 @@ Il percorso spento deve limitarsi a guardie economiche, per evitare di introdurr
 | v0.17a | Audit punti caldi runtime per NPC | ✅ |
 | v0.17b | Configurazione osservatorio con costo nullo quando spento | ✅ |
 | v0.17c | Misure per sistema: percezione, memoria, belief, query, decisione, EL, job, fallback | ✅ |
-| v0.17d | Misure per NPC e individuazione NPC piu' costosi | ⏳ |
+| v0.17d | Misure per NPC e individuazione NPC piu' costosi | ✅ |
 | v0.17e | Contatori operativi: celle viste, oggetti controllati, query, path, trace, fallback | ⏳ |
 | v0.17f | JSONL opzionale batchato e limitato per profili runtime | ⏳ |
 | v0.17g | Scenario QA 1/2/4/8/16 NPC e report costo scalare | ⏳ |

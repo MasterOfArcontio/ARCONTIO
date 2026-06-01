@@ -60,6 +60,7 @@ namespace Arcontio.Core
 
             var costObserver = world.RuntimeCostObserver;
             bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
             long costStart = costSample ? costObserver.BeginSample() : 0L;
 
             _npcIds.Clear();
@@ -83,6 +84,8 @@ namespace Arcontio.Core
                 updatedTotal += updated;
                 weakTotal += weak;
                 staleTotal += stale;
+                if (costPerNpc)
+                    costObserver.AddNpcWork(npcId, updated + weak + stale);
             }
 
             telemetry.Counter("BeliefDecaySystem.EntriesUpdated", updatedTotal);

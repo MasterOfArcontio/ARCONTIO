@@ -52,6 +52,7 @@ namespace Arcontio.Core
 
             var costObserver = world.RuntimeCostObserver;
             bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
             long costStart = costSample ? costObserver.BeginSample() : 0L;
             int costNpcScans = 0;
             int costObjectChecks = 0;
@@ -78,6 +79,10 @@ namespace Arcontio.Core
 
             for (int n = 0; n < _npcIds.Count; n++)
             {
+                int costNpcObjectChecks = 0;
+                int costNpcFoodBeliefChecks = 0;
+                int costNpcSpotted = 0;
+
                 int npcId = _npcIds[n];
                 if (!world.GridPos.TryGetValue(npcId, out var np))
                     continue;
@@ -134,11 +139,15 @@ namespace Arcontio.Core
                     out int missingFoodBeliefChecks);
                 if (costSample)
                     costFoodBeliefChecks += missingFoodBeliefChecks;
+                if (costPerNpc)
+                    costNpcFoodBeliefChecks += missingFoodBeliefChecks;
 
                 for (int o = 0; o < _objIds.Count; o++)
                 {
                     if (costSample)
                         costObjectChecks++;
+                    if (costPerNpc)
+                        costNpcObjectChecks++;
 
                     int objId = _objIds[o];
                     if (!world.Objects.TryGetValue(objId, out var obj) || obj == null)
@@ -191,7 +200,12 @@ namespace Arcontio.Core
                         witnessQuality01: q));
 
                     spotted++;
+                    if (costPerNpc)
+                        costNpcSpotted++;
                 }
+
+                if (costPerNpc)
+                    costObserver.AddNpcWork(npcId, costNpcObjectChecks + costNpcFoodBeliefChecks + costNpcSpotted);
             }
 
             telemetry.Counter("ObjectPerception.SpottedEvents", spotted);

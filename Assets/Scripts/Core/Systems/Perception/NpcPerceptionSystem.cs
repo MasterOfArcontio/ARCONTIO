@@ -49,6 +49,7 @@ namespace Arcontio.Core
 
             var costObserver = world.RuntimeCostObserver;
             bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
             long costStart = costSample ? costObserver.BeginSample() : 0L;
             int costPairChecks = 0;
 
@@ -68,6 +69,8 @@ namespace Arcontio.Core
             for (int i = 0; i < _npcIds.Count; i++)
             {
                 int observerId = _npcIds[i];
+                int costNpcPairChecks = 0;
+                int costNpcSpotted = 0;
 
                 if (!world.GridPos.TryGetValue(observerId, out var op))
                     continue;
@@ -87,6 +90,8 @@ namespace Arcontio.Core
 
                     if (costSample)
                         costPairChecks++;
+                    if (costPerNpc)
+                        costNpcPairChecks++;
 
                     if (!world.GridPos.TryGetValue(targetId, out var tp))
                         continue;
@@ -128,7 +133,12 @@ namespace Arcontio.Core
                         witnessQuality01: q));
 
                     spotted++;
+                    if (costPerNpc)
+                        costNpcSpotted++;
                 }
+
+                if (costPerNpc)
+                    costObserver.AddNpcWork(observerId, costNpcPairChecks + costNpcSpotted);
             }
 
             telemetry.Counter("NpcPerceptionSystem.NpcSpottedEvents", spotted);

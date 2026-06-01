@@ -50,6 +50,8 @@ namespace Arcontio.Tests
                 tests.RuntimeCostObserverIsCreatedOnlyWhenExplicitlyEnabled();
                 tests.RuntimeCostObserverCanLoadFromDiagnosticsLoggingSection();
                 tests.RuntimeCostObserverAccumulatesNumericSamplesAndCounters();
+                tests.RuntimeCostObserverDoesNotCreateNpcStoreWhenPerNpcTrackingIsDisabled();
+                tests.RuntimeCostObserverTracksTopNpcCostsWhenEnabled();
 
                 Debug.Log("[RuntimeCostObserverQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -125,6 +127,44 @@ namespace Arcontio.Tests
             Assert.That(observer.GetSampleCount(RuntimeCostChannel.ObjectPerception), Is.EqualTo(1));
             Assert.That(observer.GetDurationTicks(RuntimeCostChannel.ObjectPerception), Is.GreaterThanOrEqualTo(0));
             Assert.That(observer.GetCounter(RuntimeCostCounter.ObjectPerceptionNpcScans), Is.EqualTo(5));
+        }
+
+        [Test]
+        public void RuntimeCostObserverDoesNotCreateNpcStoreWhenPerNpcTrackingIsDisabled()
+        {
+            var observer = RuntimeCostObserver.CreateIfEnabled(new RuntimeCostObserverParams
+            {
+                enabled = true,
+                trackPerNpc = false
+            });
+
+            observer.AddNpcWork(1, 10);
+
+            Assert.That(observer.TrackPerNpc, Is.False);
+            Assert.That(observer.TrackedNpcCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void RuntimeCostObserverTracksTopNpcCostsWhenEnabled()
+        {
+            var observer = RuntimeCostObserver.CreateIfEnabled(new RuntimeCostObserverParams
+            {
+                enabled = true,
+                trackPerNpc = true
+            });
+            var top = new System.Collections.Generic.List<RuntimeNpcCostSnapshot>();
+
+            observer.AddNpcWork(1, 4);
+            observer.AddNpcWork(2, 9);
+            observer.AddNpcWork(1, 3);
+            observer.CopyTopNpcCostsTo(top, 2);
+
+            Assert.That(observer.TrackedNpcCount, Is.EqualTo(2));
+            Assert.That(top.Count, Is.EqualTo(2));
+            Assert.That(top[0].NpcId, Is.EqualTo(2));
+            Assert.That(top[0].Score, Is.EqualTo(9));
+            Assert.That(top[1].NpcId, Is.EqualTo(1));
+            Assert.That(top[1].Score, Is.EqualTo(7));
         }
     }
 }

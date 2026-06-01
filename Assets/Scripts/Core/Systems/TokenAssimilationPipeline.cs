@@ -51,6 +51,7 @@ namespace Arcontio.Core
 
             var costObserver = world.RuntimeCostObserver;
             bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
             long costStart = costSample ? costObserver.BeginSample() : 0L;
             int costTokenCount = tokenBuffer.Count;
 
@@ -60,6 +61,8 @@ namespace Arcontio.Core
             for (int i = 0; i < tokenBuffer.Count; i++)
             {
                 var env = tokenBuffer[i];
+                if (costPerNpc)
+                    costObserver.AddNpcWork(env.ListenerId, 1);
 
                 // Safety: esiste store memoria?
                 if (!world.Memory.TryGetValue(env.ListenerId, out var store) || store == null)
@@ -88,6 +91,8 @@ namespace Arcontio.Core
                             res,
                             env.Token.Type.ToString());
                         tracesAdded++;
+                        if (costPerNpc)
+                            costObserver.AddNpcWork(env.ListenerId, 1);
 
                         // Aggregazione lazy BeliefStore per memorie "sentite":
                         // il TokenAssimilationPipeline e l'altro punto in cui una

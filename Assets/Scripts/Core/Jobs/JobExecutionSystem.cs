@@ -63,6 +63,7 @@ namespace Arcontio.Core
 
             var costObserver = world.RuntimeCostObserver;
             bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
             long costStart = costSample ? costObserver.BeginSample() : 0L;
             int costSteps = 0;
 
@@ -80,6 +81,8 @@ namespace Arcontio.Core
 
                 if (costSample)
                     costSteps++;
+                if (costPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
 
                 var result = ExecuteCurrentAction(
                     world,

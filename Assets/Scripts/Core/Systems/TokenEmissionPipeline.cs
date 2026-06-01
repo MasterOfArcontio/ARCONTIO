@@ -48,6 +48,7 @@ namespace Arcontio.Core
         {
             var costObserver = world.RuntimeCostObserver;
             bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
             long costStart = costSample ? costObserver.BeginSample() : 0L;
             int costPairChecks = 0;
 
@@ -82,10 +83,16 @@ namespace Arcontio.Core
 
                 for (int j = i + 1; j < _npcIds.Count; j++)
                 {
+                    int b = _npcIds[j];
+
                     if (costSample)
                         costPairChecks++;
+                    if (costPerNpc)
+                    {
+                        costObserver.AddNpcWork(a, 1);
+                        costObserver.AddNpcWork(b, 1);
+                    }
 
-                    int b = _npcIds[j];
                     if (!world.GridPos.TryGetValue(b, out var pb)) continue;
 
                     int dist = Manhattan(pa.X, pa.Y, pb.X, pb.Y);
@@ -100,10 +107,10 @@ namespace Arcontio.Core
                     bool bCanTalkToA = CanDirectlyTalk(world, b, a);
 
                     if (aCanTalkToB)
-                        envelopesEmitted += EmitForPair(world, tick, tokenBus, telemetry, a, b, maxPerEncounter, maxPerDay, cooldownTicks);
+                        envelopesEmitted += EmitForPair(world, tick, tokenBus, telemetry, a, b, maxPerEncounter, maxPerDay, cooldownTicks, costPerNpc);
 
                     if (bCanTalkToA)
-                        envelopesEmitted += EmitForPair(world, tick, tokenBus, telemetry, b, a, maxPerEncounter, maxPerDay, cooldownTicks);
+                        envelopesEmitted += EmitForPair(world, tick, tokenBus, telemetry, b, a, maxPerEncounter, maxPerDay, cooldownTicks, costPerNpc);
                 }
             }
 
@@ -126,7 +133,8 @@ namespace Arcontio.Core
             int listenerId,
             int maxPerEncounter,
             int maxPerDay,
-            int cooldownTicks)
+            int cooldownTicks,
+            bool costPerNpc)
         {
             if (!world.Memory.TryGetValue(speakerId, out var store) || store == null)
                 return 0;
@@ -193,7 +201,11 @@ namespace Arcontio.Core
             }
 
             if (emittedThisEncounter > 0)
+            {
                 _tokensEmittedToday[speakerId] = emittedToday;
+                if (costPerNpc)
+                    world.RuntimeCostObserver.AddNpcWork(speakerId, emittedThisEncounter);
+            }
 
             return emittedThisEncounter;
         }

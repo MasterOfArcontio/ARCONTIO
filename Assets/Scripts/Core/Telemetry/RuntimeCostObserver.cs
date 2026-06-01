@@ -1,5 +1,6 @@
 using Arcontio.Core.Config;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 
 namespace Arcontio.Core
@@ -81,6 +82,34 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // RuntimeNpcCostSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot leggibile del costo runtime accumulato per un singolo NPC.
+    /// </para>
+    ///
+    /// <para><b>Dato diagnostico passivo</b></para>
+    /// <para>
+    /// Questo record non guida decisioni, job o fallback. Serve solo a ordinare gli
+    /// NPC che stanno generando piu' lavoro nei sistemi misurati.
+    /// </para>
+    /// </summary>
+    public readonly struct RuntimeNpcCostSnapshot
+    {
+        public readonly int NpcId;
+        public readonly long Score;
+        public readonly long Samples;
+
+        public RuntimeNpcCostSnapshot(int npcId, long score, long samples)
+        {
+            NpcId = npcId;
+            Score = score;
+            Samples = samples;
+        }
+    }
+
+    // =============================================================================
     // RuntimeCostObserver
     // =============================================================================
     /// <summary>
@@ -111,6 +140,7 @@ namespace Arcontio.Core
         private readonly long[] _durationTicksByChannel;
         private readonly long[] _sampleCountByChannel;
         private readonly long[] _counters;
+        private readonly Dictionary<int, RuntimeNpcCostRecord> _npcCosts;
 
         public bool TrackPerNpc { get; }
         public bool WriteJsonl { get; }
@@ -127,6 +157,7 @@ namespace Arcontio.Core
             _sampleCountByChannel = new long[(int)RuntimeCostChannel.Count];
             _counters = new long[(int)RuntimeCostCounter.Count];
             TrackPerNpc = config != null && config.trackPerNpc;
+            _npcCosts = TrackPerNpc ? new Dictionary<int, RuntimeNpcCostRecord>(64) : null;
             WriteJsonl = config != null && config.writeJsonl;
             MaxTicksInMemory = Math.Max(1, config?.maxTicksInMemory ?? 256);
             JsonlFlushIntervalTicks = Math.Max(1, config?.jsonlFlushIntervalTicks ?? 25);
@@ -255,6 +286,71 @@ namespace Arcontio.Core
         {
             int index = (int)counter;
             return index >= 0 && index < _counters.Length ? _counters[index] : 0L;
+        }
+
+        // =============================================================================
+        // AddNpcWork
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Accumula lavoro diagnostico su un NPC specifico.
+        /// </para>
+        ///
+        /// <para>
+        /// Il metodo non fa nulla se `trackPerNpc` e' spento. Questo mantiene il
+        /// percorso ordinario economico: i sistemi possono chiamarlo solo dopo avere
+        /// verificato che l'osservatorio stia campionando, ma il dettaglio per NPC
+        /// resta comunque protetto dal gate dedicato.
+        /// </para>
+        /// </summary>
+        public void AddNpcWork(int npcId, long score)
+        {
+            if (_npcCosts == null || npcId <= 0 || score == 0)
+                return;
+
+            _npcCosts.TryGetValue(npcId, out var current);
+            current.Score += score;
+            current.Samples++;
+            _npcCosts[npcId] = current;
+        }
+
+        public int TrackedNpcCount => _npcCosts?.Count ?? 0;
+
+        // =============================================================================
+        // CopyTopNpcCostsTo
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia nella lista ricevuta gli NPC piu' costosi, ordinati per punteggio
+        /// decrescente.
+        /// </para>
+        ///
+        /// <para>
+        /// Questo metodo e' pensato per UI/debug o report futuri, non per percorsi
+        /// caldi. Il chiamante possiede la lista e puo' riusarla.
+        /// </para>
+        /// </summary>
+        public void CopyTopNpcCostsTo(List<RuntimeNpcCostSnapshot> output, int maxCount)
+        {
+            if (output == null)
+                return;
+
+            output.Clear();
+            if (_npcCosts == null || _npcCosts.Count == 0 || maxCount <= 0)
+                return;
+
+            foreach (var pair in _npcCosts)
+                output.Add(new RuntimeNpcCostSnapshot(pair.Key, pair.Value.Score, pair.Value.Samples));
+
+            output.Sort((a, b) => b.Score.CompareTo(a.Score));
+            if (output.Count > maxCount)
+                output.RemoveRange(maxCount, output.Count - maxCount);
+        }
+
+        private struct RuntimeNpcCostRecord
+        {
+            public long Score;
+            public long Samples;
         }
     }
 }

@@ -68,6 +68,7 @@ namespace Arcontio.Core
 
             var costObserver = world.RuntimeCostObserver;
             bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
             long costStart = costSample ? costObserver.BeginSample() : 0L;
             int costRuleChecks = 0;
             int costWitnessChecks = 0;
@@ -115,10 +116,12 @@ namespace Arcontio.Core
 
                     for (int n = 0; n < _npcIds.Count; n++)
                     {
+                        int npcId = _npcIds[n];
+
                         if (costSample)
                             costWitnessChecks++;
-
-                        int npcId = _npcIds[n];
+                        if (costPerNpc)
+                            costObserver.AddNpcWork(npcId, 1);
 
                         if (!world.GridPos.TryGetValue(npcId, out var p))
                             continue;
@@ -281,6 +284,8 @@ namespace Arcontio.Core
                             }
 
                             tracesAdded++;
+                            if (costPerNpc)
+                                costObserver.AddNpcWork(npcId, 1);
                         }
                     }
 
