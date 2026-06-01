@@ -1065,7 +1065,7 @@ Il percorso spento deve limitarsi a guardie economiche, per evitare di introdurr
 | v0.17d | Misure per NPC e individuazione NPC piu' costosi | ✅ |
 | v0.17e | Contatori operativi: celle viste, oggetti controllati, query, path, trace, fallback | ✅ |
 | v0.17f | JSONL opzionale batchato e limitato per profili runtime | ✅ |
-| v0.17g | Scenario QA 1/2/4/8/16 NPC e report costo scalare | ⏳ |
+| v0.17g | Scenario QA 1/2/4/8/16 NPC e report costo scalare | ⚠️ |
 | v0.17h | Closeout osservatorio costi runtime | ⏳ |
 
 > **Nota architetturale v0.17:** questa fase NON deve ottimizzare alla cieca. Deve prima rendere misurabile il costo reale per tick e per NPC. Solo dopo i dati si decidera' se intervenire su FOV/percezione, pathfinding, EL, pannelli, query, job o comunicazione.

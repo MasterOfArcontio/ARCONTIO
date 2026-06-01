@@ -152,7 +152,7 @@ Checkpoint v0.17 pianificati:
 - `v0.17d`: misure per NPC e individuazione NPC piu' costosi - DONE;
 - `v0.17e`: contatori operativi: celle viste, oggetti controllati, query, path, trace, fallback - DONE;
 - `v0.17f`: JSONL opzionale batchato e limitato per profili runtime - DONE;
-- `v0.17g`: scenario QA 1/2/4/8/16 NPC e report costo scalare;
+- `v0.17g`: scenario QA 1/2/4/8/16 NPC e report costo scalare - PARTIAL, protocollo pronto e prova runtime/profiler da eseguire;
 - `v0.17h`: closeout osservatorio costi runtime.
 
 Checkpoint v0.12 completati:
