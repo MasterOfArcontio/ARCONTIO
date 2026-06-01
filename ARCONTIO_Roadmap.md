@@ -1060,7 +1060,7 @@ Il percorso spento deve limitarsi a guardie economiche, per evitare di introdurr
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.17a | Audit punti caldi runtime per NPC | ✅ |
-| v0.17b | Configurazione osservatorio con costo nullo quando spento | ⏳ |
+| v0.17b | Configurazione osservatorio con costo nullo quando spento | ✅ |
 | v0.17c | Misure per sistema: percezione, memoria, belief, query, decisione, EL, job, fallback | ⏳ |
 | v0.17d | Misure per NPC e individuazione NPC piu' costosi | ⏳ |
 | v0.17e | Contatori operativi: celle viste, oggetti controllati, query, path, trace, fallback | ⏳ |

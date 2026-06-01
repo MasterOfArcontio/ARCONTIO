@@ -110,6 +110,16 @@ namespace Arcontio.Core
         public DebugFovTelemetry DebugFovTelemetry { get; private set; }
 
         /// <summary>
+        /// Osservatorio costi runtime (v0.17).
+        ///
+        /// Quando e' null, la profilazione runtime e' completamente spenta. Questa
+        /// scelta e' intenzionale: i sistemi caldi devono poter fare un singolo
+        /// controllo nullo prima di qualunque misura, evitando stringhe, liste,
+        /// dizionari, JSONL o contatori nascosti.
+        /// </summary>
+        public RuntimeCostObserver RuntimeCostObserver { get; private set; }
+
+        /// <summary>
         /// LandmarkRegistry (v0.02 Day2): registro oggettivo dei landmark.
         ///
         /// Nota:
@@ -993,6 +1003,14 @@ namespace Arcontio.Core
 
                 DebugFovTelemetry = new DebugFovTelemetry(MapWidth, MapHeight, window);
             }
+
+            // ============================================================
+            // RUNTIME COST OBSERVER (v0.17)
+            // ============================================================
+            // Punto di ingresso congelabile della futura profilazione per NPC.
+            // Se runtime_cost_observer.enabled=false, la factory restituisce null
+            // e nessun registro o buffer diagnostico viene creato.
+            RuntimeCostObserver = Arcontio.Core.RuntimeCostObserver.CreateIfEnabled(Config?.Sim?.runtime_cost_observer);
 
             Global.EnableMemorySpatialFusion = false;
             Global.MemoryRegionSizeCells = 4;
