@@ -331,6 +331,85 @@ namespace Arcontio.Core
             return true;
         }
 
+        // =============================================================================
+        // TryStartDebugForcedRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara il percorso forzato dei soli comandi debug manuali. Questo ramo
+        /// mantiene il comportamento desiderato per tasto K + puntamento mouse:
+        /// l'operatore puo' spostare l'NPC verso la cella scelta anche se l'NPC non
+        /// conosce soggettivamente quella strada.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug esterno, non conoscenza NPC</b></para>
+        /// <para>
+        /// Il percorso costruito qui non deve essere letto come decisione, memoria,
+        /// belief o competenza dell'NPC. E' un override di devtool che passa ancora
+        /// dal MovementSystem per muovere fisicamente una cella alla volta, ma usa
+        /// un path fisico forzato invece dei gate percettivi ordinari.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Path fisico</b>: tenta prima la ricerca locale fisica bounded.</item>
+        ///   <item><b>Greedy debug</b>: se la ricerca locale non basta, prova il greedy fisico.</item>
+        ///   <item><b>Ownership legacy</b>: prepara DirectCommit e MacroRouteExecution coerenti con MovementSystem.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryStartDebugForcedRoute(World world, int npcId, GridPosition pos, int targetX, int targetY)
+        {
+            var forcedPath = new System.Collections.Generic.List<Vector2Int>(64);
+            int manhattan = Mathf.Abs(targetX - pos.X) + Mathf.Abs(targetY - pos.Y);
+            int budget = Mathf.Max(DefaultBoundedSearchVisited, GetLocalSearchVisitedBudget(world), manhattan * 8);
+
+            bool found = MovementPathfinder.TryBuildBoundedMovePath(
+                world, npcId, pos.X, pos.Y, targetX, targetY, budget, forcedPath);
+
+            if (!found || forcedPath.Count < 2)
+            {
+                found = MovementPathfinder.TryBuildDebugForcedGreedyPath(
+                    world, npcId, pos.X, pos.Y, targetX, targetY, forcedPath);
+            }
+
+            if (!found || forcedPath.Count < 2)
+                return false;
+
+            world.ClearDebugMacroRouteForNpc(npcId);
+            world.ClearNpcLocalSearchState(npcId, "DebugForcedMoveStarted");
+            world.Pathfinding.ClearMoveBackOff(npcId);
+            world.SetDebugDirectPathForNpc(npcId, forcedPath);
+
+            var forcedState = new NpcMacroRouteExecutionState
+            {
+                Active                     = true,
+                HasUsableMacroPath         = false,
+                IsDoingLastMile            = false,
+                NextRouteNodeIndex         = 0,
+                FinalTargetCellX           = targetX,
+                FinalTargetCellY           = targetY,
+                ImmediateTargetX           = forcedPath[1].x,
+                ImmediateTargetY           = forcedPath[1].y,
+                FailureReason              = string.Empty,
+                NavigationMode             = "DIRECT_APPROACHING",
+                LastModeSwitchTick         = (int)TickContext.CurrentTickIndex,
+                LastModeSwitchReason       = "DebugForcedMove",
+                DirectPrefixStepsRemaining = Mathf.Max(1, forcedPath.Count - 1),
+                IsApproachingFirstLm       = false,
+            };
+            world.Pathfinding.MacroRouteExecution[npcId] = forcedState;
+
+            LogDirectGateDebug(
+                world, npcId, "init_debug_forced_route", pos, targetX, targetY,
+                checkFov: false, targetVisible: true, pathClear: true,
+                effectiveTargetX: targetX, effectiveTargetY: targetY,
+                inPrefixCommitment: true, isInLastMile: false,
+                lastMileJustConverted: false, usingMacroImmediate: false,
+                extraKey: "forcedPathCount", extraValue: forcedPath.Count);
+
+            return true;
+        }
+
         private static bool TrySelectDirectCommitNextStep(
             World world,
             int npcId,
@@ -1550,6 +1629,12 @@ namespace Arcontio.Core
 
             int targetX = intent.TargetX;
             int targetY = intent.TargetY;
+
+            if (intent.Reason == MoveIntentReason.DebugClick
+                && TryStartDebugForcedRoute(world, npcId, pos, targetX, targetY))
+            {
+                return;
+            }
 
             // ── ACQUISIZIONE DIRECT (Patch 0.02.07.A) ────────────────────────
             // Regola 1 documento "Commitment Percettivo":

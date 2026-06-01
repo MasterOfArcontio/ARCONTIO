@@ -172,6 +172,115 @@ namespace Arcontio.Core
             return true;
         }
 
+        // =============================================================================
+        // TryBuildDebugForcedGreedyPath
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un percorso greedy fisico per i soli comandi di debug operatore.
+        /// A differenza del path diretto ordinario non richiede linea di vista e non
+        /// rappresenta conoscenza dell'NPC: e' un comando esterno usato dal devtool
+        /// per spostare esattamente l'attore selezionato anche quando non conosce la
+        /// strada.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: separazione tra simulazione e devtool</b></para>
+        /// <para>
+        /// Il movimento ordinario resta soggettivo e passa da percezione, landmark,
+        /// running action e recuperi Job. Questo metodo e' volutamente fisico e
+        /// non cognitivo: serve solo al comando manuale di debug, quindi non deve
+        /// essere usato da Decision, Job o MBQD.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Camminabilita fisica</b>: usa il predicato fisico e non la LOS.</item>
+        ///   <item><b>Greedy</b>: avanza verso il target provando prima l'asse dominante.</item>
+        ///   <item><b>Fail safe</b>: interrompe se il percorso non puo' essere costruito.</item>
+        /// </list>
+        /// </summary>
+        public static bool TryBuildDebugForcedGreedyPath(World world, int npcId, int startX, int startY, int targetX, int targetY, List<Vector2Int> outCells)
+        {
+            if (outCells == null)
+                return false;
+
+            outCells.Clear();
+
+            if (!world.InBounds(startX, startY) || !world.InBounds(targetX, targetY))
+                return false;
+
+            outCells.Add(new Vector2Int(startX, startY));
+
+            int x = startX;
+            int y = startY;
+            int safety = world.MapWidth * world.MapHeight + 8;
+
+            while ((x != targetX || y != targetY) && safety-- > 0)
+            {
+                int dx = targetX - x;
+                int dy = targetY - y;
+
+                int stepX = 0;
+                int stepY = 0;
+
+                if (Mathf.Abs(dx) >= Mathf.Abs(dy))
+                    stepX = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
+                else
+                    stepY = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
+
+                int nextX = x + stepX;
+                int nextY = y + stepY;
+
+                bool moved = false;
+                if (IsWalkableForPathing(world, npcId, nextX, nextY, targetX, targetY, usePhysical: true))
+                {
+                    x = nextX;
+                    y = nextY;
+                    outCells.Add(new Vector2Int(x, y));
+                    moved = true;
+                }
+                else
+                {
+                    if (stepX != 0)
+                    {
+                        stepX = 0;
+                        stepY = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
+                    }
+                    else
+                    {
+                        stepY = 0;
+                        stepX = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
+                    }
+
+                    nextX = x + stepX;
+                    nextY = y + stepY;
+
+                    if ((stepX != 0 || stepY != 0)
+                        && IsWalkableForPathing(world, npcId, nextX, nextY, targetX, targetY, usePhysical: true))
+                    {
+                        x = nextX;
+                        y = nextY;
+                        outCells.Add(new Vector2Int(x, y));
+                        moved = true;
+                    }
+                }
+
+                if (!moved)
+                {
+                    outCells.Clear();
+                    return false;
+                }
+            }
+
+            if (x != targetX || y != targetY)
+            {
+                outCells.Clear();
+                return false;
+            }
+
+            return true;
+        }
+
         /// <summary>
         /// Costruisce il prefisso diretto massimo coerente con il MovementSystem.
         /// Non richiede che il target finale sia interamente raggiungibile: si ferma al primo blocco.
