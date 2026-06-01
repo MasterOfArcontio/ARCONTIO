@@ -29,6 +29,7 @@ namespace Arcontio.Core
     public sealed class BeliefQueryService
     {
         private readonly List<IBeliefEvaluator> _evaluators = new(4);
+        private readonly List<BeliefEntry> _categoryEntries = new(32);
         private readonly List<BeliefEntry> _candidates = new(32);
         private readonly BeliefScoreContext _scoreContext = new();
 
@@ -81,7 +82,7 @@ namespace Arcontio.Core
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Null guard</b>: uno store assente equivale a nessuna credenza utile.</item>
-        ///   <item><b>Scan lineare</b>: sufficiente per MVP, senza indici prematuri.</item>
+        ///   <item><b>Filtro per categoria</b>: legge solo il bucket coerente con la query.</item>
         ///   <item><b>Filtro condiviso</b>: usa la stessa definizione di candidato della query completa.</item>
         /// </list>
         /// </summary>
@@ -90,12 +91,12 @@ namespace Arcontio.Core
             if (store == null)
                 return false;
 
-            var entries = store.Entries;
-            for (int i = 0; i < entries.Count; i++)
+            store.GetByCategory(query.GoalType, _categoryEntries);
+            for (int i = 0; i < _categoryEntries.Count; i++)
             {
                 // Il metodo non duplica la logica di filtro: una belief "utilizzabile"
                 // deve significare la stessa cosa sia nella query rapida sia nel ranking.
-                var belief = entries[i];
+                var belief = _categoryEntries[i];
                 if (IsUsableCandidate(belief, query))
                     return true;
             }
@@ -341,22 +342,18 @@ namespace Arcontio.Core
             }
 
             _candidates.Clear();
+            _categoryEntries.Clear();
 
-            var entries = store.Entries;
-            int matchingCategoryCount = 0;
-            for (int i = 0; i < entries.Count; i++)
+            store.GetByCategory(query.GoalType, _categoryEntries);
+            int matchingCategoryCount = _categoryEntries.Count;
+            for (int i = 0; i < _categoryEntries.Count; i++)
             {
                 if (costSample)
                     costEntriesRead++;
 
                 // Primo passaggio intenzionalmente semplice: raccogliamo solo credenze
                 // soggettive coerenti con la richiesta, senza consultare dati oggettivi.
-                var belief = entries[i];
-
-                // Il conteggio di categoria e' diagnostico: aiuta a distinguere tra
-                // "non conosco nulla di Food" e "conosco Food ma nessuna entry supera i gate".
-                if (belief.Category == query.GoalType)
-                    matchingCategoryCount++;
+                var belief = _categoryEntries[i];
 
                 if (IsUsableCandidate(belief, query))
                     _candidates.Add(belief);

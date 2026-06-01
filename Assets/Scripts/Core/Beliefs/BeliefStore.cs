@@ -43,7 +43,9 @@ namespace Arcontio.Core
         public const int DefaultMaxEntries = 64;
 
         private readonly List<BeliefEntry> _entries;
+        private readonly Dictionary<BeliefCategory, List<int>> _entryIndexesByCategory = new();
         private int _nextBeliefId = 1;
+        private bool _categoryIndexDirty = true;
 
         public int MaxEntries { get; set; }
 
@@ -192,6 +194,7 @@ namespace Arcontio.Core
                 _entries.Add(entries[i]);
 
             _nextBeliefId = nextBeliefId;
+            MarkCategoryIndexDirty();
             error = string.Empty;
             return true;
         }
@@ -266,6 +269,47 @@ namespace Arcontio.Core
                 Source = source,
                 Status = BeliefStatus.Active
             });
+            MarkCategoryIndexDirty();
+        }
+
+        // =============================================================================
+        // GetByCategory
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia in <paramref name="output"/> soltanto le credenze appartenenti alla
+        /// categoria richiesta, usando un indice interno ricostruito pigramente.
+        /// </para>
+        ///
+        /// <para><b>Indice passivo per categoria</b></para>
+        /// <para>
+        /// L'indice non decide, non ordina e non calcola punteggi. Serve solo a
+        /// evitare che le query leggano ogni belief dell'NPC quando il loro dominio
+        /// e' gia' noto, per esempio <c>Food</c> o <c>Rest</c>. La semantica resta
+        /// identica allo scan lineare perche' il chiamante riceve le stesse entry
+        /// della categoria e applica poi gli stessi filtri di status/confidence.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>output</b>: lista riusabile fornita dal chiamante.</item>
+        ///   <item><b>index rebuild</b>: avviene solo dopo inserimenti, restore o rimozioni.</item>
+        ///   <item><b>copy</b>: restituisce copie struct delle entry correnti, non riferimenti mutabili.</item>
+        /// </list>
+        /// </summary>
+        public void GetByCategory(BeliefCategory category, List<BeliefEntry> output)
+        {
+            if (output == null)
+                return;
+
+            output.Clear();
+            RebuildCategoryIndexIfDirty();
+
+            if (!_entryIndexesByCategory.TryGetValue(category, out var indexes))
+                return;
+
+            for (int i = 0; i < indexes.Count; i++)
+                output.Add(_entries[indexes[i]]);
         }
 
         // =============================================================================
@@ -298,11 +342,12 @@ namespace Arcontio.Core
 
             output.Clear();
 
-            for (int i = 0; i < _entries.Count; i++)
+            GetByCategory(category, output);
+
+            for (int i = output.Count - 1; i >= 0; i--)
             {
-                var entry = _entries[i];
-                if (entry.Category == category && entry.Status == status)
-                    output.Add(entry);
+                if (output[i].Status != status)
+                    output.RemoveAt(i);
             }
         }
 
@@ -516,6 +561,7 @@ namespace Arcontio.Core
                 if (entry.Status == BeliefStatus.Discarded)
                 {
                     _entries.RemoveAt(i);
+                    MarkCategoryIndexDirty();
                     removed++;
                     continue;
                 }
@@ -530,6 +576,7 @@ namespace Arcontio.Core
                 if (entry.Confidence <= config.removeConfidenceThreshold)
                 {
                     _entries.RemoveAt(i);
+                    MarkCategoryIndexDirty();
                     removed++;
                     continue;
                 }
@@ -587,6 +634,7 @@ namespace Arcontio.Core
                 if (_entries[i].Status == BeliefStatus.Discarded)
                 {
                     _entries.RemoveAt(i);
+                    MarkCategoryIndexDirty();
                     return;
                 }
             }
@@ -606,7 +654,62 @@ namespace Arcontio.Core
             }
 
             if (weakestIndex >= 0)
+            {
                 _entries.RemoveAt(weakestIndex);
+                MarkCategoryIndexDirty();
+            }
+        }
+
+        // =============================================================================
+        // MarkCategoryIndexDirty
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Segna l'indice per categoria come da ricostruire alla prossima query.
+        /// </para>
+        /// </summary>
+        private void MarkCategoryIndexDirty()
+        {
+            _categoryIndexDirty = true;
+        }
+
+        // =============================================================================
+        // RebuildCategoryIndexIfDirty
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce l'indice categoria -> posizioni nella lista solo quando la
+        /// forma della lista e' cambiata.
+        /// </para>
+        ///
+        /// <para><b>Behavior-preserving</b></para>
+        /// <para>
+        /// L'indice conserva solo gli indici delle entry gia' presenti in
+        /// <c>_entries</c>. Non rimuove credenze, non cambia status e non influenza
+        /// lo score: riduce soltanto il numero di entry visitate dalle query mirate.
+        /// </para>
+        /// </summary>
+        private void RebuildCategoryIndexIfDirty()
+        {
+            if (!_categoryIndexDirty)
+                return;
+
+            foreach (var bucket in _entryIndexesByCategory.Values)
+                bucket.Clear();
+
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                var category = _entries[i].Category;
+                if (!_entryIndexesByCategory.TryGetValue(category, out var bucket))
+                {
+                    bucket = new List<int>(8);
+                    _entryIndexesByCategory[category] = bucket;
+                }
+
+                bucket.Add(i);
+            }
+
+            _categoryIndexDirty = false;
         }
 
         // =============================================================================
