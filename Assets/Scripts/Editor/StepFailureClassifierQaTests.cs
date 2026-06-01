@@ -44,6 +44,7 @@ namespace Arcontio.Tests
                 tests.ConsumeUnavailableClassifiesAsResourceMissing();
                 tests.BlockedMoveClassifiesAsPathBlocked();
                 tests.ReservationDeniedClassifiesAsReservationConflict();
+                tests.LockedDoorClassifiesAsDoorLocked();
                 tests.CancelledStepClassifiesAsInterrupted();
                 tests.DropOccupiedClassifiesAsOutputBlockedWhenReasonIsGeneric();
                 tests.ClassifierDoesNotExposeWorldCommandOrRuntimeSystemSurface();
@@ -127,6 +128,19 @@ namespace Arcontio.Tests
 
             Assert.That(classification.HasClassification, Is.True);
             Assert.That(classification.FailureKind, Is.EqualTo(JobStepFailureKind.ReservationConflict));
+        }
+
+        [Test]
+        public void LockedDoorClassifiesAsDoorLocked()
+        {
+            var classification = StepFailureClassifier.Classify(
+                StepResult.Failed(JobFailureReason.MovementFailed, "TraversalDoorLocked"),
+                MoveAction(),
+                0,
+                0);
+
+            Assert.That(classification.HasClassification, Is.True);
+            Assert.That(classification.FailureKind, Is.EqualTo(JobStepFailureKind.DoorLocked));
         }
 
         [Test]

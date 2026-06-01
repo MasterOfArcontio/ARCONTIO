@@ -54,6 +54,7 @@ namespace Arcontio.Tests
                 new RunningActionProductiveTickingQaTests().DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
+                new RunningActionProductiveTickingQaTests().KnownRouteMoveToReturnsLockedDoorFailure();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToWritesLifecycleExplainabilityForEachCell();
                 new RunningActionProductiveTickingQaTests().DevTransportTemplatePreparesDeclaredRoutesWithoutMoveIntentFallback();
 
@@ -637,6 +638,72 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // KnownRouteMoveToReturnsLockedDoorFailure
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che una porta chiusa a chiave attraversata da MoveTo produca un
+        /// fallimento esplicito, classificabile dalla matrice dei recuperi.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: errore fisico locale, non blocco silenzioso</b></para>
+        /// <para>
+        /// La running action MoveTo non deve aprire porte bloccate e non deve
+        /// trasformarle in generico "non mi muovo". Restituisce invece
+        /// <c>TraversalDoorLocked</c>, che il classifier traduce in
+        /// <c>DoorLocked</c> e che il JSON delle recovery puo' gestire in modo
+        /// dichiarativo.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void KnownRouteMoveToReturnsLockedDoorFailure()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 2);
+            world.ObjectDefs["qa_locked_door"] = new ObjectDef
+            {
+                Id = "qa_locked_door",
+                DisplayName = "QA Locked Door",
+                IsOccluder = true,
+                IsInteractable = true,
+                IsDoor = true,
+                IsLockable = true,
+                BlocksVision = true,
+                BlocksMovement = true,
+                VisionCost = 1f
+            };
+
+            var startCell = world.GridPos[npcId];
+            var doorCell = new Vector2Int(startCell.X + 1, startCell.Y);
+            var targetCell = new Vector2Int(startCell.X + 2, startCell.Y);
+            int doorObjectId = world.CreateObject("qa_locked_door", doorCell.x, doorCell.y);
+            world.Objects[doorObjectId].IsLocked = true;
+            Assert.That(world.BlocksMovementAt(doorCell.x, doorCell.y), Is.True);
+
+            world.SetDebugDirectPathForNpc(
+                npcId,
+                new List<Vector2Int>
+                {
+                    new(startCell.X, startCell.Y),
+                    doorCell,
+                    targetCell
+                });
+
+            var job = MakeMoveJob(npcId, "job-move-known-route-locked-door", targetCell);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.Objects[doorObjectId].IsOpen, Is.False);
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
+            Assert.That(job.FailureReason, Is.EqualTo(JobFailureReason.MovementFailed));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+        }
+
+        // =============================================================================
         // OneCellMoveTraversalHonorsConfiguredFourTickDuration
         // =============================================================================
         /// <summary>
@@ -1117,6 +1184,7 @@ namespace Arcontio.Tests
                 new Arcontio.Core.Social { JusticePerception01 = 0.5f },
                 x: 1,
                 y: 1);
+            world.NpcFacing[npcId] = CardinalDirection.East;
             return world;
         }
 

@@ -44,6 +44,7 @@ namespace Arcontio.Tests
             Assert.That(Enum.IsDefined(typeof(JobStepFailureKind), JobStepFailureKind.TargetUnavailable), Is.True);
             Assert.That(Enum.IsDefined(typeof(JobStepFailureKind), JobStepFailureKind.PathBlocked), Is.True);
             Assert.That(Enum.IsDefined(typeof(JobStepFailureKind), JobStepFailureKind.AccessDenied), Is.True);
+            Assert.That(Enum.IsDefined(typeof(JobStepFailureKind), JobStepFailureKind.DoorLocked), Is.True);
             Assert.That(Enum.IsDefined(typeof(JobStepFailureKind), JobStepFailureKind.ReservationConflict), Is.True);
             Assert.That(Enum.IsDefined(typeof(JobStepFailureKind), JobStepFailureKind.ResourceMissing), Is.True);
             Assert.That(Enum.IsDefined(typeof(JobStepFailureKind), JobStepFailureKind.ActorInventoryFull), Is.True);

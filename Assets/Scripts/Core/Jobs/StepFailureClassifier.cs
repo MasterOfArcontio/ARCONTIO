@@ -113,6 +113,9 @@ namespace Arcontio.Core
             if (IsTargetInvalidDiagnostic(result.DiagnosticMessage))
                 return JobStepFailureKind.TargetInvalid;
 
+            if (IsDoorLockedDiagnostic(result.DiagnosticMessage))
+                return JobStepFailureKind.DoorLocked;
+
             if (IsPathBlockedDiagnostic(result.DiagnosticMessage))
                 return JobStepFailureKind.PathBlocked;
 
@@ -166,6 +169,12 @@ namespace Arcontio.Core
             return Contains(diagnostic, "Blocked")
                 || Contains(diagnostic, "Occupied")
                 || Contains(diagnostic, "TraversalTarget");
+        }
+
+        private static bool IsDoorLockedDiagnostic(string diagnostic)
+        {
+            return Contains(diagnostic, "TraversalDoorLocked")
+                || Contains(diagnostic, "DoorLocked");
         }
 
         private static bool IsReservationDiagnostic(string diagnostic)

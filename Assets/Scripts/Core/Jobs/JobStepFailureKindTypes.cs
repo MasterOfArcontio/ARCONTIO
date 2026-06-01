@@ -24,6 +24,7 @@ namespace Arcontio.Core
     ///   <item><b>TargetUnavailable</b>: il target esiste concettualmente ma non e' disponibile ora.</item>
     ///   <item><b>PathBlocked</b>: il percorso locale o la cella di avanzamento sono bloccati.</item>
     ///   <item><b>AccessDenied</b>: una regola operativa impedisce l'accesso al target.</item>
+    ///   <item><b>DoorLocked</b>: una porta chiusa a chiave blocca fisicamente il movimento.</item>
     ///   <item><b>ReservationConflict</b>: una reservation esistente impedisce lo step.</item>
     ///   <item><b>ResourceMissing</b>: la risorsa consumabile o materiale richiesta manca.</item>
     ///   <item><b>ActorInventoryFull</b>: l'attore non puo' ricevere ulteriore carico.</item>
@@ -41,6 +42,7 @@ namespace Arcontio.Core
         TargetUnavailable = 20,
         PathBlocked = 30,
         AccessDenied = 40,
+        DoorLocked = 45,
         ReservationConflict = 50,
         ResourceMissing = 60,
         ActorInventoryFull = 70,

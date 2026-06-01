@@ -39,6 +39,7 @@ namespace Arcontio.Tests
                 var tests = new StepRecoveryPolicyRegistryQaTests();
 
                 tests.RegistryLoadsPolicyDefinitionsFromJson();
+                tests.DefaultRegistryContainsLockedDoorPolicy();
                 tests.RegistryReturnsEmptyForMissingPolicy();
                 tests.RegistryIgnoresInvalidFailureKindsAndStrategies();
 
@@ -65,6 +66,17 @@ namespace Arcontio.Tests
             Assert.That(policy.ContainsStrategy(StepRecoveryStrategy.FindAlternateCell), Is.True);
             Assert.That(policy.MaxRetryCount, Is.EqualTo(2));
             Assert.That(policy.MaxRecoveryTicks, Is.EqualTo(12));
+        }
+
+        [Test]
+        public void DefaultRegistryContainsLockedDoorPolicy()
+        {
+            var registry = StepRecoveryPolicyRegistry.LoadDefault();
+
+            Assert.That(registry.TryGetPolicy(JobStepFailureKind.DoorLocked, out var policy), Is.True);
+            Assert.That(policy.FailureKind, Is.EqualTo(JobStepFailureKind.DoorLocked));
+            Assert.That(policy.ContainsStrategy(StepRecoveryStrategy.FailJob), Is.True);
+            Assert.That(policy.MaxRetryCount, Is.EqualTo(0));
         }
 
         [Test]

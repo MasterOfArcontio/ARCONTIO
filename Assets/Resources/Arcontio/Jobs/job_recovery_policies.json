@@ -80,6 +80,15 @@
       "maxSearchRadius": 0,
       "maxAlternativeTargets": 0,
       "maxRepathAttempts": 0
+    },
+    {
+      "failureKind": "DoorLocked",
+      "strategies": [ "FailPhase", "FailJob" ],
+      "maxRetryCount": 0,
+      "maxRecoveryTicks": 8,
+      "maxSearchRadius": 0,
+      "maxAlternativeTargets": 0,
+      "maxRepathAttempts": 0
     }
   ]
 }
