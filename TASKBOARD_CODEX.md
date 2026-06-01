@@ -146,7 +146,7 @@ Checkpoint v0.16 pianificati:
 
 Checkpoint v0.17 pianificati:
 
-- `v0.17a`: audit punti caldi runtime per NPC;
+- `v0.17a`: audit punti caldi runtime per NPC - DONE;
 - `v0.17b`: configurazione osservatorio con costo nullo quando spento;
 - `v0.17c`: misure per sistema: percezione, memoria, belief, query, decisione, EL, job, fallback;
 - `v0.17d`: misure per NPC e individuazione NPC piu' costosi;
