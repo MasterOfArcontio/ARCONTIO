@@ -141,6 +141,28 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void EatKnownFoodDecisionUsesSelectedBeliefWhenMultipleFoodStocksExist()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
+            AddCommunityFoodStock(world, foodId: 11, x: 2, y: 1, units: 3);
+            AddCommunityFoodStock(world, foodId: 44, x: 7, y: 5, units: 3);
+            AddFoodBelief(world, npcId, 7, 5);
+            PreferKnownFoodDecision(world, npcId);
+            var orchestrator = new DecisionOrchestratorSystem(
+                decisionEveryTicks: 1,
+                maxSeekRangeCells: 16,
+                enableFoodJobVerticalSlice: true,
+                jobTemplateRegistry: MakeRegistry());
+
+            orchestrator.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.EatKnownFood));
+            Assert.That(job.Request.TargetCell, Is.EqualTo(new Vector2Int(7, 5)));
+            Assert.That(job.Request.TargetObjectId, Is.EqualTo(44));
+        }
+
+        [Test]
         public void FoodFactoryPrebuiltRequestPreservesDecisionBoundaryFields()
         {
             var registry = MakeRegistry();
@@ -541,6 +563,36 @@ namespace Arcontio.Tests
 
             AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
             Assert.That(HasRememberedObject(world, npcId, objectId: 77, defId: "food_stock_private", x: 6, y: 5), Is.False);
+        }
+
+        [Test]
+        public void ObjectPerceptionSpotsFoodInNpcCurrentCell()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            world.NpcFacing[npcId] = CardinalDirection.North;
+            var bus = new MessageBus();
+            var perception = new ObjectPerceptionSystem();
+
+            perception.Update(world, new Tick(6, 1f), bus, new Telemetry());
+
+            var events = new List<ISimEvent>();
+            bus.DrainTo(events);
+            Assert.That(ContainsObjectSpottedEvent(events, npcId, foodId, "food_stock", 5, 5), Is.True);
+        }
+
+        [Test]
+        public void ObjectPerceptionDiscardsSameCellMissingFoodBelief()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            world.NpcFacing[npcId] = CardinalDirection.West;
+            AddFoodBelief(world, npcId, 5, 5);
+            AddRememberedWorldObject(world, npcId, objectId: 78, x: 5, y: 5, OwnerKind.Community, ownerId: 0);
+            var perception = new ObjectPerceptionSystem();
+
+            perception.Update(world, new Tick(7, 1f), new MessageBus(), new Telemetry());
+
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            Assert.That(HasRememberedObject(world, npcId, objectId: 78, defId: "food_stock_private", x: 5, y: 5), Is.False);
         }
 
         [Test]
@@ -1063,6 +1115,32 @@ namespace Arcontio.Tests
                     && slot.DefId == defId
                     && slot.CellX == x
                     && slot.CellY == y)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ContainsObjectSpottedEvent(
+            List<ISimEvent> events,
+            int npcId,
+            int objectId,
+            string defId,
+            int x,
+            int y)
+        {
+            for (int i = 0; i < events.Count; i++)
+            {
+                if (events[i] is not ObjectSpottedEvent spotted)
+                    continue;
+
+                if (spotted.ObserverNpcId == npcId
+                    && spotted.ObjectId == objectId
+                    && spotted.DefId == defId
+                    && spotted.CellX == x
+                    && spotted.CellY == y)
                 {
                     return true;
                 }

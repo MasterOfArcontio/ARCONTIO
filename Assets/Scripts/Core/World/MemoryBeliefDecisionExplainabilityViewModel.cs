@@ -5,8 +5,10 @@
 // =============================================================================
 //
 // ViewModel runtime read-only per l'Explainability Layer Memory/Belief/Query/
-// Decision. Il builder legge soltanto il registry EL-MBQD gia' popolato dagli
-// emitter: non interroga MemoryStore, BeliefStore, World.Objects o FoodStocks.
+// Decision. Il builder legge il registry EL-MBQD gia' popolato dagli emitter e,
+// per il tab Belief, copia anche il BeliefStore corrente dell'NPC selezionato.
+// Non interroga World.Objects o FoodStocks e non usa dati oggettivi per correggere
+// la diagnostica: separa soltanto stato belief attuale e storico mutazioni.
 // =============================================================================
 
 using System;
@@ -35,7 +37,8 @@ namespace Arcontio.Core
     ///   <item><b>Counts</b>: conteggi per famiglia diagnostica.</item>
     ///   <item><b>Latest*</b>: ultimo snapshot di ogni famiglia.</item>
     ///   <item><b>MemoryBars</b>: aggregazione per traceType delle memory recenti.</item>
-    ///   <item><b>BeliefRows</b>: belief recenti deduplicate per id/categoria.</item>
+    ///   <item><b>BeliefRows</b>: stato corrente del BeliefStore dell'NPC selezionato.</item>
+    ///   <item><b>BeliefMutationRows</b>: ultime mutazioni belief copiate dallo storico EL e limitate per la UI.</item>
     ///   <item><b>Timeline</b>: righe recenti combinate e ordinate per tick.</item>
     /// </list>
     /// </summary>
@@ -63,6 +66,7 @@ namespace Arcontio.Core
         public string HeaderSubtitle = string.Empty;
         public readonly List<MemoryBeliefDecisionMetricView> MemoryBars = new(12);
         public readonly List<MemoryBeliefDecisionBeliefView> BeliefRows = new(16);
+        public readonly List<MemoryBeliefDecisionBeliefView> BeliefMutationRows = new(12);
         public readonly MemoryBeliefDecisionMemoryView LatestMemory = new();
         public readonly MemoryBeliefDecisionBeliefMutationView LatestBeliefMutation = new();
         public readonly MemoryBeliefDecisionQueryView LatestQuery = new();
@@ -463,11 +467,12 @@ namespace Arcontio.Core
     /// runtime contenuto nel <see cref="World"/>.
     /// </para>
     ///
-    /// <para><b>Nessuna rilettura cognitiva</b></para>
+    /// <para><b>Diagnostica separata da decisione</b></para>
     /// <para>
-    /// Il builder non legge MemoryStore, BeliefStore o oggetti fisici. Se una riga
-    /// deve comparire nel pannello, deve essere stata emessa come trace EL-MBQD.
-    /// Questo mantiene il pannello allineato al JSONL e impedisce onniscienza debug.
+    /// Il builder usa il registry EL-MBQD per storico, query, decisioni e job. Per
+    /// il tab Belief legge anche il <c>BeliefStore</c> corrente dell'NPC, per evitare
+    /// che il pannello confonda mutazioni recenti con credenze vive. La lettura resta
+    /// diagnostica: non accede a oggetti fisici, stock, path o altri dati oggettivi.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -584,7 +589,10 @@ namespace Arcontio.Core
                 BuildMemoryBars(store, output.MemoryBars);
 
             if (buildBelief)
-                BuildBeliefRows(store, output.BeliefRows);
+            {
+                BuildCurrentBeliefRows(world, npcId, output.BeliefRows);
+                BuildBeliefMutationRows(store, output.BeliefMutationRows, maxRows: 12);
+            }
 
             if (buildAll || buildMemory)
                 BuildTimeline(store, output.Timeline, maxTimelineRows, buildScope);
@@ -615,6 +623,7 @@ namespace Arcontio.Core
             output.HeaderSubtitle = string.Empty;
             output.MemoryBars.Clear();
             output.BeliefRows.Clear();
+            output.BeliefMutationRows.Clear();
             output.IntentOutcomeRows.Clear();
             output.Timeline.Clear();
             ResetMemory(output.LatestMemory);
@@ -947,7 +956,33 @@ namespace Arcontio.Core
             }
         }
 
-        private static void BuildBeliefRows(MemoryBeliefDecisionExplainabilityNpcStore store, List<MemoryBeliefDecisionBeliefView> output)
+        private static void BuildCurrentBeliefRows(World world, int npcId, List<MemoryBeliefDecisionBeliefView> output)
+        {
+            output.Clear();
+
+            if (world == null
+                || world.Beliefs == null
+                || !world.Beliefs.TryGetValue(npcId, out var beliefStore)
+                || beliefStore == null)
+            {
+                return;
+            }
+
+            var entries = beliefStore.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var view = new MemoryBeliefDecisionBeliefView();
+                FillBelief(view, entries[i]);
+                output.Add(view);
+            }
+
+            output.Sort(CompareBeliefRows);
+        }
+
+        private static void BuildBeliefMutationRows(
+            MemoryBeliefDecisionExplainabilityNpcStore store,
+            List<MemoryBeliefDecisionBeliefView> output,
+            int maxRows)
         {
             output.Clear();
             TraceBuffer.Clear();
@@ -955,11 +990,11 @@ namespace Arcontio.Core
 
             for (int i = TraceBuffer.Count - 1; i >= 0; i--)
             {
+                if (output.Count >= maxRows)
+                    break;
+
                 var record = TraceBuffer[i]?.Belief;
                 if (record == null)
-                    continue;
-
-                if (ContainsBelief(output, record.Belief.BeliefId, record.Belief.Category))
                     continue;
 
                 var view = new MemoryBeliefDecisionBeliefView();
@@ -1174,6 +1209,19 @@ namespace Arcontio.Core
             view.ColorRole = ResolveBeliefStatusColor(view.Status);
         }
 
+        private static void FillBelief(MemoryBeliefDecisionBeliefView view, BeliefEntry belief)
+        {
+            view.BeliefId = belief.BeliefId;
+            view.Category = belief.Category.ToString();
+            view.Status = belief.Status.ToString();
+            view.Source = belief.Source.ToString();
+            view.EstimatedCell = FormatCell(belief.EstimatedPosition);
+            view.Confidence = Mathf.Clamp01(belief.Confidence);
+            view.Freshness = Mathf.Clamp01(belief.Freshness);
+            view.SourceCount = belief.SourceCount;
+            view.ColorRole = ResolveBeliefStatusColor(view.Status);
+        }
+
         private static void FillContributions(List<MemoryBeliefDecisionContributionView> output, MemoryBeliefDecisionScoreContributionRef[] contributions)
         {
             output.Clear();
@@ -1239,16 +1287,17 @@ namespace Arcontio.Core
             view.DiagnosticMessage = result?.DiagnosticMessage ?? string.Empty;
         }
 
-        private static bool ContainsBelief(List<MemoryBeliefDecisionBeliefView> rows, int beliefId, BeliefCategory category)
+        private static int CompareBeliefRows(MemoryBeliefDecisionBeliefView a, MemoryBeliefDecisionBeliefView b)
         {
-            string categoryText = category.ToString();
-            for (int i = 0; i < rows.Count; i++)
-            {
-                if (rows[i].BeliefId == beliefId && string.Equals(rows[i].Category, categoryText, StringComparison.Ordinal))
-                    return true;
-            }
+            int categoryCompare = string.Compare(a.Category, b.Category, StringComparison.Ordinal);
+            if (categoryCompare != 0)
+                return categoryCompare;
 
-            return false;
+            int statusCompare = string.Compare(a.Status, b.Status, StringComparison.Ordinal);
+            if (statusCompare != 0)
+                return statusCompare;
+
+            return a.BeliefId.CompareTo(b.BeliefId);
         }
 
         private static string BuildTimelineSummary(MemoryBeliefDecisionTrace trace)
@@ -1401,7 +1450,7 @@ namespace Arcontio.Core
             view.HasSourceTrace = false;
             view.SourceTraceType = string.Empty;
             view.Reason = string.Empty;
-            FillBelief(view.Belief, default);
+            FillBelief(view.Belief, default(MemoryBeliefDecisionBeliefRef));
         }
 
         private static void ResetQuery(MemoryBeliefDecisionQueryView view)
@@ -1417,7 +1466,7 @@ namespace Arcontio.Core
             view.IsEmpty = false;
             view.EmptyReason = string.Empty;
             view.FinalScore = 0f;
-            FillBelief(view.Winner, default);
+            FillBelief(view.Winner, default(MemoryBeliefDecisionBeliefRef));
             view.Contributions.Clear();
         }
 

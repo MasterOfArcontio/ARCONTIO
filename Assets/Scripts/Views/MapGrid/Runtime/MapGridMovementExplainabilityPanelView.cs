@@ -443,7 +443,7 @@ namespace Arcontio.View.MapGrid
             _memoryTimelineText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Memory].transform, "timeline memory recente", "#6E7681");
 
             _pageRoots[(int)MapGridExplainabilityPanelPage.Belief] = CreatePage("BeliefPage");
-            _beliefEntriesText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Belief].transform, "belief entries recenti", "#3FB950");
+            _beliefEntriesText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Belief].transform, "belief correnti + mutazioni recenti", "#3FB950");
             _beliefQueryText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Belief].transform, "ultima query eseguita", "#58A6FF");
             _beliefMutationText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Belief].transform, "ultima mutazione belief", "#D29922");
 

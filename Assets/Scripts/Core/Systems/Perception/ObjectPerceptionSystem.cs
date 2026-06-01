@@ -139,6 +139,8 @@ namespace Arcontio.Core
                     if (dist > visionRange)
                         continue;
 
+                    if (dist > 0)
+                    {
                     // Cone check (opzionale)
                     if (useCone)
                     {
@@ -159,6 +161,8 @@ namespace Arcontio.Core
                         continue;
 
                     // Patch 0.02.5A: qualità centralizzata in FovUtils.ObservationQuality
+                    }
+
                     float q = FovUtils.ObservationQuality(dist, visionRange);
 
                     bus.Publish(new ObjectSpottedEvent(
@@ -259,6 +263,9 @@ namespace Arcontio.Core
             int dist = FovUtils.Manhattan(npcX, npcY, cellX, cellY);
             if (dist > visionRange)
                 return false;
+
+            if (dist == 0)
+                return true;
 
             if (useCone)
             {

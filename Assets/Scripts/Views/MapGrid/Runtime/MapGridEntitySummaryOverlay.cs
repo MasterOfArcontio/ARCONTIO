@@ -1512,15 +1512,36 @@ namespace Arcontio.View.MapGrid
 
         private void AppendMbqdBelief(MemoryBeliefDecisionExplainabilityViewModel model)
         {
+            _sbMbqdBeliefEntries.Append("<b>belief correnti</b>").Append('\n');
             if (model.BeliefRows.Count == 0)
             {
-                _sbMbqdBeliefEntries.Append("<color=#6E7681>(nessuna belief mutation recente)</color>");
+                _sbMbqdBeliefEntries.Append("<color=#6E7681>(nessun belief corrente)</color>");
             }
             else
             {
                 for (int i = 0; i < model.BeliefRows.Count; i++)
                 {
                     var belief = model.BeliefRows[i];
+                    _sbMbqdBeliefEntries
+                        .Append("<color=").Append(ColorFor(belief.ColorRole)).Append(">")
+                        .Append('#').Append(belief.BeliefId).Append(' ')
+                        .Append(belief.Category).Append("  ").Append(belief.EstimatedCell)
+                        .Append("</color>")
+                        .Append("  <b>STATUS=").Append(belief.Status).Append("</b>")
+                        .Append("  conf=").Append(belief.Confidence.ToString("0.00"))
+                        .Append("  fresh=").Append(belief.Freshness.ToString("0.00"))
+                        .Append("  source=").Append(belief.Source)
+                        .Append("  sources=").Append(belief.SourceCount)
+                        .Append('\n');
+                }
+            }
+
+            if (model.BeliefMutationRows.Count > 0)
+            {
+                _sbMbqdBeliefEntries.Append('\n').Append("<b>mutazioni recenti EL</b>").Append('\n');
+                for (int i = 0; i < model.BeliefMutationRows.Count; i++)
+                {
+                    var belief = model.BeliefMutationRows[i];
                     _sbMbqdBeliefEntries
                         .Append("<color=").Append(ColorFor(belief.ColorRole)).Append(">")
                         .Append('#').Append(belief.BeliefId).Append(' ')
