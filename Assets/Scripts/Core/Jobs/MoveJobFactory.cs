@@ -15,9 +15,9 @@ namespace Arcontio.Core
     /// <para>
     /// La factory non introduce pathfinding, query o decisioni. Riceve una cella
     /// target esplicita, materializza il template JSON <c>generic.move_to_cell.v1</c>
-    /// e produce un <c>Job</c> che il <c>JobExecutionSystem</c> traduce in
-    /// <c>SetMoveIntentCommand</c>. Il MovementSystem resta l'unico responsabile
-    /// della navigazione concreta.
+    /// e produce un <c>Job</c>. Con il runtime movimento Job acceso, questo job
+    /// richiede una route gia' lecita o un target adiacente: non calcola percorsi
+    /// nascosti e non deve usare <c>SetMoveIntentCommand</c> come percorso ordinario.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
