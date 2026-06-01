@@ -85,7 +85,7 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.18d - QA profiler comparativo pre/post ottimizzazione`
+`v0.18e - Ottimizzazione NpcPerceptionSystem con indice spaziale a zone`
 
 Residual follow-ups / future hardening:
 
@@ -162,7 +162,8 @@ Checkpoint v0.18 pianificati:
 - `v0.18b`: riduzione BeliefQuery con indice per categoria belief - DONE;
 - `v0.18c`: BeliefDecay discreto per categoria con parametri da JSON - DONE;
 - `v0.18d`: QA profiler comparativo pre/post ottimizzazione con 1/2/4/8/16 NPC - PARTIAL, protocollo pronto;
-- `v0.18e`: closeout ottimizzazione runtime percezione/belief/query.
+- `v0.18e`: ottimizzazione NpcPerceptionSystem con indice spaziale a zone - DONE;
+- `v0.18f`: closeout ottimizzazione runtime percezione/belief/query.
 
 Checkpoint v0.12 completati:
 

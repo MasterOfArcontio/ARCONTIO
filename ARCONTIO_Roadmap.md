@@ -1096,7 +1096,8 @@ La fase NON cambia semantica decisionale, memoria, percezione o belief. Ottimizz
 | v0.18b | Riduzione BeliefQuery con indice per categoria belief | ✅ |
 | v0.18c | BeliefDecay discreto per categoria con parametri da JSON | ✅ |
 | v0.18d | QA profiler comparativo pre/post ottimizzazione con 1/2/4/8/16 NPC | ⚠️ |
-| v0.18e | Closeout ottimizzazione runtime percezione/belief/query | ⏳ |
+| v0.18e | Ottimizzazione NpcPerceptionSystem con indice spaziale a zone | ✅ |
+| v0.18f | Closeout ottimizzazione runtime percezione/belief/query | ⏳ |
 
 > **Nota architetturale v0.18:** questa fase nasce da misure reali, non da ottimizzazione preventiva. Ogni patch deve ridurre costo runtime senza introdurre onniscienza, senza cambiare score decisionali e senza rendere i sistemi diagnostici nuove sorgenti di costo.
 
