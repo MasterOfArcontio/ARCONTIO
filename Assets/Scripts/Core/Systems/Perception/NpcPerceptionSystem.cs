@@ -32,6 +32,7 @@ namespace Arcontio.Core
         public int Period => 1;
 
         private readonly List<int> _npcIds = new(2048);
+        private readonly List<long> _occupiedCellKeys = new(2048);
         private readonly Dictionary<long, List<int>> _npcIdsByCell = new(2048);
 
         // =============================================================================
@@ -93,71 +94,64 @@ namespace Arcontio.Core
                 int ox = observerPos.X;
                 int oy = observerPos.Y;
 
-                int minX = ox - visionRange;
-                int maxX = ox + visionRange;
-                int minY = oy - visionRange;
-                int maxY = oy + visionRange;
-
-                for (int y = minY; y <= maxY; y++)
+                for (int c = 0; c < _occupiedCellKeys.Count; c++)
                 {
-                    for (int x = minX; x <= maxX; x++)
+                    long cellKey = _occupiedCellKeys[c];
+                    if (!_npcIdsByCell.TryGetValue(cellKey, out var targetIds) || targetIds.Count == 0)
+                        continue;
+
+                    int firstTargetId = targetIds[0];
+                    if (!world.GridPos.TryGetValue(firstTargetId, out var firstTargetPos))
+                        continue;
+
+                    if (costSample)
+                        costCandidateCells++;
+
+                    int cellDistance = FovUtils.Manhattan(ox, oy, firstTargetPos.X, firstTargetPos.Y);
+                    if (cellDistance <= 0 || cellDistance > visionRange)
+                        continue;
+
+                    for (int j = 0; j < targetIds.Count; j++)
                     {
-                        if (!world.InBounds(x, y))
+                        int targetId = targetIds[j];
+                        if (targetId == observerId)
                             continue;
 
                         if (costSample)
-                            costCandidateCells++;
+                            costPairChecks++;
 
-                        int cellDistance = FovUtils.Manhattan(ox, oy, x, y);
-                        if (cellDistance <= 0 || cellDistance > visionRange)
+                        if (costPerNpc)
+                            costNpcPairChecks++;
+
+                        if (!world.GridPos.TryGetValue(targetId, out var targetPos))
                             continue;
 
-                        long cellKey = MakeCellKey(x, y);
-                        if (!_npcIdsByCell.TryGetValue(cellKey, out var targetIds))
+                        int tx = targetPos.X;
+                        int ty = targetPos.Y;
+                        int dist = FovUtils.Manhattan(ox, oy, tx, ty);
+
+                        if (dist <= 0 || dist > visionRange)
                             continue;
 
-                        for (int j = 0; j < targetIds.Count; j++)
-                        {
-                            int targetId = targetIds[j];
-                            if (targetId == observerId)
-                                continue;
+                        if (useCone && !FovUtils.IsInCone(ox, oy, facing, tx, ty, coneSlope))
+                            continue;
 
-                            if (costSample)
-                                costPairChecks++;
+                        if (!world.HasLineOfSight(ox, oy, tx, ty))
+                            continue;
 
-                            if (costPerNpc)
-                                costNpcPairChecks++;
+                        float quality01 = FovUtils.ObservationQuality(dist, visionRange);
 
-                            if (!world.GridPos.TryGetValue(targetId, out var targetPos))
-                                continue;
+                        bus.Publish(new NpcSpottedEvent(
+                            observerNpcId: observerId,
+                            observedNpcId: targetId,
+                            cellX: tx,
+                            cellY: ty,
+                            distanceCells: dist,
+                            witnessQuality01: quality01));
 
-                            int tx = targetPos.X;
-                            int ty = targetPos.Y;
-                            int dist = FovUtils.Manhattan(ox, oy, tx, ty);
-
-                            if (dist <= 0 || dist > visionRange)
-                                continue;
-
-                            if (useCone && !FovUtils.IsInCone(ox, oy, facing, tx, ty, coneSlope))
-                                continue;
-
-                            if (!world.HasLineOfSight(ox, oy, tx, ty))
-                                continue;
-
-                            float quality01 = FovUtils.ObservationQuality(dist, visionRange);
-
-                            bus.Publish(new NpcSpottedEvent(
-                                observerNpcId: observerId,
-                                observedNpcId: targetId,
-                                cellX: tx,
-                                cellY: ty,
-                                distanceCells: dist,
-                                witnessQuality01: quality01));
-
-                            spotted++;
-                            if (costPerNpc)
-                                costNpcSpotted++;
-                        }
+                        spotted++;
+                        if (costPerNpc)
+                            costNpcSpotted++;
                     }
                 }
 
@@ -194,6 +188,8 @@ namespace Arcontio.Core
         /// </summary>
         private void RebuildNpcCellIndex(World world)
         {
+            _occupiedCellKeys.Clear();
+
             foreach (var bucket in _npcIdsByCell.Values)
                 bucket.Clear();
 
@@ -208,6 +204,7 @@ namespace Arcontio.Core
                 {
                     bucket = new List<int>(1);
                     _npcIdsByCell[key] = bucket;
+                    _occupiedCellKeys.Add(key);
                 }
 
                 bucket.Add(npcId);
