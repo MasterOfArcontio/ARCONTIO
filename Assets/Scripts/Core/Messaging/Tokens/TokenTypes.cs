@@ -28,6 +28,10 @@ namespace Arcontio.Core
         TheftReportVictim,
         TheftReportWitness,
 
+        // Needs / observed facts
+        FoodConsumedReport,
+        BedRestedReport,
+
         // (futuro) DeathNotice, Accusation, ResourceHint, ecc.
     }
 

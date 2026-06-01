@@ -30,6 +30,9 @@ namespace Arcontio.Core
 
             // Patch 0.01P3 extension: comunicazione furto
             _rules.Add(new AssimilateTheftReportRule());
+
+            // Comunicazione soggettiva minima dei fatti needs osservati.
+            _rules.Add(new AssimilateNeedsObservationRule());
         }
 
         /// <summary>

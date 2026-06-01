@@ -38,6 +38,7 @@ namespace Arcontio.Core
             // Rules minime (roadmap)
             _rules.Add(new PredatorAlertEmissionRule());
             _rules.Add(new HelpRequestEmissionRule());
+            _rules.Add(new NeedsObservationEmissionRule());
         }
 
         /// <summary>
