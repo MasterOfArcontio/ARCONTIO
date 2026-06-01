@@ -146,7 +146,8 @@ namespace Arcontio.Core
             if (HasUsableDirectRoute(world, npcId, action.TargetCell))
                 return;
 
-            if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition: true))
+            bool requireCurrentAcquisition = !CanUseDeclaredBeliefTargetRoute(job);
+            if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition))
                 return;
 
             if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
@@ -179,6 +180,15 @@ namespace Arcontio.Core
                 && macro.Active
                 && direct.FinalTargetCellX == macro.ImmediateTargetX
                 && direct.FinalTargetCellY == macro.ImmediateTargetY;
+        }
+
+        private static bool CanUseDeclaredBeliefTargetRoute(Job job)
+        {
+            return job != null
+                && job.Request.IntentKind == DecisionIntentKind.EatKnownFood
+                && string.Equals(job.Plan?.PlanId, JobTemplateRegistry.FoodKnownCommunityStockTemplateId, System.StringComparison.Ordinal)
+                && job.Request.HasTargetCell
+                && job.Request.TargetObjectId > 0;
         }
 
         private static bool TryPrepareDirectRouteToFinalTarget(
