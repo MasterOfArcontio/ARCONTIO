@@ -553,10 +553,11 @@ namespace Arcontio.Tests
         [Test]
         public void AssignedFoodJobMoveTargetDeletedFailsJobAndUpdatesFoodBelief()
         {
-            var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
-            AddFoodBelief(world, npcId, 5, 5);
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 6, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            AddFoodBelief(world, npcId, 6, 5);
             EnableMbdBridgeExplainability(world);
-            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            AssignFoodJob(world, npcId, foodId, 6, 5, urgency01: 0.95f);
             world.Objects.Remove(foodId);
             world.FoodStocks.Remove(foodId);
             var system = new JobExecutionSystem();
@@ -576,6 +577,23 @@ namespace Arcontio.Tests
                 npcId,
                 JobFailureReason.MissingTarget,
                 "OperationalFailure:FoodExecutionTargetFailure:MoveFoodObjectMissing");
+        }
+
+        [Test]
+        public void AssignedFoodJobMoveTargetDeletedOutsideViewKeepsMovingTowardBelief()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
+            world.NpcFacing[npcId] = CardinalDirection.North;
+            AddFoodBelief(world, npcId, 5, 5);
+            AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
+            world.Objects.Remove(foodId);
+            world.FoodStocks.Remove(foodId);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Active);
         }
 
         [Test]

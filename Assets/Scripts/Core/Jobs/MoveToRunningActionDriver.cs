@@ -152,6 +152,8 @@ namespace Arcontio.Core
 
             if (canUseDeclaredBeliefTargetRoute)
             {
+                string previousMode = MovementExplainabilityEmitter.ResolveRuntimeMode(world, npcId);
+
                 // EatKnownFood segue la stessa gerarchia concettuale del vecchio
                 // movimento intenzionale: prima prova una rotta conosciuta tramite
                 // macro-route/landmark; solo se questa non produce un segmento utile
@@ -172,6 +174,7 @@ namespace Arcontio.Core
                         PlannerMode.LandmarkAstar,
                         SelectionReason.DirectInvalidLmChosen,
                         RouteScratch);
+                    TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, "PreparedLandmarkRoute");
                     return;
                 }
 
@@ -186,12 +189,14 @@ namespace Arcontio.Core
                         PlannerMode.DirectFallback,
                         SelectionReason.NoLmFallbackDirect,
                         RouteScratch);
+                    TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, "PreparedBeliefTargetRoute");
                 }
                 return;
             }
 
             if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition: true))
             {
+                string previousMode = string.Empty;
                 TryEmitPreparedPathfindingPlan(
                     world,
                     npcId,
@@ -201,8 +206,11 @@ namespace Arcontio.Core
                     PlannerMode.Direct,
                     SelectionReason.DirectValid,
                     RouteScratch);
+                TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMode, "PreparedDirectRoute");
                 return;
             }
+
+            string previousMacroMode = MovementExplainabilityEmitter.ResolveRuntimeMode(world, npcId);
 
             if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
                 world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
@@ -218,6 +226,7 @@ namespace Arcontio.Core
                     PlannerMode.LandmarkAstar,
                     SelectionReason.DirectInvalidLmChosen,
                     RouteScratch);
+                TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMacroMode, "PreparedLandmarkRoute");
                 return;
             }
 
@@ -232,6 +241,7 @@ namespace Arcontio.Core
                     PlannerMode.DirectFallback,
                     SelectionReason.ForcedDebug,
                     RouteScratch);
+                TryEmitPreparedPathModeTransition(world, npcId, action, npcCell, previousMacroMode, "PreparedDebugForcedRoute");
             }
         }
 
@@ -409,7 +419,30 @@ namespace Arcontio.Core
                 selectedMode: selectedMode,
                 selectionReason: selectionReason,
                 macroPlan: macroPlan,
-                localPath: localPath);
+                localPath: localPath,
+                sourceJobId: job.JobId,
+                sourceStepId: action.ActionId);
+        }
+
+        private static void TryEmitPreparedPathModeTransition(
+            World world,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell,
+            string previousMode,
+            string reason)
+        {
+            if (world == null || !action.HasTargetCell)
+                return;
+
+            MovementExplainabilityEmitter.TryEmitModeTransitionEvent(
+                world,
+                npcId,
+                previousMode,
+                npcCell,
+                action.TargetCell,
+                minVerbosity: 1,
+                reason: reason);
         }
 
         private static bool TryPrepareDeclaredDebugForcedRoute(
@@ -625,20 +658,31 @@ namespace Arcontio.Core
             if (job.Request.IntentKind != DecisionIntentKind.EatKnownFood)
                 return true;
 
+            bool canVerifyTargetCell = CanAcquireDirectTarget(world, job.Request.NpcId, action.TargetCell.x, action.TargetCell.y, checkFov: true);
+
             if (!world.Objects.TryGetValue(action.TargetObjectId, out var targetObject) || targetObject == null)
             {
+                if (!canVerifyTargetCell)
+                    return true;
+
                 failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveFoodObjectMissing");
                 return false;
             }
 
             if (!world.FoodStocks.TryGetValue(action.TargetObjectId, out var stock))
             {
+                if (!canVerifyTargetCell)
+                    return true;
+
                 failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveFoodStockMissing");
                 return false;
             }
 
             if (stock.Units <= 0)
             {
+                if (!canVerifyTargetCell)
+                    return true;
+
                 failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveFoodUnavailable");
                 return false;
             }
@@ -651,6 +695,9 @@ namespace Arcontio.Core
 
             if (targetObject.CellX != action.TargetCell.x || targetObject.CellY != action.TargetCell.y)
             {
+                if (!canVerifyTargetCell)
+                    return true;
+
                 failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveTargetNoLongerAtCell");
                 return false;
             }

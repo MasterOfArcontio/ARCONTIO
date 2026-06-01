@@ -2055,42 +2055,42 @@ namespace Arcontio.View.MapGrid
             var model = _movementExplainabilityViewModel;
             string headerMeta = $"Tick = {model.Tick}   Intent = {model.CurrentIntentId}   Plan = {model.CurrentPlanId}";
 
+            intentPlanOutput.Append("<color=#E6EDF3>[INFORMAZIONI GENERALI]</color>\n")
+                .Append("Tick = ").Append(model.Tick).Append('\n');
+
             if (model.Intent != null && model.Intent.HasIntent)
             {
-                // Intent: e' il "perche' sto andando li'". Rimane compatto per non
-                // far crescere troppo la card quando tutte le sezioni sono aperte.
-                intentPlanOutput.Append("<color=#A8E6A1>[INTENT]</color>\n")
-                    .Append("Purpose = ").Append(model.Intent.Purpose).Append('\n')
-                    .Append("Target = ").Append(model.Intent.Target).Append('\n')
-                    .Append("Belief = ").Append(model.Intent.Belief).Append('\n')
-                    .Append("Urgency = ").Append(model.Intent.Urgency01.ToString("0.00"))
-                    .Append("   Verbosity = ").Append(model.Intent.VerbosityLevel)
-                    .Append('\n');
+                intentPlanOutput.Append('\n').Append("<color=#A8E6A1>[INTENTO]</color>\n")
+                    .Append("Job sorgente = ").Append(EmptyMuted(model.Intent.SourceJobId)).Append('\n')
+                    .Append("Obiettivo del movimento = ").Append(model.Intent.Purpose).Append('\n')
+                    .Append("Target = ").Append(model.Intent.TargetType).Append(" | ").Append(model.Intent.Target).Append('\n');
             }
             else
             {
-                intentPlanOutput.Append("<color=#888888>[INTENT] nessuna trace</color>\n");
+                intentPlanOutput.Append('\n').Append("<color=#888888>[INTENTO] nessuna trace</color>\n");
             }
 
             if (model.Plan != null && model.Plan.HasPlan)
             {
-                intentPlanOutput.Append('\n').Append("<color=#9FC5E8>[PLAN]</color>\n")
-                    .Append("Mode = ").Append(model.Plan.SelectedMode)
-                    .Append("   Why = ").Append(model.Plan.SelectionReason).Append('\n')
-                    .Append("Route = ").Append(model.Plan.RouteSummary).Append('\n')
-                    .Append("FirstStep = ").Append(model.Plan.FirstStep)
-                    .Append("   Verbosity = ").Append(model.Plan.VerbosityLevel)
-                    .Append('\n');
+                intentPlanOutput.Append('\n').Append("<color=#9FC5E8>[PIANO INIZIALE]</color>\n")
+                    .Append("Modalita = ").Append(model.Plan.SelectedMode).Append('\n')
+                    .Append("Ragione della scelta = ").Append(model.Plan.SelectionReason).Append('\n')
+                    .Append("Percorso = ").Append(model.Plan.RouteCells).Append('\n')
+                    .Append("Macro route = ").Append(model.Plan.MacroRouteSummary).Append('\n');
 
                 if (model.Plan.Candidates != null && model.Plan.Candidates.Count > 0)
                 {
-                    intentPlanOutput.Append("Candidates:\n");
+                    intentPlanOutput.Append('\n').Append("<color=#D29922>[CANDIDATI]</color>\n");
                     int candidateCount = Mathf.Min(3, model.Plan.Candidates.Count);
 
-                    // Limite intenzionale: la card resta leggibile. Il ViewModel conserva
-                    // comunque tutti i candidati disponibili per una UI piu' ampia futura.
                     for (int i = 0; i < candidateCount; i++)
-                        intentPlanOutput.Append("- ").Append(model.Plan.Candidates[i]).Append('\n');
+                    {
+                        string candidate = model.Plan.Candidates[i];
+                        string color = candidate.IndexOf("Motivo dello scarto", StringComparison.OrdinalIgnoreCase) >= 0 ? "#FF6666" : "#3FB950";
+                        intentPlanOutput.Append("<color=").Append(color).Append(">")
+                            .Append("- ").Append(candidate)
+                            .Append("</color>\n");
+                    }
 
                     if (model.Plan.Candidates.Count > candidateCount)
                         intentPlanOutput.Append("- ... altri ").Append(model.Plan.Candidates.Count - candidateCount).Append('\n');
@@ -2098,46 +2098,34 @@ namespace Arcontio.View.MapGrid
             }
             else
             {
-                intentPlanOutput.Append('\n').Append("<color=#888888>[PLAN] nessuna trace</color>\n");
+                intentPlanOutput.Append('\n').Append("<color=#888888>[PIANO INIZIALE] nessuna trace</color>\n");
             }
 
-            eventsOutput.Append("<color=#FFD966>[EVENTS]</color>\n");
-            if (model.Events == null || model.Events.Count <= 0)
+            eventsOutput.Append("<color=#FFD966>[MODALITA RUNTIME]</color>\n")
+                .Append("Modalita attiva ora = ").Append(EmptyMuted(model.RuntimeMode.ActiveMode)).Append('\n')
+                .Append("Da quanti tick / celle circa = ").Append(EmptyMuted(model.RuntimeMode.ModeAge)).Append('\n')
+                .Append("Ultima ragione di cambio modalita = ").Append(EmptyMuted(model.RuntimeMode.LastModeSwitchReason)).Append('\n')
+                .Append('\n')
+                .Append("<color=#FFD966>[STORICO MODALITA]</color>\n");
+
+            if (model.ModeHistory == null || model.ModeHistory.Count <= 0)
             {
-                eventsOutput.Append("<color=#888888>(nessun evento runtime)</color>");
+                eventsOutput.Append("<color=#888888>(nessun cambio modalita registrato)</color>");
                 return headerMeta;
             }
 
-            // Timeline gia' limitata dal builder. Qui invertiamo l'ordine per mostrare
-            // subito l'evento piu' recente, e alterniamo bianco/grigio chiaro per
-            // aumentare la separazione visiva tra righe consecutive.
-            int visibleIndex = 0;
-            for (int i = model.Events.Count - 1; i >= 0; i--)
+            for (int i = model.ModeHistory.Count - 1; i >= 0; i--)
             {
-                var evt = model.Events[i];
-                string color = ResolveExplainabilityEventColor(evt, visibleIndex);
-
-                eventsOutput.Append("<color=").Append(color).Append(">");
-                eventsOutput.Append("- t").Append(evt.Tick)
-                    .Append(" ").Append(evt.EventType)
-                    .Append("  mode=").Append(evt.ActiveMode)
-                    .Append("  ").Append(evt.CurrentCell)
-                    .Append(" -> ").Append(evt.TargetCell);
-
-                if (!string.IsNullOrWhiteSpace(evt.Summary))
-                    eventsOutput.Append("  | ").Append(evt.Summary);
-
-                if (!string.IsNullOrWhiteSpace(evt.Detail))
-                    eventsOutput.Append('\n').Append("  detail: ").Append(evt.Detail);
-
-                eventsOutput.Append("</color>");
-
-                if (i > 0)
-                    eventsOutput.Append('\n').Append('\n');
-                else
-                    eventsOutput.Append('\n');
-
-                visibleIndex++;
+                var row = model.ModeHistory[i];
+                eventsOutput.Append("- ")
+                    .Append(row.Tick)
+                    .Append(" | ")
+                    .Append(EmptyMuted(row.FromMode))
+                    .Append(" -> ")
+                    .Append(EmptyMuted(row.ToMode))
+                    .Append(" | ")
+                    .Append(EmptyMuted(row.Reason))
+                    .Append('\n');
             }
 
             return headerMeta;

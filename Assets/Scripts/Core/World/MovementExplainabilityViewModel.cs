@@ -66,6 +66,8 @@ namespace Arcontio.Core
         public string HeaderSubtitle = string.Empty;
         public MovementExplainabilityIntentView Intent = new MovementExplainabilityIntentView();
         public MovementExplainabilityPlanView Plan = new MovementExplainabilityPlanView();
+        public MovementExplainabilityRuntimeModeView RuntimeMode = new MovementExplainabilityRuntimeModeView();
+        public List<MovementExplainabilityModeHistoryView> ModeHistory = new List<MovementExplainabilityModeHistoryView>(16);
         public List<MovementExplainabilityEventView> Events = new List<MovementExplainabilityEventView>(32);
     }
 
@@ -100,7 +102,10 @@ namespace Arcontio.Core
     {
         public bool HasIntent;
         public int IntentId;
+        public string SourceJobId = string.Empty;
+        public string SourceStepId = string.Empty;
         public string Purpose = string.Empty;
+        public string TargetType = string.Empty;
         public string Target = string.Empty;
         public string Belief = string.Empty;
         public float Urgency01;
@@ -142,10 +147,29 @@ namespace Arcontio.Core
         public int PlanId;
         public string SelectedMode = string.Empty;
         public string SelectionReason = string.Empty;
+        public string RouteCells = string.Empty;
+        public string MacroRouteSummary = string.Empty;
         public string RouteSummary = string.Empty;
         public string FirstStep = string.Empty;
         public List<string> Candidates = new List<string>(4);
         public int VerbosityLevel;
+    }
+
+    [Serializable]
+    public sealed class MovementExplainabilityRuntimeModeView
+    {
+        public string ActiveMode = string.Empty;
+        public string ModeAge = string.Empty;
+        public string LastModeSwitchReason = string.Empty;
+    }
+
+    [Serializable]
+    public sealed class MovementExplainabilityModeHistoryView
+    {
+        public long Tick;
+        public string FromMode = string.Empty;
+        public string ToMode = string.Empty;
+        public string Reason = string.Empty;
     }
 
     // =============================================================================
@@ -291,6 +315,8 @@ namespace Arcontio.Core
             }
 
             output.Tick = ResolveLatestTick(intentTrace, planTrace, EventBuffer);
+            FillRuntimeMode(world, npcId, output.RuntimeMode, output.Tick, EventBuffer);
+            FillModeHistory(output.ModeHistory, EventBuffer);
             return true;
         }
 
@@ -315,7 +341,10 @@ namespace Arcontio.Core
 
             output.Intent.HasIntent = false;
             output.Intent.IntentId = 0;
+            output.Intent.SourceJobId = string.Empty;
+            output.Intent.SourceStepId = string.Empty;
             output.Intent.Purpose = string.Empty;
+            output.Intent.TargetType = string.Empty;
             output.Intent.Target = string.Empty;
             output.Intent.Belief = string.Empty;
             output.Intent.Urgency01 = 0f;
@@ -325,11 +354,17 @@ namespace Arcontio.Core
             output.Plan.PlanId = 0;
             output.Plan.SelectedMode = string.Empty;
             output.Plan.SelectionReason = string.Empty;
+            output.Plan.RouteCells = string.Empty;
+            output.Plan.MacroRouteSummary = string.Empty;
             output.Plan.RouteSummary = string.Empty;
             output.Plan.FirstStep = string.Empty;
             output.Plan.Candidates.Clear();
             output.Plan.VerbosityLevel = 0;
 
+            output.RuntimeMode.ActiveMode = string.Empty;
+            output.RuntimeMode.ModeAge = string.Empty;
+            output.RuntimeMode.LastModeSwitchReason = string.Empty;
+            output.ModeHistory.Clear();
             output.Events.Clear();
         }
 
@@ -350,11 +385,57 @@ namespace Arcontio.Core
 
             view.HasIntent = true;
             view.IntentId = trace.IntentId;
+            view.SourceJobId = trace.SourceJobId ?? string.Empty;
+            view.SourceStepId = trace.SourceStepId ?? string.Empty;
             view.Purpose = trace.MovementPurpose.ToString();
+            view.TargetType = trace.TargetType.ToString();
             view.Target = FormatTarget(trace.TargetType, trace.TargetCell, trace.TargetObjectId);
             view.Belief = trace.HasBeliefBasis ? FormatBelief(trace.BeliefBasis) : "Nessuna belief causale registrata";
             view.Urgency01 = Mathf.Clamp01(trace.Urgency);
             view.VerbosityLevel = trace.VerbosityLevel;
+        }
+
+        private static void FillRuntimeMode(
+            World world,
+            int npcId,
+            MovementExplainabilityRuntimeModeView view,
+            long latestTick,
+            List<PathExecutionEvent> events)
+        {
+            if (view == null)
+                return;
+
+            string activeMode = MovementExplainabilityEmitter.ResolveRuntimeMode(world, npcId);
+            view.ActiveMode = string.IsNullOrWhiteSpace(activeMode) ? "Modo non noto" : activeMode;
+
+            long sinceTick = ResolveModeSinceTick(world, npcId, events, latestTick);
+            long ageTicks = sinceTick > 0 && latestTick >= sinceTick ? latestTick - sinceTick : 0;
+            view.ModeAge = $"da {ageTicks} tick | celle circa {ResolveApproxModeCells(world, npcId)}";
+            view.LastModeSwitchReason = ResolveLastModeSwitchReason(world, npcId, events);
+        }
+
+        private static void FillModeHistory(List<MovementExplainabilityModeHistoryView> output, List<PathExecutionEvent> events)
+        {
+            output.Clear();
+            if (events == null)
+                return;
+
+            for (int i = 0; i < events.Count; i++)
+            {
+                var evt = events[i];
+                if (evt == null || evt.EventType != PathEventType.SwitchedMode)
+                    continue;
+
+                var row = new MovementExplainabilityModeHistoryView
+                {
+                    Tick = evt.Tick,
+                    FromMode = ExtractModePart(evt.Summary, "mode:", "->"),
+                    ToMode = ExtractModePart(evt.Summary, "->", " | reason:"),
+                    Reason = ExtractModePart(evt.Summary, "reason:", string.Empty),
+                };
+
+                output.Add(row);
+            }
         }
 
         // =============================================================================
@@ -376,6 +457,8 @@ namespace Arcontio.Core
             view.PlanId = trace.PlanId;
             view.SelectedMode = trace.SelectedMode.ToString();
             view.SelectionReason = trace.SelectionReason.ToString();
+            view.RouteCells = $"{FormatCell(trace.StartCell)} -> {FormatCell(trace.GoalCell)}";
+            view.MacroRouteSummary = FormatMacroRoute(trace);
             view.RouteSummary = FormatRoute(trace);
             view.FirstStep = trace.HasLocalRouteFirstStep
                 ? FormatCell(trace.LocalRouteFirstStep)
@@ -448,6 +531,100 @@ namespace Arcontio.Core
             return latest;
         }
 
+        private static long ResolveModeSinceTick(World world, int npcId, List<PathExecutionEvent> events, long fallbackTick)
+        {
+            if (world?.Pathfinding != null
+                && world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macro)
+                && macro != null
+                && macro.LastModeSwitchTick > 0)
+            {
+                return macro.LastModeSwitchTick;
+            }
+
+            if (events != null)
+            {
+                for (int i = events.Count - 1; i >= 0; i--)
+                {
+                    var evt = events[i];
+                    if (evt != null && evt.EventType == PathEventType.SwitchedMode)
+                        return evt.Tick;
+                }
+            }
+
+            return fallbackTick;
+        }
+
+        private static string ResolveApproxModeCells(World world, int npcId)
+        {
+            if (world?.Pathfinding == null)
+                return "n/d";
+
+            if (world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var direct)
+                && direct != null
+                && direct.CurrentPath != null
+                && direct.CurrentPath.Count > 0)
+            {
+                return Mathf.Max(0, direct.NextPathIndex - 1).ToString();
+            }
+
+            if (world.Pathfinding.GoalLocalSearchExecution.TryGetValue(npcId, out var local)
+                && local != null
+                && local.CurrentPath != null
+                && local.CurrentPath.Count > 0)
+            {
+                return Mathf.Max(0, local.NextPathIndex - 1).ToString();
+            }
+
+            if (world.Pathfinding.DebugLmPathCells.TryGetValue(npcId, out var lmPath) && lmPath != null)
+                return Mathf.Max(0, lmPath.Count - 1).ToString();
+
+            return "n/d";
+        }
+
+        private static string ResolveLastModeSwitchReason(World world, int npcId, List<PathExecutionEvent> events)
+        {
+            if (world?.Pathfinding != null
+                && world.Pathfinding.MacroRouteExecution.TryGetValue(npcId, out var macro)
+                && macro != null
+                && !string.IsNullOrWhiteSpace(macro.LastModeSwitchReason))
+            {
+                return macro.LastModeSwitchReason;
+            }
+
+            if (events != null)
+            {
+                for (int i = events.Count - 1; i >= 0; i--)
+                {
+                    var evt = events[i];
+                    if (evt == null || evt.EventType != PathEventType.SwitchedMode)
+                        continue;
+
+                    string reason = ExtractModePart(evt.Summary, "reason:", string.Empty);
+                    if (!string.IsNullOrWhiteSpace(reason))
+                        return reason;
+                }
+            }
+
+            return "nessuna ragione registrata";
+        }
+
+        private static string ExtractModePart(string value, string startToken, string endToken)
+        {
+            if (string.IsNullOrWhiteSpace(value) || string.IsNullOrWhiteSpace(startToken))
+                return string.Empty;
+
+            int start = value.IndexOf(startToken, StringComparison.Ordinal);
+            if (start < 0)
+                return string.Empty;
+
+            start += startToken.Length;
+            int end = string.IsNullOrEmpty(endToken) ? value.Length : value.IndexOf(endToken, start, StringComparison.Ordinal);
+            if (end < 0)
+                end = value.Length;
+
+            return value.Substring(start, Math.Max(0, end - start)).Trim();
+        }
+
         // =============================================================================
         // FormatTarget
         // =============================================================================
@@ -488,12 +665,15 @@ namespace Arcontio.Core
         /// </summary>
         private static string FormatRoute(PathPlanTrace trace)
         {
-            int macroCount = trace.MacroRouteNodes == null ? 0 : trace.MacroRouteNodes.Length;
-            string macroPart = macroCount > 0
-                ? $" | landmark {macroCount} | costo {trace.MacroRouteCost:0.00}"
-                : " | nessuna macro-route";
+            return $"{FormatCell(trace.StartCell)} -> {FormatCell(trace.GoalCell)} | {FormatMacroRoute(trace)}";
+        }
 
-            return $"{FormatCell(trace.StartCell)} -> {FormatCell(trace.GoalCell)}{macroPart}";
+        private static string FormatMacroRoute(PathPlanTrace trace)
+        {
+            if (trace.MacroRouteNodes == null || trace.MacroRouteNodes.Length <= 0)
+                return "nessuna macro route";
+
+            return $"nodi [{string.Join(" -> ", trace.MacroRouteNodes)}] | costo {trace.MacroRouteCost:0.00}";
         }
 
         // =============================================================================
@@ -507,11 +687,13 @@ namespace Arcontio.Core
         /// </summary>
         private static string FormatCandidate(PlannerCandidate candidate)
         {
-            string state = candidate.Valid ? "valido" : $"scartato: {candidate.InvalidReason}";
             string cost = candidate.EstimatedCost >= 0f ? $"costo {candidate.EstimatedCost:0.00}" : "costo n/d";
             string note = string.IsNullOrWhiteSpace(candidate.Note) ? string.Empty : $" | {candidate.Note}";
 
-            return $"{candidate.Mode} | {state} | {cost}{note}";
+            if (candidate.Valid)
+                return $"Candidato = {candidate.Mode} | valido | {cost}{note}";
+
+            return $"Candidato = {candidate.Mode}\n  Motivo dello scarto = {candidate.InvalidReason} | {cost}{note}";
         }
 
         // =============================================================================

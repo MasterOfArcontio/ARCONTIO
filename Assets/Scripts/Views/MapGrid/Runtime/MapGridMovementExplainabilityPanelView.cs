@@ -458,8 +458,8 @@ namespace Arcontio.View.MapGrid
             _jobRuntimeText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Job].transform, "state, arbitration, reservation, command, failure", "#D29922");
 
             _pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding] = CreatePage("PathfindingPage");
-            _pathIntentPlanText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding].transform, "intent e plan", "#9FC5E8");
-            _pathEventsText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding].transform, "eventi pathfinding", "#FFD966");
+            _pathIntentPlanText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding].transform, "informazioni, intento, piano, candidati", "#9FC5E8");
+            _pathEventsText = CreateSection(_pageRoots[(int)MapGridExplainabilityPanelPage.Pathfinding].transform, "modalita runtime e storico", "#FFD966");
         }
 
         private GameObject CreatePage(string name)
