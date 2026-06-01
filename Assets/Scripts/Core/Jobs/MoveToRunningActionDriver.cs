@@ -162,22 +162,77 @@ namespace Arcontio.Core
                     world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
 
                 if (TryPrepareMacroImmediateSegment(world, npcId, action.TargetCell, npcCell))
+                {
+                    TryEmitPreparedPathfindingPlan(
+                        world,
+                        npcId,
+                        job,
+                        action,
+                        npcCell,
+                        PlannerMode.LandmarkAstar,
+                        SelectionReason.DirectInvalidLmChosen,
+                        RouteScratch);
                     return;
+                }
 
-                TryPrepareDeclaredBeliefTargetRoute(world, npcId, action, npcCell);
+                if (TryPrepareDeclaredBeliefTargetRoute(world, npcId, action, npcCell))
+                {
+                    TryEmitPreparedPathfindingPlan(
+                        world,
+                        npcId,
+                        job,
+                        action,
+                        npcCell,
+                        PlannerMode.DirectFallback,
+                        SelectionReason.NoLmFallbackDirect,
+                        RouteScratch);
+                }
                 return;
             }
 
             if (TryPrepareDirectRouteToFinalTarget(world, npcId, action, npcCell, requireCurrentAcquisition: true))
+            {
+                TryEmitPreparedPathfindingPlan(
+                    world,
+                    npcId,
+                    job,
+                    action,
+                    npcCell,
+                    PlannerMode.Direct,
+                    SelectionReason.DirectValid,
+                    RouteScratch);
                 return;
+            }
 
             if (!HasUsableMacroRoute(world, npcId, action.TargetCell))
                 world.BeginMacroRouteExecutionForNpc(npcId, action.TargetCell.x, action.TargetCell.y);
 
             if (TryPrepareMacroImmediateSegment(world, npcId, action.TargetCell, npcCell))
+            {
+                TryEmitPreparedPathfindingPlan(
+                    world,
+                    npcId,
+                    job,
+                    action,
+                    npcCell,
+                    PlannerMode.LandmarkAstar,
+                    SelectionReason.DirectInvalidLmChosen,
+                    RouteScratch);
                 return;
+            }
 
-            TryPrepareDeclaredDebugForcedRoute(world, npcId, job, action, npcCell);
+            if (TryPrepareDeclaredDebugForcedRoute(world, npcId, job, action, npcCell))
+            {
+                TryEmitPreparedPathfindingPlan(
+                    world,
+                    npcId,
+                    job,
+                    action,
+                    npcCell,
+                    PlannerMode.DirectFallback,
+                    SelectionReason.ForcedDebug,
+                    RouteScratch);
+            }
         }
 
         private static bool HasUsableDirectRoute(World world, int npcId, Vector2Int finalTarget)
@@ -312,6 +367,49 @@ namespace Arcontio.Core
                 && macro.Active
                 && macro.FinalTargetCellX == finalTarget.x
                 && macro.FinalTargetCellY == finalTarget.y;
+        }
+
+        private static void TryEmitPreparedPathfindingPlan(
+            World world,
+            int npcId,
+            Job job,
+            JobAction action,
+            GridPosition npcCell,
+            PlannerMode selectedMode,
+            SelectionReason selectionReason,
+            IReadOnlyList<Vector2Int> localPath)
+        {
+            if (world == null || job == null || !action.HasTargetCell)
+                return;
+
+            world.NpcMacroRoutes.TryGetValue(npcId, out var macroPlan);
+
+            var intent = new MoveIntent
+            {
+                Active = true,
+                TargetX = action.TargetCell.x,
+                TargetY = action.TargetCell.y,
+                TargetObjectId = action.TargetObjectId > 0 ? action.TargetObjectId : job.Request.TargetObjectId,
+                Reason = ResolveMoveIntentReason(job.Request.IntentKind),
+                Urgency01 = job.Request.Urgency01
+            };
+
+            // L'EL pathfinding era nato nel vecchio MovementSystem, quindi il nuovo
+            // MoveTo job-owned deve produrre la stessa fotografia diagnostica quando
+            // prepara una rotta. Questo non guida la simulazione: registra solo il
+            // piano gia' scelto dalla running action, cosi' il pannello Pathfinding
+            // resta alimentato anche quando MoveIntent runtime e' pensionato.
+            MovementExplainabilityEmitter.TryEmitIntentAndPlan(
+                world,
+                npcId,
+                in intent,
+                npcCell,
+                targetVisible: CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, checkFov: true),
+                directPathClear: selectedMode == PlannerMode.Direct,
+                selectedMode: selectedMode,
+                selectionReason: selectionReason,
+                macroPlan: macroPlan,
+                localPath: localPath);
         }
 
         private static bool TryPrepareDeclaredDebugForcedRoute(
