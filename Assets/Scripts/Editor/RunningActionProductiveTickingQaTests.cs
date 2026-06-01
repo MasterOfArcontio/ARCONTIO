@@ -57,6 +57,7 @@ namespace Arcontio.Tests
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToReturnsLockedDoorFailure();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToWritesLifecycleExplainabilityForEachCell();
+                new RunningActionProductiveTickingQaTests().DevForcedMoveToCellUsesMoveToRunningActionRoute();
                 new RunningActionProductiveTickingQaTests().DevTransportTemplatePreparesDeclaredRoutesWithoutMoveIntentFallback();
 
                 Debug.Log("[RunningActionProductiveTickingQaTests] PASS targeted traversal tests");
@@ -1198,6 +1199,52 @@ namespace Arcontio.Tests
             Assert.That(world.Objects[objectId].IsHeld, Is.False);
             Assert.That(world.Objects[objectId].CellX, Is.EqualTo(destination.x));
             Assert.That(world.Objects[objectId].CellY, Is.EqualTo(destination.y));
+        }
+
+        // =============================================================================
+        // DevForcedMoveToCellUsesMoveToRunningActionRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il comando umano forzato equivalente a K + mouse: il target puo'
+        /// essere fuori dalla conoscenza soggettiva ordinaria, ma l'esecuzione non
+        /// deve ricadere su <c>SetMoveIntentCommand</c>. Il movimento passa invece
+        /// dal template <c>generic.move_to_cell.v1</c>, da <c>MoveTo</c> e dalle
+        /// running action multi-tick.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DevForcedMoveToCellUsesMoveToRunningActionRoute()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 1);
+            var start = world.GridPos[npcId];
+            var target = new Vector2Int(start.X, start.Y + 3);
+            bool created = MoveJobFactory.TryCreateMoveToCellJob(
+                JobTemplateRegistry.LoadDefault(),
+                npcId,
+                target,
+                tick: 0,
+                urgency01: 1f,
+                debugLabel: MoveJobFactory.DevToolsForcedMoveToCellDebugLabel,
+                out var job,
+                out var reason);
+            Assert.That(created, Is.True, reason);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out reason), Is.True, reason);
+
+            var system = new JobExecutionSystem();
+            var bus = new MessageBus();
+            for (int tick = 0; tick < 8 && world.JobRuntimeState.HasActiveJob(npcId); tick++)
+            {
+                system.Update(world, new Tick(tick, 1f), bus, new Telemetry());
+                FlushJobCommandBuffer(world, bus);
+            }
+
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Completed));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent) && intent.Active, Is.False);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(target.x));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(target.y));
         }
 
         private static World MakeWorldWithNpc(out int npcId)
