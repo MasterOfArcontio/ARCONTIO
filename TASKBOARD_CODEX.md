@@ -38,7 +38,7 @@ closeout della fase cognitiva soggettiva iniziale, con lifecycle belief, eventi 
 
 DOC SYNC:
 root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.16`;
-allineamento esteso `ARCONTIO_docs` / Notion raccomandato prima dell'apertura stabile della fase sociale `v0.17`
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato prima dell'apertura stabile della fase sociale `v0.170`
 
 OBIETTIVO:
 Chiudere il debito tra movimento legacy e Job runtime prima di aprire la cognizione soggettiva avanzata.
@@ -85,12 +85,13 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.17a - Audit reputazione/sospetto post-v0.16`
+`v0.17a - Audit punti caldi runtime per NPC`
 
 Residual follow-ups / future hardening:
 
-- `v0.17`: query multi-candidato food, recovery `FindEquivalentTarget` senza query interne, sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
-- `v0.18+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+- `v0.17`: osservatorio costi runtime, profilazione per NPC, misure per percezione/memoria/belief/query/decisione/EL/job/fallback/pathfinding;
+- `v0.170`: query multi-candidato food, recovery `FindEquivalentTarget` senza query interne, sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
+- `v0.180+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
 Checkpoint v0.13 pianificati:
 
@@ -142,6 +143,17 @@ Checkpoint v0.16 pianificati:
 - `v0.16h`: QA anti-onniscienza cognitiva - DONE;
 - `v0.16i`: SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili - DONE;
 - `v0.16j`: closeout cognizione soggettiva avanzata - DONE.
+
+Checkpoint v0.17 pianificati:
+
+- `v0.17a`: audit punti caldi runtime per NPC;
+- `v0.17b`: configurazione osservatorio con costo nullo quando spento;
+- `v0.17c`: misure per sistema: percezione, memoria, belief, query, decisione, EL, job, fallback;
+- `v0.17d`: misure per NPC e individuazione NPC piu' costosi;
+- `v0.17e`: contatori operativi: celle viste, oggetti controllati, query, path, trace, fallback;
+- `v0.17f`: JSONL opzionale batchato e limitato per profili runtime;
+- `v0.17g`: scenario QA 1/2/4/8/16 NPC e report costo scalare;
+- `v0.17h`: closeout osservatorio costi runtime.
 
 Checkpoint v0.12 completati:
 
