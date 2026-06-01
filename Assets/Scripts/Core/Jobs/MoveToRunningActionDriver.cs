@@ -183,9 +183,6 @@ namespace Arcontio.Core
 
         private static bool TryPrepareDirectRouteToFinalTarget(World world, int npcId, JobAction action, GridPosition npcCell)
         {
-            if (!CanAcquireDirectTarget(world, npcId, action.TargetCell.x, action.TargetCell.y, GetDirectCheckFov(world)))
-                return false;
-
             RouteScratch.Clear();
             if (!MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, npcCell.X, npcCell.Y, action.TargetCell.x, action.TargetCell.y, RouteScratch)
                 || RouteScratch.Count < 2)

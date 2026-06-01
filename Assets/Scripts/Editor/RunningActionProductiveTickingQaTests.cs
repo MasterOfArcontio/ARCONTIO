@@ -50,6 +50,7 @@ namespace Arcontio.Tests
             {
                 new RunningActionProductiveTickingQaTests().OneCellMoveTraversalHonorsConfiguredFourTickDuration();
                 new RunningActionProductiveTickingQaTests().DeclaredDistantMoveTargetPreparesRouteAndHonorsConfiguredDuration();
+                new RunningActionProductiveTickingQaTests().DeclaredBeliefTargetOutsideCurrentFacingStillPreparesRoute();
                 new RunningActionProductiveTickingQaTests().EatKnownFoodMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
@@ -352,6 +353,46 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X + 1));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
+        }
+
+        // =============================================================================
+        // DeclaredBeliefTargetOutsideCurrentFacingStillPreparesRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che MoveTo possa preparare un tragitto verso una cella gia'
+        /// dichiarata dal job anche quando quella cella non e' nel fronte percettivo
+        /// corrente dell'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: target deciso prima, movimento operativo dopo</b></para>
+        /// <para>
+        /// Un incarico <c>EatKnownFood</c> nasce da una query di belief: il movimento
+        /// non deve rifare la decisione e non deve pretendere che il target sia
+        /// visibile in quel preciso tick. Se la cella dichiarata e' percorribile, la
+        /// running action MoveTo prepara la route e prova ad arrivarci; eventuali
+        /// contraddizioni fisiche successive tornano come fallimenti del job.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DeclaredBeliefTargetOutsideCurrentFacingStillPreparesRoute()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 3);
+            var startCell = world.GridPos[npcId];
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            var sideTarget = new Vector2Int(startCell.X, startCell.Y + 2);
+            var job = MakeMoveJob(npcId, "job-move-side-belief-target", sideTarget);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+            var system = new JobExecutionSystem();
+
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.Pathfinding.DirectCommitExecution.ContainsKey(npcId), Is.True);
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
         }
 
         // =============================================================================
