@@ -141,6 +141,34 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void ActiveFoodJobDefersEquivalentCriticalHungerDecision()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(5, 5, 7, 5, out int npcId, out int foodId, enableMbdExplainability: true);
+            AddFoodBelief(world, npcId, 7, 5);
+            PreferKnownFoodDecision(world, npcId);
+            AssignFoodJob(world, npcId, foodId, 7, 5, urgency01: 0.95f);
+
+            var needs = world.Needs[npcId];
+            needs.SetValue(NeedKind.Hunger, 1f);
+            needs.SetFlags(NeedKind.Hunger, isAlert: true, isCritical: true);
+            world.Needs[npcId] = needs;
+
+            var orchestrator = new DecisionOrchestratorSystem(
+                decisionEveryTicks: 1,
+                maxSeekRangeCells: 16,
+                enableFoodJobVerticalSlice: true,
+                jobTemplateRegistry: MakeRegistry());
+
+            orchestrator.Update(world, new Tick(80, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.JobRuntimeState.ActiveJobCount, Is.EqualTo(1));
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.JobId, Does.StartWith("job_food_"));
+            AssertNoJobRequestTrace(world, npcId);
+            AssertNoDecisionTrace(world, npcId);
+        }
+
+        [Test]
         public void EatKnownFoodDecisionUsesSelectedBeliefWhenMultipleFoodStocksExist()
         {
             var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
@@ -805,6 +833,21 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void DestroyVisibleFoodStockDiscardsObserverFoodBelief()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(5, 5, 6, 5, out int npcId, out int foodId);
+            AddFoodBelief(world, npcId, 6, 5);
+            AddRememberedWorldObject(world, npcId, foodId, 6, 5, OwnerKind.Community, ownerId: 0);
+
+            world.DestroyObject(foodId);
+
+            Assert.That(world.Objects.ContainsKey(foodId), Is.False);
+            Assert.That(world.FoodStocks.ContainsKey(foodId), Is.False);
+            AssertFoodBeliefStatus(world, npcId, BeliefStatus.Discarded);
+            Assert.That(HasRememberedObject(world, npcId, foodId, "food_stock_private", 6, 5), Is.False);
+        }
+
+        [Test]
         public void EatPrivateFoodCommandPublishesFoodConsumedEventAfterMutation()
         {
             var world = MakeWorldWithNpcOnly(4, 6, out int npcId);
@@ -951,6 +994,22 @@ namespace Arcontio.Tests
             Assert.That(store.Entries.Count, Is.GreaterThanOrEqualTo(1));
             Assert.That(store.Entries[0].Category, Is.EqualTo(BeliefCategory.Food));
             Assert.That(store.Entries[0].Status, Is.EqualTo(expectedStatus));
+        }
+
+        private static void AssertNoJobRequestTrace(World world, int npcId)
+        {
+            if (!world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store))
+                return;
+
+            Assert.That(store.TryGetLatestJobRequestTrace(out _), Is.False);
+        }
+
+        private static void AssertNoDecisionTrace(World world, int npcId)
+        {
+            if (!world.MemoryBeliefDecisionExplainability.TryGetNpcStore(npcId, out var store))
+                return;
+
+            Assert.That(store.TryGetLatestDecisionTrace(out _), Is.False);
         }
 
         private static void PreferKnownFoodDecision(World world, int npcId)

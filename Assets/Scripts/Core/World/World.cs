@@ -3922,6 +3922,8 @@ if (!NpcAction.ContainsKey(id))
 
             int x = obj.CellX;
             int y = obj.CellY;
+            bool wasFoodStock = FoodStocks.TryGetValue(objectId, out var removedFoodStock)
+                && removedFoodStock.Units > 0;
 
             // 1) Se Ã¨ occluder, pulisci la cache occlusione prima di rimuovere dai dizionari.
             //    (Questo evita che restino celle "bloccate" anche dopo la rimozione dell'oggetto.)
@@ -3964,6 +3966,90 @@ if (!NpcAction.ContainsKey(id))
 
             // 4) rimuovi dal registry oggetti
             Objects.Remove(objectId);
+
+            if (wasFoodStock)
+                DiscardVisibleFoodKnowledgeForRemovedStock(objectId, x, y);
+        }
+
+        private void DiscardVisibleFoodKnowledgeForRemovedStock(int objectId, int cellX, int cellY)
+        {
+            int visionRange = Global.NpcVisionRangeCells;
+            if (visionRange <= 0)
+                visionRange = 6;
+
+            bool useCone = Global.NpcVisionUseCone;
+            float coneSlope = Global.NpcVisionConeSlope;
+            int tick = (int)TickContext.CurrentTickIndex;
+
+            foreach (var pair in Beliefs)
+            {
+                int npcId = pair.Key;
+                var beliefStore = pair.Value;
+                if (beliefStore == null)
+                    continue;
+
+                if (!CanNpcCurrentlyVerifyMissingFoodAtCell(npcId, cellX, cellY, visionRange, useCone, coneSlope))
+                    continue;
+
+                beliefStore.TryDiscardByCategoryAndPosition(BeliefCategory.Food, new Vector2Int(cellX, cellY), tick);
+                RemovePinnedFoodStockBelief(npcId, objectId);
+                InvalidateFoodObjectMemoryForRemovedStock(npcId, objectId, cellX, cellY);
+            }
+        }
+
+        private bool CanNpcCurrentlyVerifyMissingFoodAtCell(
+            int npcId,
+            int cellX,
+            int cellY,
+            int visionRange,
+            bool useCone,
+            float coneSlope)
+        {
+            if (!GridPos.TryGetValue(npcId, out var pos))
+                return false;
+
+            int dist = FovUtils.Manhattan(pos.X, pos.Y, cellX, cellY);
+            if (dist > visionRange)
+                return false;
+
+            if (dist == 0)
+                return true;
+
+            if (useCone)
+            {
+                if (!NpcFacing.TryGetValue(npcId, out var facing))
+                    facing = CardinalDirection.North;
+
+                if (!FovUtils.IsInCone(pos.X, pos.Y, facing, cellX, cellY, coneSlope))
+                    return false;
+            }
+
+            return HasLineOfSight(pos.X, pos.Y, cellX, cellY);
+        }
+
+        private void InvalidateFoodObjectMemoryForRemovedStock(int npcId, int objectId, int cellX, int cellY)
+        {
+            if (!NpcObjectMemory.TryGetValue(npcId, out var store) || store == null)
+                return;
+
+            for (int i = 0; i < store.Slots.Length; i++)
+            {
+                ref var slot = ref store.Slots[i];
+                if (!slot.IsValid)
+                    continue;
+
+                int slotObjId = slot.SubjectId != 0 ? slot.SubjectId : slot.ObjectId;
+                bool sameObject = slotObjId == objectId;
+                bool sameFoodCell = slot.CellX == cellX
+                    && slot.CellY == cellY
+                    && !string.IsNullOrWhiteSpace(slot.DefId)
+                    && slot.DefId.IndexOf("food", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                if (!sameObject && !sameFoodCell)
+                    continue;
+
+                slot.IsValid = false;
+            }
         }
 
         // =============================================================================

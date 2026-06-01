@@ -157,6 +157,12 @@ namespace Arcontio.Core
             bool hasActiveJob = world.JobRuntimeState != null
                 && world.JobRuntimeState.GetSnapshot(npcId, nowTick).HasActiveJob;
 
+            if (hasActiveJob && ActiveFoodJobAlreadyCoversCriticalHunger(world, npcId, in needs))
+            {
+                _lastDecisionTicks[npcId] = nowTick;
+                return false;
+            }
+
             bool hasEmergencyIntentSignal = HasCriticalNeedSignal(needs);
             var input = new NpcDecisionSchedulerInput(
                 npcId,
@@ -284,6 +290,18 @@ namespace Arcontio.Core
             }
 
             return false;
+        }
+
+        private static bool ActiveFoodJobAlreadyCoversCriticalHunger(World world, int npcId, in NpcNeeds needs)
+        {
+            if (world?.JobRuntimeState == null || !needs.IsCritical(NeedKind.Hunger))
+                return false;
+
+            if (!world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var activeJob) || activeJob == null)
+                return false;
+
+            return activeJob.Request.IntentKind == DecisionIntentKind.EatKnownFood
+                || activeJob.Request.IntentKind == DecisionIntentKind.SearchFood;
         }
 
         private static DecisionSelectionConfig ResolveDecisionSelectionConfig(DecisionRuntimeParams runtimeConfig)
