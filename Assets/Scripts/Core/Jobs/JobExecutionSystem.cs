@@ -761,6 +761,12 @@ namespace Arcontio.Core
                     explainabilityRegistry);
             }
 
+            TryPrepareDeclaredJobTargetRoute(
+                world,
+                npcId,
+                action,
+                npcCell);
+
             TryPrepareDeclaredDevTransportRoute(
                 world,
                 npcId,
@@ -826,6 +832,75 @@ namespace Arcontio.Core
             }
 
             return StepResult.Running(alreadyMovingToTarget ? "MoveAlreadyRequested" : "MoveCommandEnqueued");
+        }
+
+        // =============================================================================
+        // TryPrepareDeclaredJobTargetRoute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara una route locale diretta verso il target gia' dichiarato dallo
+        /// step <c>MoveToCell</c>, senza scegliere nuovi obiettivi e senza passare da
+        /// <c>MoveIntent</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: esecuzione del target scelto, non nuova decisione</b></para>
+        /// <para>
+        /// Dopo il pensionamento del movimento legacy ordinario, un Job con
+        /// <c>enableJobRunningActionTraversal=true</c> non puo' piu' appoggiarsi al
+        /// <c>MovementSystem</c> per preparare il direct path. Questo metodo colma il
+        /// vuoto minimo: se il target e' gia' nel Job e il pathfinder locale riesce a
+        /// costruire una route diretta percorribile dalla posizione corrente, la route
+        /// viene registrata nello stesso stato <c>DirectCommitExecution</c> consumato
+        /// poi cella per cella dalla running action multi-tick.
+        /// </para>
+        ///
+        /// <para>
+        /// La patch e' behavior-preserving rispetto alla decisione: non cerca cibo
+        /// alternativo, non interroga belief, non cambia intent, non emette comandi e
+        /// non seleziona una destinazione diversa. Se la route diretta non esiste,
+        /// il metodo non produce fallback nascosti: il normale ramo di fallimento del
+        /// Job resta responsabile di consegnare l'esito alla matrice recovery.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate config</b>: agisce solo con movimento Job multi-tick acceso.</item>
+        ///   <item><b>Gate stato</b>: non sovrascrive una route gia' coerente.</item>
+        ///   <item><b>Route diretta</b>: usa il pathfinder locale gia' esistente, con gli stessi vincoli di camminabilita'.</item>
+        ///   <item><b>Nessun fallback</b>: se il path non e' costruibile, non inventa alternative.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryPrepareDeclaredJobTargetRoute(
+            World world,
+            int npcId,
+            JobAction action,
+            GridPosition npcCell)
+        {
+            if (!CanUseJobMovementRuntime(world))
+                return false;
+
+            if (world == null || !action.HasTargetCell)
+                return false;
+
+            if (world.Pathfinding.DirectCommitExecution.TryGetValue(npcId, out var existing)
+                && existing != null
+                && existing.Active
+                && existing.FinalTargetCellX == action.TargetCell.x
+                && existing.FinalTargetCellY == action.TargetCell.y)
+            {
+                return true;
+            }
+
+            var route = new List<Vector2Int>(32);
+            if (!MovementPathfinder.TryBuildGreedyDirectPath(world, npcId, npcCell.X, npcCell.Y, action.TargetCell.x, action.TargetCell.y, route)
+                || route.Count < 2)
+            {
+                return false;
+            }
+
+            world.SetDebugDirectPathForNpc(npcId, route);
+            return true;
         }
 
         // =============================================================================

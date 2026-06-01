@@ -52,7 +52,7 @@ namespace Arcontio.Tests
                 tests.SetMoveIntentCommandStillFeedsLegacyMovementSystem();
                 tests.JobMoveToCellUsesRunningActionOnlyForAdjacentCardinalTargetWithGateEnabled();
                 tests.JobMoveToCellFallsBackToLegacyCommandWhenTraversalGateIsDisabled();
-                tests.JobMoveToCellKeepsDistantAndDiagonalTargetsOnLegacyFallback();
+                tests.JobMoveToCellPreparesDeclaredDistantRoutesWhenTraversalGateIsEnabled();
 
                 Debug.Log("[MovementPathInventoryQaTests] PASS");
                 UnityEditor.EditorApplication.Exit(0);
@@ -173,16 +173,16 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // JobMoveToCellKeepsDistantAndDiagonalTargetsOnLegacyFallback
+        // JobMoveToCellPreparesDeclaredDistantRoutesWhenTraversalGateIsEnabled
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che il gate attivo non allarghi il traversal a pathfinding,
-        /// target lontani o diagonali: questi casi restano fallback legacy.
+        /// Verifica che il gate attivo prepari route locali dichiarate per target
+        /// lontani o diagonali gia' presenti nel Job, senza tornare al ponte legacy.
         /// </para>
         /// </summary>
         [Test]
-        public void JobMoveToCellKeepsDistantAndDiagonalTargetsOnLegacyFallback()
+        public void JobMoveToCellPreparesDeclaredDistantRoutesWhenTraversalGateIsEnabled()
         {
             var distantWorld = MakeWorldWithNpc(out int distantNpcId);
             EnableOneCellTraversal(distantWorld, durationTicks: 3);
@@ -192,9 +192,11 @@ namespace Arcontio.Tests
 
             new JobExecutionSystem().Update(distantWorld, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
-            Assert.That(distantWorld.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
-            Assert.That(distantWorld.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(1));
-            Assert.That(distantWorld.JobRuntimeState.CommandBuffer.Snapshot()[0], Is.TypeOf<SetMoveIntentCommand>());
+            Assert.That(distantWorld.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(distantWorld.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(distantWorld.Pathfinding.DirectCommitExecution.ContainsKey(distantNpcId), Is.True);
+            Assert.That(distantWorld.GridPos[distantNpcId].X, Is.EqualTo(distantStart.X));
+            Assert.That(distantWorld.GridPos[distantNpcId].Y, Is.EqualTo(distantStart.Y));
 
             var diagonalWorld = MakeWorldWithNpc(out int diagonalNpcId);
             EnableOneCellTraversal(diagonalWorld, durationTicks: 3);
@@ -204,9 +206,11 @@ namespace Arcontio.Tests
 
             new JobExecutionSystem().Update(diagonalWorld, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
-            Assert.That(diagonalWorld.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
-            Assert.That(diagonalWorld.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(1));
-            Assert.That(diagonalWorld.JobRuntimeState.CommandBuffer.Snapshot()[0], Is.TypeOf<SetMoveIntentCommand>());
+            Assert.That(diagonalWorld.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(diagonalWorld.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(diagonalWorld.Pathfinding.DirectCommitExecution.ContainsKey(diagonalNpcId), Is.True);
+            Assert.That(diagonalWorld.GridPos[diagonalNpcId].X, Is.EqualTo(diagonalStart.X));
+            Assert.That(diagonalWorld.GridPos[diagonalNpcId].Y, Is.EqualTo(diagonalStart.Y));
         }
 
         private static World MakeWorldWithNpc(out int npcId)
