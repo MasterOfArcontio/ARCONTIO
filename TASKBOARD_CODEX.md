@@ -85,11 +85,12 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.17a - Audit punti caldi runtime per NPC`
+`v0.18a - Ottimizzazione ObjectPerceptionSystem con indice spaziale a griglia`
 
 Residual follow-ups / future hardening:
 
 - `v0.17`: osservatorio costi runtime, profilazione per NPC, misure per percezione/memoria/belief/query/decisione/EL/job/fallback/pathfinding;
+- `v0.18`: ottimizzazione forte runtime percezione/belief/query basata sui dati JSONL dell'osservatorio;
 - `v0.170`: query multi-candidato food, recovery `FindEquivalentTarget` senza query interne, sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
 - `v0.180+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
@@ -154,6 +155,14 @@ Checkpoint v0.17 pianificati:
 - `v0.17f`: JSONL opzionale batchato e limitato per profili runtime - DONE;
 - `v0.17g`: scenario QA 1/2/4/8/16 NPC e report costo scalare - PARTIAL, protocollo pronto e prova runtime/profiler da eseguire;
 - `v0.17h`: closeout osservatorio costi runtime.
+
+Checkpoint v0.18 pianificati:
+
+- `v0.18a`: ottimizzazione ObjectPerceptionSystem con indice spaziale a griglia e budget massimo oggetti/celle per NPC - DONE;
+- `v0.18b`: riduzione BeliefQuery con indice per categoria belief;
+- `v0.18c`: BeliefDecay discreto per categoria con parametri da JSON;
+- `v0.18d`: QA profiler comparativo pre/post ottimizzazione con 1/2/4/8/16 NPC;
+- `v0.18e`: closeout ottimizzazione runtime percezione/belief/query.
 
 Checkpoint v0.12 completati:
 

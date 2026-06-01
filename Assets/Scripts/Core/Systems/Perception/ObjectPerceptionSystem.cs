@@ -58,6 +58,7 @@ namespace Arcontio.Core
             int costObjectChecks = 0;
             int costFoodBeliefChecks = 0;
             int costDebugFovCells = 0;
+            int costCandidateCells = 0;
 
             int visionRange = world.Global.NpcVisionRangeCells;
             if (visionRange <= 0) visionRange = 6;
@@ -73,10 +74,9 @@ namespace Arcontio.Core
             _npcIds.Clear();
             _npcIds.AddRange(world.NpcDna.Keys);
 
-            _objIds.Clear();
-            _objIds.AddRange(world.Objects.Keys);
-
             int spotted = 0;
+            int maxCandidateCellsPerNpc = world.Global.ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
+            int maxObjectsPerNpc = world.Global.ObjectPerceptionMaxObjectsPerNpcPerTick;
 
             for (int n = 0; n < _npcIds.Count; n++)
             {
@@ -147,6 +147,25 @@ namespace Arcontio.Core
                 if (costPerNpc)
                     costNpcFoodBeliefChecks += missingFoodBeliefChecks;
 
+                if (!ProcessVisibleObjectsBySpatialIndex(
+                    world,
+                    bus,
+                    npcId,
+                    np,
+                    facing,
+                    visionRange,
+                    useCone,
+                    coneSlope,
+                    maxCandidateCellsPerNpc,
+                    maxObjectsPerNpc,
+                    costSample,
+                    costPerNpc,
+                    costObserver,
+                    ref costObjectChecks,
+                    ref costCandidateCells,
+                    ref spotted))
+                {
+
                 for (int o = 0; o < _objIds.Count; o++)
                 {
                     if (costSample)
@@ -211,6 +230,7 @@ namespace Arcontio.Core
 
                 if (costPerNpc)
                     costObserver.AddNpcWork(npcId, costNpcObjectChecks + costNpcFoodBeliefChecks + costNpcSpotted);
+                }
             }
 
             telemetry.Counter("ObjectPerception.SpottedEvents", spotted);
@@ -222,8 +242,139 @@ namespace Arcontio.Core
                 costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionSpottedEvents, spotted);
                 costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionFoodBeliefChecks, costFoodBeliefChecks);
                 costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionDebugFovCells, costDebugFovCells);
+                costObserver.AddCounter(RuntimeCostCounter.ObjectPerceptionCandidateCells, costCandidateCells);
                 costObserver.EndSample(RuntimeCostChannel.ObjectPerception, costStart);
             }
+        }
+
+        // =============================================================================
+        // ProcessVisibleObjectsBySpatialIndex
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Processa gli oggetti visibili usando l'indice spaziale a griglia del
+        /// <see cref="World"/> invece di attraversare tutti gli oggetti globali.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: percezione locale</b></para>
+        /// <para>
+        /// Il comportamento percettivo resta lo stesso: range, cono/frontale e linea
+        /// di vista decidono se un oggetto viene visto. Cambia solo il modo in cui
+        /// troviamo i candidati: si visitano le celle potenzialmente visibili e si
+        /// chiede al <c>World</c> se in quella cella esiste un oggetto. Questo riduce
+        /// il costo da <c>NPC x tutti gli oggetti</c> a <c>NPC x celle candidate</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Budget celle</b>: limite opzionale per celle candidate per NPC.</item>
+        ///   <item><b>Budget oggetti</b>: limite opzionale per oggetti processati per NPC.</item>
+        ///   <item><b>Indice cella</b>: usa <see cref="World.GetObjectAt(int, int)"/>.</item>
+        /// </list>
+        /// </summary>
+        private static bool ProcessVisibleObjectsBySpatialIndex(
+            World world,
+            MessageBus bus,
+            int npcId,
+            GridPosition np,
+            CardinalDirection facing,
+            int visionRange,
+            bool useCone,
+            float coneSlope,
+            int maxCandidateCellsPerNpc,
+            int maxObjectsPerNpc,
+            bool costSample,
+            bool costPerNpc,
+            RuntimeCostObserver costObserver,
+            ref int costObjectChecks,
+            ref int costCandidateCells,
+            ref int spotted)
+        {
+            int npcCandidateCells = 0;
+            int npcObjectChecks = 0;
+            int npcSpotted = 0;
+            int objectsProcessed = 0;
+
+            int minX = np.X - visionRange;
+            int maxX = np.X + visionRange;
+            int minY = np.Y - visionRange;
+            int maxY = np.Y + visionRange;
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (!world.InBounds(x, y))
+                        continue;
+
+                    int dist = FovUtils.Manhattan(np.X, np.Y, x, y);
+                    if (dist > visionRange)
+                        continue;
+
+                    if (dist > 0)
+                    {
+                        if (useCone)
+                        {
+                            if (!FovUtils.IsInCone(np.X, np.Y, facing, x, y, coneSlope))
+                                continue;
+                        }
+                        else if (!FovUtils.IsInFront(np.X, np.Y, facing, x, y))
+                        {
+                            continue;
+                        }
+                    }
+
+                    if (maxCandidateCellsPerNpc > 0 && npcCandidateCells >= maxCandidateCellsPerNpc)
+                        goto Done;
+
+                    npcCandidateCells++;
+                    if (costSample)
+                        costCandidateCells++;
+
+                    int objId = world.GetObjectAt(x, y);
+                    if (objId < 0)
+                        continue;
+
+                    if (maxObjectsPerNpc > 0 && objectsProcessed >= maxObjectsPerNpc)
+                        goto Done;
+
+                    objectsProcessed++;
+                    if (costSample)
+                        costObjectChecks++;
+                    if (costPerNpc)
+                        npcObjectChecks++;
+
+                    if (!world.Objects.TryGetValue(objId, out var obj) || obj == null)
+                        continue;
+
+                    if (!world.TryGetObjectDef(obj.DefId, out var def) || def == null)
+                        continue;
+
+                    if (!def.IsInteractable)
+                        continue;
+
+                    if (dist > 0 && !world.HasLineOfSight(np.X, np.Y, obj.CellX, obj.CellY))
+                        continue;
+
+                    float q = FovUtils.ObservationQuality(dist, visionRange);
+                    bus.Publish(new ObjectSpottedEvent(
+                        observerNpcId: npcId,
+                        objectId: objId,
+                        defId: obj.DefId,
+                        cellX: obj.CellX,
+                        cellY: obj.CellY,
+                        witnessQuality01: q));
+
+                    spotted++;
+                    npcSpotted++;
+                }
+            }
+
+        Done:
+            if (costPerNpc)
+                costObserver.AddNpcWork(npcId, npcCandidateCells + npcObjectChecks + npcSpotted);
+
+            return true;
         }
 
         // =============================================================================

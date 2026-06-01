@@ -31,6 +31,7 @@
 | v0.15 | Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime | Giugno-Luglio 2026 | Completata |
 | v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Completata |
 | v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
+| v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -1069,6 +1070,35 @@ Il percorso spento deve limitarsi a guardie economiche, per evitare di introdurr
 | v0.17h | Closeout osservatorio costi runtime | ⏳ |
 
 > **Nota architetturale v0.17:** questa fase NON deve ottimizzare alla cieca. Deve prima rendere misurabile il costo reale per tick e per NPC. Solo dopo i dati si decidera' se intervenire su FOV/percezione, pathfinding, EL, pannelli, query, job o comunicazione.
+
+---
+
+#### v0.18 - Ottimizzazione forte runtime percezione / belief / query
+
+## Stato
+IN CORSO / PRIORITA' ALTA
+
+## Obiettivo
+
+Ridurre i tre punti di crescita runtime piu' evidenti emersi dal JSONL dell'osservatorio costi:
+
+- percezione oggetti;
+- query belief;
+- decadimento belief.
+
+La fase NON cambia semantica decisionale, memoria, percezione o belief. Ottimizza il modo in cui i dati vengono cercati, letti e aggiornati, preservando conoscenza soggettiva, tick order e autorita' dei layer.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.18a | Ottimizzazione ObjectPerceptionSystem con indice spaziale a griglia e budget massimo oggetti/celle per NPC | ✅ |
+| v0.18b | Riduzione BeliefQuery con indice per categoria belief | ⏳ |
+| v0.18c | BeliefDecay discreto per categoria con parametri da JSON | ⏳ |
+| v0.18d | QA profiler comparativo pre/post ottimizzazione con 1/2/4/8/16 NPC | ⏳ |
+| v0.18e | Closeout ottimizzazione runtime percezione/belief/query | ⏳ |
+
+> **Nota architetturale v0.18:** questa fase nasce da misure reali, non da ottimizzazione preventiva. Ogni patch deve ridurre costo runtime senza introdurre onniscienza, senza cambiare score decisionali e senza rendere i sistemi diagnostici nuove sorgenti di costo.
 
 ---
 

@@ -68,6 +68,7 @@ namespace Arcontio.Core.Config
         public bool npcVisionUseCone = true;
         public float npcVisionConeSlope = 1.0f;
         public int npcVisionFovDegrees = 90;
+        public ObjectPerceptionRuntimeParams perception = new ObjectPerceptionRuntimeParams();
 
         // ---------------- Debug FOV heatmap (view overlay) ----------------
         public DebugFovParams debug_fov = new DebugFovParams();
@@ -380,6 +381,35 @@ namespace Arcontio.Core.Config
         public float noise01 = 0.15f;
         public float impulsivityNoiseBonus = 0.35f;
         public float minimumWeight = 0.001f;
+    }
+
+    // =============================================================================
+    // ObjectPerceptionRuntimeParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Parametri runtime della percezione oggetti.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: percezione locale e budgettizzabile</b></para>
+    /// <para>
+    /// La percezione oggetti non deve crescere come <c>NPC x tutti gli oggetti del
+    /// mondo</c>. I parametri permettono di usare l'indice spaziale a griglia del
+    /// <c>World</c> e, quando serve per test o stress runtime, limitare il numero di
+    /// celle candidate e oggetti processati per NPC in un singolo tick.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>maxCandidateCellsPerNpcPerTick</b>: limite celle candidate; 0 o negativo significa nessun limite.</item>
+    ///   <item><b>maxObjectsPerNpcPerTick</b>: limite oggetti processati; 0 o negativo significa nessun limite.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class ObjectPerceptionRuntimeParams
+    {
+        public int maxCandidateCellsPerNpcPerTick = 0;
+        public int maxObjectsPerNpcPerTick = 0;
     }
 
     // ============================================================

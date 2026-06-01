@@ -82,13 +82,14 @@ namespace Arcontio.Core
         MoveToRoutePreparations = 23,
         MoveToFailures = 24,
         ObjectPerceptionDebugFovCells = 25,
-        TokenEmissionPairChecks = 26,
-        TokenEmissionTokensCreated = 27,
-        TokenDeliveryTokens = 28,
-        TokenDeliveryDelivered = 29,
-        TokenAssimilationTokens = 30,
-        TokenAssimilationTracesAdded = 31,
-        Count = 32
+        ObjectPerceptionCandidateCells = 26,
+        TokenEmissionPairChecks = 27,
+        TokenEmissionTokensCreated = 28,
+        TokenDeliveryTokens = 29,
+        TokenDeliveryDelivered = 30,
+        TokenAssimilationTokens = 31,
+        TokenAssimilationTracesAdded = 32,
+        Count = 33
     }
 
     public readonly struct RuntimeCostChannelSnapshot
