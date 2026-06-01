@@ -25,20 +25,20 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ACTIVE: v0.15 - Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime
+## MACRO JOB ACTIVE: v0.16 - Cognizione Soggettiva Avanzata
 
 CHECKPOINT CORRENTE:
-v0.15.6 - MoveTo multi-cella su route conosciuta
+v0.16a - Allineamento template generic.move_to_cell.v1 e transport.object_to_cell.v1 al movimento multi-tick
 
 STATUS:
 READY / NEXT STEP
 
 OUTPUT ATTESO:
-prima implementazione della running action MoveTo multi-cella su route lecita, senza fallback greedy ordinario
+allineamento dei template generici al movimento multi-tick, senza introdurre cognizione profonda o planner globale
 
 DOC SYNC:
-root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.14`;
-allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza `v0.15`
+root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.15`;
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza `v0.16`
 
 OBIETTIVO:
 Chiudere il debito tra movimento legacy e Job runtime prima di aprire la cognizione soggettiva avanzata.
@@ -84,7 +84,7 @@ Obiettivo tecnico corrente `v0.15`:
 - preparare la cognizione soggettiva sopra movimento non onnisciente.
 
 Prossimo macro job consigliato:
-`v0.15.6 - MoveTo multi-cella su route conosciuta`
+`v0.16a - Allineamento template generic.move_to_cell.v1 e transport.object_to_cell.v1 al movimento multi-tick`
 
 Residual follow-ups / future hardening:
 
@@ -116,18 +116,19 @@ Checkpoint v0.14 pianificati:
 
 Checkpoint v0.15 pianificati:
 
-- `v0.15.1`: debug riapertura job e cadenza decisionale - QA PENDING;
-- `v0.15.2`: audit movimento legacy vs RunningAction MoveTo - IN PROGRESS;
-- `v0.15.3`: bug target cibo eliminato durante movimento e belief obsoleta - QA PENDING;
+- `v0.15.1`: debug riapertura job e cadenza decisionale - DONE;
+- `v0.15.2`: audit movimento legacy vs RunningAction MoveTo - DONE;
+- `v0.15.3`: bug target cibo eliminato durante movimento e belief obsoleta - DONE;
 - `v0.15.4`: specifica RunningAction MoveTo e cause fallimento - DONE;
 - `v0.15.5`: matrice recovery movimento in `job_recovery_policies.json` - DONE;
-- `v0.15.6`: MoveTo multi-cella su route conosciuta;
-- `v0.15.7`: porte e micro-interazioni locali in MoveTo;
-- `v0.15.8`: rimozione fallback greedy ordinario;
-- `v0.15.9`: isolamento MoveIntent/MovementSystem come dev o compatibilita';
-- `v0.15.10`: EL movimento Job e QA anti-onniscienza path;
-- `v0.15.11`: flash diagnostico NPC su decisione presa;
-- `v0.15.12`: closeout movimento multi-tick.
+- `v0.15.6`: MoveTo multi-cella su route conosciuta - DONE;
+- `v0.15.7`: porte e micro-interazioni locali in MoveTo - DONE;
+- `v0.15.8`: rimozione fallback greedy ordinario - DONE;
+- `v0.15.9`: isolamento MoveIntent/MovementSystem come dev o compatibilita' - PARTIAL / COMPAT;
+- `v0.15.10`: EL movimento Job e QA anti-onniscienza path - DONE;
+- `v0.15.11`: flash diagnostico NPC su decisione presa - DONE;
+- `v0.15.12`: QA target cibo, belief food lifecycle e percezione same-cell - DONE;
+- `v0.15.13`: closeout movimento multi-tick - DONE.
 
 Checkpoint v0.16 pianificati:
 
