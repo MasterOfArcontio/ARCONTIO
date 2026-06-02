@@ -61,6 +61,12 @@ namespace Arcontio.Core
             if (world?.JobRuntimeState == null)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costSteps = 0;
+
             var runtime = world.JobRuntimeState;
             var explainabilityConfig = world.Config?.Sim?.memory_belief_decision_explainability;
             var explainabilityRegistry = world.MemoryBeliefDecisionExplainability;
@@ -72,6 +78,11 @@ namespace Arcontio.Core
                 int npcId = _activeNpcIds[i];
                 if (!runtime.TryGetActiveJob(npcId, out var npcState, out var job) || job == null)
                     continue;
+
+                if (costSample)
+                    costSteps++;
+                if (costPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
 
                 var result = ExecuteCurrentAction(
                     world,
@@ -131,6 +142,13 @@ namespace Arcontio.Core
                 }
 
                 runtime.SetNpcState(npcId, in updatedState);
+            }
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.JobExecutionActiveNpcs, _activeNpcIds.Count);
+                costObserver.AddCounter(RuntimeCostCounter.JobExecutionSteps, costSteps);
+                costObserver.EndSample(RuntimeCostChannel.JobExecution, costStart);
             }
         }
 
@@ -202,6 +220,15 @@ namespace Arcontio.Core
             if (!_recoveryPolicyRegistry.TryGetPolicy(classification.FailureKind, out var policy))
                 return stepResult;
 
+            var costObserver = world?.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick);
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.JobRecoveryEvaluated, 1);
+                if (costObserver.TrackPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
+            }
+
             int retryCount = npcState.GetRecoveryRetryCount(
                 classification.FailureKind,
                 classification.PhaseIndex,
@@ -232,6 +259,13 @@ namespace Arcontio.Core
 
             if (recovery.Kind != JobRecoveryResultKind.RetryScheduled)
                 return stepResult;
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.JobRecoveryRetryScheduled, 1);
+                if (costObserver.TrackPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
+            }
 
             npcState.RegisterRecoveryRetry(
                 classification.FailureKind,

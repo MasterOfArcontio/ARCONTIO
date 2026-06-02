@@ -28,10 +28,12 @@
 | v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | Completata |
 | v0.13 | Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule | Giugno 2026 | Completata |
 | v0.14 | Job Recovery Runtime e fallback degli incarichi | Giugno 2026 | Completata |
-| v0.15 | Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime | Giugno-Luglio 2026 | Prossima fase |
-| v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Pending |
-| v0.17 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
-| v0.18 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
+| v0.15 | Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime | Giugno-Luglio 2026 | Completata |
+| v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Completata |
+| v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
+| v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
+| v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
+| v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
 
 ---
@@ -975,7 +977,7 @@ In questa fase NON si deve:
 #### v0.16 - Cognizione Soggettiva Avanzata
 
 ## Stato
-IN CORSO / ACTIVE
+COMPLETATA / DONE
 
 ## Obiettivo
 
@@ -990,6 +992,7 @@ Questa fase deve lavorare su:
 - verifica locale delle credenze;
 - reazione a eventi mondo;
 - comunicazione non onnisciente;
+- ricerca attiva del cibo quando non esistono target visibili;
 - decisioni basate su conoscenza imperfetta.
 
 ---
@@ -997,20 +1000,110 @@ Questa fase deve lavorare su:
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.16a | Allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick | ✅ |
-| v0.16b | Audit cognition gap post-v0.15 | ⏳ |
-| v0.16c | Belief lifecycle e obsolescenza cibo/oggetti | ⏳ |
-| v0.16d | Memory encoding da world events needs | ⏳ |
-| v0.16e | Verifica locale credenze obsolete | ⏳ |
-| v0.16f | Comunicazione soggettiva dei fatti osservati | ⏳ |
-| v0.16g | Decisioni con belief incerte e parziali | ⏳ |
-| v0.16h | QA anti-omniscienza cognitiva | ⏳ |
-| v0.16i | Closeout cognition deepening | ⏳ |
+| v0.16b | Audit cognition gap post-v0.15 | ✅ |
+| v0.16c | Belief lifecycle e obsolescenza cibo/oggetti | ✅ |
+| v0.16d | Memory encoding da world events needs | ✅ |
+| v0.16e | Verifica locale credenze obsolete | ✅ |
+| v0.16f | Comunicazione soggettiva dei fatti osservati | ✅ |
+| v0.16g | Decisioni con belief incerte e parziali | ✅ |
+| v0.16h | QA anti-omniscienza cognitiva | ✅ |
+| v0.16i | SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili | ✅ |
+| v0.16j | Closeout cognition deepening | ✅ |
 
 
 > **Nota closeout v0.16a (2026-06-01):** il checkpoint `v0.16a` ha allineato `generic.move_to_cell.v1` e `transport.object_to_cell.v1` alla semantica `MoveTo` multi-tick. Il movimento ordinario dei Job passa da `MoveToRunningActionDriver`, attraversa route conosciute cella per cella, usa route dichiarate da belief food senza rifare query decisionali, e fallisce quando non esiste route lecita. Il movimento debug umano da mappa viene instradato come job tecnico `generic.move_to_cell.v1` con label dev esplicita e puo' usare route fisica/greedy solo perche' rappresenta un comando dell'operatore, non conoscenza NPC.
+
+> **Nota audit v0.16b (2026-06-01):** il checkpoint `v0.16b` ha prodotto la fotografia dei gap cognitivi residui dopo `v0.15` e `v0.16a`. Il sistema possiede gia' `BeliefStore`, decay configurabile, stati `Active/Weak/Stale/Discarded`, query soggettiva e invalidazione locale del cibo visto come mancante. Restano da chiudere: route belief-only `EatKnownFood` senza object id fisico, memoria da eventi needs, policy esplicita per credenze stale, query multi-candidato futura e riduzione della recovery `FindEquivalentTarget` che oggi legge ancora World. Dettaglio: `v0.16b_Cognition_Gap_Audit_Report.md`.
+
+> **Nota closeout v0.16j (2026-06-01):** la fase `v0.16` e' chiusa come Cognizione Soggettiva Avanzata iniziale. Ha stabilizzato lifecycle food belief, stato `Stale/Discarded`, invalidazione locale del cibo mancante, memoria da eventi needs, comunicazione soggettiva minima, uso di belief incerte ma non obsolete, QA anti-onniscienza e primo SearchFood esplorativo via MoveTo. Prima di aprire il sociale va completata la fase ponte `v0.17` sui costi runtime per NPC. Restano rinviati a `v0.170+`: query multi-candidato per alternative food, recovery `FindEquivalentTarget` senza nuove query interne, SearchFood esplorativo ricco a settori/copertura e riprogettazione completa del pannello EL pathfinding. Dettaglio: `v0.16j_Closeout_Report.md`.
 ---
 
-#### v0.17 - Conseguenze Sociali Emergenti
+#### v0.17 - Osservatorio costi runtime e profilazione per NPC
+
+## Stato
+FUTURA / PRIORITA' ALTA
+
+## Obiettivo
+
+Costruire uno strumento leggero per capire quale parte del runtime consuma risorse quando cresce il numero di NPC.
+
+Questa fase viene prima della crescita sociale perche' ogni nuovo NPC sembra aumentare il costo frame in modo sensibile. Prima di aggiungere reputazione, sospetto, rumor o socialita' emergente bisogna misurare in modo chiaro:
+
+- percezione;
+- memoria;
+- belief;
+- query;
+- decisione;
+- EL;
+- job;
+- running action;
+- pathfinding;
+- fallback/recovery;
+- pannelli diagnostici;
+- comunicazione/token.
+
+---
+
+## Regola architetturale fondamentale
+
+Lo strumento deve essere congelabile.
+
+Quando e' disattivato deve avere costo praticamente nullo:
+
+```text
+profilazione spenta -> niente stringhe, niente liste, niente dizionari, niente JSONL, niente misure per NPC
+```
+
+Il percorso spento deve limitarsi a guardie economiche, per evitare di introdurre un nuovo sistema diagnostico che diventa esso stesso causa del calo frame.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.17a | Audit punti caldi runtime per NPC | ✅ |
+| v0.17b | Configurazione osservatorio con costo nullo quando spento | ✅ |
+| v0.17c | Misure per sistema: percezione, memoria, belief, query, decisione, EL, job, fallback | ✅ |
+| v0.17d | Misure per NPC e individuazione NPC piu' costosi | ✅ |
+| v0.17e | Contatori operativi: celle viste, oggetti controllati, query, path, trace, fallback | ✅ |
+| v0.17f | JSONL opzionale batchato e limitato per profili runtime | ✅ |
+| v0.17g | Scenario QA 1/2/4/8/16 NPC e report costo scalare | ⚠️ |
+| v0.17h | Closeout osservatorio costi runtime | ⏳ |
+
+> **Nota architetturale v0.17:** questa fase NON deve ottimizzare alla cieca. Deve prima rendere misurabile il costo reale per tick e per NPC. Solo dopo i dati si decidera' se intervenire su FOV/percezione, pathfinding, EL, pannelli, query, job o comunicazione.
+
+---
+
+#### v0.18 - Ottimizzazione forte runtime percezione / belief / query
+
+## Stato
+IN CORSO / PRIORITA' ALTA
+
+## Obiettivo
+
+Ridurre i tre punti di crescita runtime piu' evidenti emersi dal JSONL dell'osservatorio costi:
+
+- percezione oggetti;
+- query belief;
+- decadimento belief.
+
+La fase NON cambia semantica decisionale, memoria, percezione o belief. Ottimizza il modo in cui i dati vengono cercati, letti e aggiornati, preservando conoscenza soggettiva, tick order e autorita' dei layer.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.18a | Ottimizzazione ObjectPerceptionSystem con indice spaziale a griglia e budget massimo oggetti/celle per NPC | ✅ |
+| v0.18b | Riduzione BeliefQuery con indice per categoria belief | ✅ |
+| v0.18c | BeliefDecay discreto per categoria con parametri da JSON | ✅ |
+| v0.18d | QA profiler comparativo pre/post ottimizzazione con 1/2/4/8/16 NPC | ⚠️ |
+| v0.18e | Ottimizzazione NpcPerceptionSystem con indice spaziale a zone | ✅ |
+| v0.18f | Closeout ottimizzazione runtime percezione/belief/query | ⏳ |
+
+> **Nota architetturale v0.18:** questa fase nasce da misure reali, non da ottimizzazione preventiva. Ogni patch deve ridurre costo runtime senza introdurre onniscienza, senza cambiare score decisionali e senza rendere i sistemi diagnostici nuove sorgenti di costo.
+
+---
+
+#### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
 FUTURA / PENDING
@@ -1023,16 +1116,16 @@ Introdurre conseguenze sociali emergenti sopra world events, memoria soggettiva 
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.17a | Audit reputazione/sospetto post-v0.16 | ⏳ |
-| v0.17b | Catene sospetto/furto da eventi osservati | ⏳ |
-| v0.17c | Giudizio sociale locale | ⏳ |
-| v0.17d | Prime norme emergenti | ⏳ |
-| v0.17e | Istituzioni runtime leggere | ⏳ |
-| v0.17f | QA scenario sociale osservabile | ⏳ |
+| v0.170a | Audit reputazione/sospetto post-v0.16 | ⏳ |
+| v0.170b | Catene sospetto/furto da eventi osservati | ⏳ |
+| v0.170c | Giudizio sociale locale | ⏳ |
+| v0.170d | Prime norme emergenti | ⏳ |
+| v0.170e | Istituzioni runtime leggere | ⏳ |
+| v0.170f | QA scenario sociale osservabile | ⏳ |
 
 ---
 
-#### v0.18 - Observer Layer Pubblico ed Explainability Esterna
+#### v0.180 - Observer Layer Pubblico ed Explainability Esterna
 
 ## Stato
 FUTURA / PENDING
@@ -1045,11 +1138,11 @@ Costruire uno strato observer esterno leggibile sopra eventi, memoria, decisioni
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.18a | Timeline eventi mondo | ⏳ |
-| v0.18b | Reason graph NPC | ⏳ |
-| v0.18c | Pannelli observer leggibili | ⏳ |
-| v0.18d | Reinserimento job traces v0.07 | ⏳ |
-| v0.18e | QA observer end-to-end | ⏳ |
+| v0.180a | Timeline eventi mondo | ⏳ |
+| v0.180b | Reason graph NPC | ⏳ |
+| v0.180c | Pannelli observer leggibili | ⏳ |
+| v0.180d | Reinserimento job traces v0.07 | ⏳ |
+| v0.180e | QA observer end-to-end | ⏳ |
 
 > **Nota:** questa fase riassorbe la vecchia v0.07 e la porta a uno strato observer realmente utile.
 

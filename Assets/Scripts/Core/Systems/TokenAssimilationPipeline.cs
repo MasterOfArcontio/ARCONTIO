@@ -30,6 +30,9 @@ namespace Arcontio.Core
 
             // Patch 0.01P3 extension: comunicazione furto
             _rules.Add(new AssimilateTheftReportRule());
+
+            // Comunicazione soggettiva minima dei fatti needs osservati.
+            _rules.Add(new AssimilateNeedsObservationRule());
         }
 
         /// <summary>
@@ -46,12 +49,20 @@ namespace Arcontio.Core
             if (tokenBuffer.Count == 0)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costTokenCount = tokenBuffer.Count;
+
             int tracesAdded = 0;
 
             // 2) Per ogni envelope, applichiamo 1 regola (prima compatibile)
             for (int i = 0; i < tokenBuffer.Count; i++)
             {
                 var env = tokenBuffer[i];
+                if (costPerNpc)
+                    costObserver.AddNpcWork(env.ListenerId, 1);
 
                 // Safety: esiste store memoria?
                 if (!world.Memory.TryGetValue(env.ListenerId, out var store) || store == null)
@@ -80,6 +91,8 @@ namespace Arcontio.Core
                             res,
                             env.Token.Type.ToString());
                         tracesAdded++;
+                        if (costPerNpc)
+                            costObserver.AddNpcWork(env.ListenerId, 1);
 
                         // Aggregazione lazy BeliefStore per memorie "sentite":
                         // il TokenAssimilationPipeline e l'altro punto in cui una
@@ -143,6 +156,13 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("TokenAssimilation.TracesAdded", tracesAdded);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.TokenAssimilationTokens, costTokenCount);
+                costObserver.AddCounter(RuntimeCostCounter.TokenAssimilationTracesAdded, tracesAdded);
+                costObserver.EndSample(RuntimeCostChannel.TokenAssimilation, costStart);
+            }
         }
 
     }

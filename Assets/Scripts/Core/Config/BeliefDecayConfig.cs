@@ -37,6 +37,14 @@ namespace Arcontio.Core
         public float situationConfidenceDecayPerTick;
         public float structureConfidenceDecayPerTick;
 
+        public int foodDecayIntervalTicks;
+        public int restDecayIntervalTicks;
+        public int dangerDecayIntervalTicks;
+        public int socialDecayIntervalTicks;
+        public int ownershipDecayIntervalTicks;
+        public int situationDecayIntervalTicks;
+        public int structureDecayIntervalTicks;
+
         public float freshnessDecayMultiplier;
         public float weakConfidenceThreshold;
         public float staleFreshnessThreshold;
@@ -77,6 +85,14 @@ namespace Arcontio.Core
                 ownershipConfidenceDecayPerTick = 0.0010f,
                 situationConfidenceDecayPerTick = 0.0010f,
                 structureConfidenceDecayPerTick = 0.0002f,
+
+                foodDecayIntervalTicks      = 1,
+                restDecayIntervalTicks      = 1,
+                dangerDecayIntervalTicks    = 1,
+                socialDecayIntervalTicks    = 1,
+                ownershipDecayIntervalTicks = 1,
+                situationDecayIntervalTicks = 1,
+                structureDecayIntervalTicks = 1,
 
                 freshnessDecayMultiplier = 2.0f,
                 weakConfidenceThreshold  = 0.20f,
@@ -119,6 +135,14 @@ namespace Arcontio.Core
             raw.ownershipConfidenceDecayPerTick = UseDefaultIfNonPositive(raw.ownershipConfidenceDecayPerTick, defaults.ownershipConfidenceDecayPerTick);
             raw.situationConfidenceDecayPerTick = UseDefaultIfNonPositive(raw.situationConfidenceDecayPerTick, defaults.situationConfidenceDecayPerTick);
             raw.structureConfidenceDecayPerTick = UseDefaultIfNonPositive(raw.structureConfidenceDecayPerTick, defaults.structureConfidenceDecayPerTick);
+
+            raw.foodDecayIntervalTicks      = UseDefaultIfNonPositive(raw.foodDecayIntervalTicks,      defaults.foodDecayIntervalTicks);
+            raw.restDecayIntervalTicks      = UseDefaultIfNonPositive(raw.restDecayIntervalTicks,      defaults.restDecayIntervalTicks);
+            raw.dangerDecayIntervalTicks    = UseDefaultIfNonPositive(raw.dangerDecayIntervalTicks,    defaults.dangerDecayIntervalTicks);
+            raw.socialDecayIntervalTicks    = UseDefaultIfNonPositive(raw.socialDecayIntervalTicks,    defaults.socialDecayIntervalTicks);
+            raw.ownershipDecayIntervalTicks = UseDefaultIfNonPositive(raw.ownershipDecayIntervalTicks, defaults.ownershipDecayIntervalTicks);
+            raw.situationDecayIntervalTicks = UseDefaultIfNonPositive(raw.situationDecayIntervalTicks, defaults.situationDecayIntervalTicks);
+            raw.structureDecayIntervalTicks = UseDefaultIfNonPositive(raw.structureDecayIntervalTicks, defaults.structureDecayIntervalTicks);
 
             raw.freshnessDecayMultiplier = UseDefaultIfNonPositive(raw.freshnessDecayMultiplier, defaults.freshnessDecayMultiplier);
             raw.weakConfidenceThreshold  = UseDefaultIfNonPositive(raw.weakConfidenceThreshold,  defaults.weakConfidenceThreshold);
@@ -165,6 +189,36 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // GetDecayIntervalFor
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce ogni quanti tick applicare il decadimento della categoria.
+        /// </para>
+        ///
+        /// <para><b>Decadimento discreto configurabile</b></para>
+        /// <para>
+        /// Il valore non cambia la formula di decay. Permette solo di applicarla meno
+        /// spesso e con scala temporale equivalente, cosi categorie numerose possono
+        /// costare meno senza diventare una nuova autorita decisionale.
+        /// </para>
+        /// </summary>
+        public int GetDecayIntervalFor(BeliefCategory category)
+        {
+            switch (category)
+            {
+                case BeliefCategory.Food:      return foodDecayIntervalTicks;
+                case BeliefCategory.Rest:      return restDecayIntervalTicks;
+                case BeliefCategory.Danger:    return dangerDecayIntervalTicks;
+                case BeliefCategory.Social:    return socialDecayIntervalTicks;
+                case BeliefCategory.Ownership: return ownershipDecayIntervalTicks;
+                case BeliefCategory.Situation: return situationDecayIntervalTicks;
+                case BeliefCategory.Structure: return structureDecayIntervalTicks;
+                default:                       return situationDecayIntervalTicks;
+            }
+        }
+
+        // =============================================================================
         // UseDefaultIfNonPositive
         // =============================================================================
         /// <summary>
@@ -188,6 +242,11 @@ namespace Arcontio.Core
         private static float UseDefaultIfNonPositive(float value, float fallback)
         {
             return value > 0f ? value : fallback;
+        }
+
+        private static int UseDefaultIfNonPositive(int value, int fallback)
+        {
+            return value > 0 ? value : fallback;
         }
     }
 

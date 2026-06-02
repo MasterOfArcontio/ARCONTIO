@@ -28,6 +28,9 @@ namespace Arcontio.Core
         ObjectSpotted,
         NpcSpotted,
 
+        FoodConsumed,
+        BedRested,
+
         // Crime (future)
         TheftWitnessed,             // Ho visto un furto
         TheftSuffered,

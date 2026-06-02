@@ -165,6 +165,7 @@ namespace Arcontio.Core
     ///   <item><b>NoKnownLandmarks</b>: l'NPC non conosce landmark utili.</item>
     ///   <item><b>LmPlanFailed</b>: A* landmark ha fallito nonostante dati disponibili.</item>
     ///   <item><b>ForcedDebug</b>: scelta imposta da DevTools o flusso di debug.</item>
+    ///   <item><b>SearchFoodExploration</b>: SearchFood usa una rotta esplorativa fisica senza target cibo noto.</item>
     /// </list>
     /// </summary>
     public enum SelectionReason
@@ -175,7 +176,8 @@ namespace Arcontio.Core
         NoLmFallbackDirect = 3,
         NoKnownLandmarks = 4,
         LmPlanFailed = 5,
-        ForcedDebug = 6
+        ForcedDebug = 6,
+        SearchFoodExploration = 7
     }
 
     // =============================================================================

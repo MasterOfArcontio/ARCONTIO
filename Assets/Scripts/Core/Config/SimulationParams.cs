@@ -68,9 +68,16 @@ namespace Arcontio.Core.Config
         public bool npcVisionUseCone = true;
         public float npcVisionConeSlope = 1.0f;
         public int npcVisionFovDegrees = 90;
+        public ObjectPerceptionRuntimeParams perception = new ObjectPerceptionRuntimeParams();
 
         // ---------------- Debug FOV heatmap (view overlay) ----------------
         public DebugFovParams debug_fov = new DebugFovParams();
+
+        // ---------------- Runtime cost observer (v0.17) ----------------
+        // Osservatorio costi runtime. Il default e' spento e deve restare tale:
+        // quando enabled=false il World non crea nessuna istanza osservatore, cosi'
+        // i sistemi caldi non pagano misure, stringhe, liste o JSONL.
+        public RuntimeCostObserverParams runtime_cost_observer = new RuntimeCostObserverParams();
 
         // ---------------- Landmark pathfinding (v0.02) ----------------
         public LandmarkSystemParams landmarks = new LandmarkSystemParams();
@@ -265,6 +272,9 @@ namespace Arcontio.Core.Config
             if (logging.devtools != null && logging.devtools.debug_fov != null)
                 debug_fov = logging.devtools.debug_fov;
 
+            if (logging.runtime_cost_observer != null)
+                runtime_cost_observer = logging.runtime_cost_observer;
+
             if (logging.movement_explainability != null)
                 explainability = logging.movement_explainability.ToMovementExplainabilityParams(explainability);
 
@@ -373,6 +383,35 @@ namespace Arcontio.Core.Config
         public float minimumWeight = 0.001f;
     }
 
+    // =============================================================================
+    // ObjectPerceptionRuntimeParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Parametri runtime della percezione oggetti.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: percezione locale e budgettizzabile</b></para>
+    /// <para>
+    /// La percezione oggetti non deve crescere come <c>NPC x tutti gli oggetti del
+    /// mondo</c>. I parametri permettono di usare l'indice spaziale a griglia del
+    /// <c>World</c> e, quando serve per test o stress runtime, limitare il numero di
+    /// celle candidate e oggetti processati per NPC in un singolo tick.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>maxCandidateCellsPerNpcPerTick</b>: limite celle candidate; 0 o negativo significa nessun limite.</item>
+    ///   <item><b>maxObjectsPerNpcPerTick</b>: limite oggetti processati; 0 o negativo significa nessun limite.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class ObjectPerceptionRuntimeParams
+    {
+        public int maxCandidateCellsPerNpcPerTick = 0;
+        public int maxObjectsPerNpcPerTick = 0;
+    }
+
     // ============================================================
     // INVENTORY
     // ============================================================
@@ -402,9 +441,48 @@ namespace Arcontio.Core.Config
         public LoggerJsonlParams jsonl = new LoggerJsonlParams();
         public LoggerTelemetryParams telemetry = new LoggerTelemetryParams();
         public DiagnosticsDevtoolParams devtools = new DiagnosticsDevtoolParams();
+        public RuntimeCostObserverParams runtime_cost_observer = new RuntimeCostObserverParams();
         public DiagnosticsMovementExplainabilityParams movement_explainability = new DiagnosticsMovementExplainabilityParams();
         public DiagnosticsMemoryBeliefDecisionExplainabilityParams memory_belief_decision_explainability =
             new DiagnosticsMemoryBeliefDecisionExplainabilityParams();
+    }
+
+    // =============================================================================
+    // RuntimeCostObserverParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile della configurazione dell'osservatorio costi runtime.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: costo nullo quando spento</b></para>
+    /// <para>
+    /// Questa sezione prepara la fase `v0.17` senza attivare misure implicite. Il
+    /// default e' `enabled=false`; in tale stato `World.RuntimeCostObserver` resta
+    /// nullo e i sistemi caldi non devono costruire alcun dato diagnostico.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>enabled</b>: abilita la creazione dell'osservatorio nel World.</item>
+    ///   <item><b>sampleEveryTicks</b>: cadenza minima futura delle misure aggregate.</item>
+    ///   <item><b>trackPerNpc</b>: abilita in futuro il dettaglio per NPC, piu' costoso.</item>
+    ///   <item><b>writeJsonl</b>: abilita in futuro esportazione JSONL batchata.</item>
+    ///   <item><b>maxTicksInMemory</b>: limite futuro del registro in memoria.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class RuntimeCostObserverParams
+    {
+        public bool enabled = false;
+        public int sampleEveryTicks = 1;
+        public bool trackPerNpc = false;
+        public bool writeJsonl = false;
+        public int maxTicksInMemory = 256;
+        public int jsonlFlushIntervalTicks = 25;
+        public int jsonlMaxQueueSize = 4096;
+        public int jsonlMaxBatchSize = 512;
+        public string jsonLogFileNamePattern = "arcontio_runtime_cost_{yyyyMMdd_HHmmss}.jsonl";
     }
 
     [Serializable]

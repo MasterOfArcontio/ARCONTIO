@@ -45,6 +45,10 @@ namespace Arcontio.Core
             // Furto cibo (Day9)
             _rules.Add(new FoodStolenMemoryRule());
 
+            // Eventi needs minimali -> memoria soggettiva.
+            _rules.Add(new FoodConsumedMemoryRule());
+            _rules.Add(new BedRestedMemoryRule());
+
             // Se hai una rule per FoodMissingSuspectedEvent, aggiungila qui.
             // _rules.Add(new FoodMissingSuspectedMemoryRule());
         }
@@ -61,6 +65,13 @@ namespace Arcontio.Core
         {
             if (_eventsBuffer == null || _eventsBuffer.Count == 0)
                 return;
+
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costRuleChecks = 0;
+            int costWitnessChecks = 0;
 
             // Snapshot parametri percezione dal GlobalState:
             int visionRange = world.Global.NpcVisionRangeCells;
@@ -93,6 +104,9 @@ namespace Arcontio.Core
                 for (int r = 0; r < _rules.Count; r++)
                 {
                     var rule = _rules[r];
+                    if (costSample)
+                        costRuleChecks++;
+
                     if (!rule.Matches(e))
                         continue;
 
@@ -103,6 +117,11 @@ namespace Arcontio.Core
                     for (int n = 0; n < _npcIds.Count; n++)
                     {
                         int npcId = _npcIds[n];
+
+                        if (costSample)
+                            costWitnessChecks++;
+                        if (costPerNpc)
+                            costObserver.AddNpcWork(npcId, 1);
 
                         if (!world.GridPos.TryGetValue(npcId, out var p))
                             continue;
@@ -265,6 +284,8 @@ namespace Arcontio.Core
                             }
 
                             tracesAdded++;
+                            if (costPerNpc)
+                                costObserver.AddNpcWork(npcId, 1);
                         }
                     }
 
@@ -273,6 +294,15 @@ namespace Arcontio.Core
             }
 
             telemetry.Counter("MemoryEncodingSystem.TracesAdded", tracesAdded);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.MemoryEncodingEvents, _eventsBuffer.Count);
+                costObserver.AddCounter(RuntimeCostCounter.MemoryEncodingRuleChecks, costRuleChecks);
+                costObserver.AddCounter(RuntimeCostCounter.MemoryEncodingWitnessChecks, costWitnessChecks);
+                costObserver.AddCounter(RuntimeCostCounter.MemoryEncodingTracesAdded, tracesAdded);
+                costObserver.EndSample(RuntimeCostChannel.MemoryEncoding, costStart);
+            }
         }
 
         // Patch 0.02.5A: Manhattan rimosso — usa FovUtils.Manhattan
@@ -594,6 +624,14 @@ namespace Arcontio.Core
 
                 case FoodStolenEvent fe:
                     x = fe.CellX; y = fe.CellY;
+                    return true;
+
+                case FoodConsumedEvent fce:
+                    x = fce.CellX; y = fce.CellY;
+                    return true;
+
+                case BedRestedEvent bre:
+                    x = bre.CellX; y = bre.CellY;
                     return true;
             }
 

@@ -36,7 +36,7 @@ namespace Arcontio.Core
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>SearchFood</b>: seleziona una probe cell locale e crea un job di esplorazione.</item>
+    ///   <item><b>SearchFood</b>: seleziona una destinazione fisica di esplorazione e crea un job di ricerca.</item>
     ///   <item><b>EatKnownFood</b>: risolve uno stock community visibile o ricordato e crea un job food.</item>
     ///   <item><b>Legacy fallback hook</b>: conserva il gate job anche quando la rule arriva dal ramo fame storico.</item>
     ///   <item><b>Explainability</b>: emette la stessa trace <c>JobRequest</c> del ponte precedente.</item>
@@ -54,6 +54,18 @@ namespace Arcontio.Core
             new Vector2Int(0, 2),
             new Vector2Int(-2, 0),
             new Vector2Int(0, -2),
+            new Vector2Int(1, 1),
+            new Vector2Int(-1, 1),
+            new Vector2Int(-1, -1),
+            new Vector2Int(1, -1),
+        };
+
+        private static readonly Vector2Int[] SearchFoodExplorationDirections =
+        {
+            new Vector2Int(1, 0),
+            new Vector2Int(0, 1),
+            new Vector2Int(-1, 0),
+            new Vector2Int(0, -1),
             new Vector2Int(1, 1),
             new Vector2Int(-1, 1),
             new Vector2Int(-1, -1),
@@ -98,7 +110,7 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!TryResolveSearchFoodProbeCell(world, npcId, out var probeCell, out reason))
+            if (!TryResolveSearchFoodTargetCell(world, npcId, out var probeCell, out reason))
             {
                 LogSearchFoodJobRoute(nowTick, npcId, "ProbeUnavailable", reason, gateEnabled);
                 return false;
@@ -451,7 +463,7 @@ namespace Arcontio.Core
             return 0;
         }
 
-        private static bool TryResolveSearchFoodProbeCell(World world, int npcId, out Vector2Int probeCell, out string reason)
+        private static bool TryResolveSearchFoodTargetCell(World world, int npcId, out Vector2Int probeCell, out string reason)
         {
             probeCell = default;
             reason = string.Empty;
@@ -463,6 +475,33 @@ namespace Arcontio.Core
             }
 
             var origin = new Vector2Int(position.X, position.Y);
+            if (HasVisibleCommunityFoodStock(world, npcId)
+                && TryResolveSearchFoodLocalProbeCell(world, npcId, origin, out probeCell))
+            {
+                reason = "SearchFoodVisibleTargetProbeResolved";
+                return true;
+            }
+
+            if (TryResolveSearchFoodExplorationCell(world, npcId, origin, out probeCell))
+            {
+                reason = "SearchFoodExplorationCellResolved";
+                return true;
+            }
+
+            if (TryResolveSearchFoodLocalProbeCell(world, npcId, origin, out probeCell))
+            {
+                reason = "SearchFoodProbeResolved";
+                return true;
+            }
+
+            reason = "SearchFoodProbeUnavailable";
+            return false;
+        }
+
+        private static bool TryResolveSearchFoodLocalProbeCell(World world, int npcId, Vector2Int origin, out Vector2Int probeCell)
+        {
+            probeCell = default;
+
             for (int i = 0; i < SearchFoodProbeOffsets.Length; i++)
             {
                 var candidate = origin + SearchFoodProbeOffsets[i];
@@ -470,11 +509,64 @@ namespace Arcontio.Core
                     continue;
 
                 probeCell = candidate;
-                reason = "SearchFoodProbeResolved";
                 return true;
             }
 
-            reason = "SearchFoodProbeUnavailable";
+            return false;
+        }
+
+        private static bool TryResolveSearchFoodExplorationCell(World world, int npcId, Vector2Int origin, out Vector2Int explorationCell)
+        {
+            explorationCell = default;
+
+            int visionRange = world.Global.NpcVisionRangeCells <= 0 ? 6 : world.Global.NpcVisionRangeCells;
+            int maxDistance = Mathf.Clamp(visionRange, 4, 8);
+
+            for (int distance = maxDistance; distance >= 3; distance--)
+            {
+                for (int i = 0; i < SearchFoodExplorationDirections.Length; i++)
+                {
+                    var direction = SearchFoodExplorationDirections[i];
+                    var candidate = origin + new Vector2Int(direction.x * distance, direction.y * distance);
+                    if (!IsValidSearchFoodProbeCell(world, npcId, candidate))
+                        continue;
+
+                    explorationCell = candidate;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasVisibleCommunityFoodStock(World world, int npcId)
+        {
+            if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
+                return false;
+
+            int visionRange = world.Global.NpcVisionRangeCells <= 0 ? 6 : world.Global.NpcVisionRangeCells;
+            bool useCone = world.Global.NpcVisionUseCone;
+            float coneSlope = world.Global.NpcVisionConeSlope;
+            if (!world.NpcFacing.TryGetValue(npcId, out var facing))
+                facing = CardinalDirection.North;
+
+            foreach (var kv in world.FoodStocks)
+            {
+                int objId = kv.Key;
+                var stock = kv.Value;
+                if (stock.Units <= 0)
+                    continue;
+
+                if (stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
+                    continue;
+
+                if (!TryGetObjectCell(world, objId, out int ox, out int oy))
+                    continue;
+
+                if (FovUtils.IsVisible(world, nx, ny, facing, ox, oy, visionRange, useCone, coneSlope))
+                    return true;
+            }
+
             return false;
         }
 

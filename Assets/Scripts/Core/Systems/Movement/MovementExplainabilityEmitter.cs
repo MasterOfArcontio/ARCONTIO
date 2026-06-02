@@ -59,7 +59,9 @@ namespace Arcontio.Core
             PlannerMode selectedMode,
             SelectionReason selectionReason,
             NpcMacroRoutePlan macroPlan,
-            IReadOnlyList<Vector2Int> localPath)
+            IReadOnlyList<Vector2Int> localPath,
+            string sourceJobId = "",
+            string sourceStepId = "")
         {
             if (!ShouldEmitForNpc(world, npcId, out var config, out int verbosity))
                 return;
@@ -71,7 +73,7 @@ namespace Arcontio.Core
             int intentId = registry.AllocateIntentId();
             int planId = registry.AllocatePlanId();
 
-            var intentTrace = BuildIntentTrace(npcId, intent, intentId, verbosity);
+            var intentTrace = BuildIntentTrace(npcId, intent, intentId, verbosity, sourceJobId, sourceStepId);
             var planTrace = BuildPlanTrace(
                 npcId,
                 intent,
@@ -100,6 +102,23 @@ namespace Arcontio.Core
                 new Vector2Int(intent.TargetX, intent.TargetY),
                 minVerbosity: 1,
                 summary: "movement_started_after_initial_plan");
+        }
+
+        public static void TryEmitModeTransitionEvent(
+            World world,
+            int npcId,
+            string previousMode,
+            GridPosition currentCell,
+            Vector2Int targetCell,
+            int minVerbosity,
+            string reason)
+        {
+            string nextMode = ResolveRuntimeMode(world, npcId);
+            if (string.Equals(previousMode ?? string.Empty, nextMode ?? string.Empty, System.StringComparison.Ordinal))
+                return;
+
+            string summary = $"mode:{NormalizeMode(previousMode)}->{NormalizeMode(nextMode)} | reason:{reason ?? string.Empty}";
+            TryEmitExecutionEvent(world, npcId, PathEventType.SwitchedMode, currentCell, targetCell, minVerbosity, summary);
         }
 
         // =============================================================================
@@ -337,13 +356,17 @@ namespace Arcontio.Core
             int npcId,
             in MoveIntent intent,
             int intentId,
-            int verbosity)
+            int verbosity,
+            string sourceJobId,
+            string sourceStepId)
         {
             return new MovementIntentTrace
             {
                 NpcId = npcId,
                 Tick = TickContext.CurrentTickIndex,
                 IntentId = intentId,
+                SourceJobId = sourceJobId ?? string.Empty,
+                SourceStepId = sourceStepId ?? string.Empty,
                 MovementPurpose = MapPurpose(intent.Reason),
                 TargetType = intent.TargetObjectId != 0 ? MovementTargetType.WorldObject : MovementTargetType.Cell,
                 TargetCell = new Vector2Int(intent.TargetX, intent.TargetY),
@@ -573,7 +596,7 @@ namespace Arcontio.Core
         /// serve solo a rendere leggibile l'evento EL.
         /// </para>
         /// </summary>
-        private static string ResolveActiveMode(World world, int npcId)
+        public static string ResolveRuntimeMode(World world, int npcId)
         {
             if (world == null)
                 return string.Empty;
@@ -594,6 +617,16 @@ namespace Arcontio.Core
                 return "DIRECT_COMMIT";
 
             return string.Empty;
+        }
+
+        private static string ResolveActiveMode(World world, int npcId)
+        {
+            return ResolveRuntimeMode(world, npcId);
+        }
+
+        private static string NormalizeMode(string mode)
+        {
+            return string.IsNullOrWhiteSpace(mode) ? "NONE" : mode;
         }
     }
 }

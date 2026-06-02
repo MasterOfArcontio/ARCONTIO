@@ -129,6 +129,14 @@ namespace Arcontio.Core
             if (world == null)
                 return;
 
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costEvaluations = 0;
+            int costJobsStarted = 0;
+            int costRouteRejected = 0;
+
             int nowTick = (int)tick.Index;
             foreach (var pair in world.NpcDna)
             {
@@ -139,12 +147,33 @@ namespace Arcontio.Core
                 if (!CanEvaluateNpc(world, npcId, in needs, nowTick))
                     continue;
 
+                if (costSample)
+                    costEvaluations++;
+                if (costPerNpc)
+                    costObserver.AddNpcWork(npcId, 1);
+
                 var startResult = TryEvaluateAndStartJob(world, npcId, in needs, nowTick, telemetry);
+                if (costSample)
+                {
+                    if (startResult == DecisionJobStartResult.JobStarted)
+                        costJobsStarted++;
+                    else if (startResult == DecisionJobStartResult.RouteRejected)
+                        costRouteRejected++;
+                }
+
                 if (ShouldConsumeDecisionCadence(startResult))
                 {
                     _lastDecisionTicks[npcId] = nowTick;
                     world.SignalNpcDecisionFlash(npcId, nowTick);
                 }
+            }
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.DecisionNpcEvaluations, costEvaluations);
+                costObserver.AddCounter(RuntimeCostCounter.DecisionJobsStarted, costJobsStarted);
+                costObserver.AddCounter(RuntimeCostCounter.DecisionRouteRejected, costRouteRejected);
+                costObserver.EndSample(RuntimeCostChannel.Decision, costStart);
             }
         }
 
@@ -156,6 +185,12 @@ namespace Arcontio.Core
 
             bool hasActiveJob = world.JobRuntimeState != null
                 && world.JobRuntimeState.GetSnapshot(npcId, nowTick).HasActiveJob;
+
+            if (hasActiveJob && ActiveFoodJobAlreadyCoversCriticalHunger(world, npcId, in needs))
+            {
+                _lastDecisionTicks[npcId] = nowTick;
+                return false;
+            }
 
             bool hasEmergencyIntentSignal = HasCriticalNeedSignal(needs);
             var input = new NpcDecisionSchedulerInput(
@@ -175,9 +210,16 @@ namespace Arcontio.Core
             if (!_contextBuilder.TryBuild(world, npcId, in needs, nowTick, out var context))
                 return DecisionJobStartResult.ContextUnavailable;
 
-            _candidateGenerator.GeneratePhase1Candidates(in context, _decisionCandidates);
+            _candidateGenerator.GenerateFoodJobCandidates(in context, _decisionCandidates);
             RemoveNonRoutableJobCandidates(_decisionCandidates);
-            _scoringService.ScoreCandidates(in context, _decisionCandidates, DecisionScoringConfig.Default());
+            bool captureDecisionBreakdown = MemoryBeliefDecisionExplainabilityEmitter.ShouldWriteTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                MemoryBeliefDecisionTraceKind.Decision);
+            _scoringService.ScoreCandidates(
+                in context,
+                _decisionCandidates,
+                DecisionScoringConfig.Default(),
+                captureDecisionBreakdown);
 
             var selectionConfig = ResolveDecisionSelectionConfig(world.Config?.Sim?.decision);
             var selection = _selectionService.Select(in context, _decisionCandidates, selectionConfig, _decisionRandom);
@@ -284,6 +326,18 @@ namespace Arcontio.Core
             }
 
             return false;
+        }
+
+        private static bool ActiveFoodJobAlreadyCoversCriticalHunger(World world, int npcId, in NpcNeeds needs)
+        {
+            if (world?.JobRuntimeState == null || !needs.IsCritical(NeedKind.Hunger))
+                return false;
+
+            if (!world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var activeJob) || activeJob == null)
+                return false;
+
+            return activeJob.Request.IntentKind == DecisionIntentKind.EatKnownFood
+                || activeJob.Request.IntentKind == DecisionIntentKind.SearchFood;
         }
 
         private static DecisionSelectionConfig ResolveDecisionSelectionConfig(DecisionRuntimeParams runtimeConfig)

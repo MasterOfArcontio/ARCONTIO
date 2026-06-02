@@ -25,20 +25,20 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ACTIVE: v0.16 - Cognizione Soggettiva Avanzata
+## MACRO JOB COMPLETED: v0.16 - Cognizione Soggettiva Avanzata
 
 CHECKPOINT CORRENTE:
-v0.16b - Audit cognition gap post-v0.15
+v0.16j - Closeout cognizione soggettiva avanzata
 
 STATUS:
-READY / AUDIT
+COMPLETED / READY FOR PR
 
 OUTPUT ATTESO:
-fotografia dei gap cognitivi residui dopo la chiusura del movimento multi-tick e dell'allineamento template v0.16a
+closeout della fase cognitiva soggettiva iniziale, con lifecycle belief, eventi needs in memoria, comunicazione soggettiva minima, decisioni su belief incerte, SearchFood esplorativo e QA anti-onniscienza consolidati
 
 DOC SYNC:
-root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.15`;
-allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo validazione umana della nuova sequenza `v0.16`
+root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.16`;
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato prima dell'apertura stabile della fase sociale `v0.170`
 
 OBIETTIVO:
 Chiudere il debito tra movimento legacy e Job runtime prima di aprire la cognizione soggettiva avanzata.
@@ -79,18 +79,20 @@ Obiettivo tecnico corrente `v0.16`:
 - stabilizzare lifecycle, freshness, obsolescenza e stato delle belief;
 - collegare eventi mondo needs a memoria soggettiva senza onniscienza;
 - verificare localmente credenze obsolete prima di agire;
+- sviluppare SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili;
 - preparare decisioni su conoscenza incerta e parziale;
 - introdurre comunicazione soggettiva minima dei fatti osservati;
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.16b - Audit cognition gap post-v0.15`
+`v0.18e - Ottimizzazione NpcPerceptionSystem con indice spaziale a zone`
 
 Residual follow-ups / future hardening:
 
-- `v0.16`: belief lifecycle, obsolescenza cibo/oggetti, memoria da world events needs, verifica locale credenze;
-- `v0.17`: sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
-- `v0.18+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
+- `v0.17`: osservatorio costi runtime, profilazione per NPC, misure per percezione/memoria/belief/query/decisione/EL/job/fallback/pathfinding;
+- `v0.18`: ottimizzazione forte runtime percezione/belief/query basata sui dati JSONL dell'osservatorio;
+- `v0.170`: query multi-candidato food, recovery `FindEquivalentTarget` senza query interne, sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
+- `v0.180+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
 Checkpoint v0.13 pianificati:
 
@@ -133,14 +135,35 @@ Checkpoint v0.15 pianificati:
 Checkpoint v0.16 pianificati:
 
 - `v0.16a`: allineamento template `generic.move_to_cell.v1` e `transport.object_to_cell.v1` al movimento multi-tick - DONE;
-- `v0.16b`: audit cognition gap post-v0.15;
-- `v0.16c`: lifecycle credenze e obsolescenza cibo/oggetti;
-- `v0.16d`: memoria da eventi needs;
-- `v0.16e`: verifica locale credenze;
-- `v0.16f`: decisione su conoscenza incerta;
-- `v0.16g`: comunicazione soggettiva minima;
-- `v0.16h`: QA anti-onniscienza cognitiva;
-- `v0.16i`: closeout cognizione soggettiva avanzata.
+- `v0.16b`: audit cognition gap post-v0.15 - DONE;
+- `v0.16c`: lifecycle credenze e obsolescenza cibo/oggetti - DONE;
+- `v0.16d`: memoria da eventi needs - DONE;
+- `v0.16e`: verifica locale credenze - DONE;
+- `v0.16f`: comunicazione soggettiva minima - DONE;
+- `v0.16g`: decisione su conoscenza incerta - DONE;
+- `v0.16h`: QA anti-onniscienza cognitiva - DONE;
+- `v0.16i`: SearchFood avanzato con MoveTo esplorativo quando non esistono target visibili - DONE;
+- `v0.16j`: closeout cognizione soggettiva avanzata - DONE.
+
+Checkpoint v0.17 pianificati:
+
+- `v0.17a`: audit punti caldi runtime per NPC - DONE;
+- `v0.17b`: configurazione osservatorio con costo nullo quando spento - DONE;
+- `v0.17c`: misure per sistema: percezione, memoria, belief, query, decisione, EL, job, fallback - DONE;
+- `v0.17d`: misure per NPC e individuazione NPC piu' costosi - DONE;
+- `v0.17e`: contatori operativi: celle viste, oggetti controllati, query, path, trace, fallback - DONE;
+- `v0.17f`: JSONL opzionale batchato e limitato per profili runtime - DONE;
+- `v0.17g`: scenario QA 1/2/4/8/16 NPC e report costo scalare - PARTIAL, protocollo pronto e prova runtime/profiler da eseguire;
+- `v0.17h`: closeout osservatorio costi runtime.
+
+Checkpoint v0.18 pianificati:
+
+- `v0.18a`: ottimizzazione ObjectPerceptionSystem con indice spaziale a griglia e budget massimo oggetti/celle per NPC - DONE;
+- `v0.18b`: riduzione BeliefQuery con indice per categoria belief - DONE;
+- `v0.18c`: BeliefDecay discreto per categoria con parametri da JSON - DONE;
+- `v0.18d`: QA profiler comparativo pre/post ottimizzazione con 1/2/4/8/16 NPC - PARTIAL, protocollo pronto;
+- `v0.18e`: ottimizzazione NpcPerceptionSystem con indice spaziale a zone - DONE;
+- `v0.18f`: closeout ottimizzazione runtime percezione/belief/query.
 
 Checkpoint v0.12 completati:
 

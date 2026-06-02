@@ -235,6 +235,41 @@ namespace Arcontio.Tests
             Assert.That(store.Entries[0].Freshness, Is.EqualTo(0.0f).Within(0.0001f));
         }
 
+        [Test]
+        public void BeliefQueryUsesWeakBeliefsButRejectsStaleAndDiscardedBeliefs()
+        {
+            var service = new BeliefQueryService();
+            var config = BeliefQueryConfig.Default();
+            config.defaultMinConfidence = 0.05f;
+            var query = new BeliefQueryContext(
+                BeliefCategory.Food,
+                urgency01: 0.80f,
+                npcPosition: new Vector2Int(0, 0),
+                minConfidence: config.defaultMinConfidence);
+
+            var weakStore = MakeFoodBeliefStore(new Vector2Int(2, 0), confidence: 0.65f, freshness: 0.70f);
+            weakStore.TryReduceConfidence(weakStore.Entries[0].BeliefId, penalty01: 0.10f, currentTick: 20, BeliefStatus.Weak);
+
+            var staleStore = MakeFoodBeliefStore(new Vector2Int(3, 0), confidence: 0.65f, freshness: 0.05f);
+            var staleConfig = BeliefDecayConfig.Default();
+            staleConfig.foodConfidenceDecayPerTick = 0.01f;
+            staleConfig.freshnessDecayMultiplier = 10.0f;
+            staleConfig.staleFreshnessThreshold = 0.10f;
+            staleStore.TickDecay(staleConfig, tickScale: 1.0f, out _, out _, out _);
+
+            var discardedStore = MakeFoodBeliefStore(new Vector2Int(4, 0), confidence: 0.90f, freshness: 0.90f);
+            discardedStore.TryDiscardBelief(discardedStore.Entries[0].BeliefId, currentTick: 30);
+
+            var weakResult = service.QueryBest(weakStore, query, config);
+            var staleResult = service.QueryBest(staleStore, query, config);
+            var discardedResult = service.QueryBest(discardedStore, query, config);
+
+            Assert.That(weakResult.IsEmpty, Is.False);
+            Assert.That(weakResult.Belief.Status, Is.EqualTo(BeliefStatus.Weak));
+            Assert.That(staleResult.IsEmpty, Is.True);
+            Assert.That(discardedResult.IsEmpty, Is.True);
+        }
+
         // =============================================================================
         // MakeTrace
         // =============================================================================
@@ -283,6 +318,19 @@ namespace Arcontio.Tests
                 HeardKind = isHeard ? HeardKind.DirectHeard : HeardKind.None,
                 SourceSpeakerId = isHeard ? 99 : 0
             };
+        }
+
+        private static BeliefStore MakeFoodBeliefStore(Vector2Int position, float confidence, float freshness)
+        {
+            var store = new BeliefStore();
+            store.AddOrMergeByCategoryAndPosition(
+                BeliefCategory.Food,
+                position,
+                confidence,
+                freshness,
+                currentTick: 10,
+                BeliefSource.Seen);
+            return store;
         }
 
         // =============================================================================

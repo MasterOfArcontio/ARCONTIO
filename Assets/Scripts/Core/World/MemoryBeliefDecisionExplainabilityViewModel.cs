@@ -201,7 +201,9 @@ namespace Arcontio.Core
     [Serializable]
     public sealed class MemoryBeliefDecisionCandidateView
     {
+        public long Tick;
         public string Intent = string.Empty;
+        public bool IsSelected;
         public bool Available;
         public string Need = string.Empty;
         public float NeedUrgency01;
@@ -730,7 +732,9 @@ namespace Arcontio.Core
                 var source = decision.Candidates[i];
                 var candidate = new MemoryBeliefDecisionCandidateView
                 {
+                    Tick = trace.Tick,
                     Intent = source.Intent.ToString(),
+                    IsSelected = i == decision.SelectedIndex,
                     Available = source.Available,
                     Need = source.Need.ToString(),
                     NeedUrgency01 = source.NeedUrgency01,
@@ -1118,11 +1122,16 @@ namespace Arcontio.Core
                 if (trace?.JobRequest == null)
                     continue;
 
-                if (trace.Tick != decisionTick || trace.JobRequest.Intent != intent)
+                long distance = Math.Abs(trace.Tick - decisionTick);
+                if (distance > 3 || trace.JobRequest.Intent != intent)
                     continue;
 
-                if (best == null || trace.Tick > best.Tick)
+                if (best == null
+                    || Math.Abs(trace.Tick - decisionTick) < Math.Abs(best.Tick - decisionTick)
+                    || (distance == Math.Abs(best.Tick - decisionTick) && trace.Tick > best.Tick))
+                {
                     best = trace;
+                }
             }
 
             return best;

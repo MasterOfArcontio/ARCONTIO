@@ -110,6 +110,16 @@ namespace Arcontio.Core
         public DebugFovTelemetry DebugFovTelemetry { get; private set; }
 
         /// <summary>
+        /// Osservatorio costi runtime (v0.17).
+        ///
+        /// Quando e' null, la profilazione runtime e' completamente spenta. Questa
+        /// scelta e' intenzionale: i sistemi caldi devono poter fare un singolo
+        /// controllo nullo prima di qualunque misura, evitando stringhe, liste,
+        /// dizionari, JSONL o contatori nascosti.
+        /// </summary>
+        public RuntimeCostObserver RuntimeCostObserver { get; private set; }
+
+        /// <summary>
         /// LandmarkRegistry (v0.02 Day2): registro oggettivo dei landmark.
         ///
         /// Nota:
@@ -994,6 +1004,14 @@ namespace Arcontio.Core
                 DebugFovTelemetry = new DebugFovTelemetry(MapWidth, MapHeight, window);
             }
 
+            // ============================================================
+            // RUNTIME COST OBSERVER (v0.17)
+            // ============================================================
+            // Punto di ingresso congelabile della futura profilazione per NPC.
+            // Se runtime_cost_observer.enabled=false, la factory restituisce null
+            // e nessun registro o buffer diagnostico viene creato.
+            RuntimeCostObserver = Arcontio.Core.RuntimeCostObserver.CreateIfEnabled(Config?.Sim?.runtime_cost_observer);
+
             Global.EnableMemorySpatialFusion = false;
             Global.MemoryRegionSizeCells = 4;
 
@@ -1041,6 +1059,12 @@ namespace Arcontio.Core
             // Legacy/back-compat: manteniamo anche HalfWidthPerStep per codice vecchio.
             Global.NpcVisionConeSlope = slope;
             Global.NpcVisionConeHalfWidthPerStep = slope;
+            Global.ObjectPerceptionMaxCandidateCellsPerNpcPerTick = Config?.Sim?.perception != null
+                ? Config.Sim.perception.maxCandidateCellsPerNpcPerTick
+                : 0;
+            Global.ObjectPerceptionMaxObjectsPerNpcPerTick = Config?.Sim?.perception != null
+                ? Config.Sim.perception.maxObjectsPerNpcPerTick
+                : 0;
 
             Global.Needs = NeedsConfig.Default();
             Global.BeliefDecay = BeliefDecayConfig.Default();
@@ -3922,6 +3946,8 @@ if (!NpcAction.ContainsKey(id))
 
             int x = obj.CellX;
             int y = obj.CellY;
+            bool wasFoodStock = FoodStocks.TryGetValue(objectId, out var removedFoodStock)
+                && removedFoodStock.Units > 0;
 
             // 1) Se Ã¨ occluder, pulisci la cache occlusione prima di rimuovere dai dizionari.
             //    (Questo evita che restino celle "bloccate" anche dopo la rimozione dell'oggetto.)
@@ -3964,6 +3990,90 @@ if (!NpcAction.ContainsKey(id))
 
             // 4) rimuovi dal registry oggetti
             Objects.Remove(objectId);
+
+            if (wasFoodStock)
+                DiscardVisibleFoodKnowledgeForRemovedStock(objectId, x, y);
+        }
+
+        private void DiscardVisibleFoodKnowledgeForRemovedStock(int objectId, int cellX, int cellY)
+        {
+            int visionRange = Global.NpcVisionRangeCells;
+            if (visionRange <= 0)
+                visionRange = 6;
+
+            bool useCone = Global.NpcVisionUseCone;
+            float coneSlope = Global.NpcVisionConeSlope;
+            int tick = (int)TickContext.CurrentTickIndex;
+
+            foreach (var pair in Beliefs)
+            {
+                int npcId = pair.Key;
+                var beliefStore = pair.Value;
+                if (beliefStore == null)
+                    continue;
+
+                if (!CanNpcCurrentlyVerifyMissingFoodAtCell(npcId, cellX, cellY, visionRange, useCone, coneSlope))
+                    continue;
+
+                beliefStore.TryDiscardByCategoryAndPosition(BeliefCategory.Food, new Vector2Int(cellX, cellY), tick);
+                RemovePinnedFoodStockBelief(npcId, objectId);
+                InvalidateFoodObjectMemoryForRemovedStock(npcId, objectId, cellX, cellY);
+            }
+        }
+
+        private bool CanNpcCurrentlyVerifyMissingFoodAtCell(
+            int npcId,
+            int cellX,
+            int cellY,
+            int visionRange,
+            bool useCone,
+            float coneSlope)
+        {
+            if (!GridPos.TryGetValue(npcId, out var pos))
+                return false;
+
+            int dist = FovUtils.Manhattan(pos.X, pos.Y, cellX, cellY);
+            if (dist > visionRange)
+                return false;
+
+            if (dist == 0)
+                return true;
+
+            if (useCone)
+            {
+                if (!NpcFacing.TryGetValue(npcId, out var facing))
+                    facing = CardinalDirection.North;
+
+                if (!FovUtils.IsInCone(pos.X, pos.Y, facing, cellX, cellY, coneSlope))
+                    return false;
+            }
+
+            return HasLineOfSight(pos.X, pos.Y, cellX, cellY);
+        }
+
+        private void InvalidateFoodObjectMemoryForRemovedStock(int npcId, int objectId, int cellX, int cellY)
+        {
+            if (!NpcObjectMemory.TryGetValue(npcId, out var store) || store == null)
+                return;
+
+            for (int i = 0; i < store.Slots.Length; i++)
+            {
+                ref var slot = ref store.Slots[i];
+                if (!slot.IsValid)
+                    continue;
+
+                int slotObjId = slot.SubjectId != 0 ? slot.SubjectId : slot.ObjectId;
+                bool sameObject = slotObjId == objectId;
+                bool sameFoodCell = slot.CellX == cellX
+                    && slot.CellY == cellY
+                    && !string.IsNullOrWhiteSpace(slot.DefId)
+                    && slot.DefId.IndexOf("food", StringComparison.OrdinalIgnoreCase) >= 0;
+
+                if (!sameObject && !sameFoodCell)
+                    continue;
+
+                slot.IsValid = false;
+            }
         }
 
         // =============================================================================
@@ -4612,6 +4722,8 @@ if (!NpcAction.ContainsKey(id))
         public bool NpcVisionUseCone;
         public float NpcVisionConeSlope; // half-width per forward step (grid cone)
         public float NpcVisionConeHalfWidthPerStep; // legacy/back-compat (se lo stai usando altrove)
+        public int ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
+        public int ObjectPerceptionMaxObjectsPerNpcPerTick;
 
         // --- Needs config ---
         public NeedsConfig Needs;

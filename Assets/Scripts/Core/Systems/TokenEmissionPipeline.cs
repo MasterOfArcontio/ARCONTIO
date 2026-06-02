@@ -38,6 +38,7 @@ namespace Arcontio.Core
             // Rules minime (roadmap)
             _rules.Add(new PredatorAlertEmissionRule());
             _rules.Add(new HelpRequestEmissionRule());
+            _rules.Add(new NeedsObservationEmissionRule());
         }
 
         /// <summary>
@@ -45,6 +46,12 @@ namespace Arcontio.Core
         /// </summary>
         public void Emit(World world, Tick tick, TokenBus tokenBus, Telemetry telemetry)
         {
+            var costObserver = world.RuntimeCostObserver;
+            bool costSample = costObserver != null && costObserver.ShouldSample(tick.Index);
+            bool costPerNpc = costSample && costObserver.TrackPerNpc;
+            long costStart = costSample ? costObserver.BeginSample() : 0L;
+            int costPairChecks = 0;
+
             // Parametri da World (configurabili)
             int maxPerEncounter = world.Global.MaxTokensPerEncounter;
             if (maxPerEncounter <= 0) maxPerEncounter = 1;
@@ -77,6 +84,15 @@ namespace Arcontio.Core
                 for (int j = i + 1; j < _npcIds.Count; j++)
                 {
                     int b = _npcIds[j];
+
+                    if (costSample)
+                        costPairChecks++;
+                    if (costPerNpc)
+                    {
+                        costObserver.AddNpcWork(a, 1);
+                        costObserver.AddNpcWork(b, 1);
+                    }
+
                     if (!world.GridPos.TryGetValue(b, out var pb)) continue;
 
                     int dist = Manhattan(pa.X, pa.Y, pb.X, pb.Y);
@@ -91,14 +107,21 @@ namespace Arcontio.Core
                     bool bCanTalkToA = CanDirectlyTalk(world, b, a);
 
                     if (aCanTalkToB)
-                        envelopesEmitted += EmitForPair(world, tick, tokenBus, telemetry, a, b, maxPerEncounter, maxPerDay, cooldownTicks);
+                        envelopesEmitted += EmitForPair(world, tick, tokenBus, telemetry, a, b, maxPerEncounter, maxPerDay, cooldownTicks, costPerNpc);
 
                     if (bCanTalkToA)
-                        envelopesEmitted += EmitForPair(world, tick, tokenBus, telemetry, b, a, maxPerEncounter, maxPerDay, cooldownTicks);
+                        envelopesEmitted += EmitForPair(world, tick, tokenBus, telemetry, b, a, maxPerEncounter, maxPerDay, cooldownTicks, costPerNpc);
                 }
             }
 
             telemetry.Counter("TokenEmissionPipeline.EnvelopesEmitted", envelopesEmitted);
+
+            if (costSample)
+            {
+                costObserver.AddCounter(RuntimeCostCounter.TokenEmissionPairChecks, costPairChecks);
+                costObserver.AddCounter(RuntimeCostCounter.TokenEmissionTokensCreated, envelopesEmitted);
+                costObserver.EndSample(RuntimeCostChannel.TokenEmission, costStart);
+            }
         }
 
         private int EmitForPair(
@@ -110,7 +133,8 @@ namespace Arcontio.Core
             int listenerId,
             int maxPerEncounter,
             int maxPerDay,
-            int cooldownTicks)
+            int cooldownTicks,
+            bool costPerNpc)
         {
             if (!world.Memory.TryGetValue(speakerId, out var store) || store == null)
                 return 0;
@@ -177,7 +201,11 @@ namespace Arcontio.Core
             }
 
             if (emittedThisEncounter > 0)
+            {
                 _tokensEmittedToday[speakerId] = emittedToday;
+                if (costPerNpc)
+                    world.RuntimeCostObserver.AddNpcWork(speakerId, emittedThisEncounter);
+            }
 
             return emittedThisEncounter;
         }
