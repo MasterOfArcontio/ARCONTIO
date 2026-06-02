@@ -32,6 +32,7 @@
 | v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Completata |
 | v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
 | v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
+| v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Pending |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -1103,6 +1104,50 @@ La fase NON cambia semantica decisionale, memoria, percezione o belief. Ottimizz
 
 ---
 
+#### v0.20 - Rifondazione percettiva strutturale e scheduling percettivo
+
+## Stato
+FUTURA / PRIORITA' ALTA
+
+## Scopo
+
+La fase `v0.20` sostituisce il piano precedente di sola percezione cadenzata con una rifondazione strutturale del rapporto tra movimento, percezione, mappe di invalidazione e aggiornamento memoria/belief.
+
+L'obiettivo non e' aggiungere gameplay, ma ridurre drasticamente il costo runtime della percezione quando aumentano gli NPC, evitando cicli globali inutili e sostituendo la scansione periodica di tutti con un modello basato su dirty percettivo, indici persistenti e cadenza per stato percettivo.
+
+Il principio guida e':
+
+```text
+percepire solo quando serve,
+solo chi deve percepire,
+solo nel tick compatibile con il suo stato,
+ma senza perdere variazioni del mondo rilevanti.
+```
+
+## Checkpoint
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.20a | Audit architettura percezione/movimento e documento di rifondazione | ⏳ |
+| v0.20b | Indici persistenti compatti per oggetti e NPC | ⏳ |
+| v0.20c | Dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati | ⏳ |
+| v0.20d | Separazione observed / watched nella mappa percettiva | ⏳ |
+| v0.20e | Scheduler percettivo per stato NPC con cadenza da `game_params` | ⏳ |
+| v0.20f | Limite massimo NPC percettivi per tick e distribuzione del carico | ⏳ |
+| v0.20g | ObjectPerceptionSystem e NpcPerceptionSystem su soli NPC dirty/cadenzati | ⏳ |
+| v0.20h | Landmark perception allineata a dirty/cadenza/range | ⏳ |
+| v0.20i | Rotazione movimento e `LookDirection` come sorgenti dirty percettive | ⏳ |
+| v0.20j | Cleanup strutture obsolete o ridondanti post-rifondazione | ⏳ |
+| v0.20k | QA profiler 20/50/100 NPC e debug overlay costo percettivo | ⏳ |
+| v0.20l | Closeout rifondazione percezione runtime | ⏳ |
+
+> **Nota architetturale v0.20:** questa fase introduce una biforcazione controllata del ramo di sviluppo perche' tocca la struttura del ciclo runtime. La patch deve restare progressiva, ma non deve lasciare a meta' indici persistenti, dirty percettivo o cadenza: ogni checkpoint deve mantenere simulazione e diagnostica in uno stato leggibile.
+
+> **Nota dati v0.20:** tutte le nuove strutture percettive devono privilegiare rappresentazioni piccole e veloci. Usare `byte`, `short`, `ushort`, `int`, liste compatte e buffer riutilizzabili quando bastano; evitare `long`, stringhe, LINQ, liste temporanee e dizionari pesanti nel percorso caldo salvo necessita' reale.
+
+> **Nota ciclo runtime v0.20:** il ciclo obiettivo diventa: movimento, memoria landmark, percezione landmark, decadimento bisogni, percezione dirty/cadenzata, codifica memoria, manutenzione memoria oggetti, decadimento memoria, decadimento belief, esecuzione job, decisione. Le mutazioni di oggetti/NPC fuori ciclo non devono eseguire percezione immediata: devono solo sporcare le strutture percettive che verranno consumate nel punto centrale del ciclo.
+
+---
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
