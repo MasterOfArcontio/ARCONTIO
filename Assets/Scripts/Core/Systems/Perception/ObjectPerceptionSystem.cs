@@ -114,22 +114,28 @@ namespace Arcontio.Core
                     bool debugUseLos = world.Config?.Sim?.debug_fov != null
                         ? world.Config.Sim.debug_fov.use_los
                         : true;
+                    bool debugActiveNpcOnly = world.Config?.Sim?.debug_fov != null
+                        ? world.Config.Sim.debug_fov.activeNpcOnly
+                        : true;
 
-                    int debugFovCells = RecordDebugFovCellsForNpc(
-                        world: world,
-                        npcId: npcId,
-                        originX: np.X,
-                        originY: np.Y,
-                        facing: facing,
-                        visionRange: visionRange,
-                        useCone: useCone,
-                        coneSlope: coneSlope,
-                        useLos: debugUseLos
-                    );
-                    if (costSample)
-                        costDebugFovCells += debugFovCells;
-                    if (costPerNpc)
-                        costObserver.AddNpcWork(npcId, debugFovCells);
+                    if (world.DebugFovTelemetry.ShouldRecordNpc(npcId, debugActiveNpcOnly))
+                    {
+                        int debugFovCells = RecordDebugFovCellsForNpc(
+                            world: world,
+                            npcId: npcId,
+                            originX: np.X,
+                            originY: np.Y,
+                            facing: facing,
+                            visionRange: visionRange,
+                            useCone: useCone,
+                            coneSlope: coneSlope,
+                            useLos: debugUseLos
+                        );
+                        if (costSample)
+                            costDebugFovCells += debugFovCells;
+                        if (costPerNpc)
+                            costObserver.AddNpcWork(npcId, debugFovCells);
+                    }
                 }
 
                 InvalidateVisibleMissingFoodBeliefs(

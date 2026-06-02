@@ -42,8 +42,10 @@ namespace Arcontio.Core
         private readonly Dictionary<int, int[]> _oldReadRecycle = new(256);
         private readonly List<int> _writeKeysBuffer = new(256);
         private readonly List<int> _cleanupKeysBuffer = new(256);
+        private int _activeNpcId = -1;
 
         public int WindowTicks => _windowTicks;
+        public int ActiveNpcId => _activeNpcId;
 
         public DebugFovTelemetry(int width, int height, int windowTicks)
         {
@@ -72,6 +74,19 @@ namespace Arcontio.Core
             }
 
             heat[(y * _width) + x]++;
+        }
+
+        public void SetActiveNpc(int npcId)
+        {
+            _activeNpcId = npcId > 0 ? npcId : -1;
+        }
+
+        public bool ShouldRecordNpc(int npcId, bool activeNpcOnly)
+        {
+            if (!activeNpcOnly)
+                return true;
+
+            return npcId > 0 && npcId == _activeNpcId;
         }
 
         /// <summary>
