@@ -452,6 +452,8 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             if (_world.DebugFovTelemetry != null && _fovOverlay != null)
             {
+                _world.DebugFovTelemetry.SetActiveNpc(activeNpcId);
+
                 if (activeNpcId > 0 && _world.DebugFovTelemetry.TryGetReadHeat(activeNpcId, out var heat))
                 {
                     int windowTicks = _world.DebugFovTelemetry.WindowTicks;
