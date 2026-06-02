@@ -663,6 +663,66 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void PerceptionWatchMapTrimsAndGarbageCollectsObservedZones()
+        {
+            var watchMap = new PerceptionWatchMap(
+                mapWidth: 64,
+                mapHeight: 64,
+                zoneSizeCells: 8,
+                maxZonesPerNpc: 2,
+                staleAfterTicks: 10,
+                garbageCollectEveryTicks: 1,
+                garbageCollectMaxEntriesPerRun: 1);
+
+            watchMap.RecordObservedZoneAtCell(npcId: 1, cellX: 1, cellY: 1, tick: 0);
+            watchMap.RecordObservedZoneAtCell(npcId: 1, cellX: 9, cellY: 1, tick: 1);
+            watchMap.RecordObservedZoneAtCell(npcId: 1, cellX: 17, cellY: 1, tick: 2);
+
+            Assert.That(watchMap.TryGetLastSeenTick(1, 1, 1, out _), Is.False);
+            Assert.That(watchMap.GetTrackedZoneCount(1), Is.EqualTo(2));
+
+            watchMap.GarbageCollectIfDue(tick: 20);
+
+            Assert.That(watchMap.GetTrackedZoneCount(1), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void ObjectPerceptionRecordsObservedZonesWhenWatchMapEnabled()
+        {
+            var sim = new SimulationParams();
+            sim.perception_watch_map.enabled = true;
+            sim.perception_watch_map.zoneSizeCells = 4;
+            sim.perception_watch_map.maxZonesPerNpc = 16;
+            sim.perception_watch_map.staleAfterTicks = 40;
+            sim.perception_watch_map.garbageCollectEveryTicks = 4;
+            sim.perception_watch_map.garbageCollectMaxEntriesPerRun = 8;
+            sim.npcVisionRangeCells = 8;
+            sim.npcVisionUseCone = true;
+            sim.npcVisionConeSlope = 1f;
+
+            var world = new World(new WorldConfig(sim));
+            world.Global.Needs = NeedsConfig.Default();
+            world.Global.BeliefQuery = BeliefQueryConfig.Default();
+            world.Global.NpcVisionRangeCells = 8;
+            world.Global.NpcVisionUseCone = true;
+            world.Global.NpcVisionConeSlope = 1f;
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("watch_map_qa"),
+                NpcNeeds.Make(0.95f, 0.1f),
+                new Arcontio.Core.Social { JusticePerception01 = 0.9f },
+                5,
+                5);
+            world.NpcFacing[npcId] = CardinalDirection.East;
+            var perception = new ObjectPerceptionSystem();
+
+            perception.Update(world, new Tick(11, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.PerceptionWatchMap, Is.Not.Null);
+            Assert.That(world.PerceptionWatchMap.TryGetLastSeenTick(npcId, 9, 5, out int lastSeenTick), Is.True);
+            Assert.That(lastSeenTick, Is.EqualTo(11));
+        }
+
+        [Test]
         public void AssignedFoodJobMoveTargetEmptyCanReplaceWithVisibleEquivalentFood()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);

@@ -1122,7 +1122,7 @@ Questa fase e' necessaria prima delle conseguenze sociali perche' reputazione, s
 |---|---|---|
 | v0.19a | Riduzione ObjectPerceptionDebugFovCells solo per NPC attivo | ✅ |
 | v0.19b | WaitAndObserve via Job con step LookDirection configurato | ✅ |
-| v0.19c | PerceptionWatchMap e tracciamento celle osservate | ⏳ |
+| v0.19c | PerceptionWatchMap e tracciamento celle osservate | ✅ |
 | v0.19d | Indice spaziale oggetti a zone completo | ⏳ |
 | v0.19e | Riduzione scan celle vuote e candidati inutili | ⏳ |
 | v0.19f | QA profiler percezione 1/2/4/8/16 NPC | ⏳ |

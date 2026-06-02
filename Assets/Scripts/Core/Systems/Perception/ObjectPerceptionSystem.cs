@@ -77,6 +77,7 @@ namespace Arcontio.Core
             _npcIds.Clear();
             _npcIds.AddRange(world.NpcDna.Keys);
             RebuildGroundObjectZoneIndex(world);
+            world.PerceptionWatchMap?.GarbageCollectIfDue((int)tick.Index);
 
             int spotted = 0;
             int maxCandidateCellsPerNpc = world.Global.ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
@@ -95,6 +96,17 @@ namespace Arcontio.Core
 
                 if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                     facing = CardinalDirection.North;
+
+                RecordVisibleWatchZonesForNpc(
+                    world,
+                    npcId,
+                    np.X,
+                    np.Y,
+                    facing,
+                    visionRange,
+                    useCone,
+                    coneSlope,
+                    (int)tick.Index);
 
                 // ============================================================
                 // DEBUG FOV (heatmap per finestra N tick)
@@ -426,6 +438,83 @@ namespace Arcontio.Core
                 case CardinalDirection.East:  return targetX > originX;
                 case CardinalDirection.West:  return targetX < originX;
                 default:                      return false;
+            }
+        }
+
+        // =============================================================================
+        // RecordVisibleWatchZonesForNpc
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra nella WatchMap le zone il cui centro e' visibile dall'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: copertura approssimata ma soggettiva</b></para>
+        /// <para>
+        /// La funzione non scansiona tutte le celle e non produce eventi. Usa la
+        /// stessa geometria del sistema di percezione per segnare una copertura a
+        /// zone bounded. Il centro zona e' una scelta conservativa: una zona viene
+        /// registrata solo quando almeno il suo punto rappresentativo supera range,
+        /// cono/frontale e linea di vista.
+        /// </para>
+        /// </summary>
+        private static void RecordVisibleWatchZonesForNpc(
+            World world,
+            int npcId,
+            int npcX,
+            int npcY,
+            CardinalDirection facing,
+            int visionRange,
+            bool useCone,
+            float coneSlope,
+            int tick)
+        {
+            var watchMap = world?.PerceptionWatchMap;
+            if (watchMap == null)
+                return;
+
+            int zoneSize = watchMap.ZoneSizeCells;
+            int minZoneX = FloorDiv(npcX - visionRange, zoneSize);
+            int maxZoneX = FloorDiv(npcX + visionRange, zoneSize);
+            int minZoneY = FloorDiv(npcY - visionRange, zoneSize);
+            int maxZoneY = FloorDiv(npcY + visionRange, zoneSize);
+
+            for (int zoneY = minZoneY; zoneY <= maxZoneY; zoneY++)
+            {
+                for (int zoneX = minZoneX; zoneX <= maxZoneX; zoneX++)
+                {
+                    int zoneMinX = zoneX * zoneSize;
+                    int zoneMinY = zoneY * zoneSize;
+                    if (zoneMinX >= world.MapWidth || zoneMinY >= world.MapHeight)
+                        continue;
+
+                    if (zoneMinX + zoneSize <= 0 || zoneMinY + zoneSize <= 0)
+                        continue;
+
+                    int centerX = Mathf.Clamp(zoneX * zoneSize + (zoneSize / 2), 0, world.MapWidth - 1);
+                    int centerY = Mathf.Clamp(zoneY * zoneSize + (zoneSize / 2), 0, world.MapHeight - 1);
+                    int dist = FovUtils.Manhattan(npcX, npcY, centerX, centerY);
+                    if (dist > visionRange)
+                        continue;
+
+                    if (dist > 0)
+                    {
+                        if (useCone)
+                        {
+                            if (!FovUtils.IsInCone(npcX, npcY, facing, centerX, centerY, coneSlope))
+                                continue;
+                        }
+                        else if (!FovUtils.IsInFront(npcX, npcY, facing, centerX, centerY))
+                        {
+                            continue;
+                        }
+
+                        if (!world.HasLineOfSight(npcX, npcY, centerX, centerY))
+                            continue;
+                    }
+
+                    watchMap.RecordObservedZone(npcId, zoneX, zoneY, tick);
+                }
             }
         }
 

@@ -84,6 +84,14 @@
   "npcVisionUseCone": true,
   "npcVisionConeSlope": 1.0,
   "npcVisionFovDegrees": 90,
+  "perception_watch_map": {
+    "enabled": true,
+    "zoneSizeCells": 8,
+    "maxZonesPerNpc": 128,
+    "staleAfterTicks": 400,
+    "garbageCollectEveryTicks": 50,
+    "garbageCollectMaxEntriesPerRun": 256
+  },
   "inventory": {
     "inventory_max_units": 30
   },

@@ -120,6 +120,11 @@ namespace Arcontio.Core
         public RuntimeCostObserver RuntimeCostObserver { get; private set; }
 
         /// <summary>
+        /// Mappa runtime opzionale delle zone osservate dagli NPC.
+        /// </summary>
+        public PerceptionWatchMap PerceptionWatchMap { get; private set; }
+
+        /// <summary>
         /// LandmarkRegistry (v0.02 Day2): registro oggettivo dei landmark.
         ///
         /// Nota:
@@ -1011,6 +1016,19 @@ namespace Arcontio.Core
             // Se runtime_cost_observer.enabled=false, la factory restituisce null
             // e nessun registro o buffer diagnostico viene creato.
             RuntimeCostObserver = Arcontio.Core.RuntimeCostObserver.CreateIfEnabled(Config?.Sim?.runtime_cost_observer);
+
+            var watchMapConfig = Config?.Sim?.perception_watch_map;
+            if (watchMapConfig != null && watchMapConfig.enabled)
+            {
+                PerceptionWatchMap = new PerceptionWatchMap(
+                    MapWidth,
+                    MapHeight,
+                    watchMapConfig.zoneSizeCells,
+                    watchMapConfig.maxZonesPerNpc,
+                    watchMapConfig.staleAfterTicks,
+                    watchMapConfig.garbageCollectEveryTicks,
+                    watchMapConfig.garbageCollectMaxEntriesPerRun);
+            }
 
             Global.EnableMemorySpatialFusion = false;
             Global.MemoryRegionSizeCells = 4;
