@@ -1136,23 +1136,27 @@ Questa fase e' necessaria prima delle conseguenze sociali perche' reputazione, s
 
 ---
 
-#### v0.20 - Percezione cadenzata per stato percettivo NPC
+#### v0.20 - Rifondazione ciclo percettivo dirty/cadenzato
 
 ## Stato
 FUTURA / PRIORITA' ALTA
 
 ## Obiettivo
 
-Introdurre uno stato percettivo per NPC e usare quello stato per decidere quanto spesso l'NPC deve aggiornare la percezione e quanto lungo deve essere il suo cono visivo.
+Rifondare il tratto movimento + percezione + dirty percettivo + indici runtime persistenti, riducendo drasticamente il costo CPU della percezione senza introdurre percezione onnisciente o fuori ciclo.
 
-La percezione non deve piu' essere trattata come un lavoro uguale per tutti, ogni tick, indipendentemente dal contesto. Un NPC fermo e inattivo, un NPC in movimento, un NPC che si sta guardando attorno e un NPC in allerta non hanno lo stesso bisogno percettivo.
+La percezione non deve piu' essere trattata come un lavoro uguale per tutti, ogni tick, indipendentemente dal contesto. Un NPC fermo e inattivo, un NPC in movimento, un NPC che si sta guardando attorno e un NPC in allerta non hanno lo stesso bisogno percettivo. Allo stesso tempo, oggetti e NPC modificati devono invalidare in modo conservativo solo gli osservatori potenzialmente interessati, usando una mappa observed/watched e stati dirty espliciti.
 
 Questa fase serve a:
 
 - ridurre il costo CPU della percezione;
+- introdurre indici persistenti oggetti/NPC aggiornati dai punti World autorevoli;
+- distinguere cio' che e' visto davvero da cio' che e' solo monitorato per invalidazione;
+- mantenere la percezione centralizzata nel ciclo `SimulationHost`;
 - mantenere causalita' e leggibilita' delle osservazioni;
 - rendere i job capaci di dichiarare lo stato percettivo piu' adatto alla fase corrente;
-- preparare stati futuri piu' ricchi senza cambiare di nuovo il contratto dati.
+- preparare stati futuri piu' ricchi senza cambiare di nuovo il contratto dati;
+- rendere misurabile quanti NPC percepiscono, quanti sono dirty, quanti restano pending e quanti vengono saltati.
 
 Per ora ogni stato percettivo avra':
 
@@ -1165,21 +1169,26 @@ In futuro lo stesso blocco potra' includere ampiezza del cono, priorita', budget
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.20a | Audit percezione attuale e assunzioni ogni tick | ⏳ |
-| v0.20b | Stato percettivo NPC minimo | ⏳ |
-| v0.20c | Configurazione stati percettivi in game_params | ⏳ |
-| v0.20d | Cadenza percezione in ObjectPerceptionSystem e NpcPerceptionSystem | ⏳ |
-| v0.20e | Lunghezza cono visivo per stato percettivo | ⏳ |
-| v0.20f | Collegamento job/fasi allo stato percettivo | ⏳ |
-| v0.20g | Stati speciali per movimento, LookDirection, SearchFood e allerta | ⏳ |
-| v0.20h | Rotazione causale prima di LookDirection e attraversamento movimento | ⏳ |
-| v0.20i | Skip percezione tramite cadenza + dirty da PerceptionDependencyMap | ⏳ |
-| v0.20j | EL/debug skip percezione e stato percettivo corrente | ⏳ |
-| v0.20k | QA profiler e closeout percezione cadenzata | ⏳ |
+| v0.20a | Audit ciclo percezione/movimento/mutazioni e nuova specifica strutturale | ⏳ |
+| v0.20b | Branch strutturale e documento tecnico operativo | ⏳ |
+| v0.20c | Indici persistenti oggetti/NPC con rebuild completo | ⏳ |
+| v0.20d | Dirty state percettivo NPC con reason, urgenza e pending | ⏳ |
+| v0.20e | Observed/Watched map con margine cono | ⏳ |
+| v0.20f | Dirty conservativo per creazione, spostamento e distruzione entita' | ⏳ |
+| v0.20g | Stati percettivi da game_params con cadenza e range | ⏳ |
+| v0.20h | Object/Npc/Landmark perception filtrate da dirty e cadenza | ⏳ |
+| v0.20i | Limite massimo NPC percepiti per tick e coda deterministica | ⏳ |
+| v0.20j | SetFacing/SetNpcPos dirty proprio NPC e osservatori | ⏳ |
+| v0.20k | Debug runtime percepiti/totali/dirty/pending/skipped | ⏳ |
+| v0.20l | QA profiler e closeout rifondazione percettiva | ⏳ |
 
-> **Nota architetturale v0.20:** la configurazione in `game_params.json` deve essere il default operativo degli stati percettivi. I job potranno dichiarare lo stato da applicare a una fase, ma non dovranno decidere direttamente quali oggetti vedere o saltare. La percezione resta un sistema autonomo: il job modifica lo stato dell'NPC, il sistema di percezione legge quello stato e applica cadenza e cono.
+> **Nota architetturale v0.20:** la configurazione in `game_params.json` deve essere il default operativo degli stati percettivi. I job potranno dichiarare lo stato da applicare a una fase, ma non dovranno decidere direttamente quali oggetti vedere o saltare. La percezione resta un sistema autonomo e centralizzato: mutazioni World, movimento e orientamento marcano dirty, mentre il blocco percezione decide in modo deterministico chi processare.
 >
-> **Nota rotazione percettiva v0.20h:** `LookDirection` e movimento multi-tick devono diventare causalmente coerenti con la percezione. Guardare in una direzione deve produrre almeno una percezione valida con quell'orientamento prima di completare lo step osservativo. Allo stesso modo, prima di attraversare una cella verso est, ovest, nord o sud, l'NPC deve orientarsi verso la direzione reale di spostamento, cosi' il cono visivo non resta bloccato su un facing precedente.
+> **Nota rotazione percettiva v0.20:** `LookDirection` e movimento multi-tick devono diventare causalmente coerenti con la percezione. Guardare in una direzione deve produrre almeno una percezione valida con quell'orientamento nel blocco percezione centralizzato successivo. Allo stesso modo, prima di attraversare una cella verso est, ovest, nord o sud, l'NPC deve orientarsi verso la direzione reale di spostamento, cosi' il cono visivo non resta bloccato su un facing precedente.
+>
+> **Nota strutture dati v0.20:** ogni nuova struttura runtime deve ridurre numero di operazioni, costo della singola operazione e allocazioni. Nei percorsi caldi vanno preferiti tipi piccoli, indici numerici, array, buffer riusabili e flag compatti; stringhe, LINQ e collezioni pesanti annidate devono restare fuori dal tick caldo.
+>
+> **Nota observed/watched v0.20:** `observed` significa visto davvero e puo' produrre eventi, memoria e belief. `watched` significa monitorato solo per invalidazione e non deve produrre conoscenza. Il margine del cono serve a non perdere entita' che entrano nel campo visivo tra una percezione e l'altra.
 
 ---
 

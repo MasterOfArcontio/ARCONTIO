@@ -85,14 +85,14 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.20a - Audit percezione attuale e assunzioni ogni tick`
+`v0.20a - Audit ciclo percezione/movimento/mutazioni e nuova specifica strutturale`
 
 Residual follow-ups / future hardening:
 
 - `v0.17`: osservatorio costi runtime, profilazione per NPC, misure per percezione/memoria/belief/query/decisione/EL/job/fallback/pathfinding;
 - `v0.18`: ottimizzazione forte runtime percezione/belief/query basata sui dati JSONL dell'osservatorio;
 - `v0.19`: scalabilita' percettiva, osservazione tramite Job e PerceptionWatchMap;
-- `v0.20`: percezione cadenzata per stato percettivo NPC con cadenza e lunghezza cono da `game_params.json`;
+- `v0.20`: rifondazione ciclo percettivo dirty/cadenzato con indici persistenti, observed/watched, stati percettivi e limite massimo NPC percepiti per tick;
 - `v0.170`: query multi-candidato food, recovery `FindEquivalentTarget` senza query interne, sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
 - `v0.180+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
@@ -179,17 +179,18 @@ Checkpoint v0.19 pianificati:
 
 Checkpoint v0.20 pianificati:
 
-- `v0.20a`: audit percezione attuale e assunzioni ogni tick;
-- `v0.20b`: stato percettivo NPC minimo;
-- `v0.20c`: configurazione stati percettivi in `game_params.json`;
-- `v0.20d`: cadenza percezione in ObjectPerceptionSystem e NpcPerceptionSystem;
-- `v0.20e`: lunghezza cono visivo per stato percettivo;
-- `v0.20f`: collegamento job/fasi allo stato percettivo;
-- `v0.20g`: stati speciali per movimento, LookDirection, SearchFood e allerta;
-- `v0.20h`: rotazione causale prima di LookDirection e attraversamento movimento;
-- `v0.20i`: skip percezione tramite cadenza + dirty da PerceptionDependencyMap;
-- `v0.20j`: EL/debug skip percezione e stato percettivo corrente;
-- `v0.20k`: QA profiler e closeout percezione cadenzata.
+- `v0.20a`: audit ciclo percezione/movimento/mutazioni e nuova specifica strutturale;
+- `v0.20b`: branch strutturale e documento tecnico operativo;
+- `v0.20c`: indici persistenti oggetti/NPC con rebuild completo;
+- `v0.20d`: dirty state percettivo NPC con reason, urgenza e pending;
+- `v0.20e`: observed/watched map con margine cono;
+- `v0.20f`: dirty conservativo per creazione, spostamento e distruzione entita';
+- `v0.20g`: stati percettivi da `game_params.json` con cadenza e range;
+- `v0.20h`: Object/Npc/Landmark perception filtrate da dirty e cadenza;
+- `v0.20i`: limite massimo NPC percepiti per tick e coda deterministica;
+- `v0.20j`: SetFacing/SetNpcPos dirty proprio NPC e osservatori;
+- `v0.20k`: debug runtime percepiti/totali/dirty/pending/skipped;
+- `v0.20l`: QA profiler e closeout rifondazione percettiva.
 
 Checkpoint v0.12 completati:
 
