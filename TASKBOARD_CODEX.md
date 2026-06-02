@@ -25,23 +25,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB COMPLETED: v0.16 - Cognizione Soggettiva Avanzata
+## MACRO JOB COMPLETED: v0.19 - Scalabilita' percettiva e osservazione tramite Job
 
 CHECKPOINT CORRENTE:
-v0.16j - Closeout cognizione soggettiva avanzata
+v0.19g - Closeout scalabilita' percettiva
 
 STATUS:
 COMPLETED / READY FOR PR
 
 OUTPUT ATTESO:
-closeout della fase cognitiva soggettiva iniziale, con lifecycle belief, eventi needs in memoria, comunicazione soggettiva minima, decisioni su belief incerte, SearchFood esplorativo e QA anti-onniscienza consolidati
+closeout della fase di scalabilita' percettiva, con debug FOV ridotto all'NPC attivo, osservazione tramite Job, PerceptionDependencyMap pronta, indice oggetti a zone e riduzione candidati inutili
 
 DOC SYNC:
-root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.16`;
-allineamento esteso `ARCONTIO_docs` / Notion raccomandato prima dell'apertura stabile della fase sociale `v0.170`
+root taskboard e roadmap aggiornate alla chiusura tecnica di `v0.19`;
+allineamento esteso `ARCONTIO_docs` / Notion raccomandato dopo il confronto del JSONL runtime cost prodotto sul test 20 NPC
 
 OBIETTIVO:
-Chiudere il debito tra movimento legacy e Job runtime prima di aprire la cognizione soggettiva avanzata.
+Chiudere il debito di costo percettivo immediato prima di introdurre la percezione cadenzata per stato NPC.
 
 Esito tecnico ereditato da `v0.12`:
 
@@ -85,7 +85,7 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.19b - WaitAndObserve via Job con step LookDirection configurato`
+`v0.20a - Audit percezione attuale e assunzioni ogni tick`
 
 Residual follow-ups / future hardening:
 
@@ -174,8 +174,8 @@ Checkpoint v0.19 pianificati:
 - `v0.19c`: PerceptionDependencyMap e dirty percettivo oggetti/NPC osservati - DONE;
 - `v0.19d`: indice spaziale oggetti a zone completo - DONE;
 - `v0.19e`: riduzione scan celle vuote e candidati inutili - DONE;
-- `v0.19f`: QA profiler percezione 1/2/4/8/16 NPC;
-- `v0.19g`: closeout scalabilita' percettiva.
+- `v0.19f`: QA profiler percezione 1/2/4/8/16 NPC - PARTIAL, test runtime 20 NPC in produzione tramite JSONL operatore;
+- `v0.19g`: closeout scalabilita' percettiva - DONE.
 
 Checkpoint v0.20 pianificati:
 
@@ -186,9 +186,10 @@ Checkpoint v0.20 pianificati:
 - `v0.20e`: lunghezza cono visivo per stato percettivo;
 - `v0.20f`: collegamento job/fasi allo stato percettivo;
 - `v0.20g`: stati speciali per movimento, LookDirection, SearchFood e allerta;
-- `v0.20h`: skip percezione tramite cadenza + dirty da PerceptionDependencyMap;
-- `v0.20i`: EL/debug skip percezione e stato percettivo corrente;
-- `v0.20j`: QA profiler e closeout percezione cadenzata.
+- `v0.20h`: rotazione causale prima di LookDirection e attraversamento movimento;
+- `v0.20i`: skip percezione tramite cadenza + dirty da PerceptionDependencyMap;
+- `v0.20j`: EL/debug skip percezione e stato percettivo corrente;
+- `v0.20k`: QA profiler e closeout percezione cadenzata.
 
 Checkpoint v0.12 completati:
 

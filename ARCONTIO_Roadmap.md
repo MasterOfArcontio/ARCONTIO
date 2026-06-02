@@ -32,7 +32,7 @@
 | v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Completata |
 | v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
 | v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | Completata |
-| v0.19 | Scalabilita' percettiva e osservazione tramite Job | Luglio 2026 | In corso |
+| v0.19 | Scalabilita' percettiva e osservazione tramite Job | Luglio 2026 | Completata |
 | v0.20 | Percezione cadenzata per stato percettivo NPC | Luglio 2026 | Pending |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
@@ -1108,7 +1108,7 @@ La fase NON cambia semantica decisionale, memoria, percezione o belief. Ottimizz
 #### v0.19 - Scalabilita' percettiva e osservazione tramite Job
 
 ## Stato
-IN CORSO / PRIORITA' ALTA
+COMPLETATA / READY FOR PR
 
 ## Obiettivo
 
@@ -1125,12 +1125,14 @@ Questa fase e' necessaria prima delle conseguenze sociali perche' reputazione, s
 | v0.19c | PerceptionDependencyMap e dirty percettivo oggetti/NPC osservati | ✅ |
 | v0.19d | Indice spaziale oggetti a zone completo | ✅ |
 | v0.19e | Riduzione scan celle vuote e candidati inutili | ✅ |
-| v0.19f | QA profiler percezione 1/2/4/8/16 NPC | ⏳ |
-| v0.19g | Closeout scalabilita' percettiva | ⏳ |
+| v0.19f | QA profiler percezione 1/2/4/8/16 NPC | ⚠️ |
+| v0.19g | Closeout scalabilita' percettiva | ✅ |
 
 > **Nota architetturale v0.19:** il guardarsi attorno non deve piu' essere un effetto automatico nascosto di idle. Deve diventare un comportamento causale: intent osservativo, richiesta Job, template configurato e step espliciti di orientamento. I sistemi percettivi restano responsabili della lettura del mondo, ma la scelta di osservare deve essere visibile nel percorso decisionale.
 >
 > **Nota dirty percettivo v0.19c:** il tracciamento percettivo non deve piu' essere inteso come semplice elenco di celle osservate. La forma corretta e' una mappa di dipendenze tra oggetti/NPC osservati e NPC osservatori: quando un oggetto o un NPC osservato cambia, gli osservatori interessati vengono marcati come percettivamente sporchi. Lo skip effettivo della percezione resta rinviato a v0.20, quando la cadenza percettiva per stato potra' usare questo dirty senza introdurre salti onniscienti.
+
+> **Nota closeout v0.19g (2026-06-02):** la fase `v0.19` e' chiusa come Scalabilita' percettiva e osservazione tramite Job. Ha ridotto il costo debug FOV limitandolo all'NPC attivo, spostato il guardarsi attorno dentro il percorso MBQD + Job con step `LookDirection`, sostituito il vecchio concetto di celle osservate con una `PerceptionDependencyMap` basata su oggetti/NPC osservati e dirty percettivo, completato l'indice spaziale oggetti a zone e ridotto candidati inutili nelle percezioni oggetti/NPC. La fase NON introduce ancora lo skip percettivo: la mappa dirty e' pronta, ma verra' consumata in `v0.20` insieme a cadenza, stato percettivo, orientamento causale e lunghezza cono per stato. Il QA profiler runtime con 20 NPC resta da allegare tramite JSONL esterno prodotto dall'operatore. Dettaglio: `v0.19g_Closeout_Report.md`.
 
 ---
 
