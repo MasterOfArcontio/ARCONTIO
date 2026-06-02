@@ -2,9 +2,9 @@
   "worldWidth": 64,
   "worldHeight": 64,
   "tick": {
-    "ticksPerSecond": 5,
-    "baseWalkCellDurationTicks": 3,
-    "enableJobRunningActionTraversal": false
+    "ticksPerSecond": 25,
+    "baseWalkCellDurationTicks": 4,
+    "enableJobRunningActionTraversal": true
   },
   "Language": "it",
   "logging": {
@@ -26,10 +26,21 @@
       "max_queue_size": 4096,
       "max_batch_size": 512
     },
+    "runtime_cost_observer": {
+      "enabled": true,
+      "sampleEveryTicks": 1,
+      "trackPerNpc": true,
+      "writeJsonl": true,
+      "maxTicksInMemory": 256,
+      "jsonlFlushIntervalTicks": 25,
+      "jsonlMaxQueueSize": 4096,
+      "jsonlMaxBatchSize": 512,
+      "jsonLogFileNamePattern": "arcontio_runtime_cost_{yyyyMMdd_HHmmss}.jsonl"
+    },
     "movement_explainability": {
       "enabled": true,
       "runtime_registry_enabled": true,
-      "file_logging_enabled": true,
+      "file_logging_enabled": false,
       "defaultVerbosity": 2,
       "maxTrackedNpcs": 3,
       "trackedNpcIds": [],
@@ -55,6 +66,16 @@
       "logQuery": true,
       "logDecision": true,
       "logBridge": true,
+      "logJobRequest": true,
+      "logJobLifecycle": true,
+      "logJobPhase": true,
+      "logStep": true,
+      "logJobState": true,
+      "logJobArbitration": true,
+      "logReservation": true,
+      "logCommand": true,
+      "logFailureLearning": true,
+      "logRunningAction": true,
       "includeCandidates": true,
       "includeScoreBreakdown": true,
       "includeRejectedCandidates": true,
@@ -62,14 +83,24 @@
       "ringBuffer_belief": 80,
       "ringBuffer_query": 40,
       "ringBuffer_decision": 24,
-      "ringBuffer_bridge": 24
+      "ringBuffer_bridge": 24,
+      "ringBuffer_jobRequest": 24,
+      "ringBuffer_jobLifecycle": 32,
+      "ringBuffer_jobPhase": 40,
+      "ringBuffer_step": 64,
+      "ringBuffer_jobState": 40,
+      "ringBuffer_jobArbitration": 32,
+      "ringBuffer_reservation": 40,
+      "ringBuffer_command": 48,
+      "ringBuffer_failureLearning": 32,
+      "ringBuffer_runningAction": 48
     },
     "telemetry": {
-      "enabled": true,
+      "enabled": false,
       "dump_to_console_enabled": false
     },
     "devtools": {
-      "overlay_enabled": false,
+      "overlay_enabled": true,
       "verbose_debug_enabled": false,
       "debug_fov": {
         "enabled": true,
@@ -96,6 +127,8 @@
     "inventory_max_units": 30
   },
   "movement": {
+    "enableJobRunningActionTraversal": true,
+    "baseWalkCellDurationTicks": 4,
     "intentStuckTicksDefault": 12,
     "intentStuckTicksLastMile": 8,
     "intentStuckTicksBlocked": 6,
@@ -108,7 +141,7 @@
     "blacklist_penalty_stage2": 0.35
   },
   "decision": {
-    "decisionEveryTicks": 25,
+    "decisionEveryTicks": 80,
     "selectionMode": "DeterministicTop1",
     "topN": 1,
     "noise01": 0.0,
