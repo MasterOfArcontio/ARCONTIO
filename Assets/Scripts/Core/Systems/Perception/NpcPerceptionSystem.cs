@@ -14,16 +14,16 @@ namespace Arcontio.Core
     /// <para><b>Percezione soggettiva senza scansione globale</b></para>
     /// <para>
     /// Per ogni NPC osservatore, valuta quali altri NPC sono visibili e produce un
-    /// <c>NpcSpottedEvent</c>. Il sistema usa un indice temporaneo cella -> NPC per
-    /// evitare il vecchio controllo globale tutti-contro-tutti. La semantica visiva
+    /// <c>NpcSpottedEvent</c>. Il sistema usa l'indice persistente cella -> NPC del
+    /// <see cref="World"/> per evitare il vecchio controllo globale tutti-contro-tutti. La semantica visiva
     /// resta identica: range, cono e linea di vista sono ancora i gate canonici.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>Snapshot NPC</b>: copia gli id NPC per evitare mutazioni durante l'iterazione.</item>
-    ///   <item><b>Indice per cella</b>: ricostruito ogni tick da <c>world.GridPos</c>.</item>
-    ///   <item><b>Celle candidate</b>: per ogni osservatore visita solo il raggio visivo.</item>
+    ///   <item><b>Osservatori</b>: copia gli id in una lista riusabile per iterare in modo stabile.</item>
+    ///   <item><b>Indice per cella</b>: letto dal World, aggiornato quando gli NPC cambiano cella.</item>
+    ///   <item><b>Celle occupate</b>: visita solo celle che contengono davvero almeno un NPC.</item>
     ///   <item><b>Gate visivi</b>: distanza Manhattan, cono opzionale e linea di vista.</item>
     /// </list>
     /// </summary>
@@ -32,9 +32,6 @@ namespace Arcontio.Core
         public int Period => 1;
 
         private readonly List<int> _npcIds = new(2048);
-        private readonly List<long> _occupiedCellKeys = new(2048);
-        private readonly Dictionary<long, List<int>> _npcIdsByCell = new(2048);
-
         // =============================================================================
         // Update
         // =============================================================================
@@ -72,10 +69,8 @@ namespace Arcontio.Core
             float coneSlope = world.Global.NpcVisionConeSlope;
 
             _npcIds.Clear();
-            foreach (var kv in world.NpcDna)
-                _npcIds.Add(kv.Key);
-
-            RebuildNpcCellIndex(world);
+            foreach (var pair in world.NpcDna)
+                _npcIds.Add(pair.Key);
 
             int spotted = 0;
 
@@ -94,10 +89,10 @@ namespace Arcontio.Core
                 int ox = observerPos.X;
                 int oy = observerPos.Y;
 
-                for (int c = 0; c < _occupiedCellKeys.Count; c++)
+                for (int c = 0; c < world.PerceptionNpcOccupiedCellCount; c++)
                 {
-                    long cellKey = _occupiedCellKeys[c];
-                    if (!_npcIdsByCell.TryGetValue(cellKey, out var targetIds) || targetIds.Count == 0)
+                    long cellKey = world.GetPerceptionNpcCellKeyAt(c);
+                    if (!world.TryGetNpcIdsInPerceptionCellKey(cellKey, out var targetIds))
                         continue;
 
                     int firstTargetId = targetIds[0];
@@ -170,50 +165,5 @@ namespace Arcontio.Core
             }
         }
 
-        // =============================================================================
-        // RebuildNpcCellIndex
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Ricostruisce l'indice temporaneo cella -> NPC presenti usando le posizioni
-        /// autorevoli del <c>World</c>.
-        /// </para>
-        ///
-        /// <para><b>Indice runtime non persistente</b></para>
-        /// <para>
-        /// L'indice viene svuotato e ricostruito a ogni tick, quindi non diventa una
-        /// cache persistente da sincronizzare. Il dato vero resta sempre
-        /// <c>world.GridPos</c>.
-        /// </para>
-        /// </summary>
-        private void RebuildNpcCellIndex(World world)
-        {
-            _occupiedCellKeys.Clear();
-
-            foreach (var bucket in _npcIdsByCell.Values)
-                bucket.Clear();
-
-            for (int i = 0; i < _npcIds.Count; i++)
-            {
-                int npcId = _npcIds[i];
-                if (!world.GridPos.TryGetValue(npcId, out var position))
-                    continue;
-
-                long key = MakeCellKey(position.X, position.Y);
-                if (!_npcIdsByCell.TryGetValue(key, out var bucket))
-                {
-                    bucket = new List<int>(1);
-                    _npcIdsByCell[key] = bucket;
-                    _occupiedCellKeys.Add(key);
-                }
-
-                bucket.Add(npcId);
-            }
-        }
-
-        private static long MakeCellKey(int x, int y)
-        {
-            return ((long)x << 32) ^ (uint)y;
-        }
     }
 }

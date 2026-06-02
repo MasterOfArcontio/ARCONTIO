@@ -1,5 +1,8 @@
 using Arcontio.Core;
+using Arcontio.Core.Config;
+using System;
 using NUnit.Framework;
+using UnityEditor;
 using UnityEngine;
 
 namespace Arcontio.Tests
@@ -70,6 +73,124 @@ namespace Arcontio.Tests
             Assert.That(pickMissing.FailureReason, Is.EqualTo(JobFailureReason.MissingTarget));
             Assert.That(pickOk.Status, Is.EqualTo(StepResultStatus.Succeeded));
             Assert.That(dropOk.Status, Is.EqualTo(StepResultStatus.Succeeded));
+        }
+    }
+    // =============================================================================
+    // PerceptionSpatialIndexQaTests
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Test QA EditMode per gli indici percettivi persistenti mantenuti dal World.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: indice aggiornato dalla mutazione autorevole</b></para>
+    /// <para>
+    /// Gli indici non devono piu' essere ricostruiti dentro i sistemi di percezione.
+    /// Devono invece restare coerenti quando il World crea, muove, raccoglie,
+    /// deposita o cancella entita' osservabili.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Oggetti</b>: create, pick up, drop e destroy aggiornano la zona percettiva.</item>
+    ///   <item><b>NPC</b>: create, SetNpcPos e cleanup dev aggiornano la cella percettiva.</item>
+    /// </list>
+    /// </summary>
+    public sealed class PerceptionSpatialIndexQaTests
+    {
+        // =============================================================================
+        // RunFromCommandLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Entry point minimale per eseguire questi test da Unity batchmode anche
+        /// quando il test runner standard non produce il file XML dei risultati.
+        /// </para>
+        /// </summary>
+        public static void RunFromCommandLine()
+        {
+            try
+            {
+                var tests = new PerceptionSpatialIndexQaTests();
+                tests.GroundObjectPerceptionIndexTracksCreatePickupDropAndDestroy();
+                tests.NpcPerceptionIndexTracksCreateMoveAndDevRemovalHook();
+
+                Debug.Log("[PerceptionSpatialIndexQaTests] PASS");
+                EditorApplication.Exit(0);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError("[PerceptionSpatialIndexQaTests] FAIL\n" + ex);
+                EditorApplication.Exit(1);
+            }
+        }
+        [Test]
+        public void GroundObjectPerceptionIndexTracksCreatePickupDropAndDestroy()
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            world.ObjectDefs["qa_food_stock"] = new ObjectDef
+            {
+                Id = "qa_food_stock",
+                DisplayName = "QA food stock",
+                IsInteractable = true,
+                IsOccluder = false,
+                BlocksMovement = false,
+                BlocksVision = false
+            };
+            int objectId = world.CreateObject("qa_food_stock", 2, 2, OwnerKind.Community, 0);
+            Assert.That(objectId, Is.GreaterThan(0));
+
+            Assert.That(world.TryGetGroundObjectIdsInPerceptionZone(0, 0, out var objectIds), Is.True);
+            Assert.That(objectIds.IndexOf(objectId), Is.GreaterThanOrEqualTo(0));
+
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Indexer"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                2,
+                2);
+
+            Assert.That(world.TryPickUpObject(npcId, objectId, out _, out _, out string pickupReason), Is.True, pickupReason);
+            bool stillIndexedAfterPickup = world.TryGetGroundObjectIdsInPerceptionZone(0, 0, out objectIds)
+                && objectIds.IndexOf(objectId) >= 0;
+            Assert.That(stillIndexedAfterPickup, Is.False);
+
+            Assert.That(world.TryDropObject(npcId, objectId, 3, 2, out string dropReason), Is.True, dropReason);
+            Assert.That(world.TryGetGroundObjectIdsInPerceptionZone(0, 0, out objectIds), Is.True);
+            Assert.That(objectIds.IndexOf(objectId), Is.GreaterThanOrEqualTo(0));
+
+            world.DestroyObject(objectId);
+            bool stillIndexedAfterDestroy = world.TryGetGroundObjectIdsInPerceptionZone(0, 0, out objectIds)
+                && objectIds.IndexOf(objectId) >= 0;
+            Assert.That(stillIndexedAfterDestroy, Is.False);
+        }
+
+        [Test]
+        public void NpcPerceptionIndexTracksCreateMoveAndDevRemovalHook()
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("IndexedNpc"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+
+            Assert.That(world.TryGetNpcIdsInPerceptionCell(1, 1, out var npcIds), Is.True);
+            Assert.That(npcIds.IndexOf(npcId), Is.GreaterThanOrEqualTo(0));
+
+            world.SetNpcPos(npcId, 4, 1);
+            bool stillInOldCell = world.TryGetNpcIdsInPerceptionCell(1, 1, out npcIds)
+                && npcIds.IndexOf(npcId) >= 0;
+            Assert.That(stillInOldCell, Is.False);
+            Assert.That(world.TryGetNpcIdsInPerceptionCell(4, 1, out npcIds), Is.True);
+            Assert.That(npcIds.IndexOf(npcId), Is.GreaterThanOrEqualTo(0));
+
+            world.RemoveNpcFromPerceptionSpatialIndex(npcId);
+            world.GridPos.Remove(npcId);
+            bool stillInNewCell = world.TryGetNpcIdsInPerceptionCell(4, 1, out npcIds)
+                && npcIds.IndexOf(npcId) >= 0;
+            Assert.That(stillInNewCell, Is.False);
         }
     }
 }

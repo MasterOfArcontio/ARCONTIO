@@ -56,6 +56,7 @@ namespace Arcontio.Core.Commands.DevTools
             world.NpcProfiles.Remove(npcId);
             world.Needs.Remove(npcId);
             world.Social.Remove(npcId);
+            world.RemoveNpcFromPerceptionSpatialIndex(npcId);
             world.GridPos.Remove(npcId);
             world.NpcFacing.Remove(npcId);
 

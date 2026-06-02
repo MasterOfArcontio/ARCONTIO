@@ -1956,8 +1956,9 @@ namespace Arcontio.Core
             if (world.TryGetNpcAt(tx, ty, out _))
                 return false;
 
-            // Muovi
-            world.GridPos[npcId] = new GridPosition(tx, ty);
+            // Muovi tramite World.SetNpcPos, cosi' anche gli indici percettivi persistenti
+            // restano coerenti quando questo percorso legacy/debug viene ancora usato.
+            world.SetNpcPos(npcId, tx, ty);
 
             if (ArcontioLogger.ShouldWrite(LogLevel.Trace))
             {
