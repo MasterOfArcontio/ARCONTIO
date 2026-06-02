@@ -39,14 +39,13 @@ namespace Arcontio.Core
     /// </summary>
     public sealed class ObjectPerceptionSystem : ISystem
     {
-        private const int ObjectZoneSizeCells = 8;
-
         public int Period => 1;
 
         private readonly List<int> _npcIds = new(2048);
         private readonly List<long> _objectZoneKeys = new(512);
         private readonly Dictionary<long, List<int>> _objectIdsByZone = new(512);
         private readonly List<Vector2Int> _visibleMissingFoodBeliefCells = new(64);
+        private int _objectZoneSizeCells = 8;
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
@@ -76,6 +75,7 @@ namespace Arcontio.Core
 
             _npcIds.Clear();
             _npcIds.AddRange(world.NpcDna.Keys);
+            _objectZoneSizeCells = ResolveObjectZoneSize(world);
             RebuildGroundObjectZoneIndex(world);
             world.PerceptionWatchMap?.GarbageCollectIfDue((int)tick.Index);
 
@@ -250,10 +250,11 @@ namespace Arcontio.Core
             int npcSpotted = 0;
             int objectsProcessed = 0;
 
-            int minZoneX = FloorDiv(np.X - visionRange, ObjectZoneSizeCells);
-            int maxZoneX = FloorDiv(np.X + visionRange, ObjectZoneSizeCells);
-            int minZoneY = FloorDiv(np.Y - visionRange, ObjectZoneSizeCells);
-            int maxZoneY = FloorDiv(np.Y + visionRange, ObjectZoneSizeCells);
+            int zoneSize = _objectZoneSizeCells;
+            int minZoneX = FloorDiv(np.X - visionRange, zoneSize);
+            int maxZoneX = FloorDiv(np.X + visionRange, zoneSize);
+            int minZoneY = FloorDiv(np.Y - visionRange, zoneSize);
+            int maxZoneY = FloorDiv(np.Y + visionRange, zoneSize);
 
             for (int zoneY = minZoneY; zoneY <= maxZoneY; zoneY++)
             {
@@ -377,8 +378,8 @@ namespace Arcontio.Core
                 if (!world.InBounds(obj.CellX, obj.CellY))
                     continue;
 
-                int zoneX = FloorDiv(obj.CellX, ObjectZoneSizeCells);
-                int zoneY = FloorDiv(obj.CellY, ObjectZoneSizeCells);
+                int zoneX = FloorDiv(obj.CellX, _objectZoneSizeCells);
+                int zoneY = FloorDiv(obj.CellY, _objectZoneSizeCells);
                 long zoneKey = MakeZoneKey(zoneX, zoneY);
                 if (!_objectIdsByZone.TryGetValue(zoneKey, out var bucket))
                 {
@@ -399,6 +400,15 @@ namespace Arcontio.Core
                 return value / divisor;
 
             return -(((-value) + divisor - 1) / divisor);
+        }
+
+        private static int ResolveObjectZoneSize(World world)
+        {
+            int zoneSize = world?.Global != null
+                ? world.Global.ObjectPerceptionZoneSizeCells
+                : 8;
+
+            return zoneSize > 0 ? zoneSize : 8;
         }
 
         private static long MakeZoneKey(int zoneX, int zoneY)

@@ -402,6 +402,7 @@ namespace Arcontio.Core.Config
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
+    ///   <item><b>objectZoneSizeCells</b>: dimensione delle zone usate dall'indice oggetti.</item>
     ///   <item><b>maxCandidateCellsPerNpcPerTick</b>: limite celle candidate; 0 o negativo significa nessun limite.</item>
     ///   <item><b>maxObjectsPerNpcPerTick</b>: limite oggetti processati; 0 o negativo significa nessun limite.</item>
     /// </list>
@@ -409,6 +410,7 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class ObjectPerceptionRuntimeParams
     {
+        public int objectZoneSizeCells = 8;
         public int maxCandidateCellsPerNpcPerTick = 0;
         public int maxObjectsPerNpcPerTick = 0;
     }

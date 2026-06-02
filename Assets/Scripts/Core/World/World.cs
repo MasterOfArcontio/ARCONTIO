@@ -1077,6 +1077,12 @@ namespace Arcontio.Core
             // Legacy/back-compat: manteniamo anche HalfWidthPerStep per codice vecchio.
             Global.NpcVisionConeSlope = slope;
             Global.NpcVisionConeHalfWidthPerStep = slope;
+            Global.ObjectPerceptionZoneSizeCells = Config?.Sim?.perception != null
+                ? Config.Sim.perception.objectZoneSizeCells
+                : 8;
+            if (Global.ObjectPerceptionZoneSizeCells <= 0)
+                Global.ObjectPerceptionZoneSizeCells = 8;
+
             Global.ObjectPerceptionMaxCandidateCellsPerNpcPerTick = Config?.Sim?.perception != null
                 ? Config.Sim.perception.maxCandidateCellsPerNpcPerTick
                 : 0;
@@ -4741,6 +4747,7 @@ if (!NpcAction.ContainsKey(id))
         public bool NpcVisionUseCone;
         public float NpcVisionConeSlope; // half-width per forward step (grid cone)
         public float NpcVisionConeHalfWidthPerStep; // legacy/back-compat (se lo stai usando altrove)
+        public int ObjectPerceptionZoneSizeCells;
         public int ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
         public int ObjectPerceptionMaxObjectsPerNpcPerTick;
 

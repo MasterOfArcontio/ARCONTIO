@@ -723,6 +723,17 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void WorldReadsConfiguredObjectPerceptionZoneSize()
+        {
+            var sim = new SimulationParams();
+            sim.perception.objectZoneSizeCells = 4;
+
+            var world = new World(new WorldConfig(sim));
+
+            Assert.That(world.Global.ObjectPerceptionZoneSizeCells, Is.EqualTo(4));
+        }
+
+        [Test]
         public void AssignedFoodJobMoveTargetEmptyCanReplaceWithVisibleEquivalentFood()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
