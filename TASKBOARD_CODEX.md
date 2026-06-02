@@ -171,9 +171,9 @@ Checkpoint v0.19 pianificati:
 
 - `v0.19a`: riduzione ObjectPerceptionDebugFovCells solo per NPC attivo - DONE;
 - `v0.19b`: WaitAndObserve via Job con step LookDirection configurato - DONE;
-- `v0.19c`: PerceptionWatchMap e tracciamento celle osservate - DONE;
+- `v0.19c`: PerceptionDependencyMap e dirty percettivo oggetti/NPC osservati - DONE;
 - `v0.19d`: indice spaziale oggetti a zone completo - DONE;
-- `v0.19e`: riduzione scan celle vuote e candidati inutili;
+- `v0.19e`: riduzione scan celle vuote e candidati inutili - DONE;
 - `v0.19f`: QA profiler percezione 1/2/4/8/16 NPC;
 - `v0.19g`: closeout scalabilita' percettiva.
 

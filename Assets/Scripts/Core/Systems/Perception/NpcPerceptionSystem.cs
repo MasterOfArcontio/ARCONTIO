@@ -105,12 +105,15 @@ namespace Arcontio.Core
                     if (!world.GridPos.TryGetValue(firstTargetId, out var firstTargetPos))
                         continue;
 
-                    if (costSample)
-                        costCandidateCells++;
-
                     int cellDistance = FovUtils.Manhattan(ox, oy, firstTargetPos.X, firstTargetPos.Y);
                     if (cellDistance <= 0 || cellDistance > visionRange)
                         continue;
+
+                    if (!IsPotentiallyInFacingHalfPlane(ox, oy, facing, firstTargetPos.X, firstTargetPos.Y))
+                        continue;
+
+                    if (costSample)
+                        costCandidateCells++;
 
                     for (int j = 0; j < targetIds.Count; j++)
                     {
@@ -216,6 +219,47 @@ namespace Arcontio.Core
         private static long MakeCellKey(int x, int y)
         {
             return ((long)x << 32) ^ (uint)y;
+        }
+
+        // =============================================================================
+        // IsPotentiallyInFacingHalfPlane
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scarta in modo economico una cella occupata che si trova certamente dietro
+        /// l'NPC osservatore.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: scarto conservativo prima della LOS</b></para>
+        /// <para>
+        /// Il metodo non decide la visibilita' finale. Anticipa solo uno scarto che
+        /// il cono percettivo avrebbe comunque applicato piu' avanti, evitando di
+        /// entrare nel ciclo dei target e nella linea di vista per celle chiaramente
+        /// non osservabili.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Nord/Sud</b>: confronta l'asse Y.</item>
+        ///   <item><b>Est/Ovest</b>: confronta l'asse X.</item>
+        ///   <item><b>Same-cell</b>: esclusa a monte perche' un NPC non osserva se stesso.</item>
+        /// </list>
+        /// </summary>
+        private static bool IsPotentiallyInFacingHalfPlane(
+            int originX,
+            int originY,
+            CardinalDirection facing,
+            int targetX,
+            int targetY)
+        {
+            switch (facing)
+            {
+                case CardinalDirection.North: return targetY > originY;
+                case CardinalDirection.South: return targetY < originY;
+                case CardinalDirection.East:  return targetX > originX;
+                case CardinalDirection.West:  return targetX < originX;
+                default:                      return false;
+            }
         }
     }
 }

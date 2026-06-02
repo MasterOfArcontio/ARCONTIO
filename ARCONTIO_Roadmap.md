@@ -1122,13 +1122,15 @@ Questa fase e' necessaria prima delle conseguenze sociali perche' reputazione, s
 |---|---|---|
 | v0.19a | Riduzione ObjectPerceptionDebugFovCells solo per NPC attivo | ✅ |
 | v0.19b | WaitAndObserve via Job con step LookDirection configurato | ✅ |
-| v0.19c | PerceptionWatchMap e tracciamento celle osservate | ✅ |
+| v0.19c | PerceptionDependencyMap e dirty percettivo oggetti/NPC osservati | ✅ |
 | v0.19d | Indice spaziale oggetti a zone completo | ✅ |
-| v0.19e | Riduzione scan celle vuote e candidati inutili | ⏳ |
+| v0.19e | Riduzione scan celle vuote e candidati inutili | ✅ |
 | v0.19f | QA profiler percezione 1/2/4/8/16 NPC | ⏳ |
 | v0.19g | Closeout scalabilita' percettiva | ⏳ |
 
 > **Nota architetturale v0.19:** il guardarsi attorno non deve piu' essere un effetto automatico nascosto di idle. Deve diventare un comportamento causale: intent osservativo, richiesta Job, template configurato e step espliciti di orientamento. I sistemi percettivi restano responsabili della lettura del mondo, ma la scelta di osservare deve essere visibile nel percorso decisionale.
+>
+> **Nota dirty percettivo v0.19c:** il tracciamento percettivo non deve piu' essere inteso come semplice elenco di celle osservate. La forma corretta e' una mappa di dipendenze tra oggetti/NPC osservati e NPC osservatori: quando un oggetto o un NPC osservato cambia, gli osservatori interessati vengono marcati come percettivamente sporchi. Lo skip effettivo della percezione resta rinviato a v0.20, quando la cadenza percettiva per stato potra' usare questo dirty senza introdurre salti onniscienti.
 
 ---
 
@@ -1168,11 +1170,14 @@ In futuro lo stesso blocco potra' includere ampiezza del cono, priorita', budget
 | v0.20e | Lunghezza cono visivo per stato percettivo | ⏳ |
 | v0.20f | Collegamento job/fasi allo stato percettivo | ⏳ |
 | v0.20g | Stati speciali per movimento, LookDirection, SearchFood e allerta | ⏳ |
-| v0.20h | Skip percezione tramite cadenza + dirty da PerceptionDependencyMap | ⏳ |
-| v0.20i | EL/debug skip percezione e stato percettivo corrente | ⏳ |
-| v0.20j | QA profiler e closeout percezione cadenzata | ⏳ |
+| v0.20h | Rotazione causale prima di LookDirection e attraversamento movimento | ⏳ |
+| v0.20i | Skip percezione tramite cadenza + dirty da PerceptionDependencyMap | ⏳ |
+| v0.20j | EL/debug skip percezione e stato percettivo corrente | ⏳ |
+| v0.20k | QA profiler e closeout percezione cadenzata | ⏳ |
 
 > **Nota architetturale v0.20:** la configurazione in `game_params.json` deve essere il default operativo degli stati percettivi. I job potranno dichiarare lo stato da applicare a una fase, ma non dovranno decidere direttamente quali oggetti vedere o saltare. La percezione resta un sistema autonomo: il job modifica lo stato dell'NPC, il sistema di percezione legge quello stato e applica cadenza e cono.
+>
+> **Nota rotazione percettiva v0.20h:** `LookDirection` e movimento multi-tick devono diventare causalmente coerenti con la percezione. Guardare in una direzione deve produrre almeno una percezione valida con quell'orientamento prima di completare lo step osservativo. Allo stesso modo, prima di attraversare una cella verso est, ovest, nord o sud, l'NPC deve orientarsi verso la direzione reale di spostamento, cosi' il cono visivo non resta bloccato su un facing precedente.
 
 ---
 

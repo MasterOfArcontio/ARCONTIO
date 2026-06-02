@@ -240,10 +240,16 @@ namespace Arcontio.Core
             int objectsProcessed = 0;
 
             int zoneSize = _objectZoneSizeCells;
-            int minZoneX = FloorDiv(np.X - visionRange, zoneSize);
-            int maxZoneX = FloorDiv(np.X + visionRange, zoneSize);
-            int minZoneY = FloorDiv(np.Y - visionRange, zoneSize);
-            int maxZoneY = FloorDiv(np.Y + visionRange, zoneSize);
+            ResolveFacingLimitedZoneBounds(
+                np.X,
+                np.Y,
+                facing,
+                visionRange,
+                zoneSize,
+                out int minZoneX,
+                out int maxZoneX,
+                out int minZoneY,
+                out int maxZoneY);
 
             for (int zoneY = minZoneY; zoneY <= maxZoneY; zoneY++)
             {
@@ -404,6 +410,68 @@ namespace Arcontio.Core
         private static long MakeZoneKey(int zoneX, int zoneY)
         {
             return ((long)zoneX << 32) ^ (uint)zoneY;
+        }
+
+        // =============================================================================
+        // ResolveFacingLimitedZoneBounds
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola il riquadro di zone da visitare tenendo conto della direzione
+        /// dell'NPC prima ancora di leggere i bucket degli oggetti.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: scarto economico conservativo</b></para>
+        /// <para>
+        /// La percezione canonica resta decisa dai gate successivi: distanza, cono e
+        /// linea di vista. Questo metodo restringe solo il riquadro delle zone che
+        /// sono certamente dietro l'NPC. La zona dell'origine resta inclusa per non
+        /// perdere oggetti sulla stessa cella dell'osservatore.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Asse X</b>: ristretto quando l'NPC guarda est o ovest.</item>
+        ///   <item><b>Asse Y</b>: ristretto quando l'NPC guarda nord o sud.</item>
+        ///   <item><b>Origine inclusa</b>: preserva percezione same-cell.</item>
+        /// </list>
+        /// </summary>
+        private static void ResolveFacingLimitedZoneBounds(
+            int originX,
+            int originY,
+            CardinalDirection facing,
+            int visionRange,
+            int zoneSize,
+            out int minZoneX,
+            out int maxZoneX,
+            out int minZoneY,
+            out int maxZoneY)
+        {
+            int minX = originX - visionRange;
+            int maxX = originX + visionRange;
+            int minY = originY - visionRange;
+            int maxY = originY + visionRange;
+
+            switch (facing)
+            {
+                case CardinalDirection.North:
+                    minY = originY;
+                    break;
+                case CardinalDirection.South:
+                    maxY = originY;
+                    break;
+                case CardinalDirection.East:
+                    minX = originX;
+                    break;
+                case CardinalDirection.West:
+                    maxX = originX;
+                    break;
+            }
+
+            minZoneX = FloorDiv(minX, zoneSize);
+            maxZoneX = FloorDiv(maxX, zoneSize);
+            minZoneY = FloorDiv(minY, zoneSize);
+            maxZoneY = FloorDiv(maxY, zoneSize);
         }
 
         // =============================================================================
