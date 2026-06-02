@@ -92,6 +92,7 @@ Residual follow-ups / future hardening:
 - `v0.17`: osservatorio costi runtime, profilazione per NPC, misure per percezione/memoria/belief/query/decisione/EL/job/fallback/pathfinding;
 - `v0.18`: ottimizzazione forte runtime percezione/belief/query basata sui dati JSONL dell'osservatorio;
 - `v0.19`: scalabilita' percettiva, osservazione tramite Job e PerceptionWatchMap;
+- `v0.20`: percezione cadenzata per stato percettivo NPC con cadenza e lunghezza cono da `game_params.json`;
 - `v0.170`: query multi-candidato food, recovery `FindEquivalentTarget` senza query interne, sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
 - `v0.180+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
@@ -175,6 +176,18 @@ Checkpoint v0.19 pianificati:
 - `v0.19e`: riduzione scan celle vuote e candidati inutili;
 - `v0.19f`: QA profiler percezione 1/2/4/8/16 NPC;
 - `v0.19g`: closeout scalabilita' percettiva.
+
+Checkpoint v0.20 pianificati:
+
+- `v0.20a`: audit percezione attuale e assunzioni ogni tick;
+- `v0.20b`: stato percettivo NPC minimo;
+- `v0.20c`: configurazione stati percettivi in `game_params.json`;
+- `v0.20d`: cadenza percezione in ObjectPerceptionSystem e NpcPerceptionSystem;
+- `v0.20e`: lunghezza cono visivo per stato percettivo;
+- `v0.20f`: collegamento job/fasi allo stato percettivo;
+- `v0.20g`: stati speciali per movimento, LookDirection, SearchFood e allerta;
+- `v0.20h`: EL/debug skip percezione e stato percettivo corrente;
+- `v0.20i`: QA profiler e closeout percezione cadenzata.
 
 Checkpoint v0.12 completati:
 

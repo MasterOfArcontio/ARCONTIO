@@ -33,6 +33,7 @@
 | v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
 | v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | Completata |
 | v0.19 | Scalabilita' percettiva e osservazione tramite Job | Luglio 2026 | In corso |
+| v0.20 | Percezione cadenzata per stato percettivo NPC | Luglio 2026 | Pending |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -1128,6 +1129,49 @@ Questa fase e' necessaria prima delle conseguenze sociali perche' reputazione, s
 | v0.19g | Closeout scalabilita' percettiva | ⏳ |
 
 > **Nota architetturale v0.19:** il guardarsi attorno non deve piu' essere un effetto automatico nascosto di idle. Deve diventare un comportamento causale: intent osservativo, richiesta Job, template configurato e step espliciti di orientamento. I sistemi percettivi restano responsabili della lettura del mondo, ma la scelta di osservare deve essere visibile nel percorso decisionale.
+
+---
+
+#### v0.20 - Percezione cadenzata per stato percettivo NPC
+
+## Stato
+FUTURA / PRIORITA' ALTA
+
+## Obiettivo
+
+Introdurre uno stato percettivo per NPC e usare quello stato per decidere quanto spesso l'NPC deve aggiornare la percezione e quanto lungo deve essere il suo cono visivo.
+
+La percezione non deve piu' essere trattata come un lavoro uguale per tutti, ogni tick, indipendentemente dal contesto. Un NPC fermo e inattivo, un NPC in movimento, un NPC che si sta guardando attorno e un NPC in allerta non hanno lo stesso bisogno percettivo.
+
+Questa fase serve a:
+
+- ridurre il costo CPU della percezione;
+- mantenere causalita' e leggibilita' delle osservazioni;
+- rendere i job capaci di dichiarare lo stato percettivo piu' adatto alla fase corrente;
+- preparare stati futuri piu' ricchi senza cambiare di nuovo il contratto dati.
+
+Per ora ogni stato percettivo avra':
+
+- cadenza percezione;
+- lunghezza del cono visivo.
+
+In futuro lo stesso blocco potra' includere ampiezza del cono, priorita', budget celle, budget oggetti, profondita' memoria e tipo di scansione.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.20a | Audit percezione attuale e assunzioni ogni tick | ⏳ |
+| v0.20b | Stato percettivo NPC minimo | ⏳ |
+| v0.20c | Configurazione stati percettivi in game_params | ⏳ |
+| v0.20d | Cadenza percezione in ObjectPerceptionSystem e NpcPerceptionSystem | ⏳ |
+| v0.20e | Lunghezza cono visivo per stato percettivo | ⏳ |
+| v0.20f | Collegamento job/fasi allo stato percettivo | ⏳ |
+| v0.20g | Stati speciali per movimento, LookDirection, SearchFood e allerta | ⏳ |
+| v0.20h | EL/debug skip percezione e stato percettivo corrente | ⏳ |
+| v0.20i | QA profiler e closeout percezione cadenzata | ⏳ |
+
+> **Nota architetturale v0.20:** la configurazione in `game_params.json` deve essere il default operativo degli stati percettivi. I job potranno dichiarare lo stato da applicare a una fase, ma non dovranno decidere direttamente quali oggetti vedere o saltare. La percezione resta un sistema autonomo: il job modifica lo stato dell'NPC, il sistema di percezione legge quello stato e applica cadenza e cono.
 
 ---
 
