@@ -42,6 +42,7 @@ namespace Arcontio.Core
         ReleaseReservation = 30,
         WaitTicks = 40,
         Observe = 50,
+        LookDirection = 55,
         Search = 60,
         PickUp = 70,
         Drop = 80,

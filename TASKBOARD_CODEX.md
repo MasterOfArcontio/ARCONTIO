@@ -85,12 +85,13 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.18e - Ottimizzazione NpcPerceptionSystem con indice spaziale a zone`
+`v0.19b - WaitAndObserve via Job con step LookDirection configurato`
 
 Residual follow-ups / future hardening:
 
 - `v0.17`: osservatorio costi runtime, profilazione per NPC, misure per percezione/memoria/belief/query/decisione/EL/job/fallback/pathfinding;
 - `v0.18`: ottimizzazione forte runtime percezione/belief/query basata sui dati JSONL dell'osservatorio;
+- `v0.19`: scalabilita' percettiva, osservazione tramite Job e PerceptionWatchMap;
 - `v0.170`: query multi-candidato food, recovery `FindEquivalentTarget` senza query interne, sospetto, reputazione, audit cibo privato, rumor e conseguenze sociali;
 - `v0.180+`: observer layer pubblico, incapsulamento store `World`, cleanup completo command/event.
 
@@ -164,6 +165,16 @@ Checkpoint v0.18 pianificati:
 - `v0.18d`: QA profiler comparativo pre/post ottimizzazione con 1/2/4/8/16 NPC - PARTIAL, protocollo pronto;
 - `v0.18e`: ottimizzazione NpcPerceptionSystem con indice spaziale a zone - DONE;
 - `v0.18f`: closeout ottimizzazione runtime percezione/belief/query.
+
+Checkpoint v0.19 pianificati:
+
+- `v0.19a`: riduzione ObjectPerceptionDebugFovCells solo per NPC attivo - DONE;
+- `v0.19b`: WaitAndObserve via Job con step LookDirection configurato - DONE;
+- `v0.19c`: PerceptionWatchMap e tracciamento celle osservate;
+- `v0.19d`: indice spaziale oggetti a zone completo;
+- `v0.19e`: riduzione scan celle vuote e candidati inutili;
+- `v0.19f`: QA profiler percezione 1/2/4/8/16 NPC;
+- `v0.19g`: closeout scalabilita' percettiva.
 
 Checkpoint v0.12 completati:
 

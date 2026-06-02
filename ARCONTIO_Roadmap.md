@@ -31,7 +31,8 @@
 | v0.15 | Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime | Giugno-Luglio 2026 | Completata |
 | v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Completata |
 | v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
-| v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
+| v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | Completata |
+| v0.19 | Scalabilita' percettiva e osservazione tramite Job | Luglio 2026 | In corso |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -1100,6 +1101,33 @@ La fase NON cambia semantica decisionale, memoria, percezione o belief. Ottimizz
 | v0.18f | Closeout ottimizzazione runtime percezione/belief/query | ⏳ |
 
 > **Nota architetturale v0.18:** questa fase nasce da misure reali, non da ottimizzazione preventiva. Ogni patch deve ridurre costo runtime senza introdurre onniscienza, senza cambiare score decisionali e senza rendere i sistemi diagnostici nuove sorgenti di costo.
+
+---
+
+#### v0.19 - Scalabilita' percettiva e osservazione tramite Job
+
+## Stato
+IN CORSO / PRIORITA' ALTA
+
+## Obiettivo
+
+Chiudere il debito runtime rimasto sulla percezione dopo v0.18: ridurre lavoro debug non necessario, spostare il guardarsi attorno dentro MBQD + Job, completare l'indice spaziale a zone e preparare una percezione che scala con molti NPC senza tornare a scansioni onniscienti o automatiche.
+
+Questa fase e' necessaria prima delle conseguenze sociali perche' reputazione, sospetto e comunicazione aumenteranno il numero di osservazioni e letture locali. Se il sistema percettivo resta troppo costoso o poco causale, ogni nuovo NPC moltiplichera' costo CPU e debito explainability.
+
+---
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.19a | Riduzione ObjectPerceptionDebugFovCells solo per NPC attivo | ✅ |
+| v0.19b | WaitAndObserve via Job con step LookDirection configurato | ✅ |
+| v0.19c | PerceptionWatchMap e tracciamento celle osservate | ⏳ |
+| v0.19d | Indice spaziale oggetti a zone completo | ⏳ |
+| v0.19e | Riduzione scan celle vuote e candidati inutili | ⏳ |
+| v0.19f | QA profiler percezione 1/2/4/8/16 NPC | ⏳ |
+| v0.19g | Closeout scalabilita' percettiva | ⏳ |
+
+> **Nota architetturale v0.19:** il guardarsi attorno non deve piu' essere un effetto automatico nascosto di idle. Deve diventare un comportamento causale: intent osservativo, richiesta Job, template configurato e step espliciti di orientamento. I sistemi percettivi restano responsabili della lettura del mondo, ma la scelta di osservare deve essere visibile nel percorso decisionale.
 
 ---
 

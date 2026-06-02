@@ -143,6 +143,54 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // TryBuildWaitAndObserveRequest
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la richiesta job per l'intent <c>WaitAndObserve</c>.
+        /// </para>
+        ///
+        /// <para><b>Osservazione senza target oggettivo</b></para>
+        /// <para>
+        /// Il job di guardarsi attorno non ha cella target e non sceglie oggetti. La
+        /// request conserva solo identita', urgenza e origine decisionale; il template
+        /// decidera' la sequenza di orientamenti da eseguire.
+        /// </para>
+        /// </summary>
+        public bool TryBuildWaitAndObserveRequest(
+            int tick,
+            int npcId,
+            DecisionCandidate candidate,
+            out JobRequest request,
+            out string reason)
+        {
+            request = default;
+            reason = string.Empty;
+
+            if (candidate.Kind != DecisionIntentKind.WaitAndObserve)
+            {
+                reason = "UnsupportedJobRequestIntent";
+                return false;
+            }
+
+            request = new JobRequest(
+                $"jobreq_look_around_{npcId}_{tick}",
+                npcId,
+                DecisionIntentKind.WaitAndObserve,
+                ResolveJobPriorityClass(candidate),
+                candidate.NeedUrgency01,
+                tick,
+                false,
+                Vector2Int.zero,
+                0,
+                string.Empty,
+                "LookAround");
+
+            reason = "JobRequestBuilt";
+            return true;
+        }
+
+        // =============================================================================
         // ResolveJobPriorityClass
         // =============================================================================
         /// <summary>

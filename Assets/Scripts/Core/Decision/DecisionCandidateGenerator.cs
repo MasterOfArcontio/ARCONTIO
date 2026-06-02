@@ -32,7 +32,8 @@ namespace Arcontio.Core
         private static readonly DecisionIntentKind[] FoodJobIntentSubset =
         {
             DecisionIntentKind.EatKnownFood,
-            DecisionIntentKind.SearchFood
+            DecisionIntentKind.SearchFood,
+            DecisionIntentKind.WaitAndObserve
         };
 
         private readonly BeliefQueryService _beliefQueryService = new();
@@ -82,8 +83,8 @@ namespace Arcontio.Core
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Riempie la lista di output con il sottoinsieme minimo di intenzioni food
-        /// che l'orchestratore runtime e' davvero in grado di trasformare in job.
+        /// Riempie la lista di output con il sottoinsieme minimo di intenzioni che
+        /// l'orchestratore runtime e' davvero in grado di trasformare in job.
         /// </para>
         ///
         /// <para><b>Catalogo ridotto per percorso caldo</b></para>
@@ -91,7 +92,8 @@ namespace Arcontio.Core
         /// Il catalogo completo resta disponibile per QA e sviluppo futuro, ma il
         /// runtime attuale non deve scandire intenzioni sociali, lavoro, acqua o
         /// riposo quando il ponte operativo supporta solo fame -> EatKnownFood /
-        /// SearchFood. Questa funzione non cambia lo score e non forza la scelta:
+        /// SearchFood e osservazione idle -> WaitAndObserve. Questa funzione non
+        /// cambia lo score e non forza la scelta:
         /// riduce solo il numero di candidati costruiti prima dello scoring.
         /// </para>
         ///

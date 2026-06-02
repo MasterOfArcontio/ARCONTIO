@@ -31,6 +31,7 @@ namespace Arcontio.Core
         public const string DefaultResourcePath = "Arcontio/Jobs/job_templates";
         public const string FoodKnownCommunityStockTemplateId = "food.eat_known_community_stock.v1";
         public const string SearchFoodLocalProbeTemplateId = "food.search_local_probe.v1";
+        public const string PerceptionLookAroundTemplateId = "perception.look_around.v1";
         public const string GenericMoveToCellTemplateId = "generic.move_to_cell.v1";
         public const string TransportObjectToCellTemplateId = "transport.object_to_cell.v1";
 
@@ -164,7 +165,9 @@ namespace Arcontio.Core
             if (kind == JobActionKind.Consume)
                 return new JobAction(actionId, kind, actionId, hasTargetCell, targetCell, request.TargetObjectId, 0, "known_food");
 
-            return new JobAction(actionId, kind, actionId, hasTargetCell, targetCell, request.TargetObjectId, 0, string.Empty);
+            int durationTicks = Math.Max(0, actionDef?.durationTicks ?? 0);
+            string payloadKey = actionDef?.payloadKey ?? string.Empty;
+            return new JobAction(actionId, kind, actionId, hasTargetCell, targetCell, request.TargetObjectId, durationTicks, payloadKey);
         }
 
         private static bool TryParseEnum<TEnum>(string value, TEnum fallback, out TEnum parsed)
@@ -208,5 +211,7 @@ namespace Arcontio.Core
         public string actionId;
         public string kind;
         public string targetCellSource;
+        public string payloadKey;
+        public int durationTicks;
     }
 }

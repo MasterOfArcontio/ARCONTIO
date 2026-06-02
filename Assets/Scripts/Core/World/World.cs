@@ -1069,6 +1069,7 @@ namespace Arcontio.Core
             Global.Needs = NeedsConfig.Default();
             Global.BeliefDecay = BeliefDecayConfig.Default();
             Global.BeliefQuery = BeliefQueryConfig.Default();
+            Global.DecisionIntentScore = DecisionIntentScoreConfig.Default();
 
             // ============================================================
             // Inventory params (data-driven via game_params.json)
@@ -4733,6 +4734,9 @@ if (!NpcAction.ContainsKey(id))
 
         // --- Belief query config ---
         public BeliefQueryConfig BeliefQuery;
+
+        // --- Decision intent score config ---
+        public DecisionIntentScoreConfig DecisionIntentScore;
 
         // --- Object memory config ---
         public int NpcObjectMemorySlots;       // slot per memoria oggetti interagibili (per NPC)

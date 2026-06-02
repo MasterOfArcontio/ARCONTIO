@@ -95,4 +95,59 @@ namespace Arcontio.Core
             return true;
         }
     }
+
+    // =============================================================================
+    // LookAroundJobFactory
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Factory minimale per trasformare <c>WaitAndObserve</c> in un job di
+    /// orientamento percettivo configurato da template.
+    /// </para>
+    ///
+    /// <para><b>Guardarsi attorno come incarico, non sistema automatico</b></para>
+    /// <para>
+    /// Il job non fa comparire informazione nuova da solo. Esegue soltanto quattro
+    /// step <c>LookDirection</c> configurati in JSON; i sistemi di percezione leggono
+    /// poi il facing nel normale ordine di simulazione. Questo rende causale e
+    /// spiegabile l'atto di osservare.
+    /// </para>
+    /// </summary>
+    public static class LookAroundJobFactory
+    {
+        public static bool TryCreateLookAroundJob(
+            JobTemplateRegistry registry,
+            JobRequest request,
+            out Job job,
+            out string reason)
+        {
+            job = null;
+            reason = string.Empty;
+
+            if (registry == null)
+            {
+                reason = "RegistryMissing";
+                return false;
+            }
+
+            if (request.NpcId <= 0)
+            {
+                reason = "InvalidNpcId";
+                return false;
+            }
+
+            if (request.IntentKind != DecisionIntentKind.WaitAndObserve)
+            {
+                reason = "InvalidLookAroundJobIntent";
+                return false;
+            }
+
+            if (!registry.TryBuildPlan(JobTemplateRegistry.PerceptionLookAroundTemplateId, request, out var plan, out reason))
+                return false;
+
+            job = new Job($"job_look_around_{request.NpcId}_{request.CreatedTick}", request, plan);
+            reason = "LookAroundJobCreated";
+            return true;
+        }
+    }
 }

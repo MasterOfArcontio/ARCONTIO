@@ -109,9 +109,44 @@ namespace Arcontio.Core
             DecisionScoringConfig config,
             bool captureContributions)
         {
+            var scoreConfig = DecisionIntentScoreConfig.Default();
+            scoreConfig.needUrgencyWeight = config.needUrgencyWeight;
+            scoreConfig.competenceWeight = config.competenceWeight;
+            scoreConfig.preferenceWeight = config.preferenceWeight;
+            scoreConfig.obligationWeight = config.obligationWeight;
+            scoreConfig.memoryConfidenceWeight = config.memoryConfidenceWeight;
+            scoreConfig.cognitiveModulatorWeight = config.cognitiveModulatorWeight;
+            scoreConfig.criticalNeedFloor = config.criticalNeedFloor;
+            scoreConfig.highObligationFloor = config.highObligationFloor;
+            scoreConfig.highObligationThreshold = config.highObligationThreshold;
+            ScoreCandidates(in context, candidates, scoreConfig, captureContributions);
+        }
+
+        // =============================================================================
+        // ScoreCandidates
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola lo score usando la configurazione JSON degli intent.
+        /// </para>
+        ///
+        /// <para><b>Pesi data-driven senza cambiare il boundary</b></para>
+        /// <para>
+        /// La funzione applica prima i contributi storici, poi piccoli correttivi per
+        /// intent letti da config. Non crea job, non legge World e non sostituisce il
+        /// catalogo intenzioni: rende solo regolabile la parte numerica della scelta.
+        /// </para>
+        /// </summary>
+        public void ScoreCandidates(
+            in DecisionEvaluationContext context,
+            List<DecisionCandidate> candidates,
+            DecisionIntentScoreConfig intentScoreConfig,
+            bool captureContributions)
+        {
             if (candidates == null)
                 return;
 
+            var config = intentScoreConfig.ToScoringConfig();
             for (int i = 0; i < candidates.Count; i++)
             {
                 var candidate = candidates[i];
@@ -119,14 +154,22 @@ namespace Arcontio.Core
                     continue;
 
                 _contributions.Clear();
+                bool hasIntentConfig = intentScoreConfig.TryGetEntry(candidate.Kind, out var intentConfig);
+                if (hasIntentConfig && !intentConfig.enabled)
+                {
+                    candidates[i] = DecisionCandidate.Filtered(candidate.Metadata, "IntentDisabledByScoreConfig");
+                    continue;
+                }
 
                 float score = 0f;
-                score += AddNeedUrgencyContribution(candidate, config);
+                score += AddIntentBaseScoreContribution(intentConfig, hasIntentConfig);
+                score += AddNeedUrgencyContribution(candidate, config, intentConfig, hasIntentConfig);
                 score += AddCompetenceContribution(context.Profile, candidate, config);
                 score += AddPreferenceContribution(context.Profile, candidate, config);
                 score += AddObligationContribution(context.Profile, candidate, config);
-                score += AddMemoryConfidenceContribution(candidate, config);
+                score += AddMemoryConfidenceContribution(candidate, config, intentConfig, hasIntentConfig);
                 score += AddCognitiveModulatorContribution(context.Dna, candidate, config);
+                score += AddIntentRiskPenaltyContribution(intentConfig, hasIntentConfig);
                 score = ApplyMandatoryFloors(context.Profile, candidate, config, score);
 
                 candidate.AttachScore(
@@ -162,7 +205,17 @@ namespace Arcontio.Core
         /// </summary>
         private float AddNeedUrgencyContribution(DecisionCandidate candidate, DecisionScoringConfig config)
         {
-            float contribution = candidate.NeedUrgency01 * config.needUrgencyWeight;
+            return AddNeedUrgencyContribution(candidate, config, default, hasIntentConfig: false);
+        }
+
+        private float AddNeedUrgencyContribution(
+            DecisionCandidate candidate,
+            DecisionScoringConfig config,
+            DecisionIntentScoreEntry intentConfig,
+            bool hasIntentConfig)
+        {
+            float multiplier = hasIntentConfig ? intentConfig.ResolveNeedMultiplier() : 1f;
+            float contribution = candidate.NeedUrgency01 * config.needUrgencyWeight * multiplier;
             _contributions.Add(new DecisionScoreContribution("NeedUrgency", contribution));
             return contribution;
         }
@@ -348,14 +401,43 @@ namespace Arcontio.Core
         /// </summary>
         private float AddMemoryConfidenceContribution(DecisionCandidate candidate, DecisionScoringConfig config)
         {
+            return AddMemoryConfidenceContribution(candidate, config, default, hasIntentConfig: false);
+        }
+
+        private float AddMemoryConfidenceContribution(
+            DecisionCandidate candidate,
+            DecisionScoringConfig config,
+            DecisionIntentScoreEntry intentConfig,
+            bool hasIntentConfig)
+        {
             if (!candidate.Metadata.RequiresBeliefTarget || candidate.BeliefResult.IsEmpty)
             {
                 _contributions.Add(new DecisionScoreContribution("MemoryConfidence", 0f));
                 return 0f;
             }
 
-            float contribution = candidate.BeliefResult.Belief.Confidence * config.memoryConfidenceWeight;
+            float multiplier = hasIntentConfig
+                ? intentConfig.ResolveMemoryMultiplier() * intentConfig.ResolveBeliefMultiplier()
+                : 1f;
+            float contribution = candidate.BeliefResult.Belief.Confidence * config.memoryConfidenceWeight * multiplier;
             _contributions.Add(new DecisionScoreContribution("MemoryConfidence", contribution));
+            return contribution;
+        }
+
+        private float AddIntentBaseScoreContribution(DecisionIntentScoreEntry intentConfig, bool hasIntentConfig)
+        {
+            float contribution = hasIntentConfig ? intentConfig.baseScore : 0f;
+            _contributions.Add(new DecisionScoreContribution("IntentBaseScore", contribution));
+            return contribution;
+        }
+
+        private float AddIntentRiskPenaltyContribution(DecisionIntentScoreEntry intentConfig, bool hasIntentConfig)
+        {
+            float contribution = 0f;
+            if (hasIntentConfig && intentConfig.riskPenalty > 0f)
+                contribution = -intentConfig.riskPenalty;
+
+            _contributions.Add(new DecisionScoreContribution("IntentRiskPenalty", contribution));
             return contribution;
         }
 

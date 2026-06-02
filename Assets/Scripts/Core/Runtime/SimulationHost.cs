@@ -751,7 +751,11 @@ namespace Arcontio.Core
                     .AddField(
                         "hasEatKnownFoodTemplate",
                         _jobTemplateRegistry != null
-                        && _jobTemplateRegistry.TryGetTemplate(JobTemplateRegistry.FoodKnownCommunityStockTemplateId, out _)));
+                        && _jobTemplateRegistry.TryGetTemplate(JobTemplateRegistry.FoodKnownCommunityStockTemplateId, out _))
+                    .AddField(
+                        "hasLookAroundTemplate",
+                        _jobTemplateRegistry != null
+                        && _jobTemplateRegistry.TryGetTemplate(JobTemplateRegistry.PerceptionLookAroundTemplateId, out _)));
 
             // ******************************************************************************************************************************
             // 5) ISCRIVO I SISTEMI ALLO SCHEDULER
@@ -784,9 +788,11 @@ namespace Arcontio.Core
             // ******************************************************************************************************************************
             // 5.2) SCAN IN IDLE - IdleScan
             // ******************************************************************************************************************************
-            // Quando l?NPC è idle, ruota (scan) per evitare ?visione 360 gratuita?.
-            // Deve stare PRIMA della perception: così la rotation influenza cosa viene percepito nello stesso tick.
-            _scheduler.AddSystem(new IdleScanSystem(scanPeriodTicks: 12));
+            // v0.19b: lo scan passivo non viene piu' schedulato come rotazione
+            // automatica nascosta. Il guardarsi attorno entra nel percorso
+            // Decisione -> JobRequest -> Job tramite WaitAndObserve e tramite la
+            // fase finale di SearchFood, cosi' l'orientamento resta causalmente
+            // leggibile e non costa lavoro per NPC idle non coinvolti.
 
             // ******************************************************************************************************************************
             // 5.3) BISOGNI NPC - NeedsDecaySystem
@@ -1583,6 +1589,7 @@ namespace Arcontio.Core
             NeedsConfigLoader.LoadIntoWorld(world);
             BeliefDecayConfigLoader.LoadIntoWorld(world);
             BeliefQueryConfigLoader.LoadIntoWorld(world);
+            DecisionIntentScoreConfigLoader.LoadIntoWorld(world);
         }
 
         // =============================================================================

@@ -56,6 +56,73 @@
               "kind": "MoveToCell"
             }
           ]
+        },
+        {
+          "phaseId": "search_food_look_around",
+          "kind": "Execute",
+          "isInterruptible": true,
+          "actions": [
+            {
+              "actionId": "look_east",
+              "kind": "LookDirection",
+              "payloadKey": "East",
+              "durationTicks": 1
+            },
+            {
+              "actionId": "look_west",
+              "kind": "LookDirection",
+              "payloadKey": "West",
+              "durationTicks": 1
+            },
+            {
+              "actionId": "look_south",
+              "kind": "LookDirection",
+              "payloadKey": "South",
+              "durationTicks": 1
+            },
+            {
+              "actionId": "look_north",
+              "kind": "LookDirection",
+              "payloadKey": "North",
+              "durationTicks": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "templateId": "perception.look_around.v1",
+      "phases": [
+        {
+          "phaseId": "look_around",
+          "kind": "Execute",
+          "isInterruptible": true,
+          "actions": [
+            {
+              "actionId": "look_east",
+              "kind": "LookDirection",
+              "payloadKey": "East",
+              "durationTicks": 1
+            },
+            {
+              "actionId": "look_west",
+              "kind": "LookDirection",
+              "payloadKey": "West",
+              "durationTicks": 1
+            },
+            {
+              "actionId": "look_south",
+              "kind": "LookDirection",
+              "payloadKey": "South",
+              "durationTicks": 1
+            },
+            {
+              "actionId": "look_north",
+              "kind": "LookDirection",
+              "payloadKey": "North",
+              "durationTicks": 1
+            }
+          ]
         }
       ]
     },

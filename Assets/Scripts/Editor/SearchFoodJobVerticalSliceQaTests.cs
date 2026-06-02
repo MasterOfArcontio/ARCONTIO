@@ -36,7 +36,7 @@ namespace Arcontio.Tests
     public sealed class SearchFoodJobVerticalSliceQaTests
     {
         private const string TemplateJson =
-            "{\"templates\":[{\"templateId\":\"food.search_local_probe.v1\",\"phases\":[{\"phaseId\":\"search_food_probe\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_probe\",\"kind\":\"MoveToCell\"}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
+            "{\"templates\":[{\"templateId\":\"food.search_local_probe.v1\",\"phases\":[{\"phaseId\":\"search_food_probe\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_probe\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"search_food_look_around\",\"kind\":\"Execute\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"look_east\",\"kind\":\"LookDirection\",\"payloadKey\":\"East\",\"durationTicks\":1},{\"actionId\":\"look_west\",\"kind\":\"LookDirection\",\"payloadKey\":\"West\",\"durationTicks\":1},{\"actionId\":\"look_south\",\"kind\":\"LookDirection\",\"payloadKey\":\"South\",\"durationTicks\":1},{\"actionId\":\"look_north\",\"kind\":\"LookDirection\",\"payloadKey\":\"North\",\"durationTicks\":1}]}]},{\"templateId\":\"perception.look_around.v1\",\"phases\":[{\"phaseId\":\"look_around\",\"kind\":\"Execute\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"look_east\",\"kind\":\"LookDirection\",\"payloadKey\":\"East\",\"durationTicks\":1},{\"actionId\":\"look_west\",\"kind\":\"LookDirection\",\"payloadKey\":\"West\",\"durationTicks\":1},{\"actionId\":\"look_south\",\"kind\":\"LookDirection\",\"payloadKey\":\"South\",\"durationTicks\":1},{\"actionId\":\"look_north\",\"kind\":\"LookDirection\",\"payloadKey\":\"North\",\"durationTicks\":1}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
 
         // =============================================================================
         // RunFromCommandLine
@@ -84,9 +84,14 @@ namespace Arcontio.Tests
             Assert.That(job.Request.TargetObjectId, Is.EqualTo(0));
             Assert.That(job.Request.TargetCell, Is.EqualTo(target));
             Assert.That(job.Plan.PlanId, Is.EqualTo(JobTemplateRegistry.SearchFoodLocalProbeTemplateId));
+            Assert.That(job.Plan.PhaseCount, Is.EqualTo(2));
             Assert.That(job.Plan.TryGetPhase(0, out var phase), Is.True);
             Assert.That(phase.TryGetAction(0, out var action), Is.True);
             Assert.That(action.Kind, Is.EqualTo(JobActionKind.MoveToCell));
+            Assert.That(job.Plan.TryGetPhase(1, out var lookPhase), Is.True);
+            Assert.That(lookPhase.TryGetAction(0, out var lookAction), Is.True);
+            Assert.That(lookAction.Kind, Is.EqualTo(JobActionKind.LookDirection));
+            Assert.That(lookAction.PayloadKey, Is.EqualTo("East"));
         }
 
         [Test]
@@ -158,6 +163,44 @@ namespace Arcontio.Tests
 
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
             Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.SearchFood));
+        }
+
+        [Test]
+        public void WaitAndObserveSelectionStartsLookAroundJob()
+        {
+            var world = MakeWorldWithCalmNpc(npcX: 5, npcY: 5, out int npcId);
+
+            RunDecisionOrchestrator(world, tick: 0);
+
+            Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
+            Assert.That(job.Request.IntentKind, Is.EqualTo(DecisionIntentKind.WaitAndObserve));
+            Assert.That(job.Plan.PlanId, Is.EqualTo(JobTemplateRegistry.PerceptionLookAroundTemplateId));
+            Assert.That(job.Plan.TryGetPhase(0, out var phase), Is.True);
+            Assert.That(phase.ExpectedStepCount, Is.EqualTo(4));
+            Assert.That(phase.TryGetAction(0, out var firstAction), Is.True);
+            Assert.That(firstAction.Kind, Is.EqualTo(JobActionKind.LookDirection));
+            Assert.That(firstAction.PayloadKey, Is.EqualTo("East"));
+        }
+
+        [Test]
+        public void LookAroundJobTurnsNpcThroughConfiguredDirections()
+        {
+            var world = MakeWorldWithCalmNpc(npcX: 5, npcY: 5, out int npcId);
+            RunDecisionOrchestrator(world, tick: 0);
+            var jobSystem = new JobExecutionSystem();
+
+            jobSystem.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GetFacing(npcId), Is.EqualTo(CardinalDirection.East));
+
+            jobSystem.Update(world, new Tick(2, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GetFacing(npcId), Is.EqualTo(CardinalDirection.West));
+
+            jobSystem.Update(world, new Tick(3, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GetFacing(npcId), Is.EqualTo(CardinalDirection.South));
+
+            jobSystem.Update(world, new Tick(4, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GetFacing(npcId), Is.EqualTo(CardinalDirection.North));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
         }
 
         [Test]
@@ -247,7 +290,12 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(probe.x));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(probe.y));
 
-            jobSystem.Update(world, new Tick(3, 1f), bus, new Telemetry());
+            for (int i = 0; i < 8; i++)
+            {
+                jobSystem.Update(world, new Tick(3 + i, 1f), bus, new Telemetry());
+                if (!world.JobRuntimeState.HasActiveJob(npcId))
+                    break;
+            }
 
             var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
             bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(world, npcId, viewModel);
@@ -256,7 +304,7 @@ namespace Arcontio.Tests
             Assert.That(viewModel.LatestJobPhase.HasValue, Is.True);
             Assert.That(viewModel.LatestJobPhase.Operation, Is.EqualTo("Completed"));
             Assert.That(viewModel.LatestStep.HasValue, Is.True);
-            Assert.That(viewModel.LatestStep.Step.Kind, Is.EqualTo("MoveToCell"));
+            Assert.That(viewModel.LatestStep.Step.Kind, Is.EqualTo("LookDirection"));
             Assert.That(viewModel.LatestStep.Result.Status, Is.EqualTo("Succeeded"));
             Assert.That(viewModel.CurrentNpcJobState.HasValue, Is.True);
             Assert.That(viewModel.CurrentNpcJobState.HasActiveJob, Is.False);
@@ -448,6 +496,27 @@ namespace Arcontio.Tests
             profile.Competence.Set(DomainKind.Agriculture, 1f);
             profile.Preference.Set(DomainKind.Agriculture, 1f);
             profile.Obligation.Set(DomainKind.Agriculture, 1f);
+
+            return world;
+        }
+
+        private static World MakeWorldWithCalmNpc(int npcX, int npcY, out int npcId)
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            world.Global.Needs = NeedsConfig.Default();
+            world.Global.BeliefQuery = BeliefQueryConfig.Default();
+            world.Global.DecisionIntentScore = DecisionIntentScoreConfig.Default();
+            world.Global.NpcOperationalRangeCells = 16;
+            world.Global.NpcVisionRangeCells = 16;
+            world.Global.NpcVisionUseCone = false;
+            world.Config.Sim.decision.selectionMode = "DeterministicTop1";
+
+            npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("look_around_job_qa"),
+                NpcNeeds.Make(0.1f, 0.1f),
+                new Arcontio.Core.Social { JusticePerception01 = 0.9f },
+                npcX,
+                npcY);
 
             return world;
         }

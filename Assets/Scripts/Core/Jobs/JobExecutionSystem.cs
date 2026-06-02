@@ -600,6 +600,9 @@ namespace Arcontio.Core
                     explainabilityConfig,
                     explainabilityRegistry);
 
+            if (action.Kind == JobActionKind.LookDirection)
+                return ExecuteLookDirection(world, npcId, action);
+
             if (action.Kind == JobActionKind.MoveToCell)
             {
                 return MoveToRunningActionDriver.Execute(
@@ -626,6 +629,22 @@ namespace Arcontio.Core
                 return ExecuteDropObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             return StepResult.Failed(JobFailureReason.StepFailed, "UnsupportedJobActionInRuntimeSlice");
+        }
+
+        private static StepResult ExecuteLookDirection(World world, int npcId, JobAction action)
+        {
+            if (world == null)
+                return StepResult.Failed(JobFailureReason.StepFailed, "LookDirectionWorldMissing");
+
+            if (!System.Enum.TryParse(action.PayloadKey ?? string.Empty, ignoreCase: true, out CardinalDirection direction))
+                return StepResult.Failed(JobFailureReason.StepFailed, "LookDirectionInvalidPayload:" + action.PayloadKey);
+
+            // v0.19b: questo step sostituisce lo scan automatico idle con una
+            // mutazione esplicita del facing dentro il Job Layer. Non crea percezione
+            // immediata e non legge oggetti: orienta soltanto l'NPC, poi i sistemi di
+            // percezione ordinari leggeranno il nuovo facing nel loro turno normale.
+            world.SetFacing(npcId, direction);
+            return StepResult.Succeeded("LookDirectionCompleted:" + direction);
         }
 
         private static StepResult ExecuteRunningWaitAction(
