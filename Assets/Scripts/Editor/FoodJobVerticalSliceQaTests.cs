@@ -663,39 +663,42 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void PerceptionWatchMapTrimsAndGarbageCollectsObservedZones()
+        public void PerceptionWatchMapObjectChangeMarksOnlyObserversDirty()
         {
-            var watchMap = new PerceptionWatchMap(
-                mapWidth: 64,
-                mapHeight: 64,
-                zoneSizeCells: 8,
-                maxZonesPerNpc: 2,
-                staleAfterTicks: 10,
-                garbageCollectEveryTicks: 1,
-                garbageCollectMaxEntriesPerRun: 1);
+            var watchMap = new PerceptionWatchMap();
 
-            watchMap.RecordObservedZoneAtCell(npcId: 1, cellX: 1, cellY: 1, tick: 0);
-            watchMap.RecordObservedZoneAtCell(npcId: 1, cellX: 9, cellY: 1, tick: 1);
-            watchMap.RecordObservedZoneAtCell(npcId: 1, cellX: 17, cellY: 1, tick: 2);
+            watchMap.RecordObjectObserved(objectId: 77, observerNpcId: 1);
+            watchMap.RecordObjectObserved(objectId: 77, observerNpcId: 2);
+            watchMap.MarkObjectModified(objectId: 77);
 
-            Assert.That(watchMap.TryGetLastSeenTick(1, 1, 1, out _), Is.False);
-            Assert.That(watchMap.GetTrackedZoneCount(1), Is.EqualTo(2));
+            int dirtyCount = watchMap.PropagateModifiedEntitiesToDirtyNpcs(tick: 12, reason: "ObjectChanged");
 
-            watchMap.GarbageCollectIfDue(tick: 20);
-
-            Assert.That(watchMap.GetTrackedZoneCount(1), Is.EqualTo(1));
+            Assert.That(dirtyCount, Is.EqualTo(2));
+            Assert.That(watchMap.IsNpcPerceptionDirty(1), Is.True);
+            Assert.That(watchMap.IsNpcPerceptionDirty(2), Is.True);
+            Assert.That(watchMap.IsNpcPerceptionDirty(3), Is.False);
         }
 
         [Test]
-        public void ObjectPerceptionRecordsObservedZonesWhenWatchMapEnabled()
+        public void PerceptionWatchMapNpcChangeMarksOnlyObserversDirty()
+        {
+            var watchMap = new PerceptionWatchMap();
+
+            watchMap.RecordNpcObserved(observedNpcId: 9, observerNpcId: 1);
+            watchMap.MarkNpcModified(npcId: 9);
+
+            int dirtyCount = watchMap.PropagateModifiedEntitiesToDirtyNpcs(tick: 14, reason: "NpcMoved");
+
+            Assert.That(dirtyCount, Is.EqualTo(1));
+            Assert.That(watchMap.IsNpcPerceptionDirty(1), Is.True);
+            Assert.That(watchMap.IsNpcPerceptionDirty(9), Is.False);
+        }
+
+        [Test]
+        public void ObjectPerceptionRecordsObservedObjectDependencyWhenEnabled()
         {
             var sim = new SimulationParams();
-            sim.perception_watch_map.enabled = true;
-            sim.perception_watch_map.zoneSizeCells = 4;
-            sim.perception_watch_map.maxZonesPerNpc = 16;
-            sim.perception_watch_map.staleAfterTicks = 40;
-            sim.perception_watch_map.garbageCollectEveryTicks = 4;
-            sim.perception_watch_map.garbageCollectMaxEntriesPerRun = 8;
+            sim.perception_dependency_map.enabled = true;
             sim.npcVisionRangeCells = 8;
             sim.npcVisionUseCone = true;
             sim.npcVisionConeSlope = 1f;
@@ -707,19 +710,69 @@ namespace Arcontio.Tests
             world.Global.NpcVisionUseCone = true;
             world.Global.NpcVisionConeSlope = 1f;
             int npcId = world.CreateNpc(
-                NpcDnaProfile.CreateDefault("watch_map_qa"),
+                NpcDnaProfile.CreateDefault("dependency_map_qa"),
                 NpcNeeds.Make(0.95f, 0.1f),
                 new Arcontio.Core.Social { JusticePerception01 = 0.9f },
                 5,
                 5);
+            const int foodId = 77;
+            world.Objects[foodId] = new WorldObjectInstance
+            {
+                ObjectId = foodId,
+                DefId = "food_stock",
+                CellX = 7,
+                CellY = 5,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 3,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
             world.NpcFacing[npcId] = CardinalDirection.East;
             var perception = new ObjectPerceptionSystem();
 
             perception.Update(world, new Tick(11, 1f), new MessageBus(), new Telemetry());
 
             Assert.That(world.PerceptionWatchMap, Is.Not.Null);
-            Assert.That(world.PerceptionWatchMap.TryGetLastSeenTick(npcId, 9, 5, out int lastSeenTick), Is.True);
-            Assert.That(lastSeenTick, Is.EqualTo(11));
+            Assert.That(world.PerceptionWatchMap.GetObjectObserverCount(foodId), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void DestroyObservedObjectMarksObserverPerceptionDirty()
+        {
+            var sim = new SimulationParams();
+            sim.perception_dependency_map.enabled = true;
+            var world = new World(new WorldConfig(sim));
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("dependency_map_qa"),
+                NpcNeeds.Make(0.95f, 0.1f),
+                new Arcontio.Core.Social { JusticePerception01 = 0.9f },
+                5,
+                5);
+            const int foodId = 77;
+            world.Objects[foodId] = new WorldObjectInstance
+            {
+                ObjectId = foodId,
+                DefId = "food_stock",
+                CellX = 6,
+                CellY = 5,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            world.FoodStocks[foodId] = new FoodStockComponent
+            {
+                Units = 1,
+                OwnerKind = OwnerKind.Community,
+                OwnerId = 0
+            };
+            world.PerceptionWatchMap.RecordObjectObserved(foodId, npcId);
+
+            world.DestroyObject(foodId);
+
+            Assert.That(world.PerceptionWatchMap.IsNpcPerceptionDirty(npcId), Is.True);
         }
 
         [Test]

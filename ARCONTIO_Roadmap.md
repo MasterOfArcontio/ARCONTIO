@@ -1168,8 +1168,9 @@ In futuro lo stesso blocco potra' includere ampiezza del cono, priorita', budget
 | v0.20e | Lunghezza cono visivo per stato percettivo | ⏳ |
 | v0.20f | Collegamento job/fasi allo stato percettivo | ⏳ |
 | v0.20g | Stati speciali per movimento, LookDirection, SearchFood e allerta | ⏳ |
-| v0.20h | EL/debug skip percezione e stato percettivo corrente | ⏳ |
-| v0.20i | QA profiler e closeout percezione cadenzata | ⏳ |
+| v0.20h | Skip percezione tramite cadenza + dirty da PerceptionDependencyMap | ⏳ |
+| v0.20i | EL/debug skip percezione e stato percettivo corrente | ⏳ |
+| v0.20j | QA profiler e closeout percezione cadenzata | ⏳ |
 
 > **Nota architetturale v0.20:** la configurazione in `game_params.json` deve essere il default operativo degli stati percettivi. I job potranno dichiarare lo stato da applicare a una fase, ma non dovranno decidere direttamente quali oggetti vedere o saltare. La percezione resta un sistema autonomo: il job modifica lo stato dell'NPC, il sistema di percezione legge quello stato e applica cadenza e cono.
 

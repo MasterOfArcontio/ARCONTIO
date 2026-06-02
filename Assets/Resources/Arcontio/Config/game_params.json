@@ -89,13 +89,8 @@
     "maxCandidateCellsPerNpcPerTick": 0,
     "maxObjectsPerNpcPerTick": 0
   },
-  "perception_watch_map": {
-    "enabled": true,
-    "zoneSizeCells": 8,
-    "maxZonesPerNpc": 128,
-    "staleAfterTicks": 400,
-    "garbageCollectEveryTicks": 50,
-    "garbageCollectMaxEntriesPerRun": 256
+  "perception_dependency_map": {
+    "enabled": true
   },
   "inventory": {
     "inventory_max_units": 30

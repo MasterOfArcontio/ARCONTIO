@@ -69,7 +69,7 @@ namespace Arcontio.Core.Config
         public float npcVisionConeSlope = 1.0f;
         public int npcVisionFovDegrees = 90;
         public ObjectPerceptionRuntimeParams perception = new ObjectPerceptionRuntimeParams();
-        public PerceptionWatchMapParams perception_watch_map = new PerceptionWatchMapParams();
+        public PerceptionDependencyMapParams perception_dependency_map = new PerceptionDependencyMapParams();
 
         // ---------------- Debug FOV heatmap (view overlay) ----------------
         public DebugFovParams debug_fov = new DebugFovParams();
@@ -416,39 +416,29 @@ namespace Arcontio.Core.Config
     }
 
     // =============================================================================
-    // PerceptionWatchMapParams
+    // PerceptionDependencyMapParams
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Parametri runtime della mappa delle zone osservate dagli NPC.
+    /// Parametri runtime della mappa di dipendenze percettive.
     /// </para>
     ///
     /// <para><b>Principio architetturale: memoria percettiva bounded</b></para>
     /// <para>
-    /// La WatchMap e' un'infrastruttura preparatoria: registra copertura visiva a
-    /// zone, non a cella, e viene creata solo quando abilitata. I valori qui sotto
-    /// governano dimensione, vecchiaia e quantita' massima di garbage ripulibile per
-    /// giro, cosi' la struttura non diventa un nuovo accumulo silenzioso.
+    /// La mappa viene creata solo quando abilitata. Quando e' spenta, i sistemi
+    /// percettivi non registrano dipendenze e le mutazioni del World non propagano
+    /// dirty percettivi. La v0.20 usera' questi dirty insieme alla cadenza.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>enabled</b>: crea o congela completamente la WatchMap.</item>
-    ///   <item><b>zoneSizeCells</b>: dimensione della zona percettiva aggregata.</item>
-    ///   <item><b>maxZonesPerNpc</b>: limite massimo di zone ricordate per NPC.</item>
-    ///   <item><b>staleAfterTicks</b>: eta' oltre la quale una zona puo' essere rimossa.</item>
-    ///   <item><b>garbageCollectMaxEntriesPerRun</b>: limite di pulizia per evitare picchi.</item>
+    ///   <item><b>enabled</b>: crea o congela completamente la mappa.</item>
     /// </list>
     /// </summary>
     [Serializable]
-    public sealed class PerceptionWatchMapParams
+    public sealed class PerceptionDependencyMapParams
     {
         public bool enabled = false;
-        public int zoneSizeCells = 8;
-        public int maxZonesPerNpc = 128;
-        public int staleAfterTicks = 400;
-        public int garbageCollectEveryTicks = 50;
-        public int garbageCollectMaxEntriesPerRun = 256;
     }
 
     // ============================================================

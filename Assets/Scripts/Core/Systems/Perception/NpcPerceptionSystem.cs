@@ -76,6 +76,7 @@ namespace Arcontio.Core
                 _npcIds.Add(kv.Key);
 
             RebuildNpcCellIndex(world);
+            world.PerceptionWatchMap?.ClearNpcObservers();
 
             int spotted = 0;
 
@@ -148,6 +149,7 @@ namespace Arcontio.Core
                             cellY: ty,
                             distanceCells: dist,
                             witnessQuality01: quality01));
+                        world.PerceptionWatchMap?.RecordNpcObserved(targetId, observerId);
 
                         spotted++;
                         if (costPerNpc)

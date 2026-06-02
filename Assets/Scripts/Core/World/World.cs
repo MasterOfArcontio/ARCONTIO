@@ -120,7 +120,7 @@ namespace Arcontio.Core
         public RuntimeCostObserver RuntimeCostObserver { get; private set; }
 
         /// <summary>
-        /// Mappa runtime opzionale delle zone osservate dagli NPC.
+        /// Mappa runtime opzionale delle dipendenze percettive oggetto/NPC -> osservatori.
         /// </summary>
         public PerceptionWatchMap PerceptionWatchMap { get; private set; }
 
@@ -1017,17 +1017,10 @@ namespace Arcontio.Core
             // e nessun registro o buffer diagnostico viene creato.
             RuntimeCostObserver = Arcontio.Core.RuntimeCostObserver.CreateIfEnabled(Config?.Sim?.runtime_cost_observer);
 
-            var watchMapConfig = Config?.Sim?.perception_watch_map;
+            var watchMapConfig = Config?.Sim?.perception_dependency_map;
             if (watchMapConfig != null && watchMapConfig.enabled)
             {
-                PerceptionWatchMap = new PerceptionWatchMap(
-                    MapWidth,
-                    MapHeight,
-                    watchMapConfig.zoneSizeCells,
-                    watchMapConfig.maxZonesPerNpc,
-                    watchMapConfig.staleAfterTicks,
-                    watchMapConfig.garbageCollectEveryTicks,
-                    watchMapConfig.garbageCollectMaxEntriesPerRun);
+                PerceptionWatchMap = new PerceptionWatchMap();
             }
 
             Global.EnableMemorySpatialFusion = false;
@@ -3564,6 +3557,7 @@ if (!NpcAction.ContainsKey(id))
         {
             if (!ExistsNpc(npcId)) return;
             GridPos[npcId] = new GridPosition(x, y);
+            MarkPerceptionNpcModified(npcId, "NpcMoved");
         }
 
         public bool TryGetObjectCell(int objectId, out int x, out int y)
@@ -3572,6 +3566,63 @@ if (!NpcAction.ContainsKey(id))
             if (!Objects.TryGetValue(objectId, out var obj) || obj == null) return false;
             x = obj.CellX; y = obj.CellY;
             return true;
+        }
+
+        // =============================================================================
+        // MarkPerceptionObjectModified
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Segnala alla mappa percettiva che un oggetto gia' osservabile e' cambiato.
+        /// </para>
+        /// </summary>
+        private void MarkPerceptionObjectModified(int objectId, string reason)
+        {
+            var map = PerceptionWatchMap;
+            if (map == null)
+                return;
+
+            map.MarkObjectModified(objectId);
+            map.PropagateModifiedEntitiesToDirtyNpcs((int)TickContext.CurrentTickIndex, reason);
+        }
+
+        // =============================================================================
+        // MarkPerceptionNpcModified
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Segnala alla mappa percettiva che un NPC osservabile ha cambiato stato
+        /// percettivamente rilevante, per esempio posizione.
+        /// </para>
+        /// </summary>
+        private void MarkPerceptionNpcModified(int npcId, string reason)
+        {
+            var map = PerceptionWatchMap;
+            if (map == null)
+                return;
+
+            map.MarkNpcModified(npcId);
+            map.PropagateModifiedEntitiesToDirtyNpcs((int)TickContext.CurrentTickIndex, reason);
+        }
+
+        // =============================================================================
+        // MarkAllNpcPerceptionsDirty
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca sporca la percezione di tutti gli NPC quando appare un'entita' nuova
+        /// che non poteva avere osservatori precedenti nella dependency map.
+        /// </para>
+        /// </summary>
+        private void MarkAllNpcPerceptionsDirty(string reason)
+        {
+            var map = PerceptionWatchMap;
+            if (map == null)
+                return;
+
+            int tick = (int)TickContext.CurrentTickIndex;
+            foreach (var pair in NpcDna)
+                map.MarkNpcPerceptionDirty(pair.Key, tick, reason);
         }
 
         public bool BlocksMovementAt(int x, int y)
@@ -3834,6 +3885,7 @@ if (!NpcAction.ContainsKey(id))
                 PlaceOccluderInCache(id, x, y, def);
             }
 
+            MarkAllNpcPerceptionsDirty("ObjectCreated");
             return id;
         }
 
@@ -4018,6 +4070,9 @@ if (!NpcAction.ContainsKey(id))
 
             if (wasFoodStock)
                 DiscardVisibleFoodKnowledgeForRemovedStock(objectId, x, y);
+
+            MarkPerceptionObjectModified(objectId, "ObjectDestroyed");
+            PerceptionWatchMap?.RemoveObject(objectId);
         }
 
         private void DiscardVisibleFoodKnowledgeForRemovedStock(int objectId, int cellX, int cellY)
@@ -4178,6 +4233,7 @@ if (!NpcAction.ContainsKey(id))
 
             obj.IsHeld = true;
             obj.HolderNpcId = npcId;
+            MarkPerceptionObjectModified(objectId, "ObjectPickedUp");
             reason = "ObjectPickedUp";
             return true;
         }
@@ -4257,6 +4313,7 @@ if (!NpcAction.ContainsKey(id))
                     SetDoorOpen(objectId, true);
             }
 
+            MarkAllNpcPerceptionsDirty("ObjectDropped");
             reason = "ObjectDropped";
             return true;
         }
@@ -4327,6 +4384,7 @@ if (!NpcAction.ContainsKey(id))
                 BlocksMovement = blocksMovement,
                 VisionCost     = visionCost
             };
+            MarkPerceptionObjectModified(objectId, "DoorStateChanged");
         }
 
         private void PlaceOccluderInCache(int objectId, int x, int y, ObjectDef def)

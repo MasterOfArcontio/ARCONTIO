@@ -186,8 +186,9 @@ Checkpoint v0.20 pianificati:
 - `v0.20e`: lunghezza cono visivo per stato percettivo;
 - `v0.20f`: collegamento job/fasi allo stato percettivo;
 - `v0.20g`: stati speciali per movimento, LookDirection, SearchFood e allerta;
-- `v0.20h`: EL/debug skip percezione e stato percettivo corrente;
-- `v0.20i`: QA profiler e closeout percezione cadenzata.
+- `v0.20h`: skip percezione tramite cadenza + dirty da PerceptionDependencyMap;
+- `v0.20i`: EL/debug skip percezione e stato percettivo corrente;
+- `v0.20j`: QA profiler e closeout percezione cadenzata.
 
 Checkpoint v0.12 completati:
 

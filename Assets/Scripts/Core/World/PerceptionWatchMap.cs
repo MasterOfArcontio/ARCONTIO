@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using UnityEngine;
 
 namespace Arcontio.Core
 {
@@ -9,214 +8,244 @@ namespace Arcontio.Core
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Registro runtime leggero delle zone osservate da ciascun NPC.
+    /// Mappa runtime leggera delle dipendenze percettive tra entita' osservabili e
+    /// NPC osservatori.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: copertura percettiva soggettiva</b></para>
+    /// <para><b>Principio architetturale: invalidazione percettiva event-driven</b></para>
     /// <para>
-    /// La struttura non legge oggetti, non sceglie target e non modifica decisioni.
-    /// Riceve solo il risultato geometrico dei sistemi di percezione e conserva il
-    /// tick in cui una zona e' stata osservata da un NPC. Questo rende possibile,
-    /// nelle patch successive, evitare ricerche ripetitive in zone gia' controllate
-    /// senza introdurre conoscenza onnisciente.
+    /// La struttura non conserva celle vuote e non sostituisce la percezione. Registra
+    /// solo quali NPC hanno visto un oggetto o un altro NPC nell'ultimo ciclo
+    /// percettivo utile. Quando una di quelle entita' cambia, la mappa marca sporchi
+    /// gli osservatori interessati. La v0.20 usera' questo stato insieme alla cadenza
+    /// percettiva per decidere quando saltare o rieseguire uno scan.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>Zone</b>: la mappa lavora per zona, non per cella singola, per contenere memoria e costo.</item>
-    ///   <item><b>Per NPC</b>: ogni NPC mantiene una vista soggettiva separata.</item>
-    ///   <item><b>Limiti</b>: massimo zone per NPC e raccolta obsolete controllata da configurazione.</item>
-    ///   <item><b>Garbage bounded</b>: la pulizia rimuove al massimo N entry per giro, evitando picchi.</item>
+    ///   <item><b>Oggetti</b>: <c>objectId -> osservatori + modificato</c>.</item>
+    ///   <item><b>NPC osservati</b>: <c>observedNpcId -> osservatori + modificato</c>.</item>
+    ///   <item><b>NPC sporchi</b>: stato separato consumabile in futuro dalla percezione cadenzata.</item>
     /// </list>
     /// </summary>
     public sealed class PerceptionWatchMap
     {
-        private readonly Dictionary<int, Dictionary<long, int>> _lastSeenTickByNpcAndZone = new(256);
-        private readonly List<int> _npcGarbage = new(128);
-        private readonly List<long> _zoneGarbage = new(256);
-        private readonly int _mapWidth;
-        private readonly int _mapHeight;
-        private readonly int _zoneSizeCells;
-        private readonly int _maxZonesPerNpc;
-        private readonly int _staleAfterTicks;
-        private readonly int _garbageCollectEveryTicks;
-        private readonly int _garbageCollectMaxEntriesPerRun;
-        private int _lastGarbageCollectTick = -1;
-
-        public int ZoneSizeCells => _zoneSizeCells;
-        public int MaxZonesPerNpc => _maxZonesPerNpc;
-        public int StaleAfterTicks => _staleAfterTicks;
-
-        public PerceptionWatchMap(
-            int mapWidth,
-            int mapHeight,
-            int zoneSizeCells,
-            int maxZonesPerNpc,
-            int staleAfterTicks,
-            int garbageCollectEveryTicks,
-            int garbageCollectMaxEntriesPerRun)
-        {
-            _mapWidth = Math.Max(1, mapWidth);
-            _mapHeight = Math.Max(1, mapHeight);
-            _zoneSizeCells = Math.Max(1, zoneSizeCells);
-            _maxZonesPerNpc = Math.Max(1, maxZonesPerNpc);
-            _staleAfterTicks = Math.Max(1, staleAfterTicks);
-            _garbageCollectEveryTicks = Math.Max(1, garbageCollectEveryTicks);
-            _garbageCollectMaxEntriesPerRun = Math.Max(1, garbageCollectMaxEntriesPerRun);
-        }
+        private readonly Dictionary<int, ObservedEntityState> _objects = new(512);
+        private readonly Dictionary<int, ObservedEntityState> _npcs = new(512);
+        private readonly Dictionary<int, DirtyPerceptionState> _dirtyNpcs = new(256);
+        private readonly List<int> _entityGarbage = new(128);
 
         // =============================================================================
-        // RecordObservedZoneAtCell
+        // RecordObjectObserved
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Registra come osservata la zona che contiene una cella vista.
+        /// Registra che un NPC ha visto un oggetto nel ciclo percettivo corrente.
         /// </para>
         /// </summary>
-        public void RecordObservedZoneAtCell(int npcId, int cellX, int cellY, int tick)
+        public void RecordObjectObserved(int objectId, int observerNpcId)
+        {
+            if (objectId <= 0 || observerNpcId <= 0)
+                return;
+
+            GetOrCreate(_objects, objectId).AddObserver(observerNpcId);
+        }
+
+        // =============================================================================
+        // RecordNpcObserved
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra che un NPC osservatore ha visto un altro NPC.
+        /// </para>
+        /// </summary>
+        public void RecordNpcObserved(int observedNpcId, int observerNpcId)
+        {
+            if (observedNpcId <= 0 || observerNpcId <= 0 || observedNpcId == observerNpcId)
+                return;
+
+            GetOrCreate(_npcs, observedNpcId).AddObserver(observerNpcId);
+        }
+
+        public void ClearObjectObservers()
+        {
+            ClearObservers(_objects);
+        }
+
+        public void ClearNpcObservers()
+        {
+            ClearObservers(_npcs);
+        }
+
+        public void MarkObjectModified(int objectId)
+        {
+            if (objectId <= 0)
+                return;
+
+            GetOrCreate(_objects, objectId).Modified = true;
+        }
+
+        public void MarkNpcModified(int npcId)
         {
             if (npcId <= 0)
                 return;
 
-            if (cellX < 0 || cellX >= _mapWidth || cellY < 0 || cellY >= _mapHeight)
-                return;
+            GetOrCreate(_npcs, npcId).Modified = true;
+        }
 
-            int zoneX = cellX / _zoneSizeCells;
-            int zoneY = cellY / _zoneSizeCells;
-            RecordObservedZone(npcId, zoneX, zoneY, tick);
+        public void RemoveObject(int objectId)
+        {
+            _objects.Remove(objectId);
+        }
+
+        public void RemoveNpc(int npcId)
+        {
+            _npcs.Remove(npcId);
+            _dirtyNpcs.Remove(npcId);
+
+            foreach (var pair in _objects)
+                pair.Value.RemoveObserver(npcId);
+
+            foreach (var pair in _npcs)
+                pair.Value.RemoveObserver(npcId);
         }
 
         // =============================================================================
-        // RecordObservedZone
+        // PropagateModifiedEntitiesToDirtyNpcs
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Registra una zona gia' risolta come osservata da un NPC.
+        /// Trasforma le entita' osservate e modificate in NPC osservatori sporchi.
         /// </para>
         /// </summary>
-        public void RecordObservedZone(int npcId, int zoneX, int zoneY, int tick)
+        public int PropagateModifiedEntitiesToDirtyNpcs(int tick, string reason)
+        {
+            int dirtyCount = 0;
+            dirtyCount += PropagateModifiedMap(_objects, tick, reason);
+            dirtyCount += PropagateModifiedMap(_npcs, tick, reason);
+            return dirtyCount;
+        }
+
+        public void MarkNpcPerceptionDirty(int npcId, int tick, string reason)
         {
             if (npcId <= 0)
                 return;
 
-            if (zoneX < 0 || zoneY < 0)
-                return;
-
-            if (zoneX * _zoneSizeCells >= _mapWidth || zoneY * _zoneSizeCells >= _mapHeight)
-                return;
-
-            if (!_lastSeenTickByNpcAndZone.TryGetValue(npcId, out var zones))
+            _dirtyNpcs[npcId] = new DirtyPerceptionState
             {
-                zones = new Dictionary<long, int>(Math.Min(_maxZonesPerNpc, 64));
-                _lastSeenTickByNpcAndZone[npcId] = zones;
-            }
-
-            zones[MakeZoneKey(zoneX, zoneY)] = tick;
-            TrimOldestZonesIfNeeded(zones);
+                Tick = tick,
+                Reason = string.IsNullOrWhiteSpace(reason) ? "PerceptionDependencyChanged" : reason
+            };
         }
 
-        public bool TryGetLastSeenTick(int npcId, int cellX, int cellY, out int lastSeenTick)
+        public bool IsNpcPerceptionDirty(int npcId)
         {
-            lastSeenTick = -1;
-            if (cellX < 0 || cellX >= _mapWidth || cellY < 0 || cellY >= _mapHeight)
-                return false;
-
-            if (!_lastSeenTickByNpcAndZone.TryGetValue(npcId, out var zones))
-                return false;
-
-            long key = MakeZoneKey(cellX / _zoneSizeCells, cellY / _zoneSizeCells);
-            return zones.TryGetValue(key, out lastSeenTick);
+            return _dirtyNpcs.ContainsKey(npcId);
         }
 
-        public int GetTrackedZoneCount(int npcId)
+        public bool TryConsumeNpcPerceptionDirty(int npcId, out int tick, out string reason)
         {
-            return _lastSeenTickByNpcAndZone.TryGetValue(npcId, out var zones)
-                ? zones.Count
+            tick = 0;
+            reason = string.Empty;
+            if (!_dirtyNpcs.TryGetValue(npcId, out var state))
+                return false;
+
+            tick = state.Tick;
+            reason = state.Reason;
+            _dirtyNpcs.Remove(npcId);
+            return true;
+        }
+
+        public int GetObjectObserverCount(int objectId)
+        {
+            return _objects.TryGetValue(objectId, out var state)
+                ? state.ObserverNpcIds.Count
                 : 0;
         }
 
-        public void ClearNpc(int npcId)
+        public int GetNpcObserverCount(int observedNpcId)
         {
-            _lastSeenTickByNpcAndZone.Remove(npcId);
+            return _npcs.TryGetValue(observedNpcId, out var state)
+                ? state.ObserverNpcIds.Count
+                : 0;
         }
 
-        // =============================================================================
-        // GarbageCollectIfDue
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Rimuove zone obsolete con un limite massimo per giro.
-        /// </para>
-        /// </summary>
-        public void GarbageCollectIfDue(int tick)
+        private int PropagateModifiedMap(Dictionary<int, ObservedEntityState> map, int tick, string reason)
         {
-            if (_lastGarbageCollectTick >= 0
-                && tick - _lastGarbageCollectTick < _garbageCollectEveryTicks)
+            int dirtyCount = 0;
+            foreach (var pair in map)
             {
-                return;
-            }
+                var state = pair.Value;
+                if (state == null || !state.Modified)
+                    continue;
 
-            _lastGarbageCollectTick = tick;
-            int removed = 0;
-            int staleBeforeTick = tick - _staleAfterTicks;
-            _npcGarbage.Clear();
-
-            foreach (var npcPair in _lastSeenTickByNpcAndZone)
-            {
-                _zoneGarbage.Clear();
-                foreach (var zonePair in npcPair.Value)
+                for (int i = 0; i < state.ObserverNpcIds.Count; i++)
                 {
-                    if (zonePair.Value <= staleBeforeTick)
-                    {
-                        _zoneGarbage.Add(zonePair.Key);
-                        removed++;
-                        if (removed >= _garbageCollectMaxEntriesPerRun)
-                            break;
-                    }
+                    MarkNpcPerceptionDirty(state.ObserverNpcIds[i], tick, reason);
+                    dirtyCount++;
                 }
 
-                for (int i = 0; i < _zoneGarbage.Count; i++)
-                    npcPair.Value.Remove(_zoneGarbage[i]);
-
-                if (npcPair.Value.Count == 0)
-                    _npcGarbage.Add(npcPair.Key);
-
-                if (removed >= _garbageCollectMaxEntriesPerRun)
-                    break;
+                state.Modified = false;
             }
 
-            for (int i = 0; i < _npcGarbage.Count; i++)
-                _lastSeenTickByNpcAndZone.Remove(_npcGarbage[i]);
+            return dirtyCount;
         }
 
-        private void TrimOldestZonesIfNeeded(Dictionary<long, int> zones)
+        private static ObservedEntityState GetOrCreate(Dictionary<int, ObservedEntityState> map, int id)
         {
-            while (zones.Count > _maxZonesPerNpc)
+            if (!map.TryGetValue(id, out var state))
             {
-                long oldestKey = 0;
-                int oldestTick = int.MaxValue;
-                bool found = false;
+                state = new ObservedEntityState();
+                map[id] = state;
+            }
 
-                foreach (var pair in zones)
+            return state;
+        }
+
+        private void ClearObservers(Dictionary<int, ObservedEntityState> map)
+        {
+            _entityGarbage.Clear();
+            foreach (var pair in map)
+            {
+                pair.Value.ObserverNpcIds.Clear();
+                if (!pair.Value.Modified)
+                    _entityGarbage.Add(pair.Key);
+            }
+
+            for (int i = 0; i < _entityGarbage.Count; i++)
+                map.Remove(_entityGarbage[i]);
+        }
+
+        private sealed class ObservedEntityState
+        {
+            public readonly List<int> ObserverNpcIds = new(4);
+            public bool Modified;
+
+            public void AddObserver(int npcId)
+            {
+                for (int i = 0; i < ObserverNpcIds.Count; i++)
                 {
-                    if (!found || pair.Value < oldestTick)
-                    {
-                        oldestKey = pair.Key;
-                        oldestTick = pair.Value;
-                        found = true;
-                    }
+                    if (ObserverNpcIds[i] == npcId)
+                        return;
                 }
 
-                if (!found)
-                    return;
+                ObserverNpcIds.Add(npcId);
+            }
 
-                zones.Remove(oldestKey);
+            public void RemoveObserver(int npcId)
+            {
+                for (int i = ObserverNpcIds.Count - 1; i >= 0; i--)
+                {
+                    if (ObserverNpcIds[i] == npcId)
+                        ObserverNpcIds.RemoveAt(i);
+                }
             }
         }
 
-        private static long MakeZoneKey(int zoneX, int zoneY)
+        private struct DirtyPerceptionState
         {
-            return ((long)zoneX << 32) ^ (uint)zoneY;
+            public int Tick;
+            public string Reason;
         }
     }
 }
