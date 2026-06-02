@@ -32,7 +32,7 @@
 | v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Completata |
 | v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
 | v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
-| v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Pending |
+| v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | In corso |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |

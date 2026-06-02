@@ -39,13 +39,9 @@ namespace Arcontio.Core
     /// </summary>
     public sealed class ObjectPerceptionSystem : ISystem
     {
-        private const int ObjectZoneSizeCells = 8;
-
         public int Period => 1;
 
         private readonly List<int> _npcIds = new(2048);
-        private readonly List<long> _objectZoneKeys = new(512);
-        private readonly Dictionary<long, List<int>> _objectIdsByZone = new(512);
         private readonly List<Vector2Int> _visibleMissingFoodBeliefCells = new(64);
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
@@ -76,7 +72,6 @@ namespace Arcontio.Core
 
             _npcIds.Clear();
             _npcIds.AddRange(world.NpcDna.Keys);
-            RebuildGroundObjectZoneIndex(world);
 
             int spotted = 0;
             int maxCandidateCellsPerNpc = world.Global.ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
@@ -193,8 +188,8 @@ namespace Arcontio.Core
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Processa gli oggetti visibili usando l'indice cella -> oggetto del
-        /// <see cref="World"/> invece di attraversare tutti gli oggetti globali.
+        /// Processa gli oggetti visibili usando l'indice persistente zona -> oggetti
+        /// mantenuto dal <see cref="World"/> invece di attraversare tutti gli oggetti globali.
         /// </para>
         ///
         /// <para><b>Principio architetturale: percezione locale</b></para>
@@ -203,15 +198,15 @@ namespace Arcontio.Core
         /// di vista decidono se un oggetto viene visto. Cambia solo il modo in cui
         /// troviamo i candidati: si visitano le celle nel campo visivo teorico e si
         /// processano solo quelle che contengono davvero un oggetto. Questo riduce il
-        /// costo da <c>NPC x tutti gli oggetti a terra</c> a <c>NPC x celle visive
-        /// occupate</c>.
+        /// costo da <c>NPC x tutti gli oggetti a terra</c> a <c>NPC x zone percettive
+        /// occupate</c>, senza ricostruire l'indice nel tick caldo.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Budget celle</b>: limite opzionale per celle candidate per NPC.</item>
         ///   <item><b>Budget oggetti</b>: limite opzionale per oggetti processati per NPC.</item>
-        ///   <item><b>Indice cella</b>: usa <see cref="World.GetObjectAt(int, int)"/>.</item>
+        ///   <item><b>Indice persistente</b>: legge le zone occupate mantenute dal World.</item>
         ///   <item><b>Filtro geometrico</b>: evita di chiedere oggetti fuori range o dietro l'NPC.</item>
         /// </list>
         /// </summary>
@@ -238,17 +233,16 @@ namespace Arcontio.Core
             int npcSpotted = 0;
             int objectsProcessed = 0;
 
-            int minZoneX = FloorDiv(np.X - visionRange, ObjectZoneSizeCells);
-            int maxZoneX = FloorDiv(np.X + visionRange, ObjectZoneSizeCells);
-            int minZoneY = FloorDiv(np.Y - visionRange, ObjectZoneSizeCells);
-            int maxZoneY = FloorDiv(np.Y + visionRange, ObjectZoneSizeCells);
+            int minZoneX = World.FloorDivForSpatialIndex(np.X - visionRange, World.PerceptionObjectZoneSizeCells);
+            int maxZoneX = World.FloorDivForSpatialIndex(np.X + visionRange, World.PerceptionObjectZoneSizeCells);
+            int minZoneY = World.FloorDivForSpatialIndex(np.Y - visionRange, World.PerceptionObjectZoneSizeCells);
+            int maxZoneY = World.FloorDivForSpatialIndex(np.Y + visionRange, World.PerceptionObjectZoneSizeCells);
 
             for (int zoneY = minZoneY; zoneY <= maxZoneY; zoneY++)
             {
                 for (int zoneX = minZoneX; zoneX <= maxZoneX; zoneX++)
                 {
-                    long zoneKey = MakeZoneKey(zoneX, zoneY);
-                    if (!_objectIdsByZone.TryGetValue(zoneKey, out var objectIds) || objectIds.Count == 0)
+                    if (!world.TryGetGroundObjectIdsInPerceptionZone(zoneX, zoneY, out var objectIds))
                         continue;
 
                     for (int i = 0; i < objectIds.Count; i++)
@@ -327,71 +321,6 @@ namespace Arcontio.Core
                 costObserver.AddNpcWork(npcId, npcCandidateCells + npcObjectChecks + npcSpotted);
 
             return;
-        }
-
-        // =============================================================================
-        // RebuildGroundObjectZoneIndex
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Ricostruisce un indice temporaneo zona -> oggetti a terra per il tick
-        /// corrente.
-        /// </para>
-        ///
-        /// <para><b>Scalabilita' percettiva locale</b></para>
-        /// <para>
-        /// L'indice evita che ogni NPC attraversi tutte le celle vuote del proprio
-        /// campo visivo. Gli oggetti restano autorevoli nel <c>World</c>: questa
-        /// struttura viene svuotata e ricostruita ogni tick, quindi non introduce una
-        /// cache persistente da sincronizzare.
-        /// </para>
-        /// </summary>
-        private void RebuildGroundObjectZoneIndex(World world)
-        {
-            for (int i = 0; i < _objectZoneKeys.Count; i++)
-            {
-                if (_objectIdsByZone.TryGetValue(_objectZoneKeys[i], out var bucket))
-                    bucket.Clear();
-            }
-
-            _objectZoneKeys.Clear();
-
-            foreach (var pair in world.Objects)
-            {
-                var obj = pair.Value;
-                if (obj == null || obj.IsHeld)
-                    continue;
-
-                if (!world.InBounds(obj.CellX, obj.CellY))
-                    continue;
-
-                int zoneX = FloorDiv(obj.CellX, ObjectZoneSizeCells);
-                int zoneY = FloorDiv(obj.CellY, ObjectZoneSizeCells);
-                long zoneKey = MakeZoneKey(zoneX, zoneY);
-                if (!_objectIdsByZone.TryGetValue(zoneKey, out var bucket))
-                {
-                    bucket = new List<int>(4);
-                    _objectIdsByZone[zoneKey] = bucket;
-                }
-
-                if (bucket.Count == 0)
-                    _objectZoneKeys.Add(zoneKey);
-
-                bucket.Add(pair.Key);
-            }
-        }
-
-        private static int FloorDiv(int value, int divisor)
-        {
-            if (value >= 0)
-                return value / divisor;
-
-            return -(((-value) + divisor - 1) / divisor);
-        }
-
-        private static long MakeZoneKey(int zoneX, int zoneY)
-        {
-            return ((long)zoneX << 32) ^ (uint)zoneY;
         }
 
         // =============================================================================

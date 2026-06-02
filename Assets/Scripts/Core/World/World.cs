@@ -720,6 +720,13 @@ namespace Arcontio.Core
         /// </summary>
         private int[] _objIdByCell;
 
+        public const int PerceptionObjectZoneSizeCells = 8;
+
+        private readonly Dictionary<long, List<int>> _groundObjectIdsByPerceptionZone = new(512);
+        private readonly List<long> _occupiedPerceptionObjectZoneKeys = new(512);
+        private readonly Dictionary<long, List<int>> _npcIdsByPerceptionCell = new(2048);
+        private readonly List<long> _occupiedPerceptionNpcCellKeys = new(2048);
+
         /// <summary>
         /// Cache booleana: la cella blocca la visione? Derivata dagli ObjectDef.
         /// Usata da <c>HasLineOfSight</c> ogni tick per ogni NPC.
@@ -1166,6 +1173,7 @@ namespace Arcontio.Core
         public void RebuildDerivedCachesGlobal()
         {
             RebuildOcclusionCacheGlobal();
+            RebuildPerceptionSpatialIndexes();
 
             // Landmark registry Ã¨ anch'esso derivato dalla geometria mappa.
             // Nota: questa chiamata Ã¨ safe se LandmarkRegistry Ã¨ null.
@@ -1234,6 +1242,204 @@ namespace Arcontio.Core
             }
         }
 
+        // =============================================================================
+        // RebuildPerceptionSpatialIndexes
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce gli indici persistenti usati dalla percezione oggetti/NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: cache derivata non autoritativa</b></para>
+        /// <para>
+        /// Gli indici servono solo a ridurre il lavoro ripetuto dei sistemi di
+        /// percezione. La verita' resta in <c>Objects</c> e <c>GridPos</c>; in caso
+        /// di dubbio, init/load/dev rebuild possono ricostruire tutto da zero.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Oggetti grounded</b>: zona compatta -> objectId a terra.</item>
+        ///   <item><b>NPC</b>: cella -> npcId presenti nella cella.</item>
+        /// </list>
+        /// </summary>
+        public void RebuildPerceptionSpatialIndexes()
+        {
+            ClearPerceptionSpatialIndexes();
+
+            foreach (var pair in Objects)
+            {
+                AddGroundObjectToPerceptionIndex(pair.Key, pair.Value);
+            }
+
+            foreach (var pair in GridPos)
+            {
+                AddNpcToPerceptionCellIndex(pair.Key, pair.Value.X, pair.Value.Y);
+            }
+        }
+
+        /// <summary>
+        /// Legge gli oggetti a terra presenti in una zona percettiva compatta.
+        /// La lista restituita resta proprieta' del World: i chiamanti devono solo leggerla.
+        /// </summary>
+        public bool TryGetGroundObjectIdsInPerceptionZone(int zoneX, int zoneY, out List<int> objectIds)
+        {
+            return _groundObjectIdsByPerceptionZone.TryGetValue(MakePerceptionSpatialKey(zoneX, zoneY), out objectIds)
+                && objectIds != null
+                && objectIds.Count > 0;
+        }
+
+        /// <summary>
+        /// Numero di celle che contengono almeno un NPC nell'indice percettivo persistente.
+        /// </summary>
+        public int PerceptionNpcOccupiedCellCount => _occupiedPerceptionNpcCellKeys.Count;
+
+        /// <summary>
+        /// Restituisce la chiave compatta della cella NPC occupata all'indice richiesto.
+        /// Serve ai sistemi percettivi per iterare solo celle realmente occupate.
+        /// </summary>
+        public long GetPerceptionNpcCellKeyAt(int index)
+        {
+            return _occupiedPerceptionNpcCellKeys[index];
+        }
+
+        /// <summary>
+        /// Legge gli NPC presenti in una cella percettiva tramite chiave compatta.
+        /// La lista e' interna al World e non deve essere modificata dal chiamante.
+        /// </summary>
+        public bool TryGetNpcIdsInPerceptionCellKey(long cellKey, out List<int> npcIds)
+        {
+            return _npcIdsByPerceptionCell.TryGetValue(cellKey, out npcIds)
+                && npcIds != null
+                && npcIds.Count > 0;
+        }
+
+        /// <summary>
+        /// Variante leggibile per test e diagnostica: legge gli NPC presenti in una cella.
+        /// </summary>
+        public bool TryGetNpcIdsInPerceptionCell(int cellX, int cellY, out List<int> npcIds)
+        {
+            return TryGetNpcIdsInPerceptionCellKey(MakePerceptionSpatialKey(cellX, cellY), out npcIds);
+        }
+
+        /// <summary>
+        /// Rimuove un NPC dall'indice percettivo prima che venga cancellata la sua posizione.
+        /// E' usato dai comandi dev finche' non esiste una World.DestroyNpc centralizzata.
+        /// </summary>
+        public void RemoveNpcFromPerceptionSpatialIndex(int npcId)
+        {
+            if (GridPos.TryGetValue(npcId, out var position))
+                RemoveNpcFromPerceptionCellIndex(npcId, position.X, position.Y);
+        }
+
+        private void ClearPerceptionSpatialIndexes()
+        {
+            for (int i = 0; i < _occupiedPerceptionObjectZoneKeys.Count; i++)
+            {
+                if (_groundObjectIdsByPerceptionZone.TryGetValue(_occupiedPerceptionObjectZoneKeys[i], out var bucket))
+                    bucket.Clear();
+            }
+
+            _occupiedPerceptionObjectZoneKeys.Clear();
+
+            for (int i = 0; i < _occupiedPerceptionNpcCellKeys.Count; i++)
+            {
+                if (_npcIdsByPerceptionCell.TryGetValue(_occupiedPerceptionNpcCellKeys[i], out var bucket))
+                    bucket.Clear();
+            }
+
+            _occupiedPerceptionNpcCellKeys.Clear();
+        }
+
+        private void AddGroundObjectToPerceptionIndex(int objectId, WorldObjectInstance obj)
+        {
+            if (objectId <= 0 || obj == null || obj.IsHeld)
+                return;
+
+            if (!InBounds(obj.CellX, obj.CellY))
+                return;
+
+            int zoneX = FloorDivForSpatialIndex(obj.CellX, PerceptionObjectZoneSizeCells);
+            int zoneY = FloorDivForSpatialIndex(obj.CellY, PerceptionObjectZoneSizeCells);
+            long zoneKey = MakePerceptionSpatialKey(zoneX, zoneY);
+            if (!_groundObjectIdsByPerceptionZone.TryGetValue(zoneKey, out var bucket))
+            {
+                bucket = new List<int>(4);
+                _groundObjectIdsByPerceptionZone[zoneKey] = bucket;
+            }
+
+            if (bucket.Count == 0)
+                _occupiedPerceptionObjectZoneKeys.Add(zoneKey);
+
+            if (!bucket.Contains(objectId))
+                bucket.Add(objectId);
+        }
+
+        private void RemoveGroundObjectFromPerceptionIndex(int objectId, int cellX, int cellY)
+        {
+            if (objectId <= 0 || !InBounds(cellX, cellY))
+                return;
+
+            int zoneX = FloorDivForSpatialIndex(cellX, PerceptionObjectZoneSizeCells);
+            int zoneY = FloorDivForSpatialIndex(cellY, PerceptionObjectZoneSizeCells);
+            long zoneKey = MakePerceptionSpatialKey(zoneX, zoneY);
+            if (!_groundObjectIdsByPerceptionZone.TryGetValue(zoneKey, out var bucket))
+                return;
+
+            bucket.Remove(objectId);
+            if (bucket.Count == 0)
+                _occupiedPerceptionObjectZoneKeys.Remove(zoneKey);
+        }
+
+        private void AddNpcToPerceptionCellIndex(int npcId, int cellX, int cellY)
+        {
+            if (npcId <= 0 || !InBounds(cellX, cellY))
+                return;
+
+            long cellKey = MakePerceptionSpatialKey(cellX, cellY);
+            if (!_npcIdsByPerceptionCell.TryGetValue(cellKey, out var bucket))
+            {
+                bucket = new List<int>(1);
+                _npcIdsByPerceptionCell[cellKey] = bucket;
+            }
+
+            if (bucket.Count == 0)
+                _occupiedPerceptionNpcCellKeys.Add(cellKey);
+
+            if (!bucket.Contains(npcId))
+                bucket.Add(npcId);
+        }
+
+        private void RemoveNpcFromPerceptionCellIndex(int npcId, int cellX, int cellY)
+        {
+            if (npcId <= 0 || !InBounds(cellX, cellY))
+                return;
+
+            long cellKey = MakePerceptionSpatialKey(cellX, cellY);
+            if (!_npcIdsByPerceptionCell.TryGetValue(cellKey, out var bucket))
+                return;
+
+            bucket.Remove(npcId);
+            if (bucket.Count == 0)
+                _occupiedPerceptionNpcCellKeys.Remove(cellKey);
+        }
+
+        private static long MakePerceptionSpatialKey(int x, int y)
+        {
+            return ((long)x << 32) ^ (uint)y;
+        }
+
+        /// <summary>
+        /// Divisione intera verso il basso usata dagli indici spaziali anche con coordinate negative.
+        /// </summary>
+        public static int FloorDivForSpatialIndex(int value, int divisor)
+        {
+            int result = value / divisor;
+            int remainder = value % divisor;
+            if (remainder != 0 && ((remainder < 0) != (divisor < 0)))
+                result--;
+            return result;
+        }
         /// <summary>
         /// Esporta lo stato "editabile" dal DevMode in un DevMapData.
         ///
@@ -3304,6 +3510,7 @@ namespace Arcontio.Core
             Social[id] = social;
             GridPos[id] = new GridPosition(x, y);
             NpcFacing[id] = CardinalDirection.North;
+            AddNpcToPerceptionCellIndex(id, x, y);
 
             // MemoryStore — MaxTraces da config globale, tratti individuali dal DNA
             var store = new MemoryStore();
@@ -3447,6 +3654,7 @@ if (!NpcAction.ContainsKey(id))
             Social[npcId] = social;
             GridPos[npcId] = new GridPosition(x, y);
             NpcFacing[npcId] = facing;
+            AddNpcToPerceptionCellIndex(npcId, x, y);
 
             // MemoryStore vuoto: le trace salvate restano responsabilita' del
             // loader/NpcSaveSystem, che puo' aggiungerle dopo la registrazione
@@ -3538,7 +3746,16 @@ if (!NpcAction.ContainsKey(id))
         public void SetNpcPos(int npcId, int x, int y)
         {
             if (!ExistsNpc(npcId)) return;
+            if (GridPos.TryGetValue(npcId, out var oldPos))
+            {
+                if (oldPos.X == x && oldPos.Y == y)
+                    return;
+
+                RemoveNpcFromPerceptionCellIndex(npcId, oldPos.X, oldPos.Y);
+            }
+
             GridPos[npcId] = new GridPosition(x, y);
+            AddNpcToPerceptionCellIndex(npcId, x, y);
         }
 
         public bool TryGetObjectCell(int objectId, out int x, out int y)
@@ -3801,6 +4018,7 @@ if (!NpcAction.ContainsKey(id))
             };
 
             Objects[id] = inst;
+            AddGroundObjectToPerceptionIndex(id, inst);
 
             // Se Ã¨ un occluder oppure blocca la visione o il movimento, aggiorna la occlusion map.
             if (TryGetObjectDef(defId, out var def) && def != null &&
@@ -3918,6 +4136,7 @@ if (!NpcAction.ContainsKey(id))
             };
 
             Objects[objectId] = inst;
+            AddGroundObjectToPerceptionIndex(objectId, inst);
 
             // Manteniamo le cache incrementali coerenti subito dopo il restore.
             // RebuildDerivedCachesGlobal resta comunque disponibile al loader per
@@ -3984,6 +4203,7 @@ if (!NpcAction.ContainsKey(id))
    
             //   se lo stock viene distrutto/rubato fuori dalla loro percezione, loro NON devono
             //   essere aggiornati automaticamente. Scopriranno la perdita solo ispezionando.
+            RemoveGroundObjectFromPerceptionIndex(objectId, x, y);
             ObjectUse.Remove(objectId);
             FoodStocks.Remove(objectId);
             ObjectOccluders.Remove(objectId);
@@ -4148,6 +4368,8 @@ if (!NpcAction.ContainsKey(id))
                     _objIdByCell[idx] = -1;
             }
 
+            RemoveGroundObjectFromPerceptionIndex(objectId, fromX, fromY);
+
             if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
                 ClearOccluderFromCache(objectId, fromX, fromY);
 
@@ -4224,6 +4446,8 @@ if (!NpcAction.ContainsKey(id))
 
             if (_objIdByCell != null && _objIdByCell.Length == MapWidth * MapHeight)
                 _objIdByCell[CellIndex(targetX, targetY)] = objectId;
+
+            AddGroundObjectToPerceptionIndex(objectId, obj);
 
             if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
             {
