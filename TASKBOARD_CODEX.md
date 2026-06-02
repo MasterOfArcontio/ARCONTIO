@@ -85,7 +85,7 @@ Obiettivo tecnico corrente `v0.16`:
 - chiudere QA anti-onniscienza cognitiva prima della fase sociale.
 
 Prossimo macro job consigliato:
-`v0.18e - Ottimizzazione NpcPerceptionSystem con indice spaziale a zone`
+`v0.20a - Audit architettura percezione/movimento e documento di rifondazione`
 
 Residual follow-ups / future hardening:
 
@@ -165,6 +165,20 @@ Checkpoint v0.18 pianificati:
 - `v0.18e`: ottimizzazione NpcPerceptionSystem con indice spaziale a zone - DONE;
 - `v0.18f`: closeout ottimizzazione runtime percezione/belief/query.
 
+Checkpoint v0.20 pianificati:
+
+- `v0.20a`: audit architettura percezione/movimento e documento di rifondazione - PENDING;
+- `v0.20b`: indici persistenti compatti per oggetti e NPC - PENDING;
+- `v0.20c`: dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati - PENDING;
+- `v0.20d`: separazione observed / watched nella mappa percettiva - PENDING;
+- `v0.20e`: scheduler percettivo per stato NPC con cadenza da `game_params` - PENDING;
+- `v0.20f`: limite massimo NPC percettivi per tick e distribuzione del carico - PENDING;
+- `v0.20g`: percezione oggetti/NPC su soli NPC dirty/cadenzati - PENDING;
+- `v0.20h`: Landmark perception allineata a dirty/cadenza/range - PENDING;
+- `v0.20i`: rotazione movimento e `LookDirection` come sorgenti dirty percettive - PENDING;
+- `v0.20j`: cleanup strutture obsolete o ridondanti post-rifondazione - PENDING;
+- `v0.20k`: QA profiler 20/50/100 NPC e debug overlay costo percettivo - PENDING;
+- `v0.20l`: closeout rifondazione percezione runtime - PENDING.
 Checkpoint v0.12 completati:
 
 - `v0.12a`: audit logging, explainability e diagnostica runtime;
