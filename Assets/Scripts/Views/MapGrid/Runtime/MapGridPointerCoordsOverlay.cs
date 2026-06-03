@@ -154,8 +154,9 @@ namespace Arcontio.View.MapGrid
             _textBuilder.Clear();
             _textBuilder.Append(cellText);
             _textBuilder.Append("  |  Perc tick ").Append(stats.TickIndex)
-                .Append(" sel ").Append(stats.SelectedCount)
-                .Append('/').Append(stats.MaxPerceptionUpdates)
+                .Append(" npc ").Append(stats.SelectedCount)
+                .Append('/').Append(stats.TotalNpcCount)
+                .Append(" max ").Append(stats.MaxPerceptionUpdates)
                 .Append(" pend ").Append(stats.PendingCount)
                 .Append(" dirty ").Append(stats.DirtyNpcCount)
                 .Append(" cad ").Append(stats.SkippedByCadenceCount);

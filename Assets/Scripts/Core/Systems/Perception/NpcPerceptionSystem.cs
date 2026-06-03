@@ -152,8 +152,6 @@ namespace Arcontio.Core
                     costObserver.AddNpcWork(observerId, costNpcPairChecks + costNpcSpotted);
             }
 
-            world.CompleteNpcPerceptionUpdatesForTick(tick.Index);
-
             telemetry.Counter("NpcPerceptionSystem.NpcSpottedEvents", spotted);
 
             if (costSample)

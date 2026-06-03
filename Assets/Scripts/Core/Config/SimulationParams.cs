@@ -1244,11 +1244,10 @@ namespace Arcontio.Core.Config
         // Se true, gli NPC imparano i landmark che vedono nel FOV (oltre che calpestando).
         public bool enabled = true;
 
-        // Frequenza di scansione in tick (1 = ogni tick, N = ogni N tick).
-        // ATTENZIONE: scegliere valori coprimi con il periodo di IdleScanSystem (12)
-        // per evitare che alcune direzioni vengano sistematicamente saltate.
-        // Default 1: gira ogni tick, costo minimo (landmark statici, solo Range+LOS).
-        public int period = 1;
+        // Nota v0.20m:
+        // La cadenza dei landmark non vive piu' qui. I landmark usano la stessa
+        // selezione percettiva centrale di oggetti e NPC, governata dagli stati
+        // configurati in perception_states.
 
         // ── Edge soggettivi da percezione visiva (v0.03.04.c-ComplexEdge_Creation) ──────────
         //

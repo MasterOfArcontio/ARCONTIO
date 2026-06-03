@@ -178,7 +178,8 @@ Checkpoint v0.20 pianificati:
 - `v0.20i`: rotazione movimento e `LookDirection` come sorgenti dirty percettive - DONE;
 - `v0.20j`: cleanup strutture obsolete o ridondanti post-rifondazione - DONE;
 - `v0.20k`: QA profiler 20/50/100 NPC e debug overlay costo percettivo - DONE;
-- `v0.20l`: closeout rifondazione percezione runtime - DONE.
+- `v0.20l`: closeout rifondazione percezione runtime - DONE;
+- `v0.20m`: riallineamento percezione centrale, porte dirty e rimozione periodo landmark - DONE.
 
 Nota v0.20e: gli NPC possiedono ora uno stato percettivo configurabile da `game_params`; ogni stato espone cadenza, raggio visivo e cono. Il raggio dirty conservativo usa il massimo teorico tra gli stati configurati piu' margine, cosi' oggetti/NPC creati o modificati sporcano i possibili osservatori senza eseguire percezione immediata.
 Nota v0.20f: il `World` espone ora un selettore percettivo per tick che applica dirty, cadenza per stato, limite massimo configurato e round-robin deterministico. Il selettore produce liste selected/pending e contatori numerici, ma non chiama ancora i sistemi percettivi e non pulisce i dirty; il consumo operativo avverra' in `v0.20g`.
@@ -188,6 +189,7 @@ Nota v0.20i: `SetFacing` e `SetNpcPos` producono dirty percettivo immediato, qui
 Nota v0.20j: audit cleanup completato. Non sono state eliminate strutture percettive vive: indici persistenti, dirty, watched/observed e contatori costo sono ancora necessari. La patch ha rimosso letture ridondanti in `ObjectPerceptionSystem` e riallineato commenti interni di `World`; `IdleScanSystem` e `MovementSystem` restano ponti tollerati.
 Nota v0.20k: `logging.runtime_cost_observer` e' ora presente in `game_params.json` ma spento di default. Quando viene attivato, l'overlay coordinate mostra budget percettivo ultimo tick e contatori cumulativi principali per oggetti, NPC e FOV, utile per QA 20/50/100 NPC senza aprire subito i file JSONL.
 Nota v0.20l: fase `v0.20` chiusa. La rifondazione percettiva ha introdotto indici persistenti, dirty conservativo, watched/observed, cadenza per stato, budget per tick, consumo condiviso da percezione oggetti/NPC/landmark e overlay costi attivabile. I prossimi lavori devono usare i dati del runtime cost observer per ottimizzazioni mirate, non riaprire scansioni globali.
+Nota v0.20m: riallineamento post-closeout. `landmark_perception.period` viene eliminato e la percezione landmark e' governata solo dagli stati percettivi; `IdleScanSystem` precede tutto il blocco percettivo; la pulizia dirty passa a `PerceptionDirtyCompletionSystem`; le porte aperte/chiuse marcano dirty gli NPC nel watched cone economico; l'overlay mostra NPC percepiti su totale NPC.
 Checkpoint v0.12 completati:
 
 - `v0.12a`: audit logging, explainability e diagnostica runtime;

@@ -116,6 +116,7 @@ namespace Arcontio.Tests
                 tests.GroundObjectPerceptionIndexTracksCreatePickupDropAndDestroy();
                 tests.NpcPerceptionIndexTracksCreateMoveAndDevRemovalHook();
                 tests.PerceptionDirtyMarksNearbyObserversWhenGroundObjectChanges();
+                tests.DoorStateChangeMarksOnlyWatchedConeObserversDirty();
                 tests.PerceptionDirtyTracksNpcFacingAndMovement();
                 tests.PerceptionRelationsSeparateWatchedAndObservedObjects();
                 tests.PerceptionRelationsSeparateWatchedAndObservedNpcs();
@@ -127,7 +128,7 @@ namespace Arcontio.Tests
                 tests.PerceptionImmediateDirtyBypassesCadenceForFacingAndMovement();
                 tests.IdleScanUsesLookDirectionStateWhileTurning();
                 tests.ObjectPerceptionProcessesOnlyTickBudgetSelection();
-                tests.NpcPerceptionProcessesOnlyTickBudgetSelectionAndCompletesDirty();
+                tests.NpcPerceptionProcessesOnlyTickBudgetSelectionAndCompletionClearsDirty();
 
                 Debug.Log("[PerceptionSpatialIndexQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -258,6 +259,51 @@ namespace Arcontio.Tests
             world.DestroyObject(objectId);
             Assert.That(world.IsNpcPerceptionDirty(nearNpc), Is.True);
             Assert.That(world.IsNpcPerceptionDirty(farNpc), Is.False);
+        }
+
+        [Test]
+        public void DoorStateChangeMarksOnlyWatchedConeObserversDirty()
+        {
+            var sim = new SimulationParams();
+            sim.npcVisionRangeCells = 4;
+            sim.perception.dirtyRadiusMarginCells = 1;
+            sim.perception_states.idle = PerceptionStateProfile.Create(1, 4, true, 90, 0f);
+
+            var world = new World(new WorldConfig(sim));
+            world.ObjectDefs["qa_door"] = new ObjectDef
+            {
+                Id = "qa_door",
+                DisplayName = "QA Door",
+                IsDoor = true,
+                IsOccluder = true,
+                BlocksMovement = true,
+                BlocksVision = true
+            };
+
+            int watchingNpc = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("WatchingDoor"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int notWatchingNpc = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("NotWatchingDoor"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                2);
+
+            world.SetFacing(watchingNpc, CardinalDirection.East);
+            world.SetFacing(notWatchingNpc, CardinalDirection.North);
+
+            int doorId = world.CreateObject("qa_door", 2, 1, OwnerKind.Community, 0);
+            Assert.That(doorId, Is.GreaterThan(0));
+
+            world.ClearAllNpcPerceptionDirty();
+            world.SetDoorOpen(doorId, true);
+
+            Assert.That(world.IsNpcPerceptionDirty(watchingNpc), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(notWatchingNpc), Is.False);
         }
 
         [Test]
@@ -629,7 +675,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void NpcPerceptionProcessesOnlyTickBudgetSelectionAndCompletesDirty()
+        public void NpcPerceptionProcessesOnlyTickBudgetSelectionAndCompletionClearsDirty()
         {
             var sim = new SimulationParams();
             sim.perception_states.defaultState = "idle";
@@ -664,6 +710,14 @@ namespace Arcontio.Tests
 
             var perception = new NpcPerceptionSystem();
             perception.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.IsNpcObservedByNpc(target, firstObserver), Is.True);
+            Assert.That(world.IsNpcObservedByNpc(target, secondObserver), Is.False);
+            Assert.That(world.IsNpcPerceptionDirty(firstObserver), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(secondObserver), Is.True);
+
+            var completion = new PerceptionDirtyCompletionSystem();
+            completion.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
             Assert.That(world.IsNpcObservedByNpc(target, firstObserver), Is.True);
             Assert.That(world.IsNpcObservedByNpc(target, secondObserver), Is.False);
