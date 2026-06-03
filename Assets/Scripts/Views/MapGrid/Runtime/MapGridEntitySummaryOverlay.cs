@@ -699,9 +699,17 @@ namespace Arcontio.View.MapGrid
                 _sbHeader.Append("<b>NPC #").Append(npcId);
                 if (!string.IsNullOrEmpty(dna.Identity.Name))
                     _sbHeader.Append("  ").Append(dna.Identity.Name);
+                var perceptionState = world.GetNpcPerceptionActivityState(npcId);
+                int perceptionCadence = world.GetNpcPerceptionCadenceTicks(npcId);
+                int perceptionRange = world.GetNpcPerceptionRangeCells(npcId);
+                bool perceptionDirty = world.IsNpcPerceptionDirty(npcId);
                 _sbHeader.Append("</b>\n")
                     .Append("Pos = (").Append(pos.X).Append(',').Append(pos.Y).Append(")")
-                    .Append("   Facing = ").Append(facing);
+                    .Append("   Facing = ").Append(facing)
+                    .Append("\nPerc = ").Append(perceptionState)
+                    .Append("   cad = ").Append(perceptionCadence)
+                    .Append("   range = ").Append(perceptionRange)
+                    .Append("   dirty = ").Append(perceptionDirty ? "YES" : "NO");
 
                 // ============================================================
                 // LANDMARK DEBUG REPORT (v0.02.03 / Day3)

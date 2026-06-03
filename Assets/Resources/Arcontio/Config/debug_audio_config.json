@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "selectedNpcVolume": 1.0,
+  "nearbyNpcVolume": 0.3,
+  "nearbyNpcCount": 3,
+  "maxSoundsPerSecond": 6,
+  "playFootsteps": true,
+  "playDecision": true,
+  "playJobFailure": true,
+  "playJobRecovery": false,
+  "sounds": {
+    "step": "Arcontio/Audio/Debug/npc_step",
+    "decision": "Arcontio/Audio/Debug/npc_decision",
+    "jobFailed": "Arcontio/Audio/Debug/job_failed",
+    "jobRecovery": "Arcontio/Audio/Debug/job_recovery"
+  }
+}
