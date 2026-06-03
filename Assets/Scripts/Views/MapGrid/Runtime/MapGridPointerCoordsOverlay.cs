@@ -1,3 +1,5 @@
+using Arcontio.Core;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -23,8 +25,10 @@ namespace Arcontio.View.MapGrid
         private readonly Canvas _canvas;
         private readonly RectTransform _panelRt;
         private readonly Text _text;
+        private readonly StringBuilder _textBuilder = new StringBuilder(256);
 
         private bool _visible;
+        private bool _costMode;
 
         public MapGridPointerCoordsOverlay()
         {
@@ -93,19 +97,85 @@ namespace Arcontio.View.MapGrid
 
         public void SetCell(int cellX, int cellY, bool inBounds)
         {
+            SetCell(cellX, cellY, inBounds, null);
+        }
+
+        // =============================================================================
+        // SetCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna il riquadro coordinate e, solo quando l'osservatorio costi runtime
+        /// e' attivo, aggiunge una riga diagnostica sui costi percettivi principali.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: diagnostica congelabile</b></para>
+        /// <para>
+        /// Il percorso ordinario resta identico al comportamento storico: se
+        /// <c>world.RuntimeCostObserver</c> e' nullo, il metodo non legge contatori,
+        /// non costruisce riepiloghi aggiuntivi e mantiene il pannello compatto.
+        /// </para>
+        /// </summary>
+        public void SetCell(int cellX, int cellY, bool inBounds, World world)
+        {
+            var costObserver = world?.RuntimeCostObserver;
+            bool showCost = costObserver != null;
+            SetCostMode(showCost);
+
             // UX: se fuori bounds (o tileSize/camera invalidi) lo segnaliamo.
             if (!inBounds)
             {
-                _text.text = $"Cell: <color=#FF6666>{cellX},{cellY}</color>";
+                _text.text = showCost
+                    ? BuildCostText($"Cell: <color=#FF6666>{cellX},{cellY}</color>", world, costObserver)
+                    : $"Cell: <color=#FF6666>{cellX},{cellY}</color>";
                 return;
             }
 
-            _text.text = $"Cell: <b>{cellX},{cellY}</b>";
+            _text.text = showCost
+                ? BuildCostText($"Cell: <b>{cellX},{cellY}</b>", world, costObserver)
+                : $"Cell: <b>{cellX},{cellY}</b>";
         }
 
         public void SetUnknown()
         {
+            SetCostMode(false);
             _text.text = "Cell: -,-";
+        }
+
+        private string BuildCostText(string cellText, World world, RuntimeCostObserver costObserver)
+        {
+            var stats = world.GetLastNpcPerceptionTickBudgetStats();
+            long objectCells = costObserver.GetCounter(RuntimeCostCounter.ObjectPerceptionCandidateCells);
+            long objectChecks = costObserver.GetCounter(RuntimeCostCounter.ObjectPerceptionObjectChecks);
+            long npcCells = costObserver.GetCounter(RuntimeCostCounter.NpcPerceptionCandidateCells);
+            long npcPairs = costObserver.GetCounter(RuntimeCostCounter.NpcPerceptionPairChecks);
+            long debugFovCells = costObserver.GetCounter(RuntimeCostCounter.ObjectPerceptionDebugFovCells);
+
+            _textBuilder.Clear();
+            _textBuilder.Append(cellText);
+            _textBuilder.Append("  |  Perc tick ").Append(stats.TickIndex)
+                .Append(" sel ").Append(stats.SelectedCount)
+                .Append('/').Append(stats.MaxPerceptionUpdates)
+                .Append(" pend ").Append(stats.PendingCount)
+                .Append(" dirty ").Append(stats.DirtyNpcCount)
+                .Append(" cad ").Append(stats.SkippedByCadenceCount);
+            _textBuilder.Append('\n');
+            _textBuilder.Append("Costi tot: objCells ").Append(objectCells)
+                .Append(" objChecks ").Append(objectChecks)
+                .Append(" npcCells ").Append(npcCells)
+                .Append(" npcPairs ").Append(npcPairs)
+                .Append(" fovCells ").Append(debugFovCells);
+            return _textBuilder.ToString();
+        }
+
+        private void SetCostMode(bool enabled)
+        {
+            if (_costMode == enabled)
+                return;
+
+            _costMode = enabled;
+            _panelRt.sizeDelta = enabled ? new Vector2(820f, 52f) : new Vector2(220f, 34f);
+            _text.fontSize = enabled ? 12 : 14;
         }
     }
 }
