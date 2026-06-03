@@ -460,10 +460,13 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             {
                 _world.DebugFovTelemetry.SetActiveNpc(activeNpcId);
 
-                if (activeNpcId > 0 && _world.DebugFovTelemetry.TryGetReadHeat(activeNpcId, out var heat))
+                if (activeNpcId > 0)
                 {
-                    int windowTicks = _world.DebugFovTelemetry.WindowTicks;
-                    _fovOverlay.Render(heat, _world.DebugFovTelemetry.Width, _world.DebugFovTelemetry.Height, windowTicks);
+                    bool useLos = _world.Config?.Sim?.debug_fov != null
+                        ? _world.Config.Sim.debug_fov.use_los
+                        : true;
+
+                    _fovOverlay.RenderCurrentCone(_world, activeNpcId, useLos);
                 }
                 else
                 {

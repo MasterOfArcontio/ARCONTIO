@@ -133,6 +133,108 @@ namespace Arcontio.View.MapGrid
             }
         }
 
+        // =============================================================================
+        // RenderCurrentCone
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna il cono percettivo geometrico corrente di un singolo NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug visivo non autoritativo</b></para>
+        /// <para>
+        /// Questo metodo non produce percezione, non aggiorna memoria, non marca dirty
+        /// e non modifica il mondo. Serve solo a visualizzare il cono che l'NPC avrebbe
+        /// in questo momento in base a posizione, orientamento, stato percettivo,
+        /// raggio, cono e linea di vista.
+        /// </para>
+        ///
+        /// <para><b>Perché non usa più solo la heatmap storica:</b></para>
+        /// <para>
+        /// La heatmap è un buffer diagnostico a finestre di tick. Con cadenze
+        /// percettive alte può risultare vuota, parziale o visivamente ambigua.
+        /// Il pulsante FOV della barra runtime deve invece rispondere alla domanda
+        /// immediata: "dove sta guardando ora questo NPC?".
+        /// </para>
+        /// </summary>
+        public void RenderCurrentCone(World world, int npcId, bool useLos)
+        {
+            if (_root == null || _sprite == null || world == null || npcId <= 0)
+            {
+                Clear();
+                return;
+            }
+
+            if (!world.GridPos.TryGetValue(npcId, out var origin))
+            {
+                Clear();
+                return;
+            }
+
+            if (!world.NpcFacing.TryGetValue(npcId, out var facing))
+                facing = CardinalDirection.North;
+
+            int visionRange = world.GetNpcPerceptionRangeCells(npcId);
+            if (visionRange <= 0)
+            {
+                Clear();
+                return;
+            }
+
+            bool useCone = world.GetNpcPerceptionUseCone(npcId);
+            float coneSlope = world.GetNpcPerceptionConeSlope(npcId);
+
+            for (int i = 0; i < _lastActiveKeys.Count; i++)
+            {
+                int key = _lastActiveKeys[i];
+                if (_cellRenderers.TryGetValue(key, out var sr) && sr != null)
+                    sr.gameObject.SetActive(false);
+            }
+            _lastActiveKeys.Clear();
+
+            int minX = origin.X - visionRange;
+            int maxX = origin.X + visionRange;
+            int minY = origin.Y - visionRange;
+            int maxY = origin.Y + visionRange;
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (!world.InBounds(x, y))
+                        continue;
+
+                    if (FovUtils.Manhattan(origin.X, origin.Y, x, y) > visionRange)
+                        continue;
+
+                    if (useCone)
+                    {
+                        if (!FovUtils.IsInCone(origin.X, origin.Y, facing, x, y, coneSlope))
+                            continue;
+                    }
+                    else if (!FovUtils.IsInFront(origin.X, origin.Y, facing, x, y))
+                    {
+                        continue;
+                    }
+
+                    if (useLos && !world.HasLineOfSight(origin.X, origin.Y, x, y))
+                        continue;
+
+                    int key = (y * world.MapWidth) + x;
+                    var sr = GetOrCreateCellRenderer(key);
+
+                    var c = sr.color;
+                    c.a = 0.22f;
+                    sr.color = c;
+
+                    sr.transform.position = CellCenterWorld(x, y);
+                    sr.sortingOrder = _sortingOrder;
+                    sr.gameObject.SetActive(true);
+                    _lastActiveKeys.Add(key);
+                }
+            }
+        }
+
         private SpriteRenderer GetOrCreateCellRenderer(int cellKey)
         {
             if (_cellRenderers.TryGetValue(cellKey, out var existing) && existing != null)
