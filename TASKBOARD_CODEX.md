@@ -170,7 +170,7 @@ Checkpoint v0.20 pianificati:
 - `v0.20a`: audit architettura percezione/movimento e documento di rifondazione - DONE;
 - `v0.20b`: indici persistenti compatti per oggetti e NPC - DONE;
 - `v0.20c`: dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati - DONE;
-- `v0.20d`: separazione observed / watched nella mappa percettiva - PENDING;
+- `v0.20d`: separazione observed / watched nella mappa percettiva - DONE;
 - `v0.20e`: scheduler percettivo per stato NPC con cadenza da `game_params` - PENDING;
 - `v0.20f`: limite massimo NPC percettivi per tick e distribuzione del carico - PENDING;
 - `v0.20g`: percezione oggetti/NPC su soli NPC dirty/cadenzati - PENDING;

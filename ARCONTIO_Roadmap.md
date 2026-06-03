@@ -1131,7 +1131,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20a | Audit architettura percezione/movimento e documento di rifondazione | ✅ |
 | v0.20b | Indici persistenti compatti per oggetti e NPC | ✅ |
 | v0.20c | Dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati | ✅ |
-| v0.20d | Separazione observed / watched nella mappa percettiva | ⏳ |
+| v0.20d | Separazione observed / watched nella mappa percettiva | ✅ |
 | v0.20e | Scheduler percettivo per stato NPC con cadenza da `game_params` | ⏳ |
 | v0.20f | Limite massimo NPC percettivi per tick e distribuzione del carico | ⏳ |
 | v0.20g | ObjectPerceptionSystem e NpcPerceptionSystem su soli NPC dirty/cadenzati | ⏳ |

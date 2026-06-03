@@ -728,6 +728,10 @@ namespace Arcontio.Core
         private readonly List<long> _occupiedPerceptionNpcCellKeys = new(2048);
         private bool[] _perceptionDirtyNpcFlags = new bool[256];
         private readonly List<int> _perceptionDirtyNpcIds = new(256);
+        private readonly Dictionary<int, List<int>> _objectWatchedByNpcIds = new(512);
+        private readonly Dictionary<int, List<int>> _objectObservedByNpcIds = new(512);
+        private readonly Dictionary<int, List<int>> _npcWatchedByNpcIds = new(512);
+        private readonly Dictionary<int, List<int>> _npcObservedByNpcIds = new(512);
 
         /// <summary>
         /// Cache booleana: la cella blocca la visione? Derivata dagli ObjectDef.
@@ -1274,6 +1278,7 @@ namespace Arcontio.Core
         public void RebuildPerceptionSpatialIndexes()
         {
             ClearPerceptionSpatialIndexes();
+            ClearAllPerceptionRelations();
 
             foreach (var pair in Objects)
             {
@@ -1284,6 +1289,16 @@ namespace Arcontio.Core
             {
                 AddNpcToPerceptionCellIndex(pair.Key, pair.Value.X, pair.Value.Y);
             }
+
+            foreach (var pair in Objects)
+            {
+                var obj = pair.Value;
+                if (obj != null && !obj.IsHeld)
+                    MarkObjectWatchedByNearbyNpc(pair.Key, obj.CellX, obj.CellY);
+            }
+
+            foreach (var pair in GridPos)
+                MarkNpcWatchedByNearbyNpc(pair.Key, pair.Value.X, pair.Value.Y);
 
             MarkAllNpcPerceptionDirty();
         }
@@ -1345,6 +1360,7 @@ namespace Arcontio.Core
             }
 
             ClearNpcPerceptionDirty(npcId);
+            ClearNpcPerceptionRelations(npcId);
         }
 
         private void ClearPerceptionSpatialIndexes()
@@ -1532,6 +1548,182 @@ namespace Arcontio.Core
             }
 
             _perceptionDirtyNpcIds.Clear();
+        }
+
+        // =============================================================================
+        // Perception relation API: watched / observed
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone la distinzione tra relazione percettiva potenziale e relazione
+        /// percettiva reale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: watched non e' observed</b></para>
+        /// <para>
+        /// <c>Watched</c> indica solo che un NPC e' candidato conservativo a essere
+        /// invalidato quando un'entita' cambia. <c>Observed</c> indica invece che un
+        /// sistema di percezione ha superato davvero range, cono e linea di vista e
+        /// ha prodotto un evento osservativo. Questa separazione impedisce di
+        /// trasformare la mappa dirty in conoscenza oggettiva.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Object watched</b>: objectId -> NPC potenzialmente interessati.</item>
+        ///   <item><b>Object observed</b>: objectId -> NPC che hanno visto davvero l'oggetto.</item>
+        ///   <item><b>NPC watched</b>: targetNpcId -> osservatori potenziali.</item>
+        ///   <item><b>NPC observed</b>: targetNpcId -> osservatori reali.</item>
+        /// </list>
+        /// </summary>
+        public bool IsObjectWatchedByNpc(int objectId, int npcId)
+        {
+            return ContainsPerceptionRelation(_objectWatchedByNpcIds, objectId, npcId);
+        }
+
+        public bool IsObjectObservedByNpc(int objectId, int npcId)
+        {
+            return ContainsPerceptionRelation(_objectObservedByNpcIds, objectId, npcId);
+        }
+
+        public bool IsNpcWatchedByNpc(int targetNpcId, int observerNpcId)
+        {
+            return ContainsPerceptionRelation(_npcWatchedByNpcIds, targetNpcId, observerNpcId);
+        }
+
+        public bool IsNpcObservedByNpc(int targetNpcId, int observerNpcId)
+        {
+            return ContainsPerceptionRelation(_npcObservedByNpcIds, targetNpcId, observerNpcId);
+        }
+
+        public void MarkObjectObservedByNpc(int objectId, int observerNpcId)
+        {
+            if (objectId <= 0 || observerNpcId <= 0 || !ExistsNpc(observerNpcId))
+                return;
+
+            AddPerceptionRelation(_objectObservedByNpcIds, objectId, observerNpcId);
+        }
+
+        public void MarkNpcObservedByNpc(int targetNpcId, int observerNpcId)
+        {
+            if (targetNpcId <= 0 || observerNpcId <= 0 || targetNpcId == observerNpcId)
+                return;
+
+            if (!ExistsNpc(targetNpcId) || !ExistsNpc(observerNpcId))
+                return;
+
+            AddPerceptionRelation(_npcObservedByNpcIds, targetNpcId, observerNpcId);
+        }
+
+        private void MarkObjectWatchedByNearbyNpc(int objectId, int cellX, int cellY)
+        {
+            if (objectId <= 0)
+                return;
+
+            MarkEntityWatchedByNearbyNpc(_objectWatchedByNpcIds, objectId, cellX, cellY, excludedNpcId: 0);
+        }
+
+        private void MarkNpcWatchedByNearbyNpc(int targetNpcId, int cellX, int cellY)
+        {
+            if (targetNpcId <= 0)
+                return;
+
+            MarkEntityWatchedByNearbyNpc(_npcWatchedByNpcIds, targetNpcId, cellX, cellY, excludedNpcId: targetNpcId);
+        }
+
+        private void ClearObjectPerceptionRelations(int objectId)
+        {
+            if (objectId <= 0)
+                return;
+
+            _objectWatchedByNpcIds.Remove(objectId);
+            _objectObservedByNpcIds.Remove(objectId);
+        }
+
+        private void ClearNpcPerceptionRelations(int npcId)
+        {
+            if (npcId <= 0)
+                return;
+
+            _npcWatchedByNpcIds.Remove(npcId);
+            _npcObservedByNpcIds.Remove(npcId);
+            RemoveNpcFromPerceptionRelationValues(_objectWatchedByNpcIds, npcId);
+            RemoveNpcFromPerceptionRelationValues(_objectObservedByNpcIds, npcId);
+            RemoveNpcFromPerceptionRelationValues(_npcWatchedByNpcIds, npcId);
+            RemoveNpcFromPerceptionRelationValues(_npcObservedByNpcIds, npcId);
+        }
+
+        private void ClearAllPerceptionRelations()
+        {
+            _objectWatchedByNpcIds.Clear();
+            _objectObservedByNpcIds.Clear();
+            _npcWatchedByNpcIds.Clear();
+            _npcObservedByNpcIds.Clear();
+        }
+
+        private void MarkEntityWatchedByNearbyNpc(
+            Dictionary<int, List<int>> relationMap,
+            int targetId,
+            int cellX,
+            int cellY,
+            int excludedNpcId)
+        {
+            if (!InBounds(cellX, cellY))
+                return;
+
+            int radiusCells = GetConservativePerceptionDirtyRadiusCells();
+            int minX = cellX - radiusCells;
+            int maxX = cellX + radiusCells;
+            int minY = cellY - radiusCells;
+            int maxY = cellY + radiusCells;
+
+            for (int i = 0; i < _occupiedPerceptionNpcCellKeys.Count; i++)
+            {
+                long cellKey = _occupiedPerceptionNpcCellKeys[i];
+                DecodePerceptionSpatialKey(cellKey, out int npcCellX, out int npcCellY);
+                if (npcCellX < minX || npcCellX > maxX || npcCellY < minY || npcCellY > maxY)
+                    continue;
+
+                if (FovUtils.Manhattan(npcCellX, npcCellY, cellX, cellY) > radiusCells)
+                    continue;
+
+                if (!_npcIdsByPerceptionCell.TryGetValue(cellKey, out var npcIds) || npcIds == null)
+                    continue;
+
+                for (int n = 0; n < npcIds.Count; n++)
+                {
+                    int observerNpcId = npcIds[n];
+                    if (observerNpcId == excludedNpcId)
+                        continue;
+
+                    AddPerceptionRelation(relationMap, targetId, observerNpcId);
+                }
+            }
+        }
+
+        private static bool ContainsPerceptionRelation(Dictionary<int, List<int>> relationMap, int targetId, int npcId)
+        {
+            return relationMap.TryGetValue(targetId, out var list)
+                && list != null
+                && list.IndexOf(npcId) >= 0;
+        }
+
+        private static void AddPerceptionRelation(Dictionary<int, List<int>> relationMap, int targetId, int npcId)
+        {
+            if (!relationMap.TryGetValue(targetId, out var list) || list == null)
+            {
+                list = new List<int>(4);
+                relationMap[targetId] = list;
+            }
+
+            if (list.IndexOf(npcId) < 0)
+                list.Add(npcId);
+        }
+
+        private static void RemoveNpcFromPerceptionRelationValues(Dictionary<int, List<int>> relationMap, int npcId)
+        {
+            foreach (var pair in relationMap)
+                pair.Value?.Remove(npcId);
         }
 
         public int GetConservativePerceptionDirtyRadiusCells()
@@ -3673,6 +3865,7 @@ namespace Arcontio.Core
             AddNpcToPerceptionCellIndex(id, x, y);
             MarkNearbyNpcPerceptionDirty(x, y);
             MarkNpcPerceptionDirty(id);
+            MarkNpcWatchedByNearbyNpc(id, x, y);
 
             // MemoryStore — MaxTraces da config globale, tratti individuali dal DNA
             var store = new MemoryStore();
@@ -3819,6 +4012,7 @@ if (!NpcAction.ContainsKey(id))
             AddNpcToPerceptionCellIndex(npcId, x, y);
             MarkNearbyNpcPerceptionDirty(x, y);
             MarkNpcPerceptionDirty(npcId);
+            MarkNpcWatchedByNearbyNpc(npcId, x, y);
 
             // MemoryStore vuoto: le trace salvate restano responsabilita' del
             // loader/NpcSaveSystem, che puo' aggiungerle dopo la registrazione
@@ -3927,6 +4121,7 @@ if (!NpcAction.ContainsKey(id))
             AddNpcToPerceptionCellIndex(npcId, x, y);
             MarkNearbyNpcPerceptionDirty(x, y);
             MarkNpcPerceptionDirty(npcId);
+            MarkNpcWatchedByNearbyNpc(npcId, x, y);
         }
 
         public bool TryGetObjectCell(int objectId, out int x, out int y)
@@ -4191,6 +4386,7 @@ if (!NpcAction.ContainsKey(id))
             Objects[id] = inst;
             AddGroundObjectToPerceptionIndex(id, inst);
             MarkNearbyNpcPerceptionDirty(x, y);
+            MarkObjectWatchedByNearbyNpc(id, x, y);
 
             // Se Ã¨ un occluder oppure blocca la visione o il movimento, aggiorna la occlusion map.
             if (TryGetObjectDef(defId, out var def) && def != null &&
@@ -4310,7 +4506,10 @@ if (!NpcAction.ContainsKey(id))
             Objects[objectId] = inst;
             AddGroundObjectToPerceptionIndex(objectId, inst);
             if (!isHeld)
+            {
                 MarkNearbyNpcPerceptionDirty(x, y);
+                MarkObjectWatchedByNearbyNpc(objectId, x, y);
+            }
 
             // Manteniamo le cache incrementali coerenti subito dopo il restore.
             // RebuildDerivedCachesGlobal resta comunque disponibile al loader per
@@ -4379,6 +4578,7 @@ if (!NpcAction.ContainsKey(id))
             //   essere aggiornati automaticamente. Scopriranno la perdita solo ispezionando.
             RemoveGroundObjectFromPerceptionIndex(objectId, x, y);
             MarkNearbyNpcPerceptionDirty(x, y);
+            ClearObjectPerceptionRelations(objectId);
             ObjectUse.Remove(objectId);
             FoodStocks.Remove(objectId);
             ObjectOccluders.Remove(objectId);
@@ -4545,6 +4745,7 @@ if (!NpcAction.ContainsKey(id))
 
             RemoveGroundObjectFromPerceptionIndex(objectId, fromX, fromY);
             MarkNearbyNpcPerceptionDirty(fromX, fromY);
+            ClearObjectPerceptionRelations(objectId);
 
             if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
                 ClearOccluderFromCache(objectId, fromX, fromY);
@@ -4625,6 +4826,7 @@ if (!NpcAction.ContainsKey(id))
 
             AddGroundObjectToPerceptionIndex(objectId, obj);
             MarkNearbyNpcPerceptionDirty(targetX, targetY);
+            MarkObjectWatchedByNearbyNpc(objectId, targetX, targetY);
 
             if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
             {
