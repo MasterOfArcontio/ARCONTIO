@@ -218,7 +218,7 @@ namespace Arcontio.Core
             _scoringService.ScoreCandidates(
                 in context,
                 _decisionCandidates,
-                ResolveDecisionScoringConfig(world.Config?.Sim?.decision_scoring),
+                ResolveDecisionIntentScoreConfig(world),
                 captureDecisionBreakdown);
 
             var selectionConfig = ResolveDecisionSelectionConfig(world.Config?.Sim?.decision);
@@ -440,14 +440,12 @@ namespace Arcontio.Core
             return config;
         }
 
-        private static DecisionScoringConfig ResolveDecisionScoringConfig(DecisionScoringRuntimeParams runtimeConfig)
+        private static DecisionIntentScoreConfig ResolveDecisionIntentScoreConfig(World world)
         {
-            // La configurazione scoring puo' mancare nei vecchi JSON. In quel caso
-            // manteniamo il comportamento precedente basato sui default hardcoded,
-            // ma appena il blocco e' presente i pesi diventano data-driven.
-            return runtimeConfig != null
-                ? runtimeConfig.ToScoringConfig()
-                : DecisionScoringConfig.Default();
+            if (world == null || world.Global.DecisionIntentScore.intents == null)
+                return DecisionIntentScoreConfig.Default();
+
+            return world.Global.DecisionIntentScore;
         }
 
         private static void RemoveNonRoutableJobCandidates(List<DecisionCandidate> candidates)

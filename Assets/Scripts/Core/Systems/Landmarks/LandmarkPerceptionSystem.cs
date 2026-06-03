@@ -124,7 +124,7 @@ namespace Arcontio.Core
                         continue;
 
                     // Cone gate: esclude landmark dietro o lateralmente fuori cono.
-                    // v0.20n: la copertura degli angoli ciechi non nasce piu' da IdleScanSystem automatico;
+                    // v0.20n: la copertura degli angoli ciechi non nasce piu' da scan idle automatico;
                     // arriva da job espliciti `WaitAndObserve` / step `LookDirection` quando la decisione li produce.
                     if (useCone && !FovUtils.IsInCone(ox, oy, facing, nx, ny, coneSlope))
                         continue;

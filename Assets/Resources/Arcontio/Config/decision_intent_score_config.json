@@ -1,0 +1,45 @@
+{
+  "decisionIntentScore": {
+    "needUrgencyWeight": 1.0,
+    "competenceWeight": 0.2,
+    "preferenceWeight": 0.25,
+    "obligationWeight": 0.3,
+    "memoryConfidenceWeight": 0.35,
+    "cognitiveModulatorWeight": 0.15,
+    "criticalNeedFloor": 1.25,
+    "highObligationFloor": 1.0,
+    "highObligationThreshold": 0.75,
+    "intents": [
+      {
+        "intent": "EatKnownFood",
+        "enabled": true,
+        "baseScore": 0.0,
+        "needMultiplier": 1.0,
+        "beliefMultiplier": 1.0,
+        "memoryMultiplier": 1.0,
+        "riskPenalty": 0.0,
+        "cooldownTicks": 0
+      },
+      {
+        "intent": "SearchFood",
+        "enabled": true,
+        "baseScore": 0.0,
+        "needMultiplier": 1.0,
+        "beliefMultiplier": 1.0,
+        "memoryMultiplier": 1.0,
+        "riskPenalty": 0.0,
+        "cooldownTicks": 0
+      },
+      {
+        "intent": "WaitAndObserve",
+        "enabled": true,
+        "baseScore": 0.05,
+        "needMultiplier": 0.25,
+        "beliefMultiplier": 1.0,
+        "memoryMultiplier": 1.0,
+        "riskPenalty": 0.0,
+        "cooldownTicks": 0
+      }
+    ]
+  }
+}

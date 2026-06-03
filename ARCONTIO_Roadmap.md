@@ -1143,6 +1143,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20m | Riallineamento percezione centrale, porte dirty e rimozione periodo landmark | ✅ |
 | v0.20n | Pensionamento IdleScan automatico e osservazione direzionale via Job | ✅ |
 | v0.20o | Pesi intent da JSON e stati percettivi di fase nei Job | ✅ |
+| v0.20q | Catalogo pesi intent dedicato e rimozione idle scan legacy | ✅ |
 
 > **Nota architetturale v0.20:** questa fase introduce una biforcazione controllata del ramo di sviluppo perche' tocca la struttura del ciclo runtime. La patch deve restare progressiva, ma non deve lasciare a meta' indici persistenti, dirty percettivo o cadenza: ogni checkpoint deve mantenere simulazione e diagnostica in uno stato leggibile.
 
@@ -1158,19 +1159,21 @@ ma senza perdere variazioni del mondo rilevanti.
 
 > **Nota landmark perception v0.20h:** `LandmarkPerceptionSystem` consuma la stessa selezione percettiva condivisa e risolve range/cone dallo stato dell'NPC. Il learning landmark non procede piu' come scansione separata su tutti gli NPC quando il sistema e' attivo.
 
-> **Nota rotazione percettiva v0.20i:** rotazioni e spostamenti reali dell'NPC producono ora dirty percettivo immediato, quindi non restano bloccati dalla cadenza lenta dello stato `Idle`. La running action `MoveTo` orienta l'NPC verso la cella attraversata prima del completamento fisico del passo multi-tick; il ponte `MovementSystem` legacy/debug mantiene lo stesso comportamento. Lo scan direzionale usa lo stato percettivo `LookDirection` durante la rotazione e torna a `Idle` a scan concluso.
+> **Nota rotazione percettiva v0.20i:** rotazioni e spostamenti reali dell'NPC producono ora dirty percettivo immediato, quindi non restano bloccati dalla cadenza lenta dello stato `Idle`. La running action `MoveTo` orienta l'NPC verso la cella attraversata prima del completamento fisico del passo multi-tick; il ponte `MovementSystem` legacy/debug mantiene lo stesso comportamento. Lo scan direzionale deve usare lo stato percettivo `LookDirection` quando viene prodotto da un incarico di osservazione.
 
-> **Nota cleanup v0.20j:** l'audit post-rifondazione non ha individuato strutture percettive eliminabili senza rischio: indici persistenti, dirty, watched/observed e contatori costo risultano vivi. La patch rimuove solo letture ridondanti rimaste da prima degli stati percettivi e aggiorna i commenti interni ormai superati. `IdleScanSystem` e `MovementSystem` restano ponti tollerati fino alla chiusura dei relativi debiti futuri.
+> **Nota cleanup v0.20j:** l'audit post-rifondazione non ha individuato strutture percettive eliminabili senza rischio: indici persistenti, dirty, watched/observed e contatori costo risultano vivi. La patch rimuove solo letture ridondanti rimaste da prima degli stati percettivi e aggiorna i commenti interni ormai superati. `MovementSystem` resta ponte tollerato per debug/legacy fino alla chiusura del relativo debito futuro.
 
 > **Nota QA costo percettivo v0.20k:** `game_params.json` espone ora la sezione `logging.runtime_cost_observer`, spenta di default per mantenere costo nullo. Quando e' attiva, il riquadro coordinate mostra un riepilogo leggero di selezione percettiva, pending, dirty e contatori cumulativi principali per oggetti/NPC/FOV, cosi' i test 20/50/100 NPC possono essere letti direttamente in runtime oltre che dai JSONL.
 
 > **Nota closeout v0.20l:** la fase `v0.20` e' chiusa come rifondazione percettiva runtime. La percezione oggetti, NPC e landmark non procede piu' come scansione globale ordinaria: usa dirty percettivo, indici persistenti, cadenza per stato, budget massimo per tick e osservabilita' runtime attivabile. Restano debiti di ottimizzazione avanzata e QA numerico esteso, ma la struttura base e' pronta per misurazioni 20/50/100 NPC e per ulteriori riduzioni mirate.
 
-> **Nota riallineamento v0.20m:** il closeout ha evidenziato alcuni debiti di coerenza percettiva centrale. `landmark_perception.period` viene rimosso, i landmark seguono solo dirty/cadenza/stato/budget, `IdleScanSystem` precede il blocco percettivo, la pulizia dirty viene separata in `PerceptionDirtyCompletionSystem`, le porte aperte/chiuse marcano dirty gli osservatori nel watched cone economico e l'overlay mostra NPC percepiti su NPC totali. Restano rinviati watched cone visualizzato a bordo, rinforzo memoria cadenzato e ottimizzazione strutture dati piu' calde.
+> **Nota riallineamento v0.20m:** il closeout ha evidenziato alcuni debiti di coerenza percettiva centrale. `landmark_perception.period` viene rimosso, i landmark seguono solo dirty/cadenza/stato/budget, la pulizia dirty viene separata in `PerceptionDirtyCompletionSystem`, le porte aperte/chiuse marcano dirty gli osservatori nel watched cone economico e l'overlay mostra NPC percepiti su NPC totali. Restano rinviati watched cone visualizzato a bordo, rinforzo memoria cadenzato e ottimizzazione strutture dati piu' calde.
 
 > **Nota osservazione direzionale v0.20n:** lo scan automatico idle viene pensionato come comportamento runtime autonomo. Il guardarsi attorno passa dal percorso ordinario Decisione -> JobRequest -> Job tramite l'intent `WaitAndObserve`, il template `perception.look_around.v1` e quattro step `LookDirection` direzionali. `SearchFood` conserva il movimento probe e aggiunge una fase finale di osservazione locale; la percezione resta centralizzata e legge il nuovo facing solo nel blocco percettivo ordinario.
 
-> **Nota configurazione job/intent v0.20o:** i pesi degli intent sono ora letti dal blocco `decision_scoring` di `game_params.json`, mantenendo lo score come unico criterio di confronto tra candidati. I template degli incarichi espongono inoltre `PerceptionState` sulle fasi e `exitPerceptionState` sul job, cosi' movimento, osservazione direzionale e ritorno a idle vengono dichiarati dal file `job_templates.json` invece che dedotti solo dal codice.
+> **Nota configurazione job/intent v0.20o:** i template degli incarichi espongono `PerceptionState` sulle fasi e `exitPerceptionState` sul job, cosi' movimento, osservazione direzionale e ritorno a idle vengono dichiarati dal file `job_templates.json` invece che dedotti solo dal codice. I pesi degli intent vengono consolidati nel checkpoint `v0.20q` tramite catalogo dedicato.
+
+> **Nota catalogo intent e idle cleanup v0.20q:** i pesi degli intent non vivono piu' in `game_params.json`, ma nel file dedicato `decision_intent_score_config.json`, recuperando il layout separato della prima implementazione. Lo scan idle automatico residuo viene eliminato insieme allo stato legacy collegato: il guardarsi attorno deve passare solo da Decisione -> JobRequest -> Job tramite `WaitAndObserve` e step `LookDirection`.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti

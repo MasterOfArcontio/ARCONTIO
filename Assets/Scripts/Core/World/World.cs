@@ -760,17 +760,6 @@ namespace Arcontio.Core
         /// </summary>
         public readonly JobRuntimeState JobRuntimeState;
 
-        /// <summary>
-        /// Stato di scan direzionale per NPC.
-        /// <list type="bullet">
-        ///   <item>Struttura legacy non piu' registrata nel ciclo runtime ordinario.</item>
-        ///   <item>Il guardarsi attorno passa da <c>WaitAndObserve</c> e <c>LookDirection</c>.</item>
-        ///   <item>Resta temporaneamente per compatibilita' con test/helper finche' non viene rimossa con gestione Unity sicura.</item>
-        /// </list>
-        /// </summary>
-        public readonly Dictionary<int, ScanState> NpcScanStates = new();
-
-
         // =====================================================================
         // INTERNAL GRID INDEXES / CACHE
         // =====================================================================
@@ -1170,6 +1159,8 @@ namespace Arcontio.Core
             Global.Needs = NeedsConfig.Default();
             Global.BeliefDecay = BeliefDecayConfig.Default();
             Global.BeliefQuery = BeliefQueryConfig.Default();
+            Global.DecisionIntentScore = DecisionIntentScoreConfig.Default();
+            DecisionIntentScoreConfigLoader.LoadIntoWorld(this);
 
             // ============================================================
             // Inventory params (data-driven via game_params.json)
@@ -4401,11 +4392,6 @@ namespace Arcontio.Core
 
             JobRuntimeState.EnsureNpcState(id);
 
-            // Scan state init (se non presente)
-            if (!NpcScanStates.ContainsKey(id))
-                NpcScanStates[id] = default;
-
-
             // ============================================================
             // Landmark memory init (v0.02 Day3)
             // ============================================================
@@ -4552,9 +4538,6 @@ if (!NpcAction.ContainsKey(id))
             // registra quindi solo uno slot runtime vuoto per permettere al prossimo
             // tick di ricostruire eventuali intenzioni da needs/beliefs.
             JobRuntimeState.EnsureNpcState(npcId);
-
-            if (!NpcScanStates.ContainsKey(npcId))
-                NpcScanStates[npcId] = default;
 
             if (!NpcAction.ContainsKey(npcId))
                 NpcAction[npcId] = NpcActionState.Idle();
@@ -4811,46 +4794,6 @@ if (!NpcAction.ContainsKey(id))
         {
             _npcDecisionFlashTicks.Remove(npcId);
         }
-
-
-        /// <summary>
-        /// Utility: consideriamo "idle" se non ha MoveIntent attivo e non sta facendo scan.
-        /// Questo Ã¨ volutamente minimale: in futuro ActivityStateComponent puÃ² sostituire.
-        /// </summary>
-        public bool IsNpcIdleForScan(int npcId)
-        {
-            if (!ExistsNpc(npcId)) return false;
-
-            if (NpcMoveIntents.TryGetValue(npcId, out var mi) && mi.Active)
-                return false;
-
-            if (NpcScanStates.TryGetValue(npcId, out var ss) && ss.Active)
-                return false;
-
-            return true;
-        }
-
-        public void StartScan(int npcId, int currentTick, int turns = 4)
-        {
-            if (!ExistsNpc(npcId)) return;
-
-            // Importante:
-            // - lo scan Ã¨ "costoso": Ã¨ una sequenza di turn su tick successivi.
-            // - non facciamo 4 turn nello stesso tick.
-            NpcScanStates[npcId] = new ScanState
-            {
-                Active = true,
-                RemainingTurns = turns,
-                LastTurnTick = currentTick - 999999
-            };
-        }
-
-        public void StopScan(int npcId)
-        {
-            if (!ExistsNpc(npcId)) return;
-            NpcScanStates[npcId] = default;
-        }
-
 
         // ============================================================
         // OBJECT API (Create / Destroy)
@@ -5852,6 +5795,9 @@ if (!NpcAction.ContainsKey(id))
 
         // --- Belief query config ---
         public BeliefQueryConfig BeliefQuery;
+
+        // --- Decision intent score config ---
+        public DecisionIntentScoreConfig DecisionIntentScore;
 
         // --- Object memory config ---
         public int NpcObjectMemorySlots;       // slot per memoria oggetti interagibili (per NPC)
