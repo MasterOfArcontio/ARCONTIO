@@ -231,7 +231,7 @@ namespace Arcontio.Tests
             Assert.That(request.IntentKind, Is.EqualTo(DecisionIntentKind.WaitAndObserve));
             Assert.That(request.HasTargetCell, Is.False);
             Assert.That(request.TargetObjectId, Is.EqualTo(0));
-            Assert.That(request.OriginLabel, Is.EqualTo("LookAround"));
+            Assert.That(request.DebugLabel, Is.EqualTo("LookAround"));
         }
 
         // =============================================================================
