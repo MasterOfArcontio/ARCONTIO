@@ -129,25 +129,4 @@ namespace Arcontio.Core
         /// </summary>
         public int Stage;
     }
-
-    /// <summary>
-    /// Stato di “scan” direzionale:
-    /// - Non esiste 360° gratuito.
-    /// - Lo scan è modellato come 4 rotazioni consecutive (una per tick).
-    /// </summary>
-    public struct ScanState
-    {
-        public bool Active;
-
-        /// <summary>
-        /// Quante rotazioni da fare ancora (tipicamente 4).
-        /// Ogni tick: Turn90 + RemainingTurns--.
-        /// </summary>
-        public int RemainingTurns;
-
-        /// <summary>
-        /// Tick dell’ultimo “turn” fatto durante scan, per evitare doppi turn in stesso tick.
-        /// </summary>
-        public int LastTurnTick;
-    }
 }

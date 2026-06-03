@@ -87,11 +87,10 @@ namespace Arcontio.Core.Commands.DevTools
             world.NpcLastPrivateFoodConsumeTick.Remove(npcId);
 
             // ============================================================
-            // MOVEMENT / SCAN
+            // MOVEMENT
             // ============================================================
 
             world.NpcMoveIntents.Remove(npcId);
-            world.NpcScanStates.Remove(npcId);
 
             // Nota:
             // - Non chiamiamo rebuild cache globale: NPC non modifica occlusion.

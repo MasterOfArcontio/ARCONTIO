@@ -120,12 +120,12 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // IntentSpecificWeightChangesScoreWithoutChangingCandidateGeneration
+        // IntentSpecificConfigChangesScoreWithoutChangingCandidateGeneration
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che il peso specifico di un intent letto da configurazione cambi
-        /// solo lo score, non la disponibilita' dei candidati.
+        /// Verifica che il catalogo intent dedicato cambi solo lo score, non la
+        /// disponibilita' dei candidati.
         /// </para>
         ///
         /// <para><b>Score data-driven, query ancora sovrana</b></para>
@@ -136,17 +136,27 @@ namespace Arcontio.Tests
         /// </para>
         /// </summary>
         [Test]
-        public void IntentSpecificWeightChangesScoreWithoutChangingCandidateGeneration()
+        public void IntentSpecificConfigChangesScoreWithoutChangingCandidateGeneration()
         {
             var context = MakeContext(hunger01: 0.90f, rest01: 0.10f, addFoodBelief: false);
             var candidates = new List<DecisionCandidate>();
             var generator = new DecisionCandidateGenerator();
             var scoring = new DecisionScoringService();
 
-            var config = DecisionScoringConfig.Default();
-            config.intentWeights = new[]
+            var config = DecisionIntentScoreConfig.Default();
+            config.intents = new[]
             {
-                new DecisionIntentScoreWeight(DecisionIntentKind.SearchFood, 2.0f, 0.5f)
+                new DecisionIntentScoreEntry
+                {
+                    intent = DecisionIntentKind.SearchFood.ToString(),
+                    enabled = true,
+                    baseScore = 0.5f,
+                    needMultiplier = 2.0f,
+                    beliefMultiplier = 1.0f,
+                    memoryMultiplier = 1.0f,
+                    riskPenalty = 0.0f,
+                    cooldownTicks = 0
+                }
             };
 
             generator.GeneratePhase1Candidates(context, candidates);
@@ -159,7 +169,8 @@ namespace Arcontio.Tests
             for (int i = 0; i < searchFood.ScoreContributions.Length; i++)
             {
                 var contribution = searchFood.ScoreContributions[i];
-                if (contribution.Label == "IntentWeight" && contribution.Value > 0f)
+                if ((contribution.Label == "IntentBaseScore" || contribution.Label == "NeedUrgency")
+                    && contribution.Value > 0f)
                 {
                     hasPositiveIntentWeight = true;
                     break;
