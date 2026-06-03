@@ -1135,7 +1135,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20e | Scheduler percettivo per stato NPC con cadenza da `game_params` | ✅ |
 | v0.20f | Limite massimo NPC percettivi per tick e distribuzione del carico | ✅ |
 | v0.20g | ObjectPerceptionSystem e NpcPerceptionSystem su soli NPC dirty/cadenzati | ✅ |
-| v0.20h | Landmark perception allineata a dirty/cadenza/range | ⏳ |
+| v0.20h | Landmark perception allineata a dirty/cadenza/range | ✅ |
 | v0.20i | Rotazione movimento e `LookDirection` come sorgenti dirty percettive | ⏳ |
 | v0.20j | Cleanup strutture obsolete o ridondanti post-rifondazione | ⏳ |
 | v0.20k | QA profiler 20/50/100 NPC e debug overlay costo percettivo | ⏳ |
@@ -1152,6 +1152,8 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota budget percettivo v0.20f:** il `World` ora seleziona gli NPC percettivi candidati per tick applicando dirty, cadenza dello stato, limite massimo configurato e round-robin deterministico. La selezione produce liste e contatori, ma i sistemi percettivi non la consumano ancora: l'integrazione operativa resta nel checkpoint `v0.20g`.
 
 > **Nota sistemi percettivi v0.20g:** `ObjectPerceptionSystem` e `NpcPerceptionSystem` consumano ora la selezione percettiva condivisa del tick. Gli NPC non dirty, fuori cadenza o oltre budget non producono percezione in quel tick; quelli pending restano dirty e vengono riproposti dal round-robin.
+
+> **Nota landmark perception v0.20h:** `LandmarkPerceptionSystem` consuma la stessa selezione percettiva condivisa e risolve range/cone dallo stato dell'NPC. Il learning landmark non procede piu' come scansione separata su tutti gli NPC quando il sistema e' attivo.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti

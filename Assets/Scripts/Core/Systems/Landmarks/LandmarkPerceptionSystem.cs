@@ -56,9 +56,6 @@ namespace Arcontio.Core
 
         public int Period => _period;
 
-        // Buffer snapshot NPC ids (evita allocazioni ogni tick)
-        private readonly List<int> _npcIds = new(2048);
-
         // Buffer nodi visibili per NPC corrente (riusato ad ogni NPC, svuotato ogni iterazione)
         private readonly List<int> _visibleNodeIds = new(32);
 
@@ -84,33 +81,30 @@ namespace Arcontio.Core
             if (world.NpcDna.Count == 0)
                 return;
 
-            int visionRange = world.Global.NpcVisionRangeCells;
-            if (visionRange <= 0) visionRange = 6;
-
-            bool  useCone   = world.Global.NpcVisionUseCone;
-            float coneSlope = world.Global.NpcVisionConeSlope;
-
             // Parametri edge soggettivi (v0.03.04.c-ComplexEdge_Creation)
             bool  subjectiveEdgesEnabled = lpCfg == null || lpCfg.subjective_edges_enabled;
             int   maxDist    = lpCfg?.subjective_edge_max_dist         ?? 8;
             float reliability = lpCfg?.subjective_edge_base_reliability ?? 0.15f;
 
-            // Snapshot NPC ids (evita iterazioni su Dictionary mentre qualcuno muta lo state)
-            _npcIds.Clear();
-            foreach (var kv in world.NpcDna)
-                _npcIds.Add(kv.Key);
+            var selectedNpcIds = world.SelectNpcPerceptionUpdatesForTick(tick.Index);
 
             var nodes    = world.LandmarkRegistry.Nodes;
             var registry = world.LandmarkRegistry;
             int learned      = 0;
             int edgesCreated = 0;
 
-            for (int i = 0; i < _npcIds.Count; i++)
+            for (int i = 0; i < selectedNpcIds.Count; i++)
             {
-                int npcId = _npcIds[i];
+                int npcId = selectedNpcIds[i];
 
                 if (!world.GridPos.TryGetValue(npcId, out var op))
                     continue;
+
+                int visionRange = world.GetNpcPerceptionRangeCells(npcId);
+                if (visionRange <= 0) visionRange = 6;
+
+                bool  useCone   = world.GetNpcPerceptionUseCone(npcId);
+                float coneSlope = world.GetNpcPerceptionConeSlope(npcId);
 
                 if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                     facing = CardinalDirection.North;
