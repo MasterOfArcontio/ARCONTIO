@@ -465,7 +465,7 @@ namespace Arcontio.View.MapGrid
                     if (_npcNameLabels.TryGetValue(npcId, out var label) && label != null)
                     {
                         label.SetText(ResolveNpcLabel(world, npcId));
-                        label.SetCanvasLocalPosition(anchor + new Vector2(0f, 22f));
+                        label.SetCanvasLocalPosition(anchor + new Vector2(0f, 38f));
                         label.SetVisible(true);
                     }
                     continue;
@@ -2539,10 +2539,10 @@ namespace Arcontio.View.MapGrid
             _rect.anchorMin = new Vector2(0.5f, 0.5f);
             _rect.anchorMax = new Vector2(0.5f, 0.5f);
             _rect.pivot = new Vector2(0.5f, 0.5f);
-            _rect.sizeDelta = new Vector2(64f, 18f);
+            _rect.sizeDelta = new Vector2(74f, 20f);
 
             var bg = _root.AddComponent<Image>();
-            bg.color = new Color(0f, 0f, 0f, 0.38f);
+            bg.color = new Color(0.08f, 0.24f, 0.42f, 0.72f);
             bg.raycastTarget = false;
 
             var textGo = new GameObject("Text");
@@ -2558,7 +2558,7 @@ namespace Arcontio.View.MapGrid
             _text.fontSize = 10;
             _text.fontStyle = FontStyle.Bold;
             _text.alignment = TextAnchor.MiddleCenter;
-            _text.color = new Color(1f, 1f, 1f, 0.78f);
+            _text.color = new Color(1f, 1f, 1f, 0.92f);
             _text.raycastTarget = false;
 
             SetVisible(false);
