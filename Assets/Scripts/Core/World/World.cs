@@ -11,6 +11,40 @@ using static UnityEditor.PlayerSettings;
 namespace Arcontio.Core
 {
     // =============================================================================
+    // NpcPerceptionActivityState
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Stato percettivo compatto dell'NPC.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: stato percettivo separato dal pensiero</b></para>
+    /// <para>
+    /// Questo enum non decide cosa vuole fare l'NPC e non sostituisce Job,
+    /// Decisione o bisogni. Descrive soltanto quanto spesso e con che raggio
+    /// l'NPC deve aggiornare la percezione quando i sistemi percettivi verranno
+    /// filtrati da dirty/cadenza.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Idle</b>: stato ordinario a basso costo.</item>
+    ///   <item><b>Movement</b>: NPC in spostamento.</item>
+    ///   <item><b>Alert</b>: attenzione aumentata.</item>
+    ///   <item><b>Combat</b>: massima reattivita' futura.</item>
+    ///   <item><b>LookDirection</b>: osservazione direzionale esplicita.</item>
+    /// </list>
+    /// </summary>
+    public enum NpcPerceptionActivityState : byte
+    {
+        Idle = 0,
+        Movement = 1,
+        Alert = 2,
+        Combat = 3,
+        LookDirection = 4
+    }
+
+    // =============================================================================
     // World.cs — Patch 0.02.5A (commenti verbosi)
     // =============================================================================
     /// <summary>
@@ -728,6 +762,7 @@ namespace Arcontio.Core
         private readonly List<long> _occupiedPerceptionNpcCellKeys = new(2048);
         private bool[] _perceptionDirtyNpcFlags = new bool[256];
         private readonly List<int> _perceptionDirtyNpcIds = new(256);
+        private readonly Dictionary<int, NpcPerceptionActivityState> _npcPerceptionActivityStates = new(256);
         private readonly Dictionary<int, List<int>> _objectWatchedByNpcIds = new(512);
         private readonly Dictionary<int, List<int>> _objectObservedByNpcIds = new(512);
         private readonly Dictionary<int, List<int>> _npcWatchedByNpcIds = new(512);
@@ -1551,6 +1586,162 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // Npc perception activity state API
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone e risolve lo stato percettivo runtime di un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: scheduler pronto, percezione invariata</b></para>
+        /// <para>
+        /// Questa API prepara la cadenza percettiva per stato senza cambiare ancora
+        /// l'esecuzione di <c>ObjectPerceptionSystem</c> e <c>NpcPerceptionSystem</c>.
+        /// I prossimi checkpoint useranno questi resolver per saltare gli NPC non
+        /// dirty o fuori turno, mantenendo un unico punto centrale di percezione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Stato compatto</b>: dizionario per-NPC con enum byte.</item>
+        ///   <item><b>Profilo</b>: dati letti da <c>game_params.perception_states</c>.</item>
+        ///   <item><b>Fallback</b>: valori globali storici se la config e' assente o invalida.</item>
+        /// </list>
+        /// </summary>
+        public NpcPerceptionActivityState GetNpcPerceptionActivityState(int npcId)
+        {
+            if (npcId <= 0 || !_npcPerceptionActivityStates.TryGetValue(npcId, out var state))
+                return ResolveDefaultPerceptionActivityState();
+
+            return state;
+        }
+
+        public void SetNpcPerceptionActivityState(int npcId, NpcPerceptionActivityState state)
+        {
+            if (!ExistsNpc(npcId))
+                return;
+
+            _npcPerceptionActivityStates[npcId] = state;
+            MarkNpcPerceptionDirty(npcId);
+        }
+
+        public int GetNpcPerceptionCadenceTicks(int npcId)
+        {
+            var profile = GetPerceptionStateProfile(GetNpcPerceptionActivityState(npcId));
+            int cadenceTicks = profile != null ? profile.cadenceTicks : 1;
+            return Mathf.Max(1, cadenceTicks);
+        }
+
+        public int GetNpcPerceptionRangeCells(int npcId)
+        {
+            var profile = GetPerceptionStateProfile(GetNpcPerceptionActivityState(npcId));
+            int range = profile != null ? profile.visionRangeCells : 0;
+            if (range <= 0)
+                range = Global.NpcVisionRangeCells;
+
+            return Mathf.Max(0, range);
+        }
+
+        public bool GetNpcPerceptionUseCone(int npcId)
+        {
+            var profile = GetPerceptionStateProfile(GetNpcPerceptionActivityState(npcId));
+            return profile != null ? profile.useCone : Global.NpcVisionUseCone;
+        }
+
+        public float GetNpcPerceptionConeSlope(int npcId)
+        {
+            var profile = GetPerceptionStateProfile(GetNpcPerceptionActivityState(npcId));
+            return ResolvePerceptionConeSlope(profile);
+        }
+
+        public bool ShouldNpcRunPerceptionThisTick(int npcId, long tickIndex)
+        {
+            if (!ExistsNpc(npcId))
+                return false;
+
+            int cadenceTicks = GetNpcPerceptionCadenceTicks(npcId);
+            if (cadenceTicks <= 1)
+                return true;
+
+            long tickPhase = tickIndex % cadenceTicks;
+            if (tickPhase < 0)
+                tickPhase += cadenceTicks;
+
+            int npcPhase = npcId % cadenceTicks;
+            return tickPhase == npcPhase;
+        }
+
+        private NpcPerceptionActivityState ResolveDefaultPerceptionActivityState()
+        {
+            string raw = Config?.Sim?.perception_states != null
+                ? Config.Sim.perception_states.defaultState
+                : null;
+
+            return ParsePerceptionActivityState(raw, NpcPerceptionActivityState.Idle);
+        }
+
+        private static NpcPerceptionActivityState ParsePerceptionActivityState(
+            string raw,
+            NpcPerceptionActivityState fallback)
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+                return fallback;
+
+            switch (raw.Trim().ToLowerInvariant())
+            {
+                case "idle": return NpcPerceptionActivityState.Idle;
+                case "movement": return NpcPerceptionActivityState.Movement;
+                case "alert": return NpcPerceptionActivityState.Alert;
+                case "combat": return NpcPerceptionActivityState.Combat;
+                case "lookdirection":
+                case "look_direction":
+                case "look-direction":
+                    return NpcPerceptionActivityState.LookDirection;
+                default:
+                    return fallback;
+            }
+        }
+
+        private PerceptionStateProfile GetPerceptionStateProfile(NpcPerceptionActivityState state)
+        {
+            var states = Config?.Sim?.perception_states;
+            if (states == null)
+                return null;
+
+            switch (state)
+            {
+                case NpcPerceptionActivityState.Movement: return states.movement;
+                case NpcPerceptionActivityState.Alert: return states.alert;
+                case NpcPerceptionActivityState.Combat: return states.combat;
+                case NpcPerceptionActivityState.LookDirection: return states.lookDirection;
+                default: return states.idle;
+            }
+        }
+
+        private float ResolvePerceptionConeSlope(PerceptionStateProfile profile)
+        {
+            if (profile != null && profile.coneSlope > 0f)
+                return profile.coneSlope;
+
+            int fovDegrees = profile != null ? profile.coneFovDegrees : 0;
+            if (fovDegrees > 0)
+            {
+                float halfRad = (fovDegrees * 0.5f) * Mathf.Deg2Rad;
+                float slope = Mathf.Tan(halfRad);
+                if (slope > 0f)
+                    return slope;
+            }
+
+            if (Global.NpcVisionConeSlope > 0f)
+                return Global.NpcVisionConeSlope;
+
+            if (Global.NpcVisionConeHalfWidthPerStep > 0f)
+                return Global.NpcVisionConeHalfWidthPerStep;
+
+            return 1.0f;
+        }
+
+        // =============================================================================
         // Perception relation API: watched / observed
         // =============================================================================
         /// <summary>
@@ -1645,6 +1836,7 @@ namespace Arcontio.Core
             if (npcId <= 0)
                 return;
 
+            _npcPerceptionActivityStates.Remove(npcId);
             _npcWatchedByNpcIds.Remove(npcId);
             _npcObservedByNpcIds.Remove(npcId);
             RemoveNpcFromPerceptionRelationValues(_objectWatchedByNpcIds, npcId);
@@ -1728,7 +1920,7 @@ namespace Arcontio.Core
 
         public int GetConservativePerceptionDirtyRadiusCells()
         {
-            int radius = Global.NpcVisionRangeCells;
+            int radius = GetMaxConfiguredPerceptionVisionRangeCells();
             if (radius < 0)
                 radius = 0;
 
@@ -1737,6 +1929,29 @@ namespace Arcontio.Core
                 margin = 0;
 
             return radius + margin;
+        }
+
+        private int GetMaxConfiguredPerceptionVisionRangeCells()
+        {
+            int maxRange = Global.NpcVisionRangeCells;
+            var states = Config?.Sim?.perception_states;
+            if (states == null)
+                return maxRange;
+
+            maxRange = MaxPerceptionRange(maxRange, states.idle);
+            maxRange = MaxPerceptionRange(maxRange, states.movement);
+            maxRange = MaxPerceptionRange(maxRange, states.alert);
+            maxRange = MaxPerceptionRange(maxRange, states.combat);
+            maxRange = MaxPerceptionRange(maxRange, states.lookDirection);
+            return maxRange;
+        }
+
+        private static int MaxPerceptionRange(int currentMax, PerceptionStateProfile profile)
+        {
+            if (profile != null && profile.visionRangeCells > currentMax)
+                return profile.visionRangeCells;
+
+            return currentMax;
         }
 
         public int MarkNearbyNpcPerceptionDirty(int cellX, int cellY)
@@ -3862,6 +4077,7 @@ namespace Arcontio.Core
             Social[id] = social;
             GridPos[id] = new GridPosition(x, y);
             NpcFacing[id] = CardinalDirection.North;
+            _npcPerceptionActivityStates[id] = ResolveDefaultPerceptionActivityState();
             AddNpcToPerceptionCellIndex(id, x, y);
             MarkNearbyNpcPerceptionDirty(x, y);
             MarkNpcPerceptionDirty(id);
@@ -4009,6 +4225,7 @@ if (!NpcAction.ContainsKey(id))
             Social[npcId] = social;
             GridPos[npcId] = new GridPosition(x, y);
             NpcFacing[npcId] = facing;
+            _npcPerceptionActivityStates[npcId] = ResolveDefaultPerceptionActivityState();
             AddNpcToPerceptionCellIndex(npcId, x, y);
             MarkNearbyNpcPerceptionDirty(x, y);
             MarkNpcPerceptionDirty(npcId);

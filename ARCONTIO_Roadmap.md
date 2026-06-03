@@ -1132,7 +1132,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20b | Indici persistenti compatti per oggetti e NPC | ✅ |
 | v0.20c | Dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati | ✅ |
 | v0.20d | Separazione observed / watched nella mappa percettiva | ✅ |
-| v0.20e | Scheduler percettivo per stato NPC con cadenza da `game_params` | ⏳ |
+| v0.20e | Scheduler percettivo per stato NPC con cadenza da `game_params` | ✅ |
 | v0.20f | Limite massimo NPC percettivi per tick e distribuzione del carico | ⏳ |
 | v0.20g | ObjectPerceptionSystem e NpcPerceptionSystem su soli NPC dirty/cadenzati | ⏳ |
 | v0.20h | Landmark perception allineata a dirty/cadenza/range | ⏳ |
@@ -1147,7 +1147,7 @@ ma senza perdere variazioni del mondo rilevanti.
 
 > **Nota ciclo runtime v0.20:** il ciclo obiettivo diventa: movimento, memoria landmark, percezione landmark, decadimento bisogni, percezione dirty/cadenzata, codifica memoria, manutenzione memoria oggetti, decadimento memoria, decadimento belief, esecuzione job, decisione. Le mutazioni di oggetti/NPC fuori ciclo non devono eseguire percezione immediata: devono solo sporcare le strutture percettive che verranno consumate nel punto centrale del ciclo.
 
-> **Nota stati percettivi v0.20:** il dirty percettivo conservativo iniziale usa un raggio globale massimo provvisorio. Quando v0.20e introdurra' gli stati percettivi configurati in game_params, il raggio dirty dovra' essere riallineato a cadenza e range dello stato percettivo dell'NPC, mantenendo un margine conservativo per non perdere oggetti/NPC al bordo del campo visivo.
+> **Nota stati percettivi v0.20:** da `v0.20e` gli NPC possiedono uno stato percettivo configurabile da `game_params`. Ogni stato definisce cadenza, raggio visivo e cono; il dirty conservativo usa il massimo raggio teorico degli stati configurati piu' margine, mantenendo una invalidazione prudente senza eseguire percezione immediata fuori dal ciclo centrale.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti
