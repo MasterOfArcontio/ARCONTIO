@@ -56,8 +56,11 @@ namespace Arcontio.View.MapGrid
             _panelRt.anchorMax = new Vector2(0f, 1f);
             _panelRt.pivot = new Vector2(0f, 1f);
 
-            // Offset dal bordo schermo
-            _panelRt.anchoredPosition = new Vector2(10f, -10f);
+            // Offset dal bordo schermo.
+            // Il riquadro non resta piu' appiccicato al bordo alto perche' la barra
+            // runtime contiene pulsanti F3/Pausa/Step: tenerlo sotto la toolbar
+            // evita sovrapposizioni durante i test con osservatorio costi attivo.
+            _panelRt.anchoredPosition = new Vector2(12f, -58f);
             _panelRt.sizeDelta = new Vector2(220f, 34f);
 
             // Text
@@ -150,22 +153,32 @@ namespace Arcontio.View.MapGrid
             long npcCells = costObserver.GetCounter(RuntimeCostCounter.NpcPerceptionCandidateCells);
             long npcPairs = costObserver.GetCounter(RuntimeCostCounter.NpcPerceptionPairChecks);
             long debugFovCells = costObserver.GetCounter(RuntimeCostCounter.ObjectPerceptionDebugFovCells);
+            long jobSteps = costObserver.GetCounter(RuntimeCostCounter.JobExecutionSteps);
+            long routePreparations = costObserver.GetCounter(RuntimeCostCounter.MoveToRoutePreparations);
+            long moveFailures = costObserver.GetCounter(RuntimeCostCounter.MoveToFailures);
+            long recoveryEvaluated = costObserver.GetCounter(RuntimeCostCounter.JobRecoveryEvaluated);
 
             _textBuilder.Clear();
-            _textBuilder.Append(cellText);
-            _textBuilder.Append("  |  Perc tick ").Append(stats.TickIndex)
-                .Append(" npc ").Append(stats.SelectedCount)
-                .Append('/').Append(stats.TotalNpcCount)
-                .Append(" max ").Append(stats.MaxPerceptionUpdates)
-                .Append(" pend ").Append(stats.PendingCount)
-                .Append(" dirty ").Append(stats.DirtyNpcCount)
-                .Append(" cad ").Append(stats.SkippedByCadenceCount);
+            _textBuilder.Append(cellText)
+                .Append("  <color=#8DD6FF>Runtime cost</color>");
             _textBuilder.Append('\n');
-            _textBuilder.Append("Costi tot: objCells ").Append(objectCells)
-                .Append(" objChecks ").Append(objectChecks)
-                .Append(" npcCells ").Append(npcCells)
-                .Append(" npcPairs ").Append(npcPairs)
-                .Append(" fovCells ").Append(debugFovCells);
+            _textBuilder.Append("<color=#A7F3D0>Percezione</color> tick ").Append(stats.TickIndex)
+                .Append(" | NPC ").Append(stats.SelectedCount).Append('/').Append(stats.TotalNpcCount)
+                .Append(" | limite ").Append(stats.MaxPerceptionUpdates)
+                .Append(" | attesa ").Append(stats.PendingCount)
+                .Append(" | dirty ").Append(stats.DirtyNpcCount)
+                .Append(" | cadenza ").Append(stats.SkippedByCadenceCount);
+            _textBuilder.Append('\n');
+            _textBuilder.Append("<color=#FFD166>Oggetti</color> celle ").Append(objectCells)
+                .Append(" | controlli ").Append(objectChecks)
+                .Append(" | fov ").Append(debugFovCells)
+                .Append("    <color=#FFD166>NPC</color> celle ").Append(npcCells)
+                .Append(" | coppie ").Append(npcPairs);
+            _textBuilder.Append('\n');
+            _textBuilder.Append("<color=#FF9F8A>Job</color> step ").Append(jobSteps)
+                .Append(" | route ").Append(routePreparations)
+                .Append(" | fail ").Append(moveFailures)
+                .Append(" | recovery ").Append(recoveryEvaluated);
             return _textBuilder.ToString();
         }
 
@@ -175,7 +188,7 @@ namespace Arcontio.View.MapGrid
                 return;
 
             _costMode = enabled;
-            _panelRt.sizeDelta = enabled ? new Vector2(820f, 52f) : new Vector2(220f, 34f);
+            _panelRt.sizeDelta = enabled ? new Vector2(560f, 92f) : new Vector2(220f, 34f);
             _text.fontSize = enabled ? 12 : 14;
         }
     }
