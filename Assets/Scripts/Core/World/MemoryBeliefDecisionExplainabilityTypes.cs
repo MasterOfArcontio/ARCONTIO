@@ -379,6 +379,7 @@ namespace Arcontio.Core
         public BeliefSource Source;
         public int BeliefId;
         public Vector2Int EstimatedPosition;
+        public int SubjectId;
         public float Confidence;
         public float Freshness;
         public int SourceCount;

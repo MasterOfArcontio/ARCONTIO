@@ -617,6 +617,13 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
         {
             if (_fovOverlayPinned)
             {
+                int selected = NPCSelection.SelectedNpcId;
+                if (selected > 0 && _world != null && _world.ExistsNpc(selected))
+                {
+                    _fovOverlayPinnedNpcId = selected;
+                    return selected;
+                }
+
                 if (_fovOverlayPinnedNpcId > 0 && _world != null && _world.ExistsNpc(_fovOverlayPinnedNpcId))
                     return _fovOverlayPinnedNpcId;
 

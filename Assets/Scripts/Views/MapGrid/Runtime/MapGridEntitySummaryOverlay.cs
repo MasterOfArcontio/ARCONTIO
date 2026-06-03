@@ -196,6 +196,7 @@ namespace Arcontio.View.MapGrid
         // Line registries
         private readonly Dictionary<int, MapGridOverlayLine> _npcLines = new();
         private readonly Dictionary<int, MapGridOverlayLine> _objLines = new();
+        private readonly Dictionary<int, NpcNameLabelView> _npcNameLabels = new();
 
         // Offset persistence (in RAM)
         private readonly Dictionary<int, Vector2> _npcOffsets = new();
@@ -271,6 +272,10 @@ namespace Arcontio.View.MapGrid
                 if (_npcLines.TryGetValue(npcId, out var line) && line != null)
                     line.gameObject.SetActive(false);
                 _npcLines.Remove(npcId);
+
+                if (_npcNameLabels.TryGetValue(npcId, out var label) && label != null)
+                    label.SetVisible(false);
+                _npcNameLabels.Remove(npcId);
             }
 
             // Add missing NPC cards
@@ -289,9 +294,15 @@ namespace Arcontio.View.MapGrid
 
                 var line = CreateLine($"NpcLine_{npcId}");
                 _npcLines[npcId] = line;
+                _npcNameLabels[npcId] = CreateNpcNameLabel($"NpcNameLabel_{npcId}");
                 //line.SetVisible(true);
                 HookDrag(card.RootRectTransform, npcId, isNpc: true, getAnchor: () => GetNpcAnchorLocal(world, npcId, _lastCam, _lastTileSizeWorld));
             }
+        }
+
+        private NpcNameLabelView CreateNpcNameLabel(string name)
+        {
+            return new NpcNameLabelView(name, _cardsRoot != null ? _cardsRoot : _root.transform);
         }
 
         private void SyncObjectCards(Arcontio.Core.World world)
@@ -432,20 +443,36 @@ namespace Arcontio.View.MapGrid
                 if (!_npcLines.TryGetValue(npcId, out var line))
                     continue;
 
-                // Policy UX v0.11 debug:
-                // una sola card NPC puo' restare completa. La selezione e' uno stato
-                // view-only condiviso da NPCSelection; gli NPC non selezionati restano
-                // osservabili con una micro-card needs-only, senza duplicare memoria,
-                // inventario, MBQD, navigazione e altre sezioni pesanti.
-                card.SetCompactNeedsOnly(!IsNpcSelectedForFullCard(npcId));
+                bool selectedForFullCard = IsNpcSelectedForFullCard(npcId);
+                card.SetCompactNeedsOnly(!selectedForFullCard);
 
                 Vector2 anchor = GetNpcAnchorLocal(world, npcId, cam, tileSizeWorld);
                 if (float.IsNaN(anchor.x))
                 {
                     card.SetVisible(false);
                     line.SetVisible(false);
+                    if (_npcNameLabels.TryGetValue(npcId, out var hiddenLabel) && hiddenLabel != null)
+                        hiddenLabel.SetVisible(false);
                     continue;
                 }
+
+                if (!selectedForFullCard)
+                {
+                    card.SetVisible(false);
+                    line.gameObject.SetActive(false);
+                    line.SetVisible(false);
+
+                    if (_npcNameLabels.TryGetValue(npcId, out var label) && label != null)
+                    {
+                        label.SetText(ResolveNpcLabel(world, npcId));
+                        label.SetCanvasLocalPosition(anchor + new Vector2(0f, 22f));
+                        label.SetVisible(true);
+                    }
+                    continue;
+                }
+
+                if (_npcNameLabels.TryGetValue(npcId, out var selectedLabel) && selectedLabel != null)
+                    selectedLabel.SetVisible(false);
 
                 card.SetVisible(true);
                 line.gameObject.SetActive(true);
@@ -471,6 +498,16 @@ namespace Arcontio.View.MapGrid
                     card.SetCanvasLocalPosition(cardPos);
                 }
             }
+        }
+
+        private static string ResolveNpcLabel(Arcontio.Core.World world, int npcId)
+        {
+            if (world != null
+                && world.NpcDna.TryGetValue(npcId, out var dna)
+                && !string.IsNullOrWhiteSpace(dna.Identity.Name))
+                return dna.Identity.Name;
+
+            return "NPC #" + npcId;
         }
 
         private void UpdateObjectPositions(Arcontio.Core.World world, Camera cam, float tileSizeWorld)
@@ -674,15 +711,11 @@ namespace Arcontio.View.MapGrid
                 world.Needs.TryGetValue(npcId, out var needs);
                 bool isSelectedNpc = IsNpcSelectedForFullCard(npcId);
 
-                // Se l'NPC non e' selezionato, la card deve restare una micro-card:
-                // aggiorniamo soltanto le barre needs e saltiamo la costruzione delle
-                // sezioni diagnostiche complete. Questo mantiene l'overlay scalabile
-                // con molti NPC e garantisce che la view non moltiplichi lavoro UI
-                // inutile per memoria, MBQD, navigazione e inventario.
-                card.SetCompactNeedsOnly(!isSelectedNpc);
-                card.UpdateNeedsBars(needs);
                 if (!isSelectedNpc)
                     continue;
+
+                card.SetCompactNeedsOnly(!isSelectedNpc);
+                card.UpdateNeedsBars(needs);
 
                 bool buildInventory = card.ShouldBuildInventorySection();
                 bool buildComms = card.ShouldBuildCommsSection();
@@ -1534,6 +1567,8 @@ namespace Arcontio.View.MapGrid
                         .Append("<color=").Append(ColorFor(belief.ColorRole)).Append(">")
                         .Append('#').Append(belief.BeliefId).Append(' ')
                         .Append(belief.Category).Append("  ").Append(belief.EstimatedCell)
+                        .Append(belief.SubjectId > 0 ? "  subj=" : string.Empty)
+                        .Append(belief.SubjectId > 0 ? belief.SubjectId.ToString() : string.Empty)
                         .Append("</color>")
                         .Append("  <b>STATUS=").Append(belief.Status).Append("</b>")
                         .Append("  conf=").Append(belief.Confidence.ToString("0.00"))
@@ -1554,6 +1589,8 @@ namespace Arcontio.View.MapGrid
                         .Append("<color=").Append(ColorFor(belief.ColorRole)).Append(">")
                         .Append('#').Append(belief.BeliefId).Append(' ')
                         .Append(belief.Category).Append("  ").Append(belief.EstimatedCell)
+                        .Append(belief.SubjectId > 0 ? "  subj=" : string.Empty)
+                        .Append(belief.SubjectId > 0 ? belief.SubjectId.ToString() : string.Empty)
                         .Append("</color>")
                         .Append("  <b>STATUS=").Append(belief.Status).Append("</b>")
                         .Append("  conf=").Append(belief.Confidence.ToString("0.00"))
@@ -1878,7 +1915,8 @@ namespace Arcontio.View.MapGrid
             if (belief == null || belief.BeliefId == 0)
                 return "nessuna";
 
-            return $"#{belief.BeliefId} {belief.Category} {belief.EstimatedCell} STATUS={belief.Status} conf={belief.Confidence:0.00} fresh={belief.Freshness:0.00} source={belief.Source} sources={belief.SourceCount}";
+            string subject = belief.SubjectId > 0 ? $" subj={belief.SubjectId}" : string.Empty;
+            return $"#{belief.BeliefId} {belief.Category} {belief.EstimatedCell}{subject} STATUS={belief.Status} conf={belief.Confidence:0.00} fresh={belief.Freshness:0.00} source={belief.Source} sources={belief.SourceCount}";
         }
 
         // =============================================================================
@@ -2483,6 +2521,74 @@ namespace Arcontio.View.MapGrid
     // Legacy Input System
     existing.gameObject.AddComponent<StandaloneInputModule>();
 #endif
+        }
+    }
+
+    internal sealed class NpcNameLabelView
+    {
+        private readonly GameObject _root;
+        private readonly RectTransform _rect;
+        private readonly Text _text;
+
+        public NpcNameLabelView(string name, Transform parent)
+        {
+            _root = new GameObject(name);
+            _root.transform.SetParent(parent, false);
+
+            _rect = _root.AddComponent<RectTransform>();
+            _rect.anchorMin = new Vector2(0.5f, 0.5f);
+            _rect.anchorMax = new Vector2(0.5f, 0.5f);
+            _rect.pivot = new Vector2(0.5f, 0.5f);
+            _rect.sizeDelta = new Vector2(64f, 18f);
+
+            var bg = _root.AddComponent<Image>();
+            bg.color = new Color(0f, 0f, 0f, 0.38f);
+            bg.raycastTarget = false;
+
+            var textGo = new GameObject("Text");
+            textGo.transform.SetParent(_root.transform, false);
+            var textRt = textGo.AddComponent<RectTransform>();
+            textRt.anchorMin = Vector2.zero;
+            textRt.anchorMax = Vector2.one;
+            textRt.offsetMin = new Vector2(4f, 1f);
+            textRt.offsetMax = new Vector2(-4f, -1f);
+
+            _text = textGo.AddComponent<Text>();
+            _text.font = GetUiFont();
+            _text.fontSize = 10;
+            _text.fontStyle = FontStyle.Bold;
+            _text.alignment = TextAnchor.MiddleCenter;
+            _text.color = new Color(1f, 1f, 1f, 0.78f);
+            _text.raycastTarget = false;
+
+            SetVisible(false);
+        }
+
+        public void SetVisible(bool visible)
+        {
+            if (_root != null)
+                _root.SetActive(visible);
+        }
+
+        public void SetText(string value)
+        {
+            if (_text != null)
+                _text.text = string.IsNullOrWhiteSpace(value) ? "NPC" : value;
+        }
+
+        public void SetCanvasLocalPosition(Vector2 position)
+        {
+            if (_rect != null)
+                _rect.anchoredPosition = position;
+        }
+
+        private static Font GetUiFont()
+        {
+            var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            if (font != null)
+                return font;
+
+            return Resources.GetBuiltinResource<Font>("Arial.ttf");
         }
     }
 }

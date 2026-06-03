@@ -62,6 +62,7 @@ namespace Arcontio.Core
         };
 
         private static readonly List<int> SearchFoodLandmarkScratch = new(64);
+        private static readonly List<int> SearchFoodLandmarkCandidateScratch = new(64);
         private static readonly List<Vector2Int> SearchFoodPathScratch = new(128);
 
         // =============================================================================
@@ -102,7 +103,7 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!TryResolveSearchFoodTargetCell(world, npcId, out var probeCell, out reason))
+            if (!TryResolveSearchFoodTargetCell(world, npcId, nowTick, out var probeCell, out reason))
             {
                 LogSearchFoodJobRoute(nowTick, npcId, "ProbeUnavailable", reason, gateEnabled);
                 return false;
@@ -455,7 +456,7 @@ namespace Arcontio.Core
             return 0;
         }
 
-        private static bool TryResolveSearchFoodTargetCell(World world, int npcId, out Vector2Int probeCell, out string reason)
+        private static bool TryResolveSearchFoodTargetCell(World world, int npcId, int nowTick, out Vector2Int probeCell, out string reason)
         {
             probeCell = default;
             reason = string.Empty;
@@ -474,7 +475,7 @@ namespace Arcontio.Core
                 return true;
             }
 
-            if (TryResolveSearchFoodLandmarkRouteCell(world, npcId, origin, out probeCell))
+            if (TryResolveSearchFoodLandmarkRouteCell(world, npcId, origin, nowTick, out probeCell))
             {
                 reason = "SearchFoodLandmarkRouteResolved";
                 return true;
@@ -496,7 +497,7 @@ namespace Arcontio.Core
             return false;
         }
 
-        private static bool TryResolveSearchFoodLandmarkRouteCell(World world, int npcId, Vector2Int origin, out Vector2Int routeCell)
+        private static bool TryResolveSearchFoodLandmarkRouteCell(World world, int npcId, Vector2Int origin, int nowTick, out Vector2Int routeCell)
         {
             routeCell = default;
 
@@ -510,11 +511,10 @@ namespace Arcontio.Core
                 return false;
 
             SearchFoodLandmarkScratch.Clear();
+            SearchFoodLandmarkCandidateScratch.Clear();
             memory.FillKnownLandmarkIds(SearchFoodLandmarkScratch);
 
-            int bestNodeId = 0;
-            int bestDistance = -1;
-            int bestNodeCount = -1;
+            int pathBudget = ResolveSearchFoodPathBudget(world, world.GetNpcPerceptionRangeCells(npcId));
 
             for (int i = 0; i < SearchFoodLandmarkScratch.Count; i++)
             {
@@ -528,17 +528,39 @@ namespace Arcontio.Core
                 if (!world.TryPlanMacroRoute(npcId, startNodeId, nodeId, out var plan) || plan == null || !plan.Succeeded || plan.NodeIds.Count < 2)
                     continue;
 
-                int distance = Mathf.Abs(node.CellX - origin.x) + Mathf.Abs(node.CellY - origin.y);
-                if (distance > bestDistance || (distance == bestDistance && plan.NodeIds.Count > bestNodeCount))
-                {
-                    bestDistance = distance;
-                    bestNodeCount = plan.NodeIds.Count;
-                    bestNodeId = nodeId;
-                    routeCell = new Vector2Int(node.CellX, node.CellY);
-                }
+                SearchFoodPathScratch.Clear();
+                if (!MovementPathfinder.TryBuildBoundedMovePath(world, npcId, origin.x, origin.y, node.CellX, node.CellY, pathBudget, SearchFoodPathScratch)
+                    || SearchFoodPathScratch.Count < 2)
+                    continue;
+
+                SearchFoodLandmarkCandidateScratch.Add(nodeId);
             }
 
-            return bestNodeId != 0;
+            if (SearchFoodLandmarkCandidateScratch.Count == 0)
+                return false;
+
+            int selectedIndex = ResolveDeterministicSearchFoodLandmarkIndex(npcId, nowTick, SearchFoodLandmarkCandidateScratch);
+            int selectedNodeId = SearchFoodLandmarkCandidateScratch[selectedIndex];
+            if (!world.LandmarkRegistry.TryGetActiveNodeById(selectedNodeId, out var selectedNode) || selectedNode == null)
+                return false;
+
+            routeCell = new Vector2Int(selectedNode.CellX, selectedNode.CellY);
+            return true;
+        }
+
+        private static int ResolveDeterministicSearchFoodLandmarkIndex(int npcId, int nowTick, List<int> candidateNodeIds)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 31 + npcId;
+                hash = hash * 31 + nowTick;
+                for (int i = 0; i < candidateNodeIds.Count; i++)
+                    hash = hash * 31 + candidateNodeIds[i];
+
+                uint positiveHash = unchecked((uint)hash);
+                return (int)(positiveHash % (uint)candidateNodeIds.Count);
+            }
         }
 
         private static bool TryResolveSearchFoodLocalProbeCell(World world, int npcId, Vector2Int origin, out Vector2Int probeCell)

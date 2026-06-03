@@ -87,9 +87,9 @@ namespace Arcontio.View.MapGrid
         private static readonly Color WorldColor      = new Color(1f,    1f,    1f,    0.85f);
         private static readonly Color KnownColor      = new Color(0.20f, 1.00f, 0.55f, 1f);
         private static readonly Color RouteColor      = new Color(1.00f, 0.65f, 0.15f, 1f);
-        private static readonly Color LmPathColor     = new Color(1.00f, 0.65f, 0.15f, 1f);
-        private static readonly Color DirectPathColor = new Color(0.20f, 0.75f, 1.00f, 1f);
-        private static readonly Color JumpPathColor   = new Color(1.00f, 0.20f, 0.75f, 1f);
+        private static readonly Color LmPathColor     = new Color(1.00f, 0.65f, 0.15f, 0.50f);
+        private static readonly Color DirectPathColor = new Color(0.20f, 0.75f, 1.00f, 0.50f);
+        private static readonly Color JumpPathColor   = new Color(1.00f, 0.20f, 0.75f, 0.50f);
         private static readonly Color GvdNodeColor      = new Color(0.70f, 0.10f, 1.00f, 1f);
         private static readonly Color GvdRawColor       = new Color(0.00f, 1.00f, 1.00f, 0.60f);
         // v0.03.04.c-ComplexEdge_Creation: giallo — distinto da verde (known) e arancione (route)

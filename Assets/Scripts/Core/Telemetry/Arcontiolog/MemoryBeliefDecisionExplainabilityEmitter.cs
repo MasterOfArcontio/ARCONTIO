@@ -716,6 +716,7 @@ namespace Arcontio.Core
                 Source = belief.Source,
                 BeliefId = belief.BeliefId,
                 EstimatedPosition = belief.EstimatedPosition,
+                SubjectId = belief.SubjectId,
                 Confidence = belief.Confidence,
                 Freshness = belief.Freshness,
                 SourceCount = belief.SourceCount,

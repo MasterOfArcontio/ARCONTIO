@@ -155,6 +155,24 @@ namespace Arcontio.Tests
             AssertBelief(store.Entries[1], BeliefCategory.Social, BeliefStatus.Active, BeliefSource.Seen, new Vector2Int(4, 6), 0.60f, 0.70f, 1);
         }
 
+        [Test]
+        public void NpcSpottedBeliefMergesByObservedSubjectAndUpdatesPosition()
+        {
+            var store = new BeliefStore();
+            var updater = new BeliefUpdater();
+            var firstTrace = MakeTrace(MemoryType.NpcSpotted, 12, string.Empty, 4, 6, 0.70f, 0.60f, isHeard: false);
+            var secondTrace = MakeTrace(MemoryType.NpcSpotted, 12, string.Empty, 9, 10, 0.75f, 0.65f, isHeard: false);
+
+            Assert.That(updater.UpdateFromTrace(firstTrace, store, currentTick: 31), Is.True);
+            Assert.That(updater.UpdateFromTrace(secondTrace, store, currentTick: 36), Is.True);
+
+            Assert.That(store.Entries.Count, Is.EqualTo(1));
+            Assert.That(store.Entries[0].Category, Is.EqualTo(BeliefCategory.Social));
+            Assert.That(store.Entries[0].SubjectId, Is.EqualTo(12));
+            Assert.That(store.Entries[0].EstimatedPosition, Is.EqualTo(new Vector2Int(9, 10)));
+            Assert.That(store.Entries[0].SourceCount, Is.EqualTo(2));
+        }
+
         // =============================================================================
         // DroppedMemoryTraceDoesNotUpdateBeliefStore
         // =============================================================================
