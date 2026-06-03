@@ -58,17 +58,6 @@ namespace Arcontio.Core
             int costDebugFovCells = 0;
             int costCandidateCells = 0;
 
-            int visionRange = world.Global.NpcVisionRangeCells;
-            if (visionRange <= 0) visionRange = 6;
-
-            bool useCone = world.Global.NpcVisionUseCone;
-            float coneSlope = world.Global.NpcVisionConeSlope;
-
-            // Back-compat: se stai ancora usando "NpcVisionConeHalfWidthPerStep"
-            // e NpcVisionConeSlope non ï¿½ impostato, copia.
-            if (coneSlope <= 0f && world.Global.NpcVisionConeHalfWidthPerStep > 0f)
-                coneSlope = world.Global.NpcVisionConeHalfWidthPerStep;
-
             var selectedNpcIds = world.SelectNpcPerceptionUpdatesForTick(tick.Index);
 
             int spotted = 0;
@@ -86,11 +75,11 @@ namespace Arcontio.Core
                 if (costSample)
                     costNpcScans++;
 
-                visionRange = world.GetNpcPerceptionRangeCells(npcId);
+                int visionRange = world.GetNpcPerceptionRangeCells(npcId);
                 if (visionRange <= 0) visionRange = 6;
 
-                useCone = world.GetNpcPerceptionUseCone(npcId);
-                coneSlope = world.GetNpcPerceptionConeSlope(npcId);
+                bool useCone = world.GetNpcPerceptionUseCone(npcId);
+                float coneSlope = world.GetNpcPerceptionConeSlope(npcId);
 
                 if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                     facing = CardinalDirection.North;
