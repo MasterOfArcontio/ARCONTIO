@@ -435,6 +435,7 @@ namespace Arcontio.Core.Config
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>defaultState</b>: stato assegnato agli NPC appena creati o caricati.</item>
+    ///   <item><b>maxNpcPerceptionUpdatesPerTick</b>: tetto massimo di NPC percettivi processabili in un tick.</item>
     ///   <item><b>idle</b>: profilo ordinario a basso costo.</item>
     ///   <item><b>movement</b>: profilo per NPC in spostamento.</item>
     ///   <item><b>alert</b>: profilo per attenzione aumentata.</item>
@@ -446,6 +447,7 @@ namespace Arcontio.Core.Config
     public sealed class PerceptionStateRuntimeParams
     {
         public string defaultState = "idle";
+        public int maxNpcPerceptionUpdatesPerTick = 4;
         public PerceptionStateProfile idle = PerceptionStateProfile.Create(8, 12, true, 90, 0f);
         public PerceptionStateProfile movement = PerceptionStateProfile.Create(4, 14, true, 90, 0f);
         public PerceptionStateProfile alert = PerceptionStateProfile.Create(2, 17, true, 100, 0f);
