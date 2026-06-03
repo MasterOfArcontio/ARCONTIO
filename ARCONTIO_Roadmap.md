@@ -1138,7 +1138,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20h | Landmark perception allineata a dirty/cadenza/range | ✅ |
 | v0.20i | Rotazione movimento e `LookDirection` come sorgenti dirty percettive | ✅ |
 | v0.20j | Cleanup strutture obsolete o ridondanti post-rifondazione | ✅ |
-| v0.20k | QA profiler 20/50/100 NPC e debug overlay costo percettivo | ⏳ |
+| v0.20k | QA profiler 20/50/100 NPC e debug overlay costo percettivo | ✅ |
 | v0.20l | Closeout rifondazione percezione runtime | ⏳ |
 
 > **Nota architetturale v0.20:** questa fase introduce una biforcazione controllata del ramo di sviluppo perche' tocca la struttura del ciclo runtime. La patch deve restare progressiva, ma non deve lasciare a meta' indici persistenti, dirty percettivo o cadenza: ogni checkpoint deve mantenere simulazione e diagnostica in uno stato leggibile.
@@ -1158,6 +1158,8 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota rotazione percettiva v0.20i:** rotazioni e spostamenti reali dell'NPC producono ora dirty percettivo immediato, quindi non restano bloccati dalla cadenza lenta dello stato `Idle`. La running action `MoveTo` orienta l'NPC verso la cella attraversata prima del completamento fisico del passo multi-tick; il ponte `MovementSystem` legacy/debug mantiene lo stesso comportamento. Lo scan direzionale usa lo stato percettivo `LookDirection` durante la rotazione e torna a `Idle` a scan concluso.
 
 > **Nota cleanup v0.20j:** l'audit post-rifondazione non ha individuato strutture percettive eliminabili senza rischio: indici persistenti, dirty, watched/observed e contatori costo risultano vivi. La patch rimuove solo letture ridondanti rimaste da prima degli stati percettivi e aggiorna i commenti interni ormai superati. `IdleScanSystem` e `MovementSystem` restano ponti tollerati fino alla chiusura dei relativi debiti futuri.
+
+> **Nota QA costo percettivo v0.20k:** `game_params.json` espone ora la sezione `logging.runtime_cost_observer`, spenta di default per mantenere costo nullo. Quando e' attiva, il riquadro coordinate mostra un riepilogo leggero di selezione percettiva, pending, dirty e contatori cumulativi principali per oggetti/NPC/FOV, cosi' i test 20/50/100 NPC possono essere letti direttamente in runtime oltre che dai JSONL.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti

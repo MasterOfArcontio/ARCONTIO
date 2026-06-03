@@ -77,6 +77,17 @@
         "use_los": true,
         "activeNpcOnly": true
       }
+    },
+    "runtime_cost_observer": {
+      "enabled": false,
+      "sampleEveryTicks": 1,
+      "trackPerNpc": false,
+      "writeJsonl": false,
+      "maxTicksInMemory": 256,
+      "jsonlFlushIntervalTicks": 25,
+      "jsonlMaxQueueSize": 4096,
+      "jsonlMaxBatchSize": 512,
+      "jsonLogFileNamePattern": "arcontio_runtime_cost_{yyyyMMdd_HHmmss}.jsonl"
     }
   },
   "npcVisionRangeCells": 17,

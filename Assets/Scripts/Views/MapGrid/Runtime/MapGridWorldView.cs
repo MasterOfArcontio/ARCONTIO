@@ -543,7 +543,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
                     int cy = Mathf.FloorToInt(wp.y / cfg.tileSizeWorld);
 
                     bool inBounds = (_world != null) && _world.InBounds(cx, cy);
-                    _pointerCoords.SetCell(cx, cy, inBounds);
+                    _pointerCoords.SetCell(cx, cy, inBounds, _world);
                 }
             }
 
