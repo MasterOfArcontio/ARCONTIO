@@ -122,6 +122,8 @@ namespace Arcontio.Tests
                 tests.PerceptionStateConfigResolvesCadenceRangeAndCone();
                 tests.PerceptionStateSchedulerUsesDeterministicCadencePhase();
                 tests.PerceptionDirtyRadiusUsesConfiguredStateMaximumRange();
+                tests.PerceptionTickBudgetLimitsReadyDirtyNpcsAndTracksPending();
+                tests.PerceptionTickBudgetFiltersCadenceBeforeBudget();
 
                 Debug.Log("[PerceptionSpatialIndexQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -444,6 +446,72 @@ namespace Arcontio.Tests
             var world = new World(new WorldConfig(sim));
 
             Assert.That(world.GetConservativePerceptionDirtyRadiusCells(), Is.EqualTo(14));
+        }
+
+        [Test]
+        public void PerceptionTickBudgetLimitsReadyDirtyNpcsAndTracksPending()
+        {
+            var sim = new SimulationParams();
+            sim.perception_states.defaultState = "idle";
+            sim.perception_states.maxNpcPerceptionUpdatesPerTick = 2;
+            sim.perception_states.idle = PerceptionStateProfile.Create(1, 8, true, 90, 0f);
+
+            var world = new World(new WorldConfig(sim));
+            for (int i = 0; i < 5; i++)
+            {
+                world.CreateNpc(
+                    NpcDnaProfile.CreateDefault("BudgetNpc" + i),
+                    new NpcNeeds(),
+                    new Arcontio.Core.Social(),
+                    i + 1,
+                    1);
+            }
+
+            var selected = world.SelectNpcPerceptionUpdatesForTick(10);
+            var pending = world.GetLastNpcPerceptionPendingIds();
+            var stats = world.GetLastNpcPerceptionTickBudgetStats();
+
+            Assert.That(selected.Count, Is.EqualTo(2));
+            Assert.That(pending.Count, Is.EqualTo(3));
+            Assert.That(stats.DirtyNpcCount, Is.EqualTo(5));
+            Assert.That(stats.CadenceReadyCount, Is.EqualTo(5));
+            Assert.That(stats.SelectedCount, Is.EqualTo(2));
+            Assert.That(stats.PendingCount, Is.EqualTo(3));
+            Assert.That(stats.SkippedByCadenceCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void PerceptionTickBudgetFiltersCadenceBeforeBudget()
+        {
+            var sim = new SimulationParams();
+            sim.perception_states.defaultState = "idle";
+            sim.perception_states.maxNpcPerceptionUpdatesPerTick = 10;
+            sim.perception_states.idle = PerceptionStateProfile.Create(2, 8, true, 90, 0f);
+
+            var world = new World(new WorldConfig(sim));
+            int npcOne = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("CadenceOne"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int npcTwo = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("CadenceTwo"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                2,
+                1);
+
+            var selected = world.SelectNpcPerceptionUpdatesForTick(0);
+            var stats = world.GetLastNpcPerceptionTickBudgetStats();
+
+            Assert.That(selected.Count, Is.EqualTo(1));
+            Assert.That(selected[0], Is.EqualTo(npcTwo));
+            Assert.That(world.ShouldNpcRunPerceptionThisTick(npcOne, 0), Is.False);
+            Assert.That(world.ShouldNpcRunPerceptionThisTick(npcTwo, 0), Is.True);
+            Assert.That(stats.CadenceReadyCount, Is.EqualTo(1));
+            Assert.That(stats.SkippedByCadenceCount, Is.EqualTo(1));
+            Assert.That(stats.PendingCount, Is.EqualTo(0));
         }
     }
 }

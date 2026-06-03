@@ -45,6 +45,46 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // NpcPerceptionTickBudgetStats
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Contatori dell'ultimo passaggio di selezione percettiva per tick.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: diagnostica numerica senza stringhe calde</b></para>
+    /// <para>
+    /// La selezione percettiva deve essere misurabile, ma non deve costruire testo,
+    /// DTO o log a ogni tick. Questa struct contiene solo numeri piccoli e viene
+    /// aggiornata dal <c>World</c>; le UI/debug future potranno trasformarla in
+    /// stringhe solo quando visibili.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>TickIndex</b>: tick simulativo della selezione.</item>
+    ///   <item><b>TotalNpcCount</b>: NPC vivi nel World.</item>
+    ///   <item><b>DirtyNpcCount</b>: NPC marcati dirty prima del filtro.</item>
+    ///   <item><b>CadenceReadyCount</b>: dirty che hanno passato la cadenza.</item>
+    ///   <item><b>SelectedCount</b>: NPC ammessi nel budget del tick.</item>
+    ///   <item><b>PendingCount</b>: NPC pronti ma rimandati per limite massimo.</item>
+    ///   <item><b>SkippedByCadenceCount</b>: dirty rimandati per cadenza.</item>
+    ///   <item><b>MaxPerceptionUpdates</b>: limite effettivo applicato.</item>
+    /// </list>
+    /// </summary>
+    public struct NpcPerceptionTickBudgetStats
+    {
+        public long TickIndex;
+        public int TotalNpcCount;
+        public int DirtyNpcCount;
+        public int CadenceReadyCount;
+        public int SelectedCount;
+        public int PendingCount;
+        public int SkippedByCadenceCount;
+        public int MaxPerceptionUpdates;
+    }
+
+    // =============================================================================
     // World.cs — Patch 0.02.5A (commenti verbosi)
     // =============================================================================
     /// <summary>
@@ -763,6 +803,10 @@ namespace Arcontio.Core
         private bool[] _perceptionDirtyNpcFlags = new bool[256];
         private readonly List<int> _perceptionDirtyNpcIds = new(256);
         private readonly Dictionary<int, NpcPerceptionActivityState> _npcPerceptionActivityStates = new(256);
+        private readonly List<int> _npcPerceptionTickSelectedIds = new(128);
+        private readonly List<int> _npcPerceptionTickPendingIds = new(128);
+        private int _npcPerceptionRoundRobinCursor;
+        private NpcPerceptionTickBudgetStats _lastNpcPerceptionTickBudgetStats;
         private readonly Dictionary<int, List<int>> _objectWatchedByNpcIds = new(512);
         private readonly Dictionary<int, List<int>> _objectObservedByNpcIds = new(512);
         private readonly Dictionary<int, List<int>> _npcWatchedByNpcIds = new(512);
@@ -1669,6 +1713,120 @@ namespace Arcontio.Core
 
             int npcPhase = npcId % cadenceTicks;
             return tickPhase == npcPhase;
+        }
+
+        // =============================================================================
+        // SelectNpcPerceptionUpdatesForTick
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Seleziona gli NPC dirty che possono eseguire percezione nel tick corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: budget percettivo centrale</b></para>
+        /// <para>
+        /// La selezione applica in un solo punto dirty, cadenza per stato e limite
+        /// massimo per tick. Non produce eventi, non crea memoria, non aggiorna
+        /// belief e non chiama sistemi percettivi: prepara soltanto la lista che i
+        /// prossimi checkpoint useranno nel blocco percezione centralizzato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Input</b>: lista dirty compatta gia' mantenuta dal World.</item>
+        ///   <item><b>Filtro</b>: <c>ShouldNpcRunPerceptionThisTick</c> per stato/cadenza.</item>
+        ///   <item><b>Budget</b>: <c>maxNpcPerceptionUpdatesPerTick</c> da game_params.</item>
+        ///   <item><b>Equita'</b>: cursore round-robin deterministico tra i dirty.</item>
+        ///   <item><b>Output</b>: liste interne riusate, senza allocazioni per chiamata.</item>
+        /// </list>
+        /// </summary>
+        public IReadOnlyList<int> SelectNpcPerceptionUpdatesForTick(long tickIndex)
+        {
+            _npcPerceptionTickSelectedIds.Clear();
+            _npcPerceptionTickPendingIds.Clear();
+
+            int dirtyCount = _perceptionDirtyNpcIds.Count;
+            int maxUpdates = ResolveMaxNpcPerceptionUpdatesPerTick();
+            int selectedCount = 0;
+            int readyCount = 0;
+            int skippedByCadence = 0;
+            int lastSelectedIndex = -1;
+
+            if (dirtyCount > 0)
+            {
+                if (_npcPerceptionRoundRobinCursor < 0 || _npcPerceptionRoundRobinCursor >= dirtyCount)
+                    _npcPerceptionRoundRobinCursor = 0;
+
+                int startIndex = _npcPerceptionRoundRobinCursor;
+                for (int offset = 0; offset < dirtyCount; offset++)
+                {
+                    int listIndex = (startIndex + offset) % dirtyCount;
+                    int npcId = _perceptionDirtyNpcIds[listIndex];
+                    if (!ExistsNpc(npcId))
+                        continue;
+
+                    if (!ShouldNpcRunPerceptionThisTick(npcId, tickIndex))
+                    {
+                        skippedByCadence++;
+                        continue;
+                    }
+
+                    readyCount++;
+                    if (selectedCount < maxUpdates)
+                    {
+                        _npcPerceptionTickSelectedIds.Add(npcId);
+                        selectedCount++;
+                        lastSelectedIndex = listIndex;
+                    }
+                    else
+                    {
+                        _npcPerceptionTickPendingIds.Add(npcId);
+                    }
+                }
+
+                if (lastSelectedIndex >= 0)
+                    _npcPerceptionRoundRobinCursor = (lastSelectedIndex + 1) % dirtyCount;
+                else
+                    _npcPerceptionRoundRobinCursor = (startIndex + 1) % dirtyCount;
+            }
+
+            _lastNpcPerceptionTickBudgetStats = new NpcPerceptionTickBudgetStats
+            {
+                TickIndex = tickIndex,
+                TotalNpcCount = NpcDna.Count,
+                DirtyNpcCount = dirtyCount,
+                CadenceReadyCount = readyCount,
+                SelectedCount = _npcPerceptionTickSelectedIds.Count,
+                PendingCount = _npcPerceptionTickPendingIds.Count,
+                SkippedByCadenceCount = skippedByCadence,
+                MaxPerceptionUpdates = maxUpdates
+            };
+
+            return _npcPerceptionTickSelectedIds;
+        }
+
+        public IReadOnlyList<int> GetLastNpcPerceptionSelectedIds()
+        {
+            return _npcPerceptionTickSelectedIds;
+        }
+
+        public IReadOnlyList<int> GetLastNpcPerceptionPendingIds()
+        {
+            return _npcPerceptionTickPendingIds;
+        }
+
+        public NpcPerceptionTickBudgetStats GetLastNpcPerceptionTickBudgetStats()
+        {
+            return _lastNpcPerceptionTickBudgetStats;
+        }
+
+        public int ResolveMaxNpcPerceptionUpdatesPerTick()
+        {
+            int configured = Config?.Sim?.perception_states != null
+                ? Config.Sim.perception_states.maxNpcPerceptionUpdatesPerTick
+                : 0;
+
+            return configured > 0 ? configured : int.MaxValue;
         }
 
         private NpcPerceptionActivityState ResolveDefaultPerceptionActivityState()

@@ -86,6 +86,7 @@
   "npcVisionFovDegrees": 90,
   "perception_states": {
     "defaultState": "idle",
+    "maxNpcPerceptionUpdatesPerTick": 4,
     "idle": {
       "cadenceTicks": 8,
       "visionRangeCells": 12,
