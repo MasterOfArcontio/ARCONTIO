@@ -124,6 +124,8 @@ namespace Arcontio.Tests
                 tests.PerceptionDirtyRadiusUsesConfiguredStateMaximumRange();
                 tests.PerceptionTickBudgetLimitsReadyDirtyNpcsAndTracksPending();
                 tests.PerceptionTickBudgetFiltersCadenceBeforeBudget();
+                tests.PerceptionImmediateDirtyBypassesCadenceForFacingAndMovement();
+                tests.IdleScanUsesLookDirectionStateWhileTurning();
                 tests.ObjectPerceptionProcessesOnlyTickBudgetSelection();
                 tests.NpcPerceptionProcessesOnlyTickBudgetSelectionAndCompletesDirty();
 
@@ -514,6 +516,68 @@ namespace Arcontio.Tests
             Assert.That(stats.CadenceReadyCount, Is.EqualTo(1));
             Assert.That(stats.SkippedByCadenceCount, Is.EqualTo(1));
             Assert.That(stats.PendingCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void PerceptionImmediateDirtyBypassesCadenceForFacingAndMovement()
+        {
+            var sim = new SimulationParams();
+            sim.perception_states.defaultState = "idle";
+            sim.perception_states.maxNpcPerceptionUpdatesPerTick = 4;
+            sim.perception_states.idle = PerceptionStateProfile.Create(10, 8, true, 90, 0f);
+
+            var world = new World(new WorldConfig(sim));
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("ImmediateObserver"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+
+            world.ClearAllNpcPerceptionDirty();
+            Assert.That(world.ShouldNpcRunPerceptionThisTick(npcId, 0), Is.False);
+
+            world.SetFacing(npcId, CardinalDirection.East);
+            var facingSelected = world.SelectNpcPerceptionUpdatesForTick(0);
+
+            Assert.That(world.IsNpcPerceptionImmediateRequested(npcId), Is.True);
+            Assert.That(facingSelected.Count, Is.EqualTo(1));
+            Assert.That(facingSelected[0], Is.EqualTo(npcId));
+
+            world.CompleteNpcPerceptionUpdatesForTick(0);
+            Assert.That(world.IsNpcPerceptionDirty(npcId), Is.False);
+            Assert.That(world.IsNpcPerceptionImmediateRequested(npcId), Is.False);
+
+            world.SetNpcPos(npcId, 2, 1);
+            var movementSelected = world.SelectNpcPerceptionUpdatesForTick(1);
+
+            Assert.That(world.IsNpcPerceptionImmediateRequested(npcId), Is.True);
+            Assert.That(movementSelected.Count, Is.EqualTo(1));
+            Assert.That(movementSelected[0], Is.EqualTo(npcId));
+        }
+
+        [Test]
+        public void IdleScanUsesLookDirectionStateWhileTurning()
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Looker"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+
+            world.StartScan(npcId, currentTick: 0, turns: 1);
+
+            var scan = new IdleScanSystem(scanPeriodTicks: 100);
+            scan.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.GetNpcPerceptionActivityState(npcId), Is.EqualTo(NpcPerceptionActivityState.LookDirection));
+            Assert.That(world.GetFacing(npcId), Is.EqualTo(CardinalDirection.East));
+            Assert.That(world.IsNpcPerceptionImmediateRequested(npcId), Is.True);
+
+            scan.Update(world, new Tick(2, 1f), new MessageBus(), new Telemetry());
+            Assert.That(world.GetNpcPerceptionActivityState(npcId), Is.EqualTo(NpcPerceptionActivityState.Idle));
         }
 
         [Test]

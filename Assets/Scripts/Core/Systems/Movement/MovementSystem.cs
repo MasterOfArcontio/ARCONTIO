@@ -1956,6 +1956,12 @@ namespace Arcontio.Core
             if (world.TryGetNpcAt(tx, ty, out _))
                 return false;
 
+            if (world.GridPos.TryGetValue(npcId, out var currentPos)
+                && TryResolveStepFacing(currentPos.X, currentPos.Y, tx, ty, out var stepFacing))
+            {
+                world.SetFacing(npcId, stepFacing);
+            }
+
             // Muovi tramite World.SetNpcPos, cosi' anche gli indici percettivi persistenti
             // restano coerenti quando questo percorso legacy/debug viene ancora usato.
             world.SetNpcPos(npcId, tx, ty);
@@ -1969,6 +1975,28 @@ namespace Arcontio.Core
                         .AddField("y", ty)
                 );
             }
+
+            return true;
+        }
+
+        private static bool TryResolveStepFacing(int fromX, int fromY, int toX, int toY, out CardinalDirection facing)
+        {
+            int dx = toX - fromX;
+            int dy = toY - fromY;
+            if (Mathf.Abs(dx) + Mathf.Abs(dy) != 1)
+            {
+                facing = CardinalDirection.North;
+                return false;
+            }
+
+            if (dx > 0)
+                facing = CardinalDirection.East;
+            else if (dx < 0)
+                facing = CardinalDirection.West;
+            else if (dy > 0)
+                facing = CardinalDirection.North;
+            else
+                facing = CardinalDirection.South;
 
             return true;
         }

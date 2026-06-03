@@ -175,7 +175,7 @@ Checkpoint v0.20 pianificati:
 - `v0.20f`: limite massimo NPC percettivi per tick e distribuzione del carico - DONE;
 - `v0.20g`: percezione oggetti/NPC su soli NPC dirty/cadenzati - DONE;
 - `v0.20h`: Landmark perception allineata a dirty/cadenza/range - DONE;
-- `v0.20i`: rotazione movimento e `LookDirection` come sorgenti dirty percettive - PENDING;
+- `v0.20i`: rotazione movimento e `LookDirection` come sorgenti dirty percettive - DONE;
 - `v0.20j`: cleanup strutture obsolete o ridondanti post-rifondazione - PENDING;
 - `v0.20k`: QA profiler 20/50/100 NPC e debug overlay costo percettivo - PENDING;
 - `v0.20l`: closeout rifondazione percezione runtime - PENDING.
@@ -184,6 +184,7 @@ Nota v0.20e: gli NPC possiedono ora uno stato percettivo configurabile da `game_
 Nota v0.20f: il `World` espone ora un selettore percettivo per tick che applica dirty, cadenza per stato, limite massimo configurato e round-robin deterministico. Il selettore produce liste selected/pending e contatori numerici, ma non chiama ancora i sistemi percettivi e non pulisce i dirty; il consumo operativo avverra' in `v0.20g`.
 Nota v0.20g: `ObjectPerceptionSystem` e `NpcPerceptionSystem` usano ora la stessa selezione percettiva del tick invece di iterare tutti gli NPC. La pulizia dirty avviene al termine del blocco NPC perception per i soli NPC selezionati; gli NPC pending restano dirty per i tick successivi.
 Nota v0.20h: `LandmarkPerceptionSystem` usa ora la stessa selezione percettiva condivisa del tick e risolve range/cone dallo stato percettivo dell'NPC, evitando che il learning landmark resti un percorso percettivo separato e globale.
+Nota v0.20i: `SetFacing` e `SetNpcPos` producono dirty percettivo immediato, quindi rotazione e spostamento reale non attendono la cadenza lenta dello stato idle. `MoveToRunningActionDriver` orienta l'NPC verso la prossima cella prima del traversal multi-tick, `MovementSystem` legacy/debug mantiene lo stesso orientamento prima dello spostamento, e `IdleScanSystem` usa lo stato `LookDirection` durante le rotazioni dello scan.
 Checkpoint v0.12 completati:
 
 - `v0.12a`: audit logging, explainability e diagnostica runtime;

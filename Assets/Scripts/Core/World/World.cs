@@ -801,6 +801,7 @@ namespace Arcontio.Core
         private readonly Dictionary<long, List<int>> _npcIdsByPerceptionCell = new(2048);
         private readonly List<long> _occupiedPerceptionNpcCellKeys = new(2048);
         private bool[] _perceptionDirtyNpcFlags = new bool[256];
+        private bool[] _perceptionImmediateNpcFlags = new bool[256];
         private readonly List<int> _perceptionDirtyNpcIds = new(256);
         private readonly Dictionary<int, NpcPerceptionActivityState> _npcPerceptionActivityStates = new(256);
         private readonly List<int> _npcPerceptionTickSelectedIds = new(128);
@@ -1596,12 +1597,22 @@ namespace Arcontio.Core
                 && _perceptionDirtyNpcFlags[npcId];
         }
 
-        public void MarkNpcPerceptionDirty(int npcId)
+        public bool IsNpcPerceptionImmediateRequested(int npcId)
+        {
+            return npcId > 0
+                && npcId < _perceptionImmediateNpcFlags.Length
+                && _perceptionImmediateNpcFlags[npcId];
+        }
+
+        public void MarkNpcPerceptionDirty(int npcId, bool forceImmediate = false)
         {
             if (npcId <= 0 || !ExistsNpc(npcId))
                 return;
 
             EnsurePerceptionDirtyCapacity(npcId);
+            if (forceImmediate)
+                _perceptionImmediateNpcFlags[npcId] = true;
+
             if (_perceptionDirtyNpcFlags[npcId])
                 return;
 
@@ -1615,6 +1626,7 @@ namespace Arcontio.Core
                 return;
 
             _perceptionDirtyNpcFlags[npcId] = false;
+            _perceptionImmediateNpcFlags[npcId] = false;
             _perceptionDirtyNpcIds.Remove(npcId);
         }
 
@@ -1624,7 +1636,10 @@ namespace Arcontio.Core
             {
                 int npcId = _perceptionDirtyNpcIds[i];
                 if (npcId > 0 && npcId < _perceptionDirtyNpcFlags.Length)
+                {
                     _perceptionDirtyNpcFlags[npcId] = false;
+                    _perceptionImmediateNpcFlags[npcId] = false;
+                }
             }
 
             _perceptionDirtyNpcIds.Clear();
@@ -1666,8 +1681,11 @@ namespace Arcontio.Core
             if (!ExistsNpc(npcId))
                 return;
 
+            if (_npcPerceptionActivityStates.TryGetValue(npcId, out var current) && current == state)
+                return;
+
             _npcPerceptionActivityStates[npcId] = state;
-            MarkNpcPerceptionDirty(npcId);
+            MarkNpcPerceptionDirty(npcId, forceImmediate: true);
         }
 
         public int GetNpcPerceptionCadenceTicks(int npcId)
@@ -1769,7 +1787,8 @@ namespace Arcontio.Core
                     if (!ExistsNpc(npcId))
                         continue;
 
-                    if (!ShouldNpcRunPerceptionThisTick(npcId, tickIndex))
+                    bool immediate = IsNpcPerceptionImmediateRequested(npcId);
+                    if (!immediate && !ShouldNpcRunPerceptionThisTick(npcId, tickIndex))
                     {
                         skippedByCadence++;
                         continue;
@@ -2195,6 +2214,7 @@ namespace Arcontio.Core
                 newSize *= 2;
 
             Array.Resize(ref _perceptionDirtyNpcFlags, newSize);
+            Array.Resize(ref _perceptionImmediateNpcFlags, newSize);
         }
         /// <summary>
         /// Esporta lo stato "editabile" dal DevMode in un DevMapData.
@@ -4475,7 +4495,7 @@ if (!NpcAction.ContainsKey(id))
                 return;
 
             NpcFacing[npcId] = dir;
-            MarkNpcPerceptionDirty(npcId);
+            MarkNpcPerceptionDirty(npcId, forceImmediate: true);
         }
 
         // ============================================================
@@ -4526,7 +4546,7 @@ if (!NpcAction.ContainsKey(id))
             GridPos[npcId] = new GridPosition(x, y);
             AddNpcToPerceptionCellIndex(npcId, x, y);
             MarkNearbyNpcPerceptionDirty(x, y);
-            MarkNpcPerceptionDirty(npcId);
+            MarkNpcPerceptionDirty(npcId, forceImmediate: true);
             MarkNpcWatchedByNearbyNpc(npcId, x, y);
         }
 

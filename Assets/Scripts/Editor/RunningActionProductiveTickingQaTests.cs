@@ -57,6 +57,7 @@ namespace Arcontio.Tests
                 new RunningActionProductiveTickingQaTests().EatKnownFoodBeliefTargetBehindObstacleUsesBoundedRoute();
                 new RunningActionProductiveTickingQaTests().DeclaredDiagonalMoveTargetPreparesRouteAndHonorsConfiguredDuration();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToConsumesCellsThroughRunningActionTraversal();
+                new RunningActionProductiveTickingQaTests().KnownRouteMoveToFacesNextCellBeforeTraversalCompletes();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToOpensUnlockedDoorBeforeTraversal();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToReturnsLockedDoorFailure();
                 new RunningActionProductiveTickingQaTests().KnownRouteMoveToWritesLifecycleExplainabilityForEachCell();
@@ -750,6 +751,29 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+        }
+
+        [Test]
+        public void KnownRouteMoveToFacesNextCellBeforeTraversalCompletes()
+        {
+            var world = MakeWorldWithNpc(out int npcId);
+            EnableOneCellTraversal(world, durationTicks: 4);
+            var startCell = world.GridPos[npcId];
+            var targetCell = new Vector2Int(startCell.X, startCell.Y + 1);
+            world.SetFacing(npcId, CardinalDirection.East);
+            world.ClearAllNpcPerceptionDirty();
+
+            var job = MakeMoveJob(npcId, "job-move-facing", targetCell);
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, tick: 0, out var reason), Is.True, reason);
+
+            var system = new JobExecutionSystem();
+            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.GetFacing(npcId), Is.EqualTo(CardinalDirection.North));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
+            Assert.That(world.GetNpcPerceptionActivityState(npcId), Is.EqualTo(NpcPerceptionActivityState.Movement));
+            Assert.That(world.IsNpcPerceptionImmediateRequested(npcId), Is.True);
         }
 
         // =============================================================================
