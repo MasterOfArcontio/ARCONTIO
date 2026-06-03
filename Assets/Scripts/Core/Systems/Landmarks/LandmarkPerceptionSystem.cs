@@ -1,4 +1,4 @@
-using Arcontio.Core.Diagnostics;
+﻿using Arcontio.Core.Diagnostics;
 using System.Collections.Generic;
 
 namespace Arcontio.Core
@@ -124,8 +124,8 @@ namespace Arcontio.Core
                         continue;
 
                     // Cone gate: esclude landmark dietro o lateralmente fuori cono.
-                    // In idle l'NPC ruota in tutte e 4 le direzioni (IdleScanSystem),
-                    // quindi la copertura 360° viene garantita nel tempo.
+                    // v0.20n: la copertura degli angoli ciechi non nasce piu' da IdleScanSystem automatico;
+                    // arriva da job espliciti `WaitAndObserve` / step `LookDirection` quando la decisione li produce.
                     if (useCone && !FovUtils.IsInCone(ox, oy, facing, nx, ny, coneSlope))
                         continue;
 

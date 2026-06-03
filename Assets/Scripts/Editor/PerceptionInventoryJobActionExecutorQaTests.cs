@@ -126,7 +126,7 @@ namespace Arcontio.Tests
                 tests.PerceptionTickBudgetLimitsReadyDirtyNpcsAndTracksPending();
                 tests.PerceptionTickBudgetFiltersCadenceBeforeBudget();
                 tests.PerceptionImmediateDirtyBypassesCadenceForFacingAndMovement();
-                tests.IdleScanUsesLookDirectionStateWhileTurning();
+                tests.LookDirectionStateMarksImmediateDirtyWhenFacingChanges();
                 tests.ObjectPerceptionProcessesOnlyTickBudgetSelection();
                 tests.NpcPerceptionProcessesOnlyTickBudgetSelectionAndCompletionClearsDirty();
 
@@ -603,7 +603,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void IdleScanUsesLookDirectionStateWhileTurning()
+        public void LookDirectionStateMarksImmediateDirtyWhenFacingChanges()
         {
             var world = new World(new WorldConfig(new SimulationParams()));
             int npcId = world.CreateNpc(
@@ -613,16 +613,14 @@ namespace Arcontio.Tests
                 1,
                 1);
 
-            world.StartScan(npcId, currentTick: 0, turns: 1);
-
-            var scan = new IdleScanSystem(scanPeriodTicks: 100);
-            scan.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+            world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.LookDirection);
+            world.SetFacing(npcId, CardinalDirection.East);
 
             Assert.That(world.GetNpcPerceptionActivityState(npcId), Is.EqualTo(NpcPerceptionActivityState.LookDirection));
             Assert.That(world.GetFacing(npcId), Is.EqualTo(CardinalDirection.East));
             Assert.That(world.IsNpcPerceptionImmediateRequested(npcId), Is.True);
 
-            scan.Update(world, new Tick(2, 1f), new MessageBus(), new Telemetry());
+            world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Idle);
             Assert.That(world.GetNpcPerceptionActivityState(npcId), Is.EqualTo(NpcPerceptionActivityState.Idle));
         }
 

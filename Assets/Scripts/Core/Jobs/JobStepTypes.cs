@@ -25,6 +25,7 @@ namespace Arcontio.Core
     ///   <item><b>ReleaseReservation</b>: rilascio esplicito di una prenotazione.</item>
     ///   <item><b>WaitTicks</b>: attesa controllata da tick.</item>
     ///   <item><b>Observe</b>: lettura percettiva locale futura.</item>
+    ///   <item><b>LookDirection</b>: orientamento esplicito verso una direzione cardinale.</item>
     ///   <item><b>Search</b>: esplorazione o ricerca senza target certo.</item>
     ///   <item><b>PickUp</b>: acquisizione oggetto o stock.</item>
     ///   <item><b>Drop</b>: deposito oggetto o stock.</item>
@@ -42,6 +43,7 @@ namespace Arcontio.Core
         ReleaseReservation = 30,
         WaitTicks = 40,
         Observe = 50,
+        LookDirection = 55,
         Search = 60,
         PickUp = 70,
         Drop = 80,

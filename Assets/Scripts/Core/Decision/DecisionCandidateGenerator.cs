@@ -29,10 +29,11 @@ namespace Arcontio.Core
     public sealed class DecisionCandidateGenerator
     {
         private const float MinimumObligationForWorkIntent01 = 0.01f;
-        private static readonly DecisionIntentKind[] FoodJobIntentSubset =
+        private static readonly DecisionIntentKind[] RuntimeJobIntentSubset =
         {
             DecisionIntentKind.EatKnownFood,
-            DecisionIntentKind.SearchFood
+            DecisionIntentKind.SearchFood,
+            DecisionIntentKind.WaitAndObserve
         };
 
         private readonly BeliefQueryService _beliefQueryService = new();
@@ -90,8 +91,8 @@ namespace Arcontio.Core
         /// <para>
         /// Il catalogo completo resta disponibile per QA e sviluppo futuro, ma il
         /// runtime attuale non deve scandire intenzioni sociali, lavoro, acqua o
-        /// riposo quando il ponte operativo supporta solo fame -> EatKnownFood /
-        /// SearchFood. Questa funzione non cambia lo score e non forza la scelta:
+        /// riposo quando il ponte operativo supporta solo fame e osservazione
+        /// esplicita. Questa funzione non cambia lo score e non forza la scelta:
         /// riduce solo il numero di candidati costruiti prima dello scoring.
         /// </para>
         ///
@@ -109,9 +110,9 @@ namespace Arcontio.Core
 
             output.Clear();
 
-            for (int i = 0; i < FoodJobIntentSubset.Length; i++)
+            for (int i = 0; i < RuntimeJobIntentSubset.Length; i++)
             {
-                if (TryBuildCandidate(context, FoodJobIntentSubset[i], out var candidate))
+                if (TryBuildCandidate(context, RuntimeJobIntentSubset[i], out var candidate))
                     output.Add(candidate);
             }
         }

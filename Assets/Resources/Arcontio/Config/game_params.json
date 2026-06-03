@@ -2,9 +2,9 @@
   "worldWidth": 64,
   "worldHeight": 64,
   "tick": {
-    "ticksPerSecond": 5,
-    "baseWalkCellDurationTicks": 3,
-    "enableJobRunningActionTraversal": false
+    "ticksPerSecond": 25,
+    "baseWalkCellDurationTicks": 4,
+    "enableJobRunningActionTraversal": true
   },
   "Language": "it",
   "logging": {
@@ -29,7 +29,7 @@
     "movement_explainability": {
       "enabled": true,
       "runtime_registry_enabled": true,
-      "file_logging_enabled": true,
+      "file_logging_enabled": false,
       "defaultVerbosity": 2,
       "maxTrackedNpcs": 3,
       "trackedNpcIds": [],
@@ -65,7 +65,7 @@
       "ringBuffer_bridge": 24
     },
     "telemetry": {
-      "enabled": true,
+      "enabled": false,
       "dump_to_console_enabled": false
     },
     "devtools": {
@@ -79,10 +79,10 @@
       }
     },
     "runtime_cost_observer": {
-      "enabled": false,
+      "enabled": true,
       "sampleEveryTicks": 1,
       "trackPerNpc": false,
-      "writeJsonl": false,
+      "writeJsonl": true,
       "maxTicksInMemory": 256,
       "jsonlFlushIntervalTicks": 25,
       "jsonlMaxQueueSize": 4096,
@@ -128,7 +128,7 @@
     },
     "lookDirection": {
       "cadenceTicks": 1,
-      "visionRangeCells": 17,
+      "visionRangeCells": 20,
       "useCone": true,
       "coneFovDegrees": 90,
       "coneSlope": 0.0
@@ -156,6 +156,34 @@
     "noise01": 0.0,
     "impulsivityNoiseBonus": 0.0,
     "minimumWeight": 0.001
+  },
+  "decision_scoring": {
+    "needUrgencyWeight": 1.0,
+    "competenceWeight": 0.2,
+    "preferenceWeight": 0.25,
+    "obligationWeight": 0.3,
+    "memoryConfidenceWeight": 0.35,
+    "cognitiveModulatorWeight": 0.15,
+    "criticalNeedFloor": 1.25,
+    "highObligationFloor": 1.0,
+    "highObligationThreshold": 0.75,
+    "intentWeights": [
+      {
+        "intent": "EatKnownFood",
+        "scoreMultiplier": 1.0,
+        "scoreBias": 0.0
+      },
+      {
+        "intent": "SearchFood",
+        "scoreMultiplier": 1.0,
+        "scoreBias": 0.0
+      },
+      {
+        "intent": "WaitAndObserve",
+        "scoreMultiplier": 1.0,
+        "scoreBias": 0.0
+      }
+    ]
   },
   "landmarks": {
     "enableLandmarkSystem": true,

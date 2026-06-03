@@ -128,6 +128,7 @@ namespace Arcontio.Core
                 score += AddMemoryConfidenceContribution(candidate, config);
                 score += AddCognitiveModulatorContribution(context.Dna, candidate, config);
                 score = ApplyMandatoryFloors(context.Profile, candidate, config, score);
+                score = ApplyIntentSpecificWeight(candidate, config, score);
 
                 candidate.AttachScore(
                     score,
@@ -165,6 +166,53 @@ namespace Arcontio.Core
             float contribution = candidate.NeedUrgency01 * config.needUrgencyWeight;
             _contributions.Add(new DecisionScoreContribution("NeedUrgency", contribution));
             return contribution;
+        }
+
+        // =============================================================================
+        // ApplyIntentSpecificWeight
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica il peso configurabile associato al tipo di intenzione.
+        /// </para>
+        ///
+        /// <para><b>Pesi da JSON senza nuova authority decisionale</b></para>
+        /// <para>
+        /// Il catalogo pesi non crea candidati, non li rende disponibili e non
+        /// bypassa le belief query. Modifica solo il valore numerico gia' composto,
+        /// mantenendo il confronto tra intent dentro la normale pipeline di score.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Lookup lineare</b>: array piccolo letto da configurazione.</item>
+        ///   <item><b>Multiplier</b>: se omesso o non positivo resta 1 per compatibilita'.</item>
+        ///   <item><b>Bias</b>: piccolo spostamento additivo leggibile nel breakdown.</item>
+        /// </list>
+        /// </summary>
+        private float ApplyIntentSpecificWeight(DecisionCandidate candidate, DecisionScoringConfig config, float currentScore)
+        {
+            var weights = config.intentWeights;
+            if (weights == null || weights.Length == 0)
+            {
+                _contributions.Add(new DecisionScoreContribution("IntentWeight", 0f));
+                return currentScore;
+            }
+
+            for (int i = 0; i < weights.Length; i++)
+            {
+                var weight = weights[i];
+                if (weight.Intent != candidate.Kind)
+                    continue;
+
+                float multiplier = weight.ScoreMultiplier > 0f ? weight.ScoreMultiplier : 1f;
+                float adjustedScore = (currentScore * multiplier) + weight.ScoreBias;
+                _contributions.Add(new DecisionScoreContribution("IntentWeight", adjustedScore - currentScore));
+                return adjustedScore;
+            }
+
+            _contributions.Add(new DecisionScoreContribution("IntentWeight", 0f));
+            return currentScore;
         }
 
         // =============================================================================

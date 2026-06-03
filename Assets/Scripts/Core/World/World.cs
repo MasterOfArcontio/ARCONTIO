@@ -1,4 +1,4 @@
-using Arcontio.Core.Config;
+﻿using Arcontio.Core.Config;
 using Arcontio.Core.DevTools;
 using Arcontio.Core.Logging;
 using System;
@@ -667,8 +667,9 @@ namespace Arcontio.Core
         //   - cancellare/modificare l'intento da fuori senza interrompere il System
         //   - osservare lo stato di movimento dalla View senza accedere al System
         //
-        // Lo scan (IdleScanSystem) implementa "nessuna visione a 360° gratuita":
-        // un NPC idle ruota periodicamente per coprire gli angoli ciechi.
+        // v0.20n: lo scan automatico idle e' pensionato come percorso runtime.
+        // La rotazione osservativa ordinaria nasce ora da job `WaitAndObserve`
+        // composti da step `LookDirection`.
         // =====================================================================
 
         /// <summary>
@@ -762,9 +763,9 @@ namespace Arcontio.Core
         /// <summary>
         /// Stato di scan direzionale per NPC.
         /// <list type="bullet">
-        ///   <item>Uno scan = 4 rotazioni consecutive (una per tick).</item>
-        ///   <item>Attivato da <c>IdleScanSystem</c> quando l'NPC è idle.</item>
-        ///   <item>Implementa "nessuna visione a 360° gratuita" del manifesto.</item>
+        ///   <item>Struttura legacy non piu' registrata nel ciclo runtime ordinario.</item>
+        ///   <item>Il guardarsi attorno passa da <c>WaitAndObserve</c> e <c>LookDirection</c>.</item>
+        ///   <item>Resta temporaneamente per compatibilita' con test/helper finche' non viene rimossa con gestione Unity sicura.</item>
         /// </list>
         /// </summary>
         public readonly Dictionary<int, ScanState> NpcScanStates = new();
