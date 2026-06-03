@@ -1,6 +1,7 @@
 using Arcontio.Core.Config;
 using Arcontio.Core.Diagnostics;
 using Arcontio.Core.Logging;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Arcontio.Core
@@ -60,17 +61,8 @@ namespace Arcontio.Core
             new Vector2Int(1, -1),
         };
 
-        private static readonly Vector2Int[] SearchFoodExplorationDirections =
-        {
-            new Vector2Int(1, 0),
-            new Vector2Int(0, 1),
-            new Vector2Int(-1, 0),
-            new Vector2Int(0, -1),
-            new Vector2Int(1, 1),
-            new Vector2Int(-1, 1),
-            new Vector2Int(-1, -1),
-            new Vector2Int(1, -1),
-        };
+        private static readonly List<int> SearchFoodLandmarkScratch = new(64);
+        private static readonly List<Vector2Int> SearchFoodPathScratch = new(128);
 
         // =============================================================================
         // TryStartSearchFoodJob
@@ -482,9 +474,15 @@ namespace Arcontio.Core
                 return true;
             }
 
-            if (TryResolveSearchFoodExplorationCell(world, npcId, origin, out probeCell))
+            if (TryResolveSearchFoodLandmarkRouteCell(world, npcId, origin, out probeCell))
             {
-                reason = "SearchFoodExplorationCellResolved";
+                reason = "SearchFoodLandmarkRouteResolved";
+                return true;
+            }
+
+            if (TryResolveSearchFoodFarthestVisibleReachableCell(world, npcId, origin, out probeCell))
+            {
+                reason = "SearchFoodVisibleExplorationCellResolved";
                 return true;
             }
 
@@ -496,6 +494,51 @@ namespace Arcontio.Core
 
             reason = "SearchFoodProbeUnavailable";
             return false;
+        }
+
+        private static bool TryResolveSearchFoodLandmarkRouteCell(World world, int npcId, Vector2Int origin, out Vector2Int routeCell)
+        {
+            routeCell = default;
+
+            if (world?.LandmarkRegistry == null)
+                return false;
+
+            if (!world.NpcLandmarkMemory.TryGetValue(npcId, out var memory) || memory == null || memory.KnownLandmarksCount <= 1)
+                return false;
+
+            if (!world.TryResolveStartLandmark(npcId, origin.x, origin.y, out int startNodeId, out _))
+                return false;
+
+            SearchFoodLandmarkScratch.Clear();
+            memory.FillKnownLandmarkIds(SearchFoodLandmarkScratch);
+
+            int bestNodeId = 0;
+            int bestDistance = -1;
+            int bestNodeCount = -1;
+
+            for (int i = 0; i < SearchFoodLandmarkScratch.Count; i++)
+            {
+                int nodeId = SearchFoodLandmarkScratch[i];
+                if (nodeId == startNodeId)
+                    continue;
+
+                if (!world.LandmarkRegistry.TryGetActiveNodeById(nodeId, out var node) || node == null)
+                    continue;
+
+                if (!world.TryPlanMacroRoute(npcId, startNodeId, nodeId, out var plan) || plan == null || !plan.Succeeded || plan.NodeIds.Count < 2)
+                    continue;
+
+                int distance = Mathf.Abs(node.CellX - origin.x) + Mathf.Abs(node.CellY - origin.y);
+                if (distance > bestDistance || (distance == bestDistance && plan.NodeIds.Count > bestNodeCount))
+                {
+                    bestDistance = distance;
+                    bestNodeCount = plan.NodeIds.Count;
+                    bestNodeId = nodeId;
+                    routeCell = new Vector2Int(node.CellX, node.CellY);
+                }
+            }
+
+            return bestNodeId != 0;
         }
 
         private static bool TryResolveSearchFoodLocalProbeCell(World world, int npcId, Vector2Int origin, out Vector2Int probeCell)
@@ -515,28 +558,62 @@ namespace Arcontio.Core
             return false;
         }
 
-        private static bool TryResolveSearchFoodExplorationCell(World world, int npcId, Vector2Int origin, out Vector2Int explorationCell)
+        private static bool TryResolveSearchFoodFarthestVisibleReachableCell(World world, int npcId, Vector2Int origin, out Vector2Int explorationCell)
         {
             explorationCell = default;
 
             int visionRange = world.Global.NpcVisionRangeCells <= 0 ? 6 : world.Global.NpcVisionRangeCells;
-            int maxDistance = Mathf.Clamp(visionRange, 4, 8);
+            bool useCone = world.Global.NpcVisionUseCone;
+            float coneSlope = world.Global.NpcVisionConeSlope;
+            if (!world.NpcFacing.TryGetValue(npcId, out var facing))
+                facing = CardinalDirection.North;
 
-            for (int distance = maxDistance; distance >= 3; distance--)
+            int bestDistance = -1;
+            int bestPathLength = -1;
+            int budget = ResolveSearchFoodPathBudget(world, visionRange);
+
+            for (int dy = -visionRange; dy <= visionRange; dy++)
             {
-                for (int i = 0; i < SearchFoodExplorationDirections.Length; i++)
+                for (int dx = -visionRange; dx <= visionRange; dx++)
                 {
-                    var direction = SearchFoodExplorationDirections[i];
-                    var candidate = origin + new Vector2Int(direction.x * distance, direction.y * distance);
+                    if (dx == 0 && dy == 0)
+                        continue;
+
+                    int x = origin.x + dx;
+                    int y = origin.y + dy;
+                    int distance = Mathf.Abs(dx) + Mathf.Abs(dy);
+                    if (distance <= bestDistance)
+                        continue;
+
+                    var candidate = new Vector2Int(x, y);
                     if (!IsValidSearchFoodProbeCell(world, npcId, candidate))
                         continue;
 
+                    if (!FovUtils.IsVisible(world, origin.x, origin.y, facing, x, y, visionRange, useCone, coneSlope))
+                        continue;
+
+                    if (!MovementPathfinder.TryBuildBoundedMovePath(world, npcId, origin.x, origin.y, x, y, budget, SearchFoodPathScratch)
+                        || SearchFoodPathScratch.Count < 2)
+                    {
+                        continue;
+                    }
+
+                    bestDistance = distance;
+                    bestPathLength = SearchFoodPathScratch.Count;
                     explorationCell = candidate;
-                    return true;
                 }
             }
 
-            return false;
+            return bestDistance > 0 && bestPathLength >= 2;
+        }
+
+        private static int ResolveSearchFoodPathBudget(World world, int visionRange)
+        {
+            var cfg = world?.Config?.Sim?.landmarks?.localSearch ?? new LandmarkLocalSearchParams();
+            int radius = Mathf.Max(1, cfg.maxSearchRadius);
+            int baseBudget = Mathf.Max(8, radius * radius * 8);
+            int visionBudget = Mathf.Max(64, visionRange * visionRange * 4);
+            return Mathf.Max(baseBudget, visionBudget);
         }
 
         private static bool HasVisibleCommunityFoodStock(World world, int npcId)

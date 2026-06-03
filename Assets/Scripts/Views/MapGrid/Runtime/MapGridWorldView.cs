@@ -112,6 +112,9 @@ namespace Arcontio.View.MapGrid
 
         // ---------------- Debug overlay: FOV heatmap ----------------
         private MapGridFovHeatmapOverlay _fovOverlay;
+        private bool _fovOverlayEnabled = true;
+        private bool _fovOverlayPinned;
+        private int _fovOverlayPinnedNpcId = -1;
 
         // ---------------- Debug overlay: Landmarks/edges (v0.02 Day1) ----------------
         private MapGridLandmarkOverlay _landmarkOverlay;
@@ -183,6 +186,9 @@ namespace Arcontio.View.MapGrid
         public MapGridConfig RuntimeConfig => cfg;
         public MapGridPointerInputActionsProvider RuntimePointerProvider => _pointerProvider != null ? _pointerProvider : pointerProvider;
         public Camera RuntimeWorldCamera => worldCamera != null ? worldCamera : (Camera.main != null ? Camera.main : FindObjectOfType<Camera>());
+        public bool IsFovOverlayEnabled => _fovOverlayEnabled;
+        public bool IsFovOverlayPinned => _fovOverlayPinned;
+        public bool IsFovOverlayAvailable => _world?.DebugFovTelemetry != null;
 
         public void Init(MapGridConfig config)
         {
@@ -278,7 +284,7 @@ namespace Arcontio.View.MapGrid
                 devToolsOverlay = gameObject.AddComponent<MapGridRuntimeDevToolsOverlay>();
 
             _runtimeControlTopBar = new MapGridRuntimeControlTopBar();
-            _runtimeControlTopBar.AttachTo(transform, devToolsOverlay);
+            _runtimeControlTopBar.AttachTo(transform, devToolsOverlay, this);
         }
 
         private void Update()
@@ -450,7 +456,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
             // devono riferirsi allo stesso soggetto quando l'utente muove il mouse.
             int activeNpcId = ResolveActiveNpcForFovOverlay();
 
-            if (_world.DebugFovTelemetry != null && _fovOverlay != null)
+            if (_fovOverlayEnabled && _world.DebugFovTelemetry != null && _fovOverlay != null)
             {
                 _world.DebugFovTelemetry.SetActiveNpc(activeNpcId);
 
@@ -463,6 +469,10 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
                 {
                     _fovOverlay.Clear();
                 }
+            }
+            else
+            {
+                _fovOverlay?.Clear();
             }
 
             // ============================================================
@@ -567,6 +577,27 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
                 _summaryOverlay.SetEnabled(_summaryOverlayEnabled);
         }
 
+        public void ToggleFovOverlayVisibility()
+        {
+            _fovOverlayEnabled = !_fovOverlayEnabled;
+            if (!_fovOverlayEnabled)
+                _fovOverlay?.Clear();
+        }
+
+        public void ToggleFovOverlayPinned()
+        {
+            _fovOverlayPinned = !_fovOverlayPinned;
+            if (_fovOverlayPinned)
+            {
+                int hovered = ResolveHoveredNpcId();
+                _fovOverlayPinnedNpcId = hovered > 0 ? hovered : ResolveSelectedOrFirstNpcId();
+            }
+            else
+            {
+                _fovOverlayPinnedNpcId = -1;
+            }
+        }
+
         /// <summary>
         /// Decide quale NPC considerare "attivo" per l'overlay FOV.
         ///
@@ -576,6 +607,15 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
         /// </summary>
         private int ResolveActiveNpcForFovOverlay()
         {
+            if (_fovOverlayPinned)
+            {
+                if (_fovOverlayPinnedNpcId > 0 && _world != null && _world.ExistsNpc(_fovOverlayPinnedNpcId))
+                    return _fovOverlayPinnedNpcId;
+
+                _fovOverlayPinnedNpcId = ResolveSelectedOrFirstNpcId();
+                return _fovOverlayPinnedNpcId;
+            }
+
             /*// 1) prova hover: pointer -> world -> cell -> npc
             var cam = ResolveWorldCamera();
             if (cam != null && _pointerProvider != null && _pointerProvider.TryGetPointerScreenPosition(out var p))
@@ -597,6 +637,21 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             // Questo blocco di modifica fa sì che se il mouse non è su un NPC, la heatmap viene nascosta
             return ResolveHoveredNpcId();
+        }
+
+        private int ResolveSelectedOrFirstNpcId()
+        {
+            if (_world == null)
+                return -1;
+
+            int selected = NPCSelection.SelectedNpcId;
+            if (selected > 0 && _world.ExistsNpc(selected))
+                return selected;
+
+            foreach (var kv in _world.NpcDna)
+                return kv.Key;
+
+            return -1;
         }
 
         private int ResolveHoveredNpcId()

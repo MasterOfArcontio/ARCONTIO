@@ -60,7 +60,7 @@ namespace Arcontio.View.MapGrid
             // Il riquadro non resta piu' appiccicato al bordo alto perche' la barra
             // runtime contiene pulsanti F3/Pausa/Step: tenerlo sotto la toolbar
             // evita sovrapposizioni durante i test con osservatorio costi attivo.
-            _panelRt.anchoredPosition = new Vector2(12f, -58f);
+            _panelRt.anchoredPosition = new Vector2(28f, -62f);
             _panelRt.sizeDelta = new Vector2(220f, 34f);
 
             // Text
