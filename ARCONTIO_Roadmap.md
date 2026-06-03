@@ -1128,9 +1128,9 @@ ma senza perdere variazioni del mondo rilevanti.
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.20a | Audit architettura percezione/movimento e documento di rifondazione | ⏳ |
-| v0.20b | Indici persistenti compatti per oggetti e NPC | ⏳ |
-| v0.20c | Dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati | ⏳ |
+| v0.20a | Audit architettura percezione/movimento e documento di rifondazione | ✅ |
+| v0.20b | Indici persistenti compatti per oggetti e NPC | ✅ |
+| v0.20c | Dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati | ✅ |
 | v0.20d | Separazione observed / watched nella mappa percettiva | ⏳ |
 | v0.20e | Scheduler percettivo per stato NPC con cadenza da `game_params` | ⏳ |
 | v0.20f | Limite massimo NPC percettivi per tick e distribuzione del carico | ⏳ |
@@ -1146,6 +1146,8 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota dati v0.20:** tutte le nuove strutture percettive devono privilegiare rappresentazioni piccole e veloci. Usare `byte`, `short`, `ushort`, `int`, liste compatte e buffer riutilizzabili quando bastano; evitare `long`, stringhe, LINQ, liste temporanee e dizionari pesanti nel percorso caldo salvo necessita' reale.
 
 > **Nota ciclo runtime v0.20:** il ciclo obiettivo diventa: movimento, memoria landmark, percezione landmark, decadimento bisogni, percezione dirty/cadenzata, codifica memoria, manutenzione memoria oggetti, decadimento memoria, decadimento belief, esecuzione job, decisione. Le mutazioni di oggetti/NPC fuori ciclo non devono eseguire percezione immediata: devono solo sporcare le strutture percettive che verranno consumate nel punto centrale del ciclo.
+
+> **Nota stati percettivi v0.20:** il dirty percettivo conservativo iniziale usa un raggio globale massimo provvisorio. Quando v0.20e introdurra' gli stati percettivi configurati in game_params, il raggio dirty dovra' essere riallineato a cadenza e range dello stato percettivo dell'NPC, mantenendo un margine conservativo per non perdere oggetti/NPC al bordo del campo visivo.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti

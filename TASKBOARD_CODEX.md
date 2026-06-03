@@ -169,7 +169,7 @@ Checkpoint v0.20 pianificati:
 
 - `v0.20a`: audit architettura percezione/movimento e documento di rifondazione - DONE;
 - `v0.20b`: indici persistenti compatti per oggetti e NPC - DONE;
-- `v0.20c`: dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati - PENDING;
+- `v0.20c`: dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati - DONE;
 - `v0.20d`: separazione observed / watched nella mappa percettiva - PENDING;
 - `v0.20e`: scheduler percettivo per stato NPC con cadenza da `game_params` - PENDING;
 - `v0.20f`: limite massimo NPC percettivi per tick e distribuzione del carico - PENDING;
@@ -179,6 +179,8 @@ Checkpoint v0.20 pianificati:
 - `v0.20j`: cleanup strutture obsolete o ridondanti post-rifondazione - PENDING;
 - `v0.20k`: QA profiler 20/50/100 NPC e debug overlay costo percettivo - PENDING;
 - `v0.20l`: closeout rifondazione percezione runtime - PENDING.
+
+Nota v0.20c/v0.20e: il raggio dirty conservativo introdotto in v0.20c usa per ora il raggio visivo globale piu' margine configurabile; in v0.20e andra' riallineato agli stati percettivi configurati in game_params, includendo cadenza e lunghezza del cono per stato.
 Checkpoint v0.12 completati:
 
 - `v0.12a`: audit logging, explainability e diagnostica runtime;
