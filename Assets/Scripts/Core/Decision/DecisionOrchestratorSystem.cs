@@ -282,7 +282,85 @@ namespace Arcontio.Core
                     : DecisionJobStartResult.RouteRejected;
             }
 
+            if (selection.Candidate.Kind == DecisionIntentKind.WaitAndObserve)
+            {
+                bool assigned = TryStartWaitAndObserveJob(
+                    world,
+                    npcId,
+                    nowTick,
+                    selection.Candidate,
+                    _jobTemplateRegistry,
+                    _intentExecutionRouter,
+                    _explainabilityBridge,
+                    out _);
+                if (assigned)
+                    _explainabilityBridge.TryEmitDecisionTrace(
+                        world.Config?.Sim?.memory_belief_decision_explainability,
+                        world.MemoryBeliefDecisionExplainability,
+                        in context,
+                        auditValid: true,
+                        _decisionCandidates,
+                        selection,
+                        selectionConfig);
+                return assigned
+                    ? DecisionJobStartResult.JobStarted
+                    : DecisionJobStartResult.RouteRejected;
+            }
+
             return DecisionJobStartResult.UnsupportedIntent;
+        }
+
+        private static bool TryStartWaitAndObserveJob(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            JobTemplateRegistry jobTemplateRegistry,
+            IntentExecutionRouter intentExecutionRouter,
+            DecisionExplainabilityBridge explainabilityBridge,
+            out string reason)
+        {
+            reason = string.Empty;
+
+            if (world?.JobRuntimeState == null)
+            {
+                reason = "JobRuntimeMissing";
+                return false;
+            }
+
+            if (jobTemplateRegistry == null)
+            {
+                reason = "JobTemplateRegistryMissing";
+                return false;
+            }
+
+            if (intentExecutionRouter == null)
+            {
+                reason = "IntentExecutionRouterMissing";
+                return false;
+            }
+
+            if (!intentExecutionRouter.TryRouteWaitAndObserve(nowTick, npcId, candidate, out var route))
+            {
+                reason = route.Reason;
+                return false;
+            }
+
+            var request = route.Request;
+            if (!jobTemplateRegistry.TryBuildPlan(JobTemplateRegistry.PerceptionLookAroundTemplateId, request, out var plan, out reason))
+                return false;
+
+            var job = new Job($"job_look_around_{request.NpcId}_{request.CreatedTick}", request, plan);
+            explainabilityBridge?.TryEmitJobRequestTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                world.MemoryBeliefDecisionExplainability,
+                nowTick,
+                npcId,
+                request,
+                job.JobId,
+                legacyBridgeStillUsed: false);
+
+            return world.JobRuntimeState.TryAssignJob(npcId, job, nowTick, out reason);
         }
 
         // =============================================================================
@@ -368,8 +446,8 @@ namespace Arcontio.Core
                 return;
 
             // Il catalogo decisionale contiene gia' intenzioni MVP future come riposo,
-            // osservazione e azioni sociali, ma questo orchestratore oggi possiede solo
-            // route operative verso Job per EatKnownFood e SearchFood. Lasciare vincere
+            // azioni sociali e altri domini, ma questo orchestratore oggi possiede solo
+            // route operative verso Job per EatKnownFood, SearchFood e WaitAndObserve. Lasciare vincere
             // un'intenzione senza route consuma la cadenza decisionale senza aprire un
             // incarico, producendo NPC apparentemente fermi dopo la chiusura del job
             // precedente. Il filtro e' quindi behavior-preserving rispetto all'esecuzione:
@@ -385,7 +463,8 @@ namespace Arcontio.Core
         private static bool IsJobRoutableIntent(DecisionIntentKind kind)
         {
             return kind == DecisionIntentKind.EatKnownFood
-                || kind == DecisionIntentKind.SearchFood;
+                || kind == DecisionIntentKind.SearchFood
+                || kind == DecisionIntentKind.WaitAndObserve;
         }
 
         private static bool ShouldConsumeDecisionCadence(DecisionJobStartResult result)

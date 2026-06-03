@@ -21,7 +21,8 @@ namespace Arcontio.Core
     {
         None = 0,
         EatKnownFoodJobRequest = 10,
-        SearchFoodJobRequest = 20
+        SearchFoodJobRequest = 20,
+        WaitAndObserveJobRequest = 30
     }
 
     // =============================================================================
@@ -163,6 +164,34 @@ namespace Arcontio.Core
             result = built
                 ? IntentExecutionRouteResult.Accepted(IntentExecutionRouteKind.SearchFoodJobRequest, request, reason)
                 : IntentExecutionRouteResult.Rejected(IntentExecutionRouteKind.SearchFoodJobRequest, reason);
+
+            return built;
+        }
+
+        // =============================================================================
+        // TryRouteWaitAndObserve
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Tenta la route dati <c>WaitAndObserve -> JobRequest</c>.
+        /// </para>
+        /// </summary>
+        public bool TryRouteWaitAndObserve(
+            int tick,
+            int npcId,
+            DecisionCandidate selectedCandidate,
+            out IntentExecutionRouteResult result)
+        {
+            bool built = _jobRequestBuilder.TryBuildWaitAndObserveRequest(
+                tick,
+                npcId,
+                selectedCandidate,
+                out var request,
+                out string reason);
+
+            result = built
+                ? IntentExecutionRouteResult.Accepted(IntentExecutionRouteKind.WaitAndObserveJobRequest, request, reason)
+                : IntentExecutionRouteResult.Rejected(IntentExecutionRouteKind.WaitAndObserveJobRequest, reason);
 
             return built;
         }

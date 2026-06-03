@@ -769,9 +769,10 @@ namespace Arcontio.Core
             // Deve stare DOPO il MovementSystem per poter processare le nuove conoscenze acquisite nello stesso tick.
             _scheduler.AddSystem(new NpcLandmarkMemorySystem());
 
-            // IdleScan precede tutto il blocco percettivo centrale, cosi' landmark,
-            // oggetti e NPC leggono lo stesso orientamento dello stesso tick.
-            _scheduler.AddSystem(new IdleScanSystem(scanPeriodTicks: 12));
+            // v0.20n: lo scan automatico idle e' pensionato. Il guardarsi attorno
+            // passa dal percorso ordinario Decisione -> JobRequest -> Job tramite
+            // `WaitAndObserve` e step `LookDirection`, evitando rotazioni runtime
+            // fuori dal Job Layer.
 
 
             // ******************************************************************************************************************************
@@ -788,7 +789,8 @@ namespace Arcontio.Core
             // ******************************************************************************************************************************
             // 5.2) SCAN IN IDLE - IdleScan
             // ******************************************************************************************************************************
-            // Registrato sopra per precedere tutta la percezione del tick.
+            // Pensionato in v0.20n: lo stesso comportamento deve nascere da job
+            // osservativi espliciti, non da un system automatico fuori authority.
 
             // ******************************************************************************************************************************
             // 5.3) BISOGNI NPC - NeedsDecaySystem

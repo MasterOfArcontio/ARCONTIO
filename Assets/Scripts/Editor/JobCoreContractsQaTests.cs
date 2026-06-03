@@ -185,5 +185,119 @@ namespace Arcontio.Tests
             Assert.That(hasPhase, Is.True);
             Assert.That(activePhase.PhaseId, Is.EqualTo("observe"));
         }
+
+        // =============================================================================
+        // WaitAndObserveRequestHasNoObjectiveTarget
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che l'intent <c>WaitAndObserve</c> attraversi il boundary
+        /// Decisione -> JobRequest senza inventare target oggettivi.
+        /// </para>
+        ///
+        /// <para><b>Osservazione come Job, non scan automatico</b></para>
+        /// <para>
+        /// Il guardarsi attorno deve diventare un incarico esplicito. La request
+        /// quindi identifica NPC, tick e origine, ma non cella target, oggetto o
+        /// belief causale.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void WaitAndObserveRequestHasNoObjectiveTarget()
+        {
+            var candidate = DecisionCandidate.Available(
+                new DecisionIntentMetadata(
+                    DecisionIntentKind.WaitAndObserve,
+                    DomainKind.None,
+                    NeedKind.Stability,
+                    BeliefCategory.Situation,
+                    false,
+                    false,
+                    true,
+                    "WaitAndObserve"),
+                0.2f,
+                false);
+
+            var builder = new JobRequestBuilder();
+            bool built = builder.TryBuildWaitAndObserveRequest(
+                44,
+                3,
+                candidate,
+                out var request,
+                out string reason);
+
+            Assert.That(built, Is.True, reason);
+            Assert.That(request.NpcId, Is.EqualTo(3));
+            Assert.That(request.IntentKind, Is.EqualTo(DecisionIntentKind.WaitAndObserve));
+            Assert.That(request.HasTargetCell, Is.False);
+            Assert.That(request.TargetObjectId, Is.EqualTo(0));
+            Assert.That(request.OriginLabel, Is.EqualTo("LookAround"));
+        }
+
+        // =============================================================================
+        // TemplateRegistryMaterializesLookDirectionPayload
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Protegge il contratto JSON degli step <c>LookDirection</c>.
+        /// </para>
+        ///
+        /// <para><b>Template dichiarativo</b></para>
+        /// <para>
+        /// La direzione non deve essere hardcoded nell'esecutore: arriva dal
+        /// <c>payloadKey</c> del template, cosi' la sequenza Est/Ovest/Sud/Nord resta
+        /// configurabile nel file job.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void TemplateRegistryMaterializesLookDirectionPayload()
+        {
+            const string json = @"{
+  ""templates"": [
+    {
+      ""templateId"": ""perception.look_around.v1"",
+      ""phases"": [
+        {
+          ""phaseId"": ""look_around"",
+          ""kind"": ""Execute"",
+          ""isInterruptible"": true,
+          ""actions"": [
+            {
+              ""actionId"": ""look_east"",
+              ""kind"": ""LookDirection"",
+              ""payloadKey"": ""East"",
+              ""durationTicks"": 1
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}";
+
+            var registry = new JobTemplateRegistry();
+            registry.LoadFromJson(json);
+            var request = JobRequest.WithoutTarget(
+                "req-look",
+                5,
+                DecisionIntentKind.WaitAndObserve,
+                JobPriorityClass.Idle,
+                0.1f,
+                20,
+                "LookAround");
+
+            bool built = registry.TryBuildPlan(
+                JobTemplateRegistry.PerceptionLookAroundTemplateId,
+                request,
+                out var plan,
+                out string reason);
+
+            Assert.That(built, Is.True, reason);
+            Assert.That(plan.TryGetPhase(0, out var phase), Is.True);
+            Assert.That(phase.TryGetAction(0, out var action), Is.True);
+            Assert.That(action.Kind, Is.EqualTo(JobActionKind.LookDirection));
+            Assert.That(action.PayloadKey, Is.EqualTo("East"));
+            Assert.That(action.DurationTicks, Is.EqualTo(1));
+        }
     }
 }

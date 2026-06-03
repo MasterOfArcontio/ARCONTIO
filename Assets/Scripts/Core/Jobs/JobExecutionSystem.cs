@@ -130,12 +130,14 @@ namespace Arcontio.Core
                     npcId);
                 if (machineResult.TickResult == JobStateMachineTickResult.JobCompleted)
                 {
+                    RestoreIdleAfterLookDirectionJob(world, npcId);
                     runtime.CompleteCurrentJob(npcId, (int)tick.Index, out _);
                     continue;
                 }
 
                 if (machineResult.TickResult == JobStateMachineTickResult.JobFailed)
                 {
+                    RestoreIdleAfterLookDirectionJob(world, npcId);
                     ApplyFoodExecutionFailureCognitiveFeedback(world, npcId, job, result, (int)tick.Index, telemetry);
                     runtime.FailCurrentJob(npcId, machineResult.FailureReason, (int)tick.Index, out _);
                     continue;
@@ -600,6 +602,9 @@ namespace Arcontio.Core
                     explainabilityConfig,
                     explainabilityRegistry);
 
+            if (action.Kind == JobActionKind.LookDirection)
+                return ExecuteLookDirection(world, npcId, action);
+
             if (action.Kind == JobActionKind.MoveToCell)
             {
                 return MoveToRunningActionDriver.Execute(
@@ -626,6 +631,32 @@ namespace Arcontio.Core
                 return ExecuteDropObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             return StepResult.Failed(JobFailureReason.StepFailed, "UnsupportedJobActionInRuntimeSlice");
+        }
+
+        private static StepResult ExecuteLookDirection(World world, int npcId, JobAction action)
+        {
+            if (world == null)
+                return StepResult.Failed(JobFailureReason.StepFailed, "LookDirectionWorldMissing");
+
+            if (!System.Enum.TryParse(action.PayloadKey ?? string.Empty, ignoreCase: true, out CardinalDirection direction))
+                return StepResult.Failed(JobFailureReason.StepFailed, "LookDirectionInvalidPayload:" + action.PayloadKey);
+
+            // Lo step di osservazione non esegue percezione fuori ciclo e non legge
+            // oggetti. Orienta soltanto l'NPC dentro il Job Layer; `World.SetFacing`
+            // marca dirty percettivo immediato e il blocco percettivo centrale
+            // consumera' il nuovo facing secondo le regole v0.20.
+            world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.LookDirection);
+            world.SetFacing(npcId, direction);
+            return StepResult.Succeeded("LookDirectionCompleted:" + direction);
+        }
+
+        private static void RestoreIdleAfterLookDirectionJob(World world, int npcId)
+        {
+            if (world == null)
+                return;
+
+            if (world.GetNpcPerceptionActivityState(npcId) == NpcPerceptionActivityState.LookDirection)
+                world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Idle);
         }
 
         private static StepResult ExecuteRunningWaitAction(
