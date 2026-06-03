@@ -1137,7 +1137,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20g | ObjectPerceptionSystem e NpcPerceptionSystem su soli NPC dirty/cadenzati | ✅ |
 | v0.20h | Landmark perception allineata a dirty/cadenza/range | ✅ |
 | v0.20i | Rotazione movimento e `LookDirection` come sorgenti dirty percettive | ✅ |
-| v0.20j | Cleanup strutture obsolete o ridondanti post-rifondazione | ⏳ |
+| v0.20j | Cleanup strutture obsolete o ridondanti post-rifondazione | ✅ |
 | v0.20k | QA profiler 20/50/100 NPC e debug overlay costo percettivo | ⏳ |
 | v0.20l | Closeout rifondazione percezione runtime | ⏳ |
 
@@ -1156,6 +1156,8 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota landmark perception v0.20h:** `LandmarkPerceptionSystem` consuma la stessa selezione percettiva condivisa e risolve range/cone dallo stato dell'NPC. Il learning landmark non procede piu' come scansione separata su tutti gli NPC quando il sistema e' attivo.
 
 > **Nota rotazione percettiva v0.20i:** rotazioni e spostamenti reali dell'NPC producono ora dirty percettivo immediato, quindi non restano bloccati dalla cadenza lenta dello stato `Idle`. La running action `MoveTo` orienta l'NPC verso la cella attraversata prima del completamento fisico del passo multi-tick; il ponte `MovementSystem` legacy/debug mantiene lo stesso comportamento. Lo scan direzionale usa lo stato percettivo `LookDirection` durante la rotazione e torna a `Idle` a scan concluso.
+
+> **Nota cleanup v0.20j:** l'audit post-rifondazione non ha individuato strutture percettive eliminabili senza rischio: indici persistenti, dirty, watched/observed e contatori costo risultano vivi. La patch rimuove solo letture ridondanti rimaste da prima degli stati percettivi e aggiorna i commenti interni ormai superati. `IdleScanSystem` e `MovementSystem` restano ponti tollerati fino alla chiusura dei relativi debiti futuri.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti

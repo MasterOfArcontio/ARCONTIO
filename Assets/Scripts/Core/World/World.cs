@@ -1580,7 +1580,7 @@ namespace Arcontio.Core
         /// <list type="bullet">
         ///   <item><b>Flag compatto</b>: array indicizzato per npcId, molto economico da consultare.</item>
         ///   <item><b>Lista attiva</b>: contiene solo gli NPC sporchi, evitando scansioni globali future.</item>
-        ///   <item><b>Raggio provvisorio</b>: usa il raggio visivo globale piu' margine, in attesa degli stati percettivi v0.20e.</item>
+        ///   <item><b>Raggio conservativo</b>: usa il massimo raggio configurato per gli stati percettivi piu' margine.</item>
         /// </list>
         /// </summary>
         public int PerceptionDirtyNpcCount => _perceptionDirtyNpcIds.Count;
@@ -4529,7 +4529,8 @@ if (!NpcAction.ContainsKey(id))
         /// <summary>
         /// SetNpcPos:
         /// - Aggiorna GridPos.
-        /// - In futuro questo Ã¨ il punto perfetto per pubblicare NpcMovedEvent / PerceptionDirty.
+        /// - Mantiene allineati indice cella NPC, dirty percettivo e mappa watched.
+        /// - Resta il punto naturale dove aggiungere un eventuale NpcMovedEvent futuro.
         /// </summary>
         public void SetNpcPos(int npcId, int x, int y)
         {
