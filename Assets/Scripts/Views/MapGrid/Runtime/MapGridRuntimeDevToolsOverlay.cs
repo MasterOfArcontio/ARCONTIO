@@ -178,7 +178,7 @@ namespace Arcontio.View.MapGrid
         // Cache UI
         private Vector2 _scroll;
         private Vector2 _windowScroll;
-        private Rect _windowRect = new Rect(16, 16, 460, 720);
+        private Rect _windowRect = new Rect(28, 48, 460, 720);
 
         // Per evitare "click-through" (il problema riportato: clicco un bottone e contemporaneamente piazzo sulla mappa),
         // teniamo una flag aggiornata ogni frame che indica se il mouse sta "sopra" la finestra IMGUI.
@@ -245,11 +245,22 @@ namespace Arcontio.View.MapGrid
             _enabled = true;
             DeactivateTransportMode(clearMessage: true);
             _tool = Tool.SpawnNpc;
+            EnsureWindowBelowRuntimeTopBar();
 
             if (_enabled && string.IsNullOrWhiteSpace(_selectedDefId))
                 _selectedDefId = ResolveFirstPlaceableDefId();
 
             ResetTransientInputState();
+        }
+
+        private void EnsureWindowBelowRuntimeTopBar()
+        {
+            const float minX = 28f;
+            const float minY = 48f;
+            if (_windowRect.x < minX)
+                _windowRect.x = minX;
+            if (_windowRect.y < minY)
+                _windowRect.y = minY;
         }
 
         private void Awake()

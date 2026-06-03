@@ -38,11 +38,16 @@ namespace Arcontio.View.MapGrid
         private GameObject _root;
         private Text _spawnText;
         private Text _pauseText;
+        private Text _fovText;
+        private Text _fovPinText;
         private Text _stepOneText;
         private Text _stepTenText;
         private Image _spawnImage;
         private Image _pauseImage;
+        private Image _fovImage;
+        private Image _fovPinImage;
         private MapGridRuntimeDevToolsOverlay _devToolsOverlay;
+        private MapGridWorldView _worldView;
         private float _nextRefreshTime;
 
         // =============================================================================
@@ -55,13 +60,14 @@ namespace Arcontio.View.MapGrid
         /// ritenta tramite <c>FindObjectOfType</c> durante il refresh.
         /// </para>
         /// </summary>
-        public void AttachTo(Transform parent, MapGridRuntimeDevToolsOverlay devToolsOverlay)
+        public void AttachTo(Transform parent, MapGridRuntimeDevToolsOverlay devToolsOverlay, MapGridWorldView worldView)
         {
             if (_root != null)
                 return;
 
             EnsureEventSystemExists();
             _devToolsOverlay = devToolsOverlay;
+            _worldView = worldView;
 
             _root = new GameObject("MapGridRuntimeControlTopBar");
             _root.transform.SetParent(parent, false);
@@ -103,6 +109,8 @@ namespace Arcontio.View.MapGrid
 
             CreateButton(panelGo.transform, "Spawn F3", 112f, OnSpawnClicked, out _spawnText, out _spawnImage);
             CreateButton(panelGo.transform, "Pausa P", 96f, OnPauseClicked, out _pauseText, out _pauseImage);
+            CreateButton(panelGo.transform, "FOV", 74f, OnFovClicked, out _fovText, out _fovImage);
+            CreateButton(panelGo.transform, "Fissa", 74f, OnFovPinClicked, out _fovPinText, out _fovPinImage);
             CreateButton(panelGo.transform, "Step 1 O", 96f, OnStepOneClicked, out _stepOneText, out _);
             CreateButton(panelGo.transform, "Step 10 I", 104f, OnStepTenClicked, out _stepTenText, out _);
 
@@ -139,6 +147,18 @@ namespace Arcontio.View.MapGrid
             RefreshLabels(force: true);
         }
 
+        private void OnFovClicked()
+        {
+            ResolveWorldView()?.ToggleFovOverlayVisibility();
+            RefreshLabels(force: true);
+        }
+
+        private void OnFovPinClicked()
+        {
+            ResolveWorldView()?.ToggleFovOverlayPinned();
+            RefreshLabels(force: true);
+        }
+
         private void OnStepOneClicked()
         {
             SimulationHost.Instance?.StepOneTickPaused();
@@ -163,6 +183,17 @@ namespace Arcontio.View.MapGrid
             if (_pauseText != null)
                 _pauseText.text = paused ? "Riprendi P" : "Pausa P";
 
+            var view = ResolveWorldView();
+            bool fovAvailable = view != null && view.IsFovOverlayAvailable;
+            bool fovEnabled = view != null && view.IsFovOverlayEnabled;
+            bool fovPinned = view != null && view.IsFovOverlayPinned;
+
+            if (_fovText != null)
+                _fovText.text = fovAvailable ? (fovEnabled ? "FOV ON" : "FOV OFF") : "FOV cfg";
+
+            if (_fovPinText != null)
+                _fovPinText.text = fovPinned ? "Fissa ON" : "Fissa";
+
             if (_stepOneText != null)
                 _stepOneText.text = "Step 1 O";
 
@@ -174,6 +205,12 @@ namespace Arcontio.View.MapGrid
 
             if (_pauseImage != null)
                 _pauseImage.color = paused ? ColorFromHex("#D29922", 0.82f) : ColorFromHex("#161B22", 0.88f);
+
+            if (_fovImage != null)
+                _fovImage.color = fovAvailable && fovEnabled ? ColorFromHex("#1F6FEB", 0.82f) : ColorFromHex("#161B22", 0.88f);
+
+            if (_fovPinImage != null)
+                _fovPinImage.color = fovPinned ? ColorFromHex("#8957E5", 0.82f) : ColorFromHex("#161B22", 0.88f);
         }
 
         private MapGridRuntimeDevToolsOverlay ResolveDevToolsOverlay()
@@ -183,6 +220,15 @@ namespace Arcontio.View.MapGrid
 
             _devToolsOverlay = Object.FindObjectOfType<MapGridRuntimeDevToolsOverlay>();
             return _devToolsOverlay;
+        }
+
+        private MapGridWorldView ResolveWorldView()
+        {
+            if (_worldView != null)
+                return _worldView;
+
+            _worldView = Object.FindObjectOfType<MapGridWorldView>();
+            return _worldView;
         }
 
         private static void CreateButton(Transform parent, string label, float width, UnityEngine.Events.UnityAction onClick, out Text text, out Image image)
