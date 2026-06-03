@@ -302,6 +302,7 @@ namespace Arcontio.Core
                             continue;
 
                         float q = FovUtils.ObservationQuality(dist, visionRange);
+                        world.MarkObjectObservedByNpc(objId, npcId);
                         bus.Publish(new ObjectSpottedEvent(
                             observerNpcId: npcId,
                             objectId: objId,

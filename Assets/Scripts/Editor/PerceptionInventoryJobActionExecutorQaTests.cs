@@ -1,5 +1,6 @@
 using Arcontio.Core;
 using Arcontio.Core.Config;
+using Arcontio.Core.Diagnostics;
 using System;
 using NUnit.Framework;
 using UnityEditor;
@@ -116,6 +117,8 @@ namespace Arcontio.Tests
                 tests.NpcPerceptionIndexTracksCreateMoveAndDevRemovalHook();
                 tests.PerceptionDirtyMarksNearbyObserversWhenGroundObjectChanges();
                 tests.PerceptionDirtyTracksNpcFacingAndMovement();
+                tests.PerceptionRelationsSeparateWatchedAndObservedObjects();
+                tests.PerceptionRelationsSeparateWatchedAndObservedNpcs();
 
                 Debug.Log("[PerceptionSpatialIndexQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -286,6 +289,96 @@ namespace Arcontio.Tests
             Assert.That(world.IsNpcPerceptionDirty(mover), Is.True);
             Assert.That(world.IsNpcPerceptionDirty(observer), Is.True);
             Assert.That(world.IsNpcPerceptionDirty(farNpc), Is.False);
+        }
+
+        [Test]
+        public void PerceptionRelationsSeparateWatchedAndObservedObjects()
+        {
+            var sim = new SimulationParams();
+            sim.npcVisionRangeCells = 4;
+            sim.perception.dirtyRadiusMarginCells = 1;
+
+            var world = new World(new WorldConfig(sim));
+            world.ObjectDefs["qa_food_stock"] = new ObjectDef
+            {
+                Id = "qa_food_stock",
+                DisplayName = "QA food stock",
+                IsInteractable = true,
+                IsOccluder = false,
+                BlocksMovement = false,
+                BlocksVision = false
+            };
+
+            int observer = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Observer"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int farNpc = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Far"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                20,
+                20);
+            int objectId = world.CreateObject("qa_food_stock", 2, 1, OwnerKind.Community, 0);
+
+            Assert.That(world.IsObjectWatchedByNpc(objectId, observer), Is.True);
+            Assert.That(world.IsObjectWatchedByNpc(objectId, farNpc), Is.False);
+            Assert.That(world.IsObjectObservedByNpc(objectId, observer), Is.False);
+
+            world.SetFacing(observer, CardinalDirection.East);
+            var perception = new ObjectPerceptionSystem();
+            perception.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.IsObjectObservedByNpc(objectId, observer), Is.True);
+            Assert.That(world.IsObjectObservedByNpc(objectId, farNpc), Is.False);
+
+            Assert.That(world.TryPickUpObject(observer, objectId, out _, out _, out string pickupReason), Is.False, pickupReason);
+            world.SetNpcPos(observer, 2, 1);
+            Assert.That(world.TryPickUpObject(observer, objectId, out _, out _, out pickupReason), Is.True, pickupReason);
+            Assert.That(world.IsObjectWatchedByNpc(objectId, observer), Is.False);
+            Assert.That(world.IsObjectObservedByNpc(objectId, observer), Is.False);
+        }
+
+        [Test]
+        public void PerceptionRelationsSeparateWatchedAndObservedNpcs()
+        {
+            var sim = new SimulationParams();
+            sim.npcVisionRangeCells = 4;
+            sim.perception.dirtyRadiusMarginCells = 1;
+
+            var world = new World(new WorldConfig(sim));
+            int observer = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Observer"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int target = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Target"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                2,
+                1);
+            int farNpc = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Far"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                20,
+                20);
+
+            Assert.That(world.IsNpcWatchedByNpc(target, observer), Is.True);
+            Assert.That(world.IsNpcWatchedByNpc(target, target), Is.False);
+            Assert.That(world.IsNpcWatchedByNpc(target, farNpc), Is.False);
+            Assert.That(world.IsNpcObservedByNpc(target, observer), Is.False);
+
+            world.SetFacing(observer, CardinalDirection.East);
+            var perception = new NpcPerceptionSystem();
+            perception.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.IsNpcObservedByNpc(target, observer), Is.True);
+            Assert.That(world.IsNpcObservedByNpc(target, farNpc), Is.False);
         }
     }
 }
