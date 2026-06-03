@@ -256,10 +256,12 @@ namespace Arcontio.Tests
   ""templates"": [
     {
       ""templateId"": ""perception.look_around.v1"",
+      ""exitPerceptionState"": ""idle"",
       ""phases"": [
         {
           ""phaseId"": ""look_around"",
           ""kind"": ""Execute"",
+          ""PerceptionState"": ""lookDirection"",
           ""isInterruptible"": true,
           ""actions"": [
             {
@@ -293,7 +295,9 @@ namespace Arcontio.Tests
                 out string reason);
 
             Assert.That(built, Is.True, reason);
+            Assert.That(plan.ExitPerceptionState, Is.EqualTo("idle"));
             Assert.That(plan.TryGetPhase(0, out var phase), Is.True);
+            Assert.That(phase.PerceptionState, Is.EqualTo("lookDirection"));
             Assert.That(phase.TryGetAction(0, out var action), Is.True);
             Assert.That(action.Kind, Is.EqualTo(JobActionKind.LookDirection));
             Assert.That(action.PayloadKey, Is.EqualTo("East"));

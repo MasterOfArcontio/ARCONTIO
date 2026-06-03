@@ -133,10 +133,11 @@ namespace Arcontio.Core
                     string.IsNullOrWhiteSpace(phaseDef.phaseId) ? phaseKind.ToString() : phaseDef.phaseId,
                     actions.Length,
                     phaseDef.isInterruptible,
-                    actions);
+                    actions,
+                    phaseDef.ResolvePerceptionState());
             }
 
-            plan = new JobPlan(template.templateId, materializedPhases);
+            plan = new JobPlan(template.templateId, materializedPhases, template.exitPerceptionState);
             reason = "PlanBuilt";
             return true;
         }
@@ -193,6 +194,7 @@ namespace Arcontio.Core
     public sealed class JobTemplateDefinition
     {
         public string templateId;
+        public string exitPerceptionState;
         public JobTemplatePhaseDefinition[] phases;
     }
 
@@ -201,8 +203,17 @@ namespace Arcontio.Core
     {
         public string phaseId;
         public string kind;
+        public string PerceptionState;
+        public string perceptionState;
         public bool isInterruptible = true;
         public JobTemplateActionDefinition[] actions;
+
+        public string ResolvePerceptionState()
+        {
+            return !string.IsNullOrWhiteSpace(PerceptionState)
+                ? PerceptionState
+                : perceptionState;
+        }
     }
 
     [Serializable]

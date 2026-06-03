@@ -67,6 +67,7 @@ namespace Arcontio.Core
         public float criticalNeedFloor;
         public float highObligationFloor;
         public float highObligationThreshold;
+        public DecisionIntentScoreWeight[] intentWeights;
 
         public static DecisionScoringConfig Default()
         {
@@ -80,8 +81,45 @@ namespace Arcontio.Core
                 cognitiveModulatorWeight = 0.15f,
                 criticalNeedFloor = 1.25f,
                 highObligationFloor = 1.00f,
-                highObligationThreshold = 0.75f
+                highObligationThreshold = 0.75f,
+                intentWeights = System.Array.Empty<DecisionIntentScoreWeight>()
             };
+        }
+    }
+
+    // =============================================================================
+    // DecisionIntentScoreWeight
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Peso configurabile applicato a una singola intenzione decisionale.
+    /// </para>
+    ///
+    /// <para><b>Catalogo intent data-driven</b></para>
+    /// <para>
+    /// Questa struttura permette di modificare da JSON il peso relativo di una
+    /// intenzione senza cambiare codice. Non decide la disponibilita' del candidato:
+    /// agisce solo sullo score dopo che la query/belief ha prodotto candidati validi.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Intent</b>: nome dell'intenzione, per esempio <c>EatKnownFood</c>.</item>
+    ///   <item><b>ScoreMultiplier</b>: moltiplicatore dello score finale.</item>
+    ///   <item><b>ScoreBias</b>: contributo additivo leggero dopo il moltiplicatore.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct DecisionIntentScoreWeight
+    {
+        public readonly DecisionIntentKind Intent;
+        public readonly float ScoreMultiplier;
+        public readonly float ScoreBias;
+
+        public DecisionIntentScoreWeight(DecisionIntentKind intent, float scoreMultiplier, float scoreBias)
+        {
+            Intent = intent;
+            ScoreMultiplier = scoreMultiplier;
+            ScoreBias = scoreBias;
         }
     }
 }

@@ -2,10 +2,12 @@
   "templates": [
     {
       "templateId": "food.eat_known_community_stock.v1",
+      "exitPerceptionState": "idle",
       "phases": [
         {
           "phaseId": "reach_food",
           "kind": "ReachTarget",
+          "PerceptionState": "movement",
           "isInterruptible": true,
           "actions": [
             {
@@ -17,6 +19,7 @@
         {
           "phaseId": "consume_food",
           "kind": "Execute",
+          "PerceptionState": "idle",
           "isInterruptible": false,
           "actions": [
             {
@@ -29,10 +32,12 @@
     },
     {
       "templateId": "generic.move_to_cell.v1",
+      "exitPerceptionState": "idle",
       "phases": [
         {
           "phaseId": "move_to_cell",
           "kind": "ReachTarget",
+          "PerceptionState": "movement",
           "isInterruptible": true,
           "actions": [
             {
@@ -45,10 +50,12 @@
     },
     {
       "templateId": "food.search_local_probe.v1",
+      "exitPerceptionState": "idle",
       "phases": [
         {
           "phaseId": "search_food_probe",
           "kind": "ReachTarget",
+          "PerceptionState": "movement",
           "isInterruptible": true,
           "actions": [
             {
@@ -60,6 +67,7 @@
         {
           "phaseId": "search_food_look_around",
           "kind": "Execute",
+          "PerceptionState": "lookDirection",
           "isInterruptible": true,
           "actions": [
             {
@@ -92,10 +100,12 @@
     },
     {
       "templateId": "perception.look_around.v1",
+      "exitPerceptionState": "idle",
       "phases": [
         {
           "phaseId": "look_around",
           "kind": "Execute",
+          "PerceptionState": "lookDirection",
           "isInterruptible": true,
           "actions": [
             {
@@ -128,10 +138,12 @@
     },
     {
       "templateId": "transport.object_to_cell.v1",
+      "exitPerceptionState": "idle",
       "phases": [
         {
           "phaseId": "reach_object",
           "kind": "ReachTarget",
+          "PerceptionState": "movement",
           "isInterruptible": true,
           "actions": [
             {
@@ -143,6 +155,7 @@
         {
           "phaseId": "pickup_object",
           "kind": "Execute",
+          "PerceptionState": "idle",
           "isInterruptible": false,
           "actions": [
             {
@@ -154,6 +167,7 @@
         {
           "phaseId": "reach_destination",
           "kind": "ReachTarget",
+          "PerceptionState": "movement",
           "isInterruptible": true,
           "actions": [
             {
@@ -166,6 +180,7 @@
         {
           "phaseId": "drop_object",
           "kind": "Cleanup",
+          "PerceptionState": "idle",
           "isInterruptible": false,
           "actions": [
             {

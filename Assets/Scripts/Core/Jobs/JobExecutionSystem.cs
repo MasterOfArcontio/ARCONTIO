@@ -130,14 +130,14 @@ namespace Arcontio.Core
                     npcId);
                 if (machineResult.TickResult == JobStateMachineTickResult.JobCompleted)
                 {
-                    RestoreIdleAfterLookDirectionJob(world, npcId);
+                    ApplyJobExitPerceptionState(world, npcId, job);
                     runtime.CompleteCurrentJob(npcId, (int)tick.Index, out _);
                     continue;
                 }
 
                 if (machineResult.TickResult == JobStateMachineTickResult.JobFailed)
                 {
-                    RestoreIdleAfterLookDirectionJob(world, npcId);
+                    ApplyJobExitPerceptionState(world, npcId, job);
                     ApplyFoodExecutionFailureCognitiveFeedback(world, npcId, job, result, (int)tick.Index, telemetry);
                     runtime.FailCurrentJob(npcId, machineResult.FailureReason, (int)tick.Index, out _);
                     continue;
@@ -589,6 +589,9 @@ namespace Arcontio.Core
             if (!world.GridPos.TryGetValue(npcId, out var npcCell))
                 return StepResult.Failed(JobFailureReason.MissingTarget, "NpcPositionMissing");
 
+            if (!TryApplyPhasePerceptionState(world, npcId, phase.PerceptionState, out string perceptionStateReason))
+                return StepResult.Failed(JobFailureReason.StepFailed, perceptionStateReason);
+
             if (action.Kind == JobActionKind.WaitTicks)
                 return ExecuteRunningWaitAction(
                     runtime,
@@ -645,18 +648,59 @@ namespace Arcontio.Core
             // oggetti. Orienta soltanto l'NPC dentro il Job Layer; `World.SetFacing`
             // marca dirty percettivo immediato e il blocco percettivo centrale
             // consumera' il nuovo facing secondo le regole v0.20.
-            world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.LookDirection);
+            if (world.GetNpcPerceptionActivityState(npcId) != NpcPerceptionActivityState.LookDirection)
+                world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.LookDirection);
+
             world.SetFacing(npcId, direction);
             return StepResult.Succeeded("LookDirectionCompleted:" + direction);
         }
 
-        private static void RestoreIdleAfterLookDirectionJob(World world, int npcId)
+        private static bool TryApplyPhasePerceptionState(World world, int npcId, string rawState, out string reason)
+        {
+            reason = string.Empty;
+            if (world == null)
+                return true;
+
+            if (string.IsNullOrWhiteSpace(rawState))
+                return true;
+
+            if (!TryParsePerceptionActivityState(rawState, out var state))
+            {
+                reason = "InvalidPhasePerceptionState:" + rawState;
+                return false;
+            }
+
+            if (world.GetNpcPerceptionActivityState(npcId) != state)
+                world.SetNpcPerceptionActivityState(npcId, state);
+            return true;
+        }
+
+        private static void ApplyJobExitPerceptionState(World world, int npcId, Job job)
         {
             if (world == null)
                 return;
 
+            string rawState = job?.Plan?.ExitPerceptionState;
+            if (TryParsePerceptionActivityState(rawState, out var state))
+            {
+                if (world.GetNpcPerceptionActivityState(npcId) != state)
+                    world.SetNpcPerceptionActivityState(npcId, state);
+                return;
+            }
+
             if (world.GetNpcPerceptionActivityState(npcId) == NpcPerceptionActivityState.LookDirection)
                 world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Idle);
+        }
+
+        private static bool TryParsePerceptionActivityState(string rawState, out NpcPerceptionActivityState state)
+        {
+            if (string.IsNullOrWhiteSpace(rawState))
+            {
+                state = default;
+                return false;
+            }
+
+            return System.Enum.TryParse(rawState.Trim(), ignoreCase: true, out state);
         }
 
         private static StepResult ExecuteRunningWaitAction(

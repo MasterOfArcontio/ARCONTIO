@@ -105,6 +105,7 @@ namespace Arcontio.Core.Config
         // questa sezione dall'EL: l'EL osserva, mentre "decision" puo' modificare la
         // policy di scelta, per esempio rendendo i test runtime deterministici.
         public DecisionRuntimeParams decision = new DecisionRuntimeParams();
+        public DecisionScoringRuntimeParams decision_scoring = new DecisionScoringRuntimeParams();
 
         // ---------------- GVD-DIN (v0.03) ----------------
         // Sistema GVD dinamico condition-based + pruning.
@@ -382,6 +383,132 @@ namespace Arcontio.Core.Config
         public float noise01 = 0.15f;
         public float impulsivityNoiseBonus = 0.35f;
         public float minimumWeight = 0.001f;
+    }
+
+    // =============================================================================
+    // DecisionScoringRuntimeParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile dei pesi usati per comporre lo score degli intent.
+    /// </para>
+    ///
+    /// <para><b>Pesi degli intent letti da JSON</b></para>
+    /// <para>
+    /// Questa configurazione separa la disponibilita' degli intent dal loro peso. Le
+    /// belief query continuano a dire quali intent sono candidabili; questo gruppo
+    /// modifica solo il punteggio numerico con cui i candidati vengono confrontati.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Pesi globali</b>: bisogni, competenza, preferenza, obbligo, memoria e modulatori.</item>
+    ///   <item><b>Floor</b>: soglie minime per bisogno critico e obbligo alto.</item>
+    ///   <item><b>intentWeights</b>: pesi specifici per singolo intent.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class DecisionScoringRuntimeParams
+    {
+        public float needUrgencyWeight = 1.00f;
+        public float competenceWeight = 0.20f;
+        public float preferenceWeight = 0.25f;
+        public float obligationWeight = 0.30f;
+        public float memoryConfidenceWeight = 0.35f;
+        public float cognitiveModulatorWeight = 0.15f;
+        public float criticalNeedFloor = 1.25f;
+        public float highObligationFloor = 1.00f;
+        public float highObligationThreshold = 0.75f;
+        public DecisionIntentScoreRuntimeWeight[] intentWeights = Array.Empty<DecisionIntentScoreRuntimeWeight>();
+
+        // =============================================================================
+        // ToScoringConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte il DTO letto da JSON nella configurazione compatta usata dal
+        /// servizio di scoring runtime.
+        /// </para>
+        ///
+        /// <para><b>Conversione confinata</b></para>
+        /// <para>
+        /// Le stringhe del JSON vengono risolte una sola volta prima dello scoring.
+        /// Voci sconosciute vengono ignorate, cosi' errori di configurazione non
+        /// creano intent fittizi e non cambiano la disponibilita' dei candidati.
+        /// </para>
+        /// </summary>
+        public Arcontio.Core.DecisionScoringConfig ToScoringConfig()
+        {
+            var config = new Arcontio.Core.DecisionScoringConfig
+            {
+                needUrgencyWeight = needUrgencyWeight,
+                competenceWeight = competenceWeight,
+                preferenceWeight = preferenceWeight,
+                obligationWeight = obligationWeight,
+                memoryConfidenceWeight = memoryConfidenceWeight,
+                cognitiveModulatorWeight = cognitiveModulatorWeight,
+                criticalNeedFloor = criticalNeedFloor,
+                highObligationFloor = highObligationFloor,
+                highObligationThreshold = highObligationThreshold,
+                intentWeights = BuildIntentWeights(intentWeights)
+            };
+
+            return config;
+        }
+
+        private static Arcontio.Core.DecisionIntentScoreWeight[] BuildIntentWeights(
+            DecisionIntentScoreRuntimeWeight[] source)
+        {
+            if (source == null || source.Length == 0)
+                return Array.Empty<Arcontio.Core.DecisionIntentScoreWeight>();
+
+            var buffer = new Arcontio.Core.DecisionIntentScoreWeight[source.Length];
+            int count = 0;
+            for (int i = 0; i < source.Length; i++)
+            {
+                var entry = source[i];
+                if (entry == null || string.IsNullOrWhiteSpace(entry.intent))
+                    continue;
+
+                if (!Enum.TryParse(entry.intent, ignoreCase: true, out Arcontio.Core.DecisionIntentKind intent))
+                    continue;
+
+                buffer[count++] = new Arcontio.Core.DecisionIntentScoreWeight(
+                    intent,
+                    entry.scoreMultiplier,
+                    entry.scoreBias);
+            }
+
+            if (count == buffer.Length)
+                return buffer;
+
+            var compact = new Arcontio.Core.DecisionIntentScoreWeight[count];
+            Array.Copy(buffer, compact, count);
+            return compact;
+        }
+    }
+
+    // =============================================================================
+    // DecisionIntentScoreRuntimeWeight
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Riga serializzabile del catalogo pesi per singolo intent.
+    /// </para>
+    ///
+    /// <para><b>Mapping testuale sicuro</b></para>
+    /// <para>
+    /// Il JSON usa nomi leggibili come <c>EatKnownFood</c>. La conversione verso
+    /// enum avviene nel DTO padre; qui restano solo campi semplici leggibili da
+    /// <c>JsonUtility</c>.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class DecisionIntentScoreRuntimeWeight
+    {
+        public string intent;
+        public float scoreMultiplier = 1f;
+        public float scoreBias = 0f;
     }
 
     // =============================================================================

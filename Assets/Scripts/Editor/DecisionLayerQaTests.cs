@@ -120,6 +120,56 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // IntentSpecificWeightChangesScoreWithoutChangingCandidateGeneration
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il peso specifico di un intent letto da configurazione cambi
+        /// solo lo score, non la disponibilita' dei candidati.
+        /// </para>
+        ///
+        /// <para><b>Score data-driven, query ancora sovrana</b></para>
+        /// <para>
+        /// Il test usa un contesto senza belief Food: <c>EatKnownFood</c> non deve
+        /// comparire comunque. Il peso su <c>SearchFood</c> alza solo il candidato
+        /// gia' prodotto dalla pipeline normale.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void IntentSpecificWeightChangesScoreWithoutChangingCandidateGeneration()
+        {
+            var context = MakeContext(hunger01: 0.90f, rest01: 0.10f, addFoodBelief: false);
+            var candidates = new List<DecisionCandidate>();
+            var generator = new DecisionCandidateGenerator();
+            var scoring = new DecisionScoringService();
+
+            var config = DecisionScoringConfig.Default();
+            config.intentWeights = new[]
+            {
+                new DecisionIntentScoreWeight(DecisionIntentKind.SearchFood, 2.0f, 0.5f)
+            };
+
+            generator.GeneratePhase1Candidates(context, candidates);
+            scoring.ScoreCandidates(context, candidates, config);
+
+            Assert.That(candidates.Exists(candidate => candidate.Kind == DecisionIntentKind.EatKnownFood), Is.False);
+            var searchFood = candidates.Find(candidate => candidate.Kind == DecisionIntentKind.SearchFood);
+            Assert.That(searchFood.IsAvailable, Is.True);
+            bool hasPositiveIntentWeight = false;
+            for (int i = 0; i < searchFood.ScoreContributions.Length; i++)
+            {
+                var contribution = searchFood.ScoreContributions[i];
+                if (contribution.Label == "IntentWeight" && contribution.Value > 0f)
+                {
+                    hasPositiveIntentWeight = true;
+                    break;
+                }
+            }
+
+            Assert.That(hasPositiveIntentWeight, Is.True);
+        }
+
+        // =============================================================================
         // DecisionInputAuditAcceptsWhitelistedPerNpcInputs
         // =============================================================================
         /// <summary>

@@ -1142,6 +1142,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20l | Closeout rifondazione percezione runtime | ✅ |
 | v0.20m | Riallineamento percezione centrale, porte dirty e rimozione periodo landmark | ✅ |
 | v0.20n | Pensionamento IdleScan automatico e osservazione direzionale via Job | ✅ |
+| v0.20o | Pesi intent da JSON e stati percettivi di fase nei Job | ✅ |
 
 > **Nota architetturale v0.20:** questa fase introduce una biforcazione controllata del ramo di sviluppo perche' tocca la struttura del ciclo runtime. La patch deve restare progressiva, ma non deve lasciare a meta' indici persistenti, dirty percettivo o cadenza: ogni checkpoint deve mantenere simulazione e diagnostica in uno stato leggibile.
 
@@ -1168,6 +1169,8 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota riallineamento v0.20m:** il closeout ha evidenziato alcuni debiti di coerenza percettiva centrale. `landmark_perception.period` viene rimosso, i landmark seguono solo dirty/cadenza/stato/budget, `IdleScanSystem` precede il blocco percettivo, la pulizia dirty viene separata in `PerceptionDirtyCompletionSystem`, le porte aperte/chiuse marcano dirty gli osservatori nel watched cone economico e l'overlay mostra NPC percepiti su NPC totali. Restano rinviati watched cone visualizzato a bordo, rinforzo memoria cadenzato e ottimizzazione strutture dati piu' calde.
 
 > **Nota osservazione direzionale v0.20n:** lo scan automatico idle viene pensionato come comportamento runtime autonomo. Il guardarsi attorno passa dal percorso ordinario Decisione -> JobRequest -> Job tramite l'intent `WaitAndObserve`, il template `perception.look_around.v1` e quattro step `LookDirection` direzionali. `SearchFood` conserva il movimento probe e aggiunge una fase finale di osservazione locale; la percezione resta centralizzata e legge il nuovo facing solo nel blocco percettivo ordinario.
+
+> **Nota configurazione job/intent v0.20o:** i pesi degli intent sono ora letti dal blocco `decision_scoring` di `game_params.json`, mantenendo lo score come unico criterio di confronto tra candidati. I template degli incarichi espongono inoltre `PerceptionState` sulle fasi e `exitPerceptionState` sul job, cosi' movimento, osservazione direzionale e ritorno a idle vengono dichiarati dal file `job_templates.json` invece che dedotti solo dal codice.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti

@@ -323,6 +323,7 @@ namespace Arcontio.Core
         public readonly int ExpectedStepCount;
         public readonly bool IsInterruptible;
         public readonly JobAction[] Actions;
+        public readonly string PerceptionState;
 
         public JobPhase(string phaseId, JobPhaseKind kind, string displayName, int expectedStepCount, bool isInterruptible)
             : this(phaseId, kind, displayName, expectedStepCount, isInterruptible, Array.Empty<JobAction>())
@@ -335,12 +336,14 @@ namespace Arcontio.Core
             string displayName,
             int expectedStepCount,
             bool isInterruptible,
-            JobAction[] actions)
+            JobAction[] actions,
+            string perceptionState = "")
         {
             PhaseId = string.IsNullOrWhiteSpace(phaseId) ? kind.ToString() : phaseId;
             Kind = kind;
             DisplayName = displayName ?? string.Empty;
             IsInterruptible = isInterruptible;
+            PerceptionState = perceptionState ?? string.Empty;
             Actions = actions == null || actions.Length == 0
                 ? Array.Empty<JobAction>()
                 : (JobAction[])actions.Clone();
@@ -392,13 +395,15 @@ namespace Arcontio.Core
     {
         public readonly string PlanId;
         public readonly JobPhase[] Phases;
+        public readonly string ExitPerceptionState;
 
         public int PhaseCount => Phases.Length;
         public bool IsEmpty => Phases.Length == 0;
 
-        public JobPlan(string planId, JobPhase[] phases)
+        public JobPlan(string planId, JobPhase[] phases, string exitPerceptionState = "")
         {
             PlanId = string.IsNullOrWhiteSpace(planId) ? "JobPlan" : planId;
+            ExitPerceptionState = exitPerceptionState ?? string.Empty;
 
             // La copia difensiva impedisce al chiamante di cambiare il piano dopo
             // averlo consegnato al job system, mantenendo deterministici test e log.
