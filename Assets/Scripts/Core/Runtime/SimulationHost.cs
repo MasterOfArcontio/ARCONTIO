@@ -769,29 +769,30 @@ namespace Arcontio.Core
             // Deve stare DOPO il MovementSystem per poter processare le nuove conoscenze acquisite nello stesso tick.
             _scheduler.AddSystem(new NpcLandmarkMemorySystem());
 
+            // IdleScan precede tutto il blocco percettivo centrale, cosi' landmark,
+            // oggetti e NPC leggono lo stesso orientamento dello stesso tick.
+            _scheduler.AddSystem(new IdleScanSystem(scanPeriodTicks: 12));
+
 
             // ******************************************************************************************************************************
-            // 5.1C) LANDMARK PERCEPTION (v0.03.03.a — Landmark Perception) - LandmarkPerceptionSystem
+            // 5.1C) LANDMARK PERCEPTION (v0.03.03.a - Landmark Perception) - LandmarkPerceptionSystem
             // ******************************************************************************************************************************
             // Apprendimento visivo dei landmark tramite FOV degli NPC.
             // Complementa il learning fisico (NotifyNpcMovedForLandmarkLearning).
-            // Deve stare DOPO NpcLandmarkMemorySystem (processa i nodi già manutenuti).
+            // Da v0.20m non usa piu' un periodo autonomo: consuma la stessa
+            // selezione percettiva dirty/cadenzata usata da oggetti e NPC.
             {
-                int lpPeriod = _world.Config?.Sim?.landmark_perception?.period ?? 3;
-                _scheduler.AddSystem(new LandmarkPerceptionSystem(lpPeriod));
+                _scheduler.AddSystem(new LandmarkPerceptionSystem());
             }
 
             // ******************************************************************************************************************************
             // 5.2) SCAN IN IDLE - IdleScan
             // ******************************************************************************************************************************
-            // Quando l?NPC è idle, ruota (scan) per evitare ?visione 360 gratuita?.
-            // Deve stare PRIMA della perception: così la rotation influenza cosa viene percepito nello stesso tick.
-            _scheduler.AddSystem(new IdleScanSystem(scanPeriodTicks: 12));
+            // Registrato sopra per precedere tutta la percezione del tick.
 
             // ******************************************************************************************************************************
             // 5.3) BISOGNI NPC - NeedsDecaySystem
             // ******************************************************************************************************************************
-            _scheduler.AddSystem(new NeedsDecaySystem());
 
             // ******************************************************************************************************************************
             // 5.4) PERCEZIONE - ObjectPerceptionSystem (genera eventi ObjectSpottedEvent)
@@ -802,6 +803,14 @@ namespace Arcontio.Core
             // 5.5) PERCEZIONE - NpcPerceptionSystem (genera eventi NpcSpottedEvent)
             // ******************************************************************************************************************************
             _scheduler.AddSystem(new NpcPerceptionSystem());
+
+            // Chiusura del blocco percettivo centrale: il dirty viene pulito solo
+            // dopo landmark, oggetti e NPC.
+            _scheduler.AddSystem(new PerceptionDirtyCompletionSystem());
+
+            // I bisogni restano prima di Job/Decision, ma non spezzano piu' il
+            // blocco percettivo centrale.
+            _scheduler.AddSystem(new NeedsDecaySystem());
 
             // ******************************************************************************************************************************
             // 6) INIZIALIZZO LA COMUNICAZIONE TRA NPC

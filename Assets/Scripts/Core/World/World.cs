@@ -2198,6 +2198,89 @@ namespace Arcontio.Core
             return _perceptionDirtyNpcIds.Count - before;
         }
 
+        // =============================================================================
+        // MarkNpcPerceptionDirtyByWatchedCone
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca dirty gli NPC che potrebbero essere interessati da una modifica
+        /// visiva locale, usando un watched economico basato su raggio, margine e
+        /// cono, senza calcolare la linea di vista.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dirty economico, osservazione accurata</b></para>
+        /// <para>
+        /// Il dirty non deve trasformarsi in una seconda percezione completa. Per
+        /// questo metodo non usa <c>HasLineOfSight</c>: la linea di vista resta nel
+        /// percorso observed vero, dentro i sistemi percettivi. Qui accettiamo una
+        /// piccola sovra-invalidazione pur di non pagare costo alto ogni volta che
+        /// una porta o un oggetto esistente cambia stato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Raggio massimo</b>: limita prima le celle candidate tramite l'indice NPC.</item>
+        ///   <item><b>Stato percettivo</b>: usa range e cono dello stato attuale dell'NPC.</item>
+        ///   <item><b>Margine</b>: include il bordo watched configurato per evitare buchi di invalidazione.</item>
+        /// </list>
+        /// </summary>
+        private int MarkNpcPerceptionDirtyByWatchedCone(int cellX, int cellY)
+        {
+            if (!InBounds(cellX, cellY))
+                return 0;
+
+            int before = _perceptionDirtyNpcIds.Count;
+            int margin = Global.PerceptionDirtyRadiusMarginCells;
+            if (margin < 0)
+                margin = 0;
+
+            int maxRadius = GetConservativePerceptionDirtyRadiusCells();
+            int minX = cellX - maxRadius;
+            int maxX = cellX + maxRadius;
+            int minY = cellY - maxRadius;
+            int maxY = cellY + maxRadius;
+
+            for (int i = 0; i < _occupiedPerceptionNpcCellKeys.Count; i++)
+            {
+                long cellKey = _occupiedPerceptionNpcCellKeys[i];
+                DecodePerceptionSpatialKey(cellKey, out int npcCellX, out int npcCellY);
+                if (npcCellX < minX || npcCellX > maxX || npcCellY < minY || npcCellY > maxY)
+                    continue;
+
+                if (!_npcIdsByPerceptionCell.TryGetValue(cellKey, out var npcIds) || npcIds == null)
+                    continue;
+
+                for (int n = 0; n < npcIds.Count; n++)
+                {
+                    int npcId = npcIds[n];
+                    if (!GridPos.TryGetValue(npcId, out var pos))
+                        continue;
+
+                    int allowedRange = GetNpcPerceptionRangeCells(npcId) + margin;
+                    if (allowedRange < 0)
+                        allowedRange = 0;
+
+                    int dist = FovUtils.Manhattan(pos.X, pos.Y, cellX, cellY);
+                    if (dist <= 0 || dist > allowedRange)
+                        continue;
+
+                    if (GetNpcPerceptionUseCone(npcId))
+                    {
+                        var facing = NpcFacing.TryGetValue(npcId, out var dir)
+                            ? dir
+                            : CardinalDirection.North;
+                        float coneSlope = GetNpcPerceptionConeSlope(npcId);
+                        if (!FovUtils.IsInCone(pos.X, pos.Y, facing, cellX, cellY, coneSlope))
+                            continue;
+                    }
+
+                    MarkNpcPerceptionDirty(npcId);
+                }
+            }
+
+            return _perceptionDirtyNpcIds.Count - before;
+        }
+
         public void MarkAllNpcPerceptionDirty()
         {
             foreach (var pair in GridPos)
@@ -5294,6 +5377,7 @@ if (!NpcAction.ContainsKey(id))
                 return;
             }
 
+            bool changed = instance.IsOpen != isOpen;
             instance.IsOpen = isOpen;
 
             int x   = instance.CellX;
@@ -5332,6 +5416,9 @@ if (!NpcAction.ContainsKey(id))
                 BlocksMovement = blocksMovement,
                 VisionCost     = visionCost
             };
+
+            if (changed)
+                MarkNpcPerceptionDirtyByWatchedCone(x, y);
         }
 
         private void PlaceOccluderInCache(int objectId, int x, int y, ObjectDef def)

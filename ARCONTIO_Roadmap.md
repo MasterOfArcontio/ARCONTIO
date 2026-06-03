@@ -1140,6 +1140,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20j | Cleanup strutture obsolete o ridondanti post-rifondazione | ✅ |
 | v0.20k | QA profiler 20/50/100 NPC e debug overlay costo percettivo | ✅ |
 | v0.20l | Closeout rifondazione percezione runtime | ✅ |
+| v0.20m | Riallineamento percezione centrale, porte dirty e rimozione periodo landmark | ✅ |
 
 > **Nota architetturale v0.20:** questa fase introduce una biforcazione controllata del ramo di sviluppo perche' tocca la struttura del ciclo runtime. La patch deve restare progressiva, ma non deve lasciare a meta' indici persistenti, dirty percettivo o cadenza: ogni checkpoint deve mantenere simulazione e diagnostica in uno stato leggibile.
 
@@ -1162,6 +1163,8 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota QA costo percettivo v0.20k:** `game_params.json` espone ora la sezione `logging.runtime_cost_observer`, spenta di default per mantenere costo nullo. Quando e' attiva, il riquadro coordinate mostra un riepilogo leggero di selezione percettiva, pending, dirty e contatori cumulativi principali per oggetti/NPC/FOV, cosi' i test 20/50/100 NPC possono essere letti direttamente in runtime oltre che dai JSONL.
 
 > **Nota closeout v0.20l:** la fase `v0.20` e' chiusa come rifondazione percettiva runtime. La percezione oggetti, NPC e landmark non procede piu' come scansione globale ordinaria: usa dirty percettivo, indici persistenti, cadenza per stato, budget massimo per tick e osservabilita' runtime attivabile. Restano debiti di ottimizzazione avanzata e QA numerico esteso, ma la struttura base e' pronta per misurazioni 20/50/100 NPC e per ulteriori riduzioni mirate.
+
+> **Nota riallineamento v0.20m:** il closeout ha evidenziato alcuni debiti di coerenza percettiva centrale. `landmark_perception.period` viene rimosso, i landmark seguono solo dirty/cadenza/stato/budget, `IdleScanSystem` precede il blocco percettivo, la pulizia dirty viene separata in `PerceptionDirtyCompletionSystem`, le porte aperte/chiuse marcano dirty gli osservatori nel watched cone economico e l'overlay mostra NPC percepiti su NPC totali. Restano rinviati watched cone visualizzato a bordo, rinforzo memoria cadenzato e ottimizzazione strutture dati piu' calde.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti

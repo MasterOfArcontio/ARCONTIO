@@ -45,24 +45,17 @@ namespace Arcontio.Core
     /// </list>
     ///
     /// <para>
-    /// Il period è configurabile via <c>game_params.json → landmark_perception.period</c>.
-    /// Scegliere valori coprimi con il ciclo di IdleScanSystem (12) per garantire
-    /// copertura 360° nel tempo. Default 1 (ogni tick).
+    /// Da <c>v0.20m</c> i landmark non hanno piu' un periodo autonomo. Il sistema
+    /// consuma la stessa selezione percettiva centrale di oggetti e NPC, quindi
+    /// usa dirty, stato percettivo, cadenza dello stato e budget massimo del tick.
     /// </para>
     /// </summary>
     public sealed class LandmarkPerceptionSystem : ISystem
     {
-        private readonly int _period;
-
-        public int Period => _period;
+        public int Period => 1;
 
         // Buffer nodi visibili per NPC corrente (riusato ad ogni NPC, svuotato ogni iterazione)
         private readonly List<int> _visibleNodeIds = new(32);
-
-        public LandmarkPerceptionSystem(int period = 3)
-        {
-            _period = period < 1 ? 1 : period;
-        }
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
