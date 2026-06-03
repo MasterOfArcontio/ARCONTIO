@@ -726,6 +726,8 @@ namespace Arcontio.Core
         private readonly List<long> _occupiedPerceptionObjectZoneKeys = new(512);
         private readonly Dictionary<long, List<int>> _npcIdsByPerceptionCell = new(2048);
         private readonly List<long> _occupiedPerceptionNpcCellKeys = new(2048);
+        private bool[] _perceptionDirtyNpcFlags = new bool[256];
+        private readonly List<int> _perceptionDirtyNpcIds = new(256);
 
         /// <summary>
         /// Cache booleana: la cella blocca la visione? Derivata dagli ObjectDef.
@@ -1072,6 +1074,12 @@ namespace Arcontio.Core
             Global.ObjectPerceptionMaxObjectsPerNpcPerTick = Config?.Sim?.perception != null
                 ? Config.Sim.perception.maxObjectsPerNpcPerTick
                 : 0;
+            int dirtyMargin = Config?.Sim?.perception != null
+                ? Config.Sim.perception.dirtyRadiusMarginCells
+                : 2;
+            if (dirtyMargin < 0)
+                dirtyMargin = 0;
+            Global.PerceptionDirtyRadiusMarginCells = dirtyMargin;
 
             Global.Needs = NeedsConfig.Default();
             Global.BeliefDecay = BeliefDecayConfig.Default();
@@ -1276,6 +1284,8 @@ namespace Arcontio.Core
             {
                 AddNpcToPerceptionCellIndex(pair.Key, pair.Value.X, pair.Value.Y);
             }
+
+            MarkAllNpcPerceptionDirty();
         }
 
         /// <summary>
@@ -1329,7 +1339,12 @@ namespace Arcontio.Core
         public void RemoveNpcFromPerceptionSpatialIndex(int npcId)
         {
             if (GridPos.TryGetValue(npcId, out var position))
+            {
+                MarkNearbyNpcPerceptionDirty(position.X, position.Y);
                 RemoveNpcFromPerceptionCellIndex(npcId, position.X, position.Y);
+            }
+
+            ClearNpcPerceptionDirty(npcId);
         }
 
         private void ClearPerceptionSpatialIndexes()
@@ -1429,6 +1444,12 @@ namespace Arcontio.Core
             return ((long)x << 32) ^ (uint)y;
         }
 
+        private static void DecodePerceptionSpatialKey(long key, out int x, out int y)
+        {
+            x = (int)(key >> 32);
+            y = (int)key;
+        }
+
         /// <summary>
         /// Divisione intera verso il basso usata dagli indici spaziali anche con coordinate negative.
         /// </summary>
@@ -1439,6 +1460,145 @@ namespace Arcontio.Core
             if (remainder != 0 && ((remainder < 0) != (divisor < 0)))
                 result--;
             return result;
+        }
+
+        // =============================================================================
+        // Perception dirty API
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mantiene l'elenco degli NPC che devono rifare percezione perche' qualcosa
+        /// di potenzialmente osservabile e' cambiato vicino a loro.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: invalidazione conservativa</b></para>
+        /// <para>
+        /// Questo flag non dice che l'NPC abbia visto davvero qualcosa. Dice solo che
+        /// potrebbe aver bisogno di ricalcolare la percezione. La verifica geometrica
+        /// vera resta nei sistemi percettivi, che applicano cono visivo, distanza e
+        /// linea di vista.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Flag compatto</b>: array indicizzato per npcId, molto economico da consultare.</item>
+        ///   <item><b>Lista attiva</b>: contiene solo gli NPC sporchi, evitando scansioni globali future.</item>
+        ///   <item><b>Raggio provvisorio</b>: usa il raggio visivo globale piu' margine, in attesa degli stati percettivi v0.20e.</item>
+        /// </list>
+        /// </summary>
+        public int PerceptionDirtyNpcCount => _perceptionDirtyNpcIds.Count;
+
+        public int GetPerceptionDirtyNpcIdAt(int index)
+        {
+            return _perceptionDirtyNpcIds[index];
+        }
+
+        public bool IsNpcPerceptionDirty(int npcId)
+        {
+            return npcId > 0
+                && npcId < _perceptionDirtyNpcFlags.Length
+                && _perceptionDirtyNpcFlags[npcId];
+        }
+
+        public void MarkNpcPerceptionDirty(int npcId)
+        {
+            if (npcId <= 0 || !ExistsNpc(npcId))
+                return;
+
+            EnsurePerceptionDirtyCapacity(npcId);
+            if (_perceptionDirtyNpcFlags[npcId])
+                return;
+
+            _perceptionDirtyNpcFlags[npcId] = true;
+            _perceptionDirtyNpcIds.Add(npcId);
+        }
+
+        public void ClearNpcPerceptionDirty(int npcId)
+        {
+            if (npcId <= 0 || npcId >= _perceptionDirtyNpcFlags.Length || !_perceptionDirtyNpcFlags[npcId])
+                return;
+
+            _perceptionDirtyNpcFlags[npcId] = false;
+            _perceptionDirtyNpcIds.Remove(npcId);
+        }
+
+        public void ClearAllNpcPerceptionDirty()
+        {
+            for (int i = 0; i < _perceptionDirtyNpcIds.Count; i++)
+            {
+                int npcId = _perceptionDirtyNpcIds[i];
+                if (npcId > 0 && npcId < _perceptionDirtyNpcFlags.Length)
+                    _perceptionDirtyNpcFlags[npcId] = false;
+            }
+
+            _perceptionDirtyNpcIds.Clear();
+        }
+
+        public int GetConservativePerceptionDirtyRadiusCells()
+        {
+            int radius = Global.NpcVisionRangeCells;
+            if (radius < 0)
+                radius = 0;
+
+            int margin = Global.PerceptionDirtyRadiusMarginCells;
+            if (margin < 0)
+                margin = 0;
+
+            return radius + margin;
+        }
+
+        public int MarkNearbyNpcPerceptionDirty(int cellX, int cellY)
+        {
+            return MarkNearbyNpcPerceptionDirty(cellX, cellY, GetConservativePerceptionDirtyRadiusCells());
+        }
+
+        public int MarkNearbyNpcPerceptionDirty(int cellX, int cellY, int radiusCells)
+        {
+            if (!InBounds(cellX, cellY) || radiusCells < 0)
+                return 0;
+
+            int before = _perceptionDirtyNpcIds.Count;
+            int minX = cellX - radiusCells;
+            int maxX = cellX + radiusCells;
+            int minY = cellY - radiusCells;
+            int maxY = cellY + radiusCells;
+
+            for (int i = 0; i < _occupiedPerceptionNpcCellKeys.Count; i++)
+            {
+                long cellKey = _occupiedPerceptionNpcCellKeys[i];
+                DecodePerceptionSpatialKey(cellKey, out int npcCellX, out int npcCellY);
+                if (npcCellX < minX || npcCellX > maxX || npcCellY < minY || npcCellY > maxY)
+                    continue;
+
+                if (FovUtils.Manhattan(npcCellX, npcCellY, cellX, cellY) > radiusCells)
+                    continue;
+
+                if (!_npcIdsByPerceptionCell.TryGetValue(cellKey, out var npcIds) || npcIds == null)
+                    continue;
+
+                for (int n = 0; n < npcIds.Count; n++)
+                    MarkNpcPerceptionDirty(npcIds[n]);
+            }
+
+            return _perceptionDirtyNpcIds.Count - before;
+        }
+
+        public void MarkAllNpcPerceptionDirty()
+        {
+            foreach (var pair in GridPos)
+                MarkNpcPerceptionDirty(pair.Key);
+        }
+
+        private void EnsurePerceptionDirtyCapacity(int npcId)
+        {
+            if (npcId < _perceptionDirtyNpcFlags.Length)
+                return;
+
+            int newSize = _perceptionDirtyNpcFlags.Length;
+            while (newSize <= npcId)
+                newSize *= 2;
+
+            Array.Resize(ref _perceptionDirtyNpcFlags, newSize);
         }
         /// <summary>
         /// Esporta lo stato "editabile" dal DevMode in un DevMapData.
@@ -3511,6 +3671,8 @@ namespace Arcontio.Core
             GridPos[id] = new GridPosition(x, y);
             NpcFacing[id] = CardinalDirection.North;
             AddNpcToPerceptionCellIndex(id, x, y);
+            MarkNearbyNpcPerceptionDirty(x, y);
+            MarkNpcPerceptionDirty(id);
 
             // MemoryStore — MaxTraces da config globale, tratti individuali dal DNA
             var store = new MemoryStore();
@@ -3655,6 +3817,8 @@ if (!NpcAction.ContainsKey(id))
             GridPos[npcId] = new GridPosition(x, y);
             NpcFacing[npcId] = facing;
             AddNpcToPerceptionCellIndex(npcId, x, y);
+            MarkNearbyNpcPerceptionDirty(x, y);
+            MarkNpcPerceptionDirty(npcId);
 
             // MemoryStore vuoto: le trace salvate restano responsabilita' del
             // loader/NpcSaveSystem, che puo' aggiungerle dopo la registrazione
@@ -3707,7 +3871,11 @@ if (!NpcAction.ContainsKey(id))
         public void SetFacing(int npcId, CardinalDirection dir)
         {
             if (!ExistsNpc(npcId)) return;
+            if (NpcFacing.TryGetValue(npcId, out var current) && current == dir)
+                return;
+
             NpcFacing[npcId] = dir;
+            MarkNpcPerceptionDirty(npcId);
         }
 
         // ============================================================
@@ -3751,11 +3919,14 @@ if (!NpcAction.ContainsKey(id))
                 if (oldPos.X == x && oldPos.Y == y)
                     return;
 
+                MarkNearbyNpcPerceptionDirty(oldPos.X, oldPos.Y);
                 RemoveNpcFromPerceptionCellIndex(npcId, oldPos.X, oldPos.Y);
             }
 
             GridPos[npcId] = new GridPosition(x, y);
             AddNpcToPerceptionCellIndex(npcId, x, y);
+            MarkNearbyNpcPerceptionDirty(x, y);
+            MarkNpcPerceptionDirty(npcId);
         }
 
         public bool TryGetObjectCell(int objectId, out int x, out int y)
@@ -4019,6 +4190,7 @@ if (!NpcAction.ContainsKey(id))
 
             Objects[id] = inst;
             AddGroundObjectToPerceptionIndex(id, inst);
+            MarkNearbyNpcPerceptionDirty(x, y);
 
             // Se Ã¨ un occluder oppure blocca la visione o il movimento, aggiorna la occlusion map.
             if (TryGetObjectDef(defId, out var def) && def != null &&
@@ -4137,6 +4309,8 @@ if (!NpcAction.ContainsKey(id))
 
             Objects[objectId] = inst;
             AddGroundObjectToPerceptionIndex(objectId, inst);
+            if (!isHeld)
+                MarkNearbyNpcPerceptionDirty(x, y);
 
             // Manteniamo le cache incrementali coerenti subito dopo il restore.
             // RebuildDerivedCachesGlobal resta comunque disponibile al loader per
@@ -4204,6 +4378,7 @@ if (!NpcAction.ContainsKey(id))
             //   se lo stock viene distrutto/rubato fuori dalla loro percezione, loro NON devono
             //   essere aggiornati automaticamente. Scopriranno la perdita solo ispezionando.
             RemoveGroundObjectFromPerceptionIndex(objectId, x, y);
+            MarkNearbyNpcPerceptionDirty(x, y);
             ObjectUse.Remove(objectId);
             FoodStocks.Remove(objectId);
             ObjectOccluders.Remove(objectId);
@@ -4369,6 +4544,7 @@ if (!NpcAction.ContainsKey(id))
             }
 
             RemoveGroundObjectFromPerceptionIndex(objectId, fromX, fromY);
+            MarkNearbyNpcPerceptionDirty(fromX, fromY);
 
             if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
                 ClearOccluderFromCache(objectId, fromX, fromY);
@@ -4448,6 +4624,7 @@ if (!NpcAction.ContainsKey(id))
                 _objIdByCell[CellIndex(targetX, targetY)] = objectId;
 
             AddGroundObjectToPerceptionIndex(objectId, obj);
+            MarkNearbyNpcPerceptionDirty(targetX, targetY);
 
             if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
             {
@@ -4948,6 +5125,7 @@ if (!NpcAction.ContainsKey(id))
         public float NpcVisionConeHalfWidthPerStep; // legacy/back-compat (se lo stai usando altrove)
         public int ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
         public int ObjectPerceptionMaxObjectsPerNpcPerTick;
+        public int PerceptionDirtyRadiusMarginCells;
 
         // --- Needs config ---
         public NeedsConfig Needs;

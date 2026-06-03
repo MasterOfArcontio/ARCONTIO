@@ -403,6 +403,7 @@ namespace Arcontio.Core.Config
     /// <list type="bullet">
     ///   <item><b>maxCandidateCellsPerNpcPerTick</b>: limite celle candidate; 0 o negativo significa nessun limite.</item>
     ///   <item><b>maxObjectsPerNpcPerTick</b>: limite oggetti processati; 0 o negativo significa nessun limite.</item>
+    ///   <item><b>dirtyRadiusMarginCells</b>: margine conservativo oltre il raggio visivo globale per marcare osservatori potenziali.</item>
     /// </list>
     /// </summary>
     [Serializable]
@@ -410,6 +411,7 @@ namespace Arcontio.Core.Config
     {
         public int maxCandidateCellsPerNpcPerTick = 0;
         public int maxObjectsPerNpcPerTick = 0;
+        public int dirtyRadiusMarginCells = 2;
     }
 
     // ============================================================

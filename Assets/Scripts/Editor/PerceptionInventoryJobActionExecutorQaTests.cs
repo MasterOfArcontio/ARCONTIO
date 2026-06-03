@@ -114,6 +114,8 @@ namespace Arcontio.Tests
                 var tests = new PerceptionSpatialIndexQaTests();
                 tests.GroundObjectPerceptionIndexTracksCreatePickupDropAndDestroy();
                 tests.NpcPerceptionIndexTracksCreateMoveAndDevRemovalHook();
+                tests.PerceptionDirtyMarksNearbyObserversWhenGroundObjectChanges();
+                tests.PerceptionDirtyTracksNpcFacingAndMovement();
 
                 Debug.Log("[PerceptionSpatialIndexQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -191,6 +193,99 @@ namespace Arcontio.Tests
             bool stillInNewCell = world.TryGetNpcIdsInPerceptionCell(4, 1, out npcIds)
                 && npcIds.IndexOf(npcId) >= 0;
             Assert.That(stillInNewCell, Is.False);
+        }
+
+        [Test]
+        public void PerceptionDirtyMarksNearbyObserversWhenGroundObjectChanges()
+        {
+            var sim = new SimulationParams();
+            sim.npcVisionRangeCells = 4;
+            sim.perception.dirtyRadiusMarginCells = 1;
+
+            var world = new World(new WorldConfig(sim));
+            world.ObjectDefs["qa_food_stock"] = new ObjectDef
+            {
+                Id = "qa_food_stock",
+                DisplayName = "QA food stock",
+                IsInteractable = true,
+                IsOccluder = false,
+                BlocksMovement = false,
+                BlocksVision = false
+            };
+
+            int nearNpc = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("NearObserver"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int farNpc = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("FarObserver"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                20,
+                20);
+
+            world.ClearAllNpcPerceptionDirty();
+            int objectId = world.CreateObject("qa_food_stock", 1, 1, OwnerKind.Community, 0);
+            Assert.That(objectId, Is.GreaterThan(0));
+            Assert.That(world.IsNpcPerceptionDirty(nearNpc), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(farNpc), Is.False);
+
+            world.ClearAllNpcPerceptionDirty();
+            Assert.That(world.TryPickUpObject(nearNpc, objectId, out _, out _, out string pickupReason), Is.True, pickupReason);
+            Assert.That(world.IsNpcPerceptionDirty(nearNpc), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(farNpc), Is.False);
+
+            world.ClearAllNpcPerceptionDirty();
+            Assert.That(world.TryDropObject(nearNpc, objectId, 2, 1, out string dropReason), Is.True, dropReason);
+            Assert.That(world.IsNpcPerceptionDirty(nearNpc), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(farNpc), Is.False);
+
+            world.ClearAllNpcPerceptionDirty();
+            world.DestroyObject(objectId);
+            Assert.That(world.IsNpcPerceptionDirty(nearNpc), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(farNpc), Is.False);
+        }
+
+        [Test]
+        public void PerceptionDirtyTracksNpcFacingAndMovement()
+        {
+            var sim = new SimulationParams();
+            sim.npcVisionRangeCells = 4;
+            sim.perception.dirtyRadiusMarginCells = 1;
+
+            var world = new World(new WorldConfig(sim));
+            int observer = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Observer"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int mover = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Mover"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                3,
+                1);
+            int farNpc = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("FarNpc"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                20,
+                20);
+
+            world.ClearAllNpcPerceptionDirty();
+            world.SetFacing(mover, CardinalDirection.East);
+            Assert.That(world.IsNpcPerceptionDirty(mover), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(observer), Is.False);
+            Assert.That(world.IsNpcPerceptionDirty(farNpc), Is.False);
+
+            world.ClearAllNpcPerceptionDirty();
+            world.SetNpcPos(mover, 4, 1);
+            Assert.That(world.IsNpcPerceptionDirty(mover), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(observer), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(farNpc), Is.False);
         }
     }
 }
