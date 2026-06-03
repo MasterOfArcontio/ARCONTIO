@@ -1134,7 +1134,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20d | Separazione observed / watched nella mappa percettiva | ✅ |
 | v0.20e | Scheduler percettivo per stato NPC con cadenza da `game_params` | ✅ |
 | v0.20f | Limite massimo NPC percettivi per tick e distribuzione del carico | ✅ |
-| v0.20g | ObjectPerceptionSystem e NpcPerceptionSystem su soli NPC dirty/cadenzati | ⏳ |
+| v0.20g | ObjectPerceptionSystem e NpcPerceptionSystem su soli NPC dirty/cadenzati | ✅ |
 | v0.20h | Landmark perception allineata a dirty/cadenza/range | ⏳ |
 | v0.20i | Rotazione movimento e `LookDirection` come sorgenti dirty percettive | ⏳ |
 | v0.20j | Cleanup strutture obsolete o ridondanti post-rifondazione | ⏳ |
@@ -1150,6 +1150,8 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota stati percettivi v0.20:** da `v0.20e` gli NPC possiedono uno stato percettivo configurabile da `game_params`. Ogni stato definisce cadenza, raggio visivo e cono; il dirty conservativo usa il massimo raggio teorico degli stati configurati piu' margine, mantenendo una invalidazione prudente senza eseguire percezione immediata fuori dal ciclo centrale.
 
 > **Nota budget percettivo v0.20f:** il `World` ora seleziona gli NPC percettivi candidati per tick applicando dirty, cadenza dello stato, limite massimo configurato e round-robin deterministico. La selezione produce liste e contatori, ma i sistemi percettivi non la consumano ancora: l'integrazione operativa resta nel checkpoint `v0.20g`.
+
+> **Nota sistemi percettivi v0.20g:** `ObjectPerceptionSystem` e `NpcPerceptionSystem` consumano ora la selezione percettiva condivisa del tick. Gli NPC non dirty, fuori cadenza o oltre budget non producono percezione in quel tick; quelli pending restano dirty e vengono riproposti dal round-robin.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti

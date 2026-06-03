@@ -806,6 +806,7 @@ namespace Arcontio.Core
         private readonly List<int> _npcPerceptionTickSelectedIds = new(128);
         private readonly List<int> _npcPerceptionTickPendingIds = new(128);
         private int _npcPerceptionRoundRobinCursor;
+        private long _npcPerceptionSelectionTickIndex = long.MinValue;
         private NpcPerceptionTickBudgetStats _lastNpcPerceptionTickBudgetStats;
         private readonly Dictionary<int, List<int>> _objectWatchedByNpcIds = new(512);
         private readonly Dictionary<int, List<int>> _objectObservedByNpcIds = new(512);
@@ -1742,6 +1743,9 @@ namespace Arcontio.Core
         /// </summary>
         public IReadOnlyList<int> SelectNpcPerceptionUpdatesForTick(long tickIndex)
         {
+            if (_npcPerceptionSelectionTickIndex == tickIndex)
+                return _npcPerceptionTickSelectedIds;
+
             _npcPerceptionTickSelectedIds.Clear();
             _npcPerceptionTickPendingIds.Clear();
 
@@ -1802,6 +1806,7 @@ namespace Arcontio.Core
                 MaxPerceptionUpdates = maxUpdates
             };
 
+            _npcPerceptionSelectionTickIndex = tickIndex;
             return _npcPerceptionTickSelectedIds;
         }
 
@@ -1818,6 +1823,32 @@ namespace Arcontio.Core
         public NpcPerceptionTickBudgetStats GetLastNpcPerceptionTickBudgetStats()
         {
             return _lastNpcPerceptionTickBudgetStats;
+        }
+
+        // =============================================================================
+        // CompleteNpcPerceptionUpdatesForTick
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Chiude il passaggio percettivo del tick pulendo il dirty degli NPC
+        /// selezionati e realmente consegnati ai sistemi di percezione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dirty pulito solo dopo percezione centrale</b></para>
+        /// <para>
+        /// Il dirty non viene cancellato quando un NPC entra nel budget, ma solo
+        /// dopo che il blocco percettivo del tick ha avuto occasione di processarlo.
+        /// Gli NPC rimasti pending restano dirty e verranno riproposti nei tick
+        /// successivi dal round-robin deterministico.
+        /// </para>
+        /// </summary>
+        public void CompleteNpcPerceptionUpdatesForTick(long tickIndex)
+        {
+            if (_npcPerceptionSelectionTickIndex != tickIndex)
+                return;
+
+            for (int i = 0; i < _npcPerceptionTickSelectedIds.Count; i++)
+                ClearNpcPerceptionDirty(_npcPerceptionTickSelectedIds[i]);
         }
 
         public int ResolveMaxNpcPerceptionUpdatesPerTick()

@@ -31,7 +31,6 @@ namespace Arcontio.Core
     {
         public int Period => 1;
 
-        private readonly List<int> _npcIds = new(2048);
         // =============================================================================
         // Update
         // =============================================================================
@@ -61,27 +60,25 @@ namespace Arcontio.Core
             int costPairChecks = 0;
             int costCandidateCells = 0;
 
-            int visionRange = world.Global.NpcVisionRangeCells;
-            if (visionRange <= 0)
-                visionRange = 6;
-
-            bool useCone = world.Global.NpcVisionUseCone;
-            float coneSlope = world.Global.NpcVisionConeSlope;
-
-            _npcIds.Clear();
-            foreach (var pair in world.NpcDna)
-                _npcIds.Add(pair.Key);
+            var selectedNpcIds = world.SelectNpcPerceptionUpdatesForTick(tick.Index);
 
             int spotted = 0;
 
-            for (int i = 0; i < _npcIds.Count; i++)
+            for (int i = 0; i < selectedNpcIds.Count; i++)
             {
-                int observerId = _npcIds[i];
+                int observerId = selectedNpcIds[i];
                 int costNpcPairChecks = 0;
                 int costNpcSpotted = 0;
 
                 if (!world.GridPos.TryGetValue(observerId, out var observerPos))
                     continue;
+
+                int visionRange = world.GetNpcPerceptionRangeCells(observerId);
+                if (visionRange <= 0)
+                    visionRange = 6;
+
+                bool useCone = world.GetNpcPerceptionUseCone(observerId);
+                float coneSlope = world.GetNpcPerceptionConeSlope(observerId);
 
                 if (!world.NpcFacing.TryGetValue(observerId, out var facing))
                     facing = CardinalDirection.North;
@@ -154,6 +151,8 @@ namespace Arcontio.Core
                 if (costPerNpc)
                     costObserver.AddNpcWork(observerId, costNpcPairChecks + costNpcSpotted);
             }
+
+            world.CompleteNpcPerceptionUpdatesForTick(tick.Index);
 
             telemetry.Counter("NpcPerceptionSystem.NpcSpottedEvents", spotted);
 

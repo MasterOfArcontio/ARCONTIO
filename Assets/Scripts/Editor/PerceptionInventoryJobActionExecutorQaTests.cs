@@ -124,6 +124,8 @@ namespace Arcontio.Tests
                 tests.PerceptionDirtyRadiusUsesConfiguredStateMaximumRange();
                 tests.PerceptionTickBudgetLimitsReadyDirtyNpcsAndTracksPending();
                 tests.PerceptionTickBudgetFiltersCadenceBeforeBudget();
+                tests.ObjectPerceptionProcessesOnlyTickBudgetSelection();
+                tests.NpcPerceptionProcessesOnlyTickBudgetSelectionAndCompletesDirty();
 
                 Debug.Log("[PerceptionSpatialIndexQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -512,6 +514,97 @@ namespace Arcontio.Tests
             Assert.That(stats.CadenceReadyCount, Is.EqualTo(1));
             Assert.That(stats.SkippedByCadenceCount, Is.EqualTo(1));
             Assert.That(stats.PendingCount, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ObjectPerceptionProcessesOnlyTickBudgetSelection()
+        {
+            var sim = new SimulationParams();
+            sim.perception_states.defaultState = "idle";
+            sim.perception_states.maxNpcPerceptionUpdatesPerTick = 1;
+            sim.perception_states.idle = PerceptionStateProfile.Create(1, 8, true, 90, 0f);
+
+            var world = new World(new WorldConfig(sim));
+            world.ObjectDefs["qa_food_stock"] = new ObjectDef
+            {
+                Id = "qa_food_stock",
+                DisplayName = "QA food stock",
+                IsInteractable = true,
+                IsOccluder = false,
+                BlocksMovement = false,
+                BlocksVision = false
+            };
+
+            int firstObserver = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("FirstObserver"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int secondObserver = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("SecondObserver"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int objectId = world.CreateObject("qa_food_stock", 2, 1, OwnerKind.Community, 0);
+
+            world.SetFacing(firstObserver, CardinalDirection.East);
+            world.SetFacing(secondObserver, CardinalDirection.East);
+            world.ClearAllNpcPerceptionDirty();
+            world.MarkNpcPerceptionDirty(firstObserver);
+            world.MarkNpcPerceptionDirty(secondObserver);
+
+            var perception = new ObjectPerceptionSystem();
+            perception.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.IsObjectObservedByNpc(objectId, firstObserver), Is.True);
+            Assert.That(world.IsObjectObservedByNpc(objectId, secondObserver), Is.False);
+            Assert.That(world.IsNpcPerceptionDirty(firstObserver), Is.True);
+            Assert.That(world.IsNpcPerceptionDirty(secondObserver), Is.True);
+        }
+
+        [Test]
+        public void NpcPerceptionProcessesOnlyTickBudgetSelectionAndCompletesDirty()
+        {
+            var sim = new SimulationParams();
+            sim.perception_states.defaultState = "idle";
+            sim.perception_states.maxNpcPerceptionUpdatesPerTick = 1;
+            sim.perception_states.idle = PerceptionStateProfile.Create(1, 8, true, 90, 0f);
+
+            var world = new World(new WorldConfig(sim));
+            int firstObserver = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("FirstObserver"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int secondObserver = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("SecondObserver"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+            int target = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("Target"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                2,
+                1);
+
+            world.SetFacing(firstObserver, CardinalDirection.East);
+            world.SetFacing(secondObserver, CardinalDirection.East);
+            world.ClearAllNpcPerceptionDirty();
+            world.MarkNpcPerceptionDirty(firstObserver);
+            world.MarkNpcPerceptionDirty(secondObserver);
+
+            var perception = new NpcPerceptionSystem();
+            perception.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+
+            Assert.That(world.IsNpcObservedByNpc(target, firstObserver), Is.True);
+            Assert.That(world.IsNpcObservedByNpc(target, secondObserver), Is.False);
+            Assert.That(world.IsNpcPerceptionDirty(firstObserver), Is.False);
+            Assert.That(world.IsNpcPerceptionDirty(secondObserver), Is.True);
         }
     }
 }

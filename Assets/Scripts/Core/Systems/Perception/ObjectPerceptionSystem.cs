@@ -41,7 +41,6 @@ namespace Arcontio.Core
     {
         public int Period => 1;
 
-        private readonly List<int> _npcIds = new(2048);
         private readonly List<Vector2Int> _visibleMissingFoodBeliefCells = new(64);
 
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
@@ -70,23 +69,28 @@ namespace Arcontio.Core
             if (coneSlope <= 0f && world.Global.NpcVisionConeHalfWidthPerStep > 0f)
                 coneSlope = world.Global.NpcVisionConeHalfWidthPerStep;
 
-            _npcIds.Clear();
-            _npcIds.AddRange(world.NpcDna.Keys);
+            var selectedNpcIds = world.SelectNpcPerceptionUpdatesForTick(tick.Index);
 
             int spotted = 0;
             int maxCandidateCellsPerNpc = world.Global.ObjectPerceptionMaxCandidateCellsPerNpcPerTick;
             int maxObjectsPerNpc = world.Global.ObjectPerceptionMaxObjectsPerNpcPerTick;
 
-            for (int n = 0; n < _npcIds.Count; n++)
+            for (int n = 0; n < selectedNpcIds.Count; n++)
             {
                 int costNpcFoodBeliefChecks = 0;
 
-                int npcId = _npcIds[n];
+                int npcId = selectedNpcIds[n];
                 if (!world.GridPos.TryGetValue(npcId, out var np))
                     continue;
 
                 if (costSample)
                     costNpcScans++;
+
+                visionRange = world.GetNpcPerceptionRangeCells(npcId);
+                if (visionRange <= 0) visionRange = 6;
+
+                useCone = world.GetNpcPerceptionUseCone(npcId);
+                coneSlope = world.GetNpcPerceptionConeSlope(npcId);
 
                 if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                     facing = CardinalDirection.North;
