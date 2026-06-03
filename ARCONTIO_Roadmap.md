@@ -1107,7 +1107,7 @@ La fase NON cambia semantica decisionale, memoria, percezione o belief. Ottimizz
 #### v0.20 - Rifondazione percettiva strutturale e scheduling percettivo
 
 ## Stato
-FUTURA / PRIORITA' ALTA
+COMPLETATA / DONE
 
 ## Scopo
 
@@ -1139,7 +1139,7 @@ ma senza perdere variazioni del mondo rilevanti.
 | v0.20i | Rotazione movimento e `LookDirection` come sorgenti dirty percettive | ✅ |
 | v0.20j | Cleanup strutture obsolete o ridondanti post-rifondazione | ✅ |
 | v0.20k | QA profiler 20/50/100 NPC e debug overlay costo percettivo | ✅ |
-| v0.20l | Closeout rifondazione percezione runtime | ⏳ |
+| v0.20l | Closeout rifondazione percezione runtime | ✅ |
 
 > **Nota architetturale v0.20:** questa fase introduce una biforcazione controllata del ramo di sviluppo perche' tocca la struttura del ciclo runtime. La patch deve restare progressiva, ma non deve lasciare a meta' indici persistenti, dirty percettivo o cadenza: ogni checkpoint deve mantenere simulazione e diagnostica in uno stato leggibile.
 
@@ -1160,6 +1160,8 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota cleanup v0.20j:** l'audit post-rifondazione non ha individuato strutture percettive eliminabili senza rischio: indici persistenti, dirty, watched/observed e contatori costo risultano vivi. La patch rimuove solo letture ridondanti rimaste da prima degli stati percettivi e aggiorna i commenti interni ormai superati. `IdleScanSystem` e `MovementSystem` restano ponti tollerati fino alla chiusura dei relativi debiti futuri.
 
 > **Nota QA costo percettivo v0.20k:** `game_params.json` espone ora la sezione `logging.runtime_cost_observer`, spenta di default per mantenere costo nullo. Quando e' attiva, il riquadro coordinate mostra un riepilogo leggero di selezione percettiva, pending, dirty e contatori cumulativi principali per oggetti/NPC/FOV, cosi' i test 20/50/100 NPC possono essere letti direttamente in runtime oltre che dai JSONL.
+
+> **Nota closeout v0.20l:** la fase `v0.20` e' chiusa come rifondazione percettiva runtime. La percezione oggetti, NPC e landmark non procede piu' come scansione globale ordinaria: usa dirty percettivo, indici persistenti, cadenza per stato, budget massimo per tick e osservabilita' runtime attivabile. Restano debiti di ottimizzazione avanzata e QA numerico esteso, ma la struttura base e' pronta per misurazioni 20/50/100 NPC e per ulteriori riduzioni mirate.
 
 ---
 #### v0.170 - Conseguenze Sociali Emergenti
