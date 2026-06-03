@@ -142,6 +142,7 @@ namespace Arcontio.View.MapGrid
         private MapGridEntitySummaryOverlay _summaryOverlay;
         private bool _summaryOverlayEnabled;
         private MapGridRuntimeControlTopBar _runtimeControlTopBar;
+        private MapGridRuntimeDebugAudioFeedback _debugAudioFeedback;
 
         // ============================================================
         // Debug click-to-move (runtime test tool)
@@ -285,6 +286,9 @@ namespace Arcontio.View.MapGrid
 
             _runtimeControlTopBar = new MapGridRuntimeControlTopBar();
             _runtimeControlTopBar.AttachTo(transform, devToolsOverlay, this);
+
+            _debugAudioFeedback = new MapGridRuntimeDebugAudioFeedback();
+            _debugAudioFeedback.AttachTo(transform);
         }
 
         private void Update()
@@ -438,6 +442,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             // (opzionale) cleanup: se entità spariscono, rimuovi view
             CleanupMissing();
+            _debugAudioFeedback?.Tick(_world);
 
             // ============================================================
             // DEBUG FOV OVERLAY (heatmap su finestre N tick)
@@ -1026,6 +1031,7 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             ClearEntityRenderersForWorldRebind();
             _summaryOverlay?.ClearOffsetsAndRequestRelayout();
+            _debugAudioFeedback?.ResetState();
             _world = currentWorld;
         }
 

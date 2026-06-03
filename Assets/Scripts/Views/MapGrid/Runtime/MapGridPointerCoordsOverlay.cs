@@ -168,6 +168,7 @@ namespace Arcontio.View.MapGrid
                 .Append(" | attesa ").Append(stats.PendingCount)
                 .Append(" | dirty ").Append(stats.DirtyNpcCount)
                 .Append(" | cadenza ").Append(stats.SkippedByCadenceCount);
+            AppendSelectedPerceptionState(world);
             _textBuilder.Append('\n');
             _textBuilder.Append("<color=#FFD166>Oggetti</color> celle ").Append(objectCells)
                 .Append(" | controlli ").Append(objectChecks)
@@ -180,6 +181,24 @@ namespace Arcontio.View.MapGrid
                 .Append(" | fail ").Append(moveFailures)
                 .Append(" | recovery ").Append(recoveryEvaluated);
             return _textBuilder.ToString();
+        }
+
+        private void AppendSelectedPerceptionState(World world)
+        {
+            int npcId = SocialViewer.UI.NPCSelection.SelectedNpcId;
+            if (npcId <= 0 || world == null || !world.ExistsNpc(npcId))
+                return;
+
+            var state = world.GetNpcPerceptionActivityState(npcId);
+            int cadence = world.GetNpcPerceptionCadenceTicks(npcId);
+            int range = world.GetNpcPerceptionRangeCells(npcId);
+            bool dirty = world.IsNpcPerceptionDirty(npcId);
+
+            _textBuilder.Append(" | <color=#C084FC>sel #").Append(npcId)
+                .Append("</color> perc ").Append(state)
+                .Append(" cad ").Append(cadence)
+                .Append(" range ").Append(range)
+                .Append(" dirty ").Append(dirty ? "si" : "no");
         }
 
         private void SetCostMode(bool enabled)
