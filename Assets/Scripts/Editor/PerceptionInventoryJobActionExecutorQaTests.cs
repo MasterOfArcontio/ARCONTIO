@@ -119,6 +119,9 @@ namespace Arcontio.Tests
                 tests.PerceptionDirtyTracksNpcFacingAndMovement();
                 tests.PerceptionRelationsSeparateWatchedAndObservedObjects();
                 tests.PerceptionRelationsSeparateWatchedAndObservedNpcs();
+                tests.PerceptionStateConfigResolvesCadenceRangeAndCone();
+                tests.PerceptionStateSchedulerUsesDeterministicCadencePhase();
+                tests.PerceptionDirtyRadiusUsesConfiguredStateMaximumRange();
 
                 Debug.Log("[PerceptionSpatialIndexQaTests] PASS");
                 EditorApplication.Exit(0);
@@ -379,6 +382,68 @@ namespace Arcontio.Tests
 
             Assert.That(world.IsNpcObservedByNpc(target, observer), Is.True);
             Assert.That(world.IsNpcObservedByNpc(target, farNpc), Is.False);
+        }
+
+        [Test]
+        public void PerceptionStateConfigResolvesCadenceRangeAndCone()
+        {
+            var sim = new SimulationParams();
+            sim.npcVisionRangeCells = 6;
+            sim.npcVisionConeSlope = 1f;
+            sim.perception_states.defaultState = "movement";
+            sim.perception_states.movement = PerceptionStateProfile.Create(4, 14, true, 60, 0f);
+
+            var world = new World(new WorldConfig(sim));
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("PerceptionState"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+
+            Assert.That(world.GetNpcPerceptionActivityState(npcId), Is.EqualTo(NpcPerceptionActivityState.Movement));
+            Assert.That(world.GetNpcPerceptionCadenceTicks(npcId), Is.EqualTo(4));
+            Assert.That(world.GetNpcPerceptionRangeCells(npcId), Is.EqualTo(14));
+            Assert.That(world.GetNpcPerceptionUseCone(npcId), Is.True);
+            Assert.That(world.GetNpcPerceptionConeSlope(npcId), Is.EqualTo(Mathf.Tan(30f * Mathf.Deg2Rad)).Within(0.0001f));
+        }
+
+        [Test]
+        public void PerceptionStateSchedulerUsesDeterministicCadencePhase()
+        {
+            var sim = new SimulationParams();
+            sim.perception_states.defaultState = "idle";
+            sim.perception_states.idle = PerceptionStateProfile.Create(4, 8, true, 90, 0f);
+
+            var world = new World(new WorldConfig(sim));
+            int npcId = world.CreateNpc(
+                NpcDnaProfile.CreateDefault("CadencedNpc"),
+                new NpcNeeds(),
+                new Arcontio.Core.Social(),
+                1,
+                1);
+
+            int expectedPhase = npcId % 4;
+            Assert.That(world.ShouldNpcRunPerceptionThisTick(npcId, expectedPhase), Is.True);
+            Assert.That(world.ShouldNpcRunPerceptionThisTick(npcId, expectedPhase + 1), Is.False);
+            Assert.That(world.ShouldNpcRunPerceptionThisTick(npcId, expectedPhase + 4), Is.True);
+        }
+
+        [Test]
+        public void PerceptionDirtyRadiusUsesConfiguredStateMaximumRange()
+        {
+            var sim = new SimulationParams();
+            sim.npcVisionRangeCells = 4;
+            sim.perception.dirtyRadiusMarginCells = 2;
+            sim.perception_states.idle = PerceptionStateProfile.Create(8, 6, true, 90, 0f);
+            sim.perception_states.movement = PerceptionStateProfile.Create(4, 8, true, 90, 0f);
+            sim.perception_states.alert = PerceptionStateProfile.Create(2, 10, true, 90, 0f);
+            sim.perception_states.combat = PerceptionStateProfile.Create(1, 12, true, 120, 0f);
+            sim.perception_states.lookDirection = PerceptionStateProfile.Create(1, 11, true, 90, 0f);
+
+            var world = new World(new WorldConfig(sim));
+
+            Assert.That(world.GetConservativePerceptionDirtyRadiusCells(), Is.EqualTo(14));
         }
     }
 }

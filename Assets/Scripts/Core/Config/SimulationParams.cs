@@ -69,6 +69,7 @@ namespace Arcontio.Core.Config
         public float npcVisionConeSlope = 1.0f;
         public int npcVisionFovDegrees = 90;
         public ObjectPerceptionRuntimeParams perception = new ObjectPerceptionRuntimeParams();
+        public PerceptionStateRuntimeParams perception_states = new PerceptionStateRuntimeParams();
 
         // ---------------- Debug FOV heatmap (view overlay) ----------------
         public DebugFovParams debug_fov = new DebugFovParams();
@@ -412,6 +413,96 @@ namespace Arcontio.Core.Config
         public int maxCandidateCellsPerNpcPerTick = 0;
         public int maxObjectsPerNpcPerTick = 0;
         public int dirtyRadiusMarginCells = 2;
+    }
+
+    // =============================================================================
+    // PerceptionStateRuntimeParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile degli stati percettivi runtime.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: percezione cadenzata per stato</b></para>
+    /// <para>
+    /// La percezione non deve avere una sola frequenza globale per tutti gli NPC e
+    /// tutte le situazioni. Un NPC fermo puo' osservare meno spesso; un NPC in
+    /// combattimento o in azione di guardare puo' osservare a ogni tick. Questo DTO
+    /// rende la scelta configurabile senza spostare logica decisionale nei sistemi
+    /// percettivi.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>defaultState</b>: stato assegnato agli NPC appena creati o caricati.</item>
+    ///   <item><b>idle</b>: profilo ordinario a basso costo.</item>
+    ///   <item><b>movement</b>: profilo per NPC in spostamento.</item>
+    ///   <item><b>alert</b>: profilo per attenzione aumentata.</item>
+    ///   <item><b>combat</b>: profilo per stati ad alta reattivita'.</item>
+    ///   <item><b>lookDirection</b>: profilo per step espliciti di osservazione direzionale.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class PerceptionStateRuntimeParams
+    {
+        public string defaultState = "idle";
+        public PerceptionStateProfile idle = PerceptionStateProfile.Create(8, 12, true, 90, 0f);
+        public PerceptionStateProfile movement = PerceptionStateProfile.Create(4, 14, true, 90, 0f);
+        public PerceptionStateProfile alert = PerceptionStateProfile.Create(2, 17, true, 100, 0f);
+        public PerceptionStateProfile combat = PerceptionStateProfile.Create(1, 17, true, 120, 0f);
+        public PerceptionStateProfile lookDirection = PerceptionStateProfile.Create(1, 17, true, 90, 0f);
+    }
+
+    // =============================================================================
+    // PerceptionStateProfile
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Profilo numerico di uno stato percettivo.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: default locale, fallback globale</b></para>
+    /// <para>
+    /// I campi con valore nullo o non positivo non diventano errori runtime:
+    /// indicano che il profilo deve riusare il valore globale gia' esistente
+    /// della percezione. Questo mantiene compatibilita' con i vecchi JSON e
+    /// permette di introdurre gli stati senza cambiare subito i sistemi caldi.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>cadenceTicks</b>: ogni quanti tick lo stato e' candidato a percepire.</item>
+    ///   <item><b>visionRangeCells</b>: raggio percettivo dello stato; 0 usa il globale.</item>
+    ///   <item><b>useCone</b>: se true applica il cono visivo.</item>
+    ///   <item><b>coneFovDegrees</b>: apertura del cono; 0 usa il globale.</item>
+    ///   <item><b>coneSlope</b>: slope diretto del cono; 0 lo deriva dal FOV o dal globale.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class PerceptionStateProfile
+    {
+        public int cadenceTicks = 1;
+        public int visionRangeCells = 0;
+        public bool useCone = true;
+        public int coneFovDegrees = 0;
+        public float coneSlope = 0f;
+
+        public static PerceptionStateProfile Create(
+            int cadenceTicks,
+            int visionRangeCells,
+            bool useCone,
+            int coneFovDegrees,
+            float coneSlope)
+        {
+            return new PerceptionStateProfile
+            {
+                cadenceTicks = cadenceTicks,
+                visionRangeCells = visionRangeCells,
+                useCone = useCone,
+                coneFovDegrees = coneFovDegrees,
+                coneSlope = coneSlope
+            };
+        }
     }
 
     // ============================================================

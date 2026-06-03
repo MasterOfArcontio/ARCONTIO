@@ -84,6 +84,44 @@
   "npcVisionUseCone": true,
   "npcVisionConeSlope": 1.0,
   "npcVisionFovDegrees": 90,
+  "perception_states": {
+    "defaultState": "idle",
+    "idle": {
+      "cadenceTicks": 8,
+      "visionRangeCells": 12,
+      "useCone": true,
+      "coneFovDegrees": 90,
+      "coneSlope": 0.0
+    },
+    "movement": {
+      "cadenceTicks": 4,
+      "visionRangeCells": 14,
+      "useCone": true,
+      "coneFovDegrees": 90,
+      "coneSlope": 0.0
+    },
+    "alert": {
+      "cadenceTicks": 2,
+      "visionRangeCells": 17,
+      "useCone": true,
+      "coneFovDegrees": 100,
+      "coneSlope": 0.0
+    },
+    "combat": {
+      "cadenceTicks": 1,
+      "visionRangeCells": 17,
+      "useCone": true,
+      "coneFovDegrees": 120,
+      "coneSlope": 0.0
+    },
+    "lookDirection": {
+      "cadenceTicks": 1,
+      "visionRangeCells": 17,
+      "useCone": true,
+      "coneFovDegrees": 90,
+      "coneSlope": 0.0
+    }
+  },
   "inventory": {
     "inventory_max_units": 30
   },

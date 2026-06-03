@@ -171,7 +171,7 @@ Checkpoint v0.20 pianificati:
 - `v0.20b`: indici persistenti compatti per oggetti e NPC - DONE;
 - `v0.20c`: dirty percettivo conservativo per oggetti/NPC creati, mossi, distrutti o ruotati - DONE;
 - `v0.20d`: separazione observed / watched nella mappa percettiva - DONE;
-- `v0.20e`: scheduler percettivo per stato NPC con cadenza da `game_params` - PENDING;
+- `v0.20e`: scheduler percettivo per stato NPC con cadenza da `game_params` - DONE;
 - `v0.20f`: limite massimo NPC percettivi per tick e distribuzione del carico - PENDING;
 - `v0.20g`: percezione oggetti/NPC su soli NPC dirty/cadenzati - PENDING;
 - `v0.20h`: Landmark perception allineata a dirty/cadenza/range - PENDING;
@@ -180,7 +180,7 @@ Checkpoint v0.20 pianificati:
 - `v0.20k`: QA profiler 20/50/100 NPC e debug overlay costo percettivo - PENDING;
 - `v0.20l`: closeout rifondazione percezione runtime - PENDING.
 
-Nota v0.20c/v0.20e: il raggio dirty conservativo introdotto in v0.20c usa per ora il raggio visivo globale piu' margine configurabile; in v0.20e andra' riallineato agli stati percettivi configurati in game_params, includendo cadenza e lunghezza del cono per stato.
+Nota v0.20e: gli NPC possiedono ora uno stato percettivo configurabile da `game_params`; ogni stato espone cadenza, raggio visivo e cono. Il raggio dirty conservativo usa il massimo teorico tra gli stati configurati piu' margine, cosi' oggetti/NPC creati o modificati sporcano i possibili osservatori senza eseguire percezione immediata.
 Checkpoint v0.12 completati:
 
 - `v0.12a`: audit logging, explainability e diagnostica runtime;
