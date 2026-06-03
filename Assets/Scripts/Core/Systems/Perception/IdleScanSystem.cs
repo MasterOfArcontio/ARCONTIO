@@ -50,6 +50,7 @@ namespace Arcontio.Core
                     if (scan.RemainingTurns <= 0)
                     {
                         world.StopScan(npcId);
+                        world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Idle);
                         continue;
                     }
 
@@ -60,6 +61,7 @@ namespace Arcontio.Core
                         : CardinalDirection.North;
 
                     dir = NextClockwise(dir);
+                    world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.LookDirection);
                     world.SetFacing(npcId, dir);
 
                     scan.RemainingTurns--;

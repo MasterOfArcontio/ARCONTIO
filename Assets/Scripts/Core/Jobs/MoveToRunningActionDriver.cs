@@ -909,6 +909,7 @@ namespace Arcontio.Core
                 return StepResult.Failed(JobFailureReason.MovementFailed, "TraversalRuntimeMissing");
 
             var key = ResolveRunningActionKey(runtime, npcId, job.JobId);
+            TryFaceTraversalTarget(world, npcId, npcCell, action.TargetCell);
 
             if (!TryOpenTraversalDoorIfNeeded(world, bus, npcId, action.TargetCell, out var doorFailure))
                 return StepResult.Failed(JobFailureReason.MovementFailed, doorFailure);
@@ -941,6 +942,8 @@ namespace Arcontio.Core
                 return reservationBlockedResult;
             }
 
+            world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Movement);
+
             if (!runtime.RunningActions.TryGet(key, out var runningAction) || runningAction == null)
             {
                 int requiredTicks = ResolveBaseWalkCellDurationTicks(world);
@@ -961,7 +964,10 @@ namespace Arcontio.Core
                     policy);
 
                 if (!runtime.RunningActions.Register(key, runningAction, out var registerReason))
+                {
+                    world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Idle);
                     return StepResult.Failed(JobFailureReason.MovementFailed, registerReason);
+                }
 
                 MemoryBeliefDecisionExplainabilityEmitter.TryWriteRunningActionTrace(
                     explainabilityConfig,
@@ -999,6 +1005,7 @@ namespace Arcontio.Core
                         tick,
                         npcId);
                     runtime.RunningActions.Clear(key);
+                    world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Idle);
                     return StepResult.Failed(JobFailureReason.MovementFailed, completionBlockedReason);
                 }
 
@@ -1018,6 +1025,7 @@ namespace Arcontio.Core
                     tick,
                     npcId);
                 runtime.RunningActions.Clear(key);
+                world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Idle);
                 return StepResult.Succeeded("MoveToCellTraversalCompleted");
             }
 
@@ -1042,10 +1050,31 @@ namespace Arcontio.Core
                     tick,
                     npcId);
                 runtime.RunningActions.Clear(key);
+                world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.Idle);
                 return StepResult.Failed(JobFailureReason.MovementFailed, executorResult.Reason);
             }
 
             return StepResult.Running("MoveToCellTraversalPending");
+        }
+
+        private static void TryFaceTraversalTarget(World world, int npcId, GridPosition npcCell, Vector2Int targetCell)
+        {
+            if (world == null)
+                return;
+
+            int dx = targetCell.x - npcCell.X;
+            int dy = targetCell.y - npcCell.Y;
+            if (Mathf.Abs(dx) + Mathf.Abs(dy) != 1)
+                return;
+
+            if (dx > 0)
+                world.SetFacing(npcId, CardinalDirection.East);
+            else if (dx < 0)
+                world.SetFacing(npcId, CardinalDirection.West);
+            else if (dy > 0)
+                world.SetFacing(npcId, CardinalDirection.North);
+            else if (dy < 0)
+                world.SetFacing(npcId, CardinalDirection.South);
         }
 
         private static bool TryOpenTraversalDoorIfNeeded(
