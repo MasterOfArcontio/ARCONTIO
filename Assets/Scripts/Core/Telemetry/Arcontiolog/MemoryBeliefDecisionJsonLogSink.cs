@@ -325,6 +325,7 @@ namespace Arcontio.Core
                 beliefId = belief.BeliefId,
                 estimatedCell = BuildCell(belief.EstimatedPosition),
                 estimatedCellText = FormatCell(belief.EstimatedPosition),
+                subjectId = belief.SubjectId,
                 confidence = belief.Confidence,
                 freshness = belief.Freshness,
                 sourceCount = belief.SourceCount,
@@ -1289,6 +1290,7 @@ namespace Arcontio.Core
             public int beliefId;
             public CellLogPayload estimatedCell;
             public string estimatedCellText = string.Empty;
+            public int subjectId;
             public float confidence;
             public float freshness;
             public int sourceCount;

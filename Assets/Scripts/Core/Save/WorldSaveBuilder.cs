@@ -525,6 +525,7 @@ namespace Arcontio.Core.Save
                 category = (int)entry.Category,
                 estimatedX = position.x,
                 estimatedY = position.y,
+                subjectId = entry.SubjectId,
                 confidence = entry.Confidence,
                 freshness = entry.Freshness,
                 lastUpdatedTick = entry.LastUpdatedTick,

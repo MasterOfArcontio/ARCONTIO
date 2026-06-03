@@ -273,6 +273,92 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // AddOrMergeByCategorySubjectAndPosition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea o aggiorna una credenza usando una chiave soggettiva composta da
+        /// categoria e soggetto osservato, mantenendo la posizione come ultimo luogo
+        /// stimato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: identita' soggettiva, non onniscienza</b></para>
+        /// <para>
+        /// Questo metodo serve ai belief sociali derivati da <c>NpcSpotted</c>. Non
+        /// controlla se l'NPC osservato esista ancora nel World e non corregge la
+        /// credenza con dati oggettivi: aggrega soltanto tracce soggettive che
+        /// dichiarano lo stesso <c>SubjectId</c>. In questo modo "ho visto NPC #2 in
+        /// una nuova cella" aggiorna la stessa credenza invece di crearne una per
+        /// ogni posizione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>subjectId</b>: identita' soggettiva dell'entita' osservata.</item>
+        ///   <item><b>estimatedPosition</b>: ultima posizione stimata, aggiornata al merge.</item>
+        ///   <item><b>qualita'</b>: confidence/freshness massime e source count incrementale.</item>
+        /// </list>
+        /// </summary>
+        public void AddOrMergeByCategorySubjectAndPosition(
+            BeliefCategory category,
+            int subjectId,
+            Vector2Int estimatedPosition,
+            float confidence,
+            float freshness,
+            int currentTick,
+            BeliefSource source)
+        {
+            if (subjectId <= 0)
+            {
+                AddOrMergeByCategoryAndPosition(category, estimatedPosition, confidence, freshness, currentTick, source);
+                return;
+            }
+
+            for (int i = 0; i < _entries.Count; i++)
+            {
+                var entry = _entries[i];
+                if (entry.Category != category || entry.SubjectId != subjectId)
+                    continue;
+
+                entry.EstimatedPosition = estimatedPosition;
+
+                if (confidence > entry.Confidence)
+                    entry.Confidence = confidence;
+
+                if (freshness > entry.Freshness)
+                    entry.Freshness = freshness;
+
+                entry.LastUpdatedTick = currentTick;
+                entry.SourceCount += 1;
+                entry.Source = source;
+                entry.Status = BeliefStatus.Active;
+
+                _entries[i] = entry;
+                return;
+            }
+
+            EnsureCapacityForNewEntry();
+
+            if (_entries.Count >= MaxEntries)
+                return;
+
+            _entries.Add(new BeliefEntry
+            {
+                BeliefId = _nextBeliefId++,
+                Category = category,
+                EstimatedPosition = estimatedPosition,
+                SubjectId = subjectId,
+                Confidence = confidence,
+                Freshness = freshness,
+                LastUpdatedTick = currentTick,
+                SourceCount = 1,
+                Source = source,
+                Status = BeliefStatus.Active
+            });
+            MarkCategoryIndexDirty();
+        }
+
+        // =============================================================================
         // GetByCategory
         // =============================================================================
         /// <summary>

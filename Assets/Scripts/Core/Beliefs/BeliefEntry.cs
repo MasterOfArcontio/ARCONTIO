@@ -250,6 +250,14 @@ namespace Arcontio.Core
         public Vector2Int EstimatedPosition;
 
         /// <summary>
+        /// Identita' soggettiva opzionale dell'entita' a cui si riferisce la credenza.
+        /// Per i belief sociali derivati da <c>NpcSpotted</c> contiene l'id dell'NPC
+        /// osservato: questo permette allo store di aggiornare la sua ultima posizione
+        /// senza creare una nuova credenza per ogni cella attraversata.
+        /// </summary>
+        public int SubjectId;
+
+        /// <summary>
         /// Quanto l'NPC è sicuro della credenza. Il documento definisce il range come 0-1;
         /// la normalizzazione effettiva verrà applicata dai sistemi che creano o aggiornano il belief.
         /// </summary>
