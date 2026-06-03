@@ -197,6 +197,7 @@ namespace Arcontio.View.MapGrid
         private readonly Dictionary<int, MapGridOverlayLine> _npcLines = new();
         private readonly Dictionary<int, MapGridOverlayLine> _objLines = new();
         private readonly Dictionary<int, NpcNameLabelView> _npcNameLabels = new();
+        private readonly Dictionary<int, NpcNameLabelView> _objNameLabels = new();
 
         // Offset persistence (in RAM)
         private readonly Dictionary<int, Vector2> _npcOffsets = new();
@@ -302,7 +303,12 @@ namespace Arcontio.View.MapGrid
 
         private NpcNameLabelView CreateNpcNameLabel(string name)
         {
-            return new NpcNameLabelView(name, _cardsRoot != null ? _cardsRoot : _root.transform);
+            return new NpcNameLabelView(name, _cardsRoot != null ? _cardsRoot : _root.transform, new Color(0.08f, 0.24f, 0.42f, 0.72f));
+        }
+
+        private NpcNameLabelView CreateObjectNameLabel(string name)
+        {
+            return new NpcNameLabelView(name, _cardsRoot != null ? _cardsRoot : _root.transform, new Color(0.12f, 0.30f, 0.16f, 0.74f));
         }
 
         private void SyncObjectCards(Arcontio.Core.World world)
@@ -335,6 +341,10 @@ namespace Arcontio.View.MapGrid
                 if (_objLines.TryGetValue(objId, out var line) && line != null)
                     line.gameObject.SetActive(false);
                 _objLines.Remove(objId);
+
+                if (_objNameLabels.TryGetValue(objId, out var label) && label != null)
+                    label.SetVisible(false);
+                _objNameLabels.Remove(objId);
             }
 
             // Add missing object cards (only interactables)
@@ -358,6 +368,7 @@ namespace Arcontio.View.MapGrid
 
                 var line = CreateLine($"ObjLine_{objId}");
                 _objLines[objId] = line;
+                _objNameLabels[objId] = CreateObjectNameLabel($"ObjNameLabel_{objId}");
 
                 HookDrag(card.RootRectTransform, objId, isNpc: false, getAnchor: () => GetObjectAnchorLocal(world, objId, _lastCam, _lastTileSizeWorld));
             }
@@ -465,7 +476,7 @@ namespace Arcontio.View.MapGrid
                     if (_npcNameLabels.TryGetValue(npcId, out var label) && label != null)
                     {
                         label.SetText(ResolveNpcLabel(world, npcId));
-                        label.SetCanvasLocalPosition(anchor + new Vector2(0f, 38f));
+                        label.SetCanvasLocalPosition(anchor + new Vector2(0f, 54f));
                         label.SetVisible(true);
                     }
                     continue;
@@ -532,34 +543,43 @@ namespace Arcontio.View.MapGrid
                 {
                     card.SetVisible(false);
                     line.SetVisible(false);
+                    if (_objNameLabels.TryGetValue(objId, out var hiddenLabel) && hiddenLabel != null)
+                        hiddenLabel.SetVisible(false);
                     continue;
                 }
 
-                card.SetVisible(true);
-                line.gameObject.SetActive(true);
+                card.SetVisible(false);
+                line.gameObject.SetActive(false);
+                line.SetVisible(false);
 
-                var endOnCard = GetClosestPointOnCardBorder(card.RootRectTransform, anchor);
-                line.SetEndpoints(anchor, endOnCard);
-
-                line.SetVisible(true);
-
-                Vector2 offset = GetOrCreateOffset(_objOffsets, objId, DefaultObjectOffset(objId));
-                Vector2 cardPos = anchor + offset;
-
-                var rt = card.RootRectTransform;
-                var drag = rt != null ? rt.GetComponent<MapGridDraggableCard>() : null;
-
-                if (drag != null && drag.IsDragging)
+                if (_objNameLabels.TryGetValue(objId, out var label) && label != null)
                 {
-                    Vector2 current = card.GetCanvasLocalPosition();
-                    _objOffsets[objId] = current - anchor;
-                    cardPos = current;
-                }
-                else
-                {
-                    card.SetCanvasLocalPosition(cardPos);
+                    label.SetText(ResolveObjectLabel(world, objId, inst));
+                    label.SetCanvasLocalPosition(anchor + new Vector2(0f, 32f));
+                    label.SetVisible(true);
                 }
             }
+        }
+
+        private static string ResolveObjectLabel(Arcontio.Core.World world, int objId, Arcontio.Core.WorldObjectInstance inst)
+        {
+            if (world == null || inst == null)
+                return "OBJ #" + objId;
+
+            var ownerKind = inst.OwnerKind;
+            int ownerId = inst.OwnerId;
+            string stockSuffix = string.Empty;
+
+            if (world.FoodStocks != null && world.FoodStocks.TryGetValue(objId, out var stock))
+            {
+                ownerKind = stock.OwnerKind;
+                ownerId = stock.OwnerId;
+                stockSuffix = " food=" + stock.Units;
+            }
+
+            return "OBJ #" + objId
+                + " <color=#FFD36A>owner=" + ownerKind + "/" + ownerId + "</color>"
+                + stockSuffix;
         }
 
         private static Vector2 GetOrCreateOffset(Dictionary<int, Vector2> dict, int id, Vector2 defaultOffset)
@@ -2530,7 +2550,7 @@ namespace Arcontio.View.MapGrid
         private readonly RectTransform _rect;
         private readonly Text _text;
 
-        public NpcNameLabelView(string name, Transform parent)
+        public NpcNameLabelView(string name, Transform parent, Color backgroundColor)
         {
             _root = new GameObject(name);
             _root.transform.SetParent(parent, false);
@@ -2542,7 +2562,7 @@ namespace Arcontio.View.MapGrid
             _rect.sizeDelta = new Vector2(74f, 20f);
 
             var bg = _root.AddComponent<Image>();
-            bg.color = new Color(0.08f, 0.24f, 0.42f, 0.72f);
+            bg.color = backgroundColor;
             bg.raycastTarget = false;
 
             var textGo = new GameObject("Text");
@@ -2559,6 +2579,9 @@ namespace Arcontio.View.MapGrid
             _text.fontStyle = FontStyle.Bold;
             _text.alignment = TextAnchor.MiddleCenter;
             _text.color = new Color(1f, 1f, 1f, 0.92f);
+            _text.supportRichText = true;
+            _text.horizontalOverflow = HorizontalWrapMode.Overflow;
+            _text.verticalOverflow = VerticalWrapMode.Overflow;
             _text.raycastTarget = false;
 
             SetVisible(false);
@@ -2574,6 +2597,12 @@ namespace Arcontio.View.MapGrid
         {
             if (_text != null)
                 _text.text = string.IsNullOrWhiteSpace(value) ? "NPC" : value;
+
+            if (_text != null && _rect != null)
+            {
+                float width = Mathf.Clamp(_text.preferredWidth + 14f, 74f, 220f);
+                _rect.sizeDelta = new Vector2(width, 20f);
+            }
         }
 
         public void SetCanvasLocalPosition(Vector2 position)
