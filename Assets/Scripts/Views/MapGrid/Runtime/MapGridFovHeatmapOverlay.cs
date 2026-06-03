@@ -213,19 +213,34 @@ namespace Arcontio.View.MapGrid
                     if (distance <= 0 || distance > watchedRange)
                         continue;
 
-                    if (useCone)
-                    {
-                        if (!FovUtils.IsInCone(origin.X, origin.Y, facing, x, y, coneSlope))
-                            continue;
-                    }
-                    else if (!FovUtils.IsInFront(origin.X, origin.Y, facing, x, y))
+                    bool observed = IsObservedFovCell(
+                        world,
+                        origin.X,
+                        origin.Y,
+                        facing,
+                        x,
+                        y,
+                        visionRange,
+                        useCone,
+                        coneSlope,
+                        useLos);
+
+                    if (!observed && !IsWatchedMarginCell(
+                            world,
+                            origin.X,
+                            origin.Y,
+                            facing,
+                            x,
+                            y,
+                            visionRange,
+                            watchedMargin,
+                            useCone,
+                            coneSlope,
+                            useLos))
                     {
                         continue;
                     }
 
-                    bool inObservedRange = distance <= visionRange;
-                    bool hasObservedLos = !useLos || world.HasLineOfSight(origin.X, origin.Y, x, y);
-                    bool observed = inObservedRange && hasObservedLos;
                     bool watchedOnly = !observed;
 
                     int key = (y * world.MapWidth) + x;
@@ -241,6 +256,118 @@ namespace Arcontio.View.MapGrid
                     _lastActiveKeys.Add(key);
                 }
             }
+        }
+
+        // =============================================================================
+        // IsObservedFovCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se una cella appartiene al cono visivo realmente osservato.
+        /// Il controllo usa lo stesso percorso logico del debug FOV immediato:
+        /// raggio percettivo, cono o fronte legacy e linea di vista opzionale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: observed separato da watched</b></para>
+        /// <para>
+        /// Una cella osservata e' una cella che l'NPC vede davvero. Una cella
+        /// watched e' invece solo una cella di margine diagnostico attorno al cono.
+        /// Tenere separati i due concetti evita che il bordo conservativo venga
+        /// scambiato per percezione reale.
+        /// </para>
+        /// </summary>
+        private static bool IsObservedFovCell(
+            World world,
+            int originX,
+            int originY,
+            CardinalDirection facing,
+            int x,
+            int y,
+            int visionRange,
+            bool useCone,
+            float coneSlope,
+            bool useLos)
+        {
+            int distance = FovUtils.Manhattan(originX, originY, x, y);
+            if (distance <= 0 || distance > visionRange)
+                return false;
+
+            if (useCone)
+            {
+                if (!FovUtils.IsInCone(originX, originY, facing, x, y, coneSlope))
+                    return false;
+            }
+            else if (!FovUtils.IsInFront(originX, originY, facing, x, y))
+            {
+                return false;
+            }
+
+            return !useLos || world.HasLineOfSight(originX, originY, x, y);
+        }
+
+        // =============================================================================
+        // IsWatchedMarginCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se una cella appartiene al bordo watched attorno al cono osservato.
+        /// Il bordo viene calcolato come dilatazione locale delle celle osservate,
+        /// non come semplice allungamento del raggio del cono.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bordo conservativo simmetrico</b></para>
+        /// <para>
+        /// Questo metodo rende visibile il margine su tutti i lati del cono. La
+        /// versione precedente estendeva solo il raggio massimo e quindi poteva
+        /// mostrare il bordo su due lati, lasciando scoperti gli altri due.
+        /// </para>
+        /// </summary>
+        private static bool IsWatchedMarginCell(
+            World world,
+            int originX,
+            int originY,
+            CardinalDirection facing,
+            int x,
+            int y,
+            int visionRange,
+            int watchedMargin,
+            bool useCone,
+            float coneSlope,
+            bool useLos)
+        {
+            if (watchedMargin <= 0)
+                return false;
+
+            for (int dy = -watchedMargin; dy <= watchedMargin; dy++)
+            {
+                for (int dx = -watchedMargin; dx <= watchedMargin; dx++)
+                {
+                    if ((dx == 0 && dy == 0) || FovUtils.Manhattan(0, 0, dx, dy) > watchedMargin)
+                        continue;
+
+                    int observedX = x + dx;
+                    int observedY = y + dy;
+                    if (!world.InBounds(observedX, observedY))
+                        continue;
+
+                    if (IsObservedFovCell(
+                            world,
+                            originX,
+                            originY,
+                            facing,
+                            observedX,
+                            observedY,
+                            visionRange,
+                            useCone,
+                            coneSlope,
+                            useLos))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         private SpriteRenderer GetOrCreateCellRenderer(int cellKey)
