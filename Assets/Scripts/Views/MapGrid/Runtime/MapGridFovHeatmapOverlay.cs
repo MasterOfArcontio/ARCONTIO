@@ -192,10 +192,15 @@ namespace Arcontio.View.MapGrid
             }
             _lastActiveKeys.Clear();
 
-            int minX = origin.X - visionRange;
-            int maxX = origin.X + visionRange;
-            int minY = origin.Y - visionRange;
-            int maxY = origin.Y + visionRange;
+            int watchedMargin = world.Global.PerceptionDirtyRadiusMarginCells;
+            if (watchedMargin < 0)
+                watchedMargin = 0;
+
+            int watchedRange = visionRange + watchedMargin;
+            int minX = origin.X - watchedRange;
+            int maxX = origin.X + watchedRange;
+            int minY = origin.Y - watchedRange;
+            int maxY = origin.Y + watchedRange;
 
             for (int y = minY; y <= maxY; y++)
             {
@@ -204,7 +209,8 @@ namespace Arcontio.View.MapGrid
                     if (!world.InBounds(x, y))
                         continue;
 
-                    if (FovUtils.Manhattan(origin.X, origin.Y, x, y) > visionRange)
+                    int distance = FovUtils.Manhattan(origin.X, origin.Y, x, y);
+                    if (distance <= 0 || distance > watchedRange)
                         continue;
 
                     if (useCone)
@@ -217,15 +223,17 @@ namespace Arcontio.View.MapGrid
                         continue;
                     }
 
-                    if (useLos && !world.HasLineOfSight(origin.X, origin.Y, x, y))
-                        continue;
+                    bool inObservedRange = distance <= visionRange;
+                    bool hasObservedLos = !useLos || world.HasLineOfSight(origin.X, origin.Y, x, y);
+                    bool observed = inObservedRange && hasObservedLos;
+                    bool watchedOnly = !observed;
 
                     int key = (y * world.MapWidth) + x;
                     var sr = GetOrCreateCellRenderer(key);
 
-                    var c = sr.color;
-                    c.a = 0.22f;
-                    sr.color = c;
+                    sr.color = watchedOnly
+                        ? new Color(0.45f, 0.92f, 1f, 0.16f)
+                        : new Color(1f, 1f, 1f, 0.22f);
 
                     sr.transform.position = CellCenterWorld(x, y);
                     sr.sortingOrder = _sortingOrder;

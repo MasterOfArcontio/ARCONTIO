@@ -234,13 +234,16 @@ namespace Arcontio.Core
 
                         if (rule.TryEncode(world, npcId, e, quality, out var trace))
                         {
-                            var res = world.Memory[npcId].AddOrMerge(trace);
+                            if (e is ObjectSpottedEvent || e is NpcSpottedEvent)
+                                trace.LastObservedTick = (int)tick.Index;
+
+                            var res = world.Memory[npcId].AddOrMerge(trace, out var acceptedTrace);
                             MemoryBeliefDecisionExplainabilityEmitter.TryWriteMemoryTrace(
                                 world.Config?.Sim?.memory_belief_decision_explainability,
                                 world.MemoryBeliefDecisionExplainability,
                                 npcId,
                                 tick.Index,
-                                trace,
+                                acceptedTrace,
                                 res,
                                 e.GetType().Name);
 
@@ -274,7 +277,7 @@ namespace Arcontio.Core
                                 }
 
                                 bool beliefUpdated = _beliefUpdater.UpdateFromTrace(
-                                    trace,
+                                    acceptedTrace,
                                     beliefStore,
                                     (int)tick.Index,
                                     world.Config?.Sim?.memory_belief_decision_explainability,

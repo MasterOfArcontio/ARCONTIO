@@ -45,6 +45,19 @@ namespace Arcontio.Core
         /// </summary>
         public AddOrMergeResult AddOrMerge(in MemoryTrace incoming)
         {
+            return AddOrMerge(in incoming, out _);
+        }
+
+        /// <summary>
+        /// Aggiunge o fonde una traccia equivalente restituendo anche la traccia
+        /// realmente accettata nello store. Il chiamante puo' usarla per aggiornare
+        /// belief ed explainability con il valore rinforzato, non con il solo evento
+        /// grezzo.
+        /// </summary>
+        public AddOrMergeResult AddOrMerge(in MemoryTrace incoming, out MemoryTrace acceptedTrace)
+        {
+            acceptedTrace = incoming;
+
             // 1) Prova merge con una traccia equivalente
             //
             // IMPORTANTISSIMO (Patch 0.01P1):
@@ -98,11 +111,12 @@ namespace Arcontio.Core
                     if (!string.IsNullOrWhiteSpace(incoming.SubjectDefId))
                         t.SubjectDefId = incoming.SubjectDefId;
 
-                    // Merge deterministico (stesso schema della versione originale).
+                    // Merge deterministico con rinforzo cadenzato:
+                    // se la stessa entita' viene rivista dopo N tick percettivi,
+                    // il rinforzo equivale a N piccoli refresh, con un cap per
+                    // evitare salti enormi dopo lunghi periodi senza percezione.
                     float mergedIntensity = (t.Intensity01 > incoming.Intensity01) ? t.Intensity01 : incoming.Intensity01;
-
-                    // Rinforzo: una "nuova occorrenza" rende la memoria piu viva
-                    mergedIntensity += 0.05f;
+                    mergedIntensity += ResolveReinforcementAmount(in t, in incoming);
                     if (mergedIntensity > 1f) mergedIntensity = 1f;
 
                     t.Intensity01 = mergedIntensity;
@@ -113,7 +127,11 @@ namespace Arcontio.Core
                     // Decay: scegli il piu lento (min) => mantiene piu a lungo
                     t.DecayPerTick01 = (t.DecayPerTick01 < incoming.DecayPerTick01) ? t.DecayPerTick01 : incoming.DecayPerTick01;
 
+                    if (incoming.LastObservedTick > 0)
+                        t.LastObservedTick = incoming.LastObservedTick;
+
                     _traces[i] = t;
+                    acceptedTrace = t;
                     return AddOrMergeResult.Reinforced;
                 }
 
@@ -129,11 +147,9 @@ namespace Arcontio.Core
                     t.HeardKind == incoming.HeardKind &&
                     t.SourceSpeakerId == incoming.SourceSpeakerId)
                 {
-                    // Merge deterministico
+                    // Merge deterministico con rinforzo cadenzato.
                     float mergedIntensity = (t.Intensity01 > incoming.Intensity01) ? t.Intensity01 : incoming.Intensity01;
-
-                    // Rinforzo: una "nuova occorrenza" rende la memoria piu viva
-                    mergedIntensity += 0.05f;
+                    mergedIntensity += ResolveReinforcementAmount(in t, in incoming);
                     if (mergedIntensity > 1f) mergedIntensity = 1f;
 
                     t.Intensity01 = mergedIntensity;
@@ -151,7 +167,11 @@ namespace Arcontio.Core
                     // Decay: scegli il piu lento (min) => mantiene piu a lungo
                     t.DecayPerTick01 = (t.DecayPerTick01 < incoming.DecayPerTick01) ? t.DecayPerTick01 : incoming.DecayPerTick01;
 
+                    if (incoming.LastObservedTick > 0)
+                        t.LastObservedTick = incoming.LastObservedTick;
+
                     _traces[i] = t;
+                    acceptedTrace = t;
                     return AddOrMergeResult.Reinforced;
                 }
             }
@@ -180,12 +200,40 @@ namespace Arcontio.Core
                     return AddOrMergeResult.Dropped;
 
                 _traces[worstIndex] = incoming;
+                acceptedTrace = incoming;
                 return AddOrMergeResult.Replaced;
             }
 
             // 3) Se c'e spazio, aggiungiamo
             _traces.Add(incoming);
+            acceptedTrace = incoming;
             return AddOrMergeResult.Inserted;
+        }
+
+        private static float ResolveReinforcementAmount(in MemoryTrace existing, in MemoryTrace incoming)
+        {
+            const float BaseReinforcement = 0.05f;
+            const int MaxCadencedTicks = 16;
+
+            if (!UsesCadencedPerceptionReinforcement(in incoming)
+                || existing.LastObservedTick <= 0
+                || incoming.LastObservedTick <= 0)
+                return BaseReinforcement;
+
+            int elapsedTicks = incoming.LastObservedTick - existing.LastObservedTick;
+            if (elapsedTicks < 1)
+                elapsedTicks = 1;
+            if (elapsedTicks > MaxCadencedTicks)
+                elapsedTicks = MaxCadencedTicks;
+
+            return BaseReinforcement * elapsedTicks;
+        }
+
+        private static bool UsesCadencedPerceptionReinforcement(in MemoryTrace trace)
+        {
+            return !trace.IsHeard
+                && (trace.Type == MemoryType.ObjectSpotted
+                    || trace.Type == MemoryType.NpcSpotted);
         }
 
         /// <summary>
