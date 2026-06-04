@@ -121,7 +121,8 @@ Gli agenti devono ricordare:
 * preferire audit-first sui moduli architetturali;
 * preferire patch chirurgiche;
 * notificare quando è consigliato allineare checkpoint/root files;
-* notificare quando è consigliato allineare ARCONTIO_docs.
+* notificare quando è consigliato allineare ARCONTIO_docs;
+* Se l'utente dichiara che siamo in modalità "analisi" o "audit", non proporre cambiamenti architetturali, ma solo analisi e ispezioni. Utilizza solo linguaggio italiano, semplice, chiaro, esaustivo e utilizza esempi esplicativi.
 
 ---
 
