@@ -1564,6 +1564,7 @@ namespace Arcontio.Core.Save
                 BeliefId = dto.beliefId,
                 Category = (BeliefCategory)dto.category,
                 EstimatedPosition = new Vector2Int(dto.estimatedX, dto.estimatedY),
+                SubjectId = dto.subjectId,
                 Confidence = dto.confidence,
                 Freshness = dto.freshness,
                 LastUpdatedTick = dto.lastUpdatedTick,

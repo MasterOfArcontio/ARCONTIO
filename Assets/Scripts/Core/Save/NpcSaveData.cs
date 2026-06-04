@@ -382,6 +382,7 @@ namespace Arcontio.Core.Save
         public float  intensity01;
         public float  reliability01;
         public float  decayPerTick01;
+        public int    lastObservedTick;
         public bool   isHeard;
         // HeardKind è un enum → serializzato come int
         public int    heardKind;
@@ -400,6 +401,7 @@ namespace Arcontio.Core.Save
                 intensity01         = t.Intensity01,
                 reliability01       = t.Reliability01,
                 decayPerTick01      = t.DecayPerTick01,
+                lastObservedTick    = t.LastObservedTick,
                 isHeard             = t.IsHeard,
                 heardKind           = (int)t.HeardKind,
                 sourceSpeakerId     = t.SourceSpeakerId
@@ -419,6 +421,7 @@ namespace Arcontio.Core.Save
                 Intensity01        = intensity01,
                 Reliability01      = reliability01,
                 DecayPerTick01     = decayPerTick01,
+                LastObservedTick   = lastObservedTick,
                 IsHeard            = isHeard,
                 HeardKind          = (HeardKind)heardKind,
                 SourceSpeakerId    = sourceSpeakerId

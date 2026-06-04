@@ -606,7 +606,18 @@ namespace Arcontio.Core
                     explainabilityRegistry);
 
             if (action.Kind == JobActionKind.LookDirection)
-                return ExecuteLookDirection(world, npcId, action);
+                return ExecuteRunningLookDirectionAction(
+                    world,
+                    runtime,
+                    runningActionExecutor,
+                    npcId,
+                    in npcState,
+                    job,
+                    phase,
+                    action,
+                    tick,
+                    explainabilityConfig,
+                    explainabilityRegistry);
 
             if (action.Kind == JobActionKind.MoveToCell)
             {
@@ -636,13 +647,27 @@ namespace Arcontio.Core
             return StepResult.Failed(JobFailureReason.StepFailed, "UnsupportedJobActionInRuntimeSlice");
         }
 
-        private static StepResult ExecuteLookDirection(World world, int npcId, JobAction action)
+        private static StepResult ExecuteRunningLookDirectionAction(
+            World world,
+            JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
+            int npcId,
+            in NpcJobState npcState,
+            Job job,
+            JobPhase phase,
+            JobAction action,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
         {
             if (world == null)
                 return StepResult.Failed(JobFailureReason.StepFailed, "LookDirectionWorldMissing");
 
             if (!System.Enum.TryParse(action.PayloadKey ?? string.Empty, ignoreCase: true, out CardinalDirection direction))
                 return StepResult.Failed(JobFailureReason.StepFailed, "LookDirectionInvalidPayload:" + action.PayloadKey);
+
+            if (runtime == null || runningActionExecutor == null || job == null)
+                return StepResult.Failed(JobFailureReason.StepFailed, "LookDirectionRuntimeMissing");
 
             // Lo step di osservazione non esegue percezione fuori ciclo e non legge
             // oggetti. Orienta soltanto l'NPC dentro il Job Layer; `World.SetFacing`
@@ -652,7 +677,66 @@ namespace Arcontio.Core
                 world.SetNpcPerceptionActivityState(npcId, NpcPerceptionActivityState.LookDirection);
 
             world.SetFacing(npcId, direction);
-            return StepResult.Succeeded("LookDirectionCompleted:" + direction);
+
+            var key = new RunningActionKey(npcId, job.JobId, npcState.ActivePhaseIndex, npcState.ActiveActionIndex);
+            if (!runtime.RunningActions.TryGet(key, out var runningAction) || runningAction == null)
+            {
+                int requiredTicks = Mathf.Max(1, action.DurationTicks);
+                var policy = new RunningActionCompletionPolicy(
+                    requiredTicks,
+                    timeoutTicks: 0,
+                    failureReason: JobFailureReason.StepFailed,
+                    interruptionReason: JobFailureReason.Cancelled);
+
+                runningAction = RunningActionRuntimeState.Start(
+                    $"look_{job.JobId}_{npcState.ActivePhaseIndex}_{npcState.ActiveActionIndex}_{direction}",
+                    RunningActionKind.Wait,
+                    npcId,
+                    job.JobId,
+                    phase.PhaseId,
+                    action.ActionId,
+                    tick,
+                    policy);
+
+                if (!runtime.RunningActions.Register(key, runningAction, out var registerReason))
+                    return StepResult.Failed(JobFailureReason.StepFailed, registerReason);
+
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteRunningActionTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionRunningActionOperation.Started,
+                    in key,
+                    runningAction.ToSnapshot(),
+                    "LookDirectionRunningActionStarted");
+
+                return StepResult.Running("LookDirectionHolding:" + direction);
+            }
+
+            var executorResult = runningActionExecutor.Tick(
+                runningAction,
+                RunningActionExecutorTickRequest.Advance(1, tick, "LookDirectionRunningActionTick"));
+
+            EmitRunningActionExecutionTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                in key,
+                executorResult);
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.Completed)
+            {
+                runtime.RunningActions.Clear(key);
+                return StepResult.Succeeded("LookDirectionCompleted:" + direction);
+            }
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.Advanced
+                || executorResult.Kind == RunningActionExecutorResultKind.NoProgress)
+                return StepResult.Running("LookDirectionHolding:" + direction);
+
+            return StepResult.Failed(JobFailureReason.StepFailed, executorResult.Reason);
         }
 
         private static bool TryApplyPhasePerceptionState(World world, int npcId, string rawState, out string reason)
@@ -1124,6 +1208,7 @@ namespace Arcontio.Core
                 Source = belief.Source,
                 BeliefId = belief.BeliefId,
                 EstimatedPosition = belief.EstimatedPosition,
+                SubjectId = belief.SubjectId,
                 Confidence = belief.Confidence,
                 Freshness = belief.Freshness,
                 SourceCount = belief.SourceCount,

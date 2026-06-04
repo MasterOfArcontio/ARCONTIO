@@ -79,6 +79,12 @@ namespace Arcontio.Core
         public float DecayPerTick01;
 
         /// <summary>
+        /// Tick dell'ultima osservazione diretta che ha prodotto o rinforzato
+        /// questa traccia. Vale 0 per trace legacy o trace non percettive.
+        /// </summary>
+        public int LastObservedTick;
+
+        /// <summary>
         /// Gestione del tipo di fonte: se diretta o raccontata
         /// </summary>       
         public bool IsHeard;
@@ -89,7 +95,7 @@ namespace Arcontio.Core
         public override string ToString()
         {
             string def = string.IsNullOrWhiteSpace(SubjectDefId) ? "" : $" def={SubjectDefId}";
-            return $"{Type} subj={SubjectId}{def} cell=({CellX},{CellY}) I={Intensity01:0.00} R={Reliability01:0.00} d={DecayPerTick01:0.000}";
+            return $"{Type} subj={SubjectId}{def} cell=({CellX},{CellY}) I={Intensity01:0.00} R={Reliability01:0.00} d={DecayPerTick01:0.000} seenTick={LastObservedTick}";
         }
     }
 

@@ -465,6 +465,7 @@ namespace Arcontio.Core.Save
         public int category;
         public int estimatedX;
         public int estimatedY;
+        public int subjectId;
         public float confidence;
         public float freshness;
         public int lastUpdatedTick;

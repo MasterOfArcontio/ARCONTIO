@@ -1,7 +1,7 @@
 {
   "enabled": true,
   "selectedNpcVolume": 1.0,
-  "nearbyNpcVolume": 0.3,
+  "nearbyNpcVolume": 0.15,
   "nearbyNpcCount": 3,
   "maxSoundsPerSecond": 6,
   "playFootsteps": true,

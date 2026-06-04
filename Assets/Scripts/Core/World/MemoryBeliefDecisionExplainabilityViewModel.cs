@@ -154,6 +154,7 @@ namespace Arcontio.Core
         public string Status = string.Empty;
         public string Source = string.Empty;
         public string EstimatedCell = string.Empty;
+        public int SubjectId;
         public float Confidence;
         public float Freshness;
         public int SourceCount;
@@ -1212,6 +1213,7 @@ namespace Arcontio.Core
             view.Status = belief.Status.ToString();
             view.Source = belief.Source.ToString();
             view.EstimatedCell = FormatCell(belief.EstimatedPosition);
+            view.SubjectId = belief.SubjectId;
             view.Confidence = Mathf.Clamp01(belief.Confidence);
             view.Freshness = Mathf.Clamp01(belief.Freshness);
             view.SourceCount = belief.SourceCount;
@@ -1225,6 +1227,7 @@ namespace Arcontio.Core
             view.Status = belief.Status.ToString();
             view.Source = belief.Source.ToString();
             view.EstimatedCell = FormatCell(belief.EstimatedPosition);
+            view.SubjectId = belief.SubjectId;
             view.Confidence = Mathf.Clamp01(belief.Confidence);
             view.Freshness = Mathf.Clamp01(belief.Freshness);
             view.SourceCount = belief.SourceCount;

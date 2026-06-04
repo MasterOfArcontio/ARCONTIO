@@ -510,7 +510,7 @@ namespace Arcontio.Core
 
         public void Apply(MemoryTrace trace, BeliefStore store, int currentTick)
         {
-            BeliefAggregationRuleCommon.ApplyCommon(trace, store, currentTick, BeliefCategory.Social);
+            BeliefAggregationRuleCommon.ApplyCommonBySubject(trace, store, currentTick, BeliefCategory.Social);
         }
     }
 
@@ -545,6 +545,21 @@ namespace Arcontio.Core
 
             store.AddOrMergeByCategoryAndPosition(
                 category,
+                position,
+                trace.Reliability01,
+                trace.Intensity01,
+                currentTick,
+                source);
+        }
+
+        public static void ApplyCommonBySubject(MemoryTrace trace, BeliefStore store, int currentTick, BeliefCategory category)
+        {
+            BeliefSource source = trace.IsHeard ? BeliefSource.Heard : BeliefSource.Seen;
+            var position = new Vector2Int(trace.CellX, trace.CellY);
+
+            store.AddOrMergeByCategorySubjectAndPosition(
+                category,
+                trace.SubjectId,
                 position,
                 trace.Reliability01,
                 trace.Intensity01,
