@@ -208,7 +208,46 @@ Note operative:
 
 # 4. Prossimo gate di validazione umana
 
-Prima di procedere operativamente dentro `v0.30i` devono essere verificati:
+Esito audit `v0.30i`:
+
+1. Le classi legacy indispensabili oggi sono `MapGridBootstrap`, `MapGridData`, `MapGridChunkRenderer`, `MapGridWorldView`, `MapGridCameraController`, `MapGridPointerInputActionsProvider` e gli overlay/debug collegati.
+2. `MapGridWorldView` non e' solo renderer: contiene sync NPC/oggetti, sprite cache, stock label, balloon, flash decisionale, input debug, click-to-move, selection, FOV, landmark, DT overlay, summary UI, dev tools, audio feedback e rebind del `World`.
+3. `MapGridChunkRenderer` e `MapGridTileAtlas` sono riusabili come tecnica: mesh chunked, atlas regolare, UV mapping, varianti deterministiche di pavimento.
+4. `MapGridData` va trattato come buffer view-side temporaneo, utile per produrre snapshot terreno ArcGraph, ma non deve diventare il modello mappa definitivo.
+5. Gli overlay diagnostici vanno assorbiti dopo terrain/actor/object, perche' leggono molti dettagli del `World` e sono piu' fragili del rendering base.
+
+Matrice di assorbimento:
+
+| Area legacy | Stato attuale | Destino ArcGraph | Regola v0.30i |
+|---|---|---|---|
+| `MapGridBootstrap` | Costruisce config, layout, terrain chunk, camera, pointer provider e `MapGridWorldView` | Da sostituire con bootstrap ArcGraph futuro | Non cancellare ora |
+| `MapGridData` | Buffer view-side 2D terrain/blocked | Sorgente temporanea per `ArcGraphWorldAdapter.FillTerrainSnapshots` | Assorbire, poi pensionare |
+| `MapGridChunkRenderer` | Mesh chunk terreno con atlas | Tecnica da reimplementare come renderer terrain ArcGraph | Riusare logica, non dipendenza diretta permanente |
+| `MapGridTileAtlas` | Mapping tileId -> UV | Servizio o helper asset del terrain renderer ArcGraph | Riusabile |
+| `MapGridWorldView` | Monolite rendering + input/debug + overlay | Da spezzare in renderer actor/object, overlay, input/debug bridge | Non cancellare prima di moduli sostitutivi |
+| `MapGridCameraController` | Camera orthographic, pan, zoom, pixel perfect | Camera controller riusabile o adattabile | Separare da `MapGridData` quando ArcGraph avra' bounds proprie |
+| Overlay FOV/Landmark/DT/Summary | Diagnostica visuale dipendente dal `World` | Debug/Observer layer futuri | Rimandare dopo rendering base |
+| DevTools/click-to-move | Strumenti runtime che emettono comandi/debug | Tool separato, non renderer | Non inglobare nel renderer ArcGraph |
+
+Sequenza futura consigliata:
+
+1. Creare un bootstrap ArcGraph parallelo ma non permanente, disattivato di default o agganciato solo in test controllato.
+2. Portare il terrain renderer in ArcGraph usando snapshot terreno, chunk sporchi, atlas e tecnica mesh chunked.
+3. Portare object/actor renderer in ArcGraph usando `ArcGraphObjectLayer` e `ArcGraphActorLayer`; per actor fluido serve prima il contratto read-only origine/destinazione movimento.
+4. Separare input/debug tools dal renderer: selection, hover, click-to-move e dev tools non devono vivere nel main renderer.
+5. Portare overlay diagnostici uno alla volta: FOV, landmark, DT, summary cards.
+6. Solo quando ArcGraph copre terrain + actor + object + debug minimo, pensionare `MapGridWorldView` e poi `MapGridBootstrap`.
+
+Divieti operativi per il prossimo step:
+
+- non eliminare `MapGridWorldView`;
+- non eliminare `MapGridBootstrap`;
+- non cambiare il bootstrap scena senza test visuale;
+- non attivare due renderer permanenti;
+- non spostare dev tools dentro il renderer ArcGraph;
+- non trasformare `MapGridData` nella futura mappa simulativa.
+
+Prima di procedere operativamente oltre `v0.30i` devono essere verificati:
 
 1. quali classi legacy sono indispensabili oggi per bootstrap, input, rendering e debug;
 2. quali parti possono essere riusate da `arcgraph` senza portarsi dietro il monolite legacy;

@@ -1278,7 +1278,7 @@ La fase `v0.30` NON deve implementare:
 | Coordinate x/y/z previste anche se il runtime usa solo z = 0 | ✅ |
 | Movimento visuale multitick previsto come interpolazione grafica, non mutazione simulativa | ✅ Parziale: posa visuale interpolabile predisposta |
 | Placeholder per acqua, vegetazione, luci, meteo ed effetti identificati | ✅ Parziale: snapshot e layer passivi predisposti |
-| Strategia di eliminazione del rendering legacy dichiarata | ⏳ |
+| Strategia di eliminazione del rendering legacy dichiarata | ✅ Parziale: piano audit-first dichiarato |
 | Nessuna nuova simulazione introdotta | ✅ Parziale: adapter read-only senza runtime binding |
 | Nessuna violazione anti-omniscienza | ✅ Parziale: adapter di presentazione isolato |
 
@@ -1299,6 +1299,8 @@ La fase `v0.30` NON deve implementare:
 > **Nota tecnica v0.30g:** il checkpoint ha introdotto la posa visuale actor derivata (`ArcGraphActorVisualPoseSnapshot`) e helper di interpolazione per movimento multi-tick. L'audit ha confermato che il Job Layer espone progresso tick delle running action, ma non ancora origine/destinazione in un contratto read-only adatto alla view; per questo l'adapter continua a produrre motion inattivo finche' quel dato non sara' esposto senza accoppiamento invasivo.
 
 > **Nota tecnica v0.30h:** il checkpoint ha introdotto snapshot e layer placeholder per Water, Vegetation, Light, Weather ed Effect. I layer sono passivi, non vengono registrati nei default foundation e non simulano acqua, piante, luce, meteo o fuoco; servono solo come slot grafici futuri registrabili esplicitamente tramite `RegisterFuturePlaceholderLayers`.
+
+> **Nota audit v0.30i:** il checkpoint ha fissato il piano di assorbimento del legacy grafico. `MapGridChunkRenderer`, `MapGridTileAtlas`, convenzioni asset e parte della camera sono riusabili come tecniche; `MapGridData` va assorbito come sorgente temporanea di snapshot terreno; `MapGridWorldView` resta il monolite critico da non cancellare subito, perche' contiene actor/object sync, overlay, input debug, summary UI, rebind del World e dev tools. La sostituzione dovra' avvenire per fasi: prima bootstrap ArcGraph, poi terrain, poi actor/object, poi overlay/debug, infine pensionamento di MapGrid/WorldView.
 
 ---
 
