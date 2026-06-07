@@ -1217,7 +1217,7 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 #### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 ## Stato
-IN CORSO / NEXT: v0.30c
+IN CORSO / NEXT: v0.30d
 
 ## Scopo
 
@@ -1257,7 +1257,7 @@ La fase `v0.30` NON deve implementare:
 |---|---|---|
 | v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ✅ |
 | v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ✅ |
-| v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ⏳ |
+| v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ✅ |
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ⏳ |
 | v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ⏳ |
 | v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ |
@@ -1279,14 +1279,16 @@ La fase `v0.30` NON deve implementare:
 | Movimento visuale multitick previsto come interpolazione grafica, non mutazione simulativa | ✅ Parziale: snapshot visuale predisposto |
 | Placeholder per acqua, vegetazione, luci, meteo ed effetti identificati | ⏳ |
 | Strategia di eliminazione del rendering legacy dichiarata | ⏳ |
-| Nessuna nuova simulazione introdotta | ⏳ |
-| Nessuna violazione anti-omniscienza | ⏳ |
+| Nessuna nuova simulazione introdotta | ✅ Parziale: adapter read-only senza runtime binding |
+| Nessuna violazione anti-omniscienza | ✅ Parziale: adapter di presentazione isolato |
 
 > **Nota architetturale v0.30:** `arcgraph` deve diventare il sistema grafico unico di ARCONTIO. Nella prima fase puo' assorbire e incapsulare parti del rendering attuale, ma non deve stabilizzare un doppio sistema permanente. Il riuso atteso e' alto per asset, coordinate e alcune tecniche pratiche; e' invece limitato per la struttura complessiva, oggi ancora provvisoria.
 
 > **Nota audit v0.30a:** il checkpoint ha confermato che il rendering operativo vive soprattutto in `MapGridBootstrap`, `MapGridChunkRenderer`, `MapGridData` e `MapGridWorldView`. La parte chunk terrain e gli asset sono i candidati principali al riuso; `MapGridWorldView` e' invece un monolite view/debug/input da assorbire progressivamente in layer `arcgraph`. Il movimento multi-tick espone progresso runtime, ma la view attuale riposiziona gli NPC a centro cella solo a posizione simulativa aggiornata: l'interpolazione visuale richiede un contratto read-only dedicato.
 
 > **Nota tecnica v0.30b:** il checkpoint ha introdotto i contratti minimi di `arcgraph` in forma passiva: coordinate cella/chunk con asse `z`, identificatori layer, stato render, dirty state, interfaccia layer e snapshot visuale actor con movimento multi-tick. Nessun renderer esistente e nessun sistema simulativo sono stati modificati.
+
+> **Nota tecnica v0.30c:** il checkpoint ha introdotto l'adapter read-only `ArcGraphWorldAdapter`, con snapshot terreno, oggetto e actor. L'adapter legge `MapGridData` e `World`, produce copie value-type/listabili e non modifica il renderer legacy, il World, il Decision Layer o il Job Layer.
 
 ---
 
