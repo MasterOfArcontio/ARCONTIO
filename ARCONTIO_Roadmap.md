@@ -1217,7 +1217,7 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 #### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 ## Stato
-IN CORSO / APERTA SU BRANCH TASK
+IN CORSO / NEXT: v0.30b
 
 ## Scopo
 
@@ -1255,7 +1255,7 @@ La fase `v0.30` NON deve implementare:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ⏳ |
+| v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ✅ |
 | v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ⏳ |
 | v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ⏳ |
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ⏳ |
@@ -1283,6 +1283,8 @@ La fase `v0.30` NON deve implementare:
 | Nessuna violazione anti-omniscienza | ⏳ |
 
 > **Nota architetturale v0.30:** `arcgraph` deve diventare il sistema grafico unico di ARCONTIO. Nella prima fase puo' assorbire e incapsulare parti del rendering attuale, ma non deve stabilizzare un doppio sistema permanente. Il riuso atteso e' alto per asset, coordinate e alcune tecniche pratiche; e' invece limitato per la struttura complessiva, oggi ancora provvisoria.
+
+> **Nota audit v0.30a:** il checkpoint ha confermato che il rendering operativo vive soprattutto in `MapGridBootstrap`, `MapGridChunkRenderer`, `MapGridData` e `MapGridWorldView`. La parte chunk terrain e gli asset sono i candidati principali al riuso; `MapGridWorldView` e' invece un monolite view/debug/input da assorbire progressivamente in layer `arcgraph`. Il movimento multi-tick espone progresso runtime, ma la view attuale riposiziona gli NPC a centro cella solo a posizione simulativa aggiornata: l'interpolazione visuale richiede un contratto read-only dedicato.
 
 ---
 

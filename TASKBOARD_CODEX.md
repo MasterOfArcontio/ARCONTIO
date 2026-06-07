@@ -28,35 +28,34 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 CHECKPOINT CORRENTE:
-`v0.30a - Audit rendering attuale`
+`v0.30b - Definizione contratti minimi arcgraph`
 
 STATUS:
 IN CORSO / BRANCH TASK APERTO / AUDIT-FIRST
 
 RAMO BASE CORRENTE:
-`ai-task/v0.30-arcgraph-foundation`
+`ai-task/v0.30b-arcgraph-contracts`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- auditare il rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti;
-- aprire la fondazione di `arcgraph` come mainframe grafico modulare;
-- preparare una struttura capace di sostituire il sistema grafico provvisorio, non di affiancarlo come legacy permanente;
-- mantenere la resa visiva quasi invariata nella prima fase;
-- predisporre layer grafici, dirty cell/chunk, coordinate x/y/z e interpolazione visuale multitick;
-- preservare separazione tra simulazione e presentazione.
+- definire i contratti minimi di `arcgraph` senza ancora migrare il rendering;
+- fissare coordinate `x/y/z`, identificatori layer, stato render e dirty state;
+- preparare il vocabolario necessario per layer grafici, dirty cell/chunk e interpolazione visuale multitick;
+- mantenere `arcgraph` come presentazione read-only, non come fonte di verita' simulativa;
+- produrre un piano implementativo attendibile prima di toccare codice runtime.
 
 DOC SYNC:
 
-- Taskboard e roadmap riallineate per apertura `v0.30`;
+- Taskboard e roadmap riallineate per passaggio da `v0.30a` a `v0.30b`;
 - allineamento esteso `ARCONTIO_docs` raccomandato quando `v0.30a` produrra' un audit stabile;
 - Notion non modificato in questa patch salvo richiesta esplicita dell'operatore.
 
 OBIETTIVO:
 
-Creare la fondazione operativa di `arcgraph`, mantenendo il sistema visivo attuale come comportamento da preservare ma non come architettura definitiva. La fase deve preparare sostituzione progressiva del rendering provvisorio, senza introdurre nuova simulazione e senza trasformare la grafica in una fonte parallela di verita'.
+Definire il contratto minimo di `arcgraph` prima di qualsiasi patch strutturale sul rendering. Il checkpoint deve chiarire quali dati visuali esistono, quali coordinate usa il sistema, come vengono marcate celle/chunk sporchi e come il futuro ActorVisual potra' interpolare il movimento multi-tick senza mutare il World.
 
 ---
 
@@ -141,8 +140,8 @@ Consolidato:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ⏳ IN CORSO |
-| v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ⏳ PENDING |
+| v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ✅ COMPLETATO / PUSHATO |
+| v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ⏳ IN CORSO |
 | v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ⏳ PENDING |
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ⏳ PENDING |
 | v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ⏳ PENDING |
@@ -154,10 +153,11 @@ Consolidato:
 
 Note operative:
 
-- branch task corrente: `ai-task/v0.30-arcgraph-foundation`;
+- branch task corrente: `ai-task/v0.30b-arcgraph-contracts`;
 - base di integrazione: `ai/codex-main`;
+- branch `ai-task/v0.30-arcgraph-foundation` pushato con commit `d482cdc`;
 - `arcgraph` deve sostituire il rendering provvisorio a regime, non diventare un secondo renderer permanente;
-- la prima fase e' audit/foundation: resa visiva quasi invariata, nessuna nuova simulazione;
+- il checkpoint corrente e' contrattuale: niente migrazione grafica senza `go` dell'operatore;
 - `main` resta il ramo stabile e non deve ricevere lavoro implementativo diretto.
 
 ---
@@ -199,13 +199,13 @@ Note operative:
 
 # 4. Prossimo gate di validazione umana
 
-Prima di procedere oltre `v0.30a` devono essere verificati:
+Prima di procedere oltre `v0.30b` devono essere verificati:
 
-1. mappa dei file grafici attuali e delle loro responsabilita';
-2. identificazione di cosa riusare, cosa incapsulare e cosa eliminare;
-3. accoppiamenti tra rendering, World, MapGrid, Resources, overlay e movimento multitick;
-4. stima rischi per sostituzione progressiva;
-5. proposta del primo confine `arcgraph` senza patch runtime cieca.
+1. elenco dei contratti minimi da introdurre;
+2. confine tra adapter visuale read-only e `World`;
+3. modello coordinate `x/y/z` compatibile con z = 0 attuale;
+4. modello dirty cell / dirty chunk;
+5. contratto `ActorVisual` sufficiente per futura interpolazione multitick.
 
 ---
 
@@ -223,8 +223,8 @@ Le seguenti campagne non devono partire automaticamente:
 La priorita' resta:
 
 ```text
-v0.30a audit rendering attuale
--> contratti minimi arcgraph
+v0.30a audit rendering attuale completato
+-> v0.30b contratti minimi arcgraph
 -> adapter read-only
 -> layer grafici minimi
 -> solo dopo assorbimento progressivo del legacy grafico
@@ -267,6 +267,8 @@ Confermato:
 
 - `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `df7f211`;
 - branch task `ai-task/v0.30-arcgraph-foundation` aperto da `ai/codex-main`;
+- branch task `ai-task/v0.30-arcgraph-foundation` pushato su origin con commit `d482cdc`;
+- branch task corrente `ai-task/v0.30b-arcgraph-contracts` aperto da `ai-task/v0.30-arcgraph-foundation`;
 - `main` locale allineato a `origin/main` sul commit `8ca3af0`;
 - PR #131 integrata su `ai/codex-main`;
 - PR #132 integrata su `main` per il bootstrap analisi/audit;
@@ -277,7 +279,6 @@ Confermato:
 Da completare:
 
 - commit e pubblicazione del presente riallineamento Roadmap/Taskboard;
-- audit `v0.30a` del rendering attuale;
 - definizione contratti `arcgraph`;
 - piano di assorbimento ed eliminazione legacy grafico;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
