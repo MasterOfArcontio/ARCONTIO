@@ -2324,8 +2324,8 @@ Il renderer dovra':
 | v0.32c | Strategia atlas/materiali: UV map ArcGraph senza asset load e senza dipendenza permanente MapGrid | Completato |
 | v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Completato |
 | v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Completato |
-| v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Prossimo |
-| v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Pending |
+| v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Completato |
+| v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Prossimo |
 | v0.32h | Closeout v0.32 e preparazione v0.33 modalita' comparativa controllata | Pending |
 
 ## Esito v0.32a - Audit terrain legacy
@@ -2706,6 +2706,51 @@ nessun Resources.Load(...)
 nessun MonoBehaviour
 nessun accesso globale
 ```
+
+## Esito v0.32f - Harness/test controllato
+
+Implementato un harness statico per validare la costruzione mesh terrain da snapshot.
+
+Nuovo file:
+
+```text
+ArcGraphTerrainChunkMeshHarness.cs
+```
+
+### Cosa fa
+
+`ArcGraphTerrainChunkMeshHarness.RunTwoByTwoSmoke()`:
+
+- crea un `ArcGraphRenderState` con chunk size 2;
+- crea un `ArcGraphTerrainLayer`;
+- inserisce quattro snapshot terrain 2x2;
+- registra UV minime per floor, wall e wall-top;
+- usa `ArcGraphTerrainChunkMeshBuilder.BuildDirtyChunks`;
+- verifica contatori attesi:
+  - 1 chunk;
+  - 4 celle;
+  - 16 vertici;
+  - 24 indici triangolo;
+  - nessuna UV fallback;
+  - dirty ancora presente.
+
+### Cosa non fa
+
+L'harness:
+
+- non crea scena;
+- non crea `GameObject`;
+- non crea `MeshRenderer`;
+- non crea `MeshFilter`;
+- non carica asset;
+- non sostituisce MapGrid;
+- non usa framework test Unity.
+
+### Nota QA
+
+La compilazione isolata dell'harness e' riuscita.
+
+L'invocazione diretta via PowerShell reflection fuori dal dominio Unity non e' considerata QA valida, perche' gli assembly Unity compilati fuori dal runtime Unity non vengono caricati correttamente da `Add-Type`. Il test resta quindi un harness compilabile e pronto per un futuro wrapper EditMode/Unity batch, non un test eseguito in questa fase.
 
 ---
 

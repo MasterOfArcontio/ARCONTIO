@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.32 - ArcGraph Terrain Renderer
 
 CHECKPOINT CORRENTE:
-`v0.32f - Harness terrain ArcGraph controllato`
+`v0.32g - QA ArcGraph Terrain Renderer`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / DIRTY REBUILD v0.32e IMPLEMENTATO
+IN ESECUZIONE AUTONOMA / HARNESS v0.32f IMPLEMENTATO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.32f-arcgraph-terrain-harness`
+`ai-task/v0.32g-arcgraph-terrain-qa`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -66,11 +66,12 @@ DOC SYNC:
 - UV map terrain `v0.32c` implementata senza asset load e senza dipendenza codice da `MapGridTileAtlas`;
 - chunk mesh builder `v0.32d` implementato come produttore passivo di mesh data;
 - dirty chunk rebuild `v0.32e` implementato su `ArcGraphRenderState.Dirty.DirtyChunks`;
-- prossimo ramo operativo previsto: `ai-task/v0.32f-arcgraph-terrain-harness`.
+- harness statico `v0.32f` implementato e compilabile;
+- prossimo ramo operativo previsto: `ai-task/v0.32g-arcgraph-terrain-qa`.
 
 OBIETTIVO:
 
-Creare un harness/test controllato per verificare la costruzione mesh terrain da snapshot senza scena produttiva, senza GameObject e senza sostituzione MapGrid.
+Eseguire QA tecnica del terrain renderer ArcGraph: compilazione, diff scope, controllo chiamate vietate, verifica assenza doppio renderer e assenza mutazioni simulazione.
 
 ---
 
