@@ -148,7 +148,7 @@ Checkpoint v0.34:
 | v0.34b | Contratti render item passivi actor/object | Completato |
 | v0.34c | Builder object render queue | Completato |
 | v0.34d | Builder actor render queue | Completato |
-| v0.34e | Sorting e filtri LOD per zoom | Pending |
+| v0.34e | Sorting e filtri LOD per zoom | Completato |
 | v0.34f | Harness smoke actor/object senza scena | Pending |
 | v0.34g | QA, closeout e preparazione v0.35 | Pending |
 
@@ -235,6 +235,22 @@ Esito v0.34d:
 Indicazione per `v0.34e`:
 
 Creare una queue combinata actor/object con sorting condiviso e diagnostica aggregata, cosi' l'harness finale puo' validare un flusso completo.
+
+Esito v0.34e:
+
+- aggiunto `ArcGraphRenderQueueEntry`;
+- aggiunto `ArcGraphRenderQueue`;
+- aggiunto `ArcGraphRenderQueueBuilder`;
+- la queue conserva item actor/object tipizzati;
+- le entries globali ordinano actor e oggetti insieme;
+- gli actor hanno `VisualLayerOrder = 20`;
+- gli oggetti hanno `VisualLayerOrder = 10`;
+- a parita' di cella l'actor viene dopo l'oggetto;
+- nessun renderer concreto introdotto.
+
+Indicazione per `v0.34f`:
+
+Costruire harness smoke completo actor/object senza scena, verificando contatori, sorting e casi hidden.
 
 Esito audit v0.33a:
 

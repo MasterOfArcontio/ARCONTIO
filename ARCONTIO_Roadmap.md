@@ -3826,7 +3826,7 @@ Il renderer dovra':
 | v0.34b | Contratti render item passivi per actor/object | Completato |
 | v0.34c | Builder object render queue | Completato |
 | v0.34d | Builder actor render queue | Completato |
-| v0.34e | Sorting e filtri LOD per zoom | Pending |
+| v0.34e | Sorting e filtri LOD per zoom | Completato |
 | v0.34f | Harness smoke actor/object senza scena | Pending |
 | v0.34g | QA, closeout e preparazione v0.35 | Pending |
 
@@ -4166,6 +4166,73 @@ Costruire una queue combinata actor/object o un helper comune che:
 - applichi sorting condiviso;
 - produca diagnostica aggregata;
 - renda piu' semplice l'harness `v0.34f`.
+
+## Esito v0.34e - Queue combinata e sorting globale
+
+Implementata la queue actor/object combinata.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderQueueEntry.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderQueue.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderQueueBuilder.cs
+```
+
+### Aggiunte principali
+
+`ArcGraphRenderQueueEntry`:
+
+- collega l'ordine globale a un item actor o object;
+- conserva `Kind`, indice item, entity id e sort key;
+- evita di fondere payload actor e payload object in un tipo generico ambiguo.
+
+`ArcGraphRenderQueue`:
+
+- conserva liste tipizzate actor/object;
+- conserva entries ordinate globali;
+- conserva diagnostica aggregata;
+- non crea renderer concreto.
+
+`ArcGraphRenderQueueBuilder`:
+
+- usa `ArcGraphActorRenderQueueBuilder`;
+- usa `ArcGraphObjectRenderQueueBuilder`;
+- costruisce entries globali;
+- ordina actor e oggetti con `ArcGraphRenderSortKey`;
+- aggrega diagnostica actor/object.
+
+### Sorting
+
+L'ordinamento globale usa:
+
+```text
+Z
+Y
+X
+VisualLayerOrder
+Kind
+EntityId
+```
+
+Con la policy attuale:
+
+- oggetti: `VisualLayerOrder = 10`;
+- actor: `VisualLayerOrder = 20`.
+
+Quindi, a parita' di cella, l'actor viene dopo l'oggetto e puo' essere disegnato sopra nel wrapper futuro.
+
+### Prossimo passo v0.34f
+
+Costruire un harness smoke che:
+
+- crea actor layer;
+- crea object layer;
+- inserisce snapshot minimi;
+- risolve un profilo LOD;
+- costruisce la queue combinata;
+- verifica contatori, ordine e motivi hidden;
+- non usa scena, asset o renderer Unity.
 
 ---
 
