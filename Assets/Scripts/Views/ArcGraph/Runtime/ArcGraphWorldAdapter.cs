@@ -33,7 +33,7 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphWorldAdapter
     {
-        public const int CurrentRuntimeZLevel = 0;
+        public const int CurrentRuntimeZLevel = ArcGraphZLevelPolicy.CurrentRuntimeZLevel;
 
         private readonly string _defaultNpcSpriteKey;
         private readonly string _fallbackObjectSpritePrefix;
@@ -116,7 +116,7 @@ namespace Arcontio.View.ArcGraph
                 {
                     // MapGridData garantisce l'indicizzazione per coordinate in bounds.
                     // L'adapter aggiunge solo il livello z=0, senza inventare altitudini.
-                    var cell = new ArcGraphCellCoord(x, y, CurrentRuntimeZLevel);
+                    var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(x, y);
                     target.Add(new ArcGraphTerrainCellSnapshot(
                         cell,
                         map.GetTerrain(x, y),
@@ -180,7 +180,7 @@ namespace Arcontio.View.ArcGraph
                 target.Add(new ArcGraphObjectVisualSnapshot(
                     pair.Key,
                     instance.DefId,
-                    new ArcGraphCellCoord(instance.CellX, instance.CellY, CurrentRuntimeZLevel),
+                    ArcGraphZLevelPolicy.CreateRuntimeCell(instance.CellX, instance.CellY),
                     ResolveObjectSpriteKey(world, instance),
                     instance.IsHeld,
                     instance.HolderNpcId,
@@ -235,7 +235,7 @@ namespace Arcontio.View.ArcGraph
                     continue;
 
                 var position = pair.Value;
-                var cell = new ArcGraphCellCoord(position.X, position.Y, CurrentRuntimeZLevel);
+                var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(position.X, position.Y);
                 target.Add(new ArcGraphActorVisualSnapshot(
                     actorId,
                     cell,

@@ -55,7 +55,10 @@ namespace Arcontio.View.ArcGraph
         ///   <item><b>chunkSizeCells</b>: chunk minimo pari a una cella.</item>
         /// </list>
         /// </summary>
-        public ArcGraphRenderState(int visibleZLevel = 0, float tileSizeWorld = 1f, int chunkSizeCells = 16)
+        public ArcGraphRenderState(
+            int visibleZLevel = ArcGraphZLevelPolicy.DefaultVisibleZLevel,
+            float tileSizeWorld = 1f,
+            int chunkSizeCells = 16)
         {
             VisibleZLevel = visibleZLevel;
             TileSizeWorld = tileSizeWorld > 0.0001f ? tileSizeWorld : 1f;
@@ -115,6 +118,58 @@ namespace Arcontio.View.ArcGraph
                 FloorDiv(cell.X, ChunkSizeCells),
                 FloorDiv(cell.Y, ChunkSizeCells),
                 cell.Z);
+        }
+
+        // =============================================================================
+        // IsCellOnVisibleZLevel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se una cella appartiene al livello <c>Z</c> attualmente visibile.
+        /// </para>
+        ///
+        /// <para><b>Filtro di presentazione, non esistenza simulativa</b></para>
+        /// <para>
+        /// Il metodo aiuta i futuri renderer a distinguere la slice grafica mostrata.
+        /// Non afferma che celle su altri livelli non esistano e non modifica dirty,
+        /// layer o <c>World</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>cell</b>: coordinata da confrontare.</item>
+        ///   <item><b>VisibleZLevel</b>: livello grafico corrente.</item>
+        /// </list>
+        /// </summary>
+        public bool IsCellOnVisibleZLevel(ArcGraphCellCoord cell)
+        {
+            return cell.Z == VisibleZLevel;
+        }
+
+        // =============================================================================
+        // IsChunkOnVisibleZLevel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se un chunk appartiene al livello <c>Z</c> attualmente visibile.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' chunk multilivello</b></para>
+        /// <para>
+        /// I chunk dirty conservano il proprio <c>Z</c>. Questo helper permette al
+        /// renderer futuro di ignorare temporaneamente chunk non visibili senza
+        /// cancellare il loro stato e senza perdere la distinzione tra livelli.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>chunk</b>: coordinata chunk da confrontare.</item>
+        ///   <item><b>VisibleZLevel</b>: livello grafico corrente.</item>
+        /// </list>
+        /// </summary>
+        public bool IsChunkOnVisibleZLevel(ArcGraphChunkCoord chunk)
+        {
+            return chunk.Z == VisibleZLevel;
         }
 
         // =============================================================================
