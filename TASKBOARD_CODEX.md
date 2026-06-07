@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
 
 CHECKPOINT CORRENTE:
-`v0.31g - QA bootstrap minimo ArcGraph`
+`v0.31h - Closeout ArcGraph Bootstrap controllato`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / IMPLEMENTAZIONE v0.31f COMPLETATA
+IN ESECUZIONE AUTONOMA / QA v0.31g SUPERATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.31g-arcgraph-bootstrap-qa`
+`ai-task/v0.31h-arcgraph-bootstrap-closeout`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -57,12 +57,13 @@ DOC SYNC:
 - strategia accesso dati `v0.31d` definita: runtime context esplicito, niente letture globali;
 - policy attivazione `v0.31e` definita: `InternalStateOnly`, niente attivazione automatica scena, niente rendering;
 - implementazione minima `v0.31f` completata: nucleo C# passivo del bootstrap ArcGraph;
-- prossimo ramo operativo previsto: `ai-task/v0.31g-arcgraph-bootstrap-qa`;
+- QA `v0.31g` superata: compilazione isolata, no chiamate vietate, no modifiche a Core/MapGrid/scena/meta;
+- prossimo ramo operativo previsto: `ai-task/v0.31h-arcgraph-bootstrap-closeout`;
 - esecuzione autonoma autorizzata fino a fine `v0.31`, con stop solo per scelte progettuali non risolvibili conservativamente.
 
 OBIETTIVO:
 
-Verificare che il bootstrap ArcGraph minimo compili, non disegni, non muti sorgenti runtime, non legga globali e non introduca doppio renderer permanente.
+Chiudere `v0.31`, aggiornare Definition of Done, dichiarare debiti residui e preparare il prossimo macro checkpoint `v0.32` ArcGraph Terrain Renderer.
 
 ---
 
@@ -148,7 +149,7 @@ Consolidato:
 ## v0.31 - ArcGraph Bootstrap controllato
 
 STATUS:
-v0.31f COMPLETATO / v0.31g IN CORSO
+v0.31g COMPLETATO / v0.31h IN CORSO
 
 Obiettivo:
 
@@ -167,11 +168,11 @@ Componenti da valutare:
 
 Domande aperte:
 
-1. La compilazione isolata della cartella ArcGraph riesce?
-2. Il diff tocca solo ArcGraph runtime e documenti operativi?
-3. Esistono chiamate operative vietate?
-4. Sono stati modificati Core, Decision Layer, Job Layer, MapGrid legacy, scene o `.meta`?
-5. La diagnostica conferma `DoesRenderAnything = false`?
+1. Quali criteri della Definition of Done v0.31 sono soddisfatti?
+2. Quali debiti restano per v0.32?
+3. Quale branch/checkpoint deve aprire il terrain renderer?
+4. Quale documentazione va allineata a fine macro job?
+5. La fase v0.31 puo' essere dichiarata completata?
 
 Vincoli:
 
@@ -286,6 +287,14 @@ Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRuntimeContext.cs
 Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapDiagnostics.cs
 Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapRuntime.cs
 ```
+
+Esito `v0.31g`:
+
+1. Compilazione isolata dell'intera cartella ArcGraph runtime riuscita.
+2. Diff limitato a documenti root operativi e `Assets/Scripts/Views/ArcGraph/Runtime`.
+3. Nessuna modifica a `Assets/Scripts/Core`, `Assets/Scripts/Views/MapGrid`, scene, `.meta`, `Library`, `Temp`, `Obj`.
+4. Nessuna chiamata operativa vietata rilevata.
+5. Nessun rendering produttivo introdotto.
 
 ---
 
@@ -532,7 +541,6 @@ Confermato:
 
 Da completare:
 
-- QA `v0.31g`;
 - closeout `v0.31h`;
 - decisione umana sul primo intervento operativo di bootstrap ArcGraph;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.

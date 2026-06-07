@@ -1403,8 +1403,8 @@ Quindi `v0.31` deve prima decidere il confine tra:
 | v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Completato |
 | v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Completato |
 | v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Completato |
-| v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Prossimo |
-| v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Pending |
+| v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Completato |
+| v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Prossimo |
 
 ## Esito audit v0.31a - Bootstrap legacy MapGrid
 
@@ -2081,6 +2081,85 @@ nessuna chiamata SetNpcPos(...)
 ```
 
 Resta da eseguire il checkpoint QA dedicato `v0.31g`.
+
+## Esito v0.31g - QA bootstrap controllato
+
+QA eseguita sul bootstrap minimo ArcGraph.
+
+### Compilazione
+
+Compilazione isolata riuscita sull'intera cartella:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime
+```
+
+Metodo:
+
+```text
+Roslyn via dotnet
+reference netstandard2.1
+reference Library/ScriptAssemblies/Assembly-CSharp.dll
+output temporaneo fuori repository
+```
+
+Nota: il `csc.exe` bundled Unity locale non e' stato usabile per una dipendenza mancante (`System.Text.Encoding.CodePages`), quindi la verifica e' stata eseguita con Roslyn/dotnet.
+
+### Diff scope
+
+Il diff rispetto a `ai/codex-main` resta limitato a:
+
+```text
+documenti root operativi
+Assets/Scripts/Views/ArcGraph/Runtime
+```
+
+Nessuna modifica rilevata in:
+
+```text
+Assets/Scripts/Core
+Assets/Scripts/Views/MapGrid
+Assets/Scenes
+*.meta
+Library
+Temp
+Obj
+```
+
+### Chiamate vietate
+
+Controllo testuale operativo:
+
+```text
+new GameObject(...)
+Resources.Load(...)
+: MonoBehaviour
+AddComponent<...>
+GetComponent<...>
+FindObjectOfType<...>
+SimulationHost.Instance
+SetNpcPos(...)
+CommandBuffer / ICommand / Decision / Job nei file bootstrap
+```
+
+Esito:
+
+```text
+nessuna chiamata operativa vietata nei file bootstrap
+nessuna dipendenza operativa da Core/Decision/Job
+unico riferimento a SimulationHost.Instance e' in commento di divieto nel runtime context
+```
+
+### Esito QA
+
+```text
+QA v0.31g superata.
+ArcGraph Bootstrap e' compilabile come nucleo passivo.
+Non renderizza.
+Non muta il World.
+Non muta MapGridData.
+Non sostituisce MapGrid.
+```
 
 ## Ipotesi iniziale consigliata
 
