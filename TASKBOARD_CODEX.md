@@ -28,29 +28,30 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.35 - ArcGraph Actor Motion Runtime Bridge
 
 CHECKPOINT CORRENTE:
-`v0.35a - Audit movimento multi-tick e dati read-only`
+`v0.35f - QA e closeout ArcGraph Actor Motion Runtime Bridge`
 
 STATUS:
-STOP PROGETTUALE / v0.35a COMPLETATA
+COMPLETATA NEL PERIMETRO BRIDGE READ-ONLY
 
 RAMO BASE CORRENTE:
-`ai-task/v0.35a-arcgraph-motion-audit`
+`ai-task/v0.35b-arcgraph-motion-metadata`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- attendere decisione operatore sul contratto read-only del segmento movimento;
+- commit e push branch `v0.35b`;
+- aprire branch successivo preparatorio `v0.36a`;
+- non iniziare modifiche `v0.36` senza nuovo go operatore;
 - evitare parsing di `ActionInstanceId`;
-- preparare bridge read-only per movimento actor solo dopo scelta;
 - non permettere alla view di mutare posizione NPC;
 - non permettere alla view di completare o interrompere job;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
 - non introdurre doppio renderer permanente;
 - non agganciare wrapper scena senza decisione esplicita;
-- non toccare Core, Decision Layer o Job Layer.
+- toccare Core/Job Layer solo per il contratto read-only autorizzato.
 
 DOC SYNC:
 
@@ -112,11 +113,19 @@ DOC SYNC:
 - prossimo macro checkpoint previsto: `v0.35 - ArcGraph Actor Motion Runtime Bridge`;
 - apertura operativa `v0.35` autorizzata dall'operatore;
 - branch `ai-task/v0.35a-arcgraph-motion-audit` aperto;
-- audit `v0.35a` completato con stop progettuale: manca origine/destinazione tipizzata nello snapshot running action.
+- audit `v0.35a` completato con stop progettuale: manca origine/destinazione tipizzata nello snapshot running action;
+- operatore ha confermato l'opzione consigliata: metadata movement tipizzato dentro `RunningActionRuntimeState`;
+- branch `ai-task/v0.35b-arcgraph-motion-metadata` aperto per implementare contratto, bridge ArcGraph e QA;
+- metadata movement tipizzato implementato;
+- snapshot read-only propagato;
+- lookup CPU-leggera per NPC implementata in `RunningActionStore`;
+- `ArcGraphWorldAdapter` ora alimenta `ArcGraphActorMotionSnapshot`;
+- test EditMode aggiunti per factory movement e lookup store;
+- QA statico eseguito: diff check, no chiamate vietate runtime nuove, no `.meta`, no `Library/Temp/Obj`.
 
 OBIETTIVO:
 
-Attendere decisione operatore sul contratto read-only del segmento movimento.
+Chiudere `v0.35`, pubblicare il branch e preparare il prossimo checkpoint `v0.36`.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -326,11 +335,11 @@ Checkpoint v0.35:
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.35a | Audit movimento multi-tick e dati read-only disponibili | Completato con stop progettuale |
-| v0.35b | Scelta contratto read-only del segmento movimento | In attesa operatore |
-| v0.35c | Implementazione contratto motion read-only | Pending |
-| v0.35d | Integrazione adapter ArcGraph actor motion | Pending |
-| v0.35e | Harness motion actor senza scena | Pending |
-| v0.35f | QA e closeout v0.35 | Pending |
+| v0.35b | Scelta contratto read-only del segmento movimento | Confermata |
+| v0.35c | Implementazione contratto motion read-only | Completato |
+| v0.35d | Integrazione adapter ArcGraph actor motion | Completato |
+| v0.35e | Harness motion actor senza scena | Completato tramite test EditMode |
+| v0.35f | QA e closeout v0.35 | Completato |
 
 Esito v0.35a:
 
@@ -358,6 +367,46 @@ Motivo:
 - mantiene authority nel Job Layer;
 - offre ad ArcGraph un input read-only;
 - non consente alla view di mutare posizione o job.
+
+Decisione operatore v0.35b:
+
+```text
+Confermo aggiungere metadata movement tipizzato dentro RunningActionRuntimeState
+e propagarlo nello snapshot read-only.
+
+Mantieni strutture dati piu' agili possibile per non stressare la cpu.
+```
+
+Forma implementativa scelta:
+
+- `RunningActionMovementSnapshot` value type minimale con flag presenza e coordinate intere from/to;
+- `RunningActionRuntimeState.StartMovement(...)` come factory dedicata;
+- `RunningActionProgressSnapshot.Movement` come propagazione read-only;
+- indice `npcId -> RunningActionKey` dentro `RunningActionStore` per evitare scansioni per actor;
+- `ArcGraphWorldAdapter.FillActorSnapshots(...)` legge solo `TryGetActiveMovementSnapshotForNpc(...)`;
+- fallback stabile a `ArcGraphActorMotionSnapshot.None(...)` quando non esiste movimento attivo.
+
+Esito v0.35f:
+
+- `RunningActionMovementSnapshot` aggiunto come metadata value-only;
+- `RunningActionRuntimeState.StartMovement(...)` aggiunto per movement action;
+- `RunningActionProgressSnapshot` propaga `Movement`;
+- `MoveToRunningActionDriver` crea running action movement con from/to tipizzati;
+- `RunningActionStore` mantiene indice `npcId -> RunningActionKey` per lookup O(1);
+- `ArcGraphWorldAdapter` traduce movement runtime in `ArcGraphActorMotionSnapshot`;
+- actor senza movimento restano su `ArcGraphActorMotionSnapshot.None(...)`;
+- test EditMode aggiunti:
+  - `MovementFactoryPropagatesTypedSegmentIntoSnapshot`;
+  - `ActiveMovementLookupUsesTypedMetadataAndClearsIndex`;
+- nessuna nuova chiamata runtime vietata in ArcGraph/Core;
+- nessuna modifica a `.meta`, `Library`, `Temp`, `Obj`;
+- MapGrid resta renderer produttivo.
+
+Prossimo checkpoint:
+
+`v0.36 - ArcGraph Environment Visual Layers`
+
+La prossima fase non deve ancora implementare luci, pioggia, neve, acqua o vegetazione produttive. Il primo step deve essere un audit/contratto preparatorio dei layer ambientali visuali.
 
 Esito audit v0.33a:
 

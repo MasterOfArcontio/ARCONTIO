@@ -953,15 +953,18 @@ namespace Arcontio.Core
                     failureReason: JobFailureReason.MovementFailed,
                     interruptionReason: JobFailureReason.Cancelled);
 
-                runningAction = RunningActionRuntimeState.Start(
+                runningAction = RunningActionRuntimeState.StartMovement(
                     $"move_{job.JobId}_{key.PhaseIndex}_{key.ActionIndex}_{npcCell.X}_{npcCell.Y}_{action.TargetCell.x}_{action.TargetCell.y}",
-                    RunningActionKind.Movement,
                     npcId,
                     job.JobId,
                     ResolveActivePhaseId(job, key.PhaseIndex),
                     action.ActionId,
                     tick,
-                    policy);
+                    policy,
+                    npcCell.X,
+                    npcCell.Y,
+                    action.TargetCell.x,
+                    action.TargetCell.y);
 
                 if (!runtime.RunningActions.Register(key, runningAction, out var registerReason))
                 {

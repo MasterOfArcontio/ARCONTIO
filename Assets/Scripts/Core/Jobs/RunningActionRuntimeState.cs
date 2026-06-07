@@ -143,6 +143,117 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // RunningActionMovementSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Metadato tipizzato minimale per descrivere un segmento di movimento in corso.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: dato visuale derivato, non authority</b></para>
+    /// <para>
+    /// Il Job Layer resta l'unico punto che decide e completa il movimento reale.
+    /// Questa struttura conserva solo origine e destinazione del segmento corrente,
+    /// usando interi primitivi per evitare dipendenze Unity e per mantenere basso il
+    /// costo runtime. ArcGraph puo' leggerla per interpolare lo sprite, ma non puo'
+    /// usarla per mutare la posizione simulativa.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>HasMovementSegment</b>: indica se il metadato e' realmente presente.</item>
+    ///   <item><b>FromCellX/FromCellY</b>: cella discreta di partenza.</item>
+    ///   <item><b>ToCellX/ToCellY</b>: cella discreta di arrivo.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct RunningActionMovementSnapshot
+    {
+        public readonly bool HasMovementSegment;
+        public readonly int FromCellX;
+        public readonly int FromCellY;
+        public readonly int ToCellX;
+        public readonly int ToCellY;
+
+        public bool IsValidStep =>
+            HasMovementSegment
+            && (FromCellX != ToCellX || FromCellY != ToCellY);
+
+        // =============================================================================
+        // RunningActionMovementSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il metadato read-only del segmento movimento.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: default struct distinguibile da movimento reale</b></para>
+        /// <para>
+        /// Il costruttore riceve un flag esplicito per evitare che una struttura
+        /// default venga interpretata come movimento valido. Questo mantiene sicuro
+        /// l'uso di value type e permette snapshot economici senza nullable.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>hasMovementSegment</b>: presenza effettiva del segmento.</item>
+        ///   <item><b>fromCellX/fromCellY</b>: origine discreta.</item>
+        ///   <item><b>toCellX/toCellY</b>: destinazione discreta.</item>
+        /// </list>
+        /// </summary>
+        public RunningActionMovementSnapshot(
+            bool hasMovementSegment,
+            int fromCellX,
+            int fromCellY,
+            int toCellX,
+            int toCellY)
+        {
+            // Il flag esplicito evita di interpretare il default struct come un
+            // movimento reale da (0,0) a (0,0). Le coordinate restano primitive:
+            // niente Vector2Int, niente allocazioni, niente dipendenza Unity.
+            HasMovementSegment = hasMovementSegment;
+            FromCellX = fromCellX;
+            FromCellY = fromCellY;
+            ToCellX = toCellX;
+            ToCellY = toCellY;
+        }
+
+        // =============================================================================
+        // Create
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un metadato di movimento presente usando coordinate primitive.
+        /// </para>
+        ///
+        /// <para><b>Factory minimale</b></para>
+        /// <para>
+        /// La factory evita al chiamante di passare manualmente il flag di presenza.
+        /// Non valida pathfinding, adiacenza o camminabilita': quelle authority
+        /// restano nel Job Layer e nel World.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>fromCellX/fromCellY</b>: origine del segmento.</item>
+        ///   <item><b>toCellX/toCellY</b>: destinazione del segmento.</item>
+        /// </list>
+        /// </summary>
+        public static RunningActionMovementSnapshot Create(
+            int fromCellX,
+            int fromCellY,
+            int toCellX,
+            int toCellY)
+        {
+            return new RunningActionMovementSnapshot(
+                hasMovementSegment: true,
+                fromCellX,
+                fromCellY,
+                toCellX,
+                toCellY);
+        }
+    }
+
+    // =============================================================================
     // RunningActionProgressSnapshot
     // =============================================================================
     /// <summary>
@@ -164,6 +275,7 @@ namespace Arcontio.Core
     ///   <item><b>Tempo</b>: tick di start/update ed elapsed interno.</item>
     ///   <item><b>Status</b>: lifecycle corrente e terminalita'.</item>
     ///   <item><b>Policy</b>: required/timeout e failure reason correnti.</item>
+    ///   <item><b>Movement</b>: eventuale segmento origine/destinazione read-only.</item>
     /// </list>
     /// </summary>
     public readonly struct RunningActionProgressSnapshot
@@ -184,6 +296,7 @@ namespace Arcontio.Core
         public readonly bool IsTerminal;
         public readonly bool CanComplete;
         public readonly bool IsTimedOut;
+        public readonly RunningActionMovementSnapshot Movement;
 
         public RunningActionProgressSnapshot(
             string actionInstanceId,
@@ -201,7 +314,8 @@ namespace Arcontio.Core
             JobFailureReason failureReason,
             bool isTerminal,
             bool canComplete,
-            bool isTimedOut)
+            bool isTimedOut,
+            RunningActionMovementSnapshot movement)
         {
             ActionInstanceId = actionInstanceId ?? string.Empty;
             Kind = kind;
@@ -219,6 +333,7 @@ namespace Arcontio.Core
             IsTerminal = isTerminal;
             CanComplete = canComplete;
             IsTimedOut = isTimedOut;
+            Movement = movement;
         }
     }
 
@@ -260,6 +375,7 @@ namespace Arcontio.Core
         public int UpdatedTick { get; private set; }
         public int ElapsedTicks { get; private set; }
         public RunningActionCompletionPolicy CompletionPolicy { get; }
+        public RunningActionMovementSnapshot Movement { get; }
         public RunningActionLifecycleStatus Status { get; private set; }
         public JobFailureReason FailureReason { get; private set; }
 
@@ -279,7 +395,8 @@ namespace Arcontio.Core
             string phaseId,
             string jobActionId,
             int startedTick,
-            RunningActionCompletionPolicy completionPolicy)
+            RunningActionCompletionPolicy completionPolicy,
+            RunningActionMovementSnapshot movement)
         {
             ActionInstanceId = string.IsNullOrWhiteSpace(actionInstanceId)
                 ? Guid.NewGuid().ToString("N")
@@ -293,6 +410,7 @@ namespace Arcontio.Core
             UpdatedTick = StartedTick;
             ElapsedTicks = 0;
             CompletionPolicy = completionPolicy;
+            Movement = movement;
             Status = RunningActionLifecycleStatus.Started;
             FailureReason = JobFailureReason.None;
         }
@@ -317,7 +435,64 @@ namespace Arcontio.Core
                 phaseId,
                 jobActionId,
                 startedTick,
-                completionPolicy);
+                completionPolicy,
+                default);
+        }
+
+        // =============================================================================
+        // StartMovement
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Avvia una running action di movimento con segmento origine/destinazione
+        /// tipizzato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: movement metadata sotto authority Job</b></para>
+        /// <para>
+        /// Il metodo nasce per il driver di movimento del Job Layer. Imposta
+        /// <c>RunningActionKind.Movement</c> e conserva il segmento in un value type,
+        /// evitando parsing dell'id azione e impedendo alla view di inventare il
+        /// moto. La factory non muta il <c>World</c> e non completa il job.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Identita'</b>: action, NPC, job, phase e job action.</item>
+        ///   <item><b>Policy</b>: durata e reason dichiarative.</item>
+        ///   <item><b>Segmento</b>: coordinate from/to del passo corrente.</item>
+        /// </list>
+        /// </summary>
+        public static RunningActionRuntimeState StartMovement(
+            string actionInstanceId,
+            int npcId,
+            string jobId,
+            string phaseId,
+            string jobActionId,
+            int startedTick,
+            RunningActionCompletionPolicy completionPolicy,
+            int fromCellX,
+            int fromCellY,
+            int toCellX,
+            int toCellY)
+        {
+            // Factory dedicata al movimento: il chiamante non deve ricordarsi di
+            // impostare a mano Kind=Movement e non deve serializzare from/to dentro
+            // stringhe diagnostiche. Il dato resta tipizzato e value-only.
+            return new RunningActionRuntimeState(
+                actionInstanceId,
+                RunningActionKind.Movement,
+                npcId,
+                jobId,
+                phaseId,
+                jobActionId,
+                startedTick,
+                completionPolicy,
+                RunningActionMovementSnapshot.Create(
+                    fromCellX,
+                    fromCellY,
+                    toCellX,
+                    toCellY));
         }
 
         public bool AdvanceProgress(int deltaTicks, int tick)
@@ -397,7 +572,8 @@ namespace Arcontio.Core
                 FailureReason,
                 IsTerminal,
                 CanComplete,
-                IsTimedOut);
+                IsTimedOut,
+                Movement);
         }
     }
 }

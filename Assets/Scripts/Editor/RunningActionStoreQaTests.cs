@@ -229,6 +229,46 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // ActiveMovementLookupUsesTypedMetadataAndClearsIndex
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica la lookup read-only CPU-leggera usata da ArcGraph per recuperare
+        /// il segmento di movimento attivo di un NPC.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void ActiveMovementLookupUsesTypedMetadataAndClearsIndex()
+        {
+            // Arrange: lo store contiene una movement action con metadata tipizzato.
+            var store = new RunningActionStore();
+            var key = MakeKey(3, "job-move", 0, 0);
+            var state = MakeMovementState(
+                npcId: 3,
+                jobId: "job-move",
+                fromCellX: 4,
+                fromCellY: 5,
+                toCellX: 5,
+                toCellY: 5);
+            Assert.That(store.Register(key, state, out var registerReason), Is.True, registerReason);
+
+            // Act: ArcGraph potra' usare questa API senza allocare GetSnapshots.
+            bool foundBeforeClear = store.TryGetActiveMovementSnapshotForNpc(3, out var snapshot);
+            bool cleared = store.Clear(key);
+            bool foundAfterClear = store.TryGetActiveMovementSnapshotForNpc(3, out _);
+
+            // Assert: l'indice restituisce il segmento corretto e si pulisce con la key.
+            Assert.That(foundBeforeClear, Is.True);
+            Assert.That(snapshot.Movement.IsValidStep, Is.True);
+            Assert.That(snapshot.Movement.FromCellX, Is.EqualTo(4));
+            Assert.That(snapshot.Movement.FromCellY, Is.EqualTo(5));
+            Assert.That(snapshot.Movement.ToCellX, Is.EqualTo(5));
+            Assert.That(snapshot.Movement.ToCellY, Is.EqualTo(5));
+            Assert.That(cleared, Is.True);
+            Assert.That(foundAfterClear, Is.False);
+        }
+
+        // =============================================================================
         // RunningActionStoreIsNotPartOfSaveLoadContracts
         // =============================================================================
         /// <summary>
@@ -288,6 +328,36 @@ namespace Arcontio.Tests
                 jobActionId: "action-0",
                 startedTick: 0,
                 completionPolicy: policy);
+        }
+
+        private static RunningActionRuntimeState MakeMovementState(
+            int npcId,
+            string jobId,
+            int fromCellX,
+            int fromCellY,
+            int toCellX,
+            int toCellY)
+        {
+            // Variante con metadata di movimento reale: resta locale allo store e
+            // non autorizza nessuna mutazione World o completamento job.
+            var policy = new RunningActionCompletionPolicy(
+                requiredTicks: 4,
+                timeoutTicks: 10,
+                failureReason: JobFailureReason.MovementFailed,
+                interruptionReason: JobFailureReason.Preempted);
+
+            return RunningActionRuntimeState.StartMovement(
+                actionInstanceId: "move-" + jobId,
+                npcId: npcId,
+                jobId: jobId,
+                phaseId: "phase-0",
+                jobActionId: "action-0",
+                startedTick: 0,
+                completionPolicy: policy,
+                fromCellX: fromCellX,
+                fromCellY: fromCellY,
+                toCellX: toCellX,
+                toCellY: toCellY);
         }
 
         private static Job MakeJob(string jobId, JobPriorityClass priorityClass, float urgency01)

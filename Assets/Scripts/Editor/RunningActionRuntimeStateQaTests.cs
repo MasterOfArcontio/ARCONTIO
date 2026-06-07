@@ -181,6 +181,53 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // MovementFactoryPropagatesTypedSegmentIntoSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che una running action di movimento conservi origine e
+        /// destinazione in forma tipizzata, senza dover parsare l'action id.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void MovementFactoryPropagatesTypedSegmentIntoSnapshot()
+        {
+            // Arrange: il segmento viene dichiarato con quattro interi primitivi.
+            var policy = new RunningActionCompletionPolicy(
+                requiredTicks: 4,
+                timeoutTicks: 0,
+                failureReason: JobFailureReason.MovementFailed,
+                interruptionReason: JobFailureReason.Cancelled);
+
+            // Act: StartMovement forza Kind=Movement e allega metadata read-only.
+            var state = RunningActionRuntimeState.StartMovement(
+                "move-action-test",
+                npcId: 7,
+                jobId: "job-move",
+                phaseId: "phase-move",
+                jobActionId: "move-to-cell",
+                startedTick: 10,
+                completionPolicy: policy,
+                fromCellX: 2,
+                fromCellY: 3,
+                toCellX: 3,
+                toCellY: 3);
+            state.AdvanceProgress(2, tick: 12);
+            var snapshot = state.ToSnapshot();
+
+            // Assert: lo snapshot contiene il segmento senza dipendere da stringhe.
+            Assert.That(snapshot.Kind, Is.EqualTo(RunningActionKind.Movement));
+            Assert.That(snapshot.ElapsedTicks, Is.EqualTo(2));
+            Assert.That(snapshot.RequiredTicks, Is.EqualTo(4));
+            Assert.That(snapshot.Movement.HasMovementSegment, Is.True);
+            Assert.That(snapshot.Movement.IsValidStep, Is.True);
+            Assert.That(snapshot.Movement.FromCellX, Is.EqualTo(2));
+            Assert.That(snapshot.Movement.FromCellY, Is.EqualTo(3));
+            Assert.That(snapshot.Movement.ToCellX, Is.EqualTo(3));
+            Assert.That(snapshot.Movement.ToCellY, Is.EqualTo(3));
+        }
+
+        // =============================================================================
         // RuntimeStateDoesNotStoreRunningActionDirectly
         // =============================================================================
         /// <summary>

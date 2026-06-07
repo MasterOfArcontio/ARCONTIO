@@ -98,6 +98,7 @@ namespace Arcontio.Core
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Dictionary</b>: mappa chiave composta -> stato running action.</item>
+    ///   <item><b>Indice movimento</b>: mappa NPC -> running action movement attiva.</item>
     ///   <item><b>Register/Update</b>: API esplicite per start e replace controllato.</item>
     ///   <item><b>Clear</b>: cleanup per key, NPC, job o reset globale.</item>
     ///   <item><b>Snapshots</b>: enumerazione read-only difensiva per QA/futura EL.</item>
@@ -106,6 +107,7 @@ namespace Arcontio.Core
     public sealed class RunningActionStore
     {
         private readonly Dictionary<RunningActionKey, RunningActionRuntimeState> _states = new();
+        private readonly Dictionary<int, RunningActionKey> _activeMovementByNpc = new();
 
         public int Count => _states.Count;
 
@@ -135,6 +137,7 @@ namespace Arcontio.Core
             }
 
             _states[key] = state;
+            TrackMovementIndex(key, state);
             reason = "RunningActionRegistered";
             return true;
         }
@@ -170,13 +173,18 @@ namespace Arcontio.Core
             }
 
             _states[key] = state;
+            TrackMovementIndex(key, state);
             reason = "RunningActionUpdated";
             return true;
         }
 
         public bool Clear(RunningActionKey key)
         {
-            return _states.Remove(key);
+            bool removed = _states.Remove(key);
+            if (removed)
+                UntrackMovementIndex(key);
+
+            return removed;
         }
 
         public int ClearByNpc(int npcId)
@@ -214,6 +222,7 @@ namespace Arcontio.Core
             // ClearAll e' il path esplicito per reset transitori e load: il progress
             // running action e' volatile per contratto ARC-DEC-020.
             _states.Clear();
+            _activeMovementByNpc.Clear();
         }
 
         public IReadOnlyList<RunningActionProgressSnapshot> GetSnapshots()
@@ -228,16 +237,138 @@ namespace Arcontio.Core
             return snapshots;
         }
 
+        // =============================================================================
+        // TryGetActiveMovementSnapshotForNpc
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Recupera lo snapshot read-only del movimento attivo di un NPC, se esiste.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: lettura visuale veloce senza authority</b></para>
+        /// <para>
+        /// ArcGraph deve poter chiedere il movimento di un actor senza ricevere lo
+        /// store mutabile e senza costruire una lista completa di tutte le running
+        /// action. Il metodo usa un indice minimale per NPC e restituisce uno
+        /// snapshot copiato. Non avanza progress, non pulisce job, non modifica il
+        /// <c>World</c> e non completa il movimento.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>npcId</b>: actor/NPC da interrogare.</item>
+        ///   <item><b>snapshot</b>: copia value-only del movimento trovato.</item>
+        ///   <item><b>return</b>: true solo per movement non terminale con segmento valido.</item>
+        /// </list>
+        /// </summary>
+        public bool TryGetActiveMovementSnapshotForNpc(
+            int npcId,
+            out RunningActionProgressSnapshot snapshot)
+        {
+            snapshot = default;
+
+            // Lettura O(1) pensata per ArcGraph: il rendering puo' interrogare molti
+            // attori per frame/tick, quindi evitiamo sia la lista allocata da
+            // GetSnapshots sia una scansione completa dello store per ogni NPC.
+            if (npcId <= 0
+                || !_activeMovementByNpc.TryGetValue(npcId, out var key)
+                || !_states.TryGetValue(key, out var state)
+                || state == null
+                || state.Kind != RunningActionKind.Movement
+                || state.IsTerminal
+                || !state.Movement.IsValidStep)
+            {
+                return false;
+            }
+
+            snapshot = state.ToSnapshot();
+            return true;
+        }
+
         private int RemoveKeys(List<RunningActionKey> keysToRemove)
         {
             int removed = 0;
             for (int i = 0; i < keysToRemove.Count; i++)
             {
                 if (_states.Remove(keysToRemove[i]))
+                {
+                    UntrackMovementIndex(keysToRemove[i]);
                     removed++;
+                }
             }
 
             return removed;
+        }
+
+        // =============================================================================
+        // TrackMovementIndex
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna l'indice NPC -> running action movement quando uno stato viene
+        /// registrato o sostituito.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: costo runtime spostato sui cambi di stato</b></para>
+        /// <para>
+        /// L'indice viene aggiornato solo quando lo store cambia, non durante ogni
+        /// lettura grafica. Questo riduce il costo per ArcGraph mantenendo lo store
+        /// ancora piccolo: un solo dizionario aggiuntivo con chiave NPC e valore
+        /// <c>RunningActionKey</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>key</b>: chiave composta dello stato nello store principale.</item>
+        ///   <item><b>state</b>: stato da indicizzare se e' movement valido.</item>
+        /// </list>
+        /// </summary>
+        private void TrackMovementIndex(RunningActionKey key, RunningActionRuntimeState state)
+        {
+            // Solo i movement con segmento reale entrano nell'indice. Le wait action,
+            // i lavori lunghi futuri e gli snapshot default non devono diventare
+            // candidati visuali per errore.
+            if (state != null
+                && state.Kind == RunningActionKind.Movement
+                && !state.IsTerminal
+                && state.Movement.IsValidStep)
+            {
+                _activeMovementByNpc[key.NpcId] = key;
+                return;
+            }
+
+            UntrackMovementIndex(key);
+        }
+
+        // =============================================================================
+        // UntrackMovementIndex
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove dall'indice movimento la chiave indicata, se e' ancora quella
+        /// associata all'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: cleanup mirato dello stato derivato</b></para>
+        /// <para>
+        /// L'indice movimento e' derivato dallo store principale. Quando una action
+        /// viene cancellata, l'indice deve essere pulito senza rimuovere per errore
+        /// un eventuale movimento piu' recente dello stesso NPC. Per questo la
+        /// rimozione confronta sempre la chiave completa prima di cancellare.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>key</b>: running action da rimuovere dall'indice derivato.</item>
+        /// </list>
+        /// </summary>
+        private void UntrackMovementIndex(RunningActionKey key)
+        {
+            if (!_activeMovementByNpc.TryGetValue(key.NpcId, out var indexedKey))
+                return;
+
+            if (indexedKey.Equals(key))
+                _activeMovementByNpc.Remove(key.NpcId);
         }
     }
 }

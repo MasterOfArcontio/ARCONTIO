@@ -27,7 +27,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>CurrentRuntimeZLevel</b>: livello <c>z = 0</c> usato dal runtime attuale.</item>
     ///   <item><b>FillTerrainSnapshots</b>: converte il buffer terreno MapGrid in celle ArcGraph.</item>
     ///   <item><b>FillObjectSnapshots</b>: converte gli oggetti del World in snapshot visuali.</item>
-    ///   <item><b>FillActorSnapshots</b>: converte gli NPC del World in snapshot actor.</item>
+    ///   <item><b>FillActorSnapshots</b>: converte gli NPC del World in snapshot actor e motion read-only.</item>
     ///   <item><b>ResolveObjectSpriteKey</b>: replica solo la policy di fallback sprite corrente.</item>
     /// </list>
     /// </summary>
@@ -196,15 +196,13 @@ namespace Arcontio.View.ArcGraph
         /// Converte le posizioni NPC correnti del <c>World</c> in snapshot actor.
         /// </para>
         ///
-        /// <para><b>Movimento visuale non ancora inventato</b></para>
+        /// <para><b>Movimento visuale derivato dal Job Layer</b></para>
         /// <para>
-        /// In questo checkpoint l'adapter non deduce interpolazione da
-        /// <c>NpcAction.MoveTo</c>, perche' quello stato non contiene origine e
-        /// progresso affidabili del segmento in corso. L'audit <c>v0.30g</c> ha
-        /// confermato che il Job Layer espone tick di progresso per le running
-        /// action, ma non ancora una coppia origine/destinazione adatta alla view.
-        /// Gli snapshot usano quindi <c>ArcGraphActorMotionSnapshot.None</c> finche'
-        /// quel contratto read-only non sara' disponibile.
+        /// L'adapter non deduce interpolazione dalla differenza tra celle e non
+        /// parsa stringhe diagnostiche. Se il <c>JobRuntimeState</c> espone una
+        /// running action di movimento tipizzata per l'NPC, copia origine,
+        /// destinazione e tick in <c>ArcGraphActorMotionSnapshot</c>. In assenza di
+        /// quel contratto usa <c>ArcGraphActorMotionSnapshot.None</c>.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -238,12 +236,66 @@ namespace Arcontio.View.ArcGraph
 
                 var position = pair.Value;
                 var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(position.X, position.Y);
+                var motion = ResolveActorMotion(world, actorId, cell);
+
                 target.Add(new ArcGraphActorVisualSnapshot(
                     actorId,
                     cell,
                     _defaultNpcSpriteKey,
-                    ArcGraphActorMotionSnapshot.None(cell)));
+                    motion));
             }
+        }
+
+        // =============================================================================
+        // ResolveActorMotion
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il motion snapshot visuale di un actor leggendo solo running
+        /// action movement read-only.
+        /// </para>
+        ///
+        /// <para><b>Contratto CPU-leggero</b></para>
+        /// <para>
+        /// La lookup passa dall'indice interno di <c>RunningActionStore</c>, quindi
+        /// evita di allocare una lista di snapshot e non scansiona tutte le action
+        /// per ogni actor. Il metodo converte solo quattro interi di cella e due
+        /// contatori tick in value type ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>world</b>: sorgente del JobRuntimeState read-only.</item>
+        ///   <item><b>actorId</b>: NPC per cui cercare un movimento attivo.</item>
+        ///   <item><b>fallbackCell</b>: cella discreta usata se non esiste motion.</item>
+        /// </list>
+        /// </summary>
+        private static ArcGraphActorMotionSnapshot ResolveActorMotion(
+            World world,
+            int actorId,
+            ArcGraphCellCoord fallbackCell)
+        {
+            if (world?.JobRuntimeState == null
+                || !world.JobRuntimeState.RunningActions.TryGetActiveMovementSnapshotForNpc(
+                    actorId,
+                    out var runningSnapshot))
+            {
+                return ArcGraphActorMotionSnapshot.None(fallbackCell);
+            }
+
+            var movement = runningSnapshot.Movement;
+            var fromCell = ArcGraphZLevelPolicy.CreateRuntimeCell(
+                movement.FromCellX,
+                movement.FromCellY);
+            var toCell = ArcGraphZLevelPolicy.CreateRuntimeCell(
+                movement.ToCellX,
+                movement.ToCellY);
+
+            return ArcGraphActorMotionSnapshot.CreateMovement(
+                fromCell,
+                toCell,
+                runningSnapshot.ElapsedTicks,
+                runningSnapshot.RequiredTicks);
         }
 
         // =============================================================================

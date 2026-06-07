@@ -39,7 +39,7 @@
 | v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Completata |
 | v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Completata nel perimetro sicuro |
 | v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Completata nel perimetro passivo |
-| v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | In audit con stop progettuale |
+| v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | Completata nel perimetro bridge read-only |
 | v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | Pending |
 | v0.37 | ArcGraph Debug/Overlay Migration | Settembre 2026 | Pending |
 | v0.38 | ArcGraph Legacy Absorption / Retirement | Settembre 2026 | Pending |
@@ -4409,11 +4409,11 @@ Il bridge dovra':
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.35a | Audit movimento multi-tick e dati read-only disponibili | Completato con stop progettuale |
-| v0.35b | Scelta contratto read-only del segmento movimento | In attesa operatore |
-| v0.35c | Implementazione contratto motion read-only | Pending |
-| v0.35d | Integrazione adapter ArcGraph actor motion | Pending |
-| v0.35e | Harness motion actor senza scena | Pending |
-| v0.35f | QA e closeout v0.35 | Pending |
+| v0.35b | Scelta contratto read-only del segmento movimento | Confermata |
+| v0.35c | Implementazione contratto motion read-only | Completato |
+| v0.35d | Integrazione adapter ArcGraph actor motion | Completato |
+| v0.35e | Harness motion actor senza scena | Completato tramite test EditMode |
+| v0.35f | QA e closeout v0.35 | Completato |
 
 ## Esito v0.35a - Audit movimento multi-tick e stop progettuale
 
@@ -4550,9 +4550,101 @@ Motivo:
 - prepara futuri motion kind come walk/run/slow;
 - tiene ArcGraph su un contratto leggibile.
 
-### Stato v0.35
+### Stato v0.35a
 
-`v0.35` non deve proseguire oltre l'audit finche' questa scelta non e' confermata.
+`v0.35a` si e' chiusa con stop progettuale. La scelta e' stata poi confermata
+dall'operatore nel checkpoint successivo.
+
+## Esito v0.35b - Decisione contratto motion read-only tipizzato
+
+Decisione operatore:
+
+```text
+Confermo aggiungere metadata movement tipizzato dentro RunningActionRuntimeState
+e propagarlo nello snapshot read-only.
+
+Mantieni strutture dati piu' agili possibile per non stressare la cpu.
+```
+
+Forma implementativa approvata:
+
+- aggiungere `RunningActionMovementSnapshot` come value type minimale;
+- conservare solo flag presenza e coordinate intere from/to;
+- non usare `Vector2Int` nel Core per evitare dipendenza Unity aggiuntiva;
+- aggiungere `RunningActionRuntimeState.StartMovement(...)`;
+- propagare il dato in `RunningActionProgressSnapshot.Movement`;
+- non parsare `ActionInstanceId`;
+- non dedurre movimento dalla differenza tra celle successive;
+- non permettere ad ArcGraph di chiamare `SetNpcPos`;
+- non permettere ad ArcGraph di completare o interrompere job.
+
+Scelta CPU:
+
+```text
+RunningActionStore
+├─ _states: RunningActionKey -> RunningActionRuntimeState
+└─ _activeMovementByNpc: npcId -> RunningActionKey
+```
+
+Motivo:
+
+- ArcGraph puo' interrogare il movimento di un NPC in modo diretto;
+- evita `GetSnapshots()` durante la costruzione degli actor snapshot;
+- evita una scansione completa delle running action per ogni actor;
+- mantiene l'indice derivato piccolo e pulito dai normali path di clear.
+
+Bridge previsto:
+
+```text
+MoveToRunningActionDriver
+-> RunningActionRuntimeState.StartMovement(...)
+-> RunningActionProgressSnapshot.Movement
+-> RunningActionStore.TryGetActiveMovementSnapshotForNpc(...)
+-> ArcGraphWorldAdapter.FillActorSnapshots(...)
+-> ArcGraphActorMotionSnapshot.CreateMovement(...)
+-> ArcGraphActorVisualPoseSnapshot.ResolvePose()
+```
+
+## Esito v0.35f - Closeout bridge motion actor
+
+La `v0.35` ha collegato il movimento multi-tick reale alla posa visuale ArcGraph
+senza spostare authority verso la view.
+
+Implementato:
+
+- `RunningActionMovementSnapshot` come value type minimale;
+- `RunningActionRuntimeState.StartMovement(...)`;
+- propagazione `Movement` dentro `RunningActionProgressSnapshot`;
+- creazione movement metadata in `MoveToRunningActionDriver`;
+- lookup read-only `RunningActionStore.TryGetActiveMovementSnapshotForNpc(...)`;
+- indice interno `npcId -> RunningActionKey` per evitare scansioni per actor;
+- traduzione in `ArcGraphActorMotionSnapshot` dentro `ArcGraphWorldAdapter`;
+- fallback a motion inattivo quando non esiste segmento attivo;
+- test EditMode sul metadata movement e sulla lookup indicizzata.
+
+Vincoli rispettati:
+
+- ArcGraph non chiama `SetNpcPos`;
+- ArcGraph non completa job;
+- ArcGraph non interrompe running action;
+- ArcGraph non parsa `ActionInstanceId`;
+- ArcGraph non deduce movimento da differenze tra celle successive;
+- MapGrid resta renderer produttivo;
+- nessun asset load;
+- nessun `GameObject`;
+- nessuna scena modificata.
+
+QA eseguito:
+
+- `git diff --check`;
+- ricerca nuove chiamate operative vietate nel diff runtime;
+- verifica assenza modifiche a `.meta`, `Library`, `Temp`, `Obj`;
+- verifica riferimenti a `StartMovement`, `TryGetActiveMovementSnapshotForNpc` e test dedicati.
+
+Nota QA:
+
+Non e' stata eseguita compilazione Unity batch per evitare scritture automatiche in
+`Temp` / `Library` dentro questo step controllato.
 
 ---
 
