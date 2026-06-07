@@ -34,7 +34,7 @@ STATUS:
 ATTESA GO / v0.33c COMPLETATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.33c-arcgraph-view-json-config`
+`ai-task/v0.33d-arcgraph-pan-zoom-controller`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -79,7 +79,7 @@ DOC SYNC:
 - contratto `v0.33b` implementato: config view, zoom discreto, input frame astratto, stato vista e rettangolo celle visibili;
 - branch `ai-task/v0.33c-arcgraph-view-json-config` aperto;
 - configurazione `v0.33c` implementata: DTO JSON, parser da stringa e JSON default ArcGraph;
-- prossimo branch previsto: `ai-task/v0.33d-arcgraph-pan-zoom-controller`.
+- branch `ai-task/v0.33d-arcgraph-pan-zoom-controller` aperto e in attesa di `go` operativo.
 
 OBIETTIVO:
 
