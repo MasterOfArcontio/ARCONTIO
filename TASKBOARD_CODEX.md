@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
 
 CHECKPOINT CORRENTE:
-`v0.33b - Contratto ArcGraph View/Camera`
+`v0.33c - Config mappa/zoom JSON`
 
 STATUS:
-ATTESA GO / v0.33a COMPLETATA
+ATTESA GO / v0.33b COMPLETATA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.33b-arcgraph-view-contract`
@@ -41,9 +41,9 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- definire il contratto ArcGraph View/Camera;
-- stabilire config, stato vista, input ammessi e output vietati;
-- separare camera/view da TerrainRenderer e da simulazione;
+- portare dimensione mappa e livelli zoom dentro una configurazione serializzabile;
+- preparare il passaggio da JSON config mappa a `ArcGraphMapViewConfig`;
+- non accendere ancora camera controller comparativo;
 - mantenere MapGrid come renderer produttivo;
 - usare ArcGraph terrain solo come output debug/test;
 - evitare doppio renderer permanente;
@@ -75,11 +75,13 @@ DOC SYNC:
 - branch `ai-task/v0.33a-arcgraph-view-audit` aperto;
 - decisioni zoom/pan/LOD registrate per `v0.33`;
 - audit `v0.33a` completato: camera legacy, input mouse, zoom/pan, conversione coordinate, confine ArcGraph View/Camera;
-- branch `ai-task/v0.33b-arcgraph-view-contract` aperto e in attesa di `go` operativo.
+- branch `ai-task/v0.33b-arcgraph-view-contract` aperto;
+- contratto `v0.33b` implementato: config view, zoom discreto, input frame astratto, stato vista e rettangolo celle visibili;
+- prossimo branch previsto: `ai-task/v0.33c-arcgraph-view-json-config`.
 
 OBIETTIVO:
 
-Attendere `go` operativo per `v0.33b` e definire il contratto ArcGraph View/Camera.
+Attendere `go` operativo per `v0.33c` e definire la configurazione JSON mappa/zoom.
 
 La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -103,8 +105,8 @@ Checkpoint v0.33:
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.33a | Audit view/camera legacy e registrazione decisioni zoom/pan/LOD | Completato |
-| v0.33b | Contratto ArcGraph View/Camera | Prossimo |
-| v0.33c | Config mappa/zoom JSON | Pending |
+| v0.33b | Contratto ArcGraph View/Camera | Completato |
+| v0.33c | Config mappa/zoom JSON | Prossimo |
 | v0.33d | Controller pan/zoom discreto | Pending |
 | v0.33e | Coordinate screen/world/cell e clamp viewport | Pending |
 | v0.33f | Policy LOD per zoom | Pending |
@@ -134,6 +136,33 @@ ArcGraphMapViewConfig
 + input mouse
 + Camera esplicita
 -> ArcGraphViewController
+```
+
+Esito v0.33b:
+
+- aggiunto `ArcGraphViewZoomLevelDefinition`;
+- aggiunto `ArcGraphMapViewConfig`;
+- aggiunto `ArcGraphViewCellRect`;
+- aggiunto `ArcGraphViewInputFrame`;
+- aggiunto `ArcGraphViewState`;
+- nessun `MonoBehaviour`;
+- nessuna lettura diretta `Mouse.current`;
+- nessuna lettura diretta `Camera.main`;
+- nessun `GameObject`;
+- nessun renderer;
+- nessuna mutazione simulativa.
+
+Indicazione per `v0.33c`:
+
+Definire una configurazione serializzabile per mappa e zoom.
+
+Formula:
+
+```text
+JSON config mappa
+-> DTO config view
+-> ArcGraphMapViewConfig
+-> ArcGraphViewState iniziale
 ```
 
 ---

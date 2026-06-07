@@ -2936,7 +2936,7 @@ La modalita' comparativa dovra':
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.33a | Audit view/camera legacy e registrazione decisioni zoom, pan, LOD visuale | Completato |
-| v0.33b | Contratto ArcGraph View/Camera: config, stato vista, input ammessi, output vietati | Prossimo |
+| v0.33b | Contratto ArcGraph View/Camera: config, stato vista, input ammessi, output vietati | Completato |
 | v0.33c | Configurazione mappa e zoom: dimensione 250x250, livelli zoom JSON, celle visibili | Pending |
 | v0.33d | Controller pan/zoom discreto: rotellina per zoom, rotellina premuta per pan | Pending |
 | v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Pending |
@@ -3136,6 +3136,112 @@ Il ViewController dovra':
 - non creare goal/job/eventi;
 - non decidere rendering dei layer;
 - limitarsi a gestire finestra visibile, zoom, pan, clamp e conversione coordinate.
+
+## Esito v0.33b - Contratto ArcGraph View/Camera
+
+Implementato il contratto passivo View/Camera per ArcGraph.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewZoomLevelDefinition.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphMapViewConfig.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewCellRect.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewInputFrame.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewState.cs
+```
+
+### Cosa rappresentano
+
+`ArcGraphViewZoomLevelDefinition`:
+
+- definisce un livello zoom discreto;
+- contiene celle visibili X/Y;
+- dichiara se il pan e' ammesso;
+- dichiara se le animazioni sprite sono ammesse;
+- dichiara se la vestizione actor a layer e' ammessa;
+- dichiara se il livello usa rappresentazione semplificata.
+
+`ArcGraphMapViewConfig`:
+
+- contiene dimensione mappa;
+- contiene profilo zoom;
+- contiene livello zoom iniziale;
+- contiene policy rotellina;
+- contiene policy pan con rotellina premuta;
+- espone `CreateDefaultV033()` con la configurazione decisa:
+  - mappa `250x250`;
+  - zoom 1 `300x300`, no pan, no animazioni, no layer actor, rappresentazione semplificata;
+  - zoom 2 `150x150`, pan, no animazioni, no layer actor, rappresentazione semplificata;
+  - zoom 3 `75x75`, pan, animazioni ammesse, no layer actor;
+  - zoom 4 `20x20`, pan, animazioni ammesse, layer actor ammessi.
+
+`ArcGraphViewCellRect`:
+
+- rappresenta il rettangolo discreto di celle visibili;
+- usa limiti massimi esclusivi;
+- non modifica mappa, dirty state o simulazione.
+
+`ArcGraphViewInputFrame`:
+
+- rappresenta input view gia' letto da un wrapper esterno;
+- contiene scatti rotellina, stato rotellina premuta, delta mouse e posizione puntatore;
+- non legge `Mouse.current`;
+- non legge input Unity direttamente.
+
+`ArcGraphViewState`:
+
+- conserva centro vista e zoom attivo;
+- calcola finestra celle visibili;
+- clampa il centro ai bounds mappa;
+- applica zoom discreto da delta rotellina gia' astratto;
+- applica pan in coordinate cella solo se il livello zoom lo consente.
+
+### Garanzie architetturali
+
+Il contratto View/Camera:
+
+- non e' `MonoBehaviour`;
+- non legge `Camera.main`;
+- non legge `Mouse.current`;
+- non chiama `ScreenToWorldPoint`;
+- non crea `GameObject`;
+- non crea `Mesh`;
+- non crea renderer;
+- non legge `World`;
+- non muta simulazione;
+- non sostituisce MapGrid.
+
+### Regola centrale
+
+```text
+ArcGraphViewState descrive come guardiamo la mappa.
+ArcGraphRenderState descrive cosa il renderer deve aggiornare.
+World descrive cosa esiste davvero nella simulazione.
+```
+
+Questi tre piani devono restare separati.
+
+### Preparazione v0.33c
+
+`v0.33c` dovra' trasformare il contratto in configurazione serializzabile.
+
+Obiettivo:
+
+```text
+JSON config mappa
+-> DTO configurazione view
+-> ArcGraphMapViewConfig
+-> ArcGraphViewState iniziale
+```
+
+La patch dovra' evitare:
+
+- accesso diretto a scena;
+- sostituzione di `MapGridConfig` prima del gate comparativo;
+- modifiche a Core;
+- modifica `.meta`;
+- aggancio renderer automatico.
 
 ---
 
