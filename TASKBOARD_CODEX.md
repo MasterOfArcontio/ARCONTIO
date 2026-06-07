@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.21 — Stabilizzazione post-rifondazione percettiva
 
 CHECKPOINT CORRENTE:
-`v0.21d — Correzione watched FOV e consolidamento post-merge`
+`v0.21e — QA runtime post-merge e confronto costi aggiornato`
 
 STATUS:
-IN CORSO / RAMO TASK PUBBLICATO / INTEGRAZIONE SU `ai/codex-main` PENDENTE
+IN CORSO / PATCH POST-MERGE INTEGRATE SU `ai/codex-main` / QA RUNTIME PENDENTE
 
-RAMO CORRENTE:
-`ai-task/v0.21-post-merge-fixes`
+RAMO BASE CORRENTE:
+`ai/codex-main`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -42,7 +42,6 @@ BASE DI INTEGRAZIONE:
 OUTPUT ATTESO:
 
 - stabilizzare i comportamenti emersi durante i test runtime successivi alla rifondazione percettiva;
-- integrare le correzioni post-merge già pubblicate;
 - verificare SearchFood, `WaitAndObserve`, rinforzo mnemonico cadenzato e visualizzazione watched FOV;
 - misurare il nuovo costo dominante Decisione → Incarico;
 - rifinire il censimento di Intent, Job, Step, Running Action e politiche di recupero;
@@ -142,18 +141,18 @@ Consolidato:
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.21a | Monitor stato percettivo e audio diagnostico iniziale | ✅ INTEGRATO SU `ai/codex-main` |
-| v0.21b | Stabilità SearchFood, percezione durante osservazione ed etichette runtime | ⚠️ PUBBLICATO SU RAMO TASK |
-| v0.21c | Rinforzo mnemonico cadenzato e debug watched FOV | ⚠️ PUBBLICATO SU RAMO TASK |
-| v0.21d | Correzione margine watched FOV sui quattro lati | ⚠️ PUBBLICATO SU RAMO TASK |
-| v0.21e | QA runtime post-merge e confronto costi aggiornato | ⏳ PENDING |
+| v0.21b | Stabilità SearchFood, percezione durante osservazione ed etichette runtime | ✅ INTEGRATO SU `ai/codex-main` |
+| v0.21c | Rinforzo mnemonico cadenzato e debug watched FOV | ✅ INTEGRATO SU `ai/codex-main` |
+| v0.21d | Correzione margine watched FOV sui quattro lati | ✅ INTEGRATO SU `ai/codex-main` |
+| v0.21e | QA runtime post-merge e confronto costi aggiornato | ⏳ PROSSIMO GATE |
 | v0.21f | Censimento e classificazione Intent / Job / Step / Running Action | ⏳ IN ANALISI |
 | v0.21g | Closeout stabilizzazione post-rifondazione | ⏳ PENDING |
 
 Note operative:
 
-- `ai/codex-main` contiene la PR #130 fino al commit `13e0e8c`;
-- `ai-task/v0.21-post-merge-fixes` contiene sei commit aggiuntivi pubblicati e non ancora integrati;
-- le correzioni del ramo corrente non devono essere dichiarate completate su `ai/codex-main` prima del merge;
+- `ai/codex-main` contiene la PR #131 fino al commit `84aa98d`;
+- il ramo `ai-task/v0.21-post-merge-fixes` e' stato integrato e rimosso;
+- la stabilizzazione post-merge e' integrata, ma non ancora chiusa formalmente;
 - `main` resta il ramo stabile e non deve ricevere lavoro implementativo diretto.
 
 ---
@@ -197,10 +196,10 @@ Note operative:
 
 Prima di aprire una nuova fase implementativa ampia devono essere verificati:
 
-1. merge del ramo `ai-task/v0.21-post-merge-fixes` su `ai/codex-main`;
-2. prova runtime mirata su SearchFood, `WaitAndObserve`, watched FOV e memoria;
-3. nuovo file JSONL dell'osservatorio costi;
-4. conferma del collo di bottiglia Decisione → Incarico;
+1. prova runtime mirata su SearchFood, `WaitAndObserve`, watched FOV e memoria;
+2. nuovo file JSONL dell'osservatorio costi;
+3. conferma del collo di bottiglia Decisione → Incarico;
+4. censimento Intent / Job / Step / Running Action aggiornato;
 5. approvazione del modello di composizione tra Job di alto livello e unità riusabili di basso livello.
 
 ---
@@ -260,19 +259,20 @@ Aprire nuovo branch task quando:
 
 Confermato:
 
-- ramo corrente `ai-task/v0.21-post-merge-fixes`;
-- ramo corrente pubblicato e allineato al proprio remoto prima dell'aggiornamento Taskboard;
-- `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `13e0e8c`;
-- `main` locale allineato a `origin/main` sul commit `7f2b924`;
-- ramo corrente avanti di sei commit rispetto a `ai/codex-main`;
+- `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `84aa98d`;
+- `main` locale allineato a `origin/main` sul commit `8ca3af0`;
+- PR #131 integrata su `ai/codex-main`;
+- PR #132 integrata su `main` per il bootstrap analisi/audit;
+- rami temporanei `ai-task/v0.21-post-merge-fixes` e `ai-task/governance-bootstrap-main-sync` rimossi;
 - nessun merge o rebase incompleto rilevato;
-- `AI_SESSION_BOOT.md` contiene una modifica locale preesistente da non includere automaticamente.
+- `AI_SESSION_BOOT.md` allineato su `ai/codex-main` e `main`.
 
 Da completare:
 
-- commit e pubblicazione del presente riallineamento Taskboard;
-- integrazione del ramo corrente tramite PR verso `ai/codex-main`;
-- eventuale avanzamento di `main` soltanto dopo decisione esplicita dell'operatore;
+- commit e pubblicazione del presente riallineamento Roadmap/Taskboard;
+- QA runtime post-merge e confronto costi aggiornato;
+- censimento cataloghi runtime;
+- closeout formale di `v0.21`;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
 ---

@@ -2,7 +2,7 @@
 
 > **Ritmo di lavoro:** 3 sessioni/settimana (Lunedì, Mercoledì, Giovedì) · 2 ore per sessione · 6 ore/settimana
 > **Target v1.00:** Prima demo giocabile pubblica
-> **Stato documento:** Maggio 2026
+> **Stato documento:** Giugno 2026
 
 ---
 
@@ -32,7 +32,8 @@
 | v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Completata |
 | v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
 | v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
-| v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | In corso |
+| v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Completata fino a v0.20q |
+| v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | In corso |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -1176,6 +1177,42 @@ ma senza perdere variazioni del mondo rilevanti.
 > **Nota catalogo intent e idle cleanup v0.20q:** i pesi degli intent non vivono piu' in `game_params.json`, ma nel file dedicato `decision_intent_score_config.json`, recuperando il layout separato della prima implementazione. Lo scan idle automatico residuo viene eliminato insieme allo stato legacy collegato: il guardarsi attorno deve passare solo da Decisione -> JobRequest -> Job tramite `WaitAndObserve` e step `LookDirection`.
 
 ---
+
+#### v0.21 - Stabilizzazione post-rifondazione percettiva
+
+## Stato
+IN CORSO / QA POST-MERGE
+
+## Scopo
+
+La fase `v0.21` stabilizza il runtime emerso dopo la rifondazione percettiva `v0.20`.
+
+Non introduce una nuova espansione sistemica. Serve a verificare che percezione dirty/cadenzata, osservazione direzionale via Job, SearchFood, memoria, watched FOV, etichette runtime e diagnostica costi lavorino in modo coerente dopo l'integrazione su `ai/codex-main`.
+
+Il principio guida e':
+
+```text
+prima stabilizzare cio' che e' appena stato rifondato,
+poi misurare il nuovo collo di bottiglia,
+solo dopo ampliare cataloghi, job composti o sistemi sociali.
+```
+
+## Checkpoint
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.21a | Monitor stato percettivo e audio diagnostico iniziale | ✅ |
+| v0.21b | Stabilita' SearchFood, percezione durante osservazione ed etichette runtime | ✅ |
+| v0.21c | Rinforzo mnemonico cadenzato e debug watched FOV | ✅ |
+| v0.21d | Correzione margine watched FOV sui quattro lati | ✅ |
+| v0.21e | QA runtime post-merge e confronto costi aggiornato | ⏳ |
+| v0.21f | Censimento e classificazione Intent / Job / Step / Running Action | ⏳ |
+| v0.21g | Closeout stabilizzazione post-rifondazione | ⏳ |
+
+> **Nota architetturale v0.21:** questa fase e' una stabilizzazione post-rifondazione, non una nuova architettura. Le patch gia' integrate su `ai/codex-main` hanno corretto stabilita' SearchFood, percezione durante osservazione, etichette runtime, rinforzo mnemonico cadenzato e visualizzazione watched FOV. Restano necessari QA runtime mirato, nuovo confronto JSONL dei costi e censimento dei cataloghi Intent / Job / Step / Running Action prima di aprire espansioni piu' ampie.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
