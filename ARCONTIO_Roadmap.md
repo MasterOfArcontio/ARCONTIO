@@ -2938,7 +2938,7 @@ La modalita' comparativa dovra':
 | v0.33a | Audit view/camera legacy e registrazione decisioni zoom, pan, LOD visuale | Completato |
 | v0.33b | Contratto ArcGraph View/Camera: config, stato vista, input ammessi, output vietati | Completato |
 | v0.33c | Configurazione mappa e zoom: dimensione 250x250, livelli zoom JSON, celle visibili | Completato |
-| v0.33d | Controller pan/zoom discreto: rotellina per zoom, rotellina premuta per pan | Pending |
+| v0.33d | Controller pan/zoom discreto: rotellina per zoom, rotellina premuta per pan | Completato |
 | v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Pending |
 | v0.33f | Policy LOD per zoom: icone, sprite statici, aggregazioni, animazioni disabilitate ai livelli 1/2 | Pending |
 | v0.33g | Modalita' comparativa terrain ArcGraph/MapGrid: aggancio debug/test senza doppio renderer permanente | Pending |
@@ -3346,6 +3346,92 @@ Il controller dovra' ancora evitare:
 - sostituzione MapGrid;
 - letture globali;
 - mutazioni simulazione.
+
+## Esito v0.33d - Controller pan/zoom discreto
+
+Implementato il controller passivo per zoom e pan ArcGraph.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewController.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewControllerResult.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewControllerHarness.cs
+```
+
+### Funzionamento
+
+`ArcGraphViewController`:
+
+- riceve `ArcGraphMapViewConfig`;
+- riceve `ArcGraphViewState`;
+- riceve `ArcGraphViewInputFrame`;
+- riceve dimensioni viewport in pixel;
+- applica prima zoom discreto e poi pan;
+- converte il delta mouse da pixel a celle in base allo zoom attivo;
+- ignora l'input se `IsPointerOverUi` e' true;
+- non applica pan se il livello zoom non lo consente;
+- produce `ArcGraphViewControllerResult` diagnostico.
+
+### Scelte operative
+
+Ordine interno:
+
+```text
+input frame
+-> blocco UI
+-> zoom discreto
+-> conversione pan pixel/celle
+-> clamp via ArcGraphViewState
+-> diagnostica
+```
+
+Il pan usa semantica "trascina la mappa":
+
+```text
+mouse verso destra
+-> mappa percepita verso destra
+-> centro view verso sinistra
+```
+
+Quindi il delta mouse viene convertito con segno negativo.
+
+### Harness
+
+`ArcGraphViewControllerHarness.RunDefaultSmoke()` verifica:
+
+- zoom iniziale livello 1;
+- zoom 1 clampa la vista all'intera mappa `250x250`;
+- uno scatto rotellina porta da zoom 1 a zoom 2;
+- pan con rotellina premuta applica movimento a zoom 2;
+- input sopra UI viene ignorato e non modifica il centro vista.
+
+### Garanzie architetturali
+
+Il controller:
+
+- non e' `MonoBehaviour`;
+- non legge `Mouse.current`;
+- non legge `Camera.main`;
+- non chiama `ScreenToWorldPoint`;
+- non crea `GameObject`;
+- non crea renderer;
+- non legge `World`;
+- non muta simulazione;
+- non sostituisce MapGrid.
+
+### Preparazione v0.33e
+
+`v0.33e` dovra' introdurre il contratto coordinate:
+
+```text
+screen pixel
+-> normalized viewport point
+-> visible cell rect
+-> cella ArcGraph
+```
+
+Anche questo deve restare passivo e non usare ancora una camera Unity produttiva.
 
 ---
 

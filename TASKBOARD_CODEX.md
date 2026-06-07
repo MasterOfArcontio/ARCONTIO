@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
 
 CHECKPOINT CORRENTE:
-`v0.33d - Controller pan/zoom discreto`
+`v0.33e - Coordinate screen/world/cell e clamp viewport`
 
 STATUS:
-ATTESA GO / v0.33c COMPLETATA
+IN ESECUZIONE AUTONOMA / v0.33d COMPLETATA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.33d-arcgraph-pan-zoom-controller`
@@ -41,9 +41,9 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- implementare il primo controller pan/zoom discreto usando i contratti v0.33b/c;
-- usare input gia' astratto da `ArcGraphViewInputFrame`;
-- non agganciare ancora il controller a una camera produttiva;
+- implementare conversione coordinate passiva screen/viewport/cella;
+- usare `ArcGraphViewState` e rettangolo celle visibili;
+- non usare ancora camera produttiva Unity;
 - mantenere MapGrid come renderer produttivo;
 - usare ArcGraph terrain solo come output debug/test;
 - evitare doppio renderer permanente;
@@ -79,11 +79,13 @@ DOC SYNC:
 - contratto `v0.33b` implementato: config view, zoom discreto, input frame astratto, stato vista e rettangolo celle visibili;
 - branch `ai-task/v0.33c-arcgraph-view-json-config` aperto;
 - configurazione `v0.33c` implementata: DTO JSON, parser da stringa e JSON default ArcGraph;
-- branch `ai-task/v0.33d-arcgraph-pan-zoom-controller` aperto e in attesa di `go` operativo.
+- branch `ai-task/v0.33d-arcgraph-pan-zoom-controller` aperto;
+- controller `v0.33d` implementato: zoom discreto, pan astratto, diagnostica e harness smoke;
+- prossimo branch previsto: `ai-task/v0.33e-arcgraph-view-coordinates`.
 
 OBIETTIVO:
 
-Attendere `go` operativo per `v0.33d` e implementare il controller pan/zoom discreto.
+Procedere in autonomia verso `v0.33e`, salvo scelta progettuale non deducibile.
 
 La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -109,8 +111,8 @@ Checkpoint v0.33:
 | v0.33a | Audit view/camera legacy e registrazione decisioni zoom/pan/LOD | Completato |
 | v0.33b | Contratto ArcGraph View/Camera | Completato |
 | v0.33c | Config mappa/zoom JSON | Completato |
-| v0.33d | Controller pan/zoom discreto | Prossimo |
-| v0.33e | Coordinate screen/world/cell e clamp viewport | Pending |
+| v0.33d | Controller pan/zoom discreto | Completato |
+| v0.33e | Coordinate screen/world/cell e clamp viewport | Prossimo |
 | v0.33f | Policy LOD per zoom | Pending |
 | v0.33g | Modalita' comparativa ArcGraph/MapGrid | Pending |
 | v0.33h | QA e closeout | Pending |
@@ -190,6 +192,30 @@ ArcGraphViewInputFrame
 ```
 
 per produrre un controller pan/zoom ancora passivo o testabile, prima del bridge reale con camera Unity.
+
+Esito v0.33d:
+
+- aggiunto `ArcGraphViewController`;
+- aggiunto `ArcGraphViewControllerResult`;
+- aggiunto `ArcGraphViewControllerHarness`;
+- zoom applicato prima del pan;
+- pan convertito da pixel a celle;
+- input sopra UI ignorato;
+- harness smoke eseguito fuori Unity;
+- nessuna camera Unity;
+- nessun input Unity diretto;
+- nessun renderer.
+
+Indicazione per `v0.33e`:
+
+Definire conversione coordinate passiva:
+
+```text
+screen pixel
+-> viewport normalized
+-> visible cell rect
+-> cella ArcGraph
+```
 
 ---
 
