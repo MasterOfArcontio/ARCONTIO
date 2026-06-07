@@ -28,34 +28,34 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 CHECKPOINT CORRENTE:
-`v0.30b - Definizione contratti minimi arcgraph`
+`v0.30c - Adapter read-only verso World / MapGrid corrente`
 
 STATUS:
 IN CORSO / BRANCH TASK APERTO / AUDIT-FIRST
 
 RAMO BASE CORRENTE:
-`ai-task/v0.30b-arcgraph-contracts`
+`ai-task/v0.30c-arcgraph-adapter`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- definire i contratti minimi di `arcgraph` senza ancora migrare il rendering;
-- fissare coordinate `x/y/z`, identificatori layer, stato render e dirty state;
-- preparare il vocabolario necessario per layer grafici, dirty cell/chunk e interpolazione visuale multitick;
-- mantenere `arcgraph` come presentazione read-only, non come fonte di verita' simulativa;
-- produrre un piano implementativo attendibile prima di toccare codice runtime.
+- definire un adapter visuale read-only tra stato runtime corrente e contratti `arcgraph`;
+- esporre dati grafici minimi senza mutare `World`, Decision Layer, Job Layer o sistemi simulativi;
+- mantenere il rendering operativo attuale invariato durante lo step;
+- preparare il confine anti-omniscienza grafica necessario ai layer futuri;
+- chiarire quali dati arrivano da MapGrid/World e quali restano ancora fuori dal contratto.
 
 DOC SYNC:
 
-- Taskboard e roadmap riallineate per passaggio da `v0.30a` a `v0.30b`;
-- allineamento esteso `ARCONTIO_docs` raccomandato quando `v0.30a` produrra' un audit stabile;
-- Notion non modificato in questa patch salvo richiesta esplicita dell'operatore.
+- Taskboard e roadmap riallineate per passaggio da `v0.30b` a `v0.30c`;
+- branch `ai-task/v0.30b-arcgraph-contracts` pushato con commit `2495135`;
+- diario Notion aggiornato con chiusura `v0.30b` e apertura `v0.30c`.
 
 OBIETTIVO:
 
-Definire il contratto minimo di `arcgraph` prima di qualsiasi patch strutturale sul rendering. Il checkpoint deve chiarire quali dati visuali esistono, quali coordinate usa il sistema, come vengono marcate celle/chunk sporchi e come il futuro ActorVisual potra' interpolare il movimento multi-tick senza mutare il World.
+Definire il primo confine dati tra runtime corrente e `arcgraph`. Il checkpoint deve produrre un adapter passivo e leggibile, capace di tradurre coordinate, layer e snapshot visuali minimi senza trasformare la grafica in un nuovo gestore simulativo.
 
 ---
 
@@ -141,8 +141,8 @@ Consolidato:
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ✅ COMPLETATO / PUSHATO |
-| v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ⏳ IN CORSO |
-| v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ⏳ PENDING |
+| v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ✅ COMPLETATO / PUSHATO |
+| v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ⏳ IN CORSO |
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ⏳ PENDING |
 | v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ⏳ PENDING |
 | v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ PENDING |
@@ -153,11 +153,12 @@ Consolidato:
 
 Note operative:
 
-- branch task corrente: `ai-task/v0.30b-arcgraph-contracts`;
+- branch task corrente: `ai-task/v0.30c-arcgraph-adapter`;
 - base di integrazione: `ai/codex-main`;
 - branch `ai-task/v0.30-arcgraph-foundation` pushato con commit `d482cdc`;
+- branch `ai-task/v0.30b-arcgraph-contracts` pushato con commit `2495135`;
 - `arcgraph` deve sostituire il rendering provvisorio a regime, non diventare un secondo renderer permanente;
-- il checkpoint corrente e' contrattuale: niente migrazione grafica senza `go` dell'operatore;
+- il checkpoint corrente e' di adattamento read-only: niente migrazione grafica senza `go` dell'operatore;
 - `main` resta il ramo stabile e non deve ricevere lavoro implementativo diretto.
 
 ---
@@ -199,13 +200,13 @@ Note operative:
 
 # 4. Prossimo gate di validazione umana
 
-Prima di procedere oltre `v0.30b` devono essere verificati:
+Prima di procedere operativamente dentro `v0.30c` devono essere verificati:
 
-1. elenco dei contratti minimi da introdurre;
-2. confine tra adapter visuale read-only e `World`;
-3. modello coordinate `x/y/z` compatibile con z = 0 attuale;
-4. modello dirty cell / dirty chunk;
-5. contratto `ActorVisual` sufficiente per futura interpolazione multitick.
+1. sorgenti dati minime da cui l'adapter puo' leggere;
+2. quali dati visuali arrivano da `MapGridData` e quali da `World`;
+3. forma degli snapshot terrain/object/actor iniziali;
+4. confine esplicito: adapter legge e traduce, ma non decide e non muta;
+5. compatibilita' con z = 0 attuale e con il futuro asse `z`.
 
 ---
 
@@ -224,8 +225,8 @@ La priorita' resta:
 
 ```text
 v0.30a audit rendering attuale completato
--> v0.30b contratti minimi arcgraph
--> adapter read-only
+-> v0.30b contratti minimi arcgraph completati
+-> v0.30c adapter read-only
 -> layer grafici minimi
 -> solo dopo assorbimento progressivo del legacy grafico
 ```
@@ -268,7 +269,9 @@ Confermato:
 - `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `df7f211`;
 - branch task `ai-task/v0.30-arcgraph-foundation` aperto da `ai/codex-main`;
 - branch task `ai-task/v0.30-arcgraph-foundation` pushato su origin con commit `d482cdc`;
-- branch task corrente `ai-task/v0.30b-arcgraph-contracts` aperto da `ai-task/v0.30-arcgraph-foundation`;
+- branch task `ai-task/v0.30b-arcgraph-contracts` aperto da `ai-task/v0.30-arcgraph-foundation`;
+- branch task `ai-task/v0.30b-arcgraph-contracts` pushato su origin con commit `2495135`;
+- branch task corrente `ai-task/v0.30c-arcgraph-adapter` aperto da `ai-task/v0.30b-arcgraph-contracts`;
 - `main` locale allineato a `origin/main` sul commit `8ca3af0`;
 - PR #131 integrata su `ai/codex-main`;
 - PR #132 integrata su `main` per il bootstrap analisi/audit;
@@ -278,8 +281,8 @@ Confermato:
 
 Da completare:
 
-- commit e pubblicazione del presente riallineamento Roadmap/Taskboard;
-- definizione contratti `arcgraph`;
+- commit e pubblicazione del riallineamento Roadmap/Taskboard per `v0.30c`;
+- progettazione e implementazione controllata dell'adapter read-only `arcgraph`;
 - piano di assorbimento ed eliminazione legacy grafico;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
