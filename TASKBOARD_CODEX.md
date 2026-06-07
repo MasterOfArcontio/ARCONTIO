@@ -28,21 +28,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.34 - ArcGraph Actor/Object Renderer
 
 CHECKPOINT CORRENTE:
-`attesa apertura operativa v0.34`
+`v0.34a - Audit actor/object renderer passivo`
 
 STATUS:
-ATTESA GO / v0.33 COMPLETATA NEL PERIMETRO SICURO
+IN ESECUZIONE AUTONOMA / v0.34 AVVIATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.33h-arcgraph-closeout`
+`ai-task/v0.34a-arcgraph-actor-object-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- attendere autorizzazione operativa per `v0.34`;
-- preparare actor/object renderer ArcGraph;
+- completare audit `v0.34a`;
+- definire render item passivi actor/object;
+- costruire render queue passive per actor/object;
+- applicare LOD e sorting senza scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
 - non introdurre doppio renderer permanente;
@@ -90,11 +92,13 @@ DOC SYNC:
 - branch `ai-task/v0.33h-arcgraph-closeout` aperto;
 - QA finale `v0.33h` superata sul perimetro documentale/runtime: diff scope, chiamate vietate e assenza modifiche a Core/MapGrid/scena/meta;
 - closeout `v0.33h` completato: Definition of Done, debiti residui e preparazione `v0.34`;
-- prossimo macro checkpoint previsto: `v0.34 - ArcGraph Actor/Object Renderer`.
+- prossimo macro checkpoint previsto: `v0.34 - ArcGraph Actor/Object Renderer`;
+- apertura operativa `v0.34` autorizzata dall'operatore;
+- branch `ai-task/v0.34a-arcgraph-actor-object-audit` aperto.
 
 OBIETTIVO:
 
-Attendere il `go` operativo per iniziare `v0.34`.
+Procedere in autonomia dentro il perimetro passivo della `v0.34`.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -125,6 +129,60 @@ Checkpoint v0.33:
 | v0.33f | Policy LOD per zoom | Completato |
 | v0.33g | Modalita' comparativa ArcGraph/MapGrid | Completato nel perimetro gate/diagnostica |
 | v0.33h | QA e closeout | Completato |
+
+Decisioni operative v0.34:
+
+- il renderer actor/object resta passivo;
+- input ammessi: `ArcGraphActorLayer`, `ArcGraphObjectLayer`, `ArcGraphZoomLodProfile`, vista/celle visibili;
+- output ammesso: render item o render queue value-only;
+- output vietato: `GameObject`, `SpriteRenderer`, asset load, `Camera.main`, `Mouse.current`, mutazioni world;
+- MapGrid resta renderer produttivo;
+- vestizione actor a layer non viene implementata in questa versione;
+- movimento multi-tick reale resta in `v0.35`.
+
+Checkpoint v0.34:
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.34a | Audit actor/object layer, snapshot, adapter e LOD | In corso |
+| v0.34b | Contratti render item passivi actor/object | Pending |
+| v0.34c | Builder object render queue | Pending |
+| v0.34d | Builder actor render queue | Pending |
+| v0.34e | Sorting e filtri LOD per zoom | Pending |
+| v0.34f | Harness smoke actor/object senza scena | Pending |
+| v0.34g | QA, closeout e preparazione v0.35 | Pending |
+
+Esito v0.34a:
+
+- `ArcGraphActorLayer` e `ArcGraphObjectLayer` esistono gia' come cache snapshot passive;
+- `ArcGraphActorVisualSnapshot` contiene gia' posa e motion snapshot opzionale;
+- `ArcGraphObjectVisualSnapshot` contiene gia' id, defId, cella, sprite key, held state e stock food;
+- `ArcGraphWorldAdapter` produce snapshot read-only senza mutare il mondo;
+- `ArcGraphZoomLodPolicy` e' gia' disponibile per distinguere zoom 1/2/3/4;
+- manca ancora il contratto `RenderItem` passivo;
+- manca ancora una render queue ordinata;
+- manca ancora una diagnostica minima della queue;
+- manca una lettura sequenziale read-only dei layer.
+
+Indicazione per `v0.34b`:
+
+Definire contratti value-only per actor/object render item.
+
+La queue dovra' poter ricevere snapshot dai layer senza esporre dizionari interni e senza leggere `World`.
+
+Forma preferita:
+
+```text
+ArcGraphActorLayer.CopySnapshotsTo(...)
+ArcGraphObjectLayer.CopySnapshotsTo(...)
+snapshot
+-> render item
+-> queue ordinata
+```
+
+Nota:
+
+La classificazione degli oggetti minori non e' ancora disponibile negli snapshot. In `v0.34` non bisogna inventarla.
 
 Esito audit v0.33a:
 

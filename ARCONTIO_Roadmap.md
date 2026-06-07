@@ -3803,7 +3803,7 @@ Per coerenza con `v0.31`-`v0.33`, la prima parte della `v0.34` dovrebbe restare 
 #### v0.34 - ArcGraph Actor/Object Renderer
 
 ## Stato
-PENDING
+IN CORSO / AUDIT-FIRST
 
 ## Obiettivo
 
@@ -3817,6 +3817,169 @@ Il renderer dovra':
 - mantenere sorting semplice e leggibile;
 - non introdurre ancora vestizione modulare completa;
 - non spostare la posizione simulativa degli NPC.
+
+## Checkpoint v0.34
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.34a | Audit actor/object layer, snapshot, adapter e policy LOD | In corso |
+| v0.34b | Contratti render item passivi per actor/object | Pending |
+| v0.34c | Builder object render queue | Pending |
+| v0.34d | Builder actor render queue | Pending |
+| v0.34e | Sorting e filtri LOD per zoom | Pending |
+| v0.34f | Harness smoke actor/object senza scena | Pending |
+| v0.34g | QA, closeout e preparazione v0.35 | Pending |
+
+## Vincolo v0.34
+
+La `v0.34` resta nel perimetro passivo.
+
+Non deve ancora:
+
+- creare `GameObject`;
+- creare `SpriteRenderer`;
+- caricare sprite, atlas o materiali;
+- modificare scene Unity;
+- sostituire MapGrid;
+- introdurre doppio renderer permanente;
+- implementare vestizione NPC a layer;
+- collegare il movimento multi-tick reale.
+
+Formula operativa:
+
+```text
+ArcGraphActorLayer / ArcGraphObjectLayer
+-> snapshot visuali
+-> render item passivi
+-> render queue ordinata
+-> futuro wrapper Unity
+```
+
+## Esito v0.34a - Audit actor/object renderer passivo
+
+Audit eseguito sui contratti ArcGraph gia' presenti.
+
+File principali ispezionati:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphActorLayer.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphActorVisualSnapshot.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphObjectLayer.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphObjectVisualSnapshot.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphWorldAdapter.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodModes.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodProfile.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodPolicy.cs
+```
+
+### Stato esistente
+
+`ArcGraphObjectVisualSnapshot` contiene gia':
+
+- id oggetto runtime;
+- `DefId`;
+- cella discreta;
+- `SpriteKey`;
+- stato trasportato;
+- eventuale holder actor;
+- eventuale stock food.
+
+`ArcGraphActorVisualSnapshot` contiene gia':
+
+- id actor;
+- cella discreta;
+- sprite base provvisorio;
+- motion snapshot opzionale;
+- metodo `ResolvePose()` per ottenere posa visuale frazionaria.
+
+`ArcGraphObjectLayer` e `ArcGraphActorLayer`:
+
+- conservano snapshot in dizionari interni;
+- sostituiscono snapshot in modo conservativo;
+- marcano celle/chunk dirty;
+- espongono lettura puntuale per id;
+- non leggono `World`;
+- non caricano sprite;
+- non creano oggetti Unity.
+
+`ArcGraphWorldAdapter`:
+
+- produce snapshot terrain/object/actor;
+- legge `World` solo come sorgente oggettiva per la view;
+- non muta simulazione;
+- non risolve asset;
+- per gli actor usa ancora motion inattivo, perche' il bridge movimento reale appartiene a `v0.35`.
+
+`ArcGraphZoomLodPolicy`:
+
+- distingue quattro livelli zoom;
+- disabilita animazioni e layered actor a zoom 1/2;
+- abilita sprite completi a zoom 3;
+- abilita actor layered solo a zoom 4, se consentito dal profilo.
+
+### Mancanze rilevate
+
+Per costruire un actor/object renderer passivo mancano:
+
+- contratti `RenderItem` value-only per actor e oggetti;
+- una render queue ordinata;
+- una diagnostica minima della queue;
+- una policy di sorting stabile;
+- filtri LOD applicati in modo centralizzato;
+- un modo read-only per enumerare gli snapshot contenuti nei layer.
+
+### Punto delicato: enumerazione dei layer
+
+I layer attuali espongono `TryGetActor` e `TryGetObject`, ma non espongono ancora tutti gli snapshot.
+
+Una render queue non deve interrogare il `World`, quindi non puo' ricostruire la lista degli id da fuori.
+
+Soluzione consigliata:
+
+```text
+ArcGraphActorLayer.CopySnapshotsTo(...)
+ArcGraphObjectLayer.CopySnapshotsTo(...)
+```
+
+Questa forma e' preferibile a esporre direttamente il dizionario interno.
+
+Motivo:
+
+- mantiene la cache privata;
+- produce copie value-only;
+- permette al builder di ordinare fuori dal layer;
+- non introduce authority simulativa;
+- non apre accesso mutabile allo stato interno.
+
+### Punto delicato: oggetti minori
+
+La policy LOD prevede `HideMinorObjects`, ma lo snapshot oggetto attuale non contiene ancora un campo affidabile per distinguere oggetto minore da oggetto importante.
+
+In `v0.34` non conviene inventare una classificazione.
+
+Scelta consigliata:
+
+- non nascondere oggetti solo per supposizione;
+- propagare nel render item il fatto che il profilo LOD richiede rappresentazione semplificata;
+- rinviare la vera classificazione `minor/important` a quando esistera' un dato esplicito nel catalogo oggetti o nello snapshot.
+
+### Prossimo passo v0.34b
+
+Definire i contratti passivi:
+
+- `ArcGraphRenderItemKind`;
+- `ArcGraphActorRenderItem`;
+- `ArcGraphObjectRenderItem`;
+- `ArcGraphRenderQueueDiagnostics`;
+- eventuale helper di sorting/priority value-only.
+
+Questi contratti non dovranno:
+
+- creare sprite;
+- leggere asset;
+- leggere camera;
+- leggere input;
+- modificare layer o world.
 
 ---
 
