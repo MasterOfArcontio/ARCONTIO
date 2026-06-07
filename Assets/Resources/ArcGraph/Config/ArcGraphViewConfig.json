@@ -1,0 +1,45 @@
+{
+  "mapWidthCells": 250,
+  "mapHeightCells": 250,
+  "defaultZoomLevel": 1,
+  "mouseWheelStepsPerZoomLevel": 1,
+  "panUsesMiddleMouseButton": true,
+  "zoomLevels": [
+    {
+      "level": 1,
+      "visibleCellsX": 300,
+      "visibleCellsY": 300,
+      "allowsPan": false,
+      "allowsSpriteAnimation": false,
+      "allowsLayeredActorSprites": false,
+      "usesSimplifiedRepresentation": true
+    },
+    {
+      "level": 2,
+      "visibleCellsX": 150,
+      "visibleCellsY": 150,
+      "allowsPan": true,
+      "allowsSpriteAnimation": false,
+      "allowsLayeredActorSprites": false,
+      "usesSimplifiedRepresentation": true
+    },
+    {
+      "level": 3,
+      "visibleCellsX": 75,
+      "visibleCellsY": 75,
+      "allowsPan": true,
+      "allowsSpriteAnimation": true,
+      "allowsLayeredActorSprites": false,
+      "usesSimplifiedRepresentation": false
+    },
+    {
+      "level": 4,
+      "visibleCellsX": 20,
+      "visibleCellsY": 20,
+      "allowsPan": true,
+      "allowsSpriteAnimation": true,
+      "allowsLayeredActorSprites": true,
+      "usesSimplifiedRepresentation": false
+    }
+  ]
+}

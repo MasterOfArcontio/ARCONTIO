@@ -2937,7 +2937,7 @@ La modalita' comparativa dovra':
 |---|---|---|
 | v0.33a | Audit view/camera legacy e registrazione decisioni zoom, pan, LOD visuale | Completato |
 | v0.33b | Contratto ArcGraph View/Camera: config, stato vista, input ammessi, output vietati | Completato |
-| v0.33c | Configurazione mappa e zoom: dimensione 250x250, livelli zoom JSON, celle visibili | Pending |
+| v0.33c | Configurazione mappa e zoom: dimensione 250x250, livelli zoom JSON, celle visibili | Completato |
 | v0.33d | Controller pan/zoom discreto: rotellina per zoom, rotellina premuta per pan | Pending |
 | v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Pending |
 | v0.33f | Policy LOD per zoom: icone, sprite statici, aggregazioni, animazioni disabilitate ai livelli 1/2 | Pending |
@@ -3242,6 +3242,110 @@ La patch dovra' evitare:
 - modifiche a Core;
 - modifica `.meta`;
 - aggancio renderer automatico.
+
+## Esito v0.33c - Config mappa/zoom JSON
+
+Implementata la configurazione serializzabile per la view ArcGraph.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphMapViewConfigJson.cs
+Assets/Resources/ArcGraph/Config/ArcGraphViewConfig.json
+```
+
+### Strategia
+
+Il caricamento e' separato in due fasi:
+
+```text
+TextAsset o stringa JSON ricevuta da un wrapper futuro
+-> ArcGraphMapViewConfigJson.ParseOrDefault(json)
+-> ArcGraphMapViewConfig
+-> ArcGraphViewState.CreateDefault(config)
+```
+
+`v0.33c` non introduce ancora un loader con `Resources.Load`.
+
+Motivo:
+
+- ArcGraph deve restare passivo;
+- il wrapper Unity futuro decidera' quando caricare il `TextAsset`;
+- il contratto e' testabile passando direttamente una stringa JSON;
+- il parser non dipende da scena, camera o input.
+
+### JSON default
+
+Il file default contiene:
+
+- mappa `250x250`;
+- zoom iniziale livello `1`;
+- uno scatto rotellina per livello zoom;
+- pan con rotellina premuta;
+- zoom 1: `300x300`, no pan, no animazioni, no layer actor, rappresentazione semplificata;
+- zoom 2: `150x150`, pan, no animazioni, no layer actor, rappresentazione semplificata;
+- zoom 3: `75x75`, pan, animazioni ammesse, no layer actor;
+- zoom 4: `20x20`, pan, animazioni ammesse, layer actor ammessi.
+
+### DTO e conversione
+
+`ArcGraphMapViewConfigJson.cs` contiene:
+
+- `ArcGraphMapViewConfigJson`;
+- `ArcGraphMapViewConfigDto`;
+- `ArcGraphZoomLevelConfigDto`.
+
+Il DTO:
+
+- e' compatibile con `JsonUtility`;
+- usa campi pubblici serializzabili;
+- normalizza campi numerici assenti o invalidi;
+- usa il profilo `CreateDefaultV033()` come fallback;
+- converte in `ArcGraphMapViewConfig`;
+- puo' creare anche `ArcGraphViewState` iniziale.
+
+### Garanzie architetturali
+
+La patch:
+
+- non modifica `MapGridConfig`;
+- non modifica `MapGridConfig.json`;
+- non modifica `Core`;
+- non modifica scene;
+- non crea `.meta`;
+- non crea camera controller;
+- non crea `GameObject`;
+- non crea renderer;
+- non legge `Mouse.current`;
+- non legge `Camera.main`;
+- non chiama `ScreenToWorldPoint`.
+
+### Nota QA
+
+La compilazione isolata ArcGraph richiede ora anche:
+
+```text
+UnityEngine.JSONSerializeModule.dll
+```
+
+perche' il parser usa `JsonUtility`.
+
+### Preparazione v0.33d
+
+`v0.33d` potra' implementare il controller pan/zoom discreto usando:
+
+```text
+ArcGraphMapViewConfig
+ArcGraphViewState
+ArcGraphViewInputFrame
+```
+
+Il controller dovra' ancora evitare:
+
+- aggancio produttivo alla scena;
+- sostituzione MapGrid;
+- letture globali;
+- mutazioni simulazione.
 
 ---
 

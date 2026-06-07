@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
 
 CHECKPOINT CORRENTE:
-`v0.33c - Config mappa/zoom JSON`
+`v0.33d - Controller pan/zoom discreto`
 
 STATUS:
-ATTESA GO / v0.33b COMPLETATA
+ATTESA GO / v0.33c COMPLETATA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.33c-arcgraph-view-json-config`
@@ -41,9 +41,9 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- portare dimensione mappa e livelli zoom dentro una configurazione serializzabile;
-- preparare il passaggio da JSON config mappa a `ArcGraphMapViewConfig`;
-- non accendere ancora camera controller comparativo;
+- implementare il primo controller pan/zoom discreto usando i contratti v0.33b/c;
+- usare input gia' astratto da `ArcGraphViewInputFrame`;
+- non agganciare ancora il controller a una camera produttiva;
 - mantenere MapGrid come renderer produttivo;
 - usare ArcGraph terrain solo come output debug/test;
 - evitare doppio renderer permanente;
@@ -77,11 +77,13 @@ DOC SYNC:
 - audit `v0.33a` completato: camera legacy, input mouse, zoom/pan, conversione coordinate, confine ArcGraph View/Camera;
 - branch `ai-task/v0.33b-arcgraph-view-contract` aperto;
 - contratto `v0.33b` implementato: config view, zoom discreto, input frame astratto, stato vista e rettangolo celle visibili;
-- branch `ai-task/v0.33c-arcgraph-view-json-config` aperto e in attesa di `go` operativo.
+- branch `ai-task/v0.33c-arcgraph-view-json-config` aperto;
+- configurazione `v0.33c` implementata: DTO JSON, parser da stringa e JSON default ArcGraph;
+- prossimo branch previsto: `ai-task/v0.33d-arcgraph-pan-zoom-controller`.
 
 OBIETTIVO:
 
-Attendere `go` operativo per `v0.33c` e definire la configurazione JSON mappa/zoom.
+Attendere `go` operativo per `v0.33d` e implementare il controller pan/zoom discreto.
 
 La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -106,8 +108,8 @@ Checkpoint v0.33:
 |---|---|---|
 | v0.33a | Audit view/camera legacy e registrazione decisioni zoom/pan/LOD | Completato |
 | v0.33b | Contratto ArcGraph View/Camera | Completato |
-| v0.33c | Config mappa/zoom JSON | Prossimo |
-| v0.33d | Controller pan/zoom discreto | Pending |
+| v0.33c | Config mappa/zoom JSON | Completato |
+| v0.33d | Controller pan/zoom discreto | Prossimo |
 | v0.33e | Coordinate screen/world/cell e clamp viewport | Pending |
 | v0.33f | Policy LOD per zoom | Pending |
 | v0.33g | Modalita' comparativa ArcGraph/MapGrid | Pending |
@@ -164,6 +166,30 @@ JSON config mappa
 -> ArcGraphMapViewConfig
 -> ArcGraphViewState iniziale
 ```
+
+Esito v0.33c:
+
+- aggiunto `ArcGraphMapViewConfigJson`;
+- aggiunto `ArcGraphMapViewConfigDto`;
+- aggiunto `ArcGraphZoomLevelConfigDto`;
+- aggiunto `Assets/Resources/ArcGraph/Config/ArcGraphViewConfig.json`;
+- nessun `Resources.Load` dentro ArcGraph;
+- parsing da stringa JSON tramite `JsonUtility`;
+- fallback a `ArcGraphMapViewConfig.CreateDefaultV033()`;
+- nessun aggancio scena;
+- nessuna modifica a MapGrid/Core.
+
+Indicazione per `v0.33d`:
+
+Usare:
+
+```text
+ArcGraphMapViewConfig
+ArcGraphViewState
+ArcGraphViewInputFrame
+```
+
+per produrre un controller pan/zoom ancora passivo o testabile, prima del bridge reale con camera Unity.
 
 ---
 
