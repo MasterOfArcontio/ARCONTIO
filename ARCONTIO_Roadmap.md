@@ -1217,7 +1217,7 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 #### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 ## Stato
-IN CORSO / NEXT: v0.30d
+IN CORSO / NEXT: v0.30e
 
 ## Scopo
 
@@ -1258,7 +1258,7 @@ La fase `v0.30` NON deve implementare:
 | v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ✅ |
 | v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ✅ |
 | v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ✅ |
-| v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ⏳ |
+| v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ✅ |
 | v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ⏳ |
 | v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ |
 | v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ |
@@ -1273,7 +1273,7 @@ La fase `v0.30` NON deve implementare:
 | Rendering attuale auditato e mappato | ⏳ |
 | Responsabilita' di `arcgraph` definite | ✅ Parziale: contratti minimi introdotti |
 | Separazione simulazione/rendering formalizzata | ✅ Parziale: contratti read-only predisposti |
-| Layer grafici minimi progettati | ⏳ |
+| Layer grafici minimi progettati | ✅ Parziale: stack e layer passivi introdotti |
 | Dirty cell / dirty chunk introdotti almeno come contratto | ✅ |
 | Coordinate x/y/z previste anche se il runtime usa solo z = 0 | ✅ |
 | Movimento visuale multitick previsto come interpolazione grafica, non mutazione simulativa | ✅ Parziale: snapshot visuale predisposto |
@@ -1289,6 +1289,8 @@ La fase `v0.30` NON deve implementare:
 > **Nota tecnica v0.30b:** il checkpoint ha introdotto i contratti minimi di `arcgraph` in forma passiva: coordinate cella/chunk con asse `z`, identificatori layer, stato render, dirty state, interfaccia layer e snapshot visuale actor con movimento multi-tick. Nessun renderer esistente e nessun sistema simulativo sono stati modificati.
 
 > **Nota tecnica v0.30c:** il checkpoint ha introdotto l'adapter read-only `ArcGraphWorldAdapter`, con snapshot terreno, oggetto e actor. L'adapter legge `MapGridData` e `World`, produce copie value-type/listabili e non modifica il renderer legacy, il World, il Decision Layer o il Job Layer.
+
+> **Nota tecnica v0.30d:** il checkpoint ha introdotto lo stack layer `ArcGraphLayerStack` e i layer minimi `Terrain`, `Object`, `Actor` e `Debug`. I layer consumano snapshot, marcano dirty in modo conservativo e non leggono direttamente `World`, `MapGridData`, sprite o GameObject.
 
 ---
 
