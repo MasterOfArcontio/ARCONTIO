@@ -2320,8 +2320,8 @@ Il renderer dovra':
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.32a | Audit terrain legacy: `MapGridChunkRenderer`, atlas, mesh, UV, varianti floor, muro/wall-top | Completato |
-| v0.32b | Contratto terrain renderer ArcGraph: input, output, vietati, diagnostica | Prossimo |
-| v0.32c | Strategia atlas/materiali: UV map ArcGraph senza asset load e senza dipendenza permanente MapGrid | Pending |
+| v0.32b | Contratto terrain renderer ArcGraph: input, output, vietati, diagnostica | Completato |
+| v0.32c | Strategia atlas/materiali: UV map ArcGraph senza asset load e senza dipendenza permanente MapGrid | Prossimo |
 | v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Pending |
 | v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Pending |
 | v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Pending |
@@ -2417,6 +2417,104 @@ MapGridData
 -> ArcGraphTerrainLayer
 -> ArcGraphTerrainChunkMeshBuilder
 -> mesh data terrain
+```
+
+## Esito v0.32b - Contratto terrain renderer ArcGraph
+
+Il terrain renderer ArcGraph deve essere costruito come renderer controllato a chunk.
+
+Formula:
+
+```text
+ArcGraphTerrainLayer
++ ArcGraphRenderState
++ ArcGraphTerrainVisualPolicy
++ ArcGraphTerrainTileUvMap
+-> ArcGraphTerrainChunkMeshBuilder
+-> ArcGraphTerrainChunkMeshData
+```
+
+### Input ammessi
+
+Il terrain renderer puo' leggere:
+
+- `ArcGraphTerrainLayer`;
+- `ArcGraphTerrainCellSnapshot`;
+- `ArcGraphRenderState`;
+- `ArcGraphDirtyState`;
+- una mappa UV ArcGraph ricevuta dal chiamante;
+- una policy visuale terrain ricevuta dal chiamante;
+- coordinate chunk esplicite.
+
+Non deve leggere:
+
+- `MapGridData` direttamente;
+- `World`;
+- `SimulationHost.Instance`;
+- `MapGridWorldView`;
+- `MapGridBootstrap` tramite ricerca scena.
+
+### Output ammessi
+
+Il renderer/builder puo' produrre:
+
+- array vertici;
+- array UV;
+- array triangoli;
+- conteggio celle disegnate;
+- diagnostica chunk;
+- eventuale helper per applicare quei dati a una `Mesh` fornita dal chiamante.
+
+In `v0.32` l'output principale deve restare dati mesh controllati, non un aggancio automatico alla scena.
+
+### Responsabilita' vietate
+
+Il terrain renderer non deve:
+
+- creare `GameObject` automaticamente;
+- aggiungere `MeshRenderer` o `MeshFilter` automaticamente;
+- caricare texture o materiali con `Resources.Load`;
+- mutare `World`;
+- mutare `MapGridData`;
+- sostituire `MapGridChunkRenderer`;
+- disattivare MapGrid;
+- decidere pathfinding, fertilita', movimento o collisioni;
+- introdurre actor/object rendering.
+
+### Compatibilita' visiva iniziale
+
+La policy default deve poter replicare il legacy:
+
+```text
+blocked -> wall / wallTop
+floor -> floorBase + variante deterministica hash(x,y)
+```
+
+Il `TileId` dello snapshot resta comunque disponibile. In futuro si potra' decidere se disegnare letteralmente il `TileId` o usare policy per categoria. In `v0.32` la compatibilita' con MapGrid e' prioritaria.
+
+### Diagnostica minima
+
+La costruzione chunk deve esporre:
+
+```text
+ChunkCoord
+CellCount
+VertexCount
+TriangleIndexCount
+UsedFallbackUv
+IsEmpty
+Reason
+```
+
+### Regola anti-doppio-renderer
+
+In `v0.32` la regola resta:
+
+```text
+si puo' costruire mesh data ArcGraph;
+non si puo' agganciare automaticamente il renderer alla scena;
+non si puo' sostituire MapGrid;
+la comparazione visuale appartiene a v0.33.
 ```
 
 ---
