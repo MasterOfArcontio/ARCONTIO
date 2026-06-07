@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.32 - ArcGraph Terrain Renderer
 
 CHECKPOINT CORRENTE:
-`v0.32e - Dirty chunk rebuild terrain ArcGraph`
+`v0.32f - Harness terrain ArcGraph controllato`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / CHUNK BUILDER v0.32d IMPLEMENTATO
+IN ESECUZIONE AUTONOMA / DIRTY REBUILD v0.32e IMPLEMENTATO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.32e-arcgraph-terrain-dirty-rebuild`
+`ai-task/v0.32f-arcgraph-terrain-harness`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -65,11 +65,12 @@ DOC SYNC:
 - contratto `v0.32b` definito: terrain builder a chunk, output mesh data, niente aggancio scena automatico;
 - UV map terrain `v0.32c` implementata senza asset load e senza dipendenza codice da `MapGridTileAtlas`;
 - chunk mesh builder `v0.32d` implementato come produttore passivo di mesh data;
-- prossimo ramo operativo previsto: `ai-task/v0.32e-arcgraph-terrain-dirty-rebuild`.
+- dirty chunk rebuild `v0.32e` implementato su `ArcGraphRenderState.Dirty.DirtyChunks`;
+- prossimo ramo operativo previsto: `ai-task/v0.32f-arcgraph-terrain-harness`.
 
 OBIETTIVO:
 
-Collegare il terrain builder al dirty state ArcGraph, in modo da costruire solo i chunk sporchi o richiesti esplicitamente.
+Creare un harness/test controllato per verificare la costruzione mesh terrain da snapshot senza scena produttiva, senza GameObject e senza sostituzione MapGrid.
 
 ---
 

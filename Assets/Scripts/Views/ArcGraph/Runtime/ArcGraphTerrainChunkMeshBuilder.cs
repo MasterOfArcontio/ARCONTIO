@@ -31,6 +31,56 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphTerrainChunkMeshBuilder
     {
         // =============================================================================
+        // BuildDirtyChunks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce mesh data terrain per tutti i chunk sporchi del render state.
+        /// </para>
+        ///
+        /// <para><b>Rebuild localizzato</b></para>
+        /// <para>
+        /// Il metodo legge solo <c>ArcGraphRenderState.Dirty.DirtyChunks</c> e
+        /// ricostruisce quei chunk in ordine deterministico. Non pulisce il dirty
+        /// state: il cleanup resta una decisione esplicita del chiamante, cosi' un
+        /// futuro renderer o layer diagnostico non perde accidentalmente il lavoro
+        /// ancora da consumare.
+        /// </para>
+        /// </summary>
+        public List<ArcGraphTerrainChunkMeshData> BuildDirtyChunks(
+            ArcGraphTerrainLayer terrainLayer,
+            ArcGraphTerrainTileUvMap uvMap,
+            ArcGraphRenderState renderState,
+            ArcGraphTerrainVisualPolicy visualPolicy,
+            bool onlyVisibleZLevel = true)
+        {
+            var results = new List<ArcGraphTerrainChunkMeshData>();
+
+            if (renderState == null)
+                return results;
+
+            var chunks = new List<ArcGraphChunkCoord>(renderState.Dirty.DirtyChunks);
+            chunks.Sort(CompareChunks);
+
+            for (int i = 0; i < chunks.Count; i++)
+            {
+                ArcGraphChunkCoord chunk = chunks[i];
+                if (onlyVisibleZLevel && !renderState.IsChunkOnVisibleZLevel(chunk))
+                    continue;
+
+                results.Add(BuildChunk(
+                    terrainLayer,
+                    uvMap,
+                    chunk,
+                    renderState.ChunkSizeCells,
+                    renderState.TileSizeWorld,
+                    visualPolicy));
+            }
+
+            return results;
+        }
+
+        // =============================================================================
         // BuildChunk
         // =============================================================================
         /// <summary>
@@ -193,6 +243,19 @@ namespace Arcontio.View.ArcGraph
                 h ^= (h << 5);
                 return h;
             }
+        }
+
+        private static int CompareChunks(ArcGraphChunkCoord left, ArcGraphChunkCoord right)
+        {
+            int z = left.Z.CompareTo(right.Z);
+            if (z != 0)
+                return z;
+
+            int y = left.Y.CompareTo(right.Y);
+            if (y != 0)
+                return y;
+
+            return left.X.CompareTo(right.X);
         }
     }
 }

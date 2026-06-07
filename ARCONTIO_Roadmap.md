@@ -2323,8 +2323,8 @@ Il renderer dovra':
 | v0.32b | Contratto terrain renderer ArcGraph: input, output, vietati, diagnostica | Completato |
 | v0.32c | Strategia atlas/materiali: UV map ArcGraph senza asset load e senza dipendenza permanente MapGrid | Completato |
 | v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Completato |
-| v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Prossimo |
-| v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Pending |
+| v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Completato |
+| v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Prossimo |
 | v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Pending |
 | v0.32h | Closeout v0.32 e preparazione v0.33 modalita' comparativa controllata | Pending |
 
@@ -2660,6 +2660,51 @@ nessun MonoBehaviour
 nessun AddComponent/GetComponent
 nessun FindObjectOfType
 nessun SimulationHost.Instance
+```
+
+## Esito v0.32e - Dirty chunk rebuild
+
+Collegato il builder terrain al dirty state ArcGraph.
+
+Modifica:
+
+```text
+ArcGraphTerrainChunkMeshBuilder.BuildDirtyChunks(...)
+```
+
+### Funzionamento
+
+`BuildDirtyChunks`:
+
+- legge `ArcGraphRenderState.Dirty.DirtyChunks`;
+- copia i chunk sporchi in una lista locale;
+- ordina i chunk in modo deterministico per `Z`, poi `Y`, poi `X`;
+- opzionalmente filtra i chunk fuori dal livello visibile;
+- chiama `BuildChunk` per ogni chunk sporco;
+- restituisce una lista di `ArcGraphTerrainChunkMeshData`.
+
+### Scelta importante
+
+Il metodo non chiama:
+
+```text
+renderState.ClearDirty()
+```
+
+Il cleanup del dirty resta responsabilita' del chiamante. Questo evita che il terrain builder consumi accidentalmente dirty state prima di altri layer, overlay o renderer futuri.
+
+### QA preliminare
+
+Compilazione isolata ArcGraph riuscita.
+
+Controllo chiamate vietate:
+
+```text
+nessun ClearDirty automatico
+nessun new GameObject(...)
+nessun Resources.Load(...)
+nessun MonoBehaviour
+nessun accesso globale
 ```
 
 ---
