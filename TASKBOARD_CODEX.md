@@ -28,22 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
 
 CHECKPOINT CORRENTE:
-`v0.33f - Policy LOD per zoom`
+`v0.33g - Modalita comparativa ArcGraph/MapGrid`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / v0.33e COMPLETATA
+IN ESECUZIONE AUTONOMA / v0.33f COMPLETATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.33e-arcgraph-view-coordinates`
+`ai-task/v0.33f-arcgraph-zoom-lod-policy`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- implementare policy LOD leggibile dai renderer futuri;
-- rendere espliciti animazioni, sprite layered e rappresentazione semplificata per zoom;
-- non modificare ancora renderer actor/object produttivi;
+- valutare modalita comparativa ArcGraph/MapGrid;
+- implementare solo contratti/diagnostica sicuri se l'aggancio scena richiede scelta progettuale;
+- evitare doppio renderer permanente;
 - mantenere MapGrid come renderer produttivo;
 - usare ArcGraph terrain solo come output debug/test;
 - evitare doppio renderer permanente;
@@ -83,11 +83,13 @@ DOC SYNC:
 - controller `v0.33d` implementato: zoom discreto, pan astratto, diagnostica e harness smoke;
 - branch `ai-task/v0.33e-arcgraph-view-coordinates` aperto;
 - coordinate `v0.33e` implementate: mapper viewport/cella, risultato diagnostico e harness smoke;
-- prossimo branch previsto: `ai-task/v0.33f-arcgraph-zoom-lod-policy`.
+- branch `ai-task/v0.33f-arcgraph-zoom-lod-policy` aperto;
+- policy LOD `v0.33f` implementata: profili actor/vegetation/object/effect per i quattro zoom;
+- prossimo branch previsto: `ai-task/v0.33g-arcgraph-comparison-mode`.
 
 OBIETTIVO:
 
-Procedere in autonomia verso `v0.33f`, salvo scelta progettuale non deducibile.
+Procedere in autonomia verso `v0.33g`, fermandosi se l'aggancio scena/materiali/camera richiede scelta progettuale non deducibile.
 
 La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -115,8 +117,8 @@ Checkpoint v0.33:
 | v0.33c | Config mappa/zoom JSON | Completato |
 | v0.33d | Controller pan/zoom discreto | Completato |
 | v0.33e | Coordinate screen/world/cell e clamp viewport | Completato |
-| v0.33f | Policy LOD per zoom | Prossimo |
-| v0.33g | Modalita' comparativa ArcGraph/MapGrid | Pending |
+| v0.33f | Policy LOD per zoom | Completato |
+| v0.33g | Modalita' comparativa ArcGraph/MapGrid | Prossimo |
 | v0.33h | QA e closeout | Pending |
 
 Esito audit v0.33a:
@@ -240,6 +242,30 @@ zoom level
 -> sprite layered abilitati/disabilitati
 -> rappresentazione semplificata
 -> layer minori visibili/nascosti
+```
+
+Esito v0.33f:
+
+- aggiunto `ArcGraphZoomLodModes`;
+- aggiunto `ArcGraphZoomLodProfile`;
+- aggiunto `ArcGraphZoomLodPolicy`;
+- aggiunto `ArcGraphZoomLodPolicyHarness`;
+- zoom 1: marker strategici, aree aggregate, niente animazioni;
+- zoom 2: sprite statici semplificati, niente animazioni;
+- zoom 3: sprite completi flat, animazioni ammesse;
+- zoom 4: actor layered e dettagli locali;
+- harness smoke eseguito fuori Unity;
+- nessun renderer modificato.
+
+Indicazione per `v0.33g`:
+
+Implementare solo il perimetro sicuro della modalita comparativa:
+
+```text
+contratto debug/test
+diagnostica comparativa
+nessun doppio renderer permanente
+nessun aggancio produttivo automatico
 ```
 
 ---

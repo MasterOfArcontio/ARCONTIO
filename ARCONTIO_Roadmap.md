@@ -2940,7 +2940,7 @@ La modalita' comparativa dovra':
 | v0.33c | Configurazione mappa e zoom: dimensione 250x250, livelli zoom JSON, celle visibili | Completato |
 | v0.33d | Controller pan/zoom discreto: rotellina per zoom, rotellina premuta per pan | Completato |
 | v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Completato |
-| v0.33f | Policy LOD per zoom: icone, sprite statici, aggregazioni, animazioni disabilitate ai livelli 1/2 | Pending |
+| v0.33f | Policy LOD per zoom: icone, sprite statici, aggregazioni, animazioni disabilitate ai livelli 1/2 | Completato |
 | v0.33g | Modalita' comparativa terrain ArcGraph/MapGrid: aggancio debug/test senza doppio renderer permanente | Pending |
 | v0.33h | QA, diff scope, closeout e preparazione v0.34 | Pending |
 
@@ -3503,6 +3503,105 @@ zoom level
 -> rappresentazione semplificata on/off
 -> visibilita' layer minori
 ```
+
+## Esito v0.33f - Policy LOD per zoom
+
+Implementata la policy LOD visuale per i livelli zoom ArcGraph.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodModes.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodProfile.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodPolicy.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodPolicyHarness.cs
+```
+
+### Funzionamento
+
+`ArcGraphZoomLodPolicy` traduce un livello zoom in un profilo leggibile:
+
+```text
+zoom level
+-> actor mode
+-> vegetation mode
+-> object mode
+-> effect mode
+-> animazioni on/off
+-> actor layered on/off
+-> rappresentazione semplificata on/off
+-> item minori visibili/nascosti
+```
+
+### Profili default
+
+Zoom 1:
+
+- actor come marker strategico;
+- vegetazione aggregata per area;
+- oggetti minori nascosti;
+- effetti come segnali statici;
+- niente animazioni;
+- niente actor layered;
+- rappresentazione semplificata.
+
+Zoom 2:
+
+- actor come sprite statico semplificato;
+- vegetazione semplificata;
+- solo oggetti importanti semplificati;
+- effetti statici semplificati;
+- niente animazioni;
+- niente actor layered;
+- rappresentazione semplificata.
+
+Zoom 3:
+
+- actor come sprite completo flat;
+- animazioni ammesse;
+- niente actor layered;
+- oggetti statici visibili;
+- item minori visibili.
+
+Zoom 4:
+
+- actor layered ammessi;
+- animazioni ammesse;
+- vegetazione animata individuale;
+- oggetti dettagliati;
+- effetti locali completi;
+- item minori visibili.
+
+### Harness
+
+`ArcGraphZoomLodPolicyHarness.RunDefaultSmoke()` verifica i profili dei quattro zoom default.
+
+### Garanzie architetturali
+
+La policy:
+
+- non modifica renderer esistenti;
+- non carica asset;
+- non crea sprite;
+- non crea `GameObject`;
+- non legge `World`;
+- non muta simulazione;
+- non sostituisce MapGrid.
+
+### Preparazione v0.33g
+
+`v0.33g` resta il punto piu' delicato della versione, perche' introduce la modalita' comparativa.
+
+La direzione sicura e':
+
+```text
+contratto comparativo debug/test
+-> diagnostica comparativa
+-> nessun doppio renderer permanente
+-> nessun aggancio produttivo automatico
+```
+
+Se l'aggancio scena/materiale/camera richiede una decisione non deducibile, lo step dovra' fermarsi prima della patch runtime.
 
 ---
 
