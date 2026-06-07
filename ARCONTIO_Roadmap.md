@@ -5101,6 +5101,27 @@ Gate:
 
 Attendere go operatore prima di modifiche operative sul probe visivo.
 
+## Apertura v0.36.03v - ArcGraph Visual Probe
+
+Branch:
+
+```text
+ai-task/v0.36.03v-arcgraph-visual-probe
+```
+
+Scope previsto:
+
+- audit dei punti di aggancio debug/test per una visualizzazione ArcGraph minima;
+- definizione di un probe non produttivo e non sostitutivo di MapGrid;
+- uso di snapshot controllati o finti per terrain, actor/object, vegetation, water e light;
+- verifica visuale di sorting layer, LOD e tinta luce;
+- nessuna introduzione di biosfera, acqua, luce, meteo o effetti produttivi;
+- nessuna modifica scena/prefab prima di decisione esplicita.
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul probe visivo.
+
 ---
 
 #### v0.37 - ArcGraph Debug/Overlay Migration

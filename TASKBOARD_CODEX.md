@@ -153,6 +153,7 @@ DOC SYNC:
 - aggiunto `ArcGraphLightRenderQueueHarness`;
 - luce non ancora fusa nella queue globale actor/object;
 - branch `ai-task/v0.36.03v-arcgraph-visual-probe` aperto;
+- apertura `v0.36.03v` documentata: probe visivo minimo, debug/test, non sostitutivo di MapGrid;
 - prossimo step fermo in attesa go: ArcGraph Visual Probe preparatorio.
 
 OBIETTIVO:
