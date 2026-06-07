@@ -28,7 +28,7 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.36.01 - Vegetation Renderer preparatorio`
+`v0.36.02 - Water Renderer preparatorio`
 
 STATUS:
 IN ATTESA GO OPERATORE
@@ -41,9 +41,9 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- commit e push branch `v0.36a`;
-- aprire branch successivo `v0.36.01`;
-- attendere go operatore prima di modifiche operative sul Vegetation Renderer;
+- commit e push branch `v0.36.01`;
+- aprire branch successivo `v0.36.02`;
+- attendere go operatore prima di modifiche operative sul Water Renderer;
 - non implementare simulazione produttiva di acqua, vegetazione, luce, meteo o effetti;
 - non creare GameObject, renderer Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -126,11 +126,18 @@ DOC SYNC:
 - harness `ArcGraphEnvironmentVisualContractHarness` aggiunto;
 - decisione animazione fissata: ArcGraph sceglie frame/posa/layer/LOD, Unity disegna soltanto l'output concreto.
 - branch `ai-task/v0.36.01-arcgraph-vegetation-renderer` aperto;
-- prossimo step fermo in attesa go: Vegetation Renderer preparatorio.
+- vegetation renderer passivo implementato;
+- aggiunto `ArcGraphVegetationLayer.CopySnapshotsTo(...)`;
+- aggiunto `ArcGraphVegetationRenderItem`;
+- aggiunto `ArcGraphVegetationRenderQueueDiagnostics`;
+- aggiunto `ArcGraphVegetationRenderQueueBuilder`;
+- aggiunto `ArcGraphVegetationRenderQueueHarness`;
+- vegetazione non ancora fusa nella queue globale actor/object;
+- prossimo step fermo in attesa go: Water Renderer preparatorio.
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.36.01 - Vegetation Renderer` e attendere go prima di nuove modifiche.
+Preparare il prossimo step `v0.36.02 - Water Renderer` e attendere go prima di nuove modifiche.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 

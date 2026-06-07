@@ -4662,7 +4662,7 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 | Versione | Sottopunto | Stato |
 |---|---|---|
 | v0.36a | Audit e contratto preparatorio layer ambientali visuali | Completato |
-| v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | In attesa go operatore |
+| v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Completato nel perimetro passivo |
 | v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Pending |
 | v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Pending |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
@@ -4800,6 +4800,81 @@ ai-task/v0.36.01-arcgraph-vegetation-renderer
 Gate:
 
 Attendere go operatore prima di modifiche operative sul codice della vegetazione.
+
+## Esito v0.36.01 - Vegetation Renderer passivo
+
+La `v0.36.01` ha introdotto il primo builder visuale ambientale specifico:
+vegetazione/erba/piante come item renderizzabili passivi.
+
+Implementato:
+
+- `ArcGraphVegetationLayer.CopySnapshotsTo(...)`;
+- `ArcGraphRenderItemKind.Vegetation`;
+- `ArcGraphVegetationRenderItem`;
+- `ArcGraphVegetationRenderQueueDiagnostics`;
+- `ArcGraphVegetationRenderQueueBuilder`;
+- `ArcGraphVegetationRenderQueueHarness`.
+
+Flusso:
+
+```text
+ArcGraphVegetationVisualSnapshot
+-> ArcGraphVegetationLayer
+-> ArcGraphVegetationRenderQueueBuilder
+-> ArcGraphVegetationRenderItem
+```
+
+Regole:
+
+- il builder legge solo il layer vegetazione;
+- il builder applica `ArcGraphZoomLodProfile`;
+- zoom 1 produce rappresentazione aggregata d'area;
+- zoom 2 produce sprite statici semplificati;
+- zoom 3/4 possono produrre item individuali animabili se il LOD lo consente;
+- la chiave sprite e' solo una stringa derivata, non un asset caricato;
+- nessuna crescita pianta viene simulata;
+- nessuna seed bank viene letta;
+- nessuna fertilita', umidita', stagione o acqua vicina viene calcolata;
+- nessun renderer Unity viene creato.
+
+Decisione di scope:
+
+La vegetazione non viene ancora fusa nella queue globale actor/object.
+
+Motivo:
+
+- la queue actor/object e' stata chiusa in `v0.34`;
+- inserire subito vegetazione nella queue globale obbligherebbe a decidere sorting
+  completo tra terrain, water, vegetation, object, actor, effect e light;
+- questa decisione appartiene a un checkpoint successivo di composizione ambiente.
+
+Harness:
+
+`ArcGraphVegetationRenderQueueHarness.RunDefaultSmoke()` verifica:
+
+- due snapshot vegetazione validi;
+- uno snapshot nascosto per species key mancante;
+- zoom 1 con item aggregati;
+- zoom 4 con item animabili;
+- nessuna scena, nessun asset, nessun sistema biosfera.
+
+Vincoli preservati:
+
+- nessuna biosfera produttiva;
+- nessun asset load;
+- nessun `GameObject`;
+- nessun `SpriteRenderer`;
+- nessun `ParticleSystem`;
+- nessuna modifica a Core, Decision Layer, Job Layer o MapGrid;
+- MapGrid resta renderer produttivo.
+
+Prossimo step:
+
+`v0.36.02 - Water Renderer`
+
+Il prossimo step dovra' seguire lo stesso schema: snapshot acqua gia' prodotti da
+sistemi esterni, item renderizzabili passivi, LOD, nessun flusso idraulico
+produttivo.
 
 ---
 
