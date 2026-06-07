@@ -4665,7 +4665,8 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 | v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Completato nel perimetro passivo |
 | v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Completato nel perimetro passivo |
 | v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Completato nel perimetro passivo |
-| v0.36.03v | ArcGraph Visual Probe: primo test visivo controllato dei layer base | In attesa go operatore |
+| v0.36.03v | ArcGraph Visual Probe: frame dati controllato dei layer base | Completato nel perimetro data-only |
+| v0.36.03v.01 | ArcGraph Scene Probe Renderer: primo disegno debug in Unity | In attesa go operatore |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
 | v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
 
@@ -5121,6 +5122,85 @@ Scope previsto:
 Gate:
 
 Attendere go operatore prima di modifiche operative sul probe visivo.
+
+## Esito v0.36.03v - ArcGraph Visual Probe data-only
+
+La `v0.36.03v` ha introdotto il primo frame dati unitario per un probe visuale
+ArcGraph, senza ancora disegnare in Unity.
+
+Implementato:
+
+- `ArcGraphVisualProbeDiagnostics`;
+- `ArcGraphVisualProbeFrame`;
+- `ArcGraphVisualProbeBuilder`;
+- `ArcGraphVisualProbeHarness`.
+
+Flusso:
+
+```text
+ArcGraphTerrainLayer
++ ArcGraphActorLayer
++ ArcGraphObjectLayer
++ ArcGraphVegetationLayer
++ ArcGraphWaterLayer
++ ArcGraphLightLayer
+-> ArcGraphVisualProbeBuilder
+-> ArcGraphVisualProbeFrame
+```
+
+Il frame contiene:
+
+- chunk terrain gia' prodotti dal terrain mesh builder;
+- queue actor/object gia' ordinata;
+- item vegetazione visibili;
+- item acqua visibili;
+- item luce visibili;
+- diagnostica aggregata;
+- diagnostica del gate comparativo ArcGraph/MapGrid.
+
+Harness:
+
+`ArcGraphVisualProbeHarness.RunDefaultSmoke()` costruisce una mini scena dati
+controllata:
+
+- mappa 4x4;
+- 16 celle terrain;
+- 1 actor;
+- 1 oggetto;
+- 1 vegetazione;
+- 1 acqua;
+- 2 overlay luce;
+- gate scena temporanea dichiarato come ammesso.
+
+Vincoli preservati:
+
+- nessuna scena modificata;
+- nessun prefab modificato;
+- nessun asset load;
+- nessun disegno Unity ancora attivo;
+- nessuna sostituzione di MapGrid;
+- nessuna simulazione ambientale produttiva;
+- nessuna modifica a Core, Decision Layer, Job Layer o MapGrid.
+
+Per iniziare il primo test visivo reale manca ancora il renderer debug concreto.
+
+Prossimo step:
+
+`v0.36.03v.01 - ArcGraph Scene Probe Renderer`
+
+Lo step dovra' creare un disegnatore debug temporaneo che consuma
+`ArcGraphVisualProbeFrame` e lo mostra in Unity con risorse provvisorie, senza
+diventare renderer produttivo e senza pensionare MapGrid.
+
+Branch aperto:
+
+```text
+ai-task/v0.36.03v.01-arcgraph-scene-probe-renderer
+```
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul renderer debug.
 
 ---
 
