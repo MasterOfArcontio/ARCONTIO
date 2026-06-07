@@ -4662,7 +4662,7 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 | Versione | Sottopunto | Stato |
 |---|---|---|
 | v0.36a | Audit e contratto preparatorio layer ambientali visuali | Completato |
-| v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Pending |
+| v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | In attesa go operatore |
 | v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Pending |
 | v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Pending |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
@@ -4790,6 +4790,16 @@ Prossimo step:
 Lo step dovra' partire da vegetazione/erba come layer visuale, ma ancora con scope
 controllato: snapshot, LOD, contratto animazione frame-based e nessuna biosfera
 produttiva.
+
+Branch aperto:
+
+```text
+ai-task/v0.36.01-arcgraph-vegetation-renderer
+```
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul codice della vegetazione.
 
 ---
 

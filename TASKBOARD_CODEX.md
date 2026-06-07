@@ -34,7 +34,7 @@ STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.36a-arcgraph-environment-audit`
+`ai-task/v0.36.01-arcgraph-vegetation-renderer`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -125,6 +125,8 @@ DOC SYNC:
 - catalogo `ArcGraphEnvironmentVisualContractCatalog` aggiunto per i cinque layer ambientali;
 - harness `ArcGraphEnvironmentVisualContractHarness` aggiunto;
 - decisione animazione fissata: ArcGraph sceglie frame/posa/layer/LOD, Unity disegna soltanto l'output concreto.
+- branch `ai-task/v0.36.01-arcgraph-vegetation-renderer` aperto;
+- prossimo step fermo in attesa go: Vegetation Renderer preparatorio.
 
 OBIETTIVO:
 
