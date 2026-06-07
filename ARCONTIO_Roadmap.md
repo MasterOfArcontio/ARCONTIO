@@ -2301,7 +2301,7 @@ senza attivare un doppio renderer permanente.
 #### v0.32 - ArcGraph Terrain Renderer
 
 ## Stato
-PENDING
+IN CORSO / AUDIT-FIRST
 
 ## Obiettivo
 
@@ -2314,6 +2314,110 @@ Il renderer dovra':
 - ricostruire chunk terrain in modo localizzato;
 - riusare concettualmente la tecnica di `MapGridChunkRenderer`;
 - mantenere resa visiva compatibile con il terreno MapGrid attuale.
+
+## Checkpoint v0.32
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.32a | Audit terrain legacy: `MapGridChunkRenderer`, atlas, mesh, UV, varianti floor, muro/wall-top | Completato |
+| v0.32b | Contratto terrain renderer ArcGraph: input, output, vietati, diagnostica | Prossimo |
+| v0.32c | Strategia atlas/materiali: UV map ArcGraph senza asset load e senza dipendenza permanente MapGrid | Pending |
+| v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Pending |
+| v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Pending |
+| v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Pending |
+| v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Pending |
+| v0.32h | Closeout v0.32 e preparazione v0.33 modalita' comparativa controllata | Pending |
+
+## Esito v0.32a - Audit terrain legacy
+
+Il renderer terrain legacy rilevante e':
+
+```text
+MapGridBootstrap
+-> BuildTerrainChunks()
+-> GameObject TerrainChunks
+-> GameObject Chunk_x_y
+-> MeshRenderer + MeshFilter
+-> MapGridChunkRenderer.Build(...)
+```
+
+`MapGridChunkRenderer` costruisce una mesh per chunk:
+
+- una cella = un quad;
+- ogni quad ha 4 vertici;
+- ogni quad ha 6 indici triangolo;
+- le coordinate world sono calcolate come `x * tileWorld`, `y * tileWorld`;
+- il chunk non fa culling avanzato;
+- il chunk ricostruisce l'intera mesh quando viene chiamato `Build`;
+- il renderer usa `MeshFilter.sharedMesh`;
+- il materiale e la texture atlas sono assegnati dal bootstrap legacy.
+
+### Atlas legacy
+
+`MapGridTileAtlas`:
+
+- riceve una `Texture2D`;
+- riceve `tilePixels`;
+- calcola `TilesPerRow` e `TilesPerCol`;
+- registra `tileId -> uvX/uvY`;
+- converte `uvY` da origine alto a origine basso Unity;
+- produce quattro UV per quad.
+
+Questa logica e' riusabile concettualmente, ma `v0.32` non deve rendere ArcGraph dipendente in modo permanente da `MapGridTileAtlas`.
+
+### Policy visuale legacy
+
+Il legacy usa una policy minimale "DF Steam-like":
+
+```text
+se cella bloccata:
+    se la cella a nord e' floor -> wallTopTileId
+    altrimenti -> wallTileId
+se cella non bloccata:
+    floorBaseTileId + variante deterministica hash(x,y)
+```
+
+Questa scelta significa che il `tileId` sorgente non viene sempre disegnato letteralmente. Per compatibilita' iniziale, ArcGraph deve poter replicare questa policy, almeno come default terrain visual.
+
+### Implicazioni per ArcGraph
+
+ArcGraph deve separare tre concetti:
+
+```text
+snapshot terrain
+-> contiene TileId e IsBlocked
+
+policy visuale terrain
+-> decide quale tile visuale disegnare
+
+builder mesh chunk
+-> trasforma celle + UV in dati mesh
+```
+
+Per `v0.32` la soluzione piu' prudente e':
+
+- creare una UV map ArcGraph autonoma;
+- creare una policy visuale terrain ArcGraph;
+- creare un builder mesh-data per chunk;
+- non creare ancora un `MonoBehaviour`;
+- non creare automaticamente `GameObject`;
+- non modificare `MapGridBootstrap`;
+- non modificare la scena.
+
+### Nodo tecnico
+
+Per costruire i chunk ArcGraph serve leggere `ArcGraphTerrainLayer`, non `MapGridData`.
+
+Flusso desiderato:
+
+```text
+MapGridData
+-> ArcGraphWorldAdapter
+-> ArcGraphTerrainCellSnapshot
+-> ArcGraphTerrainLayer
+-> ArcGraphTerrainChunkMeshBuilder
+-> mesh data terrain
+```
 
 ---
 

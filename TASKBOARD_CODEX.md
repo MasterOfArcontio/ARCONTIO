@@ -28,23 +28,24 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.32 - ArcGraph Terrain Renderer
 
 CHECKPOINT CORRENTE:
-`v0.32 - In attesa di apertura operativa`
+`v0.32b - Contratto ArcGraph Terrain Renderer`
 
 STATUS:
-ATTESA GO / v0.31 COMPLETATA
+IN ESECUZIONE AUTONOMA / AUDIT v0.32a COMPLETATO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.31h-arcgraph-bootstrap-closeout`
+`ai-task/v0.32b-arcgraph-terrain-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere formalmente `v0.31` su branch closeout;
-- preparare l'apertura di `v0.32` ArcGraph Terrain Renderer;
-- non iniziare implementazione terrain renderer senza nuovo `go`;
-- mantenere MapGrid come renderer visibile finche' il passaggio non sara' controllato.
+- definire e implementare il primo terrain renderer ArcGraph controllato;
+- partire da snapshot terrain e chunk sporchi;
+- non sostituire ancora MapGrid;
+- non introdurre doppio renderer permanente;
+- non toccare Core, Decision Layer o Job Layer.
 
 DOC SYNC:
 
@@ -59,11 +60,13 @@ DOC SYNC:
 - QA `v0.31g` superata: compilazione isolata, no chiamate vietate, no modifiche a Core/MapGrid/scena/meta;
 - closeout `v0.31h` in completamento;
 - prossimo macro checkpoint previsto: `v0.32 - ArcGraph Terrain Renderer`;
-- non aprire lavoro implementativo `v0.32` senza nuovo `go`.
+- apertura operativa `v0.32` autorizzata dall'operatore;
+- audit `v0.32a` completato: MapGrid terrain chunking, atlas, mesh, varianti floor e wall-top;
+- prossimo ramo operativo previsto: `ai-task/v0.32b-arcgraph-terrain-contract`.
 
 OBIETTIVO:
 
-Preparare la prossima fase `v0.32`, dedicata al primo terrain renderer produttivo ArcGraph, senza avviarla automaticamente.
+Definire il contratto del terrain renderer ArcGraph: cosa riceve, cosa produce, cosa non deve fare e quali garanzie anti-doppio-renderer deve rispettare.
 
 ---
 
