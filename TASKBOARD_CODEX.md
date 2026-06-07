@@ -161,6 +161,7 @@ DOC SYNC:
 - aggiunto `ArcGraphVisualProbeHarness`;
 - frame dati pronto per terrain, actor/object, vegetation, water e light;
 - branch `ai-task/v0.36.03v.01-arcgraph-scene-probe-renderer` aperto;
+- apertura `v0.36.03v.01` documentata: renderer debug temporaneo per disegnare `ArcGraphVisualProbeFrame`;
 - prossimo step fermo in attesa go: ArcGraph Scene Probe Renderer preparatorio.
 
 OBIETTIVO:

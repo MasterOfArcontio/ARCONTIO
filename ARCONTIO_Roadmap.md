@@ -5202,6 +5202,27 @@ Gate:
 
 Attendere go operatore prima di modifiche operative sul renderer debug.
 
+## Apertura v0.36.03v.01 - ArcGraph Scene Probe Renderer
+
+Branch:
+
+```text
+ai-task/v0.36.03v.01-arcgraph-scene-probe-renderer
+```
+
+Scope previsto:
+
+- audit del modo piu' sicuro per disegnare un `ArcGraphVisualProbeFrame` in Unity;
+- scelta esplicita di risorse provvisorie per terrain, actor/object, vegetazione, acqua e luce;
+- definizione del componente debug temporaneo;
+- nessuna sostituzione di MapGrid;
+- nessun aggancio permanente alla scena;
+- nessuna modifica a prefab o scene senza decisione esplicita.
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul renderer debug.
+
 ---
 
 #### v0.37 - ArcGraph Debug/Overlay Migration
