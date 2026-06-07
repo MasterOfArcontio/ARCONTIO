@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.36a - Audit e contratto preparatorio layer ambientali visuali`
+`v0.36.01 - Vegetation Renderer preparatorio`
 
 STATUS:
-APERTO / IN ATTESA GO OPERATORE
+IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
 `ai-task/v0.36a-arcgraph-environment-audit`
@@ -41,9 +41,9 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- attendere go operatore prima di modifiche operative;
-- avviare audit dei layer ambientali ArcGraph gia' presenti o placeholder;
-- definire contratto preparatorio per Vegetation, Water, Light, Effect, Weather;
+- commit e push branch `v0.36a`;
+- aprire branch successivo `v0.36.01`;
+- attendere go operatore prima di modifiche operative sul Vegetation Renderer;
 - non implementare simulazione produttiva di acqua, vegetazione, luce, meteo o effetti;
 - non creare GameObject, renderer Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -120,10 +120,15 @@ DOC SYNC:
 - test EditMode aggiunti per factory movement e lookup store;
 - QA statico eseguito: diff check, no chiamate vietate runtime nuove, no `.meta`, no `Library/Temp/Obj`.
 - branch `ai-task/v0.36a-arcgraph-environment-audit` aperto come prossimo checkpoint preparatorio.
+- audit `v0.36a` completato: placeholder Water, Vegetation, Light, Weather, Effect gia' presenti e registrabili solo su richiesta;
+- contratto `ArcGraphEnvironmentVisualLayerContract` aggiunto per dichiarare scope, sorgente esterna, dirty, animazione ArcGraph, overlay e divieto Unity creation;
+- catalogo `ArcGraphEnvironmentVisualContractCatalog` aggiunto per i cinque layer ambientali;
+- harness `ArcGraphEnvironmentVisualContractHarness` aggiunto;
+- decisione animazione fissata: ArcGraph sceglie frame/posa/layer/LOD, Unity disegna soltanto l'output concreto.
 
 OBIETTIVO:
 
-Preparare `v0.36` con audit e contratto dei layer ambientali visuali, senza iniziare patch codice prima del go.
+Preparare il prossimo step `v0.36.01 - Vegetation Renderer` e attendere go prima di nuove modifiche.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 

@@ -4661,7 +4661,7 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 
 | Versione | Sottopunto | Stato |
 |---|---|---|
-| v0.36a | Audit e contratto preparatorio layer ambientali visuali | In attesa go operatore |
+| v0.36a | Audit e contratto preparatorio layer ambientali visuali | Completato |
 | v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Pending |
 | v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Pending |
 | v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Pending |
@@ -4695,6 +4695,101 @@ Vietato in `v0.36a`:
 - modificare scene;
 - simulare crescita piante, acqua, meteo, luce o incendi;
 - sostituire MapGrid.
+
+## Esito v0.36a - Audit layer ambientali e contratto visuale
+
+Audit eseguito sui file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphFuturePlaceholderLayers.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphFutureVisualSnapshots.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphLayerStack.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapRuntime.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodModes.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodProfile.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphZoomLodPolicy.cs
+```
+
+Stato rilevato:
+
+- esistono gia' placeholder per `Water`, `Vegetation`, `Light`, `Weather`, `Effect`;
+- i placeholder sono registrabili solo con `RegisterFuturePlaceholderLayers()`;
+- i placeholder non sono inclusi nei layer foundation di default;
+- i layer conservano snapshot e marcano dirty dove necessario;
+- il bootstrap puo' includerli solo se `IncludeFuturePlaceholderLayers` e' esplicitamente true;
+- la policy LOD sa gia' distinguere vegetazione, effetti, weather overlay e animazioni sprite;
+- la render queue attuale riguarda solo actor/object;
+- non esiste ancora una queue ambientale;
+- non esiste ancora un renderer Unity ambientale.
+
+Contratto aggiunto:
+
+```text
+ArcGraphEnvironmentVisualLayerContract
+├─ LayerId
+├─ Scope
+├─ SourceSystemKey
+├─ RegisteredByDefault
+├─ RequiresExternalSnapshots
+├─ UsesDirtyCells
+├─ AllowsArcGraphSpriteAnimation
+├─ AllowsGlobalOverlay
+├─ AllowsLocalTint
+└─ AllowsUnityObjectCreation
+```
+
+Catalogo default:
+
+```text
+Vegetation -> CellCache    -> VegetationSystem -> animazione ArcGraph ammessa
+Water      -> CellCache    -> WaterSystem      -> animazione ArcGraph ammessa
+Light      -> CellCache    -> LightSystem      -> tinta/overlay ammessi, animazione sprite no
+Effect     -> LocalEffect  -> EffectSystem     -> animazione ArcGraph ammessa
+Weather    -> GlobalOverlay -> WeatherSystem   -> animazione ArcGraph ammessa
+```
+
+Decisione su animazione:
+
+```text
+Simulazione
+produce stato oggettivo
+
+ArcGraph
+sceglie frame, posa, layer, LOD, tint e overlay
+
+Unity
+disegna sprite, mesh, materiali, shader, luci/overlay concreti
+```
+
+In questa fase ArcGraph non usa `Animator` Unity e non crea `ParticleSystem`.
+L'animazione futura deve essere trattata come scelta frame/posa dentro ArcGraph,
+poi consegnata a un renderer Unity separato.
+
+Harness aggiunto:
+
+- `ArcGraphEnvironmentVisualContractHarness`;
+- verifica cinque contratti ambientali;
+- verifica che tutti richiedano snapshot esterni;
+- verifica che nessuno sia registrato di default;
+- verifica che nessuno autorizzi creazione Unity;
+- verifica che quattro layer possano usare animazione sprite ArcGraph.
+
+Vincoli preservati:
+
+- nessun sistema ambientale produttivo;
+- nessun asset load;
+- nessun `GameObject`;
+- nessuna scena modificata;
+- nessuna modifica a Core, Decision Layer, Job Layer o MapGrid;
+- MapGrid resta renderer produttivo.
+
+Prossimo step:
+
+`v0.36.01 - Vegetation Renderer`
+
+Lo step dovra' partire da vegetazione/erba come layer visuale, ma ancora con scope
+controllato: snapshot, LOD, contratto animazione frame-based e nessuna biosfera
+produttiva.
 
 ---
 
