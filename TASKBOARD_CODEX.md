@@ -31,7 +31,7 @@ CHECKPOINT CORRENTE:
 `v0.30j - QA regressiva visuale e closeout ArcGraph Foundation`
 
 STATUS:
-IN CORSO / BRANCH TASK APERTO / AUDIT-FIRST
+COMPLETATO / FOUNDATION CLOSEOUT / IN ATTESA DECISIONE UMANA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.30j-arcgraph-foundation-closeout`
@@ -41,21 +41,21 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- eseguire QA regressiva documentale e tecnica della foundation `arcgraph`;
-- verificare che i contratti ArcGraph compilino isolatamente;
-- controllare che nessun checkpoint `v0.30` abbia introdotto mutazioni simulative o doppio renderer permanente;
-- dichiarare cosa e' pronto, cosa resta preparatorio e cosa va rimandato;
-- produrre closeout operativo della foundation prima di eventuali PR o step successivi.
+- QA regressiva documentale e tecnica della foundation `arcgraph` eseguita;
+- contratti ArcGraph compilati isolatamente contro l'assembly corrente;
+- confermato che `v0.30` non ha introdotto mutazioni simulative o doppio renderer permanente;
+- dichiarato cosa e' pronto, cosa resta preparatorio e cosa va rimandato;
+- prodotto closeout operativo della foundation prima di eventuali PR o step successivi.
 
 DOC SYNC:
 
-- Taskboard e roadmap riallineate per passaggio da `v0.30i` a `v0.30j`;
+- Taskboard e roadmap riallineate per closeout `v0.30j`;
 - branch `ai-task/v0.30i-arcgraph-legacy-absorption-plan` pushato con commit `0bc79a0`;
-- diario Notion aggiornato con chiusura `v0.30i` e apertura `v0.30j`.
+- diario Notion aggiornato con chiusura `v0.30j` e closeout `v0.30`.
 
 OBIETTIVO:
 
-Chiudere la foundation `arcgraph` con una verifica regressiva dei contratti, dei documenti operativi e dei vincoli architetturali. Il checkpoint non deve introdurre nuove feature grafiche: deve stabilire se `v0.30` e' pronto per review/PR e quali debiti restano dichiarati.
+Foundation `arcgraph` chiusa come blocco preparatorio. Il sistema dispone ora di contratti, adapter read-only, layer passivi, dirty state, policy z-level, posa actor, placeholder futuri e piano di assorbimento legacy. Non e' ancora un renderer produttivo.
 
 ---
 
@@ -153,9 +153,11 @@ Consolidato:
 
 Note operative:
 
+- closeout stato tabella: `v0.30g`, `v0.30h`, `v0.30i` e `v0.30j` sono completati e pushati; eventuali simboli corrotti nelle righe storiche vanno letti come residuo di codifica, non come stato operativo corrente;
 - aggiornamento stato: `v0.30g` completato e pushato con commit `ecf20c3`; `v0.30h` aperto e in corso su branch `ai-task/v0.30h-arcgraph-future-placeholders`;
 - aggiornamento stato: `v0.30h` completato e pushato con commit `4fbbd8f`; `v0.30i` aperto e in corso su branch `ai-task/v0.30i-arcgraph-legacy-absorption-plan`;
 - aggiornamento stato: `v0.30i` completato e pushato con commit `0bc79a0`; `v0.30j` aperto e in corso su branch `ai-task/v0.30j-arcgraph-foundation-closeout`;
+- aggiornamento stato: `v0.30j` QA completata e pronta per push closeout;
 - branch task corrente: `ai-task/v0.30j-arcgraph-foundation-closeout`;
 - base di integrazione: `ai/codex-main`;
 - branch `ai-task/v0.30-arcgraph-foundation` pushato con commit `d482cdc`;
@@ -168,7 +170,7 @@ Note operative:
 - branch `ai-task/v0.30h-arcgraph-future-placeholders` pushato con commit `4fbbd8f`;
 - branch `ai-task/v0.30i-arcgraph-legacy-absorption-plan` pushato con commit `0bc79a0`;
 - `arcgraph` deve sostituire il rendering provvisorio a regime, non diventare un secondo renderer permanente;
-- il checkpoint corrente e' su QA regressiva e closeout: niente nuove feature grafiche o rimozioni legacy senza `go` dell'operatore;
+- il checkpoint corrente e' chiuso: niente nuove feature grafiche o rimozioni legacy senza nuovo macro checkpoint approvato;
 - `main` resta il ramo stabile e non deve ricevere lavoro implementativo diretto.
 
 ---
@@ -249,13 +251,39 @@ Divieti operativi per il prossimo step:
 - non spostare dev tools dentro il renderer ArcGraph;
 - non trasformare `MapGridData` nella futura mappa simulativa.
 
-Prima di procedere operativamente dentro `v0.30j` devono essere verificati:
+Esito QA `v0.30j`:
 
-1. compilazione isolata dei file ArcGraph;
-2. stato Git e lista file toccati da `v0.30`;
-3. conferma che non siano stati modificati Decision Layer, Job Layer o simulazione;
-4. conferma che `arcgraph` non sia ancora renderer produttivo e non abbia doppio rendering permanente;
-5. closeout dei debiti aperti: motion runtime endpoints, renderer terrain reale, bootstrap ArcGraph, overlay/debug, assorbimento legacy.
+1. Compilazione isolata dei file ArcGraph riuscita con Roslyn contro `Library/ScriptAssemblies/Assembly-CSharp.dll`.
+2. Diff complessiva rispetto a `ai/codex-main`: solo `ARCONTIO_Roadmap.md`, `TASKBOARD_CODEX.md` e nuovi file in `Assets/Scripts/Views/ArcGraph/Runtime`.
+3. Nessun file `Assets/Scripts/Core`, `Assets/Scripts/Views/MapGrid`, `.meta`, `Library`, `Temp` o `Obj` modificato da `v0.30`.
+4. Nessuna chiamata operativa vietata in ArcGraph: niente `SetNpcPos`, niente `Command`, niente `MonoBehaviour`, niente `new GameObject`, niente `Resources.Load`.
+5. `arcgraph` non e' ancora renderer produttivo e non viene registrato nel bootstrap scena: non esiste doppio renderer permanente.
+
+Stato pronto:
+
+- contratti coordinate x/y/z e chunk;
+- `ArcGraphRenderState` e dirty state;
+- layer passivi Terrain/Object/Actor/Debug;
+- adapter read-only verso `World` e `MapGridData`;
+- policy z-level centralizzata con runtime attuale su `z = 0`;
+- posa actor interpolabile a livello grafico;
+- placeholder passivi per Water/Vegetation/Light/Weather/Effect;
+- piano di assorbimento del legacy MapGrid.
+
+Debiti dichiarati:
+
+- manca renderer terrain produttivo ArcGraph;
+- manca bootstrap ArcGraph reale;
+- manca collegamento actor motion a origine/destinazione runtime read-only;
+- `MapGridWorldView` resta renderer produttivo legacy;
+- overlay/debug restano nel mondo MapGrid;
+- nessun sistema acqua, vegetazione, luci o meteo produttivo e' stato introdotto.
+
+Prossima decisione umana:
+
+- aprire PR/review della foundation `v0.30`;
+- oppure avviare un nuovo macro checkpoint per primo renderer terrain ArcGraph;
+- oppure congelare `v0.30` e tornare a un altro macro tema della roadmap.
 
 ---
 
@@ -282,8 +310,8 @@ v0.30a audit rendering attuale completato
 -> v0.30g ActorVisual preparatorio completato
 -> v0.30h placeholder layer futuri completato
 -> v0.30i piano assorbimento legacy grafico completato
--> v0.30j QA regressiva visuale e closeout ArcGraph Foundation
--> solo dopo review/PR e assorbimento progressivo del legacy grafico
+-> v0.30j QA regressiva visuale e closeout ArcGraph Foundation completato
+-> in attesa di decisione umana: PR/review o nuovo macro checkpoint
 ```
 
 ---
@@ -350,8 +378,8 @@ Confermato:
 
 Da completare:
 
-- commit e pubblicazione del riallineamento Roadmap/Taskboard per `v0.30j`;
-- QA regressiva visuale e closeout ArcGraph Foundation;
+- commit e pubblicazione del closeout Roadmap/Taskboard per `v0.30j`;
+- decisione umana su PR/review o prossimo macro checkpoint;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
 ---

@@ -34,7 +34,7 @@
 | v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
 | v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Completata fino a v0.20q |
 | v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | In corso |
-| v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | In corso |
+| v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | Completata come foundation |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -1217,7 +1217,7 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 #### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 ## Stato
-IN CORSO / NEXT: v0.30j
+COMPLETATA COME FOUNDATION / CLOSEOUT v0.30j
 
 ## Scopo
 
@@ -1264,7 +1264,7 @@ La fase `v0.30` NON deve implementare:
 | v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ✅ |
 | v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ✅ |
 | v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ✅ |
-| v0.30j | QA regressiva visuale e closeout ArcGraph Foundation | ⏳ |
+| v0.30j | QA regressiva visuale e closeout ArcGraph Foundation | ✅ |
 
 ## Definition of Done v0.30
 
@@ -1279,8 +1279,9 @@ La fase `v0.30` NON deve implementare:
 | Movimento visuale multitick previsto come interpolazione grafica, non mutazione simulativa | ✅ Parziale: posa visuale interpolabile predisposta |
 | Placeholder per acqua, vegetazione, luci, meteo ed effetti identificati | ✅ Parziale: snapshot e layer passivi predisposti |
 | Strategia di eliminazione del rendering legacy dichiarata | ✅ Parziale: piano audit-first dichiarato |
-| Nessuna nuova simulazione introdotta | ✅ Parziale: adapter read-only senza runtime binding |
-| Nessuna violazione anti-omniscienza | ✅ Parziale: adapter di presentazione isolato |
+| QA regressiva foundation eseguita | ✅ Compilazione isolata ArcGraph riuscita |
+| Nessuna nuova simulazione introdotta | ✅ Adapter/layer read-only senza runtime binding produttivo |
+| Nessuna violazione anti-omniscienza | ✅ Adapter di presentazione isolato, nessun comando simulativo |
 
 > **Nota architetturale v0.30:** `arcgraph` deve diventare il sistema grafico unico di ARCONTIO. Nella prima fase puo' assorbire e incapsulare parti del rendering attuale, ma non deve stabilizzare un doppio sistema permanente. Il riuso atteso e' alto per asset, coordinate e alcune tecniche pratiche; e' invece limitato per la struttura complessiva, oggi ancora provvisoria.
 
@@ -1301,6 +1302,8 @@ La fase `v0.30` NON deve implementare:
 > **Nota tecnica v0.30h:** il checkpoint ha introdotto snapshot e layer placeholder per Water, Vegetation, Light, Weather ed Effect. I layer sono passivi, non vengono registrati nei default foundation e non simulano acqua, piante, luce, meteo o fuoco; servono solo come slot grafici futuri registrabili esplicitamente tramite `RegisterFuturePlaceholderLayers`.
 
 > **Nota audit v0.30i:** il checkpoint ha fissato il piano di assorbimento del legacy grafico. `MapGridChunkRenderer`, `MapGridTileAtlas`, convenzioni asset e parte della camera sono riusabili come tecniche; `MapGridData` va assorbito come sorgente temporanea di snapshot terreno; `MapGridWorldView` resta il monolite critico da non cancellare subito, perche' contiene actor/object sync, overlay, input debug, summary UI, rebind del World e dev tools. La sostituzione dovra' avvenire per fasi: prima bootstrap ArcGraph, poi terrain, poi actor/object, poi overlay/debug, infine pensionamento di MapGrid/WorldView.
+
+> **Nota closeout v0.30j:** la foundation `arcgraph` compila isolatamente contro l'assembly corrente e la diff rispetto a `ai/codex-main` contiene solo documentazione operativa e nuovi file sotto `Assets/Scripts/Views/ArcGraph/Runtime`. Non sono stati modificati Core, Decision Layer, Job Layer, MapGrid legacy o file `.meta`. `arcgraph` resta preparatorio: non e' ancora un renderer produttivo e non sostituisce ancora `MapGridWorldView`.
 
 ---
 
