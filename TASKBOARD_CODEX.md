@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.32 - ArcGraph Terrain Renderer
 
 CHECKPOINT CORRENTE:
-`v0.32g - QA ArcGraph Terrain Renderer`
+`v0.32h - Closeout ArcGraph Terrain Renderer`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / HARNESS v0.32f IMPLEMENTATO
+IN ESECUZIONE AUTONOMA / QA v0.32g SUPERATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.32g-arcgraph-terrain-qa`
+`ai-task/v0.32h-arcgraph-terrain-closeout`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -67,11 +67,12 @@ DOC SYNC:
 - chunk mesh builder `v0.32d` implementato come produttore passivo di mesh data;
 - dirty chunk rebuild `v0.32e` implementato su `ArcGraphRenderState.Dirty.DirtyChunks`;
 - harness statico `v0.32f` implementato e compilabile;
-- prossimo ramo operativo previsto: `ai-task/v0.32g-arcgraph-terrain-qa`.
+- QA `v0.32g` superata: compilazione, diff scope, chiamate vietate, no Core/MapGrid/scena/meta;
+- prossimo ramo operativo previsto: `ai-task/v0.32h-arcgraph-terrain-closeout`.
 
 OBIETTIVO:
 
-Eseguire QA tecnica del terrain renderer ArcGraph: compilazione, diff scope, controllo chiamate vietate, verifica assenza doppio renderer e assenza mutazioni simulazione.
+Chiudere `v0.32`, aggiornare Definition of Done, dichiarare debiti residui e preparare `v0.33` modalita' comparativa controllata.
 
 ---
 

@@ -2325,8 +2325,8 @@ Il renderer dovra':
 | v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Completato |
 | v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Completato |
 | v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Completato |
-| v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Prossimo |
-| v0.32h | Closeout v0.32 e preparazione v0.33 modalita' comparativa controllata | Pending |
+| v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Completato |
+| v0.32h | Closeout v0.32 e preparazione v0.33 modalita' comparativa controllata | Prossimo |
 
 ## Esito v0.32a - Audit terrain legacy
 
@@ -2751,6 +2751,90 @@ L'harness:
 La compilazione isolata dell'harness e' riuscita.
 
 L'invocazione diretta via PowerShell reflection fuori dal dominio Unity non e' considerata QA valida, perche' gli assembly Unity compilati fuori dal runtime Unity non vengono caricati correttamente da `Add-Type`. Il test resta quindi un harness compilabile e pronto per un futuro wrapper EditMode/Unity batch, non un test eseguito in questa fase.
+
+## Esito v0.32g - QA terrain renderer
+
+QA tecnica eseguita sul terrain renderer ArcGraph.
+
+### Compilazione
+
+Compilazione isolata riuscita sull'intera cartella:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime
+```
+
+Reference usate:
+
+```text
+Library/ScriptAssemblies/Assembly-CSharp.dll
+UnityEngine.CoreModule.dll
+netstandard2.1
+```
+
+### Diff scope v0.32
+
+Diff specifico da `ai-task/v0.31h-arcgraph-bootstrap-closeout` a `HEAD`:
+
+```text
+ARCONTIO_Roadmap.md
+TASKBOARD_CODEX.md
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphTerrainChunkMeshBuilder.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphTerrainChunkMeshData.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphTerrainChunkMeshDiagnostics.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphTerrainChunkMeshHarness.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphTerrainTileUvDefinition.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphTerrainTileUvMap.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphTerrainVisualPolicy.cs
+```
+
+Nessuna modifica in:
+
+```text
+Assets/Scripts/Core
+Assets/Scripts/Views/MapGrid
+Assets/Scenes
+*.meta
+Library
+Temp
+Obj
+```
+
+### Chiamate vietate
+
+Controllo testuale operativo:
+
+```text
+new GameObject(...)
+Resources.Load(...)
+: MonoBehaviour
+AddComponent<...>
+GetComponent<...>
+FindObjectOfType<...>
+SimulationHost.Instance
+SetNpcPos(...)
+CommandBuffer / ICommand
+```
+
+Esito:
+
+```text
+nessuna chiamata operativa vietata
+unico riferimento a SimulationHost.Instance resta commento di divieto nel runtime context
+```
+
+### Esito QA
+
+```text
+QA v0.32g superata.
+Terrain renderer ArcGraph produce mesh data passivi.
+Non crea scena.
+Non crea renderer Unity.
+Non carica asset.
+Non muta World.
+Non muta MapGridData.
+Non sostituisce MapGrid.
+```
 
 ---
 
