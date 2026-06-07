@@ -25,13 +25,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
+## MACRO JOB ATTIVO: v0.32 - ArcGraph Terrain Renderer
 
 CHECKPOINT CORRENTE:
-`v0.31h - Closeout ArcGraph Bootstrap controllato`
+`v0.32 - In attesa di apertura operativa`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / QA v0.31g SUPERATA
+ATTESA GO / v0.31 COMPLETATA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.31h-arcgraph-bootstrap-closeout`
@@ -41,11 +41,10 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- analizzare come accendere `arcgraph` come sistema interno controllato;
-- definire dove istanziare `ArcGraphRenderState`, `ArcGraphLayerStack` e `ArcGraphWorldAdapter`;
-- evitare doppio renderer permanente e modifiche al runtime legacy;
-- stabilire se serve un bootstrap MonoBehaviour minimo o un bridge non invasivo;
-- produrre piano operativo v0.31 prima di qualsiasi modifica codice.
+- chiudere formalmente `v0.31` su branch closeout;
+- preparare l'apertura di `v0.32` ArcGraph Terrain Renderer;
+- non iniziare implementazione terrain renderer senza nuovo `go`;
+- mantenere MapGrid come renderer visibile finche' il passaggio non sara' controllato.
 
 DOC SYNC:
 
@@ -58,12 +57,13 @@ DOC SYNC:
 - policy attivazione `v0.31e` definita: `InternalStateOnly`, niente attivazione automatica scena, niente rendering;
 - implementazione minima `v0.31f` completata: nucleo C# passivo del bootstrap ArcGraph;
 - QA `v0.31g` superata: compilazione isolata, no chiamate vietate, no modifiche a Core/MapGrid/scena/meta;
-- prossimo ramo operativo previsto: `ai-task/v0.31h-arcgraph-bootstrap-closeout`;
-- esecuzione autonoma autorizzata fino a fine `v0.31`, con stop solo per scelte progettuali non risolvibili conservativamente.
+- closeout `v0.31h` in completamento;
+- prossimo macro checkpoint previsto: `v0.32 - ArcGraph Terrain Renderer`;
+- non aprire lavoro implementativo `v0.32` senza nuovo `go`.
 
 OBIETTIVO:
 
-Chiudere `v0.31`, aggiornare Definition of Done, dichiarare debiti residui e preparare il prossimo macro checkpoint `v0.32` ArcGraph Terrain Renderer.
+Preparare la prossima fase `v0.32`, dedicata al primo terrain renderer produttivo ArcGraph, senza avviarla automaticamente.
 
 ---
 
@@ -149,7 +149,7 @@ Consolidato:
 ## v0.31 - ArcGraph Bootstrap controllato
 
 STATUS:
-v0.31g COMPLETATO / v0.31h IN CORSO
+COMPLETATA
 
 Obiettivo:
 
@@ -295,6 +295,14 @@ Esito `v0.31g`:
 3. Nessuna modifica a `Assets/Scripts/Core`, `Assets/Scripts/Views/MapGrid`, scene, `.meta`, `Library`, `Temp`, `Obj`.
 4. Nessuna chiamata operativa vietata rilevata.
 5. Nessun rendering produttivo introdotto.
+
+Esito `v0.31h`:
+
+1. Definition of Done `v0.31` completata.
+2. Roadmap aggiornata: `v0.31` completata, `v0.32` resta prossimo macro checkpoint.
+3. `ArcGraphBootstrapRuntime` resta nucleo C# passivo, non agganciato automaticamente alla scena.
+4. MapGrid resta renderer visibile.
+5. Il prossimo lavoro deve concentrarsi sul terrain renderer chunked, non su altri layer ambientali.
 
 ---
 
@@ -541,8 +549,9 @@ Confermato:
 
 Da completare:
 
-- closeout `v0.31h`;
-- decisione umana sul primo intervento operativo di bootstrap ArcGraph;
+- eventuale PR/review del blocco `v0.31`;
+- apertura operativa `v0.32` solo dopo nuovo `go`;
+- decisione umana su avvio operativo `v0.32` Terrain Renderer;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
 ---

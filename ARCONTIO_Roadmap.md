@@ -35,7 +35,7 @@
 | v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Completata fino a v0.20q |
 | v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | In corso |
 | v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | Completata come foundation |
-| v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | In analisi |
+| v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | Completata |
 | v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Pending |
 | v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Pending |
 | v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Pending |
@@ -1318,7 +1318,7 @@ La fase `v0.30` NON deve implementare:
 #### v0.31 - ArcGraph Bootstrap controllato
 
 ## Stato
-IN ANALISI / AUDIT-FIRST
+COMPLETATA
 
 ## Obiettivo
 
@@ -1404,7 +1404,7 @@ Quindi `v0.31` deve prima decidere il confine tra:
 | v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Completato |
 | v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Completato |
 | v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Completato |
-| v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Prossimo |
+| v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Completato |
 
 ## Esito audit v0.31a - Bootstrap legacy MapGrid
 
@@ -2198,22 +2198,103 @@ Prima versione desiderabile:
 
 | Criterio | Stato |
 |---|---|
-| Punto di bootstrap ArcGraph deciso | Pending |
-| Lifecycle `ArcGraphRenderState` definito | Pending |
-| Lifecycle `ArcGraphLayerStack` definito | Pending |
-| Registrazione layer foundation definita | Pending |
-| Strategia accesso `MapGridData` chiarita | Pending |
-| Strategia accesso `World` chiarita senza nuova onniscienza | Pending |
-| Nessun renderer produttivo attivato | Pending |
-| Nessun doppio renderer permanente introdotto | Pending |
-| Nessuna modifica a Core/Decision/Job | Pending |
-| QA minima documentata | Pending |
+| Punto di bootstrap ArcGraph deciso | Completato |
+| Lifecycle `ArcGraphRenderState` definito | Completato |
+| Lifecycle `ArcGraphLayerStack` definito | Completato |
+| Registrazione layer foundation definita | Completato |
+| Strategia accesso `MapGridData` chiarita | Completato |
+| Strategia accesso `World` chiarita senza nuova onniscienza | Completato |
+| Nessun renderer produttivo attivato | Completato |
+| Nessun doppio renderer permanente introdotto | Completato |
+| Nessuna modifica a Core/Decision/Job | Completato |
+| QA minima documentata | Completato |
 
 ## Nota architetturale v0.31
 
-`v0.31` e' una fase di accensione controllata, non di resa visiva.
+`v0.31` e' completata come fase di accensione controllata, non di resa visiva.
 
-Se questa fase viene fatta bene, `v0.32` potra' concentrarsi sul terrain renderer senza dover decidere anche bootstrap, ownership dei dati, lifecycle dei layer e policy anti-doppio-renderer.
+`v0.32` potra' concentrarsi sul terrain renderer senza dover decidere anche bootstrap, ownership dei dati, lifecycle dei layer e policy anti-doppio-renderer.
+
+## Closeout v0.31 - ArcGraph Bootstrap controllato
+
+`v0.31` chiude il passaggio da ArcGraph come sola foundation passiva a ArcGraph come sistema inizializzabile internamente.
+
+Output consolidato:
+
+```text
+ArcGraph puo' essere inizializzato
+-> render state creato
+-> layer stack creato
+-> layer foundation registrati
+-> adapter collegato
+-> snapshot interni copiabili
+-> diagnostica disponibile
+-> nessun rendering produttivo
+-> MapGrid resta renderer visibile
+```
+
+### Nuovo nucleo tecnico disponibile
+
+Il nucleo bootstrap e' composto da:
+
+```text
+ArcGraphBootstrapRuntime
+ArcGraphBootstrapActivationMode
+ArcGraphBootstrapStatus
+ArcGraphBootstrapOptions
+ArcGraphRuntimeContext
+ArcGraphBootstrapDiagnostics
+```
+
+### Stato architetturale finale
+
+Decisioni consolidate:
+
+- bootstrap come nucleo C# passivo;
+- nessun wrapper Unity in `v0.31`;
+- nessun aggancio automatico alla scena;
+- context dati esplicito;
+- snapshot copiati dall'adapter;
+- layer alimentati da snapshot, non da `World`;
+- policy `InternalStateOnly`;
+- placeholder futuri esclusi dal default;
+- diagnostica come output primario del checkpoint.
+
+### Cosa resta fuori
+
+Restano fuori da `v0.31`:
+
+- terrain renderer produttivo;
+- mesh chunk ArcGraph;
+- sprite actor/object ArcGraph visibili;
+- modalita' comparativa;
+- sostituzione MapGrid;
+- wrapper Unity di scena;
+- accesso concreto a `MapGridData` dal runtime scena;
+- overlay/debug migration;
+- environment visual layers.
+
+### Preparazione v0.32
+
+`v0.32` dovra' occuparsi del primo renderer produttivo: il terreno.
+
+Input gia' disponibili per `v0.32`:
+
+- `ArcGraphTerrainCellSnapshot`;
+- `ArcGraphTerrainLayer`;
+- `ArcGraphRenderState`;
+- `ArcGraphDirtyState`;
+- `ArcGraphBootstrapRuntime`;
+- snapshot terrain popolabili da `MapGridData`;
+- chunk dirty preparatorio.
+
+Domanda tecnica principale per `v0.32`:
+
+```text
+come trasformare ArcGraphTerrainLayer + dirty chunks
+in un renderer terrain chunked visibile
+senza attivare un doppio renderer permanente.
+```
 
 ---
 
