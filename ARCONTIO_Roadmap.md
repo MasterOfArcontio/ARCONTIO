@@ -38,7 +38,7 @@
 | v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | Completata |
 | v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Completata |
 | v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Completata nel perimetro sicuro |
-| v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Pending |
+| v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Completata nel perimetro passivo |
 | v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | Pending |
 | v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | Pending |
 | v0.37 | ArcGraph Debug/Overlay Migration | Settembre 2026 | Pending |
@@ -3803,7 +3803,7 @@ Per coerenza con `v0.31`-`v0.33`, la prima parte della `v0.34` dovrebbe restare 
 #### v0.34 - ArcGraph Actor/Object Renderer
 
 ## Stato
-IN CORSO / AUDIT-FIRST
+COMPLETATA NEL PERIMETRO PASSIVO
 
 ## Obiettivo
 
@@ -3828,7 +3828,7 @@ Il renderer dovra':
 | v0.34d | Builder actor render queue | Completato |
 | v0.34e | Sorting e filtri LOD per zoom | Completato |
 | v0.34f | Harness smoke actor/object senza scena | Completato |
-| v0.34g | QA, closeout e preparazione v0.35 | Pending |
+| v0.34g | QA, closeout e preparazione v0.35 | Completato |
 
 ## Vincolo v0.34
 
@@ -4289,6 +4289,101 @@ Eseguire QA finale e closeout:
 - verifica documentale roadmap/taskboard;
 - diario Notion;
 - preparazione `v0.35`.
+
+## Esito v0.34g - QA finale e closeout
+
+La `v0.34` e' chiusa nel perimetro passivo.
+
+La versione ha prodotto:
+
+- contratti actor/object render item;
+- sort key deterministica;
+- diagnostica render queue;
+- copia sequenziale read-only da actor/object layer;
+- builder object render queue;
+- builder actor render queue;
+- queue combinata actor/object;
+- entries globali ordinate;
+- harness smoke senza scena.
+
+### Definition of Done v0.34
+
+Completato:
+
+- audit actor/object layer e snapshot;
+- contratti `ArcGraphActorRenderItem` e `ArcGraphObjectRenderItem`;
+- `ArcGraphRenderSortKey`;
+- `ArcGraphRenderQueueDiagnostics`;
+- `ArcGraphObjectRenderQueueBuilder`;
+- `ArcGraphActorRenderQueueBuilder`;
+- `ArcGraphRenderQueue`;
+- `ArcGraphRenderQueueBuilder`;
+- `ArcGraphRenderQueueHarness`.
+
+### Cosa non e' stato implementato
+
+Non sono stati implementati:
+
+- `GameObject`;
+- `SpriteRenderer`;
+- caricamento sprite;
+- caricamento atlas;
+- caricamento materiali;
+- aggancio camera;
+- modifica scene Unity;
+- sostituzione MapGrid;
+- doppio renderer permanente;
+- vestizione actor a layer;
+- movimento multi-tick reale.
+
+### QA finale
+
+Verifiche eseguite:
+
+- diff scope rispetto a `v0.33h`;
+- ricerca chiamate operative vietate in `Assets/Scripts/Views/ArcGraph/Runtime`;
+- controllo assenza modifiche a `Core`, `MapGrid`, scene Unity, `.meta`, `Library`, `Temp`, `Obj`;
+- controllo `git diff --check`.
+
+Esito:
+
+```text
+QA scope superata.
+```
+
+Nota compilazione:
+
+La build Unity completa non e' stata rieseguita in `v0.34g`, per lo stesso motivo documentato in `v0.33h`: il build da `.csproj` richiede restore in `Temp`, area che Codex non deve modificare.
+
+### Debiti residui
+
+Restano fuori dalla `v0.34`:
+
+- bridge scena reale;
+- risoluzione sprite/atlas/materiali;
+- classificazione oggetti `minor/important`;
+- actor layered sprites effettivi;
+- interpolazione movimento reale da Job Layer.
+
+### Preparazione v0.35
+
+La `v0.35` dovra' concentrarsi solo sul bridge movimento actor:
+
+```text
+running movement read-only
+-> origine/destinazione/progresso
+-> ArcGraphActorMotionSnapshot
+-> ArcGraphActorVisualPoseSnapshot
+-> actor render item con posizione frazionaria
+```
+
+La `v0.35` non dovra' permettere alla view di:
+
+- chiamare `SetNpcPos`;
+- completare job;
+- interrompere running action;
+- correggere pathfinding;
+- decidere destinazioni.
 
 ---
 

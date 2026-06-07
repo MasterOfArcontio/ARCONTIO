@@ -25,26 +25,26 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.34 - ArcGraph Actor/Object Renderer
+## MACRO JOB ATTIVO: v0.35 - ArcGraph Actor Motion Runtime Bridge
 
 CHECKPOINT CORRENTE:
-`v0.34a - Audit actor/object renderer passivo`
+`attesa apertura operativa v0.35`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / v0.34 AVVIATA
+ATTESA GO / v0.34 COMPLETATA NEL PERIMETRO PASSIVO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.34a-arcgraph-actor-object-audit`
+`ai-task/v0.34g-arcgraph-actor-object-closeout`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- completare audit `v0.34a`;
-- definire render item passivi actor/object;
-- costruire render queue passive per actor/object;
-- applicare LOD e sorting senza scena;
+- attendere autorizzazione operativa per `v0.35`;
+- preparare bridge read-only per movimento actor;
+- non permettere alla view di mutare posizione NPC;
+- non permettere alla view di completare o interrompere job;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
 - non introdurre doppio renderer permanente;
@@ -94,11 +94,25 @@ DOC SYNC:
 - closeout `v0.33h` completato: Definition of Done, debiti residui e preparazione `v0.34`;
 - prossimo macro checkpoint previsto: `v0.34 - ArcGraph Actor/Object Renderer`;
 - apertura operativa `v0.34` autorizzata dall'operatore;
-- branch `ai-task/v0.34a-arcgraph-actor-object-audit` aperto.
+- branch `ai-task/v0.34a-arcgraph-actor-object-audit` aperto;
+- audit `v0.34a` completato: layer actor/object, snapshot, adapter e LOD;
+- branch `ai-task/v0.34b-arcgraph-render-items` aperto;
+- contratti `v0.34b` implementati: render item actor/object, sort key, diagnostics;
+- branch `ai-task/v0.34c-arcgraph-object-render-queue` aperto;
+- object queue `v0.34c` implementata;
+- branch `ai-task/v0.34d-arcgraph-actor-render-queue` aperto;
+- actor queue `v0.34d` implementata;
+- branch `ai-task/v0.34e-arcgraph-combined-render-queue` aperto;
+- queue combinata `v0.34e` implementata;
+- branch `ai-task/v0.34f-arcgraph-render-queue-harness` aperto;
+- harness `v0.34f` implementato;
+- branch `ai-task/v0.34g-arcgraph-actor-object-closeout` aperto;
+- closeout `v0.34g` completato;
+- prossimo macro checkpoint previsto: `v0.35 - ArcGraph Actor Motion Runtime Bridge`.
 
 OBIETTIVO:
 
-Procedere in autonomia dentro il perimetro passivo della `v0.34`.
+Attendere il `go` operativo per iniziare `v0.35`.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -150,7 +164,7 @@ Checkpoint v0.34:
 | v0.34d | Builder actor render queue | Completato |
 | v0.34e | Sorting e filtri LOD per zoom | Completato |
 | v0.34f | Harness smoke actor/object senza scena | Completato |
-| v0.34g | QA, closeout e preparazione v0.35 | Pending |
+| v0.34g | QA, closeout e preparazione v0.35 | Completato |
 
 Esito v0.34a:
 
@@ -269,6 +283,30 @@ Esito v0.34f:
 Indicazione per `v0.34g`:
 
 Chiudere QA e closeout della `v0.34`, aggiornare roadmap/taskboard/Notion e preparare `v0.35`.
+
+Esito v0.34g:
+
+- `v0.34` completata nel perimetro passivo;
+- prodotte queue actor/object value-only;
+- prodotto harness smoke senza scena;
+- nessun `GameObject`;
+- nessun `SpriteRenderer`;
+- nessun asset load;
+- nessuna modifica a scene;
+- nessuna modifica a Core/MapGrid;
+- QA scope superata;
+- `v0.35` preparata come prossimo macro checkpoint.
+
+Indicazione per `v0.35`:
+
+La prossima versione dovra' collegare il movimento multi-tick reale agli snapshot visuali actor, ma solo tramite contratto read-only.
+
+Vietato:
+
+- chiamare `SetNpcPos`;
+- completare job dalla view;
+- interrompere running action dalla view;
+- correggere pathfinding dalla view.
 
 Esito audit v0.33a:
 
