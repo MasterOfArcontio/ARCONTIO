@@ -34,7 +34,7 @@ STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.36.01-arcgraph-vegetation-renderer`
+`ai-task/v0.36.02-arcgraph-water-renderer`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -133,6 +133,7 @@ DOC SYNC:
 - aggiunto `ArcGraphVegetationRenderQueueBuilder`;
 - aggiunto `ArcGraphVegetationRenderQueueHarness`;
 - vegetazione non ancora fusa nella queue globale actor/object;
+- branch `ai-task/v0.36.02-arcgraph-water-renderer` aperto;
 - prossimo step fermo in attesa go: Water Renderer preparatorio.
 
 OBIETTIVO:

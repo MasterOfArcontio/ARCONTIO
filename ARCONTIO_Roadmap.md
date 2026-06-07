@@ -4663,7 +4663,7 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 |---|---|---|
 | v0.36a | Audit e contratto preparatorio layer ambientali visuali | Completato |
 | v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Completato nel perimetro passivo |
-| v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Pending |
+| v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | In attesa go operatore |
 | v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Pending |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
 | v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
@@ -4875,6 +4875,16 @@ Prossimo step:
 Il prossimo step dovra' seguire lo stesso schema: snapshot acqua gia' prodotti da
 sistemi esterni, item renderizzabili passivi, LOD, nessun flusso idraulico
 produttivo.
+
+Branch aperto:
+
+```text
+ai-task/v0.36.02-arcgraph-water-renderer
+```
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul codice acqua.
 
 ---
 
