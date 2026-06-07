@@ -1399,8 +1399,8 @@ Quindi `v0.31` deve prima decidere il confine tra:
 |---|---|---|
 | v0.31a | Audit bootstrap legacy: `MapGridBootstrap`, ownership di `MapGridData`, camera, input provider, `MapGridWorldView` | Completato |
 | v0.31b | Definizione contratto bootstrap ArcGraph: cosa inizializza, cosa non inizializza, cosa espone | Completato |
-| v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Prossimo |
-| v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Pending |
+| v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Completato |
+| v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Prossimo |
 | v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Pending |
 | v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Pending |
 | v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Pending |
@@ -1625,6 +1625,94 @@ Non possiede la camera.
 Non possiede l'input.
 Non disegna.
 ```
+
+## Esito v0.31c - Forma concreta del bootstrap
+
+La forma scelta per il primo bootstrap controllato ArcGraph e':
+
+```text
+nucleo C# passivo
++ eventuale wrapper Unity futuro
++ nessun aggancio automatico alla scena in v0.31
+```
+
+Nome concettuale del nucleo:
+
+```text
+ArcGraphBootstrapRuntime
+```
+
+Questa forma e' preferibile perche':
+
+- non dipende da `MonoBehaviour`;
+- non usa `Awake`, `Start`, `Update` o coroutine;
+- non crea un secondo lifecycle grafico Unity accanto a `MapGridBootstrap`;
+- e' testabile con compilazione isolata o test EditMode futuri;
+- puo' essere inizializzata esplicitamente da un harness, da un wrapper o da un bootstrap scena solo quando la policy di attivazione sara' definita;
+- mantiene `arcgraph` come sistema interno controllato, non come renderer automatico.
+
+### Alternative valutate
+
+| Forma | Esito | Motivo |
+|---|---|---|
+| Servizio C# passivo puro | Scelto come nucleo | Massimo controllo, nessun lifecycle Unity nascosto |
+| `MonoBehaviour` minimo dedicato | Rinviato | Utile come wrapper futuro, ma troppo presto per legarlo alla scena |
+| Estensione di `MapGridBootstrap` | Scartata per v0.31 | Darebbe accesso facile a `MapGridData`, ma aumenterebbe il coupling col legacy |
+| Harness debug separato | Utile per test, non come forma primaria | Sicuro, ma rischia di non rappresentare il runtime reale |
+
+### Forma consigliata per v0.31f
+
+La patch minima futura dovrebbe introdurre:
+
+```text
+ArcGraphBootstrapRuntime
+ArcGraphBootstrapOptions
+ArcGraphBootstrapDiagnostics
+ArcGraphBootstrapStatus
+ArcGraphRuntimeContext
+```
+
+Il runtime deve poter essere inizializzato da codice, ma non deve ancora essere inserito automaticamente nella scena.
+
+Esempio logico:
+
+```text
+var bootstrap = new ArcGraphBootstrapRuntime();
+bootstrap.Initialize(context, options);
+
+diagnostics = bootstrap.Diagnostics;
+```
+
+Questo esempio non implica ancora un uso produttivo in scena. Serve solo a rendere verificabile che ArcGraph possa accendersi.
+
+### Wrapper Unity
+
+Il wrapper Unity resta ammesso solo come strato successivo, con responsabilita' limitata:
+
+```text
+ArcGraphBootstrapBehaviour
+-> riceve riferimenti/flag dalla scena
+-> costruisce un ArcGraphRuntimeContext
+-> chiama ArcGraphBootstrapRuntime.Initialize(...)
+-> espone diagnostica
+-> non disegna
+```
+
+Non deve essere introdotto se per implementarlo bisogna modificare subito `MapGridBootstrap`, scene, prefab o asset.
+
+### Decisione v0.31c
+
+Decisione operativa:
+
+```text
+v0.31f implementera' prima il nucleo C# passivo.
+Il wrapper Unity resta futuro o opzionale, non requisito della chiusura v0.31.
+```
+
+Questa scelta evita due errori:
+
+- trasformare ArcGraph in un secondo renderer prima del terrain renderer;
+- aumentare `MapGridBootstrap` per comodita' di accesso ai dati.
 
 ## Ipotesi iniziale consigliata
 

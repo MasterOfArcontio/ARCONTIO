@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
 
 CHECKPOINT CORRENTE:
-`v0.31c - Decisione forma bootstrap ArcGraph`
+`v0.31d - Strategia accesso dati ArcGraph`
 
 STATUS:
-ATTESA GO / CONTRATTO v0.31b DEFINITO
+IN ESECUZIONE AUTONOMA / FORMA v0.31c DECISA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.31c-arcgraph-bootstrap-shape`
+`ai-task/v0.31d-arcgraph-data-access`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -53,12 +53,13 @@ DOC SYNC:
 - branch `ai-task/v0.31-arcgraph-bootstrap-analysis` aperto da closeout `v0.30j`;
 - audit `v0.31a` completato e documentato;
 - contratto bootstrap `v0.31b` definito;
-- prossimo ramo operativo previsto: `ai-task/v0.31c-arcgraph-bootstrap-shape`;
-- diario Notion aggiornato con chiusura `v0.31b` e apertura `v0.31c`.
+- forma bootstrap `v0.31c` decisa: nucleo C# passivo, wrapper Unity rinviato;
+- prossimo ramo operativo previsto: `ai-task/v0.31d-arcgraph-data-access`;
+- esecuzione autonoma autorizzata fino a fine `v0.31`, con stop solo per scelte progettuali non risolvibili conservativamente.
 
 OBIETTIVO:
 
-Decidere la forma concreta del bootstrap controllato di `arcgraph`: servizio C# passivo, `MonoBehaviour` minimo, harness debug separato o combinazione prudente. Lo scopo resta non disegnare e non sostituire `MapGrid`.
+Definire come ArcGraph riceve `MapGridData`, `MapGridConfig` e `World` senza leggere globalmente `SimulationHost`, senza entrare in `MapGridWorldView` e senza mutare lo stato simulativo.
 
 ---
 
@@ -144,7 +145,7 @@ Consolidato:
 ## v0.31 - ArcGraph Bootstrap controllato
 
 STATUS:
-v0.31b COMPLETATO / v0.31c IN ATTESA GO
+v0.31c COMPLETATO / v0.31d IN CORSO
 
 Obiettivo:
 
@@ -163,11 +164,11 @@ Componenti da valutare:
 
 Domande aperte:
 
-1. Il bootstrap ArcGraph deve essere un servizio C# passivo?
-2. Deve avere un wrapper `MonoBehaviour` minimo in scena?
-3. Serve prima un harness debug separato?
-4. Quale forma riduce meglio il coupling con `MapGridBootstrap`?
-5. Quale forma prepara meglio `v0.31f` senza anticipare rendering produttivo?
+1. Quale runtime context fornisce i dati ad ArcGraph?
+2. Come rappresentare `MapGridData` come sorgente read-only, anche se la classe e' mutabile?
+3. Come fornire `World` senza far leggere `SimulationHost.Instance` al bootstrap?
+4. Quale validazione minima serve quando i dati non sono ancora disponibili?
+5. Quali dipendenze restano fuori dal bootstrap fino a `v0.32`?
 
 Vincoli:
 
@@ -213,6 +214,21 @@ Non possiede la mappa.
 Non possiede la camera.
 Non possiede l'input.
 Non disegna.
+```
+
+Esito `v0.31c`:
+
+1. La forma scelta per il primo bootstrap e' un nucleo C# passivo.
+2. Il nome concettuale del nucleo e' `ArcGraphBootstrapRuntime`.
+3. Il wrapper Unity viene rinviato: potra' esistere solo come adattatore leggero e non come fonte primaria del lifecycle.
+4. L'estensione diretta di `MapGridBootstrap` e' scartata per v0.31, per non aumentare il coupling legacy.
+5. Un harness debug puo' aiutare i test, ma non diventa la forma primaria del sistema.
+
+Decisione:
+
+```text
+v0.31f implementera' prima il nucleo C# passivo.
+Nessun aggancio automatico alla scena e nessun renderer produttivo.
 ```
 
 ---
@@ -460,7 +476,11 @@ Confermato:
 
 Da completare:
 
-- decisione forma bootstrap `v0.31c`;
+- strategia accesso dati `v0.31d`;
+- policy attivazione `v0.31e`;
+- implementazione minima `v0.31f`;
+- QA `v0.31g`;
+- closeout `v0.31h`;
 - decisione umana sul primo intervento operativo di bootstrap ArcGraph;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
