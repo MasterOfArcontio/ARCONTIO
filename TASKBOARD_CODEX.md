@@ -143,11 +143,21 @@ DOC SYNC:
 - aggiunto `ArcGraphWaterRenderQueueHarness`;
 - acqua non ancora fusa nella queue globale actor/object;
 - branch `ai-task/v0.36.03-arcgraph-light-renderer` aperto;
+- apertura `v0.36.03` documentata: Light Renderer preparatorio, nessuna luce Unity, nessuna propagazione luce produttiva;
 - prossimo step fermo in attesa go: Light Renderer preparatorio.
 
 OBIETTIVO:
 
 Preparare il prossimo step `v0.36.03 - Light Renderer` e attendere go prima di nuove modifiche.
+
+Scope immediato `v0.36.03`:
+
+- audit `ArcGraphLightLayer` e snapshot luce disponibili;
+- definizione item/overlay passivi per tinta globale, luce locale, giorno/notte e buio stanza;
+- uso della policy LOD gia' definita;
+- nessuna creazione di luci Unity;
+- nessuna simulazione produttiva di propagazione luce;
+- nessuna modifica a scene, prefab o asset.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 

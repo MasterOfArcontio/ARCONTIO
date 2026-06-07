@@ -4976,6 +4976,29 @@ Gate:
 
 Attendere go operatore prima di modifiche operative sul codice luce.
 
+## Apertura v0.36.03 - Light Renderer preparatorio
+
+Branch:
+
+```text
+ai-task/v0.36.03-arcgraph-light-renderer
+```
+
+Scope previsto:
+
+- audit del placeholder `ArcGraphLightLayer` e dello snapshot luce gia' presente;
+- definizione item/overlay passivi per tinta globale e luce locale;
+- gestione preparatoria di giorno/notte come dato visuale ricevuto dall'esterno;
+- gestione preparatoria di buio stanza come snapshot/overlay, non come calcolo stanza;
+- relazione con LOD zoom `v0.33f`;
+- nessuna luce Unity creata;
+- nessuna simulazione produttiva di propagazione luce;
+- nessuna modifica scena.
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul codice luce.
+
 ---
 
 #### v0.37 - ArcGraph Debug/Overlay Migration
