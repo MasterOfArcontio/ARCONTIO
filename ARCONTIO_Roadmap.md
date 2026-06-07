@@ -1402,8 +1402,8 @@ Quindi `v0.31` deve prima decidere il confine tra:
 | v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Completato |
 | v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Completato |
 | v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Completato |
-| v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Prossimo |
-| v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Pending |
+| v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Completato |
+| v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Prossimo |
 | v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Pending |
 
 ## Esito audit v0.31a - Bootstrap legacy MapGrid
@@ -1958,6 +1958,129 @@ Il bootstrap si attiva solo con chiamata esplicita.
 La modalita' consentita e' InternalStateOnly.
 Il rendering resta sempre spento.
 ```
+
+## Esito v0.31f - Implementazione bootstrap minimo controllato
+
+Implementato il nucleo C# passivo del bootstrap ArcGraph.
+
+Nuovi file:
+
+```text
+ArcGraphBootstrapActivationMode.cs
+ArcGraphBootstrapStatus.cs
+ArcGraphBootstrapOptions.cs
+ArcGraphRuntimeContext.cs
+ArcGraphBootstrapDiagnostics.cs
+ArcGraphBootstrapRuntime.cs
+```
+
+### Cosa fa
+
+`ArcGraphBootstrapRuntime` puo':
+
+- inizializzare `ArcGraphRenderState`;
+- inizializzare `ArcGraphLayerStack`;
+- registrare i layer foundation;
+- creare `ArcGraphWorldAdapter`;
+- ricevere `ArcGraphRuntimeContext`;
+- copiare snapshot terreno, oggetti e actor in liste interne;
+- alimentare le cache dei layer tramite `ReplaceSnapshots`;
+- esporre diagnostica leggibile.
+
+### Cosa non fa
+
+Il bootstrap implementato non:
+
+- eredita da `MonoBehaviour`;
+- crea `GameObject`;
+- crea `SpriteRenderer`;
+- crea `MeshRenderer`;
+- crea mesh;
+- carica asset;
+- legge `SimulationHost.Instance`;
+- cerca oggetti scena;
+- modifica `World`;
+- modifica `MapGridData`;
+- modifica `MapGridBootstrap`;
+- modifica `MapGridWorldView`;
+- sostituisce il renderer visibile.
+
+### Runtime context
+
+`ArcGraphRuntimeContext` contiene riferimenti opzionali a:
+
+```text
+MapGridConfig
+MapGridData
+World
+```
+
+Il context puo' essere parziale o vuoto. In quel caso il bootstrap puo' comunque accendere stato e layer, ma non popola gli snapshot mancanti.
+
+### Opzioni
+
+`ArcGraphBootstrapOptions` espone:
+
+```text
+ActivationMode
+IncludeFuturePlaceholderLayers
+PopulateInitialSnapshots
+AllowPartialRuntimeContext
+VisibleZLevel
+DefaultTileSizeWorld
+DefaultChunkSizeCells
+```
+
+Default operativo:
+
+```text
+ActivationMode = InternalStateOnly
+IncludeFuturePlaceholderLayers = false
+PopulateInitialSnapshots = true
+AllowPartialRuntimeContext = true
+```
+
+### Diagnostica
+
+`ArcGraphBootstrapDiagnostics` espone:
+
+```text
+Status
+Reason
+HasRenderState
+HasLayerStack
+HasAdapter
+HasRuntimeContext
+HasConfig
+HasMap
+HasWorld
+LayerCount
+TerrainSnapshotCount
+ObjectSnapshotCount
+ActorSnapshotCount
+DoesRenderAnything = false
+```
+
+### QA preliminare v0.31f
+
+Compilazione isolata riuscita sull'intera cartella:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime
+```
+
+Controllo testuale delle chiamate vietate:
+
+```text
+nessun new GameObject(...)
+nessun Resources.Load(...)
+nessun AddComponent/GetComponent operativo
+nessun FindObjectOfType operativo
+nessuna ereditarieta' MonoBehaviour
+nessuna chiamata SetNpcPos(...)
+```
+
+Resta da eseguire il checkpoint QA dedicato `v0.31g`.
 
 ## Ipotesi iniziale consigliata
 

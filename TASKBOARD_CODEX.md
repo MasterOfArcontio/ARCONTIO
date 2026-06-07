@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
 
 CHECKPOINT CORRENTE:
-`v0.31f - Implementazione bootstrap minimo ArcGraph`
+`v0.31g - QA bootstrap minimo ArcGraph`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / POLICY v0.31e DEFINITA
+IN ESECUZIONE AUTONOMA / IMPLEMENTAZIONE v0.31f COMPLETATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.31f-arcgraph-minimal-bootstrap`
+`ai-task/v0.31g-arcgraph-bootstrap-qa`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -56,12 +56,13 @@ DOC SYNC:
 - forma bootstrap `v0.31c` decisa: nucleo C# passivo, wrapper Unity rinviato;
 - strategia accesso dati `v0.31d` definita: runtime context esplicito, niente letture globali;
 - policy attivazione `v0.31e` definita: `InternalStateOnly`, niente attivazione automatica scena, niente rendering;
-- prossimo ramo operativo previsto: `ai-task/v0.31f-arcgraph-minimal-bootstrap`;
+- implementazione minima `v0.31f` completata: nucleo C# passivo del bootstrap ArcGraph;
+- prossimo ramo operativo previsto: `ai-task/v0.31g-arcgraph-bootstrap-qa`;
 - esecuzione autonoma autorizzata fino a fine `v0.31`, con stop solo per scelte progettuali non risolvibili conservativamente.
 
 OBIETTIVO:
 
-Implementare il nucleo C# passivo del bootstrap ArcGraph, senza aggancio automatico alla scena, senza renderer produttivo e senza modifiche a Core, Decision Layer, Job Layer o MapGrid legacy.
+Verificare che il bootstrap ArcGraph minimo compili, non disegni, non muti sorgenti runtime, non legga globali e non introduca doppio renderer permanente.
 
 ---
 
@@ -147,7 +148,7 @@ Consolidato:
 ## v0.31 - ArcGraph Bootstrap controllato
 
 STATUS:
-v0.31e COMPLETATO / v0.31f IN CORSO
+v0.31f COMPLETATO / v0.31g IN CORSO
 
 Obiettivo:
 
@@ -166,11 +167,11 @@ Componenti da valutare:
 
 Domande aperte:
 
-1. Quali file minimi introdurre sotto `Assets/Scripts/Views/ArcGraph/Runtime`?
-2. Come mantenere il bootstrap idempotente?
-3. Come popolare snapshot iniziali senza mutare sorgenti?
-4. Come esporre diagnostica senza UI o renderer?
-5. Come verificare che non compaiano `GameObject`, renderer, asset load o global access?
+1. La compilazione isolata della cartella ArcGraph riesce?
+2. Il diff tocca solo ArcGraph runtime e documenti operativi?
+3. Esistono chiamate operative vietate?
+4. Sono stati modificati Core, Decision Layer, Job Layer, MapGrid legacy, scene o `.meta`?
+5. La diagnostica conferma `DoesRenderAnything = false`?
 
 Vincoli:
 
@@ -265,6 +266,25 @@ Decisione:
 v0.31f puo' implementare il nucleo C# passivo.
 Il bootstrap si accende solo con chiamata esplicita.
 Il rendering resta sempre spento.
+```
+
+Esito `v0.31f`:
+
+1. Aggiunto nucleo C# passivo `ArcGraphBootstrapRuntime`.
+2. Aggiunti contratti: activation mode, status, options, runtime context, diagnostics.
+3. Il runtime puo' creare render state, layer stack, adapter e snapshot interni.
+4. Il runtime non e' un `MonoBehaviour`, non crea GameObject, non carica asset e non crea renderer Unity.
+5. La compilazione isolata della cartella ArcGraph runtime e' riuscita.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapActivationMode.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapStatus.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapOptions.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRuntimeContext.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapDiagnostics.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapRuntime.cs
 ```
 
 ---
@@ -512,7 +532,6 @@ Confermato:
 
 Da completare:
 
-- implementazione minima `v0.31f`;
 - QA `v0.31g`;
 - closeout `v0.31h`;
 - decisione umana sul primo intervento operativo di bootstrap ArcGraph;
