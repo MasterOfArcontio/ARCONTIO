@@ -102,6 +102,45 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // CopySnapshotsTo
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia tutti gli snapshot oggetto correnti dentro una lista fornita dal
+        /// chiamante.
+        /// </para>
+        ///
+        /// <para><b>Lettura sequenziale senza esposizione della cache interna</b></para>
+        /// <para>
+        /// Il futuro builder della render queue deve poter percorrere tutti gli
+        /// oggetti senza interrogare il <c>World</c>. Questo metodo fornisce quella
+        /// uscita read-only copiando value type in una lista esterna. Il dizionario
+        /// interno resta privato e non viene esposto come collezione mutabile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>target</b>: lista da popolare con copie degli snapshot.</item>
+        ///   <item><b>clearTarget</b>: se true, svuota la lista prima della copia.</item>
+        /// </list>
+        /// </summary>
+        public void CopySnapshotsTo(
+            IList<ArcGraphObjectVisualSnapshot> target,
+            bool clearTarget = true)
+        {
+            if (target == null)
+                return;
+
+            if (clearTarget)
+                target.Clear();
+
+            foreach (var pair in _objects)
+            {
+                target.Add(pair.Value);
+            }
+        }
+
+        // =============================================================================
         // ClearSnapshots
         // =============================================================================
         /// <summary>

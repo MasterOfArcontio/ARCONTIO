@@ -146,7 +146,7 @@ Checkpoint v0.34:
 |---|---|---|
 | v0.34a | Audit actor/object layer, snapshot, adapter e LOD | Completato |
 | v0.34b | Contratti render item passivi actor/object | Completato |
-| v0.34c | Builder object render queue | Pending |
+| v0.34c | Builder object render queue | Completato |
 | v0.34d | Builder actor render queue | Pending |
 | v0.34e | Sorting e filtri LOD per zoom | Pending |
 | v0.34f | Harness smoke actor/object senza scena | Pending |
@@ -202,6 +202,22 @@ Indicazione per `v0.34c`:
 Costruire il builder object render queue.
 
 Prima serve aggiungere a `ArcGraphObjectLayer` una lettura sequenziale controllata, ad esempio `CopySnapshotsTo(...)`, per evitare di esporre il dizionario interno.
+
+Esito v0.34c:
+
+- aggiunto `ArcGraphObjectLayer.CopySnapshotsTo(...)`;
+- aggiunto `ArcGraphObjectRenderQueueBuilder`;
+- il builder produce `ArcGraphObjectRenderItem`;
+- il builder ordina via `ArcGraphRenderSortKey`;
+- gli oggetti held vengono marcati nascosti come `HeldObject`;
+- gli oggetti senza sprite key vengono marcati nascosti come `MissingSpriteKey`;
+- nessuna lettura `World`;
+- nessun asset load;
+- nessuna scena.
+
+Indicazione per `v0.34d`:
+
+Costruire il builder actor render queue usando `ArcGraphActorLayer`, `ArcGraphActorVisualSnapshot.ResolvePose()` e la policy LOD actor.
 
 Esito audit v0.33a:
 

@@ -3824,7 +3824,7 @@ Il renderer dovra':
 |---|---|---|
 | v0.34a | Audit actor/object layer, snapshot, adapter e policy LOD | Completato |
 | v0.34b | Contratti render item passivi per actor/object | Completato |
-| v0.34c | Builder object render queue | Pending |
+| v0.34c | Builder object render queue | Completato |
 | v0.34d | Builder actor render queue | Pending |
 | v0.34e | Sorting e filtri LOD per zoom | Pending |
 | v0.34f | Harness smoke actor/object senza scena | Pending |
@@ -4057,6 +4057,64 @@ ArcGraphObjectLayer
 ```
 
 Per farlo serve aggiungere al layer un metodo read-only di copia snapshot, senza esporre il dizionario interno.
+
+## Esito v0.34c - Builder object render queue
+
+Implementata la costruzione passiva della queue oggetti.
+
+File modificati:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphObjectLayer.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphObjectRenderQueueBuilder.cs
+```
+
+### Aggiunte principali
+
+`ArcGraphObjectLayer.CopySnapshotsTo(...)`:
+
+- copia gli snapshot oggetto in una lista fornita dal chiamante;
+- non espone il dizionario interno;
+- non legge `World`;
+- non modifica gli oggetti;
+- consente al builder di lavorare solo su snapshot value-only.
+
+`ArcGraphObjectRenderQueueBuilder`:
+
+- legge `ArcGraphObjectLayer`;
+- applica `ArcGraphZoomLodProfile`;
+- produce `ArcGraphObjectRenderItem`;
+- calcola `ArcGraphRenderSortKey`;
+- ordina la lista target;
+- produce `ArcGraphRenderQueueDiagnostics`.
+
+### Policy v0.34c
+
+Gli oggetti trasportati (`IsHeld`) vengono marcati nascosti con motivo `HeldObject`.
+
+Motivo:
+
+- un oggetto tenuto da un actor non dovrebbe essere disegnato come oggetto appoggiato alla cella;
+- in futuro potra' essere mostrato come parte dell'actor o come attachment;
+- in `v0.34` non viene ancora implementato quel caso.
+
+Gli oggetti senza `SpriteKey` vengono marcati nascosti con motivo `MissingSpriteKey`.
+
+La policy `HideMinorObjects` non viene usata per nascondere oggetti in assenza di un dato esplicito `minor/important`.
+
+### Prossimo passo v0.34d
+
+Costruire il builder actor queue:
+
+```text
+ArcGraphActorLayer
+-> snapshot actor
+-> posa visuale risolta
+-> ArcGraphActorRenderItem
+-> lista ordinabile
+```
+
+Anche qui servira' un metodo read-only di copia snapshot su `ArcGraphActorLayer`.
 
 ---
 
