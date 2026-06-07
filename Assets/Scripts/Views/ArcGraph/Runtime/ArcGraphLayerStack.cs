@@ -116,6 +116,40 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // RegisterFuturePlaceholderLayers
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra i layer placeholder futuri previsti dal checkpoint <c>v0.30h</c>.
+        /// </para>
+        ///
+        /// <para><b>Placeholder espliciti, non bootstrap automatico</b></para>
+        /// <para>
+        /// Water, Vegetation, Light, Weather ed Effect sono slot grafici futuri. Il
+        /// metodo li registra solo quando il chiamante lo richiede esplicitamente:
+        /// non sono inclusi nei layer foundation di default per evitare che il
+        /// runtime attuale sembri avere gia' sistemi ambientali produttivi.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Water</b>: cache visuale liquidi.</item>
+        ///   <item><b>Vegetation</b>: cache visuale vegetazione.</item>
+        ///   <item><b>Light</b>: cache visuale luce.</item>
+        ///   <item><b>Weather</b>: overlay meteo globale o per livello.</item>
+        ///   <item><b>Effect</b>: effetti locali come fuoco e fumo.</item>
+        /// </list>
+        /// </summary>
+        public void RegisterFuturePlaceholderLayers()
+        {
+            Register(new ArcGraphWaterLayer(), out _);
+            Register(new ArcGraphVegetationLayer(), out _);
+            Register(new ArcGraphLightLayer(), out _);
+            Register(new ArcGraphWeatherLayer(), out _);
+            Register(new ArcGraphEffectLayer(), out _);
+        }
+
+        // =============================================================================
         // InitializeAll
         // =============================================================================
         /// <summary>
