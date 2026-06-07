@@ -28,22 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
 
 CHECKPOINT CORRENTE:
-`v0.33e - Coordinate screen/world/cell e clamp viewport`
+`v0.33f - Policy LOD per zoom`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / v0.33d COMPLETATA
+IN ESECUZIONE AUTONOMA / v0.33e COMPLETATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.33d-arcgraph-pan-zoom-controller`
+`ai-task/v0.33e-arcgraph-view-coordinates`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- implementare conversione coordinate passiva screen/viewport/cella;
-- usare `ArcGraphViewState` e rettangolo celle visibili;
-- non usare ancora camera produttiva Unity;
+- implementare policy LOD leggibile dai renderer futuri;
+- rendere espliciti animazioni, sprite layered e rappresentazione semplificata per zoom;
+- non modificare ancora renderer actor/object produttivi;
 - mantenere MapGrid come renderer produttivo;
 - usare ArcGraph terrain solo come output debug/test;
 - evitare doppio renderer permanente;
@@ -81,11 +81,13 @@ DOC SYNC:
 - configurazione `v0.33c` implementata: DTO JSON, parser da stringa e JSON default ArcGraph;
 - branch `ai-task/v0.33d-arcgraph-pan-zoom-controller` aperto;
 - controller `v0.33d` implementato: zoom discreto, pan astratto, diagnostica e harness smoke;
-- prossimo branch previsto: `ai-task/v0.33e-arcgraph-view-coordinates`.
+- branch `ai-task/v0.33e-arcgraph-view-coordinates` aperto;
+- coordinate `v0.33e` implementate: mapper viewport/cella, risultato diagnostico e harness smoke;
+- prossimo branch previsto: `ai-task/v0.33f-arcgraph-zoom-lod-policy`.
 
 OBIETTIVO:
 
-Procedere in autonomia verso `v0.33e`, salvo scelta progettuale non deducibile.
+Procedere in autonomia verso `v0.33f`, salvo scelta progettuale non deducibile.
 
 La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -112,8 +114,8 @@ Checkpoint v0.33:
 | v0.33b | Contratto ArcGraph View/Camera | Completato |
 | v0.33c | Config mappa/zoom JSON | Completato |
 | v0.33d | Controller pan/zoom discreto | Completato |
-| v0.33e | Coordinate screen/world/cell e clamp viewport | Prossimo |
-| v0.33f | Policy LOD per zoom | Pending |
+| v0.33e | Coordinate screen/world/cell e clamp viewport | Completato |
+| v0.33f | Policy LOD per zoom | Prossimo |
 | v0.33g | Modalita' comparativa ArcGraph/MapGrid | Pending |
 | v0.33h | QA e closeout | Pending |
 
@@ -215,6 +217,29 @@ screen pixel
 -> viewport normalized
 -> visible cell rect
 -> cella ArcGraph
+```
+
+Esito v0.33e:
+
+- aggiunto `ArcGraphViewCoordinateResult`;
+- aggiunto `ArcGraphViewCoordinateMapper`;
+- aggiunto `ArcGraphViewCoordinateMapperHarness`;
+- convenzione viewport basso/sinistra;
+- bordo destro/alto esclusivo;
+- harness smoke eseguito fuori Unity;
+- nessuna camera Unity;
+- nessun input Unity diretto.
+
+Indicazione per `v0.33f`:
+
+Definire policy LOD per zoom:
+
+```text
+zoom level
+-> animazioni abilitate/disabilitate
+-> sprite layered abilitati/disabilitati
+-> rappresentazione semplificata
+-> layer minori visibili/nascosti
 ```
 
 ---

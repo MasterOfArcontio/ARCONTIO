@@ -2939,7 +2939,7 @@ La modalita' comparativa dovra':
 | v0.33b | Contratto ArcGraph View/Camera: config, stato vista, input ammessi, output vietati | Completato |
 | v0.33c | Configurazione mappa e zoom: dimensione 250x250, livelli zoom JSON, celle visibili | Completato |
 | v0.33d | Controller pan/zoom discreto: rotellina per zoom, rotellina premuta per pan | Completato |
-| v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Pending |
+| v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Completato |
 | v0.33f | Policy LOD per zoom: icone, sprite statici, aggregazioni, animazioni disabilitate ai livelli 1/2 | Pending |
 | v0.33g | Modalita' comparativa terrain ArcGraph/MapGrid: aggancio debug/test senza doppio renderer permanente | Pending |
 | v0.33h | QA, diff scope, closeout e preparazione v0.34 | Pending |
@@ -3432,6 +3432,77 @@ screen pixel
 ```
 
 Anche questo deve restare passivo e non usare ancora una camera Unity produttiva.
+
+## Esito v0.33e - Coordinate screen/viewport/cell
+
+Implementata la conversione coordinate passiva per ArcGraph.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewCoordinateResult.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewCoordinateMapper.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphViewCoordinateMapperHarness.cs
+```
+
+### Funzionamento
+
+Il mapper converte:
+
+```text
+punto viewport in pixel
+-> coordinate normalizzate 0..1
+-> ArcGraphViewState.ResolveVisibleCellRect()
+-> ArcGraphCellCoord
+```
+
+La convenzione usata e':
+
+```text
+origine viewport = basso/sinistra
+limite destro/alto = esclusivo
+```
+
+Quindi:
+
+```text
+x >= viewportWidth  -> fuori viewport
+y >= viewportHeight -> fuori viewport
+```
+
+### Harness
+
+`ArcGraphViewCoordinateMapperHarness.RunDefaultSmoke()` verifica:
+
+- centro viewport a zoom 1 risolto sulla cella `125,125`;
+- bordo destro esclusivo considerato fuori viewport;
+- zoom 2 produce rettangolo visibile `150x150`;
+- bottom-left a zoom 2 risolto sulla cella `50,50`.
+
+### Garanzie architetturali
+
+Il mapper:
+
+- non usa `Camera`;
+- non chiama `ScreenToWorldPoint`;
+- non legge `Mouse.current`;
+- non crea `GameObject`;
+- non crea renderer;
+- non legge `World`;
+- non muta simulazione.
+
+### Preparazione v0.33f
+
+`v0.33f` dovra' trasformare la policy visuale per zoom in un contratto leggibile dai renderer:
+
+```text
+zoom level
+-> render detail policy
+-> animazioni on/off
+-> sprite layered on/off
+-> rappresentazione semplificata on/off
+-> visibilita' layer minori
+```
 
 ---
 
