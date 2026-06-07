@@ -5293,6 +5293,26 @@ Gate:
 
 Attendere esito del test operatore prima di nuove modifiche.
 
+## Apertura v0.36.03v.02 - ArcGraph First Visual Test QA
+
+Branch:
+
+```text
+ai-task/v0.36.03v.02-arcgraph-first-visual-test-qa
+```
+
+Scope previsto:
+
+- esecuzione del primo test visivo tramite `ArcGraphSceneProbeRenderer`;
+- raccolta difetti osservati a schermo;
+- verifica di posizione, scala, sorting, colori e pulizia root temporaneo;
+- nessuna aggiunta di nuovi layer ambientali;
+- nessuna modifica a scene/prefab prima dell'esito del test.
+
+Gate:
+
+Attendere esito del test operatore prima di nuove modifiche.
+
 ---
 
 #### v0.37 - ArcGraph Debug/Overlay Migration

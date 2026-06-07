@@ -167,6 +167,7 @@ DOC SYNC:
 - aggiunto `ArcGraphVisualProbeHarness.CreateDefaultProbeFrame(...)`;
 - il probe usa sprite runtime colorati, root temporaneo e context menu manuale;
 - branch `ai-task/v0.36.03v.02-arcgraph-first-visual-test-qa` aperto;
+- apertura `v0.36.03v.02` documentata: QA visuale manuale del primo scene probe;
 - prossimo step fermo in attesa esito operatore: primo test visivo ArcGraph.
 
 OBIETTIVO:
