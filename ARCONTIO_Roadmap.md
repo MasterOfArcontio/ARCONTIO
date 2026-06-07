@@ -39,7 +39,7 @@
 | v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Completata |
 | v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Completata nel perimetro sicuro |
 | v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Completata nel perimetro passivo |
-| v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | Pending |
+| v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | In audit con stop progettuale |
 | v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | Pending |
 | v0.37 | ArcGraph Debug/Overlay Migration | Settembre 2026 | Pending |
 | v0.38 | ArcGraph Legacy Absorption / Retirement | Settembre 2026 | Pending |
@@ -4390,7 +4390,7 @@ La `v0.35` non dovra' permettere alla view di:
 #### v0.35 - ArcGraph Actor Motion Runtime Bridge
 
 ## Stato
-PENDING
+AUDIT-FIRST / STOP PROGETTUALE
 
 ## Obiettivo
 
@@ -4403,6 +4403,156 @@ Il bridge dovra':
 - alimentare `ArcGraphActorVisualPoseSnapshot`;
 - evitare che il renderer chiami `SetNpcPos`;
 - evitare che la view completi o interrompa job.
+
+## Checkpoint v0.35
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.35a | Audit movimento multi-tick e dati read-only disponibili | Completato con stop progettuale |
+| v0.35b | Scelta contratto read-only del segmento movimento | In attesa operatore |
+| v0.35c | Implementazione contratto motion read-only | Pending |
+| v0.35d | Integrazione adapter ArcGraph actor motion | Pending |
+| v0.35e | Harness motion actor senza scena | Pending |
+| v0.35f | QA e closeout v0.35 | Pending |
+
+## Esito v0.35a - Audit movimento multi-tick e stop progettuale
+
+Audit eseguito sui file:
+
+```text
+Assets/Scripts/Core/Jobs/RunningActionStore.cs
+Assets/Scripts/Core/Jobs/RunningActionRuntimeState.cs
+Assets/Scripts/Core/Jobs/RunningActionExecutor.cs
+Assets/Scripts/Core/Jobs/MoveToRunningActionDriver.cs
+Assets/Scripts/Core/Jobs/JobRuntimeState.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphWorldAdapter.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphActorVisualSnapshot.cs
+```
+
+### Stato attuale del movimento Job
+
+Il movimento multi-tick reale esiste gia'.
+
+`MoveToRunningActionDriver`:
+
+- riceve la cella NPC corrente;
+- riceve la cella target del singolo passo;
+- crea una `RunningActionRuntimeState` di tipo `Movement`;
+- avanza `ElapsedTicks`;
+- usa `RequiredTicks`;
+- chiama `world.SetNpcPos(...)` solo a completion;
+- pulisce la running action quando il passo termina o fallisce.
+
+`RunningActionStore`:
+
+- conserva running action indicizzate da `RunningActionKey`;
+- espone `GetSnapshots()`;
+- restituisce snapshot value-only;
+- non espone il dizionario interno.
+
+`RunningActionProgressSnapshot` contiene:
+
+- `NpcId`;
+- `JobId`;
+- `PhaseId`;
+- `JobActionId`;
+- `Kind`;
+- `ElapsedTicks`;
+- `RequiredTicks`;
+- `Status`;
+- `CanComplete`;
+- `IsTimedOut`.
+
+### Dato mancante
+
+Lo snapshot running action non contiene:
+
+- cella origine del segmento;
+- cella destinazione del segmento.
+
+Il driver MoveTo conosce questi dati mentre esegue:
+
+```text
+npcCell              = origine del passo corrente
+action.TargetCell    = destinazione del passo corrente
+```
+
+Ma questi valori non vengono salvati nello stato read-only della running action.
+
+### Perche' non si puo' procedere in modo sicuro senza decisione
+
+Tecnicamente l'origine e la destinazione sono presenti nel nome:
+
+```text
+move_{jobId}_{phaseIndex}_{actionIndex}_{fromX}_{fromY}_{toX}_{toY}
+```
+
+Pero' usare questa stringa come fonte dati sarebbe sbagliato.
+
+Motivi:
+
+- e' parsing fragile;
+- non e' un contratto tipizzato;
+- puo' rompersi se cambia naming;
+- mescola diagnostica e dati runtime;
+- renderebbe ArcGraph dipendente da una convenzione interna del Job Layer.
+
+### Stop progettuale
+
+Prima di implementare `v0.35c` serve scegliere come esporre il segmento movimento.
+
+Opzione consigliata:
+
+```text
+aggiungere un metadata read-only tipizzato alla running action Movement
+```
+
+Esempio concettuale:
+
+```text
+RunningActionMovementSnapshot
+├─ HasMovementSegment
+├─ FromCellX
+├─ FromCellY
+├─ ToCellX
+├─ ToCellY
+├─ ElapsedTicks
+└─ RequiredTicks
+```
+
+Oppure estendere `RunningActionProgressSnapshot` con un blocco opzionale movement.
+
+### Scelta richiesta
+
+Serve approvazione su una di queste strade:
+
+1. **Estendere `RunningActionProgressSnapshot` con dati movement opzionali.**
+   Soluzione piu' diretta. Tocca il Job Layer ma resta read-only.
+
+2. **Aggiungere un nuovo `RunningActionMovementMetadata` dentro `RunningActionRuntimeState`.**
+   Soluzione piu' pulita e scalabile. Richiede piu' codice ma separa progress generico e metadata movement.
+
+3. **Creare un adapter ArcGraph che parsifica `ActionInstanceId`.**
+   Sconsigliata. Piu' veloce ma fragile e non architetturalmente pulita.
+
+Decisione consigliata:
+
+```text
+Opzione 2: metadata movement tipizzato dentro la running action,
+poi snapshot read-only per ArcGraph.
+```
+
+Motivo:
+
+- preserva il Job Layer come sorgente del movimento;
+- evita parsing stringhe;
+- non permette alla view di mutare nulla;
+- prepara futuri motion kind come walk/run/slow;
+- tiene ArcGraph su un contratto leggibile.
+
+### Stato v0.35
+
+`v0.35` non deve proseguire oltre l'audit finche' questa scelta non e' confermata.
 
 ---
 

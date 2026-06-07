@@ -28,21 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.35 - ArcGraph Actor Motion Runtime Bridge
 
 CHECKPOINT CORRENTE:
-`attesa apertura operativa v0.35`
+`v0.35a - Audit movimento multi-tick e dati read-only`
 
 STATUS:
-ATTESA GO / v0.34 COMPLETATA NEL PERIMETRO PASSIVO
+STOP PROGETTUALE / v0.35a COMPLETATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.34g-arcgraph-actor-object-closeout`
+`ai-task/v0.35a-arcgraph-motion-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- attendere autorizzazione operativa per `v0.35`;
-- preparare bridge read-only per movimento actor;
+- attendere decisione operatore sul contratto read-only del segmento movimento;
+- evitare parsing di `ActionInstanceId`;
+- preparare bridge read-only per movimento actor solo dopo scelta;
 - non permettere alla view di mutare posizione NPC;
 - non permettere alla view di completare o interrompere job;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -108,11 +109,14 @@ DOC SYNC:
 - harness `v0.34f` implementato;
 - branch `ai-task/v0.34g-arcgraph-actor-object-closeout` aperto;
 - closeout `v0.34g` completato;
-- prossimo macro checkpoint previsto: `v0.35 - ArcGraph Actor Motion Runtime Bridge`.
+- prossimo macro checkpoint previsto: `v0.35 - ArcGraph Actor Motion Runtime Bridge`;
+- apertura operativa `v0.35` autorizzata dall'operatore;
+- branch `ai-task/v0.35a-arcgraph-motion-audit` aperto;
+- audit `v0.35a` completato con stop progettuale: manca origine/destinazione tipizzata nello snapshot running action.
 
 OBIETTIVO:
 
-Attendere il `go` operativo per iniziare `v0.35`.
+Attendere decisione operatore sul contratto read-only del segmento movimento.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -307,6 +311,53 @@ Vietato:
 - completare job dalla view;
 - interrompere running action dalla view;
 - correggere pathfinding dalla view.
+
+Decisioni operative v0.35:
+
+- il movimento multi-tick reale e' nel Job Layer;
+- `MoveToRunningActionDriver` conosce origine e destinazione del passo mentre esegue;
+- `RunningActionProgressSnapshot` espone elapsed/required tick ma non origine/destinazione;
+- ArcGraph non deve parsare `ActionInstanceId`;
+- ArcGraph non deve dedurre movimento dalla differenza tra celle successive;
+- serve un contratto read-only tipizzato.
+
+Checkpoint v0.35:
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.35a | Audit movimento multi-tick e dati read-only disponibili | Completato con stop progettuale |
+| v0.35b | Scelta contratto read-only del segmento movimento | In attesa operatore |
+| v0.35c | Implementazione contratto motion read-only | Pending |
+| v0.35d | Integrazione adapter ArcGraph actor motion | Pending |
+| v0.35e | Harness motion actor senza scena | Pending |
+| v0.35f | QA e closeout v0.35 | Pending |
+
+Esito v0.35a:
+
+- `RunningActionStore.GetSnapshots()` espone snapshot value-only;
+- `RunningActionProgressSnapshot` contiene `NpcId`, `JobId`, `Kind`, `ElapsedTicks`, `RequiredTicks`, `Status`;
+- `MoveToRunningActionDriver` crea running action movement per il passo corrente;
+- `MoveToRunningActionDriver` conosce `npcCell` e `action.TargetCell`;
+- questi valori non sono presenti in un metadata tipizzato;
+- il nome `ActionInstanceId` contiene from/to, ma non deve essere usato come contratto.
+
+Stop progettuale:
+
+Scegliere come esporre origine/destinazione del segmento movimento.
+
+Opzione consigliata:
+
+```text
+aggiungere metadata movement tipizzato dentro RunningActionRuntimeState
+e propagarlo nello snapshot read-only.
+```
+
+Motivo:
+
+- evita parsing stringhe;
+- mantiene authority nel Job Layer;
+- offre ad ArcGraph un input read-only;
+- non consente alla view di mutare posizione o job.
 
 Esito audit v0.33a:
 
