@@ -37,7 +37,7 @@
 | v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | Completata come foundation |
 | v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | Completata |
 | v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Completata |
-| v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Pending |
+| v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Completata nel perimetro sicuro |
 | v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Pending |
 | v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | Pending |
 | v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | Pending |
@@ -2918,7 +2918,7 @@ La `v0.33` dovra' decidere con attenzione:
 #### v0.33 - ArcGraph Modalita' comparativa controllata
 
 ## Stato
-IN CORSO / AUDIT-FIRST
+COMPLETATA NEL PERIMETRO SICURO
 
 ## Obiettivo
 
@@ -2942,7 +2942,7 @@ La modalita' comparativa dovra':
 | v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Completato |
 | v0.33f | Policy LOD per zoom: icone, sprite statici, aggregazioni, animazioni disabilitate ai livelli 1/2 | Completato |
 | v0.33g | Modalita' comparativa terrain ArcGraph/MapGrid: aggancio debug/test senza doppio renderer permanente | Completato nel perimetro gate/diagnostica |
-| v0.33h | QA, diff scope, closeout e preparazione v0.34 | Pending |
+| v0.33h | QA, diff scope, closeout e preparazione v0.34 | Completato |
 
 ## Decisioni v0.33 - Zoom, pan e rappresentazione semplificata
 
@@ -3706,6 +3706,97 @@ Prima di implementarlo serve decisione operatore su:
 - come garantire spegnimento completo;
 - se mostrare overlay affiancato, sovrapposto o alternato;
 - come evitare sorting ambiguo con MapGrid.
+
+## Esito v0.33h - QA finale e closeout
+
+La `v0.33` e' chiusa nel perimetro sicuro.
+
+La versione ha prodotto la base controllata per:
+
+- configurare dimensione mappa e zoom discreto;
+- rappresentare lo stato vista senza dipendere direttamente da Unity `Camera`;
+- ricevere input mouse gia' filtrato da un adapter esterno;
+- applicare zoom e pan in modo deterministico;
+- convertire coordinate viewport in coordinate cella;
+- decidere la policy LOD visuale per i quattro livelli zoom;
+- valutare se una modalita' comparativa ArcGraph/MapGrid sia ammessa;
+- impedire che ArcGraph diventi un secondo renderer permanente non controllato.
+
+### Definition of Done v0.33
+
+Completato:
+
+- audit del sistema view/camera legacy;
+- registrazione decisioni zoom/pan/LOD;
+- contratto ArcGraph View/Camera;
+- configurazione JSON per mappa `250x250` e quattro zoom;
+- controller pan/zoom passivo;
+- mapper coordinate viewport/cella;
+- policy LOD per zoom;
+- gate diagnostico per comparazione ArcGraph/MapGrid;
+- QA finale su scope diff, chiamate vietate e assenza di modifiche fuori perimetro.
+
+### Cosa non e' stato implementato
+
+Non sono stati implementati:
+
+- aggancio reale di ArcGraph alla scena;
+- creazione di `GameObject` debug;
+- creazione o assegnazione di `MeshRenderer` / `MeshFilter`;
+- caricamento materiale o atlas;
+- lettura diretta di `Camera.main`;
+- lettura diretta di input mouse;
+- doppio renderer permanente;
+- sostituzione operativa di MapGrid;
+- modifiche a Core, Decision Layer, Job Layer o scene.
+
+Questa scelta e' intenzionale.
+
+La `v0.33` doveva costruire una modalita' comparativa controllata, non introdurre un bridge scena ambiguo.
+
+### QA finale
+
+Verifiche eseguite:
+
+- ricerca chiamate operative vietate dentro `Assets/Scripts/Views/ArcGraph/Runtime`;
+- verifica diff scope rispetto a `v0.32h`;
+- controllo assenza modifiche a `Core`, `MapGrid`, scene Unity, `.meta`, `Library`, `Temp`, `Obj`.
+
+Esito:
+
+```text
+QA scope superata.
+```
+
+Nota compilazione:
+
+La compilazione completa Unity non e' stata rieseguita in `v0.33h`, perche' il build da `Assembly-CSharp.csproj` richiede il ripristino di asset in `Temp`, area che Codex non deve modificare.
+
+Lo step `v0.33h` modifica solo documentazione operativa.
+
+### Debiti residui
+
+Prima di un vero bridge visuale comparativo serviranno decisioni esplicite su:
+
+- parent `GameObject` del probe ArcGraph;
+- materiale e atlas da usare;
+- sorting rispetto a MapGrid;
+- camera di riferimento;
+- modalita' di confronto visuale: overlay, affiancata o alternata;
+- spegnimento completo del probe debug;
+- responsabilita' del wrapper Unity che colleghera' i contratti passivi alla scena.
+
+### Preparazione v0.34
+
+La `v0.34` puo' partire come step actor/object renderer.
+
+Per coerenza con `v0.31`-`v0.33`, la prima parte della `v0.34` dovrebbe restare passiva:
+
+- leggere `ArcGraphActorLayer`;
+- leggere `ArcGraphObjectLayer`;
+- produrre dati renderizzabili;
+- rispettare la policy LOD gia' definita;
+- evitare ancora agganci scena permanenti fino a decisione esplicita.
 
 ---
 

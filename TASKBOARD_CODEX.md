@@ -25,28 +25,28 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
+## MACRO JOB ATTIVO: v0.34 - ArcGraph Actor/Object Renderer
 
 CHECKPOINT CORRENTE:
-`v0.33h - QA e closeout v0.33`
+`attesa apertura operativa v0.34`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / v0.33g COMPLETATA
+ATTESA GO / v0.33 COMPLETATA NEL PERIMETRO SICURO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.33g-arcgraph-comparison-mode`
+`ai-task/v0.33h-arcgraph-closeout`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- eseguire QA finale v0.33;
-- chiudere roadmap/taskboard;
-- dichiarare debiti residui e preparare v0.34;
-- mantenere MapGrid come renderer produttivo;
-- usare ArcGraph terrain solo come output debug/test;
-- evitare doppio renderer permanente;
+- attendere autorizzazione operativa per `v0.34`;
+- preparare actor/object renderer ArcGraph;
+- mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
+- rispettare la policy LOD definita in `v0.33f`;
+- non introdurre doppio renderer permanente;
+- non agganciare wrapper scena senza decisione esplicita;
 - non toccare Core, Decision Layer o Job Layer.
 
 DOC SYNC:
@@ -87,13 +87,16 @@ DOC SYNC:
 - policy LOD `v0.33f` implementata: profili actor/vegetation/object/effect per i quattro zoom;
 - branch `ai-task/v0.33g-arcgraph-comparison-mode` aperto;
 - gate comparativo `v0.33g` implementato: options, diagnostics, comparison gate e harness;
-- prossimo branch previsto: `ai-task/v0.33h-arcgraph-closeout`.
+- branch `ai-task/v0.33h-arcgraph-closeout` aperto;
+- QA finale `v0.33h` superata sul perimetro documentale/runtime: diff scope, chiamate vietate e assenza modifiche a Core/MapGrid/scena/meta;
+- closeout `v0.33h` completato: Definition of Done, debiti residui e preparazione `v0.34`;
+- prossimo macro checkpoint previsto: `v0.34 - ArcGraph Actor/Object Renderer`.
 
 OBIETTIVO:
 
-Procedere in autonomia verso closeout `v0.33h`.
+Attendere il `go` operativo per iniziare `v0.34`.
 
-La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
+La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 
 Decisioni operative v0.33:
 
@@ -121,7 +124,7 @@ Checkpoint v0.33:
 | v0.33e | Coordinate screen/world/cell e clamp viewport | Completato |
 | v0.33f | Policy LOD per zoom | Completato |
 | v0.33g | Modalita' comparativa ArcGraph/MapGrid | Completato nel perimetro gate/diagnostica |
-| v0.33h | QA e closeout | Prossimo |
+| v0.33h | QA e closeout | Completato |
 
 Esito audit v0.33a:
 
@@ -292,6 +295,43 @@ Il bridge scena comparativo reale richiede decisione su:
 - camera;
 - modalita sovrapposta/affiancata/alternata;
 - spegnimento completo.
+
+Esito v0.33h:
+
+- QA finale `v0.33` completata sul perimetro di closeout;
+- compilazione Unity completa non rieseguita in `v0.33h`, perche' il build da `.csproj` richiede restore in `Temp`;
+- diff scope verificato rispetto a `v0.32h`;
+- chiamate operative vietate assenti nel codice ArcGraph runtime, salvo menzioni descrittive nei commenti;
+- nessuna modifica a Core, MapGrid, scene Unity, `.meta`, `Library`, `Temp`, `Obj`;
+- roadmap aggiornata con `v0.33` completata nel perimetro sicuro;
+- `v0.34` preparata come prossimo macro checkpoint.
+
+Definition of Done v0.33:
+
+- audit view/camera legacy;
+- contratto ArcGraph View/Camera;
+- configurazione JSON mappa/zoom;
+- controller pan/zoom passivo;
+- mapper coordinate viewport/cella;
+- policy LOD per zoom;
+- gate comparativo diagnostico;
+- closeout documentale.
+
+Nota critica:
+
+`v0.33` non implementa ancora un bridge scena reale.
+
+Questa scelta e' intenzionale: il bridge richiede decisioni esplicite su camera, parent GameObject, materiale/atlas, sorting, modalita' visuale e spegnimento completo.
+
+Indicazione per `v0.34`:
+
+Partire da actor/object renderer in forma passiva:
+
+- lettura `ArcGraphActorLayer`;
+- lettura `ArcGraphObjectLayer`;
+- produzione dati renderizzabili;
+- rispetto della policy LOD;
+- nessun aggancio scena permanente senza decisione esplicita.
 
 ---
 
