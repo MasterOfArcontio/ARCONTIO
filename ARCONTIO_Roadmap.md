@@ -2941,7 +2941,7 @@ La modalita' comparativa dovra':
 | v0.33d | Controller pan/zoom discreto: rotellina per zoom, rotellina premuta per pan | Completato |
 | v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Completato |
 | v0.33f | Policy LOD per zoom: icone, sprite statici, aggregazioni, animazioni disabilitate ai livelli 1/2 | Completato |
-| v0.33g | Modalita' comparativa terrain ArcGraph/MapGrid: aggancio debug/test senza doppio renderer permanente | Pending |
+| v0.33g | Modalita' comparativa terrain ArcGraph/MapGrid: aggancio debug/test senza doppio renderer permanente | Completato nel perimetro gate/diagnostica |
 | v0.33h | QA, diff scope, closeout e preparazione v0.34 | Pending |
 
 ## Decisioni v0.33 - Zoom, pan e rappresentazione semplificata
@@ -3602,6 +3602,110 @@ contratto comparativo debug/test
 ```
 
 Se l'aggancio scena/materiale/camera richiede una decisione non deducibile, lo step dovra' fermarsi prima della patch runtime.
+
+## Esito v0.33g - Gate comparativo ArcGraph/MapGrid
+
+Implementato il perimetro sicuro della modalita' comparativa.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphComparisonMode.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphComparisonOptions.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphComparisonDiagnostics.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphComparisonGate.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphComparisonGateHarness.cs
+```
+
+### Scelta progettuale
+
+`v0.33g` non aggancia ancora ArcGraph alla scena.
+
+Motivo:
+
+- l'aggancio reale richiede scelta esplicita su camera, materiali, sorting, parent GameObject e disattivazione;
+- un aggancio automatico rischierebbe di creare un doppio renderer permanente;
+- la roadmap richiede comparazione controllata, non sostituzione implicita.
+
+### Cosa e' stato implementato
+
+`ArcGraphComparisonGate` valuta se una richiesta comparativa e' ammessa.
+
+Input dichiarativi:
+
+- esiste renderer legacy;
+- esistono dati terrain ArcGraph;
+- esiste camera;
+- esiste materiale;
+- modalita' richiesta;
+- MapGrid resta primario;
+- scena attachment ammesso o no;
+- doppio renderer permanente ammesso o no.
+
+Output:
+
+- `ArcGraphComparisonDiagnostics`;
+- `IsAllowed`;
+- `CanAttachSceneProbe`;
+- `Reason`;
+- flag dei prerequisiti;
+- flag rischio doppio renderer permanente.
+
+### Modalita'
+
+```text
+Disabled
+DiagnosticsOnly
+TemporaryDebugSceneProbe
+```
+
+`DiagnosticsOnly` puo' essere ammessa senza camera o materiale.
+
+`TemporaryDebugSceneProbe` puo' essere ammessa solo se:
+
+- MapGrid resta primario;
+- attivazione debug esplicita richiesta;
+- scene attachment e' consentito;
+- doppio renderer permanente e' vietato;
+- legacy renderer presente;
+- dati terrain ArcGraph presenti;
+- camera presente;
+- materiale presente.
+
+### Harness
+
+`ArcGraphComparisonGateHarness.RunDefaultSmoke()` verifica:
+
+- diagnostics-only ammessa senza scene probe;
+- doppio renderer permanente bloccato;
+- scene probe temporaneo ammesso con prerequisiti;
+- scene probe bloccato se manca materiale.
+
+### Garanzie architetturali
+
+La patch:
+
+- non crea `GameObject`;
+- non crea `MeshRenderer`;
+- non crea `MeshFilter`;
+- non carica materiali;
+- non legge camera;
+- non accende ArcGraph in scena;
+- non sostituisce MapGrid;
+- non modifica Core;
+- non modifica MapGrid.
+
+### Debito esplicito
+
+Il vero bridge scena comparativo resta fuori da `v0.33g`.
+
+Prima di implementarlo serve decisione operatore su:
+
+- dove montare il GameObject debug;
+- come fornire materiale/atlas;
+- come garantire spegnimento completo;
+- se mostrare overlay affiancato, sovrapposto o alternato;
+- come evitare sorting ambiguo con MapGrid.
 
 ---
 

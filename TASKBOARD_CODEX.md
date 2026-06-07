@@ -28,22 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
 
 CHECKPOINT CORRENTE:
-`v0.33g - Modalita comparativa ArcGraph/MapGrid`
+`v0.33h - QA e closeout v0.33`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / v0.33f COMPLETATA
+IN ESECUZIONE AUTONOMA / v0.33g COMPLETATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.33f-arcgraph-zoom-lod-policy`
+`ai-task/v0.33g-arcgraph-comparison-mode`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- valutare modalita comparativa ArcGraph/MapGrid;
-- implementare solo contratti/diagnostica sicuri se l'aggancio scena richiede scelta progettuale;
-- evitare doppio renderer permanente;
+- eseguire QA finale v0.33;
+- chiudere roadmap/taskboard;
+- dichiarare debiti residui e preparare v0.34;
 - mantenere MapGrid come renderer produttivo;
 - usare ArcGraph terrain solo come output debug/test;
 - evitare doppio renderer permanente;
@@ -85,11 +85,13 @@ DOC SYNC:
 - coordinate `v0.33e` implementate: mapper viewport/cella, risultato diagnostico e harness smoke;
 - branch `ai-task/v0.33f-arcgraph-zoom-lod-policy` aperto;
 - policy LOD `v0.33f` implementata: profili actor/vegetation/object/effect per i quattro zoom;
-- prossimo branch previsto: `ai-task/v0.33g-arcgraph-comparison-mode`.
+- branch `ai-task/v0.33g-arcgraph-comparison-mode` aperto;
+- gate comparativo `v0.33g` implementato: options, diagnostics, comparison gate e harness;
+- prossimo branch previsto: `ai-task/v0.33h-arcgraph-closeout`.
 
 OBIETTIVO:
 
-Procedere in autonomia verso `v0.33g`, fermandosi se l'aggancio scena/materiali/camera richiede scelta progettuale non deducibile.
+Procedere in autonomia verso closeout `v0.33h`.
 
 La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
 
@@ -118,8 +120,8 @@ Checkpoint v0.33:
 | v0.33d | Controller pan/zoom discreto | Completato |
 | v0.33e | Coordinate screen/world/cell e clamp viewport | Completato |
 | v0.33f | Policy LOD per zoom | Completato |
-| v0.33g | Modalita' comparativa ArcGraph/MapGrid | Prossimo |
-| v0.33h | QA e closeout | Pending |
+| v0.33g | Modalita' comparativa ArcGraph/MapGrid | Completato nel perimetro gate/diagnostica |
+| v0.33h | QA e closeout | Prossimo |
 
 Esito audit v0.33a:
 
@@ -267,6 +269,29 @@ diagnostica comparativa
 nessun doppio renderer permanente
 nessun aggancio produttivo automatico
 ```
+
+Esito v0.33g:
+
+- aggiunto `ArcGraphComparisonMode`;
+- aggiunto `ArcGraphComparisonOptions`;
+- aggiunto `ArcGraphComparisonDiagnostics`;
+- aggiunto `ArcGraphComparisonGate`;
+- aggiunto `ArcGraphComparisonGateHarness`;
+- diagnostics-only ammessa senza scena;
+- doppio renderer permanente bloccato;
+- scene probe temporaneo ammesso solo con prerequisiti dichiarati;
+- nessun aggancio scena implementato.
+
+Debito esplicito:
+
+Il bridge scena comparativo reale richiede decisione su:
+
+- parent GameObject debug;
+- materiale/atlas;
+- sorting;
+- camera;
+- modalita sovrapposta/affiancata/alternata;
+- spegnimento completo.
 
 ---
 
