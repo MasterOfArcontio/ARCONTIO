@@ -28,21 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
 
 CHECKPOINT CORRENTE:
-`attesa apertura operativa v0.33`
+`v0.33b - Contratto ArcGraph View/Camera`
 
 STATUS:
-ATTESA GO / v0.32 COMPLETATA
+ATTESA GO / v0.33a COMPLETATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.32h-arcgraph-terrain-closeout`
+`ai-task/v0.33a-arcgraph-view-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- preparare la modalita' comparativa controllata tra MapGrid legacy e ArcGraph terrain;
-- non aprire ancora implementazione v0.33 senza `go` operativo dell'operatore;
+- definire il contratto ArcGraph View/Camera;
+- stabilire config, stato vista, input ammessi e output vietati;
+- separare camera/view da TerrainRenderer e da simulazione;
 - mantenere MapGrid come renderer produttivo;
 - usare ArcGraph terrain solo come output debug/test;
 - evitare doppio renderer permanente;
@@ -70,13 +71,70 @@ DOC SYNC:
 - harness statico `v0.32f` implementato e compilabile;
 - QA `v0.32g` superata: compilazione, diff scope, chiamate vietate, no Core/MapGrid/scena/meta;
 - closeout `v0.32h` completato: Definition of Done, debiti residui e preparazione `v0.33`;
-- prossimo macro checkpoint previsto: `v0.33 - ArcGraph Modalita' comparativa controllata`.
+- apertura operativa `v0.33` autorizzata dall'operatore;
+- branch `ai-task/v0.33a-arcgraph-view-audit` aperto;
+- decisioni zoom/pan/LOD registrate per `v0.33`;
+- audit `v0.33a` completato: camera legacy, input mouse, zoom/pan, conversione coordinate, confine ArcGraph View/Camera;
+- prossimo branch previsto: `ai-task/v0.33b-arcgraph-view-contract`.
 
 OBIETTIVO:
 
-Attendere conferma operativa per aprire `v0.33`.
+Attendere `go` operativo per `v0.33b` e definire il contratto ArcGraph View/Camera.
 
 La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
+
+Decisioni operative v0.33:
+
+- mappa prevista: `250x250` celle;
+- zoom con quattro livelli fissi;
+- rotellina mouse: uno scatto = un livello avanti/indietro;
+- zoom 1: `300x300` celle visibili, senza pan;
+- zoom 2: `150x150` celle visibili;
+- zoom 3: `75x75` celle visibili;
+- zoom 4: `20x20` celle visibili;
+- dimensione mappa e livelli zoom in JSON di configurazione mappa;
+- pan con pressione rotellina mouse mantenuta durante movimento mouse;
+- zoom 1 e 2 senza animazioni sprite;
+- zoom 1 e 2 senza vestizione NPC a layer;
+- zoom 1 e 2 con rappresentazione semplificata: icone, sprite statici, aggregazioni d'area e filtri di visibilita'.
+
+Checkpoint v0.33:
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.33a | Audit view/camera legacy e registrazione decisioni zoom/pan/LOD | Completato |
+| v0.33b | Contratto ArcGraph View/Camera | Prossimo |
+| v0.33c | Config mappa/zoom JSON | Pending |
+| v0.33d | Controller pan/zoom discreto | Pending |
+| v0.33e | Coordinate screen/world/cell e clamp viewport | Pending |
+| v0.33f | Policy LOD per zoom | Pending |
+| v0.33g | Modalita' comparativa ArcGraph/MapGrid | Pending |
+| v0.33h | QA e closeout | Pending |
+
+Esito audit v0.33a:
+
+- `MapGridCameraController` gestisce oggi zoom/pan legacy;
+- il legacy usa zoom rotellina, PixelPerfectCamera e fallback orthographic;
+- il legacy usa pan con tasto destro, non con rotellina premuta;
+- il legacy e' legato a `MapGridData` e `MapGridConfig`;
+- `MapGridWorldView` contiene conversioni mouse/camera/cella per overlay e debug;
+- `MapGridPointerInputActionsProvider` espone solo posizione puntatore;
+- ArcGraph non possiede ancora ViewController, stato viewport, zoom state o input view dedicato.
+
+Indicazione per `v0.33b`:
+
+Definire un contratto ArcGraph View/Camera separato da TerrainRenderer.
+
+Formula:
+
+```text
+ArcGraphMapViewConfig
++ ArcGraphZoomProfile
++ ArcGraphViewState
++ input mouse
++ Camera esplicita
+-> ArcGraphViewController
+```
 
 ---
 

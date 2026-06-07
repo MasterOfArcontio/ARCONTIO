@@ -2918,7 +2918,7 @@ La `v0.33` dovra' decidere con attenzione:
 #### v0.33 - ArcGraph Modalita' comparativa controllata
 
 ## Stato
-PENDING
+IN CORSO / AUDIT-FIRST
 
 ## Obiettivo
 
@@ -2930,6 +2930,212 @@ La modalita' comparativa dovra':
 - verificare scala, tile, chunk, ordinamento e camera;
 - permettere audit visuale del terrain renderer;
 - non diventare percorso runtime stabile.
+
+## Checkpoint v0.33
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.33a | Audit view/camera legacy e registrazione decisioni zoom, pan, LOD visuale | Completato |
+| v0.33b | Contratto ArcGraph View/Camera: config, stato vista, input ammessi, output vietati | Prossimo |
+| v0.33c | Configurazione mappa e zoom: dimensione 250x250, livelli zoom JSON, celle visibili | Pending |
+| v0.33d | Controller pan/zoom discreto: rotellina per zoom, rotellina premuta per pan | Pending |
+| v0.33e | Conversione coordinate: screen -> world -> cella, clamp viewport e no pan a zoom 1 | Pending |
+| v0.33f | Policy LOD per zoom: icone, sprite statici, aggregazioni, animazioni disabilitate ai livelli 1/2 | Pending |
+| v0.33g | Modalita' comparativa terrain ArcGraph/MapGrid: aggancio debug/test senza doppio renderer permanente | Pending |
+| v0.33h | QA, diff scope, closeout e preparazione v0.34 | Pending |
+
+## Decisioni v0.33 - Zoom, pan e rappresentazione semplificata
+
+Decisioni operative registrate:
+
+- la mappa prevista per la nuova fase e' `250x250` celle;
+- lo zoom ha quattro livelli fissi;
+- la rotellina mouse modifica lo zoom di un livello per scatto;
+- il verso della rotellina decide zoom avanti o indietro;
+- zoom livello 1: `300x300` celle visibili;
+- zoom livello 2: `150x150` celle visibili;
+- zoom livello 3: `75x75` celle visibili;
+- zoom livello 4: `20x20` celle visibili;
+- a zoom livello 1 non e' previsto pan;
+- dimensione mappa e livelli zoom devono essere salvati in JSON di configurazione mappa;
+- il pan si ottiene premendo la rotellina mouse e tenendola premuta mentre si muove il mouse;
+- zoom 1 e zoom 2 non usano animazioni sprite;
+- zoom 1 e zoom 2 non usano vestizione NPC a layer;
+- zoom 1 e zoom 2 usano rappresentazioni semplificate: icone, sprite statici di categoria, aggregazioni d'area e filtri di visibilita'.
+
+Policy visuale consigliata:
+
+```text
+Zoom 1:
+vista strategica/cartografica
+no animazioni
+no pan
+NPC/animali come marker o icone
+vegetazione come aree aggregate
+oggetti piccoli nascosti
+
+Zoom 2:
+vista ampia della colonia
+no animazioni
+NPC/animali come mini sagome o icone ruolo
+piante e strutture come sprite statici semplificati
+oggetti minori nascosti salvo debug/selezione
+
+Zoom 3:
+vista normale
+sprite normali statici o animazione ridotta
+oggetti principali visibili
+
+Zoom 4:
+vista ravvicinata
+sprite completi
+animazioni
+vestizione NPC a layer
+effetti visuali locali piu' leggibili
+```
+
+Regola architetturale:
+
+```text
+La simulazione non cambia con lo zoom.
+Cambia solo la RenderPolicy.
+```
+
+Esempio:
+
+```text
+NPC Marco in cella 120,80
+
+Zoom 4 -> corpo completo, vestiti, animazione camminata.
+Zoom 3 -> sprite completo statico o animazione ridotta.
+Zoom 2 -> mini sagoma contadino.
+Zoom 1 -> marker/colore ruolo.
+```
+
+## Esito v0.33a - Audit view/camera legacy
+
+Audit eseguito sui moduli legacy e sui contratti ArcGraph esistenti.
+
+File principali ispezionati:
+
+```text
+Assets/Scripts/Views/MapGrid/Runtime/MapGridBootstrap.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridCameraController.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridWorldView.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridPointerInputActionsProvider.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridConfig.cs
+Assets/Resources/MapGrid/Config/MapGridConfig.json
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphBootstrapRuntime.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderState.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRuntimeContext.cs
+```
+
+### Stato legacy rilevato
+
+`MapGridBootstrap`:
+
+- carica `MapGridConfig` da JSON;
+- carica layout e atlas;
+- costruisce terrain chunk legacy;
+- posiziona la camera al centro mappa;
+- aggancia `MapGridCameraController`;
+- aggancia `MapGridPointerInputActionsProvider`;
+- aggancia `MapGridWorldView`.
+
+`MapGridCameraController`:
+
+- gestisce zoom con rotellina;
+- supporta PixelPerfectCamera tramite `assetsPPU`;
+- contiene fallback su `orthographicSize`;
+- usa pan con tasto destro del mouse;
+- contiene edge-pan legacy, ma attualmente e' commentato nel ciclo update;
+- applica inerzia con `SmoothDamp`;
+- clampa camera sui bounds mappa;
+- usa `Mouse.current` e `EventSystem.current`;
+- e' legato a `MapGridData` e `MapGridConfig`.
+
+`MapGridWorldView`:
+
+- risolve la camera con priorita' Inspector, cache, `Camera.main`, prima camera attiva;
+- usa la camera per `ScreenToWorldPoint`;
+- converte posizione mouse in cella;
+- usa queste conversioni per overlay, tooltip, FOV, selezione NPC e click debug.
+
+`MapGridPointerInputActionsProvider`:
+
+- espone solo la posizione puntatore;
+- non gestisce scroll;
+- non gestisce pan;
+- non gestisce pressione rotellina.
+
+### Stato ArcGraph rilevato
+
+ArcGraph oggi possiede:
+
+- bootstrap C# passivo;
+- runtime context esplicito;
+- render state con `VisibleZLevel`, `TileSizeWorld`, `ChunkSizeCells`, dirty state;
+- layer stack;
+- adapter read-only;
+- terrain mesh data builder.
+
+ArcGraph oggi non possiede ancora:
+
+- controller camera;
+- stato viewport;
+- stato zoom;
+- stato pan;
+- conversione screen/world/cell;
+- input view dedicato;
+- bridge verso `Camera`;
+- policy LOD per zoom;
+- wrapper Unity comparativo.
+
+### Valutazione
+
+Il controller legacy non va copiato direttamente.
+
+Motivi:
+
+- usa una logica zoom continua o semi-continua, mentre ArcGraph richiede quattro livelli discreti;
+- usa RMB drag pan, mentre la decisione v0.33 richiede pan con rotellina premuta;
+- e' legato a `MapGridData`;
+- contiene policy PixelPerfectCamera specifica e reflection su campi opzionali;
+- appartiene al renderer legacy che dovra' essere assorbito, non esteso.
+
+La parte riusabile e':
+
+- concetto di clamp ai bounds mappa;
+- conversione screen -> world -> cella;
+- controllo `EventSystem` per non catturare input sopra UI;
+- attenzione pixel-perfect;
+- distinzione tra camera assegnata e fallback.
+
+### Direzione consigliata
+
+`v0.33b` deve definire un contratto ArcGraph View/Camera separato dal terrain renderer.
+
+Formula desiderata:
+
+```text
+ArcGraphMapViewConfig
++ ArcGraphZoomProfile
++ ArcGraphViewState
++ input mouse
++ Camera esplicita
+-> ArcGraphViewController
+-> stato camera/view aggiornato
+```
+
+Il ViewController dovra':
+
+- essere view-only;
+- non leggere `World`;
+- non leggere decision layer;
+- non mutare simulazione;
+- non creare goal/job/eventi;
+- non decidere rendering dei layer;
+- limitarsi a gestire finestra visibile, zoom, pan, clamp e conversione coordinate.
 
 ---
 
