@@ -1217,7 +1217,7 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 #### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 ## Stato
-IN CORSO / NEXT: v0.30i
+IN CORSO / NEXT: v0.30j
 
 ## Scopo
 
@@ -1263,14 +1263,14 @@ La fase `v0.30` NON deve implementare:
 | v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ✅ |
 | v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ✅ |
 | v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ✅ |
-| v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ⏳ |
+| v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ✅ |
 | v0.30j | QA regressiva visuale e closeout ArcGraph Foundation | ⏳ |
 
 ## Definition of Done v0.30
 
 | Criterio | Stato |
 |----------|-------|
-| Rendering attuale auditato e mappato | ⏳ |
+| Rendering attuale auditato e mappato | ✅ |
 | Responsabilita' di `arcgraph` definite | ✅ Parziale: contratti minimi introdotti |
 | Separazione simulazione/rendering formalizzata | ✅ Parziale: contratti read-only predisposti |
 | Layer grafici minimi progettati | ✅ Parziale: stack e layer passivi introdotti |
