@@ -22,6 +22,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Actor</b>: item derivato da <c>ArcGraphActorLayer</c>.</item>
     ///   <item><b>Object</b>: item derivato da <c>ArcGraphObjectLayer</c>.</item>
     ///   <item><b>Vegetation</b>: item derivato da <c>ArcGraphVegetationLayer</c>.</item>
+    ///   <item><b>Water</b>: item derivato da <c>ArcGraphWaterLayer</c>.</item>
     /// </list>
     /// </summary>
     public enum ArcGraphRenderItemKind
@@ -29,6 +30,7 @@ namespace Arcontio.View.ArcGraph
         None = 0,
         Actor = 1,
         Object = 2,
-        Vegetation = 3
+        Vegetation = 3,
+        Water = 4
     }
 }

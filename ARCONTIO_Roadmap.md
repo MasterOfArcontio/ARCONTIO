@@ -4663,8 +4663,8 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 |---|---|---|
 | v0.36a | Audit e contratto preparatorio layer ambientali visuali | Completato |
 | v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Completato nel perimetro passivo |
-| v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | In attesa go operatore |
-| v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Pending |
+| v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Completato nel perimetro passivo |
+| v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | In attesa go operatore |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
 | v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
 
@@ -4885,6 +4885,96 @@ ai-task/v0.36.02-arcgraph-water-renderer
 Gate:
 
 Attendere go operatore prima di modifiche operative sul codice acqua.
+
+## Esito v0.36.02 - Water Renderer passivo
+
+La `v0.36.02` ha introdotto il builder visuale ambientale per l'acqua:
+profondita', sprite key, LOD e animazione frame-based come dati passivi.
+
+Implementato:
+
+- `ArcGraphWaterLayer.CopySnapshotsTo(...)`;
+- `ArcGraphRenderItemKind.Water`;
+- `ArcGraphWaterRenderItem`;
+- `ArcGraphWaterRenderQueueDiagnostics`;
+- `ArcGraphWaterRenderQueueBuilder`;
+- `ArcGraphWaterRenderQueueHarness`.
+
+Flusso:
+
+```text
+ArcGraphWaterVisualSnapshot
+-> ArcGraphWaterLayer
+-> ArcGraphWaterRenderQueueBuilder
+-> ArcGraphWaterRenderItem
+```
+
+Regole:
+
+- il builder legge solo il layer acqua;
+- il builder applica `ArcGraphZoomLodProfile`;
+- `DepthLevel <= 0` produce item nascosto, se gli item nascosti sono richiesti;
+- la chiave sprite e' solo una stringa derivata o ricevuta dallo snapshot;
+- zoom con rappresentazione semplificata usa sprite key `ArcGraph/Water/Simple/depth_N`;
+- zoom con rappresentazione dettagliata usa sprite key `ArcGraph/Water/depth_N`;
+- l'animazione e' ammessa solo se contratto acqua, LOD e snapshot la consentono insieme;
+- nessun flusso idraulico viene simulato;
+- nessuna pressione acqua viene calcolata;
+- nessuna sorgente, fiume, lago o cascata viene generata;
+- nessun pathfinding viene modificato;
+- nessun renderer Unity viene creato.
+
+Decisione di scope:
+
+L'acqua non viene ancora fusa nella queue globale actor/object.
+
+Motivo:
+
+- il sorting definitivo tra terrain, water, vegetation, object, actor, effect e light
+  non e' ancora stato deciso;
+- acqua e vegetazione restano per ora queue ambientali specializzate;
+- la composizione globale dell'ambiente andra' affrontata dopo i renderer
+  ambientali minimi.
+
+Harness:
+
+`ArcGraphWaterRenderQueueHarness.RunDefaultSmoke()` verifica:
+
+- tre snapshot acqua;
+- due celle visibili con profondita' positiva;
+- una cella nascosta con profondita' zero;
+- zoom 1 con rappresentazione semplificata e nessuna animazione sprite;
+- zoom 4 con animazione ammessa su acqua animabile;
+- profondita' massima tracciata in diagnostica;
+- nessuna scena, nessun asset, nessun sistema acqua produttivo.
+
+Vincoli preservati:
+
+- nessuna simulazione acqua produttiva;
+- nessun asset load;
+- nessun `GameObject`;
+- nessun `SpriteRenderer`;
+- nessun `ParticleSystem`;
+- nessuna modifica a Core, Decision Layer, Job Layer o MapGrid;
+- MapGrid resta renderer produttivo.
+
+Prossimo step:
+
+`v0.36.03 - Light Renderer`
+
+Il prossimo step dovra' seguire lo stesso schema: snapshot luce gia' prodotti da
+sistemi esterni, item o overlay passivi per giorno/notte, tinta globale, buio
+stanza e luci locali, senza creare luci Unity e senza simulare propagazione luce.
+
+Branch aperto:
+
+```text
+ai-task/v0.36.03-arcgraph-light-renderer
+```
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul codice luce.
 
 ---
 
