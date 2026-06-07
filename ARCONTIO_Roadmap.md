@@ -1217,7 +1217,7 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 #### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 ## Stato
-IN CORSO / NEXT: v0.30f
+IN CORSO / NEXT: v0.30g
 
 ## Scopo
 
@@ -1260,7 +1260,7 @@ La fase `v0.30` NON deve implementare:
 | v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ✅ |
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ✅ |
 | v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ✅ |
-| v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ |
+| v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ✅ |
 | v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ |
 | v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ⏳ |
 | v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ⏳ |
@@ -1293,6 +1293,8 @@ La fase `v0.30` NON deve implementare:
 > **Nota tecnica v0.30d:** il checkpoint ha introdotto lo stack layer `ArcGraphLayerStack` e i layer minimi `Terrain`, `Object`, `Actor` e `Debug`. I layer consumano snapshot, marcano dirty in modo conservativo e non leggono direttamente `World`, `MapGridData`, sprite o GameObject.
 
 > **Nota tecnica v0.30e:** il checkpoint ha centralizzato la marcatura dirty in `ArcGraphRenderState`, aggiungendo helper per cella+chunk, batch semplice di celle e cleanup esplicito. I layer minimi non duplicano piu' la formula cella -> chunk e il dirty resta un fatto di presentazione, non un event bus simulativo.
+
+> **Nota tecnica v0.30f:** il checkpoint ha introdotto `ArcGraphZLevelPolicy`, dichiarando in modo centrale che il runtime attuale opera solo su `z = 0`. Adapter e render state usano questa policy senza introdurre altitudini giocabili; celle, chunk e dirty continuano pero' a preservare sempre il valore `Z`.
 
 ---
 

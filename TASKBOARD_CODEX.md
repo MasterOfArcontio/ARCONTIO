@@ -28,34 +28,34 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 CHECKPOINT CORRENTE:
-`v0.30f - Compatibilita' z-level preparatoria`
+`v0.30g - ActorVisual preparatorio`
 
 STATUS:
 IN CORSO / BRANCH TASK APERTO / AUDIT-FIRST
 
 RAMO BASE CORRENTE:
-`ai-task/v0.30f-arcgraph-z-level-compat`
+`ai-task/v0.30g-arcgraph-actor-visual`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- verificare e rafforzare la compatibilita' z-level preparatoria di `arcgraph`;
-- mantenere il runtime operativo sul solo livello `z = 0`;
-- evitare introduzione di altitudini giocabili o logica multilivello produttiva;
-- controllare che coordinate, chunk, dirty, adapter e layer preservino sempre `x/y/z`;
-- chiarire quali firme sono gia' pronte e quali rimangono future.
+- preparare ActorVisual per sprite singolo attuale e futuro movimento visuale multi-tick;
+- mantenere l'interpolazione come fatto grafico, non come mutazione di posizione simulativa;
+- verificare quali dati runtime reali espongono progress del movimento;
+- evitare di dedurre movimento da stati descrittivi non affidabili;
+- chiarire cosa resta rinviato al renderer grafico vero e proprio.
 
 DOC SYNC:
 
-- Taskboard e roadmap riallineate per passaggio da `v0.30e` a `v0.30f`;
-- branch `ai-task/v0.30e-arcgraph-dirty-state` pushato con commit `a5ebf28`;
-- diario Notion aggiornato con chiusura `v0.30e` e apertura `v0.30f`.
+- Taskboard e roadmap riallineate per passaggio da `v0.30f` a `v0.30g`;
+- branch `ai-task/v0.30f-arcgraph-z-level-compat` pushato con commit `7b3c106`;
+- diario Notion aggiornato con chiusura `v0.30f` e apertura `v0.30g`.
 
 OBIETTIVO:
 
-Verificare la compatibilita' z-level preparatoria sopra contratti, dirty, adapter e layer. Il checkpoint deve mantenere il rendering operativo su `z = 0`, ma impedire che nuove API tornino implicitamente a coordinate solo `x/y`.
+Preparare il contratto ActorVisual per il movimento grafico multi-tick. Il checkpoint deve distinguere in modo netto posizione simulativa discreta, snapshot visuale e interpolazione grafica, senza spostare NPC lato rendering e senza completare running action dalla view.
 
 ---
 
@@ -145,23 +145,24 @@ Consolidato:
 | v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ✅ COMPLETATO / PUSHATO |
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ✅ COMPLETATO / PUSHATO |
 | v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ✅ COMPLETATO / PUSHATO |
-| v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ IN CORSO |
-| v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ PENDING |
+| v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ✅ COMPLETATO / PUSHATO |
+| v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ IN CORSO |
 | v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ⏳ PENDING |
 | v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ⏳ PENDING |
 | v0.30j | QA regressiva visuale e closeout ArcGraph Foundation | ⏳ PENDING |
 
 Note operative:
 
-- branch task corrente: `ai-task/v0.30f-arcgraph-z-level-compat`;
+- branch task corrente: `ai-task/v0.30g-arcgraph-actor-visual`;
 - base di integrazione: `ai/codex-main`;
 - branch `ai-task/v0.30-arcgraph-foundation` pushato con commit `d482cdc`;
 - branch `ai-task/v0.30b-arcgraph-contracts` pushato con commit `2495135`;
 - branch `ai-task/v0.30c-arcgraph-adapter` pushato con commit `01273d4`;
 - branch `ai-task/v0.30d-arcgraph-minimal-layers` pushato con commit `b6d912f`;
 - branch `ai-task/v0.30e-arcgraph-dirty-state` pushato con commit `a5ebf28`;
+- branch `ai-task/v0.30f-arcgraph-z-level-compat` pushato con commit `7b3c106`;
 - `arcgraph` deve sostituire il rendering provvisorio a regime, non diventare un secondo renderer permanente;
-- il checkpoint corrente e' sulla compatibilita' z-level: niente altitudini giocabili senza `go` dell'operatore;
+- il checkpoint corrente e' su ActorVisual: niente mutazione simulativa dalla view senza `go` dell'operatore;
 - `main` resta il ramo stabile e non deve ricevere lavoro implementativo diretto.
 
 ---
@@ -203,12 +204,12 @@ Note operative:
 
 # 4. Prossimo gate di validazione umana
 
-Prima di procedere operativamente dentro `v0.30f` devono essere verificati:
+Prima di procedere operativamente dentro `v0.30g` devono essere verificati:
 
-1. quali contratti ArcGraph usano gia' coordinate `x/y/z`;
-2. dove rimangono ancora assunzioni implicite di `z = 0`;
-3. come dichiarare il livello runtime corrente senza introdurre vera altitudine;
-4. come evitare che adapter e layer perdano il valore `z`;
+1. quali dati runtime espongono davvero progress multi-tick;
+2. se ActorVisual deve restare solo snapshot o avere helper di interpolazione;
+3. come evitare che il renderer chiami `SetNpcPos`;
+4. come trattare sprite singolo attuale e futura vestizione a layer;
 5. quali test/compilazioni bastano per validare il checkpoint.
 
 ---
@@ -232,7 +233,8 @@ v0.30a audit rendering attuale completato
 -> v0.30c adapter read-only completato
 -> v0.30d layer grafici minimi completati
 -> v0.30e dirty cell / dirty chunk preparatorio completato
--> v0.30f compatibilita' z-level preparatoria
+-> v0.30f compatibilita' z-level preparatoria completata
+-> v0.30g ActorVisual preparatorio
 -> solo dopo assorbimento progressivo del legacy grafico
 ```
 
@@ -282,7 +284,9 @@ Confermato:
 - branch task `ai-task/v0.30d-arcgraph-minimal-layers` pushato su origin con commit `b6d912f`;
 - branch task `ai-task/v0.30e-arcgraph-dirty-state` aperto da `ai-task/v0.30d-arcgraph-minimal-layers`;
 - branch task `ai-task/v0.30e-arcgraph-dirty-state` pushato su origin con commit `a5ebf28`;
-- branch task corrente `ai-task/v0.30f-arcgraph-z-level-compat` aperto da `ai-task/v0.30e-arcgraph-dirty-state`;
+- branch task `ai-task/v0.30f-arcgraph-z-level-compat` aperto da `ai-task/v0.30e-arcgraph-dirty-state`;
+- branch task `ai-task/v0.30f-arcgraph-z-level-compat` pushato su origin con commit `7b3c106`;
+- branch task corrente `ai-task/v0.30g-arcgraph-actor-visual` aperto da `ai-task/v0.30f-arcgraph-z-level-compat`;
 - `main` locale allineato a `origin/main` sul commit `8ca3af0`;
 - PR #131 integrata su `ai/codex-main`;
 - PR #132 integrata su `main` per il bootstrap analisi/audit;
@@ -293,7 +297,7 @@ Confermato:
 Da completare:
 
 - commit e pubblicazione del riallineamento Roadmap/Taskboard per `v0.30d`;
-- progettazione e implementazione controllata della compatibilita' z-level `arcgraph`;
+- progettazione e implementazione controllata di ActorVisual `arcgraph`;
 - piano di assorbimento ed eliminazione legacy grafico;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
