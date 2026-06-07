@@ -28,34 +28,34 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 CHECKPOINT CORRENTE:
-`v0.30e - Dirty cell / dirty chunk preparatorio`
+`v0.30f - Compatibilita' z-level preparatoria`
 
 STATUS:
 IN CORSO / BRANCH TASK APERTO / AUDIT-FIRST
 
 RAMO BASE CORRENTE:
-`ai-task/v0.30e-arcgraph-dirty-state`
+`ai-task/v0.30f-arcgraph-z-level-compat`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- rafforzare il contratto dirty cell / dirty chunk di `arcgraph`;
-- mantenere il dirty state come fatto di presentazione, non come evento simulativo;
-- evitare ottimizzazione aggressiva e premature diff engine;
-- preparare API minime per marcare celle, chunk e liste di snapshot;
-- chiarire quando il dirty viene osservato e quando viene pulito.
+- verificare e rafforzare la compatibilita' z-level preparatoria di `arcgraph`;
+- mantenere il runtime operativo sul solo livello `z = 0`;
+- evitare introduzione di altitudini giocabili o logica multilivello produttiva;
+- controllare che coordinate, chunk, dirty, adapter e layer preservino sempre `x/y/z`;
+- chiarire quali firme sono gia' pronte e quali rimangono future.
 
 DOC SYNC:
 
-- Taskboard e roadmap riallineate per passaggio da `v0.30d` a `v0.30e`;
-- branch `ai-task/v0.30d-arcgraph-minimal-layers` pushato con commit `b6d912f`;
-- diario Notion aggiornato con chiusura `v0.30d` e apertura `v0.30e`.
+- Taskboard e roadmap riallineate per passaggio da `v0.30e` a `v0.30f`;
+- branch `ai-task/v0.30e-arcgraph-dirty-state` pushato con commit `a5ebf28`;
+- diario Notion aggiornato con chiusura `v0.30e` e apertura `v0.30f`.
 
 OBIETTIVO:
 
-Rafforzare il dirty state grafico preparatorio sopra i layer minimi gia' creati. Il checkpoint deve mantenere la logica semplice: celle/chunk sporchi, refresh esplicito e cleanup controllato, senza trasformare il dirty grafico in un event bus simulativo.
+Verificare la compatibilita' z-level preparatoria sopra contratti, dirty, adapter e layer. Il checkpoint deve mantenere il rendering operativo su `z = 0`, ma impedire che nuove API tornino implicitamente a coordinate solo `x/y`.
 
 ---
 
@@ -144,8 +144,8 @@ Consolidato:
 | v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ✅ COMPLETATO / PUSHATO |
 | v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ✅ COMPLETATO / PUSHATO |
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ✅ COMPLETATO / PUSHATO |
-| v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ⏳ IN CORSO |
-| v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ PENDING |
+| v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ✅ COMPLETATO / PUSHATO |
+| v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ IN CORSO |
 | v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ PENDING |
 | v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ⏳ PENDING |
 | v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ⏳ PENDING |
@@ -153,14 +153,15 @@ Consolidato:
 
 Note operative:
 
-- branch task corrente: `ai-task/v0.30e-arcgraph-dirty-state`;
+- branch task corrente: `ai-task/v0.30f-arcgraph-z-level-compat`;
 - base di integrazione: `ai/codex-main`;
 - branch `ai-task/v0.30-arcgraph-foundation` pushato con commit `d482cdc`;
 - branch `ai-task/v0.30b-arcgraph-contracts` pushato con commit `2495135`;
 - branch `ai-task/v0.30c-arcgraph-adapter` pushato con commit `01273d4`;
 - branch `ai-task/v0.30d-arcgraph-minimal-layers` pushato con commit `b6d912f`;
+- branch `ai-task/v0.30e-arcgraph-dirty-state` pushato con commit `a5ebf28`;
 - `arcgraph` deve sostituire il rendering provvisorio a regime, non diventare un secondo renderer permanente;
-- il checkpoint corrente e' sul dirty state grafico: niente ottimizzazione aggressiva senza `go` dell'operatore;
+- il checkpoint corrente e' sulla compatibilita' z-level: niente altitudini giocabili senza `go` dell'operatore;
 - `main` resta il ramo stabile e non deve ricevere lavoro implementativo diretto.
 
 ---
@@ -202,12 +203,12 @@ Note operative:
 
 # 4. Prossimo gate di validazione umana
 
-Prima di procedere operativamente dentro `v0.30e` devono essere verificati:
+Prima di procedere operativamente dentro `v0.30f` devono essere verificati:
 
-1. se il dirty state attuale basta ai layer minimi;
-2. quali helper mancano per marcare liste di celle/chunk senza duplicare codice;
-3. chi deve pulire il dirty state e in quale momento;
-4. come evitare che il dirty grafico diventi un event bus simulativo;
+1. quali contratti ArcGraph usano gia' coordinate `x/y/z`;
+2. dove rimangono ancora assunzioni implicite di `z = 0`;
+3. come dichiarare il livello runtime corrente senza introdurre vera altitudine;
+4. come evitare che adapter e layer perdano il valore `z`;
 5. quali test/compilazioni bastano per validare il checkpoint.
 
 ---
@@ -230,7 +231,8 @@ v0.30a audit rendering attuale completato
 -> v0.30b contratti minimi arcgraph completati
 -> v0.30c adapter read-only completato
 -> v0.30d layer grafici minimi completati
--> v0.30e dirty cell / dirty chunk preparatorio
+-> v0.30e dirty cell / dirty chunk preparatorio completato
+-> v0.30f compatibilita' z-level preparatoria
 -> solo dopo assorbimento progressivo del legacy grafico
 ```
 
@@ -278,7 +280,9 @@ Confermato:
 - branch task `ai-task/v0.30c-arcgraph-adapter` pushato su origin con commit `01273d4`;
 - branch task `ai-task/v0.30d-arcgraph-minimal-layers` aperto da `ai-task/v0.30c-arcgraph-adapter`;
 - branch task `ai-task/v0.30d-arcgraph-minimal-layers` pushato su origin con commit `b6d912f`;
-- branch task corrente `ai-task/v0.30e-arcgraph-dirty-state` aperto da `ai-task/v0.30d-arcgraph-minimal-layers`;
+- branch task `ai-task/v0.30e-arcgraph-dirty-state` aperto da `ai-task/v0.30d-arcgraph-minimal-layers`;
+- branch task `ai-task/v0.30e-arcgraph-dirty-state` pushato su origin con commit `a5ebf28`;
+- branch task corrente `ai-task/v0.30f-arcgraph-z-level-compat` aperto da `ai-task/v0.30e-arcgraph-dirty-state`;
 - `main` locale allineato a `origin/main` sul commit `8ca3af0`;
 - PR #131 integrata su `ai/codex-main`;
 - PR #132 integrata su `main` per il bootstrap analisi/audit;
@@ -289,7 +293,7 @@ Confermato:
 Da completare:
 
 - commit e pubblicazione del riallineamento Roadmap/Taskboard per `v0.30d`;
-- progettazione e implementazione controllata del dirty state grafico `arcgraph`;
+- progettazione e implementazione controllata della compatibilita' z-level `arcgraph`;
 - piano di assorbimento ed eliminazione legacy grafico;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 

@@ -1217,7 +1217,7 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 #### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 ## Stato
-IN CORSO / NEXT: v0.30e
+IN CORSO / NEXT: v0.30f
 
 ## Scopo
 
@@ -1259,7 +1259,7 @@ La fase `v0.30` NON deve implementare:
 | v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ✅ |
 | v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ✅ |
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ✅ |
-| v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ⏳ |
+| v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ✅ |
 | v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ |
 | v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ |
 | v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ⏳ |
@@ -1291,6 +1291,8 @@ La fase `v0.30` NON deve implementare:
 > **Nota tecnica v0.30c:** il checkpoint ha introdotto l'adapter read-only `ArcGraphWorldAdapter`, con snapshot terreno, oggetto e actor. L'adapter legge `MapGridData` e `World`, produce copie value-type/listabili e non modifica il renderer legacy, il World, il Decision Layer o il Job Layer.
 
 > **Nota tecnica v0.30d:** il checkpoint ha introdotto lo stack layer `ArcGraphLayerStack` e i layer minimi `Terrain`, `Object`, `Actor` e `Debug`. I layer consumano snapshot, marcano dirty in modo conservativo e non leggono direttamente `World`, `MapGridData`, sprite o GameObject.
+
+> **Nota tecnica v0.30e:** il checkpoint ha centralizzato la marcatura dirty in `ArcGraphRenderState`, aggiungendo helper per cella+chunk, batch semplice di celle e cleanup esplicito. I layer minimi non duplicano piu' la formula cella -> chunk e il dirty resta un fatto di presentazione, non un event bus simulativo.
 
 ---
 
