@@ -35,7 +35,7 @@
 | v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Completata fino a v0.20q |
 | v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | In corso |
 | v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | Completata come foundation |
-| v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | Prossima / Analisi |
+| v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | In analisi |
 | v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Pending |
 | v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Pending |
 | v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Pending |
@@ -1318,20 +1318,53 @@ La fase `v0.30` NON deve implementare:
 #### v0.31 - ArcGraph Bootstrap controllato
 
 ## Stato
-PROSSIMA / ANALISI
+IN ANALISI / AUDIT-FIRST
 
 ## Obiettivo
 
 Accendere `arcgraph` come sistema interno controllato, senza render produttivo e senza sostituire ancora `MapGrid`.
 
-Il bootstrap dovra' istanziare e collegare:
+La fase `v0.31` deve trasformare `arcgraph` da libreria di contratti passivi a sistema inizializzabile in modo esplicito e verificabile.
+
+Il risultato desiderato non e' ancora vedere qualcosa di nuovo a schermo. Il risultato desiderato e':
+
+```text
+ArcGraph puo' essere inizializzato
+-> i suoi layer foundation esistono
+-> l'adapter puo' essere collegato
+-> il sistema puo' produrre snapshot/cache interne
+-> nessun renderer produttivo viene attivato
+-> MapGrid continua a essere il renderer visibile
+```
+
+## Componenti coinvolti
+
+Il bootstrap dovra' valutare come istanziare e collegare:
 
 - `ArcGraphRenderState`;
 - `ArcGraphLayerStack`;
-- layer foundation;
+- layer foundation: Terrain, Object, Actor, Debug;
 - `ArcGraphWorldAdapter`;
 - eventuali buffer snapshot temporanei;
 - policy esplicita di attivazione/disattivazione.
+
+## Fuori scope
+
+La fase `v0.31` NON deve implementare:
+
+- terrain renderer produttivo;
+- mesh chunk ArcGraph;
+- sprite NPC/oggetti ArcGraph visibili;
+- sostituzione di `MapGridBootstrap`;
+- sostituzione di `MapGridWorldView`;
+- modalita' comparativa visuale;
+- animazioni;
+- luci;
+- meteo;
+- acqua;
+- vegetazione;
+- overlay diagnostici migrati;
+- cambiamenti a Core, Decision Layer o Job Layer.
 
 ## Vincoli
 
@@ -1340,6 +1373,92 @@ Il bootstrap dovra' istanziare e collegare:
 - nessuna sostituzione immediata di `MapGridBootstrap`;
 - nessun `MonoBehaviour` ArcGraph invasivo prima di avere un contratto chiaro;
 - nessun accesso diretto non controllato a Core, Decision Layer o Job Layer.
+
+## Problema tecnico centrale
+
+Oggi `MapGridData` e' creato e tenuto privato dentro `MapGridBootstrap`.
+
+Questo e' il nodo principale della fase:
+
+```text
+ArcGraphWorldAdapter puo' gia' leggere MapGridData
+ma ArcGraphBootstrap non ha ancora un modo pulito per ottenerlo
+senza entrare nel monolite MapGridBootstrap / MapGridWorldView.
+```
+
+Quindi `v0.31` deve prima decidere il confine tra:
+
+- bootstrap legacy MapGrid;
+- bootstrap ArcGraph;
+- dati view-side temporanei;
+- futuro renderer ArcGraph.
+
+## Checkpoint v0.31
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.31a | Audit bootstrap legacy: `MapGridBootstrap`, ownership di `MapGridData`, camera, input provider, `MapGridWorldView` | Pending |
+| v0.31b | Definizione contratto bootstrap ArcGraph: cosa inizializza, cosa non inizializza, cosa espone | Pending |
+| v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Pending |
+| v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Pending |
+| v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Pending |
+| v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Pending |
+| v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Pending |
+| v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Pending |
+
+## Ipotesi iniziale consigliata
+
+L'ipotesi piu' prudente e':
+
+```text
+ArcGraphBootstrap = componente o servizio minimo
+che inizializza solo lo stato ArcGraph
+e non disegna nulla.
+```
+
+Prima versione desiderabile:
+
+- crea `ArcGraphRenderState`;
+- crea `ArcGraphLayerStack`;
+- registra i layer foundation;
+- crea `ArcGraphWorldAdapter`;
+- opzionalmente prepara liste snapshot riusabili;
+- espone uno stato diagnostico tipo `IsInitialized`;
+- non crea GameObject visuali;
+- non crea mesh;
+- non crea SpriteRenderer;
+- non modifica `World`;
+- non chiama metodi di movimento, job o decisione.
+
+## Alternative progettuali da valutare
+
+| Alternativa | Vantaggio | Rischio |
+|---|---|---|
+| Servizio C# passivo puro | Molto testabile, nessuna dipendenza Unity | Va comunque agganciato da qualche punto runtime |
+| `MonoBehaviour` minimo dedicato | Facile da vedere in scena e controllare | Rischio di iniziare a comportarsi come renderer troppo presto |
+| Estensione di `MapGridBootstrap` | Accesso facile a `MapGridData` | Aumenta il coupling col legacy |
+| Harness debug separato | Sicuro per test e audit | Potrebbe restare scollegato dal runtime reale |
+
+## Definition of Done v0.31
+
+| Criterio | Stato |
+|---|---|
+| Punto di bootstrap ArcGraph deciso | Pending |
+| Lifecycle `ArcGraphRenderState` definito | Pending |
+| Lifecycle `ArcGraphLayerStack` definito | Pending |
+| Registrazione layer foundation definita | Pending |
+| Strategia accesso `MapGridData` chiarita | Pending |
+| Strategia accesso `World` chiarita senza nuova onniscienza | Pending |
+| Nessun renderer produttivo attivato | Pending |
+| Nessun doppio renderer permanente introdotto | Pending |
+| Nessuna modifica a Core/Decision/Job | Pending |
+| QA minima documentata | Pending |
+
+## Nota architetturale v0.31
+
+`v0.31` e' una fase di accensione controllata, non di resa visiva.
+
+Se questa fase viene fatta bene, `v0.32` potra' concentrarsi sul terrain renderer senza dover decidere anche bootstrap, ownership dei dati, lifecycle dei layer e policy anti-doppio-renderer.
 
 ---
 
