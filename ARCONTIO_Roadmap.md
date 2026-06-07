@@ -36,7 +36,7 @@
 | v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | In corso |
 | v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | Completata come foundation |
 | v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | Completata |
-| v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Pending |
+| v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Completata |
 | v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Pending |
 | v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Pending |
 | v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | Pending |
@@ -2301,7 +2301,7 @@ senza attivare un doppio renderer permanente.
 #### v0.32 - ArcGraph Terrain Renderer
 
 ## Stato
-IN CORSO / AUDIT-FIRST
+COMPLETATA
 
 ## Obiettivo
 
@@ -2326,7 +2326,7 @@ Il renderer dovra':
 | v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Completato |
 | v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Completato |
 | v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Completato |
-| v0.32h | Closeout v0.32 e preparazione v0.33 modalita' comparativa controllata | Prossimo |
+| v0.32h | Closeout v0.32 e preparazione v0.33 modalita' comparativa controllata | Completato |
 
 ## Esito v0.32a - Audit terrain legacy
 
@@ -2835,6 +2835,83 @@ Non muta World.
 Non muta MapGridData.
 Non sostituisce MapGrid.
 ```
+
+## Esito v0.32h - Closeout terrain renderer
+
+`v0.32` e' chiusa come checkpoint di preparazione tecnica del primo renderer terrain ArcGraph.
+
+### Definition of Done v0.32
+
+Completato:
+
+- audit del terrain renderer legacy `MapGridChunkRenderer`;
+- contratto ArcGraph terrain separato da scena, `GameObject`, `MeshRenderer` e `MeshFilter`;
+- UV map terrain autonoma, senza asset load e senza dipendenza diretta da `MapGridTileAtlas`;
+- policy visuale compatibile con la resa legacy floor/wall/wall-top;
+- builder passivo di mesh data per chunk;
+- rebuild localizzato dei soli chunk dirty;
+- harness statico compilabile per smoke test 2x2;
+- QA di compilazione isolata;
+- QA su chiamate vietate;
+- QA su scope diff.
+
+### Impatto architetturale
+
+ArcGraph ora possiede il primo nucleo tecnico capace di trasformare snapshot terrain in dati mesh.
+
+La catena e':
+
+```text
+ArcGraphTerrainLayer
++ ArcGraphTerrainTileUvMap
++ ArcGraphTerrainVisualPolicy
++ ArcGraphRenderState.Dirty
+-> ArcGraphTerrainChunkMeshBuilder
+-> ArcGraphTerrainChunkMeshData
+```
+
+Questo non sostituisce ancora il renderer MapGrid.
+
+Il risultato della `v0.32` e' volutamente intermedio:
+
+- produce dati mesh;
+- non li monta ancora in scena;
+- non crea renderer Unity;
+- non decide materiali;
+- non attiva una visualizzazione alternativa stabile.
+
+### Debiti residui dichiarati
+
+Restano fuori da `v0.32`:
+
+- modalita' comparativa visuale ArcGraph/MapGrid;
+- bridge verso `Mesh` Unity reale;
+- policy di attivazione debug in scena;
+- gestione materiali/texture come asset runtime controllati;
+- confronto pixel/scala/camera;
+- sostituzione del renderer legacy.
+
+Questi punti appartengono a `v0.33` e versioni successive.
+
+### Preparazione v0.33
+
+`v0.33` dovra' costruire una modalita' comparativa controllata.
+
+Obiettivo:
+
+```text
+MapGrid legacy resta renderer produttivo.
+ArcGraph terrain viene acceso solo in debug/test.
+I due output possono essere confrontati senza rendere permanente il doppio renderer.
+```
+
+La `v0.33` dovra' decidere con attenzione:
+
+- dove montare fisicamente la mesh ArcGraph;
+- come evitare doppio rendering persistente;
+- come leggere materiali e atlas senza asset load impliciti;
+- come verificare scala, coordinate chunk, ordinamento Z e camera;
+- come disattivare completamente ArcGraph terrain fuori dal test.
 
 ---
 

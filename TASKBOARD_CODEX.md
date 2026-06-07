@@ -25,13 +25,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.32 - ArcGraph Terrain Renderer
+## MACRO JOB ATTIVO: v0.33 - ArcGraph Modalita' comparativa controllata
 
 CHECKPOINT CORRENTE:
-`v0.32h - Closeout ArcGraph Terrain Renderer`
+`attesa apertura operativa v0.33`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / QA v0.32g SUPERATA
+ATTESA GO / v0.32 COMPLETATA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.32h-arcgraph-terrain-closeout`
@@ -41,10 +41,11 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- definire e implementare il primo terrain renderer ArcGraph controllato;
-- partire da snapshot terrain e chunk sporchi;
-- non sostituire ancora MapGrid;
-- non introdurre doppio renderer permanente;
+- preparare la modalita' comparativa controllata tra MapGrid legacy e ArcGraph terrain;
+- non aprire ancora implementazione v0.33 senza `go` operativo dell'operatore;
+- mantenere MapGrid come renderer produttivo;
+- usare ArcGraph terrain solo come output debug/test;
+- evitare doppio renderer permanente;
 - non toccare Core, Decision Layer o Job Layer.
 
 DOC SYNC:
@@ -68,11 +69,51 @@ DOC SYNC:
 - dirty chunk rebuild `v0.32e` implementato su `ArcGraphRenderState.Dirty.DirtyChunks`;
 - harness statico `v0.32f` implementato e compilabile;
 - QA `v0.32g` superata: compilazione, diff scope, chiamate vietate, no Core/MapGrid/scena/meta;
-- prossimo ramo operativo previsto: `ai-task/v0.32h-arcgraph-terrain-closeout`.
+- closeout `v0.32h` completato: Definition of Done, debiti residui e preparazione `v0.33`;
+- prossimo macro checkpoint previsto: `v0.33 - ArcGraph Modalita' comparativa controllata`.
 
 OBIETTIVO:
 
-Chiudere `v0.32`, aggiornare Definition of Done, dichiarare debiti residui e preparare `v0.33` modalita' comparativa controllata.
+Attendere conferma operativa per aprire `v0.33`.
+
+La `v0.33` dovra' verificare ArcGraph terrain contro MapGrid legacy in modo controllato, senza trasformare la comparazione in un percorso runtime stabile.
+
+---
+
+## Closeout v0.32 - ArcGraph Terrain Renderer
+
+STATUS:
+COMPLETATA
+
+Consolidato:
+
+- audit terrain legacy `MapGridChunkRenderer`;
+- UV map ArcGraph autonoma;
+- policy terrain compatibile con legacy floor/wall/wall-top;
+- builder passivo di mesh data per chunk;
+- rebuild da dirty chunk;
+- harness statico compilabile;
+- QA di compilazione e scope diff.
+
+Impatto:
+
+`v0.32` abilita ArcGraph a produrre dati mesh terrain a partire da snapshot e dirty chunk.
+
+Non abilita ancora:
+
+- creazione di `GameObject`;
+- creazione di `MeshRenderer` / `MeshFilter`;
+- aggancio scena;
+- sostituzione MapGrid;
+- doppio renderer permanente.
+
+Debiti rinviati a `v0.33`:
+
+- montaggio controllato della mesh ArcGraph in debug/test;
+- confronto visuale con MapGrid;
+- verifica scala, coordinate, sorting e camera;
+- policy di accensione/spegnimento sicura;
+- gestione materiali/atlas come input esterni controllati.
 
 ---
 
