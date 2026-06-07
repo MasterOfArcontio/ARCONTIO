@@ -40,7 +40,7 @@
 | v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Completata nel perimetro sicuro |
 | v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Completata nel perimetro passivo |
 | v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | Completata nel perimetro bridge read-only |
-| v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | Pending |
+| v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | Aperta in audit preparatorio |
 | v0.37 | ArcGraph Debug/Overlay Migration | Settembre 2026 | Pending |
 | v0.38 | ArcGraph Legacy Absorption / Retirement | Settembre 2026 | Pending |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
@@ -4651,7 +4651,7 @@ Non e' stata eseguita compilazione Unity batch per evitare scritture automatiche
 #### v0.36 - ArcGraph Environment Visual Layers
 
 ## Stato
-PENDING
+APERTO IN AUDIT PREPARATORIO
 
 ## Obiettivo
 
@@ -4661,11 +4661,40 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 
 | Versione | Sottopunto | Stato |
 |---|---|---|
+| v0.36a | Audit e contratto preparatorio layer ambientali visuali | In attesa go operatore |
 | v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Pending |
 | v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Pending |
 | v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Pending |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
 | v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
+
+## Apertura v0.36a - Audit e contratto preparatorio
+
+Branch:
+
+```text
+ai-task/v0.36a-arcgraph-environment-audit
+```
+
+Scope previsto:
+
+- audit dei placeholder/layer ArcGraph ambientali gia' disponibili;
+- verifica di quanto `v0.30h` ha preparato per Water, Vegetation, Light, Weather ed Effect;
+- definizione input/output ammessi per ogni layer visuale;
+- separazione tra simulazione ambientale e rendering;
+- relazione con LOD zoom `v0.33f`;
+- relazione con render queue actor/object `v0.34`;
+- relazione con actor motion `v0.35`;
+- nessuna implementazione produttiva prima del go.
+
+Vietato in `v0.36a`:
+
+- creare `GameObject`;
+- creare `SpriteRenderer`, `MeshRenderer`, `ParticleSystem` o luci Unity;
+- caricare asset con `Resources.Load`;
+- modificare scene;
+- simulare crescita piante, acqua, meteo, luce o incendi;
+- sostituire MapGrid.
 
 ---
 

@@ -25,33 +25,30 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.35 - ArcGraph Actor Motion Runtime Bridge
+## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.35f - QA e closeout ArcGraph Actor Motion Runtime Bridge`
+`v0.36a - Audit e contratto preparatorio layer ambientali visuali`
 
 STATUS:
-COMPLETATA NEL PERIMETRO BRIDGE READ-ONLY
+APERTO / IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.35b-arcgraph-motion-metadata`
+`ai-task/v0.36a-arcgraph-environment-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- commit e push branch `v0.35b`;
-- aprire branch successivo preparatorio `v0.36a`;
-- non iniziare modifiche `v0.36` senza nuovo go operatore;
-- evitare parsing di `ActionInstanceId`;
-- non permettere alla view di mutare posizione NPC;
-- non permettere alla view di completare o interrompere job;
+- attendere go operatore prima di modifiche operative;
+- avviare audit dei layer ambientali ArcGraph gia' presenti o placeholder;
+- definire contratto preparatorio per Vegetation, Water, Light, Effect, Weather;
+- non implementare simulazione produttiva di acqua, vegetazione, luce, meteo o effetti;
+- non creare GameObject, renderer Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
-- non introdurre doppio renderer permanente;
-- non agganciare wrapper scena senza decisione esplicita;
-- toccare Core/Job Layer solo per il contratto read-only autorizzato.
+- usare la `v0.35` come base per actor motion, senza riaprire il Job Layer.
 
 DOC SYNC:
 
@@ -122,10 +119,11 @@ DOC SYNC:
 - `ArcGraphWorldAdapter` ora alimenta `ArcGraphActorMotionSnapshot`;
 - test EditMode aggiunti per factory movement e lookup store;
 - QA statico eseguito: diff check, no chiamate vietate runtime nuove, no `.meta`, no `Library/Temp/Obj`.
+- branch `ai-task/v0.36a-arcgraph-environment-audit` aperto come prossimo checkpoint preparatorio.
 
 OBIETTIVO:
 
-Chiudere `v0.35`, pubblicare il branch e preparare il prossimo checkpoint `v0.36`.
+Preparare `v0.36` con audit e contratto dei layer ambientali visuali, senza iniziare patch codice prima del go.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 
