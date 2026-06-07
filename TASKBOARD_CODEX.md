@@ -34,7 +34,7 @@ STATUS:
 ATTESA GO / v0.33b COMPLETATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.33b-arcgraph-view-contract`
+`ai-task/v0.33c-arcgraph-view-json-config`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -77,7 +77,7 @@ DOC SYNC:
 - audit `v0.33a` completato: camera legacy, input mouse, zoom/pan, conversione coordinate, confine ArcGraph View/Camera;
 - branch `ai-task/v0.33b-arcgraph-view-contract` aperto;
 - contratto `v0.33b` implementato: config view, zoom discreto, input frame astratto, stato vista e rettangolo celle visibili;
-- prossimo branch previsto: `ai-task/v0.33c-arcgraph-view-json-config`.
+- branch `ai-task/v0.33c-arcgraph-view-json-config` aperto e in attesa di `go` operativo.
 
 OBIETTIVO:
 
