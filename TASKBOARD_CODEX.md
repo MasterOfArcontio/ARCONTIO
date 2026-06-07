@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.32 - ArcGraph Terrain Renderer
 
 CHECKPOINT CORRENTE:
-`v0.32d - Renderer chunk terrain passivo`
+`v0.32e - Dirty chunk rebuild terrain ArcGraph`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / ATLAS v0.32c IMPLEMENTATO
+IN ESECUZIONE AUTONOMA / CHUNK BUILDER v0.32d IMPLEMENTATO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.32d-arcgraph-terrain-chunk-builder`
+`ai-task/v0.32e-arcgraph-terrain-dirty-rebuild`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -64,11 +64,12 @@ DOC SYNC:
 - audit `v0.32a` completato: MapGrid terrain chunking, atlas, mesh, varianti floor e wall-top;
 - contratto `v0.32b` definito: terrain builder a chunk, output mesh data, niente aggancio scena automatico;
 - UV map terrain `v0.32c` implementata senza asset load e senza dipendenza codice da `MapGridTileAtlas`;
-- prossimo ramo operativo previsto: `ai-task/v0.32d-arcgraph-terrain-chunk-builder`.
+- chunk mesh builder `v0.32d` implementato come produttore passivo di mesh data;
+- prossimo ramo operativo previsto: `ai-task/v0.32e-arcgraph-terrain-dirty-rebuild`.
 
 OBIETTIVO:
 
-Implementare il builder passivo di mesh data per chunk terrain ArcGraph, partendo da `ArcGraphTerrainLayer`, UV map e policy visuale.
+Collegare il terrain builder al dirty state ArcGraph, in modo da costruire solo i chunk sporchi o richiesti esplicitamente.
 
 ---
 

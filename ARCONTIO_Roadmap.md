@@ -2322,8 +2322,8 @@ Il renderer dovra':
 | v0.32a | Audit terrain legacy: `MapGridChunkRenderer`, atlas, mesh, UV, varianti floor, muro/wall-top | Completato |
 | v0.32b | Contratto terrain renderer ArcGraph: input, output, vietati, diagnostica | Completato |
 | v0.32c | Strategia atlas/materiali: UV map ArcGraph senza asset load e senza dipendenza permanente MapGrid | Completato |
-| v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Prossimo |
-| v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Pending |
+| v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Completato |
+| v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Prossimo |
 | v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Pending |
 | v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Pending |
 | v0.32h | Closeout v0.32 e preparazione v0.33 modalita' comparativa controllata | Pending |
@@ -2585,6 +2585,81 @@ nessun Resources.Load(...)
 nessuna dipendenza codice da MapGridTileAtlas
 nessun GameObject
 nessun MonoBehaviour
+```
+
+## Esito v0.32d - Renderer chunk passivo
+
+Implementato il builder passivo di mesh data terrain per chunk.
+
+Nuovi file:
+
+```text
+ArcGraphTerrainVisualPolicy.cs
+ArcGraphTerrainChunkMeshDiagnostics.cs
+ArcGraphTerrainChunkMeshData.cs
+ArcGraphTerrainChunkMeshBuilder.cs
+```
+
+### Funzionamento
+
+`ArcGraphTerrainChunkMeshBuilder`:
+
+- legge `ArcGraphTerrainLayer`;
+- riceve `ArcGraphTerrainTileUvMap`;
+- riceve `ArcGraphChunkCoord`;
+- riceve chunk size e tile world size;
+- riceve `ArcGraphTerrainVisualPolicy`;
+- trasforma le celle presenti nel chunk in quad;
+- produce array `Vector3[]`, `Vector2[]`, `int[]`;
+- produce diagnostica del chunk.
+
+### Compatibilita' legacy
+
+La policy default replica:
+
+```text
+floorBaseTileId = 0
+floorVariantCount = 4
+wallTileId = 10
+wallTopTileId = 11
+```
+
+La logica visuale:
+
+```text
+se IsBlocked:
+    se cella nord esiste ed e' floor -> wallTop
+    altrimenti -> wall
+se non blocked:
+    floorBase + variante deterministica hash(x,y)
+```
+
+### Garanzia anti-scena
+
+Il builder:
+
+- non crea `GameObject`;
+- non crea `Mesh`;
+- non crea `MeshRenderer`;
+- non crea `MeshFilter`;
+- non carica asset;
+- non legge `MapGridData`;
+- non legge `World`;
+- non modifica sorgenti.
+
+### QA preliminare
+
+Compilazione isolata ArcGraph riuscita.
+
+Controllo chiamate vietate:
+
+```text
+nessun new GameObject(...)
+nessun Resources.Load(...)
+nessun MonoBehaviour
+nessun AddComponent/GetComponent
+nessun FindObjectOfType
+nessun SimulationHost.Instance
 ```
 
 ---
