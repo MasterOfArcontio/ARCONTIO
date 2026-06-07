@@ -1397,14 +1397,62 @@ Quindi `v0.31` deve prima decidere il confine tra:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.31a | Audit bootstrap legacy: `MapGridBootstrap`, ownership di `MapGridData`, camera, input provider, `MapGridWorldView` | Pending |
-| v0.31b | Definizione contratto bootstrap ArcGraph: cosa inizializza, cosa non inizializza, cosa espone | Pending |
+| v0.31a | Audit bootstrap legacy: `MapGridBootstrap`, ownership di `MapGridData`, camera, input provider, `MapGridWorldView` | Completato |
+| v0.31b | Definizione contratto bootstrap ArcGraph: cosa inizializza, cosa non inizializza, cosa espone | Prossimo |
 | v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Pending |
 | v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Pending |
 | v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Pending |
 | v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Pending |
 | v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Pending |
 | v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Pending |
+
+## Esito audit v0.31a - Bootstrap legacy MapGrid
+
+L'audit `v0.31a` conferma che il bootstrap grafico attuale e' ancora concentrato in `MapGridBootstrap`.
+
+Flusso reale osservato:
+
+```text
+MapGridBootstrap.Awake()
+-> risolve Camera / Material
+-> carica MapGridConfig
+-> carica MapGridLayout
+-> crea MapGridData
+-> applica layout a MapGridData
+-> crea MapGridTileAtlas
+-> crea TerrainChunks + MapGridChunkRenderer
+-> configura MapGridCameraController
+-> crea MapGridPointerInputActionsProvider
+-> crea MapGridWorldView
+```
+
+Punti tecnici emersi:
+
+- `MapGridData` viene creato dentro `MapGridBootstrap` e resta campo privato del bootstrap;
+- `MapGridData` viene passato a `MapGridChunkRenderer` per costruire i chunk terreno;
+- `MapGridData` viene passato a `MapGridCameraController` per limiti camera e coordinate mappa;
+- `MapGridWorldView` non riceve `MapGridData`, ma solo `MapGridConfig`;
+- `MapGridWorldView` recupera il `World` tramite `MapGridWorldProvider.TryGetWorld()`;
+- `MapGridWorldProvider` usa `SimulationHost.Instance` come ponte statico view-side;
+- `ArcGraphWorldAdapter` sa gia' leggere `MapGridData` e `World`, ma non esiste ancora un punto runtime pulito che glieli fornisca insieme.
+
+Conclusione audit:
+
+```text
+ArcGraph non deve essere agganciato direttamente dentro MapGridWorldView.
+ArcGraph non deve diventare un secondo lettore casuale di SimulationHost.
+ArcGraph ha bisogno di un contratto di bootstrap esplicito.
+```
+
+Il problema non e' ancora il renderer. Il problema e':
+
+```text
+chi possiede il runtime context grafico
+e quali dati read-only puo' esporre ad ArcGraph
+senza rendere MapGridWorldView ancora piu' monolitico.
+```
+
+Il prossimo checkpoint `v0.31b` deve quindi definire il contratto minimo di bootstrap ArcGraph prima di decidere la forma implementativa.
 
 ## Ipotesi iniziale consigliata
 

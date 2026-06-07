@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
 
 CHECKPOINT CORRENTE:
-`v0.31 - Analisi bootstrap ArcGraph`
+`v0.31b - Definizione contratto bootstrap ArcGraph`
 
 STATUS:
-ANALISI / AUDIT-FIRST / ROADMAP AGGIORNATA
+ATTESA GO / AUDIT v0.31a COMPLETATO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.31-arcgraph-bootstrap-analysis`
+`ai-task/v0.31b-arcgraph-bootstrap-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -51,11 +51,13 @@ DOC SYNC:
 
 - Roadmap ufficiale aggiornata con macro versioni `v0.31`-`v0.38`;
 - branch `ai-task/v0.31-arcgraph-bootstrap-analysis` aperto da closeout `v0.30j`;
-- diario Notion aggiornato con apertura analisi `v0.31`.
+- audit `v0.31a` completato e documentato;
+- prossimo ramo operativo previsto: `ai-task/v0.31b-arcgraph-bootstrap-contract`;
+- diario Notion aggiornato con chiusura `v0.31a` e apertura `v0.31b`.
 
 OBIETTIVO:
 
-Analizzare il primo passo dopo la foundation: il bootstrap controllato di `arcgraph`. Lo scopo non e' ancora disegnare, ma capire come inizializzare il mainframe grafico senza sostituire `MapGrid`, senza mutare il `World` e senza introdurre un secondo renderer permanente.
+Definire il contratto minimo del bootstrap controllato di `arcgraph`. Lo scopo non e' ancora disegnare, ma stabilire cosa viene inizializzato, quali dati vengono letti, cosa viene esposto in diagnostica e quali azioni restano esplicitamente vietate.
 
 ---
 
@@ -141,7 +143,7 @@ Consolidato:
 ## v0.31 - ArcGraph Bootstrap controllato
 
 STATUS:
-ANALISI / AUDIT-FIRST
+AUDIT v0.31a COMPLETATO / v0.31b IN ATTESA GO
 
 Obiettivo:
 
@@ -160,10 +162,10 @@ Componenti da valutare:
 
 Domande aperte:
 
-1. Il bootstrap ArcGraph deve vivere nella scena runtime o in un harness di test controllato?
-2. Deve essere un `MonoBehaviour` minimo oppure un servizio C# passivo con wrapper Unity separato?
-3. Dove recupera `MapGridData`, visto che oggi e' privato dentro `MapGridBootstrap`?
-4. Come evita di duplicare rendering o lifecycle con `MapGridWorldView`?
+1. Quale contratto minimo deve avere il bootstrap ArcGraph?
+2. Quali oggetti deve inizializzare: `ArcGraphRenderState`, `ArcGraphLayerStack`, `ArcGraphWorldAdapter`, buffer snapshot?
+3. Quali dati deve esporre solo in lettura?
+4. Quali azioni deve dichiarare esplicitamente fuori contratto?
 5. Quale verifica minima dimostra che ArcGraph e' acceso senza disegnare?
 
 Vincoli:
@@ -174,6 +176,22 @@ Vincoli:
 - nessun doppio renderer permanente;
 - nessun accesso globale non necessario;
 - niente modifica codice senza prossimo `go` operativo.
+
+Esito audit `v0.31a`:
+
+1. `MapGridBootstrap` e' il punto unico che costruisce il runtime grafico legacy: config, layout, `MapGridData`, atlas, chunk terrain, camera, input provider e `MapGridWorldView`.
+2. `MapGridData` nasce dentro `MapGridBootstrap` e resta privato; viene passato a `MapGridChunkRenderer` e `MapGridCameraController`, ma non a `MapGridWorldView`.
+3. `MapGridWorldView` riceve solo `MapGridConfig` e legge il `World` tramite `MapGridWorldProvider.TryGetWorld()`, che a sua volta usa `SimulationHost.Instance`.
+4. `ArcGraphWorldAdapter` e' gia' compatibile con `MapGridData` e `World`, ma non ha ancora un runtime context pulito da cui riceverli.
+5. Agganciare ArcGraph direttamente dentro `MapGridWorldView` aumenterebbe il monolite legacy; far leggere `SimulationHost` a ogni layer ArcGraph rischierebbe un nuovo accesso globale diffuso.
+
+Conclusione operativa:
+
+```text
+v0.31b deve definire il contratto di bootstrap
+prima di scegliere se implementarlo come servizio C#,
+wrapper Unity minimo o harness debug.
+```
 
 ---
 
@@ -420,8 +438,7 @@ Confermato:
 
 Da completare:
 
-- commit e pubblicazione dell'aggiornamento roadmap `v0.31`-`v0.38`;
-- analisi audit-first del bootstrap controllato `v0.31`;
+- definizione contratto bootstrap `v0.31b`;
 - decisione umana sul primo intervento operativo di bootstrap ArcGraph;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
@@ -429,15 +446,15 @@ Da completare:
 
 # 8. Comportamento obbligatorio Codex durante questo macro job
 
-Durante `v0.30` Codex deve:
+Durante `v0.31` Codex deve:
 
 - restare audit-first sui cambiamenti grafici;
 - non modificare Decision Layer, Job Layer o sistemi di simulazione salvo checkpoint esplicito;
 - non trasformare `arcgraph` in fonte di verita' simulativa;
 - non creare doppio renderer permanente;
-- preservare il comportamento visivo attuale durante la foundation;
+- preservare il comportamento visivo attuale durante il bootstrap controllato;
 - preparare coordinate x/y/z anche se il runtime opera ancora su z = 0;
-- preparare interpolazione visuale multitick senza mutare la posizione simulativa discreta;
+- non aggiungere rendering produttivo prima del checkpoint dedicato;
 - evitare pulizie opportunistiche fuori checkpoint;
 - riportare separatamente ciò che è integrato e ciò che vive soltanto sul ramo task.
 
