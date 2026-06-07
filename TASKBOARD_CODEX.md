@@ -149,7 +149,7 @@ Checkpoint v0.34:
 | v0.34c | Builder object render queue | Completato |
 | v0.34d | Builder actor render queue | Completato |
 | v0.34e | Sorting e filtri LOD per zoom | Completato |
-| v0.34f | Harness smoke actor/object senza scena | Pending |
+| v0.34f | Harness smoke actor/object senza scena | Completato |
 | v0.34g | QA, closeout e preparazione v0.35 | Pending |
 
 Esito v0.34a:
@@ -251,6 +251,24 @@ Esito v0.34e:
 Indicazione per `v0.34f`:
 
 Costruire harness smoke completo actor/object senza scena, verificando contatori, sorting e casi hidden.
+
+Esito v0.34f:
+
+- aggiunto `ArcGraphRenderQueueHarness`;
+- aggiunto `ArcGraphRenderQueueHarnessResult`;
+- harness con actor/object visibili sulla stessa cella;
+- harness con actor hidden per sprite key mancante;
+- harness con object hidden per held object;
+- harness con object hidden per sprite key mancante;
+- verifica contatori actor/object/visible/hidden;
+- verifica ordine oggetto prima di actor sulla stessa cella;
+- nessuna scena;
+- nessun asset load;
+- nessuna lettura `World`.
+
+Indicazione per `v0.34g`:
+
+Chiudere QA e closeout della `v0.34`, aggiornare roadmap/taskboard/Notion e preparare `v0.35`.
 
 Esito audit v0.33a:
 

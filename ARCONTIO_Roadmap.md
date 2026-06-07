@@ -3827,7 +3827,7 @@ Il renderer dovra':
 | v0.34c | Builder object render queue | Completato |
 | v0.34d | Builder actor render queue | Completato |
 | v0.34e | Sorting e filtri LOD per zoom | Completato |
-| v0.34f | Harness smoke actor/object senza scena | Pending |
+| v0.34f | Harness smoke actor/object senza scena | Completato |
 | v0.34g | QA, closeout e preparazione v0.35 | Pending |
 
 ## Vincolo v0.34
@@ -4233,6 +4233,62 @@ Costruire un harness smoke che:
 - costruisce la queue combinata;
 - verifica contatori, ordine e motivi hidden;
 - non usa scena, asset o renderer Unity.
+
+## Esito v0.34f - Harness smoke actor/object
+
+Implementato harness statico per validare la queue actor/object.
+
+Nuovo file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderQueueHarness.cs
+```
+
+### Scenario verificato
+
+Lo smoke test crea:
+
+- un actor visibile;
+- un actor nascosto per sprite key mancante;
+- un oggetto visibile;
+- un oggetto hidden perche' held;
+- un oggetto hidden per sprite key mancante.
+
+Actor visibile e oggetto visibile vengono posizionati sulla stessa cella.
+
+Verifica attesa:
+
+```text
+ActorItemCount = 2
+ObjectItemCount = 3
+VisibleItemCount = 2
+HiddenItemCount = 3
+EntryCount = 2
+ObjectBeforeActorOnSameCell = true
+```
+
+### Garanzie
+
+L'harness:
+
+- non crea `GameObject`;
+- non crea `SpriteRenderer`;
+- non carica asset;
+- non legge `World`;
+- non legge camera;
+- non usa input;
+- non modifica MapGrid;
+- non modifica Core.
+
+### Prossimo passo v0.34g
+
+Eseguire QA finale e closeout:
+
+- diff scope;
+- ricerca chiamate vietate;
+- verifica documentale roadmap/taskboard;
+- diario Notion;
+- preparazione `v0.35`.
 
 ---
 
