@@ -28,22 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.36.03 - Light Renderer preparatorio`
+`v0.36.03v - ArcGraph Visual Probe preparatorio`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.36.03-arcgraph-light-renderer`
+`ai-task/v0.36.03v-arcgraph-visual-probe`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- commit e push branch `v0.36.02`;
-- aprire branch successivo `v0.36.03`;
-- attendere go operatore prima di modifiche operative sul Light Renderer;
+- commit e push branch `v0.36.03`;
+- aprire branch successivo `v0.36.03v`;
+- attendere go operatore prima di modifiche operative sul Visual Probe;
 - non implementare simulazione produttiva di acqua, vegetazione, luce, meteo o effetti;
 - non creare GameObject, renderer Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -144,19 +144,29 @@ DOC SYNC:
 - acqua non ancora fusa nella queue globale actor/object;
 - branch `ai-task/v0.36.03-arcgraph-light-renderer` aperto;
 - apertura `v0.36.03` documentata: Light Renderer preparatorio, nessuna luce Unity, nessuna propagazione luce produttiva;
-- prossimo step fermo in attesa go: Light Renderer preparatorio.
+- light renderer passivo implementato;
+- aggiunto `ArcGraphLightLayer.CopySnapshotsTo(...)`;
+- aggiunto `ArcGraphRenderItemKind.Light`;
+- aggiunto `ArcGraphLightRenderItem`;
+- aggiunto `ArcGraphLightRenderQueueDiagnostics`;
+- aggiunto `ArcGraphLightRenderQueueBuilder`;
+- aggiunto `ArcGraphLightRenderQueueHarness`;
+- luce non ancora fusa nella queue globale actor/object;
+- branch `ai-task/v0.36.03v-arcgraph-visual-probe` aperto;
+- prossimo step fermo in attesa go: ArcGraph Visual Probe preparatorio.
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.36.03 - Light Renderer` e attendere go prima di nuove modifiche.
+Preparare il prossimo step `v0.36.03v - ArcGraph Visual Probe` e attendere go prima di nuove modifiche.
 
-Scope immediato `v0.36.03`:
+Scope immediato `v0.36.03v`:
 
-- audit `ArcGraphLightLayer` e snapshot luce disponibili;
-- definizione item/overlay passivi per tinta globale, luce locale, giorno/notte e buio stanza;
-- uso della policy LOD gia' definita;
-- nessuna creazione di luci Unity;
-- nessuna simulazione produttiva di propagazione luce;
+- audit dei punti di aggancio visuale debug/test esistenti;
+- definizione di un probe visivo minimo non produttivo;
+- uso di snapshot controllati o finti;
+- visualizzazione controllata di terrain, actor/object, vegetation, water e light;
+- verifica sorting layer, LOD e tinta luce;
+- nessuna sostituzione di MapGrid;
 - nessuna modifica a scene, prefab o asset.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.

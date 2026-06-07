@@ -222,6 +222,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>_cells</b>: snapshot luce per cella.</item>
     ///   <item><b>ReplaceSnapshots</b>: sostituzione del buffer visuale.</item>
     ///   <item><b>TryGetCell</b>: lettura del dato luce gia' derivato.</item>
+    ///   <item><b>CopySnapshotsTo</b>: lettura sequenziale controllata per builder visuali.</item>
     ///   <item><b>ClearSnapshots</b>: reset locale.</item>
     /// </list>
     /// </summary>
@@ -251,6 +252,42 @@ namespace Arcontio.View.ArcGraph
         public bool TryGetCell(ArcGraphCellCoord cell, out ArcGraphLightVisualSnapshot snapshot)
         {
             return _cells.TryGetValue(cell, out snapshot);
+        }
+
+        // =============================================================================
+        // CopySnapshotsTo
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia gli snapshot luce in una lista fornita dal chiamante.
+        /// </para>
+        ///
+        /// <para><b>Lettura sequenziale senza propagazione luminosa</b></para>
+        /// <para>
+        /// I builder visuali devono poter scorrere il buffer luce senza ricevere il
+        /// dizionario interno mutabile. Questo metodo copia snapshot value type,
+        /// non calcola ombre, non attenua luce, non legge stanze e non crea sorgenti
+        /// luminose.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>target</b>: lista da popolare, se non nulla.</item>
+        ///   <item><b>clearTarget</b>: se true, svuota la lista prima della copia.</item>
+        /// </list>
+        /// </summary>
+        public void CopySnapshotsTo(
+            IList<ArcGraphLightVisualSnapshot> target,
+            bool clearTarget = true)
+        {
+            if (target == null)
+                return;
+
+            if (clearTarget)
+                target.Clear();
+
+            foreach (var pair in _cells)
+                target.Add(pair.Value);
         }
 
         public void ClearSnapshots()

@@ -4664,7 +4664,8 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 | v0.36a | Audit e contratto preparatorio layer ambientali visuali | Completato |
 | v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Completato nel perimetro passivo |
 | v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Completato nel perimetro passivo |
-| v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | In attesa go operatore |
+| v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Completato nel perimetro passivo |
+| v0.36.03v | ArcGraph Visual Probe: primo test visivo controllato dei layer base | In attesa go operatore |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
 | v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
 
@@ -4998,6 +4999,107 @@ Scope previsto:
 Gate:
 
 Attendere go operatore prima di modifiche operative sul codice luce.
+
+## Esito v0.36.03 - Light Renderer passivo
+
+La `v0.36.03` ha introdotto il builder visuale ambientale per la luce:
+tinta locale, buio cella, sorgenti locali e predisposizione a overlay globale
+come dati passivi.
+
+Implementato:
+
+- `ArcGraphLightLayer.CopySnapshotsTo(...)`;
+- `ArcGraphRenderItemKind.Light`;
+- `ArcGraphLightRenderItem`;
+- `ArcGraphLightRenderQueueDiagnostics`;
+- `ArcGraphLightRenderQueueBuilder`;
+- `ArcGraphLightRenderQueueHarness`.
+
+Flusso:
+
+```text
+ArcGraphLightVisualSnapshot
+-> ArcGraphLightLayer
+-> ArcGraphLightRenderQueueBuilder
+-> ArcGraphLightRenderItem
+```
+
+Regole:
+
+- il builder legge solo il layer luce;
+- il builder applica `ArcGraphZoomLodProfile`;
+- una cella neutra, senza tinta e senza sorgente locale, viene nascosta;
+- una cella scura produce una tinta `dark`;
+- una cella con sorgente locale produce una tinta `local`;
+- la chiave tinta e' solo una stringa derivata o ricevuta dallo snapshot;
+- la luce non usa animazione sprite;
+- il contratto luce conserva i flag `AllowsGlobalOverlay` e `AllowsLocalTint`;
+- nessuna propagazione luminosa viene simulata;
+- nessuna occlusione da muri o stanze viene calcolata;
+- nessuna luce Unity viene creata;
+- nessun renderer Unity viene creato.
+
+Decisione di scope:
+
+La luce non viene ancora fusa nella queue globale actor/object e non viene ancora
+combinata con acqua e vegetazione in una scena ArcGraph produttiva.
+
+Motivo:
+
+- il sorting definitivo tra terrain, water, vegetation, object, actor, effect e light
+  non e' ancora stato deciso;
+- la luce e' un overlay/tint compositivo e richiede un probe visivo prima di
+  introdurre effetti e meteo;
+- evitare accumulo di troppi moduli non verificati visivamente.
+
+Harness:
+
+`ArcGraphLightRenderQueueHarness.RunDefaultSmoke()` verifica:
+
+- tre snapshot luce;
+- una cella scura visibile;
+- una sorgente locale visibile;
+- una cella neutra nascosta;
+- uso del LOD semplificato a zoom 1;
+- conteggio sorgenti locali e celle scure;
+- nessuna scena, nessun asset, nessun sistema luce produttivo.
+
+Vincoli preservati:
+
+- nessuna simulazione luce produttiva;
+- nessun asset load;
+- nessun `GameObject`;
+- nessun `SpriteRenderer`;
+- nessun `ParticleSystem`;
+- nessuna luce Unity;
+- nessuna modifica a Core, Decision Layer, Job Layer o MapGrid;
+- MapGrid resta renderer produttivo.
+
+Prossimo step consigliato:
+
+`v0.36.03v - ArcGraph Visual Probe`
+
+Questo micro-step deve introdurre un primo test visivo controllato prima di
+procedere con fiamme/effetti e meteo.
+
+Obiettivo del probe:
+
+- accendere una scena/probe debug minima, non produttiva;
+- usare snapshot controllati o finti;
+- visualizzare terrain + actor/object + vegetation + water + light;
+- verificare sorting visuale, LOD, tinta luce e sovrapposizione layer;
+- non sostituire MapGrid;
+- non introdurre sistemi ambientali produttivi.
+
+Branch aperto:
+
+```text
+ai-task/v0.36.03v-arcgraph-visual-probe
+```
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul probe visivo.
 
 ---
 
