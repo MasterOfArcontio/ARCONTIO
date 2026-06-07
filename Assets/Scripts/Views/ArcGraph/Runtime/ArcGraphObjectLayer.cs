@@ -71,7 +71,7 @@ namespace Arcontio.View.ArcGraph
                     continue;
 
                 _objects[snapshot.ObjectId] = snapshot;
-                MarkCellAndChunkDirty(snapshot.Cell, renderState);
+                renderState?.MarkCellAndChunkDirty(snapshot.Cell);
             }
         }
 
@@ -129,15 +129,6 @@ namespace Arcontio.View.ArcGraph
         {
             ClearSnapshots();
             base.Dispose();
-        }
-
-        private static void MarkCellAndChunkDirty(ArcGraphCellCoord cell, ArcGraphRenderState renderState)
-        {
-            if (renderState == null)
-                return;
-
-            renderState.Dirty.MarkCellDirty(cell);
-            renderState.Dirty.MarkChunkDirty(renderState.ResolveChunkCoord(cell));
         }
     }
 }

@@ -135,19 +135,13 @@ namespace Arcontio.View.ArcGraph
             if (renderState == null)
                 return;
 
-            MarkCellAndChunkDirty(snapshot.Cell, renderState);
+            renderState.MarkCellAndChunkDirty(snapshot.Cell);
 
             if (!snapshot.HasMotion)
                 return;
 
-            MarkCellAndChunkDirty(snapshot.Motion.FromCell, renderState);
-            MarkCellAndChunkDirty(snapshot.Motion.ToCell, renderState);
-        }
-
-        private static void MarkCellAndChunkDirty(ArcGraphCellCoord cell, ArcGraphRenderState renderState)
-        {
-            renderState.Dirty.MarkCellDirty(cell);
-            renderState.Dirty.MarkChunkDirty(renderState.ResolveChunkCoord(cell));
+            renderState.MarkCellAndChunkDirty(snapshot.Motion.FromCell);
+            renderState.MarkCellAndChunkDirty(snapshot.Motion.ToCell);
         }
     }
 }

@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Arcontio.View.ArcGraph
 {
     // =============================================================================
@@ -113,6 +115,92 @@ namespace Arcontio.View.ArcGraph
                 FloorDiv(cell.X, ChunkSizeCells),
                 FloorDiv(cell.Y, ChunkSizeCells),
                 cell.Z);
+        }
+
+        // =============================================================================
+        // MarkCellAndChunkDirty
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca una cella e il chunk grafico che la contiene come sporchi.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dirty grafico centralizzato</b></para>
+        /// <para>
+        /// I layer non devono duplicare la formula di conversione cella -> chunk.
+        /// Questo metodo mantiene la logica nel render state, che e' l'unico punto
+        /// che conosce <c>ChunkSizeCells</c>. La marcatura resta puramente grafica:
+        /// non emette eventi, non modifica il <c>World</c> e non comunica nulla agli
+        /// NPC.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>cell</b>: cella grafica da aggiornare.</item>
+        ///   <item><b>DirtyCells</b>: riceve la cella.</item>
+        ///   <item><b>DirtyChunks</b>: riceve il chunk risolto dalla cella.</item>
+        /// </list>
+        /// </summary>
+        public void MarkCellAndChunkDirty(ArcGraphCellCoord cell)
+        {
+            Dirty.MarkCellDirty(cell);
+            Dirty.MarkChunkDirty(ResolveChunkCoord(cell));
+        }
+
+        // =============================================================================
+        // MarkCellsAndChunksDirty
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca una sequenza di celle e i rispettivi chunk come sporchi.
+        /// </para>
+        ///
+        /// <para><b>Batch semplice, non diff engine</b></para>
+        /// <para>
+        /// Questo helper serve a ridurre duplicazione nei layer quando arrivano
+        /// snapshot multipli. Non confronta vecchio e nuovo stato, non calcola delta
+        /// minimi e non ordina priorita'. L'ottimizzazione dirty aggressiva resta
+        /// fuori scope in questo checkpoint.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>cells</b>: sequenza di coordinate da marcare.</item>
+        ///   <item><b>HashSet dirty</b>: deduplica gestita da <c>ArcGraphDirtyState</c>.</item>
+        /// </list>
+        /// </summary>
+        public void MarkCellsAndChunksDirty(IEnumerable<ArcGraphCellCoord> cells)
+        {
+            if (cells == null)
+                return;
+
+            foreach (var cell in cells)
+                MarkCellAndChunkDirty(cell);
+        }
+
+        // =============================================================================
+        // ClearDirty
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Pulisce il dirty state grafico condiviso.
+        /// </para>
+        ///
+        /// <para><b>Cleanup esplicito della presentazione</b></para>
+        /// <para>
+        /// La pulizia resta una scelta del chiamante, non un effetto automatico del
+        /// refresh dei layer. Questo evita che un layer debug o un layer parziale
+        /// consumi accidentalmente il dirty prima degli altri renderer futuri.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Dirty</b>: registro grafico svuotato.</item>
+        /// </list>
+        /// </summary>
+        public void ClearDirty()
+        {
+            Dirty.Clear();
         }
 
         private static int FloorDiv(int value, int divisor)
