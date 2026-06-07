@@ -25,37 +25,37 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
+## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
 
 CHECKPOINT CORRENTE:
-`v0.30j - QA regressiva visuale e closeout ArcGraph Foundation`
+`v0.31 - Analisi bootstrap ArcGraph`
 
 STATUS:
-COMPLETATO / FOUNDATION CLOSEOUT / IN ATTESA DECISIONE UMANA
+ANALISI / AUDIT-FIRST / ROADMAP AGGIORNATA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.30j-arcgraph-foundation-closeout`
+`ai-task/v0.31-arcgraph-bootstrap-analysis`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- QA regressiva documentale e tecnica della foundation `arcgraph` eseguita;
-- contratti ArcGraph compilati isolatamente contro l'assembly corrente;
-- confermato che `v0.30` non ha introdotto mutazioni simulative o doppio renderer permanente;
-- dichiarato cosa e' pronto, cosa resta preparatorio e cosa va rimandato;
-- prodotto closeout operativo della foundation prima di eventuali PR o step successivi.
+- analizzare come accendere `arcgraph` come sistema interno controllato;
+- definire dove istanziare `ArcGraphRenderState`, `ArcGraphLayerStack` e `ArcGraphWorldAdapter`;
+- evitare doppio renderer permanente e modifiche al runtime legacy;
+- stabilire se serve un bootstrap MonoBehaviour minimo o un bridge non invasivo;
+- produrre piano operativo v0.31 prima di qualsiasi modifica codice.
 
 DOC SYNC:
 
-- Taskboard e roadmap riallineate per closeout `v0.30j`;
-- branch `ai-task/v0.30i-arcgraph-legacy-absorption-plan` pushato con commit `0bc79a0`;
-- diario Notion aggiornato con chiusura `v0.30j` e closeout `v0.30`.
+- Roadmap ufficiale aggiornata con macro versioni `v0.31`-`v0.38`;
+- branch `ai-task/v0.31-arcgraph-bootstrap-analysis` aperto da closeout `v0.30j`;
+- diario Notion aggiornato con apertura analisi `v0.31`.
 
 OBIETTIVO:
 
-Foundation `arcgraph` chiusa come blocco preparatorio. Il sistema dispone ora di contratti, adapter read-only, layer passivi, dirty state, policy z-level, posa actor, placeholder futuri e piano di assorbimento legacy. Non e' ancora un renderer produttivo.
+Analizzare il primo passo dopo la foundation: il bootstrap controllato di `arcgraph`. Lo scopo non e' ancora disegnare, ma capire come inizializzare il mainframe grafico senza sostituire `MapGrid`, senza mutare il `World` e senza introdurre un secondo renderer permanente.
 
 ---
 
@@ -136,7 +136,48 @@ Consolidato:
 
 ---
 
-# 2. Checkpoint corrente v0.30
+# 2. Checkpoint corrente v0.31
+
+## v0.31 - ArcGraph Bootstrap controllato
+
+STATUS:
+ANALISI / AUDIT-FIRST
+
+Obiettivo:
+
+Accendere `arcgraph` come sistema interno controllato, senza render produttivo e senza sostituire ancora `MapGrid`.
+
+Componenti da valutare:
+
+- punto di bootstrap: nuovo componente dedicato, estensione controllata del bootstrap esistente o test harness separato;
+- lifecycle di `ArcGraphRenderState`;
+- lifecycle di `ArcGraphLayerStack`;
+- registrazione layer foundation;
+- uso di `ArcGraphWorldAdapter`;
+- eventuali buffer snapshot riusabili;
+- policy di attivazione/disattivazione;
+- relazione con `MapGridBootstrap` e `MapGridWorldView`.
+
+Domande aperte:
+
+1. Il bootstrap ArcGraph deve vivere nella scena runtime o in un harness di test controllato?
+2. Deve essere un `MonoBehaviour` minimo oppure un servizio C# passivo con wrapper Unity separato?
+3. Dove recupera `MapGridData`, visto che oggi e' privato dentro `MapGridBootstrap`?
+4. Come evita di duplicare rendering o lifecycle con `MapGridWorldView`?
+5. Quale verifica minima dimostra che ArcGraph e' acceso senza disegnare?
+
+Vincoli:
+
+- nessuna modifica a Decision Layer, Job Layer o Core;
+- nessuna sostituzione immediata di `MapGridBootstrap`;
+- nessuna cancellazione legacy;
+- nessun doppio renderer permanente;
+- nessun accesso globale non necessario;
+- niente modifica codice senza prossimo `go` operativo.
+
+---
+
+# 3. Stato ereditato v0.30
 
 | Checkpoint | Task | Stato |
 |---|---|---|
@@ -369,6 +410,7 @@ Confermato:
 - branch task `ai-task/v0.30i-arcgraph-legacy-absorption-plan` aperto da `ai-task/v0.30h-arcgraph-future-placeholders`;
 - branch task `ai-task/v0.30i-arcgraph-legacy-absorption-plan` pushato su origin con commit `0bc79a0`;
 - branch task corrente `ai-task/v0.30j-arcgraph-foundation-closeout` aperto da `ai-task/v0.30i-arcgraph-legacy-absorption-plan`;
+- branch task corrente `ai-task/v0.31-arcgraph-bootstrap-analysis` aperto da `ai-task/v0.30j-arcgraph-foundation-closeout`;
 - `main` locale allineato a `origin/main` sul commit `8ca3af0`;
 - PR #131 integrata su `ai/codex-main`;
 - PR #132 integrata su `main` per il bootstrap analisi/audit;
@@ -378,8 +420,9 @@ Confermato:
 
 Da completare:
 
-- commit e pubblicazione del closeout Roadmap/Taskboard per `v0.30j`;
-- decisione umana su PR/review o prossimo macro checkpoint;
+- commit e pubblicazione dell'aggiornamento roadmap `v0.31`-`v0.38`;
+- analisi audit-first del bootstrap controllato `v0.31`;
+- decisione umana sul primo intervento operativo di bootstrap ArcGraph;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
 ---

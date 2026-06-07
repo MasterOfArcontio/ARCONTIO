@@ -35,6 +35,14 @@
 | v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Completata fino a v0.20q |
 | v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | In corso |
 | v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | Completata come foundation |
+| v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | Prossima / Analisi |
+| v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Pending |
+| v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Pending |
+| v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Pending |
+| v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | Pending |
+| v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | Pending |
+| v0.37 | ArcGraph Debug/Overlay Migration | Settembre 2026 | Pending |
+| v0.38 | ArcGraph Legacy Absorption / Retirement | Settembre 2026 | Pending |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -1304,6 +1312,171 @@ La fase `v0.30` NON deve implementare:
 > **Nota audit v0.30i:** il checkpoint ha fissato il piano di assorbimento del legacy grafico. `MapGridChunkRenderer`, `MapGridTileAtlas`, convenzioni asset e parte della camera sono riusabili come tecniche; `MapGridData` va assorbito come sorgente temporanea di snapshot terreno; `MapGridWorldView` resta il monolite critico da non cancellare subito, perche' contiene actor/object sync, overlay, input debug, summary UI, rebind del World e dev tools. La sostituzione dovra' avvenire per fasi: prima bootstrap ArcGraph, poi terrain, poi actor/object, poi overlay/debug, infine pensionamento di MapGrid/WorldView.
 
 > **Nota closeout v0.30j:** la foundation `arcgraph` compila isolatamente contro l'assembly corrente e la diff rispetto a `ai/codex-main` contiene solo documentazione operativa e nuovi file sotto `Assets/Scripts/Views/ArcGraph/Runtime`. Non sono stati modificati Core, Decision Layer, Job Layer, MapGrid legacy o file `.meta`. `arcgraph` resta preparatorio: non e' ancora un renderer produttivo e non sostituisce ancora `MapGridWorldView`.
+
+---
+
+#### v0.31 - ArcGraph Bootstrap controllato
+
+## Stato
+PROSSIMA / ANALISI
+
+## Obiettivo
+
+Accendere `arcgraph` come sistema interno controllato, senza render produttivo e senza sostituire ancora `MapGrid`.
+
+Il bootstrap dovra' istanziare e collegare:
+
+- `ArcGraphRenderState`;
+- `ArcGraphLayerStack`;
+- layer foundation;
+- `ArcGraphWorldAdapter`;
+- eventuali buffer snapshot temporanei;
+- policy esplicita di attivazione/disattivazione.
+
+## Vincoli
+
+- nessun doppio renderer permanente;
+- nessuna modifica al `World`;
+- nessuna sostituzione immediata di `MapGridBootstrap`;
+- nessun `MonoBehaviour` ArcGraph invasivo prima di avere un contratto chiaro;
+- nessun accesso diretto non controllato a Core, Decision Layer o Job Layer.
+
+---
+
+#### v0.32 - ArcGraph Terrain Renderer
+
+## Stato
+PENDING
+
+## Obiettivo
+
+Realizzare il primo renderer produttivo ArcGraph: il terreno.
+
+Il renderer dovra':
+
+- leggere `ArcGraphTerrainCellSnapshot`;
+- usare dirty cell / dirty chunk;
+- ricostruire chunk terrain in modo localizzato;
+- riusare concettualmente la tecnica di `MapGridChunkRenderer`;
+- mantenere resa visiva compatibile con il terreno MapGrid attuale.
+
+---
+
+#### v0.33 - ArcGraph Modalita' comparativa controllata
+
+## Stato
+PENDING
+
+## Obiettivo
+
+Confrontare ArcGraph terrain e MapGrid legacy in modo controllato, evitando un doppio renderer permanente.
+
+La modalita' comparativa dovra':
+
+- essere attivabile solo in debug/test;
+- verificare scala, tile, chunk, ordinamento e camera;
+- permettere audit visuale del terrain renderer;
+- non diventare percorso runtime stabile.
+
+---
+
+#### v0.34 - ArcGraph Actor/Object Renderer
+
+## Stato
+PENDING
+
+## Obiettivo
+
+Portare dentro ArcGraph la visualizzazione base di oggetti e attori.
+
+Il renderer dovra':
+
+- usare `ArcGraphObjectLayer`;
+- usare `ArcGraphActorLayer`;
+- disegnare sprite singoli provvisori;
+- mantenere sorting semplice e leggibile;
+- non introdurre ancora vestizione modulare completa;
+- non spostare la posizione simulativa degli NPC.
+
+---
+
+#### v0.35 - ArcGraph Actor Motion Runtime Bridge
+
+## Stato
+PENDING
+
+## Obiettivo
+
+Collegare il movimento multi-tick reale alla posa visuale ArcGraph.
+
+Il bridge dovra':
+
+- ottenere origine e destinazione del segmento movimento in modo read-only;
+- usare tick trascorsi e tick richiesti della running action;
+- alimentare `ArcGraphActorVisualPoseSnapshot`;
+- evitare che il renderer chiami `SetNpcPos`;
+- evitare che la view completi o interrompa job.
+
+---
+
+#### v0.36 - ArcGraph Environment Visual Layers
+
+## Stato
+PENDING
+
+## Obiettivo
+
+Introdurre i layer visuali ambientali, mantenendo separazione netta tra simulazione e resa grafica.
+
+Questa versione non deve decidere se piove, se una pianta cresce, se una stanza e' buia o se il fuoco si propaga. Deve solo mostrare snapshot gia' prodotti da sistemi esterni.
+
+| Versione | Sottopunto | Stato |
+|---|---|---|
+| v0.36.01 | Vegetation Renderer: erba animata, piante, variazioni stagionali visuali | Pending |
+| v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Pending |
+| v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Pending |
+| v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
+| v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
+
+---
+
+#### v0.37 - ArcGraph Debug/Overlay Migration
+
+## Stato
+PENDING
+
+## Obiettivo
+
+Migrare progressivamente gli overlay diagnostici fuori dal monolite `MapGridWorldView`.
+
+Ordine consigliato:
+
+1. pointer cell coords;
+2. FOV heatmap;
+3. landmark overlay;
+4. DT overlay;
+5. summary cards;
+6. dev tools solo dopo separazione dai renderer.
+
+---
+
+#### v0.38 - ArcGraph Legacy Absorption / Retirement
+
+## Stato
+PENDING
+
+## Obiettivo
+
+Assorbire e poi pensionare il rendering legacy MapGrid, evitando un doppio sistema permanente.
+
+La chiusura di questa fase richiedera':
+
+- ArcGraph terrain produttivo;
+- actor/object renderer produttivo;
+- debug minimo funzionante;
+- piano di dismissione `MapGridWorldView`;
+- piano di dismissione `MapGridBootstrap`;
+- mantenimento dei soli asset/helper utili.
 
 ---
 
