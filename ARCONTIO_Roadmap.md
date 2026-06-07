@@ -34,6 +34,7 @@
 | v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
 | v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Completata fino a v0.20q |
 | v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | In corso |
+| v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | In corso |
 | v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | Target |
@@ -1210,6 +1211,78 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 | v0.21g | Closeout stabilizzazione post-rifondazione | ⏳ |
 
 > **Nota architetturale v0.21:** questa fase e' una stabilizzazione post-rifondazione, non una nuova architettura. Le patch gia' integrate su `ai/codex-main` hanno corretto stabilita' SearchFood, percezione durante osservazione, etichette runtime, rinforzo mnemonico cadenzato e visualizzazione watched FOV. Restano necessari QA runtime mirato, nuovo confronto JSONL dei costi e censimento dei cataloghi Intent / Job / Step / Running Action prima di aprire espansioni piu' ampie.
+
+---
+
+#### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
+
+## Stato
+IN CORSO / APERTA SU BRANCH TASK
+
+## Scopo
+
+La fase `v0.30` apre la fondazione di `arcgraph`, il futuro mainframe grafico modulare di ARCONTIO.
+
+Questa fase non deve produrre subito un salto visivo radicale. La resa runtime deve restare vicina a quella attuale, ma il rendering deve iniziare a essere incapsulato dentro una struttura destinata a sostituire il sistema grafico provvisorio, fino alla futura eliminazione del legacy grafico.
+
+Il principio guida e':
+
+```text
+World / Simulation State
+-> adapter visuale read-only
+-> arcgraph
+-> layer grafici, chunk sporchi, animazioni e presentazione
+```
+
+`arcgraph` deve leggere lo stato simulativo e produrre rappresentazione. Non deve diventare un nuovo decisore, non deve mutare il `World`, non deve introdurre una seconda fonte di verita' grafico-simulativa.
+
+## Fuori scope
+
+La fase `v0.30` NON deve implementare:
+
+- meteo visivo produttivo;
+- luci dinamiche complete;
+- acqua fluida;
+- vegetazione simulativa;
+- NPC modulari completi a testa/busto/gambe/vestiti;
+- livelli Z giocabili;
+- nuova biosfera produttiva;
+- cambiamenti del Decision Layer;
+- cambiamenti del Job Layer;
+- riscritture larghe non necessarie.
+
+## Checkpoint
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ⏳ |
+| v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ⏳ |
+| v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ⏳ |
+| v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ⏳ |
+| v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ⏳ |
+| v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ |
+| v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ |
+| v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ⏳ |
+| v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ⏳ |
+| v0.30j | QA regressiva visuale e closeout ArcGraph Foundation | ⏳ |
+
+## Definition of Done v0.30
+
+| Criterio | Stato |
+|----------|-------|
+| Rendering attuale auditato e mappato | ⏳ |
+| Responsabilita' di `arcgraph` definite | ⏳ |
+| Separazione simulazione/rendering formalizzata | ⏳ |
+| Layer grafici minimi progettati | ⏳ |
+| Dirty cell / dirty chunk introdotti almeno come contratto | ⏳ |
+| Coordinate x/y/z previste anche se il runtime usa solo z = 0 | ⏳ |
+| Movimento visuale multitick previsto come interpolazione grafica, non mutazione simulativa | ⏳ |
+| Placeholder per acqua, vegetazione, luci, meteo ed effetti identificati | ⏳ |
+| Strategia di eliminazione del rendering legacy dichiarata | ⏳ |
+| Nessuna nuova simulazione introdotta | ⏳ |
+| Nessuna violazione anti-omniscienza | ⏳ |
+
+> **Nota architetturale v0.30:** `arcgraph` deve diventare il sistema grafico unico di ARCONTIO. Nella prima fase puo' assorbire e incapsulare parti del rendering attuale, ma non deve stabilizzare un doppio sistema permanente. Il riuso atteso e' alto per asset, coordinate e alcune tecniche pratiche; e' invece limitato per la struttura complessiva, oggi ancora provvisoria.
 
 ---
 

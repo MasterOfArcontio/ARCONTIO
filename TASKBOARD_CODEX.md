@@ -25,37 +25,38 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.21 — Stabilizzazione post-rifondazione percettiva
+## MACRO JOB ATTIVO: v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 CHECKPOINT CORRENTE:
-`v0.21e — QA runtime post-merge e confronto costi aggiornato`
+`v0.30a - Audit rendering attuale`
 
 STATUS:
-IN CORSO / PATCH POST-MERGE INTEGRATE SU `ai/codex-main` / QA RUNTIME PENDENTE
+IN CORSO / BRANCH TASK APERTO / AUDIT-FIRST
 
 RAMO BASE CORRENTE:
-`ai/codex-main`
+`ai-task/v0.30-arcgraph-foundation`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- stabilizzare i comportamenti emersi durante i test runtime successivi alla rifondazione percettiva;
-- verificare SearchFood, `WaitAndObserve`, rinforzo mnemonico cadenzato e visualizzazione watched FOV;
-- misurare il nuovo costo dominante Decisione → Incarico;
-- rifinire il censimento di Intent, Job, Step, Running Action e politiche di recupero;
-- preparare il prossimo checkpoint senza riaprire scansioni percettive globali.
+- auditare il rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti;
+- aprire la fondazione di `arcgraph` come mainframe grafico modulare;
+- preparare una struttura capace di sostituire il sistema grafico provvisorio, non di affiancarlo come legacy permanente;
+- mantenere la resa visiva quasi invariata nella prima fase;
+- predisporre layer grafici, dirty cell/chunk, coordinate x/y/z e interpolazione visuale multitick;
+- preservare separazione tra simulazione e presentazione.
 
 DOC SYNC:
 
-- diario di sviluppo Notion aggiornato fino allo stato corrente `v0.21`;
-- Taskboard riallineata allo stato reale dopo la chiusura `v0.20q`;
-- allineamento esteso `ARCONTIO_docs` raccomandato quando `v0.21` avrà un closeout stabile.
+- Taskboard e roadmap riallineate per apertura `v0.30`;
+- allineamento esteso `ARCONTIO_docs` raccomandato quando `v0.30a` produrra' un audit stabile;
+- Notion non modificato in questa patch salvo richiesta esplicita dell'operatore.
 
 OBIETTIVO:
 
-Consolidare la rifondazione percettiva completata in `v0.20`, correggere i problemi osservati durante i test runtime e individuare il nuovo collo di bottiglia prima di ampliare cataloghi decisionali, sistemi sociali o popolazione simulata.
+Creare la fondazione operativa di `arcgraph`, mantenendo il sistema visivo attuale come comportamento da preservare ma non come architettura definitiva. La fase deve preparare sostituzione progressiva del rendering provvisorio, senza introdurre nuova simulazione e senza trasformare la grafica in una fonte parallela di verita'.
 
 ---
 
@@ -136,23 +137,27 @@ Consolidato:
 
 ---
 
-# 2. Checkpoint corrente v0.21
+# 2. Checkpoint corrente v0.30
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.21a | Monitor stato percettivo e audio diagnostico iniziale | ✅ INTEGRATO SU `ai/codex-main` |
-| v0.21b | Stabilità SearchFood, percezione durante osservazione ed etichette runtime | ✅ INTEGRATO SU `ai/codex-main` |
-| v0.21c | Rinforzo mnemonico cadenzato e debug watched FOV | ✅ INTEGRATO SU `ai/codex-main` |
-| v0.21d | Correzione margine watched FOV sui quattro lati | ✅ INTEGRATO SU `ai/codex-main` |
-| v0.21e | QA runtime post-merge e confronto costi aggiornato | ⏳ PROSSIMO GATE |
-| v0.21f | Censimento e classificazione Intent / Job / Step / Running Action | ⏳ IN ANALISI |
-| v0.21g | Closeout stabilizzazione post-rifondazione | ⏳ PENDING |
+| v0.30a | Audit rendering attuale: MapGrid, chunk terrain, WorldView, SpriteRenderer, overlay, asset e accoppiamenti | ⏳ IN CORSO |
+| v0.30b | Definizione contratti minimi `arcgraph`: coordinate x/y/z, layer id, render state, dirty state | ⏳ PENDING |
+| v0.30c | Adapter read-only verso World / MapGrid corrente e primo confine anti-omniscienza grafica | ⏳ PENDING |
+| v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ⏳ PENDING |
+| v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ⏳ PENDING |
+| v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ⏳ PENDING |
+| v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ PENDING |
+| v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ⏳ PENDING |
+| v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ⏳ PENDING |
+| v0.30j | QA regressiva visuale e closeout ArcGraph Foundation | ⏳ PENDING |
 
 Note operative:
 
-- `ai/codex-main` contiene la PR #131 fino al commit `84aa98d`;
-- il ramo `ai-task/v0.21-post-merge-fixes` e' stato integrato e rimosso;
-- la stabilizzazione post-merge e' integrata, ma non ancora chiusa formalmente;
+- branch task corrente: `ai-task/v0.30-arcgraph-foundation`;
+- base di integrazione: `ai/codex-main`;
+- `arcgraph` deve sostituire il rendering provvisorio a regime, non diventare un secondo renderer permanente;
+- la prima fase e' audit/foundation: resa visiva quasi invariata, nessuna nuova simulazione;
 - `main` resta il ramo stabile e non deve ricevere lavoro implementativo diretto.
 
 ---
@@ -194,13 +199,13 @@ Note operative:
 
 # 4. Prossimo gate di validazione umana
 
-Prima di aprire una nuova fase implementativa ampia devono essere verificati:
+Prima di procedere oltre `v0.30a` devono essere verificati:
 
-1. prova runtime mirata su SearchFood, `WaitAndObserve`, watched FOV e memoria;
-2. nuovo file JSONL dell'osservatorio costi;
-3. conferma del collo di bottiglia Decisione → Incarico;
-4. censimento Intent / Job / Step / Running Action aggiornato;
-5. approvazione del modello di composizione tra Job di alto livello e unità riusabili di basso livello.
+1. mappa dei file grafici attuali e delle loro responsabilita';
+2. identificazione di cosa riusare, cosa incapsulare e cosa eliminare;
+3. accoppiamenti tra rendering, World, MapGrid, Resources, overlay e movimento multitick;
+4. stima rischi per sostituzione progressiva;
+5. proposta del primo confine `arcgraph` senza patch runtime cieca.
 
 ---
 
@@ -215,13 +220,14 @@ Le seguenti campagne non devono partire automaticamente:
 - recovery intelligente completa;
 - composizione gerarchica dei Job senza contratto approvato.
 
-La priorità resta:
+La priorita' resta:
 
 ```text
-stabilizzare v0.21
-→ misurare Decisione / Incarichi
-→ chiarire cataloghi e composizione
-→ solo dopo aprire nuove espansioni sistemiche
+v0.30a audit rendering attuale
+-> contratti minimi arcgraph
+-> adapter read-only
+-> layer grafici minimi
+-> solo dopo assorbimento progressivo del legacy grafico
 ```
 
 ---
@@ -259,7 +265,8 @@ Aprire nuovo branch task quando:
 
 Confermato:
 
-- `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `84aa98d`;
+- `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `df7f211`;
+- branch task `ai-task/v0.30-arcgraph-foundation` aperto da `ai/codex-main`;
 - `main` locale allineato a `origin/main` sul commit `8ca3af0`;
 - PR #131 integrata su `ai/codex-main`;
 - PR #132 integrata su `main` per il bootstrap analisi/audit;
@@ -270,23 +277,24 @@ Confermato:
 Da completare:
 
 - commit e pubblicazione del presente riallineamento Roadmap/Taskboard;
-- QA runtime post-merge e confronto costi aggiornato;
-- censimento cataloghi runtime;
-- closeout formale di `v0.21`;
+- audit `v0.30a` del rendering attuale;
+- definizione contratti `arcgraph`;
+- piano di assorbimento ed eliminazione legacy grafico;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
 ---
 
 # 8. Comportamento obbligatorio Codex durante questo macro job
 
-Durante `v0.21` Codex deve:
+Durante `v0.30` Codex deve:
 
-- restare audit-first sui cambiamenti a percezione, decisione e Job;
-- non reintrodurre scansioni globali ordinarie;
-- non trasformare dirty percettivo in conoscenza soggettiva;
-- non alterare score decisionali per risolvere problemi di prestazioni;
-- non trasformare JobExecutionSystem in un secondo decisore;
-- mantenere i percorsi diagnostici congelabili;
+- restare audit-first sui cambiamenti grafici;
+- non modificare Decision Layer, Job Layer o sistemi di simulazione salvo checkpoint esplicito;
+- non trasformare `arcgraph` in fonte di verita' simulativa;
+- non creare doppio renderer permanente;
+- preservare il comportamento visivo attuale durante la foundation;
+- preparare coordinate x/y/z anche se il runtime opera ancora su z = 0;
+- preparare interpolazione visuale multitick senza mutare la posizione simulativa discreta;
 - evitare pulizie opportunistiche fuori checkpoint;
 - riportare separatamente ciò che è integrato e ciò che vive soltanto sul ramo task.
 
