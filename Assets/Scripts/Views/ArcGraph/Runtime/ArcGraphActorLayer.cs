@@ -23,6 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>_actors</b>: snapshot actor indicizzati per actorId.</item>
     ///   <item><b>ReplaceSnapshots</b>: sostituzione conservativa della cache.</item>
     ///   <item><b>TryGetActor</b>: lettura puntuale per id attore.</item>
+    ///   <item><b>TryGetActorPose</b>: lettura della posa grafica interpolata.</item>
     ///   <item><b>ClearSnapshots</b>: cleanup della sola cache grafica.</item>
     /// </list>
     /// </summary>
@@ -98,6 +99,41 @@ namespace Arcontio.View.ArcGraph
         public bool TryGetActor(int actorId, out ArcGraphActorVisualSnapshot snapshot)
         {
             return _actors.TryGetValue(actorId, out snapshot);
+        }
+
+        // =============================================================================
+        // TryGetActorPose
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova a leggere la posa visuale risolta di un attore.
+        /// </para>
+        ///
+        /// <para><b>Separazione tra lettura actor e posa render</b></para>
+        /// <para>
+        /// Il renderer futuro potra' usare questo metodo per ottenere coordinate
+        /// grafiche frazionarie gia' interpolate. Se lo snapshot contiene un moto
+        /// multi-tick, la posa si trovera' tra origine e destinazione; se non lo
+        /// contiene, coincidera' con la cella discreta. In entrambi i casi il layer
+        /// non modifica la simulazione e non forza completion del movimento.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>actorId</b>: id attore richiesto.</item>
+        ///   <item><b>pose</b>: posa visuale risolta se l'attore e' presente.</item>
+        /// </list>
+        /// </summary>
+        public bool TryGetActorPose(int actorId, out ArcGraphActorVisualPoseSnapshot pose)
+        {
+            if (!_actors.TryGetValue(actorId, out var snapshot))
+            {
+                pose = default;
+                return false;
+            }
+
+            pose = snapshot.ResolvePose();
+            return true;
         }
 
         // =============================================================================

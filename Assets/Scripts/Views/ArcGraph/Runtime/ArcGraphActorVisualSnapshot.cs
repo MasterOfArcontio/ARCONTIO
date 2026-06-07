@@ -66,6 +66,187 @@ namespace Arcontio.View.ArcGraph
             BaseSpriteKey = baseSpriteKey ?? string.Empty;
             Motion = motion;
         }
+
+        // =============================================================================
+        // ResolvePose
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola la posa visuale effettiva dello snapshot actor.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: posa grafica derivata</b></para>
+        /// <para>
+        /// Il renderer futuro non dovrebbe duplicare la formula di interpolazione
+        /// tra celle. Questo metodo restituisce una posa gia' pronta: se il moto e'
+        /// attivo usa il progresso normalizzato del segmento, altrimenti mantiene
+        /// l'attore esattamente sulla cella discreta nota al <c>World</c>. Il metodo
+        /// non modifica runtime, job, actor o dirty state.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Cell</b>: fallback quando non esiste moto attivo.</item>
+        ///   <item><b>Motion</b>: sorgente di origine, destinazione e progresso.</item>
+        ///   <item><b>ArcGraphActorVisualPoseSnapshot</b>: output grafico frazionario.</item>
+        /// </list>
+        /// </summary>
+        public ArcGraphActorVisualPoseSnapshot ResolvePose()
+        {
+            return ArcGraphActorVisualPoseSnapshot.FromActorSnapshot(this);
+        }
+    }
+
+    // =============================================================================
+    // ArcGraphActorVisualPoseSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Posa visuale frazionaria di un attore nel sistema <c>arcgraph</c>.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: separazione tra posizione simulativa e posizione disegnata</b></para>
+    /// <para>
+    /// La simulazione conserva posizioni discrete a cella. La grafica, invece, deve
+    /// poter disegnare un attore a meta' tra due celle quando un movimento multi-tick
+    /// e' ancora in corso. Questa struttura rappresenta solo quella posizione
+    /// disegnata: non e' una posizione valida per pathfinding, collisioni, job o
+    /// decision layer.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>ActorId</b>: id dell'attore visualizzato.</item>
+    ///   <item><b>DiscreteCell</b>: cella simulativa ancora vera per il runtime.</item>
+    ///   <item><b>VisualX/VisualY/VisualZ</b>: coordinate grafiche frazionarie.</item>
+    ///   <item><b>BaseSpriteKey</b>: sprite provvisorio da usare.</item>
+    ///   <item><b>HasMotion/Progress01</b>: stato del segmento visuale.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ArcGraphActorVisualPoseSnapshot
+    {
+        public readonly int ActorId;
+        public readonly ArcGraphCellCoord DiscreteCell;
+        public readonly float VisualX;
+        public readonly float VisualY;
+        public readonly float VisualZ;
+        public readonly string BaseSpriteKey;
+        public readonly bool HasMotion;
+        public readonly float Progress01;
+
+        // =============================================================================
+        // ArcGraphActorVisualPoseSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una posa visuale actor gia' risolta.
+        /// </para>
+        ///
+        /// <para><b>Snapshot value-only</b></para>
+        /// <para>
+        /// Tutti i valori sono primitivi o value type. Questo evita che la posa
+        /// trattenga riferimenti a oggetti Unity, job runtime o stato mondo mutabile.
+        /// Il progresso viene normalizzato per sicurezza tra <c>0</c> e <c>1</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>actorId</b>: identita' dell'attore.</item>
+        ///   <item><b>discreteCell</b>: posizione simulativa discreta.</item>
+        ///   <item><b>visualX/Y/Z</b>: posizione di disegno.</item>
+        ///   <item><b>baseSpriteKey</b>: chiave sprite.</item>
+        ///   <item><b>hasMotion/progress01</b>: stato visuale del movimento.</item>
+        /// </list>
+        /// </summary>
+        public ArcGraphActorVisualPoseSnapshot(
+            int actorId,
+            ArcGraphCellCoord discreteCell,
+            float visualX,
+            float visualY,
+            float visualZ,
+            string baseSpriteKey,
+            bool hasMotion,
+            float progress01)
+        {
+            ActorId = actorId;
+            DiscreteCell = discreteCell;
+            VisualX = visualX;
+            VisualY = visualY;
+            VisualZ = visualZ;
+            BaseSpriteKey = baseSpriteKey ?? string.Empty;
+            HasMotion = hasMotion;
+            Progress01 = Clamp01(progress01);
+        }
+
+        // =============================================================================
+        // FromActorSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Deriva una posa visuale da uno snapshot actor.
+        /// </para>
+        ///
+        /// <para><b>Interpolazione lineare preparatoria</b></para>
+        /// <para>
+        /// Se lo snapshot contiene un movimento attivo, la posa viene calcolata con
+        /// interpolazione lineare tra <c>FromCell</c> e <c>ToCell</c>. In assenza di
+        /// moto, la posa coincide con la cella discreta. La formula e' volutamente
+        /// semplice: easing, animazioni sprite e curve diverse restano demandate a
+        /// moduli futuri, ma avranno gia' un contratto stabile su cui innestarsi.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>snapshot</b>: sorgente actor read-only.</item>
+        ///   <item><b>progress</b>: normalizzato dal motion snapshot.</item>
+        ///   <item><b>visual coordinates</b>: coordinate frazionarie calcolate.</item>
+        /// </list>
+        /// </summary>
+        public static ArcGraphActorVisualPoseSnapshot FromActorSnapshot(ArcGraphActorVisualSnapshot snapshot)
+        {
+            if (!snapshot.HasMotion)
+            {
+                return new ArcGraphActorVisualPoseSnapshot(
+                    snapshot.ActorId,
+                    snapshot.Cell,
+                    snapshot.Cell.X,
+                    snapshot.Cell.Y,
+                    snapshot.Cell.Z,
+                    snapshot.BaseSpriteKey,
+                    hasMotion: false,
+                    progress01: 1f);
+            }
+
+            float progress = snapshot.Motion.Progress01;
+            var from = snapshot.Motion.FromCell;
+            var to = snapshot.Motion.ToCell;
+
+            return new ArcGraphActorVisualPoseSnapshot(
+                snapshot.ActorId,
+                snapshot.Cell,
+                Lerp(from.X, to.X, progress),
+                Lerp(from.Y, to.Y, progress),
+                Lerp(from.Z, to.Z, progress),
+                snapshot.BaseSpriteKey,
+                hasMotion: true,
+                progress);
+        }
+
+        private static float Lerp(float from, float to, float progress01)
+        {
+            return from + ((to - from) * Clamp01(progress01));
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value <= 0f)
+                return 0f;
+
+            if (value >= 1f)
+                return 1f;
+
+            return value;
+        }
     }
 
     // =============================================================================
@@ -156,6 +337,44 @@ namespace Arcontio.View.ArcGraph
             ElapsedTicks = elapsedTicks < 0 ? 0 : elapsedTicks;
             RequiredTicks = requiredTicks < 0 ? 0 : requiredTicks;
             MotionKind = motionKind ?? string.Empty;
+        }
+
+        // =============================================================================
+        // CreateMovement
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un segmento visuale di movimento normalizzato.
+        /// </para>
+        ///
+        /// <para><b>Contratto futuro per running action multi-tick</b></para>
+        /// <para>
+        /// Quando il Job Layer esporra' in modo read-only origine e destinazione del
+        /// movimento in corso, l'adapter potra' usare questo helper per costruire il
+        /// motion snapshot senza duplicare normalizzazioni. Per ora il metodo resta
+        /// solo preparatorio e non legge direttamente alcun runtime.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>fromCell</b>: origine del segmento visuale.</item>
+        ///   <item><b>toCell</b>: destinazione del segmento visuale.</item>
+        ///   <item><b>elapsedTicks</b>: tick gia' avanzati.</item>
+        ///   <item><b>requiredTicks</b>: durata totale del movimento.</item>
+        /// </list>
+        /// </summary>
+        public static ArcGraphActorMotionSnapshot CreateMovement(
+            ArcGraphCellCoord fromCell,
+            ArcGraphCellCoord toCell,
+            int elapsedTicks,
+            int requiredTicks)
+        {
+            return new ArcGraphActorMotionSnapshot(
+                fromCell,
+                toCell,
+                elapsedTicks,
+                requiredTicks,
+                "Movement");
         }
 
         // =============================================================================

@@ -200,9 +200,11 @@ namespace Arcontio.View.ArcGraph
         /// <para>
         /// In questo checkpoint l'adapter non deduce interpolazione da
         /// <c>NpcAction.MoveTo</c>, perche' quello stato non contiene origine e
-        /// progresso affidabili del segmento in corso. Gli snapshot usano quindi
-        /// <c>ArcGraphActorMotionSnapshot.None</c>. Il collegamento ai progress
-        /// multi-tick reali appartiene al checkpoint <c>v0.30g</c>.
+        /// progresso affidabili del segmento in corso. L'audit <c>v0.30g</c> ha
+        /// confermato che il Job Layer espone tick di progresso per le running
+        /// action, ma non ancora una coppia origine/destinazione adatta alla view.
+        /// Gli snapshot usano quindi <c>ArcGraphActorMotionSnapshot.None</c> finche'
+        /// quel contratto read-only non sara' disponibile.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
