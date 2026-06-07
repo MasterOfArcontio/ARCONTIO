@@ -1398,8 +1398,8 @@ Quindi `v0.31` deve prima decidere il confine tra:
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.31a | Audit bootstrap legacy: `MapGridBootstrap`, ownership di `MapGridData`, camera, input provider, `MapGridWorldView` | Completato |
-| v0.31b | Definizione contratto bootstrap ArcGraph: cosa inizializza, cosa non inizializza, cosa espone | Prossimo |
-| v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Pending |
+| v0.31b | Definizione contratto bootstrap ArcGraph: cosa inizializza, cosa non inizializza, cosa espone | Completato |
+| v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Prossimo |
 | v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Pending |
 | v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Pending |
 | v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Pending |
@@ -1453,6 +1453,178 @@ senza rendere MapGridWorldView ancora piu' monolitico.
 ```
 
 Il prossimo checkpoint `v0.31b` deve quindi definire il contratto minimo di bootstrap ArcGraph prima di decidere la forma implementativa.
+
+## Esito v0.31b - Contratto minimo bootstrap ArcGraph
+
+Il contratto minimo del bootstrap ArcGraph deve essere trattato come un confine di accensione interna, non come un renderer.
+
+Formula sintetica:
+
+```text
+ArcGraphBootstrap
+-> crea lo stato grafico interno
+-> registra i layer foundation
+-> collega l'adapter read-only
+-> prepara cache/snapshot interni
+-> espone diagnostica minima
+-> non disegna nulla
+```
+
+### Responsabilita' consentite
+
+Il bootstrap ArcGraph puo':
+
+- creare un `ArcGraphRenderState`;
+- creare un `ArcGraphLayerStack`;
+- registrare solo i layer foundation: `Terrain`, `Object`, `Actor`, `Debug`;
+- creare un `ArcGraphWorldAdapter`;
+- inizializzare i layer con lo stato render condiviso;
+- preparare liste/buffer snapshot riusabili;
+- produrre un primo refresh interno degli snapshot se i dati sorgente sono disponibili;
+- esporre diagnostica minimale di bootstrap.
+
+Diagnostica minima consigliata:
+
+```text
+IsInitialized
+IsDisposed
+LayerCount
+HasRenderState
+HasLayerStack
+HasAdapter
+HasRuntimeContext
+LastBootstrapStatus
+LastBootstrapReason
+DoesRenderAnything = false
+```
+
+### Responsabilita' vietate
+
+Il bootstrap ArcGraph non deve:
+
+- creare `GameObject` visuali;
+- creare `SpriteRenderer`;
+- creare `MeshRenderer`;
+- creare mesh terrain;
+- caricare asset tramite `Resources.Load`;
+- leggere `SimulationHost.Instance` direttamente;
+- modificare `World`;
+- modificare `MapGridData`;
+- sostituire `MapGridBootstrap`;
+- sostituire `MapGridWorldView`;
+- gestire camera, input o click debug;
+- emettere comandi verso NPC, Job Layer o Decision Layer;
+- diventare un secondo renderer permanente.
+
+### Input logici del contratto
+
+Il bootstrap non deve inventare le proprie sorgenti dati. Deve ricevere o poter interrogare un runtime context controllato.
+
+Input minimi futuri:
+
+```text
+MapGridConfig
+MapGridData
+World read-only o provider controllato
+```
+
+Input utili ma non obbligatori nel primo bootstrap:
+
+```text
+Camera bounds / tile size
+stato attivazione debug
+flag include future placeholder layers
+```
+
+La decisione su come fornire questi input resta nel checkpoint `v0.31d`. In `v0.31b` il punto chiave e' solo il contratto: ArcGraph deve ricevere dati da un confine esplicito, non andare a cercarli autonomamente.
+
+### Output logici del contratto
+
+Il bootstrap puo' esporre solo stato diagnostico e riferimenti interni read-only.
+
+Output minimi:
+
+```text
+stato inizializzazione
+numero layer registrati
+ultimo errore diagnostico
+presenza adapter
+presenza render state
+presenza layer stack
+```
+
+Non deve esporre API operative per:
+
+- muovere actor;
+- modificare tile;
+- forzare job;
+- cambiare decisioni;
+- creare oggetti nel mondo;
+- inviare comandi runtime.
+
+### Lifecycle minimo
+
+Stati consigliati:
+
+```text
+Uninitialized
+Initializing
+Initialized
+Failed
+Disposed
+```
+
+Regole:
+
+- `Initialize` deve essere idempotente o fallire in modo spiegabile se chiamato due volte;
+- `Dispose` deve liberare solo cache grafiche interne;
+- un fallimento bootstrap non deve bloccare il renderer MapGrid legacy;
+- un fallimento bootstrap non deve mutare il `World`;
+- un fallimento bootstrap deve produrre una ragione diagnostica leggibile.
+
+### Layer foundation inclusi
+
+Il bootstrap `v0.31` deve registrare soltanto:
+
+```text
+ArcGraphTerrainLayer
+ArcGraphObjectLayer
+ArcGraphActorLayer
+ArcGraphDebugLayer
+```
+
+I placeholder futuri `Water`, `Vegetation`, `Light`, `Weather`, `Effect` restano fuori dal bootstrap default. Possono essere attivati solo da flag/debug gate esplicito in checkpoint futuri.
+
+### Verifica minima del contratto
+
+Un bootstrap ArcGraph e' considerato acceso correttamente se:
+
+```text
+RenderState != null
+LayerStack != null
+Adapter != null
+LayerStack.Count == 4
+IsInitialized == true
+DoesRenderAnything == false
+nessun GameObject visuale creato
+nessun renderer legacy sostituito
+nessuna mutazione World/MapGridData
+```
+
+### Conclusione v0.31b
+
+Il contratto non richiede ancora di scegliere se il bootstrap sara' un servizio C# passivo, un `MonoBehaviour` minimo o un harness debug. Questa scelta appartiene a `v0.31c`.
+
+La decisione importante gia' presa a livello progettuale e':
+
+```text
+ArcGraphBootstrap possiede solo il lifecycle ArcGraph.
+Non possiede il mondo.
+Non possiede la mappa.
+Non possiede la camera.
+Non possiede l'input.
+Non disegna.
+```
 
 ## Ipotesi iniziale consigliata
 

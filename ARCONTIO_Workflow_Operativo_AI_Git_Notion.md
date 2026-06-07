@@ -141,7 +141,7 @@ Non va modificato se si aggiunge solo un file dentro una cartella già descritta
 
 ---
 
-### `ARCONTIO_Roadmap_Notion.md`
+### `ARCONTIO_Roadmap.md`
 
 Funzione: roadmap macro importata/allineata da Notion.
 
@@ -184,7 +184,7 @@ Normalmente NON aggiornare:
 * `CODEX_CONTEXT.md`
 * `CODEX_PROTOCOL.md`
 * `REPO_MAP.md`
-* `ARCONTIO_Roadmap_Notion.md`
+* `ARCONTIO_Roadmap.md`
 
 Aggiornare solo se necessario:
 
@@ -224,7 +224,7 @@ Aggiorna:
 * `TASKBOARD_CODEX.md`
 * Notion Taskboard Operativa AI
 * Notion Roadmap / Gestione Progetto
-* eventualmente `ARCONTIO_Roadmap_Notion.md`
+* eventualmente `ARCONTIO_Roadmap.md`
 
 Valuta aggiornamento:
 
@@ -261,7 +261,7 @@ Aggiorna:
 * `TASKBOARD_CODEX.md`
 * Notion Taskboard Operativa AI
 * Roadmap Notion
-* `ARCONTIO_Roadmap_Notion.md`
+* `ARCONTIO_Roadmap.md`
 * eventuale changelog / patch log in `ARCONTIO_docs`
 
 Valuta aggiornamento:

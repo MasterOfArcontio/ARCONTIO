@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
 
 CHECKPOINT CORRENTE:
-`v0.31b - Definizione contratto bootstrap ArcGraph`
+`v0.31c - Decisione forma bootstrap ArcGraph`
 
 STATUS:
-ATTESA GO / AUDIT v0.31a COMPLETATO
+ATTESA GO / CONTRATTO v0.31b DEFINITO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.31b-arcgraph-bootstrap-contract`
+`ai-task/v0.31c-arcgraph-bootstrap-shape`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -52,12 +52,13 @@ DOC SYNC:
 - Roadmap ufficiale aggiornata con macro versioni `v0.31`-`v0.38`;
 - branch `ai-task/v0.31-arcgraph-bootstrap-analysis` aperto da closeout `v0.30j`;
 - audit `v0.31a` completato e documentato;
-- prossimo ramo operativo previsto: `ai-task/v0.31b-arcgraph-bootstrap-contract`;
-- diario Notion aggiornato con chiusura `v0.31a` e apertura `v0.31b`.
+- contratto bootstrap `v0.31b` definito;
+- prossimo ramo operativo previsto: `ai-task/v0.31c-arcgraph-bootstrap-shape`;
+- diario Notion aggiornato con chiusura `v0.31b` e apertura `v0.31c`.
 
 OBIETTIVO:
 
-Definire il contratto minimo del bootstrap controllato di `arcgraph`. Lo scopo non e' ancora disegnare, ma stabilire cosa viene inizializzato, quali dati vengono letti, cosa viene esposto in diagnostica e quali azioni restano esplicitamente vietate.
+Decidere la forma concreta del bootstrap controllato di `arcgraph`: servizio C# passivo, `MonoBehaviour` minimo, harness debug separato o combinazione prudente. Lo scopo resta non disegnare e non sostituire `MapGrid`.
 
 ---
 
@@ -143,7 +144,7 @@ Consolidato:
 ## v0.31 - ArcGraph Bootstrap controllato
 
 STATUS:
-AUDIT v0.31a COMPLETATO / v0.31b IN ATTESA GO
+v0.31b COMPLETATO / v0.31c IN ATTESA GO
 
 Obiettivo:
 
@@ -162,11 +163,11 @@ Componenti da valutare:
 
 Domande aperte:
 
-1. Quale contratto minimo deve avere il bootstrap ArcGraph?
-2. Quali oggetti deve inizializzare: `ArcGraphRenderState`, `ArcGraphLayerStack`, `ArcGraphWorldAdapter`, buffer snapshot?
-3. Quali dati deve esporre solo in lettura?
-4. Quali azioni deve dichiarare esplicitamente fuori contratto?
-5. Quale verifica minima dimostra che ArcGraph e' acceso senza disegnare?
+1. Il bootstrap ArcGraph deve essere un servizio C# passivo?
+2. Deve avere un wrapper `MonoBehaviour` minimo in scena?
+3. Serve prima un harness debug separato?
+4. Quale forma riduce meglio il coupling con `MapGridBootstrap`?
+5. Quale forma prepara meglio `v0.31f` senza anticipare rendering produttivo?
 
 Vincoli:
 
@@ -191,6 +192,27 @@ Conclusione operativa:
 v0.31b deve definire il contratto di bootstrap
 prima di scegliere se implementarlo come servizio C#,
 wrapper Unity minimo o harness debug.
+```
+
+Esito `v0.31b`:
+
+1. `ArcGraphBootstrap` deve essere un confine di accensione interna, non un renderer.
+2. Deve poter creare `ArcGraphRenderState`, `ArcGraphLayerStack`, `ArcGraphWorldAdapter`, layer foundation e buffer snapshot interni.
+3. Deve registrare solo `Terrain`, `Object`, `Actor`, `Debug`.
+4. Non deve creare `GameObject`, `SpriteRenderer`, `MeshRenderer`, mesh, asset load, input, camera o comandi runtime.
+5. Non deve leggere `SimulationHost.Instance` direttamente e non deve mutare `World` o `MapGridData`.
+6. Deve esporre diagnostica minima: `IsInitialized`, `LayerCount`, presenza di render state/layer stack/adapter/runtime context, ultimo stato e ultima ragione.
+7. La forma concreta del bootstrap resta da decidere in `v0.31c`.
+
+Contratto sintetico:
+
+```text
+ArcGraphBootstrap possiede solo il lifecycle ArcGraph.
+Non possiede il mondo.
+Non possiede la mappa.
+Non possiede la camera.
+Non possiede l'input.
+Non disegna.
 ```
 
 ---
@@ -438,7 +460,7 @@ Confermato:
 
 Da completare:
 
-- definizione contratto bootstrap `v0.31b`;
+- decisione forma bootstrap `v0.31c`;
 - decisione umana sul primo intervento operativo di bootstrap ArcGraph;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 

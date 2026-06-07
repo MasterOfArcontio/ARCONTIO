@@ -52,7 +52,7 @@ Codex deve ispezionare:
 * CODEX_CONTEXT.md
 * TASKBOARD_CODEX.md
 * REPO_MAP.md
-* ARCONTIO_Roadmap_Notion.md
+* ARCONTIO_Roadmap.md
 
 prima di iniziare ogni implementazione non banale.
 

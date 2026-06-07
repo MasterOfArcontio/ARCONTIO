@@ -36,7 +36,7 @@ Prima di ogni ragionamento, audit o implementazione non banale, leggi e assimila
    * documenti ARC-DEC
    * documenti funzionali collegati al modulo toccato
 
-6. `ARCONTIO_Roadmap_Notion.md`
+6. `ARCONTIO_Roadmap.md`
    = sequenziamento macro di implementazione a lungo termine e collocazione cronologica del task corrente.
 
 7. `ARCONTIO_Workflow_Operativo_AI_Git_Notion.md`
