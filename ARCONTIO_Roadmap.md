@@ -1217,7 +1217,7 @@ solo dopo ampliare cataloghi, job composti o sistemi sociali.
 #### v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 ## Stato
-IN CORSO / NEXT: v0.30g
+IN CORSO / NEXT: v0.30h
 
 ## Scopo
 
@@ -1261,7 +1261,7 @@ La fase `v0.30` NON deve implementare:
 | v0.30d | Layer grafici minimi attivi: Terrain, Object, Actor, Debug | ✅ |
 | v0.30e | Dirty cell / dirty chunk preparatorio, senza ottimizzazione aggressiva | ✅ |
 | v0.30f | Compatibilita' z-level preparatoria: firme x/y/z con rendering operativo solo su z = 0 | ✅ |
-| v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ⏳ |
+| v0.30g | ActorVisual preparatorio: sprite singolo attuale, progress multitick e interpolazione visiva tra celle | ✅ |
 | v0.30h | Placeholder layer futuri: Water, Vegetation, Light, Weather, Effect | ⏳ |
 | v0.30i | Piano di assorbimento e futura eliminazione legacy grafico, senza doppio renderer permanente | ⏳ |
 | v0.30j | QA regressiva visuale e closeout ArcGraph Foundation | ⏳ |
@@ -1276,7 +1276,7 @@ La fase `v0.30` NON deve implementare:
 | Layer grafici minimi progettati | ✅ Parziale: stack e layer passivi introdotti |
 | Dirty cell / dirty chunk introdotti almeno come contratto | ✅ |
 | Coordinate x/y/z previste anche se il runtime usa solo z = 0 | ✅ |
-| Movimento visuale multitick previsto come interpolazione grafica, non mutazione simulativa | ✅ Parziale: snapshot visuale predisposto |
+| Movimento visuale multitick previsto come interpolazione grafica, non mutazione simulativa | ✅ Parziale: posa visuale interpolabile predisposta |
 | Placeholder per acqua, vegetazione, luci, meteo ed effetti identificati | ⏳ |
 | Strategia di eliminazione del rendering legacy dichiarata | ⏳ |
 | Nessuna nuova simulazione introdotta | ✅ Parziale: adapter read-only senza runtime binding |
@@ -1295,6 +1295,8 @@ La fase `v0.30` NON deve implementare:
 > **Nota tecnica v0.30e:** il checkpoint ha centralizzato la marcatura dirty in `ArcGraphRenderState`, aggiungendo helper per cella+chunk, batch semplice di celle e cleanup esplicito. I layer minimi non duplicano piu' la formula cella -> chunk e il dirty resta un fatto di presentazione, non un event bus simulativo.
 
 > **Nota tecnica v0.30f:** il checkpoint ha introdotto `ArcGraphZLevelPolicy`, dichiarando in modo centrale che il runtime attuale opera solo su `z = 0`. Adapter e render state usano questa policy senza introdurre altitudini giocabili; celle, chunk e dirty continuano pero' a preservare sempre il valore `Z`.
+
+> **Nota tecnica v0.30g:** il checkpoint ha introdotto la posa visuale actor derivata (`ArcGraphActorVisualPoseSnapshot`) e helper di interpolazione per movimento multi-tick. L'audit ha confermato che il Job Layer espone progresso tick delle running action, ma non ancora origine/destinazione in un contratto read-only adatto alla view; per questo l'adapter continua a produrre motion inattivo finche' quel dato non sara' esposto senza accoppiamento invasivo.
 
 ---
 
