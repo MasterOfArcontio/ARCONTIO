@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.32 - ArcGraph Terrain Renderer
 
 CHECKPOINT CORRENTE:
-`v0.32c - Strategia atlas/materiali terrain ArcGraph`
+`v0.32d - Renderer chunk terrain passivo`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / CONTRATTO v0.32b DEFINITO
+IN ESECUZIONE AUTONOMA / ATLAS v0.32c IMPLEMENTATO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.32c-arcgraph-terrain-atlas`
+`ai-task/v0.32d-arcgraph-terrain-chunk-builder`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -63,11 +63,12 @@ DOC SYNC:
 - apertura operativa `v0.32` autorizzata dall'operatore;
 - audit `v0.32a` completato: MapGrid terrain chunking, atlas, mesh, varianti floor e wall-top;
 - contratto `v0.32b` definito: terrain builder a chunk, output mesh data, niente aggancio scena automatico;
-- prossimo ramo operativo previsto: `ai-task/v0.32c-arcgraph-terrain-atlas`.
+- UV map terrain `v0.32c` implementata senza asset load e senza dipendenza codice da `MapGridTileAtlas`;
+- prossimo ramo operativo previsto: `ai-task/v0.32d-arcgraph-terrain-chunk-builder`.
 
 OBIETTIVO:
 
-Definire e implementare la strategia atlas/materiali del terrain renderer ArcGraph: UV map autonoma, niente asset load, niente dipendenza permanente da `MapGridTileAtlas`.
+Implementare il builder passivo di mesh data per chunk terrain ArcGraph, partendo da `ArcGraphTerrainLayer`, UV map e policy visuale.
 
 ---
 

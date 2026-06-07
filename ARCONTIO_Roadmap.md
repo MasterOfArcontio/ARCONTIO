@@ -2321,8 +2321,8 @@ Il renderer dovra':
 |---|---|---|
 | v0.32a | Audit terrain legacy: `MapGridChunkRenderer`, atlas, mesh, UV, varianti floor, muro/wall-top | Completato |
 | v0.32b | Contratto terrain renderer ArcGraph: input, output, vietati, diagnostica | Completato |
-| v0.32c | Strategia atlas/materiali: UV map ArcGraph senza asset load e senza dipendenza permanente MapGrid | Prossimo |
-| v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Pending |
+| v0.32c | Strategia atlas/materiali: UV map ArcGraph senza asset load e senza dipendenza permanente MapGrid | Completato |
+| v0.32d | Renderer chunk passivo: builder mesh data per chunk da snapshot terrain | Prossimo |
 | v0.32e | Dirty chunk rebuild: aggiornare solo chunk sporchi o richiesti | Pending |
 | v0.32f | Harness/test controllato: costruzione mesh da snapshot senza scena produttiva | Pending |
 | v0.32g | QA: compilazione, scope diff, no doppio renderer, no mutazioni simulazione | Pending |
@@ -2515,6 +2515,76 @@ si puo' costruire mesh data ArcGraph;
 non si puo' agganciare automaticamente il renderer alla scena;
 non si puo' sostituire MapGrid;
 la comparazione visuale appartiene a v0.33.
+```
+
+## Esito v0.32c - Strategia atlas/materiali
+
+Implementata una UV map terrain autonoma per ArcGraph.
+
+Nuovi file:
+
+```text
+ArcGraphTerrainTileUvDefinition.cs
+ArcGraphTerrainTileUvMap.cs
+```
+
+### Strategia
+
+ArcGraph non usa direttamente `MapGridTileAtlas`.
+
+La nuova UV map:
+
+- riceve dimensioni atlas primitive;
+- riceve `tilePixels`;
+- registra `tileId -> uvX/uvY`;
+- calcola `TilesPerRow` e `TilesPerColumn`;
+- converte `uvY` da origine alto a origine basso Unity;
+- produce quattro UV per quad;
+- usa fallback UV zero se il tile non e' registrato;
+- non carica texture;
+- non crea materiali;
+- non possiede asset.
+
+### Materiali
+
+In `v0.32c` il materiale resta fuori dal renderer ArcGraph.
+
+Regola:
+
+```text
+texture/materiale vengono forniti da un chiamante futuro;
+ArcGraphTerrainTileUvMap conosce solo dimensioni e coordinate UV.
+```
+
+Questo evita asset load, dipendenze scena e accoppiamento prematuro con MapGrid.
+
+### Compatibilita'
+
+La convenzione UV replica quella legacy:
+
+```text
+uvX cresce verso destra
+uvY = 0 indica la riga in alto dell'atlas
+Unity UV viene convertita a origine basso
+```
+
+### QA preliminare
+
+Compilazione isolata ArcGraph riuscita con:
+
+```text
+Library/ScriptAssemblies/Assembly-CSharp.dll
+UnityEngine.CoreModule.dll
+netstandard2.1
+```
+
+Controllo chiamate vietate:
+
+```text
+nessun Resources.Load(...)
+nessuna dipendenza codice da MapGridTileAtlas
+nessun GameObject
+nessun MonoBehaviour
 ```
 
 ---
