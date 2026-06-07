@@ -28,34 +28,34 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.30 - ArcGraph Foundation e sostituzione progressiva rendering provvisorio
 
 CHECKPOINT CORRENTE:
-`v0.30h - Placeholder layer futuri`
+`v0.30i - Piano assorbimento legacy grafico`
 
 STATUS:
 IN CORSO / BRANCH TASK APERTO / AUDIT-FIRST
 
 RAMO BASE CORRENTE:
-`ai-task/v0.30h-arcgraph-future-placeholders`
+`ai-task/v0.30i-arcgraph-legacy-absorption-plan`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- introdurre placeholder passivi per layer futuri: Water, Vegetation, Light, Weather, Effect;
-- mantenere questi layer come contratti grafici vuoti o minimi, senza simulazione produttiva;
-- evitare di anticipare acqua fluida, crescita piante, illuminazione dinamica o meteo reale;
-- chiarire quali snapshot minimi serviranno in futuro e quali dati restano fuori scope;
-- preservare il comportamento visivo attuale e non collegare ancora un renderer produttivo.
+- auditare il rendering legacy che dovra' essere assorbito o eliminato;
+- distinguere asset/tecniche riusabili da classi provvisorie da pensionare;
+- definire una sequenza futura di assorbimento senza doppio renderer permanente;
+- evitare cancellazioni operative premature del sistema MapGrid corrente;
+- produrre un piano tecnico leggibile per il passaggio verso `arcgraph` come sistema grafico unico.
 
 DOC SYNC:
 
-- Taskboard e roadmap riallineate per passaggio da `v0.30g` a `v0.30h`;
-- branch `ai-task/v0.30g-arcgraph-actor-visual` pushato con commit `ecf20c3`;
-- diario Notion aggiornato con chiusura `v0.30g` e apertura `v0.30h`.
+- Taskboard e roadmap riallineate per passaggio da `v0.30h` a `v0.30i`;
+- branch `ai-task/v0.30h-arcgraph-future-placeholders` pushato con commit `4fbbd8f`;
+- diario Notion aggiornato con chiusura `v0.30h` e apertura `v0.30i`.
 
 OBIETTIVO:
 
-Preparare la struttura dei layer futuri di `arcgraph` senza introdurre sistemi simulativi. Il checkpoint deve dichiarare dove si agganceranno acqua, vegetazione, luci, meteo ed effetti locali, ma restare un telaio grafico passivo e compatibile con il rendering attuale.
+Definire il piano di assorbimento del rendering legacy dentro `arcgraph`, separando cio' che va riusato da cio' che andra' eliminato. Il checkpoint deve restare audit-first: prima mappa dipendenze, responsabilita' e rischi, poi propone una sequenza futura di sostituzione.
 
 ---
 
@@ -154,7 +154,8 @@ Consolidato:
 Note operative:
 
 - aggiornamento stato: `v0.30g` completato e pushato con commit `ecf20c3`; `v0.30h` aperto e in corso su branch `ai-task/v0.30h-arcgraph-future-placeholders`;
-- branch task corrente: `ai-task/v0.30h-arcgraph-future-placeholders`;
+- aggiornamento stato: `v0.30h` completato e pushato con commit `4fbbd8f`; `v0.30i` aperto e in corso su branch `ai-task/v0.30i-arcgraph-legacy-absorption-plan`;
+- branch task corrente: `ai-task/v0.30i-arcgraph-legacy-absorption-plan`;
 - base di integrazione: `ai/codex-main`;
 - branch `ai-task/v0.30-arcgraph-foundation` pushato con commit `d482cdc`;
 - branch `ai-task/v0.30b-arcgraph-contracts` pushato con commit `2495135`;
@@ -163,8 +164,9 @@ Note operative:
 - branch `ai-task/v0.30e-arcgraph-dirty-state` pushato con commit `a5ebf28`;
 - branch `ai-task/v0.30f-arcgraph-z-level-compat` pushato con commit `7b3c106`;
 - branch `ai-task/v0.30g-arcgraph-actor-visual` pushato con commit `ecf20c3`;
+- branch `ai-task/v0.30h-arcgraph-future-placeholders` pushato con commit `4fbbd8f`;
 - `arcgraph` deve sostituire il rendering provvisorio a regime, non diventare un secondo renderer permanente;
-- il checkpoint corrente e' sui placeholder dei layer futuri: niente simulazione produttiva di acqua, piante, luce o meteo senza `go` dell'operatore;
+- il checkpoint corrente e' sul piano di assorbimento legacy: niente eliminazioni operative del rendering corrente senza audit e `go` dell'operatore;
 - `main` resta il ramo stabile e non deve ricevere lavoro implementativo diretto.
 
 ---
@@ -206,12 +208,12 @@ Note operative:
 
 # 4. Prossimo gate di validazione umana
 
-Prima di procedere operativamente dentro `v0.30h` devono essere verificati:
+Prima di procedere operativamente dentro `v0.30i` devono essere verificati:
 
-1. quali layer placeholder sono davvero necessari ora e quali possono restare solo pianificati;
-2. se i placeholder devono essere classi layer concrete oppure solo identificatori e snapshot minimi;
-3. come evitare che i placeholder diventino simulazione anticipata di biosfera, acqua o luce;
-4. quali snapshot minimi servono per dichiarare acqua, vegetazione, luci, meteo ed effetti senza renderer produttivo;
+1. quali classi legacy sono indispensabili oggi per bootstrap, input, rendering e debug;
+2. quali parti possono essere riusate da `arcgraph` senza portarsi dietro il monolite legacy;
+3. quale sequenza futura evita un doppio renderer permanente;
+4. quali rischi di regressione visuale o runtime emergono se si rimuove troppo presto MapGrid/WorldView;
 5. quali test/compilazioni bastano per validare il checkpoint.
 
 ---
@@ -237,7 +239,8 @@ v0.30a audit rendering attuale completato
 -> v0.30e dirty cell / dirty chunk preparatorio completato
 -> v0.30f compatibilita' z-level preparatoria completata
 -> v0.30g ActorVisual preparatorio completato
--> v0.30h placeholder layer futuri
+-> v0.30h placeholder layer futuri completato
+-> v0.30i piano assorbimento legacy grafico
 -> solo dopo assorbimento progressivo del legacy grafico
 ```
 
@@ -291,7 +294,9 @@ Confermato:
 - branch task `ai-task/v0.30f-arcgraph-z-level-compat` pushato su origin con commit `7b3c106`;
 - branch task `ai-task/v0.30g-arcgraph-actor-visual` aperto da `ai-task/v0.30f-arcgraph-z-level-compat`;
 - branch task `ai-task/v0.30g-arcgraph-actor-visual` pushato su origin con commit `ecf20c3`;
-- branch task corrente `ai-task/v0.30h-arcgraph-future-placeholders` aperto da `ai-task/v0.30g-arcgraph-actor-visual`;
+- branch task `ai-task/v0.30h-arcgraph-future-placeholders` aperto da `ai-task/v0.30g-arcgraph-actor-visual`;
+- branch task `ai-task/v0.30h-arcgraph-future-placeholders` pushato su origin con commit `4fbbd8f`;
+- branch task corrente `ai-task/v0.30i-arcgraph-legacy-absorption-plan` aperto da `ai-task/v0.30h-arcgraph-future-placeholders`;
 - `main` locale allineato a `origin/main` sul commit `8ca3af0`;
 - PR #131 integrata su `ai/codex-main`;
 - PR #132 integrata su `main` per il bootstrap analisi/audit;
@@ -301,8 +306,7 @@ Confermato:
 
 Da completare:
 
-- commit e pubblicazione del riallineamento Roadmap/Taskboard per `v0.30h`;
-- progettazione e implementazione controllata dei placeholder layer futuri `arcgraph`;
+- commit e pubblicazione del riallineamento Roadmap/Taskboard per `v0.30i`;
 - piano di assorbimento ed eliminazione legacy grafico;
 - pulizia dei numerosi branch storici soltanto tramite campagna dedicata e autorizzata.
 
