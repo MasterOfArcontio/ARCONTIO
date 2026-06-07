@@ -3822,8 +3822,8 @@ Il renderer dovra':
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.34a | Audit actor/object layer, snapshot, adapter e policy LOD | In corso |
-| v0.34b | Contratti render item passivi per actor/object | Pending |
+| v0.34a | Audit actor/object layer, snapshot, adapter e policy LOD | Completato |
+| v0.34b | Contratti render item passivi per actor/object | Completato |
 | v0.34c | Builder object render queue | Pending |
 | v0.34d | Builder actor render queue | Pending |
 | v0.34e | Sorting e filtri LOD per zoom | Pending |
@@ -3980,6 +3980,83 @@ Questi contratti non dovranno:
 - leggere camera;
 - leggere input;
 - modificare layer o world.
+
+## Esito v0.34b - Contratti render item passivi
+
+Implementati i contratti value-only per rappresentare actor e oggetti come item renderizzabili.
+
+Nuovi file:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderItemKind.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderSortKey.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphActorRenderItem.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphObjectRenderItem.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderQueueDiagnostics.cs
+```
+
+### Cosa rappresentano
+
+`ArcGraphActorRenderItem`:
+
+- id actor;
+- cella discreta;
+- posizione visuale frazionaria;
+- sprite key provvisoria;
+- modalita' LOD actor;
+- stato movimento visuale;
+- flag animazione/layered/simplified;
+- sorting key;
+- stato visibile/nascosto con motivo.
+
+`ArcGraphObjectRenderItem`:
+
+- id oggetto;
+- `DefId`;
+- cella;
+- sprite key provvisoria;
+- modalita' LOD oggetto;
+- stato held/holder;
+- eventuale food stock;
+- flag simplified/show minor items;
+- sorting key;
+- stato visibile/nascosto con motivo.
+
+`ArcGraphRenderSortKey`:
+
+- prepara ordinamento deterministico senza usare sorting Unity;
+- ordina per `Z`, `Y`, `X`, layer visuale, tipo item e id;
+- non legge camera o scena.
+
+`ArcGraphRenderQueueDiagnostics`:
+
+- contiene contatori actor/object/visible/hidden;
+- permette harness e QA senza renderer concreto.
+
+### Garanzie
+
+La patch:
+
+- non crea `GameObject`;
+- non crea `SpriteRenderer`;
+- non carica asset;
+- non legge `World`;
+- non legge camera;
+- non modifica MapGrid;
+- non modifica Core.
+
+### Prossimo passo v0.34c
+
+Costruire il builder object queue:
+
+```text
+ArcGraphObjectLayer
+-> snapshot oggetto
+-> ArcGraphObjectRenderItem
+-> lista ordinabile
+```
+
+Per farlo serve aggiungere al layer un metodo read-only di copia snapshot, senza esporre il dizionario interno.
 
 ---
 

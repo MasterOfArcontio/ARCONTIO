@@ -144,8 +144,8 @@ Checkpoint v0.34:
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.34a | Audit actor/object layer, snapshot, adapter e LOD | In corso |
-| v0.34b | Contratti render item passivi actor/object | Pending |
+| v0.34a | Audit actor/object layer, snapshot, adapter e LOD | Completato |
+| v0.34b | Contratti render item passivi actor/object | Completato |
 | v0.34c | Builder object render queue | Pending |
 | v0.34d | Builder actor render queue | Pending |
 | v0.34e | Sorting e filtri LOD per zoom | Pending |
@@ -183,6 +183,25 @@ snapshot
 Nota:
 
 La classificazione degli oggetti minori non e' ancora disponibile negli snapshot. In `v0.34` non bisogna inventarla.
+
+Esito v0.34b:
+
+- aggiunto `ArcGraphRenderItemKind`;
+- aggiunto `ArcGraphRenderSortKey`;
+- aggiunto `ArcGraphActorRenderItem`;
+- aggiunto `ArcGraphObjectRenderItem`;
+- aggiunto `ArcGraphRenderQueueDiagnostics`;
+- i contratti sono value-only;
+- nessun asset load;
+- nessuna camera;
+- nessuna scena;
+- nessuna mutazione world.
+
+Indicazione per `v0.34c`:
+
+Costruire il builder object render queue.
+
+Prima serve aggiungere a `ArcGraphObjectLayer` una lettura sequenziale controllata, ad esempio `CopySnapshotsTo(...)`, per evitare di esporre il dizionario interno.
 
 Esito audit v0.33a:
 
