@@ -1401,8 +1401,8 @@ Quindi `v0.31` deve prima decidere il confine tra:
 | v0.31b | Definizione contratto bootstrap ArcGraph: cosa inizializza, cosa non inizializza, cosa espone | Completato |
 | v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Completato |
 | v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Completato |
-| v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Prossimo |
-| v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Pending |
+| v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Completato |
+| v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Prossimo |
 | v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Pending |
 | v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Pending |
 
@@ -1836,6 +1836,127 @@ ArcGraph non legge globali.
 ArcGraph non entra in MapGridWorldView.
 ArcGraph riceve dati tramite ArcGraphRuntimeContext.
 I layer leggono snapshot, non sorgenti runtime.
+```
+
+## Esito v0.31e - Policy di attivazione
+
+La policy scelta per `v0.31` e':
+
+```text
+nessuna attivazione automatica in scena
+nessun renderer produttivo
+nessun doppio renderer permanente
+bootstrap esplicito solo da codice
+modalita' interna: InternalStateOnly
+```
+
+### Modalita' operative
+
+Le modalita' concettuali del bootstrap sono:
+
+```text
+Disabled
+InternalStateOnly
+```
+
+`Disabled`:
+
+- non inizializza il bootstrap;
+- restituisce diagnostica spiegabile;
+- non crea stato, layer o snapshot.
+
+`InternalStateOnly`:
+
+- crea `ArcGraphRenderState`;
+- crea `ArcGraphLayerStack`;
+- registra i layer foundation;
+- crea `ArcGraphWorldAdapter`;
+- puo' copiare snapshot interni se il context e' disponibile;
+- non crea renderer, GameObject, mesh o sprite.
+
+Modalita' non ammesse in `v0.31`:
+
+```text
+RenderTerrain
+RenderActors
+RenderObjects
+CompareWithMapGrid
+ReplaceMapGrid
+```
+
+Queste appartengono alle versioni successive `v0.32`-`v0.38`.
+
+### Default
+
+Default raccomandato:
+
+```text
+ActivationMode = InternalStateOnly
+IncludeFuturePlaceholderLayers = false
+AllowPartialRuntimeContext = true
+PopulateInitialSnapshots = true
+DoesRenderAnything = false
+```
+
+Il default `InternalStateOnly` e' accettabile per un servizio C# passivo perche' il servizio non si accende da solo. Serve comunque una chiamata esplicita a `Initialize`.
+
+### Flag futuri
+
+Flag possibili:
+
+```text
+IncludeFuturePlaceholderLayers
+PopulateInitialSnapshots
+AllowPartialRuntimeContext
+```
+
+`IncludeFuturePlaceholderLayers` deve restare `false` nel default. I layer futuri `Water`, `Vegetation`, `Light`, `Weather`, `Effect` non devono apparire come sistemi produttivi prima delle versioni dedicate.
+
+`PopulateInitialSnapshots` puo' essere `true`, ma deve limitarsi a copiare dati in liste interne. Non deve produrre rendering.
+
+`AllowPartialRuntimeContext` deve essere `true` per evitare che l'assenza temporanea di `World` o `MapGridData` blocchi la scena o renda fragile il bootstrap.
+
+### Garanzie anti-doppio-renderer
+
+In `v0.31` la garanzia principale e':
+
+```text
+nessun codice ArcGraph viene agganciato automaticamente alla scena
+e nessuna classe bootstrap crea oggetti visuali Unity.
+```
+
+Ulteriori garanzie:
+
+- nessun `MonoBehaviour` produttivo;
+- nessun `new GameObject`;
+- nessun `SpriteRenderer`;
+- nessun `MeshRenderer`;
+- nessun `Resources.Load`;
+- nessun inserimento in `MapGridBootstrap.Awake`;
+- nessuna modifica a `Scene_MapGrid`.
+
+### Diagnostica attesa
+
+La diagnostica deve poter dire:
+
+```text
+ArcGraph e' disabilitato
+ArcGraph e' inizializzato internamente
+ArcGraph ha inizializzato N layer
+ArcGraph ha / non ha context runtime
+ArcGraph ha / non ha popolato snapshot
+ArcGraph non renderizza nulla
+```
+
+### Decisione v0.31e
+
+Decisione operativa:
+
+```text
+v0.31f puo' implementare il bootstrap minimo.
+Il bootstrap si attiva solo con chiamata esplicita.
+La modalita' consentita e' InternalStateOnly.
+Il rendering resta sempre spento.
 ```
 
 ## Ipotesi iniziale consigliata

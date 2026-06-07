@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
 
 CHECKPOINT CORRENTE:
-`v0.31e - Policy attivazione ArcGraph`
+`v0.31f - Implementazione bootstrap minimo ArcGraph`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / ACCESSO DATI v0.31d DEFINITO
+IN ESECUZIONE AUTONOMA / POLICY v0.31e DEFINITA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.31e-arcgraph-activation-policy`
+`ai-task/v0.31f-arcgraph-minimal-bootstrap`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -55,12 +55,13 @@ DOC SYNC:
 - contratto bootstrap `v0.31b` definito;
 - forma bootstrap `v0.31c` decisa: nucleo C# passivo, wrapper Unity rinviato;
 - strategia accesso dati `v0.31d` definita: runtime context esplicito, niente letture globali;
-- prossimo ramo operativo previsto: `ai-task/v0.31e-arcgraph-activation-policy`;
+- policy attivazione `v0.31e` definita: `InternalStateOnly`, niente attivazione automatica scena, niente rendering;
+- prossimo ramo operativo previsto: `ai-task/v0.31f-arcgraph-minimal-bootstrap`;
 - esecuzione autonoma autorizzata fino a fine `v0.31`, con stop solo per scelte progettuali non risolvibili conservativamente.
 
 OBIETTIVO:
 
-Definire la policy di attivazione del bootstrap ArcGraph: quando puo' accendersi, con quali flag, cosa succede se mancano dati e come si garantisce che non diventi un secondo renderer permanente.
+Implementare il nucleo C# passivo del bootstrap ArcGraph, senza aggancio automatico alla scena, senza renderer produttivo e senza modifiche a Core, Decision Layer, Job Layer o MapGrid legacy.
 
 ---
 
@@ -146,7 +147,7 @@ Consolidato:
 ## v0.31 - ArcGraph Bootstrap controllato
 
 STATUS:
-v0.31d COMPLETATO / v0.31e IN CORSO
+v0.31e COMPLETATO / v0.31f IN CORSO
 
 Obiettivo:
 
@@ -165,11 +166,11 @@ Componenti da valutare:
 
 Domande aperte:
 
-1. Il bootstrap deve essere spento di default?
-2. Quale modalita' consente inizializzazione interna senza rendering?
-3. Come dichiarare che i placeholder futuri restano esclusi dal default?
-4. Cosa succede se mancano context, `MapGridData` o `World`?
-5. Quale diagnostica conferma che ArcGraph e' acceso ma non disegna?
+1. Quali file minimi introdurre sotto `Assets/Scripts/Views/ArcGraph/Runtime`?
+2. Come mantenere il bootstrap idempotente?
+3. Come popolare snapshot iniziali senza mutare sorgenti?
+4. Come esporre diagnostica senza UI o renderer?
+5. Come verificare che non compaiano `GameObject`, renderer, asset load o global access?
 
 Vincoli:
 
@@ -248,6 +249,22 @@ ArcGraph non cerca dati.
 ArcGraph riceve dati.
 ArcGraph copia in snapshot.
 ArcGraph non muta sorgenti.
+```
+
+Esito `v0.31e`:
+
+1. Nessuna attivazione automatica in scena.
+2. Modalita' consentita in v0.31: `InternalStateOnly`.
+3. Modalita' vietate in v0.31: terrain render, actor render, object render, modalita' comparativa, sostituzione MapGrid.
+4. Default: layer foundation attivi, placeholder futuri esclusi, context parziale tollerato, snapshot iniziali ammessi solo come copie interne.
+5. Garanzia anti-doppio-renderer: nessun `MonoBehaviour` produttivo, nessun `GameObject`, nessun renderer Unity, nessun asset load, nessuna modifica scena.
+
+Decisione:
+
+```text
+v0.31f puo' implementare il nucleo C# passivo.
+Il bootstrap si accende solo con chiamata esplicita.
+Il rendering resta sempre spento.
 ```
 
 ---
@@ -495,7 +512,6 @@ Confermato:
 
 Da completare:
 
-- policy attivazione `v0.31e`;
 - implementazione minima `v0.31f`;
 - QA `v0.31g`;
 - closeout `v0.31h`;
