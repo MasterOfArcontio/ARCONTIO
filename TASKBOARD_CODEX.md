@@ -147,7 +147,7 @@ Checkpoint v0.34:
 | v0.34a | Audit actor/object layer, snapshot, adapter e LOD | Completato |
 | v0.34b | Contratti render item passivi actor/object | Completato |
 | v0.34c | Builder object render queue | Completato |
-| v0.34d | Builder actor render queue | Pending |
+| v0.34d | Builder actor render queue | Completato |
 | v0.34e | Sorting e filtri LOD per zoom | Pending |
 | v0.34f | Harness smoke actor/object senza scena | Pending |
 | v0.34g | QA, closeout e preparazione v0.35 | Pending |
@@ -218,6 +218,23 @@ Esito v0.34c:
 Indicazione per `v0.34d`:
 
 Costruire il builder actor render queue usando `ArcGraphActorLayer`, `ArcGraphActorVisualSnapshot.ResolvePose()` e la policy LOD actor.
+
+Esito v0.34d:
+
+- aggiunto `ArcGraphActorLayer.CopySnapshotsTo(...)`;
+- aggiunto `ArcGraphActorRenderQueueBuilder`;
+- il builder produce `ArcGraphActorRenderItem`;
+- il builder usa `ResolvePose()` per posizione visuale;
+- il builder ordina via `ArcGraphRenderSortKey`;
+- actor senza sprite key vengono marcati nascosti come `MissingSpriteKey`;
+- nessuna lettura `World`;
+- nessuna mutazione NPC;
+- nessun asset load;
+- nessuna scena.
+
+Indicazione per `v0.34e`:
+
+Creare una queue combinata actor/object con sorting condiviso e diagnostica aggregata, cosi' l'harness finale puo' validare un flusso completo.
 
 Esito audit v0.33a:
 

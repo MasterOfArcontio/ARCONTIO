@@ -3825,7 +3825,7 @@ Il renderer dovra':
 | v0.34a | Audit actor/object layer, snapshot, adapter e policy LOD | Completato |
 | v0.34b | Contratti render item passivi per actor/object | Completato |
 | v0.34c | Builder object render queue | Completato |
-| v0.34d | Builder actor render queue | Pending |
+| v0.34d | Builder actor render queue | Completato |
 | v0.34e | Sorting e filtri LOD per zoom | Pending |
 | v0.34f | Harness smoke actor/object senza scena | Pending |
 | v0.34g | QA, closeout e preparazione v0.35 | Pending |
@@ -4115,6 +4115,57 @@ ArcGraphActorLayer
 ```
 
 Anche qui servira' un metodo read-only di copia snapshot su `ArcGraphActorLayer`.
+
+## Esito v0.34d - Builder actor render queue
+
+Implementata la costruzione passiva della queue actor.
+
+File modificati:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphActorLayer.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphActorRenderQueueBuilder.cs
+```
+
+### Aggiunte principali
+
+`ArcGraphActorLayer.CopySnapshotsTo(...)`:
+
+- copia gli snapshot actor in una lista fornita dal chiamante;
+- non espone il dizionario interno;
+- non legge `World`;
+- non modifica NPC;
+- permette al builder di restare completamente snapshot-only.
+
+`ArcGraphActorRenderQueueBuilder`:
+
+- legge `ArcGraphActorLayer`;
+- applica `ArcGraphZoomLodProfile`;
+- risolve la posa visuale tramite `ArcGraphActorVisualSnapshot.ResolvePose()`;
+- produce `ArcGraphActorRenderItem`;
+- calcola `ArcGraphRenderSortKey`;
+- ordina la lista target;
+- produce `ArcGraphRenderQueueDiagnostics`.
+
+### Policy v0.34d
+
+Actor con id non valido vengono marcati nascosti con motivo `InvalidActorId`.
+
+Actor senza sprite key vengono marcati nascosti con motivo `MissingSpriteKey`.
+
+La posa visuale usa gia' `ArcGraphActorVisualPoseSnapshot`.
+
+Questo significa che quando `v0.35` alimentera' il motion reale, la queue actor potra' mostrare coordinate frazionarie senza cambiare contratto.
+
+### Prossimo passo v0.34e
+
+Costruire una queue combinata actor/object o un helper comune che:
+
+- raccolga actor item;
+- raccolga object item;
+- applichi sorting condiviso;
+- produca diagnostica aggregata;
+- renda piu' semplice l'harness `v0.34f`.
 
 ---
 

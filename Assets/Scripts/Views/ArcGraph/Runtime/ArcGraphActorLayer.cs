@@ -137,6 +137,45 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // CopySnapshotsTo
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia tutti gli snapshot actor correnti dentro una lista fornita dal
+        /// chiamante.
+        /// </para>
+        ///
+        /// <para><b>Lettura sequenziale senza authority sugli NPC</b></para>
+        /// <para>
+        /// Il builder della render queue deve poter produrre item per tutti gli
+        /// actor conosciuti dal layer, ma non deve interrogare il <c>World</c> e
+        /// non deve ottenere accesso mutabile alla cache interna. Questo metodo
+        /// copia value type verso l'esterno e lascia privato il dizionario.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>target</b>: lista da popolare con copie degli snapshot.</item>
+        ///   <item><b>clearTarget</b>: se true, svuota la lista prima della copia.</item>
+        /// </list>
+        /// </summary>
+        public void CopySnapshotsTo(
+            IList<ArcGraphActorVisualSnapshot> target,
+            bool clearTarget = true)
+        {
+            if (target == null)
+                return;
+
+            if (clearTarget)
+                target.Clear();
+
+            foreach (var pair in _actors)
+            {
+                target.Add(pair.Value);
+            }
+        }
+
+        // =============================================================================
         // ClearSnapshots
         // =============================================================================
         /// <summary>
