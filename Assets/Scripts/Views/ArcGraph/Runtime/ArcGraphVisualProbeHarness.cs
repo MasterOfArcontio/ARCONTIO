@@ -105,6 +105,61 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public static ArcGraphVisualProbeHarnessResult RunDefaultSmoke()
         {
+            ArcGraphVisualProbeFrame frame = CreateDefaultProbeFrame(
+                hasLegacyRenderer: true,
+                hasCamera: true,
+                hasMaterial: true,
+                requestSceneProbe: true);
+
+            bool passed = frame.Diagnostics.CanBuildVisualProbe
+                          && frame.Diagnostics.TerrainCellCount == 16
+                          && frame.Diagnostics.ActorObjectEntryCount == 2
+                          && frame.Diagnostics.VegetationItemCount == 1
+                          && frame.Diagnostics.WaterItemCount == 1
+                          && frame.Diagnostics.LightItemCount == 2
+                          && frame.ComparisonDiagnostics.CanAttachSceneProbe;
+
+            return new ArcGraphVisualProbeHarnessResult(
+                passed,
+                passed ? "VisualProbeSmokePassed" : frame.Diagnostics.Reason,
+                frame.Diagnostics.TerrainCellCount,
+                frame.Diagnostics.ActorObjectEntryCount,
+                frame.Diagnostics.VegetationItemCount,
+                frame.Diagnostics.WaterItemCount,
+                frame.Diagnostics.LightItemCount,
+                frame.ComparisonDiagnostics.CanAttachSceneProbe);
+        }
+
+        // =============================================================================
+        // CreateDefaultProbeFrame
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il frame default usato dal primo test visivo controllato.
+        /// </para>
+        ///
+        /// <para><b>Scenario riusabile dal renderer debug</b></para>
+        /// <para>
+        /// Il metodo espone lo stesso scenario dello smoke test come frame dati.
+        /// Questo permette al componente scena temporaneo di disegnare esattamente
+        /// gli stessi dati validati dal probe data-only, senza duplicare la logica
+        /// di popolamento dei layer.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>hasLegacyRenderer</b>: prerequisito dichiarato per il gate comparativo.</item>
+        ///   <item><b>hasCamera</b>: prerequisito dichiarato per il probe scena.</item>
+        ///   <item><b>hasMaterial</b>: prerequisito dichiarato per il probe scena.</item>
+        ///   <item><b>requestSceneProbe</b>: richiede modalita' temporanea di scena.</item>
+        /// </list>
+        /// </summary>
+        public static ArcGraphVisualProbeFrame CreateDefaultProbeFrame(
+            bool hasLegacyRenderer,
+            bool hasCamera,
+            bool hasMaterial,
+            bool requestSceneProbe)
+        {
             var renderState = new ArcGraphRenderState(
                 visibleZLevel: ArcGraphZLevelPolicy.DefaultVisibleZLevel,
                 tileSizeWorld: 1f,
@@ -132,7 +187,7 @@ namespace Arcontio.View.ArcGraph
             var lodProfile = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(4));
 
             var builder = new ArcGraphVisualProbeBuilder();
-            ArcGraphVisualProbeFrame frame = builder.Build(
+            return builder.Build(
                 terrainLayer,
                 actorLayer,
                 objectLayer,
@@ -143,28 +198,10 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphTerrainVisualPolicy.CreateLegacyDefault(),
                 renderState,
                 lodProfile,
-                hasLegacyRenderer: true,
-                hasCamera: true,
-                hasMaterial: true,
-                requestSceneProbe: true);
-
-            bool passed = frame.Diagnostics.CanBuildVisualProbe
-                          && frame.Diagnostics.TerrainCellCount == 16
-                          && frame.Diagnostics.ActorObjectEntryCount == 2
-                          && frame.Diagnostics.VegetationItemCount == 1
-                          && frame.Diagnostics.WaterItemCount == 1
-                          && frame.Diagnostics.LightItemCount == 2
-                          && frame.ComparisonDiagnostics.CanAttachSceneProbe;
-
-            return new ArcGraphVisualProbeHarnessResult(
-                passed,
-                passed ? "VisualProbeSmokePassed" : frame.Diagnostics.Reason,
-                frame.Diagnostics.TerrainCellCount,
-                frame.Diagnostics.ActorObjectEntryCount,
-                frame.Diagnostics.VegetationItemCount,
-                frame.Diagnostics.WaterItemCount,
-                frame.Diagnostics.LightItemCount,
-                frame.ComparisonDiagnostics.CanAttachSceneProbe);
+                hasLegacyRenderer,
+                hasCamera,
+                hasMaterial,
+                requestSceneProbe);
         }
 
         private static IEnumerable<ArcGraphTerrainCellSnapshot> CreateTerrainSnapshots()

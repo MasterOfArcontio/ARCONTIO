@@ -28,22 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.36.03v.01 - ArcGraph Scene Probe Renderer preparatorio`
+`v0.36.03v.02 - ArcGraph First Visual Test QA`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.36.03v.01-arcgraph-scene-probe-renderer`
+`ai-task/v0.36.03v.02-arcgraph-first-visual-test-qa`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- commit e push branch `v0.36.03v`;
-- aprire branch successivo `v0.36.03v.01`;
-- attendere go operatore prima di modifiche operative sul Scene Probe Renderer;
+- commit e push branch `v0.36.03v.01`;
+- aprire branch successivo `v0.36.03v.02`;
+- attendere esito test operatore prima di nuove modifiche;
 - non implementare simulazione produttiva di acqua, vegetazione, luce, meteo o effetti;
 - non creare GameObject, renderer Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -162,19 +162,24 @@ DOC SYNC:
 - frame dati pronto per terrain, actor/object, vegetation, water e light;
 - branch `ai-task/v0.36.03v.01-arcgraph-scene-probe-renderer` aperto;
 - apertura `v0.36.03v.01` documentata: renderer debug temporaneo per disegnare `ArcGraphVisualProbeFrame`;
-- prossimo step fermo in attesa go: ArcGraph Scene Probe Renderer preparatorio.
+- scene probe renderer debug implementato;
+- aggiunto `ArcGraphSceneProbeRenderer`;
+- aggiunto `ArcGraphVisualProbeHarness.CreateDefaultProbeFrame(...)`;
+- il probe usa sprite runtime colorati, root temporaneo e context menu manuale;
+- branch `ai-task/v0.36.03v.02-arcgraph-first-visual-test-qa` aperto;
+- prossimo step fermo in attesa esito operatore: primo test visivo ArcGraph.
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.36.03v.01 - ArcGraph Scene Probe Renderer` e attendere go prima di nuove modifiche.
+Preparare il prossimo step `v0.36.03v.02 - ArcGraph First Visual Test QA` e attendere l'esito del test prima di nuove modifiche.
 
-Scope immediato `v0.36.03v.01`:
+Scope immediato `v0.36.03v.02`:
 
-- audit dei punti Unity necessari al primo disegno debug;
-- definizione di un renderer temporaneo che consuma `ArcGraphVisualProbeFrame`;
-- uso di risorse provvisorie e dichiarate;
-- visualizzazione controllata del frame data-only gia' pronto;
-- verifica sorting layer, LOD e tinta luce a schermo;
+- eseguire il primo test visivo del probe;
+- verificare che il root temporaneo venga creato e pulito correttamente;
+- verificare che terrain, acqua, vegetazione, object, actor e luce siano visibili;
+- raccogliere difetti di sorting, scala, posizione, colore e leggibilita';
+- decidere eventuali micro-fix prima di effetti/meteo;
 - nessuna sostituzione di MapGrid;
 - nessuna modifica a scene, prefab o asset.
 

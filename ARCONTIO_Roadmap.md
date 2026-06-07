@@ -4666,7 +4666,8 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 | v0.36.02 | Water Renderer: acqua animata, profondita', bordi acqua/terra | Completato nel perimetro passivo |
 | v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Completato nel perimetro passivo |
 | v0.36.03v | ArcGraph Visual Probe: frame dati controllato dei layer base | Completato nel perimetro data-only |
-| v0.36.03v.01 | ArcGraph Scene Probe Renderer: primo disegno debug in Unity | In attesa go operatore |
+| v0.36.03v.01 | ArcGraph Scene Probe Renderer: primo disegno debug in Unity | Completato come renderer debug temporaneo |
+| v0.36.03v.02 | ArcGraph First Visual Test QA: esecuzione e raccolta difetti visivi | In attesa test operatore |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
 | v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
 
@@ -5222,6 +5223,75 @@ Scope previsto:
 Gate:
 
 Attendere go operatore prima di modifiche operative sul renderer debug.
+
+## Esito v0.36.03v.01 - ArcGraph Scene Probe Renderer
+
+La `v0.36.03v.01` ha introdotto il primo renderer debug temporaneo capace di
+disegnare un `ArcGraphVisualProbeFrame` dentro Unity.
+
+Implementato:
+
+- `ArcGraphSceneProbeRenderer`;
+- `ArcGraphVisualProbeHarness.CreateDefaultProbeFrame(...)`.
+
+Comportamento:
+
+- il componente e' un `MonoBehaviour` debug;
+- non parte automaticamente di default;
+- crea un root temporaneo chiamato `ArcGraphSceneProbeRoot`;
+- usa sprite runtime 1x1 colorati;
+- non carica asset con `Resources.Load`;
+- non richiede sprite o materiali esterni per il probe minimo;
+- puo' posizionare automaticamente il probe vicino alla camera assegnata;
+- espone `Render Default Probe` da context menu;
+- espone `Clear Probe` da context menu;
+- distrugge solo gli oggetti temporanei creati dal probe.
+
+Layer visualizzati:
+
+```text
+terrain    -> grigio
+water      -> blu
+vegetation -> verde
+object     -> arancione
+actor      -> magenta
+light      -> overlay giallo/nero/blu scuro
+```
+
+Vincoli preservati:
+
+- nessuna scena modificata;
+- nessun prefab modificato;
+- nessun asset aggiunto;
+- nessun file `.meta` modificato;
+- nessuna sostituzione di MapGrid;
+- nessun accesso a `SimulationHost`;
+- nessuna lettura diretta del `World`;
+- nessuna simulazione ambientale produttiva.
+
+Eccezione controllata:
+
+Questo step usa intenzionalmente `new GameObject` e `SpriteRenderer`, ma solo
+dentro il componente debug temporaneo. L'uso e' confinato al probe e non va
+confuso con il renderer produttivo ArcGraph.
+
+Prossimo step:
+
+`v0.36.03v.02 - ArcGraph First Visual Test QA`
+
+Lo step successivo non deve aggiungere nuovi moduli. Deve servire a eseguire il
+primo test visivo, raccogliere difetti e decidere eventuali micro-fix prima di
+procedere con effetti e meteo.
+
+Branch aperto:
+
+```text
+ai-task/v0.36.03v.02-arcgraph-first-visual-test-qa
+```
+
+Gate:
+
+Attendere esito del test operatore prima di nuove modifiche.
 
 ---
 
