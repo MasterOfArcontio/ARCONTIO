@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.31 - ArcGraph Bootstrap controllato
 
 CHECKPOINT CORRENTE:
-`v0.31d - Strategia accesso dati ArcGraph`
+`v0.31e - Policy attivazione ArcGraph`
 
 STATUS:
-IN ESECUZIONE AUTONOMA / FORMA v0.31c DECISA
+IN ESECUZIONE AUTONOMA / ACCESSO DATI v0.31d DEFINITO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.31d-arcgraph-data-access`
+`ai-task/v0.31e-arcgraph-activation-policy`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -54,12 +54,13 @@ DOC SYNC:
 - audit `v0.31a` completato e documentato;
 - contratto bootstrap `v0.31b` definito;
 - forma bootstrap `v0.31c` decisa: nucleo C# passivo, wrapper Unity rinviato;
-- prossimo ramo operativo previsto: `ai-task/v0.31d-arcgraph-data-access`;
+- strategia accesso dati `v0.31d` definita: runtime context esplicito, niente letture globali;
+- prossimo ramo operativo previsto: `ai-task/v0.31e-arcgraph-activation-policy`;
 - esecuzione autonoma autorizzata fino a fine `v0.31`, con stop solo per scelte progettuali non risolvibili conservativamente.
 
 OBIETTIVO:
 
-Definire come ArcGraph riceve `MapGridData`, `MapGridConfig` e `World` senza leggere globalmente `SimulationHost`, senza entrare in `MapGridWorldView` e senza mutare lo stato simulativo.
+Definire la policy di attivazione del bootstrap ArcGraph: quando puo' accendersi, con quali flag, cosa succede se mancano dati e come si garantisce che non diventi un secondo renderer permanente.
 
 ---
 
@@ -145,7 +146,7 @@ Consolidato:
 ## v0.31 - ArcGraph Bootstrap controllato
 
 STATUS:
-v0.31c COMPLETATO / v0.31d IN CORSO
+v0.31d COMPLETATO / v0.31e IN CORSO
 
 Obiettivo:
 
@@ -164,11 +165,11 @@ Componenti da valutare:
 
 Domande aperte:
 
-1. Quale runtime context fornisce i dati ad ArcGraph?
-2. Come rappresentare `MapGridData` come sorgente read-only, anche se la classe e' mutabile?
-3. Come fornire `World` senza far leggere `SimulationHost.Instance` al bootstrap?
-4. Quale validazione minima serve quando i dati non sono ancora disponibili?
-5. Quali dipendenze restano fuori dal bootstrap fino a `v0.32`?
+1. Il bootstrap deve essere spento di default?
+2. Quale modalita' consente inizializzazione interna senza rendering?
+3. Come dichiarare che i placeholder futuri restano esclusi dal default?
+4. Cosa succede se mancano context, `MapGridData` o `World`?
+5. Quale diagnostica conferma che ArcGraph e' acceso ma non disegna?
 
 Vincoli:
 
@@ -229,6 +230,24 @@ Decisione:
 ```text
 v0.31f implementera' prima il nucleo C# passivo.
 Nessun aggancio automatico alla scena e nessun renderer produttivo.
+```
+
+Esito `v0.31d`:
+
+1. ArcGraph riceve i dati tramite `ArcGraphRuntimeContext` esplicito.
+2. Il context puo' contenere `MapGridConfig`, `MapGridData` e `World`.
+3. `ArcGraphBootstrapRuntime` non deve chiamare `SimulationHost.Instance`, `FindObjectOfType` o `MapGridWorldView`.
+4. I layer non leggono il context: ricevono solo snapshot.
+5. `MapGridData` resta mutabile a livello classe, ma in v0.31 viene trattato per contratto come sorgente di sola lettura.
+6. Il bootstrap deve tollerare context parziale o assente con diagnostica, senza fallimento distruttivo.
+
+Decisione:
+
+```text
+ArcGraph non cerca dati.
+ArcGraph riceve dati.
+ArcGraph copia in snapshot.
+ArcGraph non muta sorgenti.
 ```
 
 ---
@@ -476,7 +495,6 @@ Confermato:
 
 Da completare:
 
-- strategia accesso dati `v0.31d`;
 - policy attivazione `v0.31e`;
 - implementazione minima `v0.31f`;
 - QA `v0.31g`;

@@ -1400,8 +1400,8 @@ Quindi `v0.31` deve prima decidere il confine tra:
 | v0.31a | Audit bootstrap legacy: `MapGridBootstrap`, ownership di `MapGridData`, camera, input provider, `MapGridWorldView` | Completato |
 | v0.31b | Definizione contratto bootstrap ArcGraph: cosa inizializza, cosa non inizializza, cosa espone | Completato |
 | v0.31c | Decisione forma bootstrap: servizio C# passivo, wrapper Unity minimo o harness debug separato | Completato |
-| v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Prossimo |
-| v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Pending |
+| v0.31d | Strategia accesso dati: come fornire ad ArcGraph `MapGridData` e `World` senza accoppiamento invasivo | Completato |
+| v0.31e | Policy attivazione: flag/config/debug gate per evitare doppio renderer permanente | Prossimo |
 | v0.31f | Implementazione bootstrap minimo controllato, se approvata dopo audit | Pending |
 | v0.31g | QA: compilazione, nessun rendering prodotto, nessuna mutazione simulativa, nessun coupling vietato | Pending |
 | v0.31h | Closeout v0.31 e preparazione v0.32 Terrain Renderer | Pending |
@@ -1713,6 +1713,130 @@ Questa scelta evita due errori:
 
 - trasformare ArcGraph in un secondo renderer prima del terrain renderer;
 - aumentare `MapGridBootstrap` per comodita' di accesso ai dati.
+
+## Esito v0.31d - Strategia accesso dati
+
+La strategia scelta per fornire dati ad ArcGraph e':
+
+```text
+ArcGraphRuntimeContext esplicito
+-> creato da un chiamante esterno
+-> passato al bootstrap
+-> usato solo dal bootstrap/adapters
+-> non letto direttamente dai layer
+```
+
+Il bootstrap ArcGraph non deve cercare le sorgenti dati da solo.
+
+In particolare non deve:
+
+- chiamare `SimulationHost.Instance`;
+- cercare `MapGridBootstrap` con `FindObjectOfType`;
+- agganciarsi a `MapGridWorldView`;
+- leggere dalla scena in modo implicito;
+- trasformare `MapGridData` in stato autoritativo.
+
+### Contenuto minimo del runtime context
+
+Il context dati minimo deve poter contenere:
+
+```text
+MapGridConfig Config
+MapGridData Map
+World World
+```
+
+Questi riferimenti hanno ruoli diversi:
+
+- `MapGridConfig` fornisce parametri grafici gia' esistenti, come tile size e chunk size;
+- `MapGridData` fornisce terreno e blocked view-side temporanei;
+- `World` fornisce oggetti e actor al solo `ArcGraphWorldAdapter`;
+- i layer ArcGraph ricevono snapshot, non il `World`;
+- il bootstrap orchestra la conversione, ma non muta le sorgenti.
+
+### Read-only pratico
+
+`MapGridData` oggi e' una classe mutabile. Non esiste ancora un'interfaccia read-only dedicata.
+
+Per `v0.31` la scelta conservativa e':
+
+```text
+non introdurre subito una nuova interfaccia MapGridData read-only;
+documentare il contratto di sola lettura;
+centralizzare l'accesso nel runtime context;
+vietare mutazioni dal bootstrap e dall'adapter.
+```
+
+Una futura interfaccia read-only potra' essere introdotta se il bootstrap iniziera' a essere usato in scena o se piu' moduli dovranno leggere la mappa.
+
+### Gestione dati mancanti
+
+Il bootstrap deve poter inizializzare anche senza dati runtime completi.
+
+Casi ammessi:
+
+```text
+context null
+context senza MapGridData
+context senza World
+context senza Config
+```
+
+In questi casi:
+
+- `ArcGraphRenderState` e `ArcGraphLayerStack` possono comunque nascere;
+- gli snapshot non vengono popolati;
+- la diagnostica deve segnalare il motivo;
+- il bootstrap non deve fallire in modo distruttivo;
+- il renderer legacy MapGrid deve continuare a funzionare.
+
+### Flusso dati previsto
+
+Flusso consentito:
+
+```text
+chiamante esterno
+-> crea ArcGraphRuntimeContext
+-> passa il context ad ArcGraphBootstrapRuntime
+-> ArcGraphBootstrapRuntime usa ArcGraphWorldAdapter
+-> adapter copia dati in snapshot
+-> layer ArcGraph ricevono snapshot
+```
+
+Flusso vietato:
+
+```text
+Layer ArcGraph
+-> SimulationHost.Instance
+-> World
+```
+
+oppure:
+
+```text
+ArcGraphBootstrapRuntime
+-> FindObjectOfType<MapGridBootstrap>
+-> campo privato MapGridData
+```
+
+### Relazione con MapGridBootstrap
+
+`MapGridBootstrap` resta il proprietario pratico del buffer view-side legacy.
+
+In `v0.31d` non si modifica ancora `MapGridBootstrap`.
+
+Il problema di come ottenere concretamente `MapGridData` dalla scena resta rinviato a una patch futura e controllata. In `v0.31f` il bootstrap minimo potra' essere verificato con context esplicito costruito da codice/test, senza aggancio automatico alla scena.
+
+### Decisione v0.31d
+
+Decisione operativa:
+
+```text
+ArcGraph non legge globali.
+ArcGraph non entra in MapGridWorldView.
+ArcGraph riceve dati tramite ArcGraphRuntimeContext.
+I layer leggono snapshot, non sorgenti runtime.
+```
 
 ## Ipotesi iniziale consigliata
 
