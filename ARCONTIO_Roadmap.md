@@ -7150,8 +7150,8 @@ La chiusura di questa fase richiedera':
 | v0.38b | Piano di sostituzione bootstrap scena ArcGraph, senza doppio renderer permanente | Completato |
 | v0.38c | Piano ponte terrain ArcGraph controllato o comparativo finale | Completato |
 | v0.38c.01 | Contratto accesso read-only alla mappa runtime per snapshot terrain ArcGraph | Completato |
-| v0.38c.02 | Probe scena terrain ArcGraph temporaneo e gated | Prossimo |
-| v0.38c.03 | Gate visuale terrain ArcGraph vs MapGrid | Pending |
+| v0.38c.02 | Probe scena terrain ArcGraph temporaneo e gated | Completato |
+| v0.38c.03 | Gate visuale terrain ArcGraph vs MapGrid | Prossimo |
 | v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Pending |
 | v0.38e | Aggancio overlay debug minimo validato | Pending |
 | v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Pending |
@@ -7585,6 +7585,107 @@ Scopo del prossimo step:
 - mantenere MapGrid come renderer produttivo;
 - non salvare scene;
 - non introdurre ancora un renderer terrain permanente.
+
+## Esito v0.38c.02 - ArcGraph Terrain Scene Probe
+
+La `v0.38c.02` ha introdotto il primo probe scena terrain ArcGraph capace di
+trasformare la catena data-only gia' esistente in oggetti Unity temporanei.
+
+Il probe non e' un renderer produttivo.
+Serve solo a costruire il primo gate visuale tra MapGrid e ArcGraph.
+
+### Modifiche introdotte
+
+- aggiunto `ArcGraphTerrainSceneProbeRenderer`;
+- aggiunta diagnostica `ArcGraphTerrainSceneProbeRendererDiagnostics`;
+- aggiunto context menu manuale:
+
+```text
+ArcGraph/Render Terrain Scene Probe From MapGrid
+```
+
+- aggiunto context menu di cleanup:
+
+```text
+ArcGraph/Clear Terrain Scene Probe
+```
+
+### Flusso operativo
+
+Il percorso visuale temporaneo diventa:
+
+```text
+ArcGraphTerrainRuntimeMapGridAdapter
+-> ArcGraphRuntimeContext(config, map, world opzionale)
+-> ArcGraphBootstrapRuntime temporaneo
+-> ArcGraphTerrainLayer
+-> ArcGraphTerrainChunkMeshBuilder
+-> ArcGraphTerrainChunkMeshData
+-> ArcGraphTerrainSceneProbeRoot
+-> MeshFilter + MeshRenderer temporanei
+```
+
+### Gate di sicurezza
+
+Il renderer probe usa `ArcGraphComparisonGate` con:
+
+```text
+ArcGraphComparisonMode.TemporaryDebugSceneProbe
+```
+
+Il probe viene bloccato se mancano:
+
+- adapter runtime;
+- config;
+- mappa runtime;
+- camera scena;
+- materiale terrain.
+
+Il materiale terrain deve essere assegnato da Inspector.
+Questa scelta evita che ArcGraph carichi asset tramite `Resources.Load` o legga
+direttamente il renderer MapGrid per recuperare il materiale.
+
+### Limiti confermati
+
+La `v0.38c.02` non introduce:
+
+- renderer terrain permanente;
+- salvataggi scena;
+- prefab;
+- asset load;
+- hotkey;
+- `Update`;
+- letture globali;
+- modifiche a `World`;
+- modifiche a `MapGridData`;
+- cancellazione di `MapGridChunkRenderer`.
+
+I GameObject creati dal probe sono figli di:
+
+```text
+ArcGraphTerrainSceneProbeRoot
+```
+
+e vengono rimossi dal comando:
+
+```text
+ArcGraph/Clear Terrain Scene Probe
+```
+
+### Prossimo checkpoint
+
+```text
+v0.38c.03 - ArcGraph Terrain Visual Gate
+```
+
+Scopo del prossimo step:
+
+- guidare il test manuale in Unity;
+- verificare che il probe venga renderizzato;
+- verificare scala e posizione rispetto a MapGrid;
+- verificare che le UV terrain siano coerenti;
+- verificare che il cleanup rimuova il root temporaneo;
+- decidere se il terrain ArcGraph puo' diventare candidato produttivo.
 
 ---
 

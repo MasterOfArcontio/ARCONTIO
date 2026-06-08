@@ -28,22 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38c.02 - ArcGraph Terrain Scene Probe`
+`v0.38c.03 - ArcGraph Terrain Visual Gate`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38c-02-arcgraph-terrain-scene-probe`
+`ai-task/v0.38c-03-arcgraph-terrain-visual-gate`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- introdurre un probe scena terrain ArcGraph temporaneo e gated;
-- consumare il context terrain prodotto dal contratto `v0.38c.01`;
-- costruire mesh data ArcGraph e applicarle solo a oggetti temporanei controllati;
+- eseguire gate visuale terrain ArcGraph vs MapGrid;
+- verificare scala, posizione, UV, chunk, sorting, cleanup e diagnostica del probe;
+- preparare istruzioni manuali chiare per l'operatore Unity;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -114,7 +114,15 @@ Regola corrente:
   - l'adapter costruisce un `ArcGraphRuntimeContext(config, map, world opzionale)` da riferimenti Inspector espliciti;
   - il probe `ArcGraph/Probe Terrain Runtime Context From MapGrid` inizializza un `ArcGraphBootstrapRuntime` temporaneo in memoria e conta gli snapshot terrain prodotti;
   - nessun renderer, nessuna mesh scena, nessun `Update`, nessuna lettura globale, nessuna modifica scena.
-- prossimo micro-step: `v0.38c.02 - ArcGraph Terrain Scene Probe`.
+- micro-step `v0.38c.02` completato:
+  - aggiunto `ArcGraphTerrainSceneProbeRenderer`;
+  - il renderer consuma `ArcGraphTerrainRuntimeMapGridAdapter`;
+  - il renderer usa `ArcGraphComparisonGate` con modalita' `TemporaryDebugSceneProbe`;
+  - il renderer costruisce mesh terrain temporanee sotto `ArcGraphTerrainSceneProbeRoot`;
+  - il materiale terrain deve essere assegnato da Inspector: nessun asset load dentro ArcGraph;
+  - aggiunti context menu `ArcGraph/Render Terrain Scene Probe From MapGrid` e `ArcGraph/Clear Terrain Scene Probe`;
+  - nessun salvataggio scena, nessun renderer permanente, nessuna rimozione legacy.
+- prossimo micro-step: `v0.38c.03 - ArcGraph Terrain Visual Gate`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
