@@ -6406,6 +6406,59 @@ Scope consigliato:
 - controllare Console Unity per diagnostica e warning;
 - non agganciare ancora `World`, NPC attivo, toggle UI o DevTools.
 
+## Esito v0.37j - ArcGraph Debug Overlay Visual QA
+
+La `v0.37j` esegue la QA tecnica del renderer probe debug introdotto in
+`v0.37i` e prepara il gate visuale manuale in Unity.
+
+Verifiche tecniche completate:
+
+- Unity Editor aperto sul progetto ARCONTIO;
+- log Editor controllato dopo import script;
+- ricompilazione Unity riuscita con `Tundra build success`;
+- nessun errore C# prodotto dal renderer debug;
+- warning presenti solo su codice legacy MapGrid/AtomViewer gia' noto;
+- compilazione Roslyn isolata del renderer e dei feed debug riuscita;
+- context menu verificati sul componente:
+  - `ArcGraph/Render Default Debug Overlay Probe`;
+  - `ArcGraph/Clear Debug Overlay Probe`;
+- controllo dipendenze vietate riuscito:
+  - nessun `Resources.Load`;
+  - nessun `MapGridWorldView`;
+  - nessun `SimulationHost`;
+  - nessuna lettura diretta producer `World.GetNpcLandmarkOverlayData`;
+  - nessuna lettura diretta producer `World.GetGvdDinOverlayData`.
+
+Limite della QA:
+
+- la verifica visiva reale non puo' essere chiusa solo da shell;
+- non e' stato introdotto un editor runner automatico, per evitare uno script
+  QA fuori scope e modifiche scena/prefab;
+- la conferma finale richiede osservazione umana in Unity.
+
+Gate visuale manuale richiesto:
+
+1. aggiungere temporaneamente il componente `ArcGraphDebugOverlaySceneProbeRenderer`
+   a un GameObject di test;
+2. non salvare la scena;
+3. opzionalmente assegnare `MainCamera` al campo `Scene Camera`;
+4. usare il context menu del componente:
+   `ArcGraph/Render Default Debug Overlay Probe`;
+5. verificare la creazione del root temporaneo:
+   `ArcGraphDebugOverlaySceneProbeRoot`;
+6. verificare la presenza di celle, nodi ed edge colorati;
+7. controllare in Console il log atteso:
+   `cells=3, nodes=4, edges=8, labelsIgnored=0, visible=15`;
+8. usare `ArcGraph/Clear Debug Overlay Probe`;
+9. verificare che il root temporaneo venga eliminato.
+
+Decisione per proseguire:
+
+- se il gate visuale manuale e' positivo, si puo' passare a
+  `v0.37k - ArcGraph Debug Runtime Wiring Audit`;
+- se il probe non e' visibile, prima va corretta posizione/camera/sorting del
+  probe, senza ancora collegarlo al runtime reale.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement

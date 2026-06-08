@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37i - ArcGraph Debug Overlay Scene Probe Renderer`
+`v0.37j - ArcGraph Debug Overlay Visual QA`
 
 STATUS:
-COMPLETATO / IN ATTESA GO v0.37j
+QA TECNICA COMPLETATA / IN ATTESA CONFERMA VISIVA UMANA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37i-arcgraph-debug-overlay-scene-probe`
+`ai-task/v0.37j-arcgraph-debug-overlay-visual-qa`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -69,6 +69,7 @@ Regola corrente:
 - `v0.37g` ha introdotto feed runtime debug passivo Landmark/GVD;
 - `v0.37h` ha auditato il percorso renderer/probe debug per visualizzare `ArcGraphDebugOverlayQueue`;
 - `v0.37i` introduce il renderer scena temporaneo separato per visualizzare `ArcGraphDebugOverlayQueue`;
+- `v0.37j` ha completato QA tecnica del renderer e preparato il gate visuale umano;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -229,9 +230,8 @@ DOC SYNC:
 
 OBIETTIVO:
 
-Chiudere `v0.37i - ArcGraph Debug Overlay Scene Probe Renderer` con un renderer
-probe separato, consumer-only, capace di visualizzare una queue debug Landmark/GVD
-senza agganciare il runtime reale.
+Chiudere `v0.37j - ArcGraph Debug Overlay Visual QA` distinguendo la QA tecnica
+eseguibile da Codex dalla conferma visuale umana richiesta in Unity.
 
 Esito operativo `v0.37h`:
 
@@ -290,6 +290,43 @@ Scope consigliato:
 - verificare il cleanup del root temporaneo;
 - controllare la diagnostica in Console;
 - non collegare ancora runtime reale, NPC attivo, toggle UI o DevTools.
+
+Esito operativo `v0.37j`:
+
+- Unity Editor aperto sul progetto ARCONTIO;
+- log Editor controllato dopo import script;
+- ricompilazione Unity riuscita con `Tundra build success`;
+- nessun errore C# prodotto dal renderer debug;
+- warning presenti solo su codice legacy MapGrid/AtomViewer gia' noto;
+- compilazione Roslyn isolata del renderer e dei feed debug riuscita;
+- context menu verificati:
+  - `ArcGraph/Render Default Debug Overlay Probe`;
+  - `ArcGraph/Clear Debug Overlay Probe`;
+- controllo dipendenze vietate riuscito:
+  - nessun `Resources.Load`;
+  - nessun `MapGridWorldView`;
+  - nessun `SimulationHost`;
+  - nessuna lettura diretta `World.GetNpcLandmarkOverlayData`;
+  - nessuna lettura diretta `World.GetGvdDinOverlayData`;
+- non creati editor runner automatici;
+- non modificate scene, prefab, asset o `.meta`.
+
+Gate visuale umano richiesto:
+
+- aggiungere temporaneamente `ArcGraphDebugOverlaySceneProbeRenderer` a un GameObject di test;
+- non salvare la scena;
+- opzionalmente assegnare `MainCamera` al campo `Scene Camera`;
+- usare `ArcGraph/Render Default Debug Overlay Probe`;
+- verificare root temporaneo `ArcGraphDebugOverlaySceneProbeRoot`;
+- verificare celle, nodi ed edge colorati;
+- verificare log Console atteso:
+  `cells=3, nodes=4, edges=8, labelsIgnored=0, visible=15`;
+- usare `ArcGraph/Clear Debug Overlay Probe`;
+- verificare eliminazione del root temporaneo.
+
+Prossimo micro-step consigliato dopo conferma visuale positiva:
+
+`v0.37k - ArcGraph Debug Runtime Wiring Audit`
 
 Esito operativo `v0.37d`:
 
