@@ -28,21 +28,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38b - ArcGraph Scene Bootstrap Replacement Plan`
+`v0.38c - ArcGraph Terrain Scene Bridge Plan`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38b-arcgraph-scene-bootstrap-plan`
+`ai-task/v0.38c-arcgraph-terrain-scene-bridge-plan`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- definire il piano di sostituzione bootstrap scena ArcGraph dopo audit `v0.38a`;
-- scegliere il primo wrapper/probe produttivo minimo senza doppio renderer permanente;
+- progettare il primo aggancio terrain ArcGraph controllato dopo il piano `v0.38b`;
+- definire se il primo test terrain avviene nella scena MapGrid corrente o in scena separata di prova;
+- mantenere ArcGraph come consumer di snapshot/context read-only, non come figlio del renderer MapGrid;
+- impedire il doppio renderer permanente: ogni eventuale ponte visuale deve essere temporaneo, diagnostico o gated;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
@@ -91,6 +93,13 @@ Regola corrente:
   - actor/object ArcGraph hanno snapshot e queue, ma manca renderer scena produttivo con sprite asset reali, pooling e cleanup;
   - debug Landmark/GVD e' migrato come ponte manuale validato; FOV current cone, labels screen-space, pointer coords, top bar, summary cards e DevTools restano fuori dal renderer ArcGraph produttivo iniziale;
   - `v0.38b` deve quindi progettare il bootstrap scena ArcGraph, non cancellare subito `MapGridWorldView`.
+- piano `v0.38b` completato:
+  - MapGrid e ArcGraph possono vivere in scene separate solo come strategia di test/confronto, non come due bootstrap simulativi divergenti;
+  - ArcGraph non deve ricevere dati dal renderer MapGrid come dipendenza definitiva: deve ricevere context/snapshot read-only da una sorgente neutra o da adapter temporanei dichiarati;
+  - `MapGridData` resta sorgente legacy temporanea per terrain snapshot, non modello mappa definitivo;
+  - il primo wrapper scena ArcGraph deve essere esplicito, spento o gated di default, e deve ricevere riferimenti da Inspector/context senza `FindObjectOfType` operativo;
+  - cancellazione fisica di `MapGridBootstrap`, `MapGridWorldView` e componenti collegati ammessa solo dopo assorbimento verificato di terrain, actor/object, debug minimo, camera/input e strumenti UI separati;
+  - `v0.38c` deve progettare il primo ponte terrain scena, senza ancora salvare scene o introdurre renderer permanente non approvato.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

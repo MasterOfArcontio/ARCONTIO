@@ -7146,9 +7146,9 @@ La chiusura di questa fase richiedera':
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.38a | Audit assorbimento legacy MapGrid: bootstrap, terrain, actor/object, overlay, input, UI debug e dipendenze scena | In corso |
-| v0.38b | Piano di sostituzione bootstrap scena ArcGraph, senza doppio renderer permanente | Pending |
-| v0.38c | Aggancio terrain ArcGraph produttivo controllato o comparativo finale | Pending |
+| v0.38a | Audit assorbimento legacy MapGrid: bootstrap, terrain, actor/object, overlay, input, UI debug e dipendenze scena | Completato |
+| v0.38b | Piano di sostituzione bootstrap scena ArcGraph, senza doppio renderer permanente | Completato |
+| v0.38c | Piano ponte terrain ArcGraph controllato o comparativo finale | Prossimo |
 | v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Pending |
 | v0.38e | Aggancio overlay debug minimo validato | Pending |
 | v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Pending |
@@ -7259,6 +7259,138 @@ Non cancellare MapGridWorldView.
 Non salvare scene.
 Non introdurre renderer produttivo prima del piano bootstrap.
 ```
+
+## Esito v0.38b - ArcGraph Scene Bootstrap Replacement Plan
+
+La `v0.38b` ha fissato il piano di sostituzione del bootstrap scena senza
+introdurre codice runtime, renderer produttivi, asset load, modifiche scena o
+rimozioni legacy.
+
+La decisione principale e':
+
+```text
+ArcGraph deve diventare un consumer alternativo e poi sostitutivo della view.
+Non deve diventare un figlio del renderer MapGrid.
+```
+
+### Risposta tecnica alle tre domande operative
+
+1. Scene separate MapGrid / ArcGraph.
+
+Sono possibili e utili come strategia di test, ma non devono diventare due
+runtime simulativi separati. La scena MapGrid puo' restare scena produttiva
+legacy, mentre una scena ArcGraph dedicata puo' servire per testare bootstrap,
+terrain e gate visuali. Entrambe devono pero' leggere dati equivalenti tramite
+context/snapshot o adapter dichiarati; non devono creare due simulazioni diverse.
+
+2. Origine dei dati ArcGraph.
+
+ArcGraph non deve ricevere dati dal renderer MapGrid come dipendenza
+architetturale definitiva. Puo' usare temporaneamente strutture legacy come
+`MapGridData` e `MapGridWorldView.RuntimeWorld`, ma solo tramite adapter
+espliciti e read-only. La forma corretta resta:
+
+```text
+World / map data / context esplicito
+-> snapshot read-only
+-> ArcGraph
+```
+
+e non:
+
+```text
+MapGrid renderer
+-> ArcGraph renderer
+```
+
+3. Eliminazione fisica MapGrid.
+
+MapGrid potra' essere eliminato fisicamente solo dopo assorbimento verificato.
+Non basta sostituire le tile terrain. Oggi `MapGridBootstrap` e
+`MapGridWorldView` contengono ancora bootstrap, terrain chunk, camera/input,
+sync NPC/oggetti, overlay debug, UI diagnostica, DevTools e rebind del `World`.
+
+La cancellazione e' quindi ammessa solo dopo che ogni responsabilita' e' stata:
+
+- migrata in ArcGraph;
+- spostata in un sistema UI/debug separato;
+- oppure dichiarata obsoleta e rimossa con gate esplicito.
+
+### Piano bootstrap scena consigliato
+
+Il primo wrapper scena ArcGraph dovra' essere un componente Unity leggero e
+dichiarativo, con responsabilita' limitata:
+
+- vivere su un GameObject esplicito, ad esempio `ArcGraphRuntimeRoot`;
+- ricevere riferimenti da Inspector o da un factory/bootstrap autorizzato;
+- costruire un `ArcGraphRuntimeContext`;
+- inizializzare `ArcGraphBootstrapRuntime`;
+- esporre diagnostica leggibile;
+- restare spento, debug-only o gated finche' MapGrid resta renderer produttivo;
+- non leggere `SimulationHost.Instance` direttamente;
+- non usare `FindObjectOfType` come canale operativo stabile;
+- non mutare `World`, `MapGridData` o sistemi core;
+- non creare due renderer permanenti sovrapposti.
+
+### Strategia scene
+
+La transizione ammette due forme:
+
+```text
+Scene_MapGrid
+-> scena produttiva legacy corrente
+-> puo' ospitare wrapper/probe ArcGraph temporanei per gate manuali
+```
+
+```text
+Scene_ArcGraphRuntime / Scene_ArcGraphProbe
+-> scena separata futura di test ArcGraph
+-> utile per validare terrain, camera e bootstrap senza salvare modifiche nella scena MapGrid
+```
+
+La scelta operativa per `v0.38c` dovra' decidere se il primo terrain bridge viene
+testato dentro `Scene_MapGrid` come probe temporaneo o dentro una scena separata
+di prova. In entrambi i casi, il renderer MapGrid non viene cancellato.
+
+### Sequenza di assorbimento fissata
+
+La sequenza v0.38 diventa:
+
+1. `v0.38c`: progettare il ponte terrain scena ArcGraph.
+2. Validare se il terrain ArcGraph puo' consumare `MapGridData` come snapshot
+   temporaneo senza diventare dipendente dal renderer MapGrid.
+3. Accendere il terrain solo in modalita' controllata, comparativa o scena di
+   test.
+4. Solo dopo terrain stabile, procedere con actor/object.
+5. Solo dopo actor/object, procedere con debug minimo.
+6. Solo dopo camera/input e strumenti UI separati, pianificare spegnimento
+   completo MapGrid.
+7. Solo dopo gate finale, cancellare fisicamente i componenti legacy assorbiti.
+
+### Stop progettuali confermati
+
+```text
+Non cancellare MapGridBootstrap.
+Non cancellare MapGridWorldView.
+Non salvare scene Unity.
+Non introdurre renderer produttivo permanente senza gate.
+Non trasformare MapGridData nella mappa simulativa definitiva.
+Non far dipendere ArcGraph dal renderer MapGrid come parent logico.
+```
+
+### Prossimo checkpoint
+
+```text
+v0.38c - ArcGraph Terrain Scene Bridge Plan
+```
+
+Scopo del prossimo step:
+
+- decidere dove testare il primo terrain bridge;
+- definire il wrapper o adapter terrain minimo;
+- chiarire quali dati terrain passano ad ArcGraph;
+- chiarire come viene impedito il doppio renderer permanente;
+- preparare il gate visuale prima di qualunque sostituzione.
 
 ---
 
