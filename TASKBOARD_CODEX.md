@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37c - ArcGraph Debug Overlay Queue Builder`
+`v0.37d - ArcGraph Debug Overlay Producer Bridge Audit`
 
 STATUS:
 IN COMPLETAMENTO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37c-arcgraph-debug-overlay-builder`
+`ai-task/v0.37d-arcgraph-debug-producer-bridge-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -63,6 +63,7 @@ Regola corrente:
 - audit `v0.37a` completato: MapGridWorldView contiene overlay di mappa, HUD, UI interattiva e strumenti operativi;
 - `v0.37b` ha introdotto contratti dati debug ArcGraph passivi;
 - `v0.37c` ha introdotto builder queue debug passivo da input DTO/snapshot;
+- `v0.37d` ha completato audit dei producer reali FOV, landmark e DT/GVD-DIN;
 - `main`, `ai/codex-main` e `ai-task/v0.37c-arcgraph-debug-overlay-builder` sono stati allineati allo stesso commit di integrazione;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -249,14 +250,23 @@ Esito operativo `v0.37c`:
 
 Prossimo micro-step consigliato:
 
-`v0.37d - ArcGraph Debug Overlay Producer Bridge Audit`
+`v0.37e - ArcGraph Landmark/GVD Debug Producer Bridge`
 
 Obiettivo:
 
-- audit mirato dei producer reali FOV, landmark e DT/GVD-DIN;
-- definire quali sorgenti possono alimentare `ArcGraphDebugOverlaySnapshot`;
+- implementare bridge passivo per `LandmarkOverlayNode`, `LandmarkOverlayEdge` e `GvdDinOverlaySnapshot`;
+- usare dati DTO gia' esistenti senza creare un nuovo reader onnisciente del `World`;
+- rinviare FOV current cone finche' non esiste un producer separato;
 - non creare ancora renderer Unity;
-- non migrare DevTools, TopBar o summary cards.
+- non migrare DevTools, TopBar, summary cards, pointer coords o runtime cost HUD.
+
+Esito operativo `v0.37d`:
+
+- `LandmarkOverlayNode`, `LandmarkOverlayEdge` e `GvdDinOverlaySnapshot` sono pronti per un bridge passivo;
+- `DebugFovTelemetry` heatmap storica e' parzialmente pronta, ma richiede policy su NPC attivo e costo scansione buffer;
+- FOV current cone non e' pronto: oggi e' calcolato dentro `MapGridFovHeatmapOverlay.RenderCurrentCone(...)`;
+- pointer coords, runtime cost HUD, landmark labels e DT numeric labels sono screen-space/UI e vanno rinviati;
+- prossimo step tecnico consigliato: bridge landmark/GVD, non renderer Unity.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 

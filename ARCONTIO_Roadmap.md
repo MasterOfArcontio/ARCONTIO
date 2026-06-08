@@ -5841,6 +5841,165 @@ Scope consigliato:
 - non creare ancora renderer Unity;
 - non migrare DevTools, TopBar o summary cards.
 
+## Esito v0.37d - ArcGraph Debug Overlay Producer Bridge Audit
+
+La `v0.37d` esegue l'audit dei producer reali che oggi alimentano gli overlay debug
+di `MapGridWorldView`, per capire quali dati possono essere convertiti in
+`ArcGraphDebugOverlaySnapshot` senza introdurre un renderer Unity e senza creare
+un secondo manager diagnostico.
+
+File ispezionati:
+
+```text
+Assets/Scripts/Core/Telemetry/DebugFovTelemetry.cs
+Assets/Scripts/Core/World/LandmarkDebugTypes.cs
+Assets/Scripts/Core/World/LandmarkRegistry.cs
+Assets/Scripts/Core/World/World.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridWorldView.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridFovHeatmapOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridLandmarkOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridLandmarkLabelOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridDtValueOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridPointerCoordsOverlay.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphWorldAdapter.cs
+```
+
+Classificazione delle sorgenti:
+
+```text
+PRONTE PER BRIDGE PASSIVO
+- LandmarkOverlayNode
+- LandmarkOverlayEdge
+- GvdDinOverlaySnapshot.DtCells
+- GvdDinOverlaySnapshot.GvdRawCells
+- GvdDinOverlaySnapshot.GvdNodes
+- GvdDinOverlaySnapshot.GvdEdges
+
+PARZIALMENTE PRONTE
+- DebugFovTelemetry heatmap storica
+
+NON ANCORA PRONTE SENZA ESTRAZIONE PRODUCER
+- FOV current cone / watched margin
+- Pointer cell coords HUD
+- Runtime cost HUD
+- Landmark labels screen-space
+- DT numeric labels screen-space
+```
+
+Dettaglio FOV:
+
+- `DebugFovTelemetry` e' un buffer read-only gia' separato dal renderer;
+- la heatmap storica puo' essere tradotta in `ArcGraphDebugCellOverlaySnapshot`
+  scansionando il read buffer dell'NPC attivo;
+- il cono FOV corrente non e' ancora un producer separato;
+- `MapGridFovHeatmapOverlay.RenderCurrentCone(...)` calcola direttamente le celle
+  osservate e watched usando `World`, `GridPos`, facing, range, cone slope e LOS;
+- questo metodo oggi e' contemporaneamente producer e renderer;
+- portarlo in ArcGraph senza estrazione creerebbe un bridge troppo accoppiato al
+  `World` e ripeterebbe il problema del renderer legacy.
+
+Dettaglio landmark:
+
+- `World.GetNpcLandmarkOverlayData(...)` produce gia' liste view-only per:
+  - grafo mondo;
+  - grafo conosciuto dall'NPC;
+  - route macro;
+  - path runtime cella-per-cella;
+  - direct path;
+  - jump/local search path;
+  - complex edge fisicamente percorsi;
+- i dati sono gia' nel formato `LandmarkOverlayNode` e `LandmarkOverlayEdge`;
+- questi DTO sono candidati forti per un bridge ArcGraph immediato;
+- il bridge dovra' solo assegnare il corretto `ArcGraphDebugOverlayKind`.
+
+Dettaglio GVD-DIN:
+
+- `GvdDinOverlaySnapshot` e' gia' un contenitore riusabile e passivo;
+- contiene DT heatmap, GVD raw, GVD nodes e GVD edges;
+- `World.GetGvdDinOverlayData(...)` pulisce e ripopola lo snapshot;
+- la sorgente effettiva e' `LandmarkRegistry.FillGvdDinOverlayData(...)`;
+- il bridge puo' convertire:
+  - `DtCells` -> `DtHeatCell`;
+  - `GvdRawCells` -> `GvdRawCell`;
+  - `GvdNodes` -> `LandmarkGvdNode`;
+  - `GvdEdges` -> `LandmarkGvdEdge`.
+
+Dettaglio HUD / label:
+
+- pointer coords e runtime cost sono ancora costruiti in
+  `MapGridPointerCoordsOverlay`;
+- la conversione mouse/camera/cella avviene in `MapGridWorldView`;
+- landmark labels e DT numeric labels sono screen-space e dipendono da camera,
+  canvas, font e frustum check;
+- questi elementi possono entrare in `ArcGraphDebugLabelOverlaySnapshot`, ma solo
+  dopo aver separato producer testuale e renderer UI;
+- non devono essere il primo bridge operativo.
+
+Forma consigliata del prossimo bridge:
+
+```text
+ArcGraphDebugOverlayProducerBridge
+├─ FillLandmarkDebugSnapshot(...)
+├─ FillGvdDinDebugSnapshot(...)
+├─ FillHistoricalFovHeatSnapshot(...)
+└─ non implementa FOV current cone finche' non esiste producer separato
+```
+
+Vincoli per il bridge futuro:
+
+- leggere dati gia' disponibili tramite contratti debug esistenti;
+- non creare `GameObject`;
+- non creare `SpriteRenderer`;
+- non creare `LineRenderer`;
+- non creare `Canvas`;
+- non leggere input mouse/tastiera;
+- non emettere comandi;
+- non chiamare `SimulationHost`;
+- non duplicare logica percettiva produttiva;
+- non spostare in ArcGraph il calcolo del cono FOV corrente finche' resta dentro
+  `MapGridFovHeatmapOverlay`.
+
+Decisione tecnica consigliata:
+
+La `v0.37e` dovrebbe implementare solo il bridge passivo per landmark e GVD-DIN,
+piu' eventualmente la heatmap storica `DebugFovTelemetry`.
+
+Il FOV current cone va rinviato o preceduto da un micro-step dedicato di estrazione
+producer:
+
+```text
+Fov current cone producer
+-> lista celle observed/watched
+-> ArcGraphDebugOverlaySnapshot
+```
+
+Rischi principali:
+
+- se il bridge legge direttamente troppi dettagli di `World`, ArcGraph diventa un
+  secondo `MapGridWorldView`;
+- se il FOV current cone viene copiato nel bridge, duplichiamo logica percettiva e
+  aumentiamo rischio di divergenza;
+- se HUD e label vengono migrati troppo presto, si mescolano dati di mappa,
+  screen-space, input e UI;
+- se landmark/GVD vengono agganciati senza classificazione dei kind, il renderer
+  futuro ricevera' dati corretti ma poco spiegabili.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37e - ArcGraph Landmark/GVD Debug Producer Bridge
+```
+
+Scope consigliato:
+
+- implementare un adapter passivo da `LandmarkOverlayNode`, `LandmarkOverlayEdge`
+  e `GvdDinOverlaySnapshot` verso `ArcGraphDebugOverlaySnapshot`;
+- non implementare FOV current cone;
+- non implementare renderer Unity;
+- aggiungere harness smoke con dati DTO fittizi;
+- mantenere fuori scope pointer coords, runtime cost HUD, summary cards, top bar
+  e DevTools.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
