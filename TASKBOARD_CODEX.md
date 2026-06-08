@@ -28,20 +28,20 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37k - ArcGraph Debug Runtime Wiring Audit`
+`v0.37l - ArcGraph Debug Runtime Wiring Contract`
 
 STATUS:
-COMPLETATO / IN ATTESA GO v0.37l
+COMPLETATO / IN ATTESA GO v0.37m
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37k-arcgraph-debug-runtime-wiring-audit`
+`ai-task/v0.37l-arcgraph-debug-runtime-wiring-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere `v0.37k` con audit del wiring runtime debug ArcGraph;
+- chiudere `v0.37l` con contratto passivo del wiring runtime debug ArcGraph;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -72,6 +72,7 @@ Regola corrente:
 - `v0.37i` introduce il renderer scena temporaneo separato per visualizzare `ArcGraphDebugOverlayQueue`;
 - `v0.37j` ha completato QA tecnica del renderer e preparato il gate visuale umano;
 - `v0.37k` ha auditato il wiring runtime futuro tra context, feed e renderer debug;
+- `v0.37l` ha introdotto contratto, coordinator e harness del wiring runtime debug;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -232,9 +233,9 @@ DOC SYNC:
 
 OBIETTIVO:
 
-Chiudere `v0.37k - ArcGraph Debug Runtime Wiring Audit` definendo dove deve stare
-il futuro collegamento tra `ArcGraphRuntimeContext`, feed debug e renderer probe,
-senza implementare ancora il collegamento operativo.
+Chiudere `v0.37l - ArcGraph Debug Runtime Wiring Contract` introducendo il
+contratto passivo che permette a context, feed e renderer debug di incontrarsi
+senza wrapper scena automatici, hotkey, UI o global access.
 
 Esito operativo `v0.37h`:
 
@@ -363,6 +364,40 @@ Scope consigliato:
 - non aggiungere hotkey o UI;
 - non migrare FOV;
 - preparare solo il punto controllato in cui feed e renderer potranno incontrarsi.
+
+Esito operativo `v0.37l`:
+
+- aggiunto `IArcGraphDebugOverlayQueueConsumer`;
+- aggiunto `ArcGraphDebugRuntimeWiringFrame`;
+- aggiunto `ArcGraphDebugRuntimeWiringDiagnostics`;
+- aggiunto `ArcGraphDebugRuntimeWiringCoordinator`;
+- aggiunto `ArcGraphDebugRuntimeWiringHarness`;
+- `ArcGraphDebugOverlaySceneProbeRenderer` implementa il consumer tipizzato;
+- il coordinator valida frame, context e World prima di chiamare il feed;
+- il coordinator non legge `SimulationHost.Instance`;
+- il coordinator non usa `MapGridWorldProvider`;
+- il coordinator non dipende da `MapGridWorldView`;
+- il coordinator non legge input, mouse, tastiera o camera;
+- il dispatch verso renderer avviene solo se un consumer viene fornito dal chiamante;
+- harness aggiunto per verificare `OverlayDisabled`, `RuntimeContextMissing` e `WorldMissing`;
+- nessuna scena, prefab, asset o `.meta` modificati;
+- FOV current cone ancora fuori scope.
+
+Prossimo micro-step consigliato:
+
+`v0.37m - ArcGraph Debug Runtime Scene Wrapper`
+
+Scope consigliato:
+
+- creare wrapper MonoBehaviour piccolo e disattivato di default;
+- ricevere riferimenti serializzati espliciti;
+- costruire il frame di wiring;
+- usare `NPCSelection.SelectedNpcId` solo come sorgente view-only dell'active NPC;
+- chiamare il coordinator;
+- non introdurre hotkey o UI;
+- non usare `SimulationHost.Instance`;
+- non usare `MapGridWorldProvider`;
+- non salvare scene o prefab.
 
 Esito operativo `v0.37d`:
 

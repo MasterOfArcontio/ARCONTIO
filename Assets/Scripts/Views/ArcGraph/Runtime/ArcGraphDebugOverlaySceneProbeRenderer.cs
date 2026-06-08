@@ -31,7 +31,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>CreateLine</b>: primitive LineRenderer runtime per edge.</item>
     /// </list>
     /// </summary>
-    public sealed class ArcGraphDebugOverlaySceneProbeRenderer : MonoBehaviour
+    public sealed class ArcGraphDebugOverlaySceneProbeRenderer : MonoBehaviour, IArcGraphDebugOverlayQueueConsumer
     {
         [SerializeField] private Camera sceneCamera;
         [SerializeField] private bool renderDefaultProbeOnStart;

@@ -6558,6 +6558,80 @@ Scope consigliato:
 - preparare solo il punto in cui un futuro componente potra' chiamare feed e
   renderer in modo controllato.
 
+## Esito v0.37l - ArcGraph Debug Runtime Wiring Contract
+
+La `v0.37l` introduce il contratto C# passivo del futuro wiring runtime debug
+ArcGraph.
+
+File introdotti:
+
+- `IArcGraphDebugOverlayQueueConsumer`;
+- `ArcGraphDebugRuntimeWiringFrame`;
+- `ArcGraphDebugRuntimeWiringDiagnostics`;
+- `ArcGraphDebugRuntimeWiringCoordinator`;
+- `ArcGraphDebugRuntimeWiringHarness`.
+
+File aggiornato:
+
+- `ArcGraphDebugOverlaySceneProbeRenderer`.
+
+Contratto introdotto:
+
+- `IArcGraphDebugOverlayQueueConsumer` definisce il consumer tipizzato di una
+  `ArcGraphDebugOverlayQueue`;
+- `ArcGraphDebugOverlaySceneProbeRenderer` implementa il consumer senza cambiare
+  comportamento;
+- `ArcGraphDebugRuntimeWiringFrame` trasporta context, active NPC, opzioni debug,
+  gate overlay e richiesta di dispatch;
+- `ArcGraphDebugRuntimeWiringCoordinator` valida il frame, chiama il feed e,
+  solo se richiesto, consegna la queue a un consumer fornito dall'esterno;
+- `ArcGraphDebugRuntimeWiringDiagnostics` spiega perche' il coordinatore ha
+  lavorato o si e' fermato;
+- `ArcGraphDebugRuntimeWiringHarness` verifica i gate base senza World reale e
+  senza scena Unity.
+
+Vincoli mantenuti:
+
+- nessuna lettura di `SimulationHost.Instance`;
+- nessuna dipendenza da `MapGridWorldProvider`;
+- nessuna dipendenza da `MapGridWorldView`;
+- nessuna hotkey;
+- nessuna UI;
+- nessun picking;
+- nessuna ricerca scena;
+- nessun wrapper automatico;
+- nessuna modifica a scene, prefab, asset o `.meta`;
+- FOV current cone ancora fuori scope.
+
+Comportamento del coordinatore:
+
+- se il frame manca, ritorna `FrameMissing`;
+- se l'overlay e' spento, ritorna `OverlayDisabled`;
+- se il context manca, ritorna `RuntimeContextMissing`;
+- se il context non contiene World, ritorna `WorldMissing`;
+- se il frame e' valido, invoca `ArcGraphDebugOverlayRuntimeFeed.BuildFromWorld`;
+- se il dispatch e' richiesto e il consumer e' presente, consegna `feed.Queue`;
+- se il consumer manca, produce comunque diagnostica e queue, senza renderizzare.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37m - ArcGraph Debug Runtime Scene Wrapper
+```
+
+Scope consigliato:
+
+- creare un componente scena piccolo e disattivato di default;
+- ricevere riferimenti serializzati espliciti;
+- costruire `ArcGraphDebugRuntimeWiringFrame`;
+- usare `NPCSelection.SelectedNpcId` solo come sorgente view-only dell'active NPC;
+- chiamare `ArcGraphDebugRuntimeWiringCoordinator`;
+- non introdurre hotkey;
+- non creare UI;
+- non usare `SimulationHost.Instance`;
+- non usare `MapGridWorldProvider`;
+- non salvare scene o prefab.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
