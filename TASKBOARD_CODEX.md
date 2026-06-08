@@ -28,32 +28,31 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.36.05 - ArcGraph Weather Renderer`
+`v0.37 - ArcGraph Debug/Overlay Migration`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.36.05-arcgraph-weather-renderer`
+`ai-task/v0.37-arcgraph-debug-overlay-migration`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere e pushare branch `v0.36.04` con Effect Renderer passivo;
-- aprire branch successivo `v0.36.05`;
-- presentare piano operativo Weather Renderer;
+- chiudere e pushare branch `v0.36.05` con Weather Renderer passivo;
+- aprire branch successivo `v0.37`;
+- presentare piano operativo Debug/Overlay Migration;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
-- usare la `v0.35` come base per actor motion, senza riaprire il Job Layer.
+- non migrare strumenti interattivi o dev tools prima dell'audit mirato.
 
 PROMPT OPERATIVO - ROADMAP RESIDUA ARCGRAPH:
 
 ```text
-v0.36.05 -> Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico
 v0.37    -> Debug/Overlay Migration: migrazione progressiva overlay diagnostici da MapGridWorldView
 v0.38    -> Legacy Absorption / Retirement: assorbimento e pensionamento controllato del rendering MapGrid legacy
 ```
@@ -62,8 +61,9 @@ Regola corrente:
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;
-- il prossimo step coerente con roadmap e' `v0.36.05`, non il collegamento alla mappa reale;
-- eventuale ponte mappa reale andra' pianificato dopo i layer ambientali previsti o come micro-step esplicitamente approvato;
+- `v0.36.05` ha completato il builder meteo passivo;
+- il prossimo step coerente con roadmap e' `v0.37`, cioe' audit e migrazione controllata degli overlay/debug;
+- eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
 
 DOC SYNC:
@@ -196,23 +196,28 @@ DOC SYNC:
 - aggiunto `ArcGraphEffectRenderQueueHarness`;
 - QA Roslyn isolata riuscita sui file toccati e nuovi;
 - effetti non ancora fusi nella queue globale actor/object;
-- branch `ai-task/v0.36.05-arcgraph-weather-renderer` da aprire come prossimo checkpoint.
+- branch `ai-task/v0.36.05-arcgraph-weather-renderer` aperto come checkpoint Weather Renderer;
+- aggiunto `ArcGraphRenderItemKind.Weather`;
+- aggiunto `ArcGraphWeatherRenderItem`;
+- aggiunto `ArcGraphWeatherRenderQueueDiagnostics`;
+- aggiunto `ArcGraphWeatherRenderQueueBuilder`;
+- aggiunto `ArcGraphWeatherRenderQueueHarness`;
+- QA Roslyn isolata riuscita sui file Weather toccati e nuovi;
+- meteo non ancora fuso nella queue globale actor/object;
+- meteo non ancora disegnato dal scene probe;
+- branch `ai-task/v0.37-arcgraph-debug-overlay-migration` da aprire come prossimo checkpoint.
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.36.05 - ArcGraph Weather Renderer` dopo completamento Effect Renderer passivo.
+Preparare il prossimo step `v0.37 - ArcGraph Debug/Overlay Migration` dopo completamento Weather Renderer passivo.
 
-Scope immediato `v0.36.05`:
+Scope immediato `v0.37`:
 
-- audit del placeholder `ArcGraphWeatherLayer` e dello snapshot meteo gia' presente;
-- definizione item/overlay passivi per pioggia, neve, vento e overlay atmosferici;
-- applicazione LOD zoom `v0.33f` e flag `ShowWeatherOverlay`;
-- predisposizione animazione frame-based ArcGraph per overlay meteo, senza `Animator` Unity;
-- harness smoke per verificare meteo attivo/inattivo, LOD e diagnostica;
-- nessuna simulazione clima;
-- nessuna temperatura o umidita' produttiva;
-- nessuna generazione precipitazioni;
-- nessun `ParticleSystem`;
+- audit degli overlay diagnostici ancora gestiti da `MapGridWorldView` e componenti vicini;
+- classificazione degli overlay migrabili in ArcGraph;
+- priorita' a pointer cell coords, FOV heatmap, landmark overlay, DT overlay e summary cards;
+- definizione del confine tra overlay visuale, debug UI e strumenti interattivi;
+- nessuna migrazione dei dev tools prima di una decisione esplicita;
 - nessuna sostituzione di MapGrid;
 - nessuna modifica a scene, prefab o asset.
 

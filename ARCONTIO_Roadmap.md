@@ -4669,14 +4669,13 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 | v0.36.03v.01 | ArcGraph Scene Probe Renderer: primo disegno debug in Unity | Completato come renderer debug temporaneo |
 | v0.36.03v.02 | ArcGraph First Visual Test QA: esecuzione e raccolta difetti visivi | Completato con test manuale positivo |
 | v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Completato nel perimetro passivo |
-| v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Prossimo checkpoint |
+| v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Completato nel perimetro passivo |
 
 ## Prompt operativo - roadmap residua ArcGraph
 
 Prima di proseguire oltre il primo test visivo, il lavoro residuo della roadmap ArcGraph e' questo:
 
 ```text
-v0.36.05 -> Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico
 v0.37    -> Debug/Overlay Migration: migrazione progressiva overlay diagnostici da MapGridWorldView
 v0.38    -> Legacy Absorption / Retirement: assorbimento e pensionamento controllato del rendering MapGrid legacy
 ```
@@ -4687,6 +4686,78 @@ Regola di sequenza:
 - non sostituire MapGrid;
 - non fondere i layer ambientali in una queue globale finche' sorting e composizione non sono stati verificati;
 - usare il probe visuale appena validato come controllo anti-accumulo prima dei moduli successivi.
+
+## Esito v0.36.05 - Weather Renderer passivo
+
+La `v0.36.05` ha completato la preparazione passiva del renderer meteo ArcGraph.
+
+Il meteo non viene ancora disegnato in scena, non genera precipitazioni produttive, non modifica temperatura,
+umidita' o altri stati simulativi, e non usa `ParticleSystem`, `Animator`, `Resources.Load` o creazione di
+oggetti Unity.
+
+File/runtime aggiunti o aggiornati:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderItemKind.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphWeatherRenderItem.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphWeatherRenderQueueDiagnostics.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphWeatherRenderQueueBuilder.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphWeatherRenderQueueHarness.cs
+```
+
+Elementi introdotti:
+
+- aggiunto `ArcGraphRenderItemKind.Weather`;
+- aggiunto `ArcGraphWeatherRenderItem`;
+- aggiunto `ArcGraphWeatherRenderQueueDiagnostics`;
+- aggiunto `ArcGraphWeatherRenderQueueBuilder`;
+- aggiunto `ArcGraphWeatherRenderQueueHarness`.
+
+Comportamento preparato:
+
+- `ArcGraphWeatherRenderQueueBuilder` legge solo `ArcGraphWeatherLayer`;
+- produce al massimo un item meteo globale per livello Z visibile;
+- applica il contratto visuale `Weather` gia' definito nella `v0.36a`;
+- rispetta la policy LOD `v0.33f`;
+- mantiene overlay meteo visibile anche agli zoom semplificati;
+- disattiva l'animazione agli zoom 1 e 2;
+- abilita l'animazione solo quando il profilo LOD lo consente;
+- registra motivi espliciti di mancata visibilita', come snapshot assente, meteo inattivo,
+  intensita' nulla o livello Z non visibile.
+
+QA eseguita:
+
+- controllo testuale su chiamate vietate superato;
+- compilazione Roslyn isolata riuscita sui file toccati e nuovi;
+- harness smoke previsto per validare pioggia attiva, LOD semplificato, animazione a zoom alto,
+  meteo inattivo e meteo su livello Z non visibile.
+
+Debiti residui:
+
+- il meteo non e' ancora fuso nella render queue globale;
+- il meteo non e' ancora disegnato da `ArcGraphSceneProbeRenderer`;
+- non esiste ancora bridge produttivo dal sistema climatico reale;
+- la scelta concreta di sprite, overlay, shader o particle-like rendering resta rinviata alle fasi renderer Unity successive.
+
+Prossimo checkpoint:
+
+```text
+v0.37 - ArcGraph Debug/Overlay Migration
+```
+
+Branch previsto:
+
+```text
+ai-task/v0.37-arcgraph-debug-overlay-migration
+```
+
+Scope iniziale:
+
+- audit degli overlay diagnostici e debug ancora presenti nel renderer MapGrid legacy;
+- classificazione di quali overlay possono migrare in ArcGraph;
+- priorita' a pointer cell coords, FOV heatmap, landmark overlay, DT overlay e summary cards;
+- nessuna migrazione dei dev tools interattivi prima di separare chiaramente input/debug/rendering;
+- nessuna sostituzione di MapGrid.
 
 ## Apertura v0.36a - Audit e contratto preparatorio
 
