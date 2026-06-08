@@ -6632,6 +6632,84 @@ Scope consigliato:
 - non usare `MapGridWorldProvider`;
 - non salvare scene o prefab.
 
+## Esito v0.37m - ArcGraph Debug Runtime Scene Wrapper
+
+La `v0.37m` introduce il wrapper Unity passivo che permette, in una scena di
+test controllata, di chiamare il contratto di wiring runtime debug senza
+trasformare ArcGraph in un nuovo manager globale.
+
+File introdotto:
+
+- `ArcGraphDebugRuntimeSceneWrapper`.
+
+Contratto del wrapper:
+
+- e' un `MonoBehaviour` scene-side;
+- resta spento di default tramite `overlayEnabled = false`;
+- non chiama `Update`;
+- non cerca il `World`;
+- non legge `SimulationHost.Instance`;
+- non usa `MapGridWorldProvider`;
+- non dipende da `MapGridWorldView`;
+- non legge `NPCSelection.SelectedNpcId`;
+- non crea hotkey, UI, picking o strumenti interattivi;
+- riceve `ArcGraphRuntimeContext` tramite `SetRuntimeContext(...)` o
+  `ProcessFrame(context, npcId, sourceTick)`;
+- riceve l'id NPC attivo tramite `SetActiveNpcId(...)` o overload di
+  `ProcessFrame(...)`;
+- costruisce `ArcGraphDebugRuntimeWiringFrame`;
+- chiama `ArcGraphDebugRuntimeWiringCoordinator`;
+- consegna la queue solo al consumer visuale assegnato esplicitamente
+  nell'Inspector.
+
+Decisione prudenziale:
+
+- la nota precedente indicava `NPCSelection.SelectedNpcId` come sorgente
+  view-only possibile;
+- in `v0.37m` il wrapper non la legge direttamente;
+- questa scelta mantiene il wrapper ancora piu' passivo;
+- un eventuale adapter `NPCSelection -> activeNpcId` resta micro-step separato,
+  cosi' la selezione globale non viene fusa col wiring debug.
+
+Context menu disponibili:
+
+- `ArcGraph/Run Debug Runtime Wiring Smoke`;
+- `ArcGraph/Process Debug Runtime Frame`.
+
+Comportamento atteso:
+
+- se nessun context e' stato fornito, il wrapper produce diagnostica
+  `RuntimeContextMissing`;
+- se il context esiste ma non contiene `World`, produce `WorldMissing`;
+- se overlay e' spento, produce `OverlayDisabled`;
+- se context, World, NPC e consumer sono forniti, il coordinator puo' costruire
+  la queue e dispatcharla al renderer debug.
+
+Vincoli mantenuti:
+
+- nessuna scena modificata;
+- nessun prefab modificato;
+- nessun asset modificato;
+- nessun `.meta` aggiunto;
+- nessuna sostituzione del renderer MapGrid;
+- FOV current cone ancora fuori scope.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37n - ArcGraph Debug Runtime Context Adapter Audit
+```
+
+Scope consigliato:
+
+- auditare come produrre in modo controllato un `ArcGraphRuntimeContext` reale
+  per il wrapper;
+- decidere se l'adapter deve stare vicino a MapGrid, ArcGraph o bootstrap scena;
+- valutare come passare l'NPC selezionato senza far leggere `NPCSelection` al
+  wrapper;
+- non introdurre ancora hotkey o UI;
+- non salvare scene o prefab.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement

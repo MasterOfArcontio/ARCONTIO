@@ -28,26 +28,26 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37l - ArcGraph Debug Runtime Wiring Contract`
+`v0.37m - ArcGraph Debug Runtime Scene Wrapper`
 
 STATUS:
-COMPLETATO / IN ATTESA GO v0.37m
+COMPLETATO / IN ATTESA GO v0.37n
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37l-arcgraph-debug-runtime-wiring-contract`
+`ai-task/v0.37m-arcgraph-debug-runtime-scene-wrapper`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere `v0.37l` con contratto passivo del wiring runtime debug ArcGraph;
+- chiudere `v0.37m` con wrapper scena passivo del wiring runtime debug ArcGraph;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
 - non migrare strumenti interattivi o dev tools prima dell'audit mirato;
-- non collegare runtime reale al renderer debug prima di un contratto dedicato.
+- collegare feed e renderer solo tramite context, NPC e consumer espliciti, senza accessi globali.
 
 PROMPT OPERATIVO - ROADMAP RESIDUA ARCGRAPH:
 
@@ -73,6 +73,7 @@ Regola corrente:
 - `v0.37j` ha completato QA tecnica del renderer e preparato il gate visuale umano;
 - `v0.37k` ha auditato il wiring runtime futuro tra context, feed e renderer debug;
 - `v0.37l` ha introdotto contratto, coordinator e harness del wiring runtime debug;
+- `v0.37m` ha introdotto wrapper scena passivo, spento di default, senza lettura di `SimulationHost`, `MapGridWorldProvider`, `MapGridWorldView` o `NPCSelection`;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -397,6 +398,35 @@ Scope consigliato:
 - non introdurre hotkey o UI;
 - non usare `SimulationHost.Instance`;
 - non usare `MapGridWorldProvider`;
+- non salvare scene o prefab.
+
+Esito operativo `v0.37m`:
+
+- aggiunto `ArcGraphDebugRuntimeSceneWrapper`;
+- il wrapper e' un `MonoBehaviour` piccolo, disattivato di default;
+- riceve `ArcGraphRuntimeContext` solo tramite setter/metodo esplicito;
+- riceve l'id NPC attivo tramite setter/metodo esplicito;
+- non legge `NPCSelection.SelectedNpcId`, scelta rimandata a eventuale adapter dedicato;
+- non legge `SimulationHost.Instance`;
+- non usa `MapGridWorldProvider`;
+- non dipende da `MapGridWorldView`;
+- non crea hotkey, UI, picking o polling `Update`;
+- costruisce `ArcGraphDebugRuntimeWiringFrame`;
+- chiama `ArcGraphDebugRuntimeWiringCoordinator`;
+- consegna la queue solo al renderer consumer assegnato esplicitamente;
+- espone context menu di smoke test contratto e tentativo manuale sullo stato corrente;
+- nessuna scena, prefab, asset o `.meta` modificati.
+
+Prossimo micro-step consigliato:
+
+`v0.37n - ArcGraph Debug Runtime Context Adapter Audit`
+
+Scope consigliato:
+
+- auditare come produrre in modo controllato un `ArcGraphRuntimeContext` reale per il wrapper;
+- decidere se l'adapter deve vivere vicino a MapGrid, ArcGraph o bootstrap scena;
+- valutare come passare NPC selezionato senza far leggere `NPCSelection` al wrapper;
+- non introdurre ancora hotkey o UI;
 - non salvare scene o prefab.
 
 Esito operativo `v0.37d`:
