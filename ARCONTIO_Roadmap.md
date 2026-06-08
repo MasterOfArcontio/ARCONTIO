@@ -6108,6 +6108,81 @@ Scope consigliato:
 
 ---
 
+## Esito v0.37f - ArcGraph Debug Overlay Runtime Feed Audit
+
+La `v0.37f` chiude l'audit del punto piu' sicuro in cui alimentare il bridge
+debug ArcGraph con DTO reali.
+
+Conclusione principale:
+
+```text
+World / Core debug DTO
+-> feed runtime debug separato
+-> ArcGraphDebugOverlayProducerBridge
+-> ArcGraphDebugOverlaySnapshot
+-> ArcGraphDebugOverlayQueueBuilder
+-> ArcGraphDebugOverlayQueue
+-> renderer debug futuro
+```
+
+Scelta consigliata:
+
+- non innestare il feed dentro `MapGridWorldView`, perche' quello e' il vecchio
+  renderer Unity misto a input, HUD, overlay e strumenti debug;
+- non gonfiare `ArcGraphWorldAdapter`, che oggi ha gia' una responsabilita'
+  chiara: terreno, oggetti, actor e motion visuale;
+- non mettere il feed dentro `ArcGraphLayerStack` o `ArcGraphDebugLayer`, perche'
+  i layer devono restare cache/consumer di dati, non producer;
+- introdurre un adapter/feed debug separato, ad esempio
+  `ArcGraphDebugOverlayRuntimeFeed`, con cache interne riusabili e input espliciti.
+
+Fonti runtime adatte al primo feed:
+
+- `World.GetNpcLandmarkOverlayData(...)` per world nodes/edges, known
+  nodes/edges, route nodes/edges e path debug;
+- `World.GetGvdDinOverlayData(...)` per DT heatmap, GVD raw, GVD nodes e GVD
+  edges;
+- `activeNpcId` passato dal chiamante, non risolto con logica mouse dentro il feed.
+
+Vincoli fissati:
+
+- il feed puo' leggere `World` solo come consumer view/debug read-only;
+- il feed non deve mutare `World`, job, pathfinding, percezione, memoria o input;
+- il feed non deve creare `GameObject`, `SpriteRenderer`, `LineRenderer`,
+  `Canvas`, asset o renderer Unity;
+- il feed non deve dipendere da `MapGridWorldView`;
+- il feed deve riusare liste/snapshot per evitare allocazioni superflue;
+- FOV current cone resta escluso, perche' oggi e' ancora calcolato dentro
+  `MapGridFovHeatmapOverlay.RenderCurrentCone(...)`;
+- HUD, pointer coords, top bar, summary cards, DevTools e labels screen-space
+  restano fuori scope.
+
+Rischio principale rilevato:
+
+- se il feed viene messo nel vecchio MapGrid, ArcGraph resta dipendente dal
+  renderer da pensionare;
+- se il feed viene messo nell'adapter generale, `ArcGraphWorldAdapter` diventa un
+  contenitore crescente di logiche non omogenee;
+- se il feed calcola FOV corrente prima di estrarre un producer dedicato, si
+  duplica logica percettiva e si aumenta il rischio di divergenza.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37g - ArcGraph Debug Overlay Runtime Feed
+```
+
+Scope consigliato:
+
+- introdurre `ArcGraphDebugOverlayRuntimeFeed` come adapter/feed passivo;
+- usare input espliciti: `World`, `activeNpcId`, flag Landmark/GVD;
+- produrre `ArcGraphDebugOverlaySnapshot` e `ArcGraphDebugOverlayQueue`;
+- aggiungere diagnostica e harness smoke;
+- non creare renderer visuale;
+- non migrare FOV current cone.
+
+---
+
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
 
 ## Stato

@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37e - ArcGraph Landmark/GVD Debug Producer Bridge`
+`v0.37f - ArcGraph Debug Overlay Runtime Feed Audit`
 
 STATUS:
 IN COMPLETAMENTO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37e-arcgraph-landmark-gvd-debug-bridge`
+`ai-task/v0.37f-arcgraph-debug-runtime-feed-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -65,6 +65,7 @@ Regola corrente:
 - `v0.37c` ha introdotto builder queue debug passivo da input DTO/snapshot;
 - `v0.37d` ha completato audit dei producer reali FOV, landmark e DT/GVD-DIN;
 - `v0.37e` ha introdotto bridge passivo Landmark/GVD verso `ArcGraphDebugOverlaySnapshot`;
+- `v0.37f` ha auditato il punto di alimentazione runtime del bridge debug;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -225,41 +226,41 @@ DOC SYNC:
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.37c - ArcGraph Debug Overlay Queue Builder` dopo definizione contratti dati debug.
+Chiudere `v0.37f - ArcGraph Debug Overlay Runtime Feed Audit` dopo il bridge
+passivo Landmark/GVD.
 
-Scope immediato `v0.37c`:
+Esito operativo `v0.37f`:
 
-- costruire builder passivo da input DTO/snapshot verso `ArcGraphDebugOverlayQueue`;
-- accettare dati gia' forniti dal chiamante, senza leggere direttamente il `World`;
-- supportare FOV cell-based, landmark node/edge e DT/GVD-DIN;
-- mantenere separati label/HUD da overlay di mappa;
-- aggiungere harness smoke;
-- non collegare ancora `MapGridWorldView`;
-- non migrare summary cards, top bar o DevTools;
-- nessuna sostituzione di MapGrid;
-- nessuna modifica a scene, prefab o asset.
-
-Esito operativo `v0.37c`:
-
-- introdotto `ArcGraphDebugOverlaySnapshot` come contenitore DTO passivo;
-- introdotti snapshot cell/node/edge/label separati;
-- introdotto `ArcGraphDebugOverlayQueueBuilder`;
-- introdotto `ArcGraphDebugOverlayQueueBuilderHarness`;
-- QA `git diff --check` riuscita;
-- compilazione Roslyn isolata riuscita sui file nuovi e sulle dipendenze ArcGraph minime;
-- nessun collegamento a `MapGridWorldView`, `World`, scene, prefab, asset o renderer Unity.
+- `ArcGraphWorldAdapter` resta dedicato a terreno, oggetti, actor e motion;
+- il feed debug non deve essere innestato dentro `MapGridWorldView`;
+- il feed debug non deve essere collocato nello stack layer, perche' i layer devono
+  restare consumer/cache e non producer di dati;
+- candidato consigliato: adapter/feed debug separato, es. `ArcGraphDebugOverlayRuntimeFeed`,
+  con liste interne riusabili;
+- il feed puo' leggere `World` solo come consumer view/debug read-only e solo per
+  chiamare producer Core gia' esistenti;
+- `World.GetNpcLandmarkOverlayData(...)` e `World.GetGvdDinOverlayData(...)` sono
+  fonti DTO adatte al primo feed runtime;
+- FOV current cone resta rinviato, perche' oggi la logica e' ancora dentro
+  `MapGridFovHeatmapOverlay.RenderCurrentCone(...)`;
+- HUD, pointer coords, labels screen-space, top bar, summary cards e DevTools restano
+  fuori scope.
 
 Prossimo micro-step consigliato:
 
-`v0.37f - ArcGraph Debug Overlay Runtime Feed Audit`
+`v0.37g - ArcGraph Debug Overlay Runtime Feed`
 
-Obiettivo:
+Scope consigliato:
 
-- audit del punto piu' sicuro in cui alimentare il bridge con DTO reali;
-- decidere se il feed deve stare in `ArcGraphWorldAdapter`, in adapter debug separato o wrapper runtime ArcGraph;
-- rinviare FOV current cone finche' non esiste un producer separato;
-- non creare ancora renderer Unity;
-- non migrare DevTools, TopBar, summary cards, pointer coords o runtime cost HUD.
+- introdurre un feed runtime debug separato da `ArcGraphWorldAdapter`;
+- riusare `ArcGraphDebugOverlayProducerBridge`, `ArcGraphDebugOverlaySnapshot` e
+  `ArcGraphDebugOverlayQueueBuilder`;
+- accettare `World`, `activeNpcId` e flag debug come input espliciti;
+- produrre `ArcGraphDebugOverlayQueue` senza GameObject, renderer Unity, input o
+  dipendenze da `MapGridWorldView`;
+- aggiungere harness smoke con `World` nullo e con DTO minimi;
+- non implementare ancora renderer visuale debug;
+- non migrare FOV current cone.
 
 Esito operativo `v0.37d`:
 
