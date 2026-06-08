@@ -7054,6 +7054,38 @@ Decisione post-gate:
 - non introdurre refresh automatico, hotkey o UI finche' il gate manuale non e'
   stabile.
 
+## v0.37q - ArcGraph Debug Overlay Closeout or Fix Gate
+
+La `v0.37q` e' il punto operativo successivo alla QA tecnica `v0.37p`.
+
+Non aggiunge nuove feature ArcGraph.
+Non introduce renderer produttivi.
+Non abilita polling automatico.
+Non apre ancora la `v0.38`.
+
+Il suo compito e' mantenere esplicita una scelta molto semplice:
+
+- se il gate visuale umano dell'adapter MapGrid -> ArcGraph e' positivo, `v0.37`
+  puo' essere chiusa come Debug/Overlay Migration preparatoria;
+- se il gate visuale fallisce, il branch `v0.37q` deve ospitare solo il fix minimo
+  collegato alla causa osservata;
+- se il gate non e' ancora stato eseguito o registrato, `v0.37` resta in attesa e
+  la `v0.38` non deve partire.
+
+Condizione per passare alla fase successiva:
+
+```text
+ArcGraphDebugRuntimeMapGridAdapter
+-> ArcGraphDebugRuntimeSceneWrapper
+-> ArcGraphDebugRuntimeWiringCoordinator
+-> ArcGraphDebugOverlayRuntimeFeed
+-> ArcGraphDebugOverlayQueue
+-> ArcGraphDebugOverlaySceneProbeRenderer
+```
+
+deve produrre un esito manuale leggibile in Unity, almeno come dispatch corretto e
+assenza di errori runtime nel probe debug.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement

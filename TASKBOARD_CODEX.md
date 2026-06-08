@@ -28,20 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37p - ArcGraph Debug Runtime Adapter QA`
+`v0.37q - ArcGraph Debug Overlay Closeout or Fix Gate`
 
 STATUS:
-COMPLETATO / IN ATTESA GATE VISUALE MANUALE
+IN CORSO / IN ATTESA ESITO GATE VISUALE MANUALE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37p-arcgraph-debug-runtime-adapter-qa`
+`ai-task/v0.37q-arcgraph-debug-overlay-closeout-or-fix`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere `v0.37p` con QA tecnica e istruzioni di gate visuale manuale per adapter MapGrid -> ArcGraph debug runtime;
+- governare `v0.37q` come punto di chiusura o fix mirato dopo il gate visuale manuale dell'adapter MapGrid -> ArcGraph debug runtime;
+- non dichiarare chiusa `v0.37` finche' il gate visuale umano non viene registrato come positivo;
+- se il gate fallisce, applicare solo il fix minimo collegato alla causa osservata;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -77,6 +79,7 @@ Regola corrente:
 - `v0.37n` ha auditato il context adapter: per debug overlay basta `World`; il candidato consigliato e' adapter separato che legge `MapGridWorldView.RuntimeWorld` read-only e passa `NPCSelection` al wrapper, senza far scegliere NPC al wrapper;
 - `v0.37o` ha implementato `RuntimeWorld` read-only su `MapGridWorldView` e `ArcGraphDebugRuntimeMapGridAdapter` manuale, senza `Update`, hotkey, UI o scena salvata;
 - `v0.37p` ha completato QA tecnica adapter e preparato gate visuale umano su scena non salvata;
+- `v0.37q` e' il checkpoint corrente di closeout/fix: resta fermo sul gate visuale manuale, non aggiunge feature e non apre `v0.38` senza esito positivo o correzione mirata;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
