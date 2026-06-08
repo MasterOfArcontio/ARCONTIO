@@ -6183,6 +6183,90 @@ Scope consigliato:
 
 ---
 
+## Esito v0.37g - ArcGraph Debug Overlay Runtime Feed
+
+La `v0.37g` introduce il primo feed runtime debug passivo di ArcGraph.
+
+Componenti aggiunti:
+
+- `ArcGraphDebugOverlayRuntimeFeed`;
+- `ArcGraphDebugOverlayRuntimeFeedOptions`;
+- `ArcGraphDebugOverlayRuntimeFeedDiagnostics`;
+- `ArcGraphDebugOverlayRuntimeFeedHarness`.
+
+Flusso dati implementato:
+
+```text
+World.GetNpcLandmarkOverlayData(...)
+World.GetGvdDinOverlayData(...)
+-> ArcGraphDebugOverlayRuntimeFeed
+-> ArcGraphDebugOverlayProducerBridge
+-> ArcGraphDebugOverlaySnapshot
+-> ArcGraphDebugOverlayQueueBuilder
+-> ArcGraphDebugOverlayQueue
+```
+
+Contratto runtime:
+
+- il feed riceve `World`, `activeNpcId` e opzioni debug esplicite;
+- il feed non decide autonomamente quale NPC sia attivo;
+- il feed legge `World` solo come consumer view/debug read-only;
+- il feed non muta `World`, pathfinding, job, memoria, percezione o input;
+- il feed non consulta `MapGridWorldView`;
+- il feed non crea `GameObject`, `SpriteRenderer`, `LineRenderer`, `Canvas`,
+  asset, scena o prefab;
+- il feed usa liste Landmark e snapshot GVD-DIN interni riusabili;
+- il feed espone snapshot e queue finali per renderer futuri;
+- il feed possiede diagnostica dedicata per distinguere world mancante, producer
+  richiesti, producer tentati, item snapshot e item queue.
+
+Smoke harness:
+
+- caso `World == null`: produce queue vuota con reason `WorldMissing`;
+- caso DTO minimi preparati a mano: produce queue Landmark/GVD valida;
+- lo smoke non richiede scena Unity, camera, asset o MapGrid.
+
+Vincoli preservati:
+
+- nessun renderer visuale introdotto;
+- nessuna sostituzione di MapGrid;
+- nessuna migrazione FOV current cone;
+- nessuna migrazione HUD, DevTools, top bar, pointer coords o summary cards;
+- nessuna modifica a scene, prefab, asset o `.meta`.
+
+QA eseguita:
+
+- `git diff --check` superato;
+- controllo statico sulle chiamate vietate eseguito: le occorrenze di
+  `MapGridWorldView` nei nuovi file sono solo commenti/documentazione;
+- compilazione Roslyn isolata riuscita includendo i contratti debug ArcGraph
+  necessari. I warning prodotti sono conflitti attesi da compilazione isolata,
+  perche' alcuni tipi ArcGraph sono gia' presenti in `Assembly-CSharp.dll`.
+
+Debiti residui:
+
+- il feed non e' ancora collegato al bootstrap/mainframe ArcGraph;
+- non esiste ancora renderer visuale per `ArcGraphDebugOverlayQueue`;
+- FOV current cone richiede ancora un producer separato;
+- HUD e labels screen-space restano da trattare in un passaggio dedicato.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37h - ArcGraph Debug Overlay Renderer Audit
+```
+
+Scope consigliato:
+
+- audit del modo piu' sicuro per visualizzare la queue debug ArcGraph;
+- decidere se estendere temporaneamente `ArcGraphSceneProbeRenderer` o creare un
+  renderer debug separato;
+- preparare un test visuale piccolo per Landmark/GVD;
+- non creare ancora renderer produttivo definitivo;
+- non migrare FOV current cone, HUD o DevTools.
+
+---
+
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
 
 ## Stato

@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37f - ArcGraph Debug Overlay Runtime Feed Audit`
+`v0.37g - ArcGraph Debug Overlay Runtime Feed`
 
 STATUS:
 IN COMPLETAMENTO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37f-arcgraph-debug-runtime-feed-audit`
+`ai-task/v0.37g-arcgraph-debug-runtime-feed`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -66,6 +66,7 @@ Regola corrente:
 - `v0.37d` ha completato audit dei producer reali FOV, landmark e DT/GVD-DIN;
 - `v0.37e` ha introdotto bridge passivo Landmark/GVD verso `ArcGraphDebugOverlaySnapshot`;
 - `v0.37f` ha auditato il punto di alimentazione runtime del bridge debug;
+- `v0.37g` ha introdotto feed runtime debug passivo Landmark/GVD;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -226,41 +227,38 @@ DOC SYNC:
 
 OBIETTIVO:
 
-Chiudere `v0.37f - ArcGraph Debug Overlay Runtime Feed Audit` dopo il bridge
-passivo Landmark/GVD.
+Chiudere `v0.37g - ArcGraph Debug Overlay Runtime Feed` dopo l'audit del punto di
+alimentazione runtime.
 
-Esito operativo `v0.37f`:
+Esito operativo `v0.37g`:
 
-- `ArcGraphWorldAdapter` resta dedicato a terreno, oggetti, actor e motion;
-- il feed debug non deve essere innestato dentro `MapGridWorldView`;
-- il feed debug non deve essere collocato nello stack layer, perche' i layer devono
-  restare consumer/cache e non producer di dati;
-- candidato consigliato: adapter/feed debug separato, es. `ArcGraphDebugOverlayRuntimeFeed`,
-  con liste interne riusabili;
-- il feed puo' leggere `World` solo come consumer view/debug read-only e solo per
-  chiamare producer Core gia' esistenti;
-- `World.GetNpcLandmarkOverlayData(...)` e `World.GetGvdDinOverlayData(...)` sono
-  fonti DTO adatte al primo feed runtime;
-- FOV current cone resta rinviato, perche' oggi la logica e' ancora dentro
-  `MapGridFovHeatmapOverlay.RenderCurrentCone(...)`;
-- HUD, pointer coords, labels screen-space, top bar, summary cards e DevTools restano
-  fuori scope.
+- aggiunto `ArcGraphDebugOverlayRuntimeFeed`;
+- aggiunto `ArcGraphDebugOverlayRuntimeFeedOptions`;
+- aggiunto `ArcGraphDebugOverlayRuntimeFeedDiagnostics`;
+- aggiunto `ArcGraphDebugOverlayRuntimeFeedHarness`;
+- il feed accetta `World`, `activeNpcId` e flag debug espliciti;
+- il feed legge il `World` solo tramite `GetNpcLandmarkOverlayData(...)` e
+  `GetGvdDinOverlayData(...)`;
+- il feed produce `ArcGraphDebugOverlaySnapshot` e `ArcGraphDebugOverlayQueue`;
+- il feed possiede liste e snapshot GVD riusabili per ridurre allocazioni;
+- harness smoke copre `World` nullo e DTO Landmark/GVD minimi;
+- nessuna dipendenza da `MapGridWorldView`;
+- nessun `GameObject`, renderer Unity, asset load, input, scena o prefab;
+- FOV current cone resta escluso.
 
 Prossimo micro-step consigliato:
 
-`v0.37g - ArcGraph Debug Overlay Runtime Feed`
+`v0.37h - ArcGraph Debug Overlay Renderer Audit`
 
 Scope consigliato:
 
-- introdurre un feed runtime debug separato da `ArcGraphWorldAdapter`;
-- riusare `ArcGraphDebugOverlayProducerBridge`, `ArcGraphDebugOverlaySnapshot` e
-  `ArcGraphDebugOverlayQueueBuilder`;
-- accettare `World`, `activeNpcId` e flag debug come input espliciti;
-- produrre `ArcGraphDebugOverlayQueue` senza GameObject, renderer Unity, input o
-  dipendenze da `MapGridWorldView`;
-- aggiungere harness smoke con `World` nullo e con DTO minimi;
-- non implementare ancora renderer visuale debug;
-- non migrare FOV current cone.
+- decidere come visualizzare la queue debug ArcGraph senza creare un renderer
+  produttivo prematuro;
+- valutare se estendere il `ArcGraphSceneProbeRenderer` temporaneo o introdurre un
+  renderer debug separato;
+- mantenere MapGrid come renderer produttivo;
+- non migrare HUD, DevTools, top bar o FOV current cone;
+- preparare un test visuale piccolo e leggibile per Landmark/GVD.
 
 Esito operativo `v0.37d`:
 
