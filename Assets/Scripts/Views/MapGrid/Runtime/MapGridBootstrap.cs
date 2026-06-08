@@ -41,6 +41,53 @@ namespace Arcontio.View.MapGrid
         private MapGridData _map;
         private MapGridTileAtlas _atlas;
 
+        // =============================================================================
+        // RuntimeConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone in sola lettura la configurazione MapGrid caricata dal bootstrap.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: sorgente view-side dichiarata</b></para>
+        /// <para>
+        /// ArcGraph deve ricevere i dati dal bootstrap che li possiede gia', non
+        /// cercarli nella scena tramite letture globali. Questa property non crea
+        /// configurazioni, non ricarica JSON e non modifica lo stato della MapGrid:
+        /// restituisce soltanto il riferimento runtime gia' costruito in
+        /// <c>Awake</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>_cfg</b>: configurazione runtime caricata da Resources.</item>
+        /// </list>
+        /// </summary>
+        public MapGridConfig RuntimeConfig => _cfg;
+
+        // =============================================================================
+        // RuntimeMap
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone in sola lettura il buffer terrain runtime costruito da MapGrid.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: MapGridData come sorgente legacy temporanea</b></para>
+        /// <para>
+        /// Il riferimento restituito permette ad adapter ArcGraph espliciti di
+        /// copiare snapshot terrain senza entrare nel renderer MapGrid e senza
+        /// rendere <c>ArcGraph</c> figlio logico di <c>MapGridChunkRenderer</c>.
+        /// La mappa resta un buffer view-side legacy: non diventa modello
+        /// simulativo definitivo e non deve essere mutata dai consumer.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>_map</b>: buffer celle terrain/blocco creato durante il bootstrap.</item>
+        /// </list>
+        /// </summary>
+        public MapGridData RuntimeMap => _map;
         private void Awake()
         {
             // 0) Pre-check: camera

@@ -7149,8 +7149,8 @@ La chiusura di questa fase richiedera':
 | v0.38a | Audit assorbimento legacy MapGrid: bootstrap, terrain, actor/object, overlay, input, UI debug e dipendenze scena | Completato |
 | v0.38b | Piano di sostituzione bootstrap scena ArcGraph, senza doppio renderer permanente | Completato |
 | v0.38c | Piano ponte terrain ArcGraph controllato o comparativo finale | Completato |
-| v0.38c.01 | Contratto accesso read-only alla mappa runtime per snapshot terrain ArcGraph | Prossimo |
-| v0.38c.02 | Probe scena terrain ArcGraph temporaneo e gated | Pending |
+| v0.38c.01 | Contratto accesso read-only alla mappa runtime per snapshot terrain ArcGraph | Completato |
+| v0.38c.02 | Probe scena terrain ArcGraph temporaneo e gated | Prossimo |
 | v0.38c.03 | Gate visuale terrain ArcGraph vs MapGrid | Pending |
 | v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Pending |
 | v0.38e | Aggancio overlay debug minimo validato | Pending |
@@ -7514,6 +7514,77 @@ Scopo del prossimo step:
 - mantenere accesso read-only e dichiarato;
 - verificare che `ArcGraphRuntimeContext` possa contenere config + map + world;
 - restare data-only, senza disegnare in Unity.
+
+## Esito v0.38c.01 - ArcGraph Terrain Runtime Map Access Contract
+
+La `v0.38c.01` ha introdotto il contratto minimo per consegnare ad ArcGraph la
+mappa terrain runtime gia' costruita da MapGrid, senza far dipendere ArcGraph
+dal renderer legacy e senza introdurre ancora un renderer terrain in scena.
+
+### Modifiche introdotte
+
+- `MapGridBootstrap` espone `RuntimeConfig`;
+- `MapGridBootstrap` espone `RuntimeMap`;
+- aggiunto `ArcGraphTerrainRuntimeMapGridAdapter`;
+- aggiunta diagnostica `ArcGraphTerrainRuntimeMapGridAdapterDiagnostics`;
+- aggiunto context menu manuale:
+
+```text
+ArcGraph/Probe Terrain Runtime Context From MapGrid
+```
+
+### Forma del contratto
+
+Il passaggio dati ammesso ora e':
+
+```text
+MapGridBootstrap.RuntimeConfig
+MapGridBootstrap.RuntimeMap
+MapGridWorldView.RuntimeWorld opzionale
+-> ArcGraphTerrainRuntimeMapGridAdapter
+-> ArcGraphRuntimeContext(config, map, world)
+-> ArcGraphBootstrapRuntime temporaneo
+-> TerrainSnapshots
+```
+
+Questo contratto e' read-only dal punto di vista di ArcGraph: l'adapter legge i
+riferimenti runtime gia' costruiti, ma non modifica `MapGridData`, non ricarica
+JSON, non interroga provider globali e non entra nel `MapGridChunkRenderer`.
+
+### Limiti confermati
+
+La `v0.38c.01` non disegna nulla.
+
+Non introduce:
+
+- `MeshRenderer` ArcGraph;
+- `MeshFilter` ArcGraph;
+- GameObject di terrain;
+- `Update`;
+- hotkey;
+- letture globali;
+- salvataggi scena;
+- modifiche a prefab o file `.meta`;
+- sostituzione di `MapGridChunkRenderer`.
+
+Il probe e' solo diagnostico: inizializza un `ArcGraphBootstrapRuntime`
+temporaneo in memoria, misura quanti snapshot terrain sono stati prodotti e poi
+rilascia lo stato.
+
+### Prossimo checkpoint
+
+```text
+v0.38c.02 - ArcGraph Terrain Scene Probe
+```
+
+Scopo del prossimo step:
+
+- consumare il context terrain gia' disponibile;
+- costruire mesh data ArcGraph;
+- applicarle a un probe scena temporaneo e gated;
+- mantenere MapGrid come renderer produttivo;
+- non salvare scene;
+- non introdurre ancora un renderer terrain permanente.
 
 ---
 

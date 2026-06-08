@@ -28,23 +28,24 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38c.01 - ArcGraph Terrain Runtime Map Access Contract`
+`v0.38c.02 - ArcGraph Terrain Scene Probe`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38c-01-arcgraph-terrain-map-access-contract`
+`ai-task/v0.38c-02-arcgraph-terrain-scene-probe`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- introdurre o progettare il contratto minimo di accesso read-only alla `MapGridData` runtime;
-- permettere ad ArcGraph di ricevere snapshot terrain completi senza leggere direttamente il renderer MapGrid;
+- introdurre un probe scena terrain ArcGraph temporaneo e gated;
+- consumare il context terrain prodotto dal contratto `v0.38c.01`;
+- costruire mesh data ArcGraph e applicarle solo a oggetti temporanei controllati;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
-- non costruire ancora mesh in scena e non creare ancora `MeshRenderer` ArcGraph permanenti;
+- non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
@@ -107,6 +108,13 @@ Regola corrente:
   - `ArcGraphWorldAdapter.FillTerrainSnapshots(...)` e `ArcGraphTerrainChunkMeshBuilder` sono gia' pronti come catena data-only;
   - manca un bridge scena che consegni `MapGridData` ad `ArcGraphRuntimeContext` senza far dipendere ArcGraph dal renderer MapGrid;
   - il prossimo micro-step e' quindi `v0.38c.01 - ArcGraph Terrain Runtime Map Access Contract`.
+- micro-step `v0.38c.01` completato:
+  - `MapGridBootstrap` espone `RuntimeConfig` e `RuntimeMap` come accessi read-only dichiarati;
+  - aggiunto `ArcGraphTerrainRuntimeMapGridAdapter`;
+  - l'adapter costruisce un `ArcGraphRuntimeContext(config, map, world opzionale)` da riferimenti Inspector espliciti;
+  - il probe `ArcGraph/Probe Terrain Runtime Context From MapGrid` inizializza un `ArcGraphBootstrapRuntime` temporaneo in memoria e conta gli snapshot terrain prodotti;
+  - nessun renderer, nessuna mesh scena, nessun `Update`, nessuna lettura globale, nessuna modifica scena.
+- prossimo micro-step: `v0.38c.02 - ArcGraph Terrain Scene Probe`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
