@@ -7148,7 +7148,10 @@ La chiusura di questa fase richiedera':
 |---|---|---|
 | v0.38a | Audit assorbimento legacy MapGrid: bootstrap, terrain, actor/object, overlay, input, UI debug e dipendenze scena | Completato |
 | v0.38b | Piano di sostituzione bootstrap scena ArcGraph, senza doppio renderer permanente | Completato |
-| v0.38c | Piano ponte terrain ArcGraph controllato o comparativo finale | Prossimo |
+| v0.38c | Piano ponte terrain ArcGraph controllato o comparativo finale | Completato |
+| v0.38c.01 | Contratto accesso read-only alla mappa runtime per snapshot terrain ArcGraph | Prossimo |
+| v0.38c.02 | Probe scena terrain ArcGraph temporaneo e gated | Pending |
+| v0.38c.03 | Gate visuale terrain ArcGraph vs MapGrid | Pending |
 | v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Pending |
 | v0.38e | Aggancio overlay debug minimo validato | Pending |
 | v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Pending |
@@ -7391,6 +7394,126 @@ Scopo del prossimo step:
 - chiarire quali dati terrain passano ad ArcGraph;
 - chiarire come viene impedito il doppio renderer permanente;
 - preparare il gate visuale prima di qualunque sostituzione.
+
+## Esito v0.38c - ArcGraph Terrain Scene Bridge Plan
+
+La `v0.38c` ha auditato il percorso terrain gia' disponibile e ha fissato il
+piano del primo ponte scena terrain ArcGraph.
+
+File principali auditati:
+
+- `ArcGraphTerrainLayer`;
+- `ArcGraphTerrainChunkMeshBuilder`;
+- `ArcGraphTerrainChunkMeshData`;
+- `ArcGraphWorldAdapter`;
+- `MapGridChunkRenderer`;
+- `MapGridBootstrap`;
+- `ArcGraphBootstrapRuntime`;
+- `ArcGraphRuntimeContext`.
+
+### Stato tecnico rilevato
+
+ArcGraph possiede gia' la catena data-only:
+
+```text
+MapGridData
+-> ArcGraphWorldAdapter.FillTerrainSnapshots(...)
+-> ArcGraphTerrainLayer.ReplaceSnapshots(...)
+-> ArcGraphTerrainChunkMeshBuilder.BuildDirtyChunks(...)
+-> ArcGraphTerrainChunkMeshData
+```
+
+Questa catena produce dati mesh, ma non crea ancora oggetti Unity in scena.
+Questo e' corretto: il terrain ArcGraph e' pronto come builder passivo, non come
+renderer produttivo.
+
+Il punto mancante non e' il calcolo mesh.
+Il punto mancante e':
+
+```text
+come consegnare la MapGridData runtime ad ArcGraph
+senza far dipendere ArcGraph dal renderer MapGrid
+```
+
+Oggi `MapGridBootstrap` costruisce e possiede la `MapGridData`, ma la conserva
+come campo interno privato. `ArcGraphRuntimeContext` puo' gia' contenere una
+`MapGridData`, ma manca un contratto scena esplicito che la passi ad ArcGraph in
+sola lettura.
+
+### Decisione: prima Scene_MapGrid, poi scena separata
+
+Il primo test terrain ArcGraph deve avvenire dentro `Scene_MapGrid` come probe
+temporaneo, spento o gated di default.
+
+Motivazione:
+
+- `Scene_MapGrid` possiede gia' config, layout, `MapGridData`, camera e World;
+- consente di confrontare ArcGraph e MapGrid sullo stesso dato di partenza;
+- evita di creare subito una seconda scena con bootstrap divergente;
+- riduce il rischio di scambiare un problema di rendering per un problema di
+  scenario o caricamento dati.
+
+La scena separata ArcGraph resta una soluzione futura utile, ma solo dopo che il
+contratto terrain sara' stabile e verificato.
+
+### Regola sul doppio renderer
+
+Il terrain ArcGraph non deve restare acceso permanentemente sopra MapGrid.
+
+Le sole forme ammesse per il primo ponte sono:
+
+- probe temporaneo manuale;
+- modalita' comparativa gated;
+- scena di test futura separata;
+- nessuna attivazione automatica permanente.
+
+In `v0.38c` non viene ancora introdotto alcun `MeshRenderer` ArcGraph produttivo.
+
+### Micro-roadmap terrain dentro v0.38c
+
+La fase terrain viene spezzata cosi':
+
+1. `v0.38c.01 - ArcGraph Terrain Runtime Map Access Contract`
+   - esporre o definire il modo minimo read-only per ottenere `MapGridData`;
+   - costruire un `ArcGraphRuntimeContext` completo per terrain;
+   - non disegnare ancora in scena.
+
+2. `v0.38c.02 - ArcGraph Terrain Scene Probe`
+   - consumare il context terrain;
+   - costruire mesh data ArcGraph;
+   - applicarle a un probe temporaneo gated;
+   - non salvare scene.
+
+3. `v0.38c.03 - ArcGraph Terrain Visual Gate`
+   - confrontare output MapGrid e output ArcGraph;
+   - verificare scala, posizione, UV, chunk, sorting e cleanup;
+   - decidere se il terrain ArcGraph puo' diventare candidato produttivo.
+
+Solo dopo questi tre passaggi ha senso procedere ad actor/object.
+
+### Stop progettuali confermati
+
+```text
+Non passare direttamente ad actor/object.
+Non cancellare MapGridChunkRenderer.
+Non cancellare MapGridBootstrap.
+Non salvare Scene_MapGrid.
+Non introdurre renderer terrain permanente.
+Non creare scena separata ArcGraph prima del contratto dati terrain.
+```
+
+### Prossimo checkpoint
+
+```text
+v0.38c.01 - ArcGraph Terrain Runtime Map Access Contract
+```
+
+Scopo del prossimo step:
+
+- rendere disponibile a un adapter/wrapper ArcGraph la `MapGridData` runtime;
+- mantenere accesso read-only e dichiarato;
+- verificare che `ArcGraphRuntimeContext` possa contenere config + map + world;
+- restare data-only, senza disegnare in Unity.
 
 ---
 
