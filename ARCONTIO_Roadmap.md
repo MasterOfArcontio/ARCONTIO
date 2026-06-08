@@ -6357,6 +6357,55 @@ Scope consigliato:
 - non usare `World`;
 - non migrare FOV current cone, labels, HUD, DevTools o top bar.
 
+## Esito v0.37i - ArcGraph Debug Overlay Scene Probe Renderer
+
+La `v0.37i` introduce il primo renderer scena temporaneo per visualizzare una
+`ArcGraphDebugOverlayQueue` senza agganciare ancora il runtime reale.
+
+Componente introdotto:
+
+- `ArcGraphDebugOverlaySceneProbeRenderer`
+
+Responsabilita' del componente:
+
+- consumare una `ArcGraphDebugOverlayQueue` gia' pronta;
+- disegnare celle debug con sprite runtime 1x1;
+- disegnare nodi debug con sprite runtime 1x1;
+- disegnare edge debug con `LineRenderer` temporanei;
+- creare un root temporaneo dedicato;
+- pulire solo gli oggetti generati dal probe;
+- offrire context menu `ArcGraph/Render Default Debug Overlay Probe`;
+- offrire context menu `ArcGraph/Clear Debug Overlay Probe`;
+- loggare una diagnostica sintetica con conteggi cell/node/edge/label.
+
+Vincoli mantenuti:
+
+- nessuna lettura diretta di `World`;
+- nessuna dipendenza da `MapGridWorldView`;
+- nessuna modifica a scene, prefab, asset o `.meta`;
+- nessun collegamento automatico al runtime produttivo;
+- labels/HUD ignorati intenzionalmente nel primo renderer;
+- FOV current cone ancora fuori scope.
+
+Il renderer usa il feed prepared-data solo per costruire il probe finto da
+context menu. Questo non e' un aggancio runtime reale: serve a generare una
+queue dimostrativa Landmark/GVD verificabile a schermo.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37j - ArcGraph Debug Overlay Visual QA
+```
+
+Scope consigliato:
+
+- aggiungere il componente a un GameObject temporaneo in scena senza salvare asset;
+- eseguire `ArcGraph/Render Default Debug Overlay Probe`;
+- verificare visivamente celle, nodi ed edge;
+- verificare `ArcGraph/Clear Debug Overlay Probe`;
+- controllare Console Unity per diagnostica e warning;
+- non agganciare ancora `World`, NPC attivo, toggle UI o DevTools.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement

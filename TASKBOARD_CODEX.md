@@ -28,20 +28,20 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37h - ArcGraph Debug Overlay Renderer Audit`
+`v0.37i - ArcGraph Debug Overlay Scene Probe Renderer`
 
 STATUS:
-IN COMPLETAMENTO
+COMPLETATO / IN ATTESA GO v0.37j
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37h-arcgraph-debug-renderer-audit`
+`ai-task/v0.37i-arcgraph-debug-overlay-scene-probe`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere `v0.37c` con builder queue debug passivo da snapshot DTO;
+- chiudere `v0.37i` con renderer probe separato per `ArcGraphDebugOverlayQueue`;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -68,6 +68,7 @@ Regola corrente:
 - `v0.37f` ha auditato il punto di alimentazione runtime del bridge debug;
 - `v0.37g` ha introdotto feed runtime debug passivo Landmark/GVD;
 - `v0.37h` ha auditato il percorso renderer/probe debug per visualizzare `ArcGraphDebugOverlayQueue`;
+- `v0.37i` introduce il renderer scena temporaneo separato per visualizzare `ArcGraphDebugOverlayQueue`;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -228,8 +229,9 @@ DOC SYNC:
 
 OBIETTIVO:
 
-Chiudere `v0.37h - ArcGraph Debug Overlay Renderer Audit` dopo il feed runtime
-debug passivo.
+Chiudere `v0.37i - ArcGraph Debug Overlay Scene Probe Renderer` con un renderer
+probe separato, consumer-only, capace di visualizzare una queue debug Landmark/GVD
+senza agganciare il runtime reale.
 
 Esito operativo `v0.37h`:
 
@@ -263,6 +265,31 @@ Scope consigliato:
 - non leggere `World`;
 - non dipendere da `MapGridWorldView`;
 - non modificare scene/prefab/meta.
+
+Esito operativo `v0.37i`:
+
+- aggiunto `ArcGraphDebugOverlaySceneProbeRenderer`;
+- il renderer consuma `ArcGraphDebugOverlayQueue` gia' prodotte;
+- celle debug renderizzate con sprite runtime 1x1;
+- nodi debug renderizzati con sprite runtime 1x1;
+- edge debug renderizzati con `LineRenderer` temporanei;
+- aggiunto context menu `ArcGraph/Render Default Debug Overlay Probe`;
+- aggiunto context menu `ArcGraph/Clear Debug Overlay Probe`;
+- il probe default crea dati Landmark/GVD finti tramite prepared-data, senza leggere `World`;
+- labels/HUD e FOV current cone restano fuori scope;
+- nessuna scena, prefab, asset o `.meta` modificati.
+
+Prossimo micro-step consigliato:
+
+`v0.37j - ArcGraph Debug Overlay Visual QA`
+
+Scope consigliato:
+
+- testare manualmente il context menu del renderer in Unity;
+- verificare visivamente celle, nodi ed edge;
+- verificare il cleanup del root temporaneo;
+- controllare la diagnostica in Console;
+- non collegare ancora runtime reale, NPC attivo, toggle UI o DevTools.
 
 Esito operativo `v0.37d`:
 
