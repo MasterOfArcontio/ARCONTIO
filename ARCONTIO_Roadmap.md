@@ -5743,6 +5743,104 @@ Scope previsto:
 - non collegare ancora `MapGridWorldView`;
 - non creare renderer Unity.
 
+## Esito v0.37c - ArcGraph Debug Overlay Queue Builder
+
+La `v0.37c` introduce il primo builder passivo per alimentare la queue debug ArcGraph.
+
+Allineamento Git preliminare:
+
+- `main`, `ai/codex-main` e `ai-task/v0.37c-arcgraph-debug-overlay-builder` sono stati
+  allineati allo stesso commit di integrazione;
+- la storia di `main` e la storia ArcGraph sono state conservate tramite merge commit;
+- non sono stati usati force-push;
+- il controllo finale ha mostrato differenze `0/0` tra `main`, `ai/codex-main` e i rispettivi remoti.
+
+File/runtime aggiunti:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlaySnapshot.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlayQueueBuilder.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlayQueueBuilderHarness.cs
+```
+
+Elementi introdotti:
+
+- aggiunto snapshot DTO cell-based per FOV, DT e GVD raw;
+- aggiunto snapshot DTO node-based per landmark world/known/route/GVD;
+- aggiunto snapshot DTO edge-based per landmark edge, path, route e GVD;
+- aggiunto snapshot DTO label/HUD;
+- aggiunto contenitore `ArcGraphDebugOverlaySnapshot` separato dalla queue renderizzabile;
+- aggiunto `ArcGraphDebugOverlayQueueBuilder`;
+- aggiunto harness smoke `ArcGraphDebugOverlayQueueBuilderHarness`.
+
+Flusso dati fissato:
+
+```text
+producer debug esterno
+-> ArcGraphDebugOverlaySnapshot
+-> ArcGraphDebugOverlayQueueBuilder
+-> ArcGraphDebugOverlayQueue
+-> renderer Unity futuro
+```
+
+Comportamento del builder:
+
+- pulisce la queue target se richiesto;
+- accetta solo snapshot gia' preparati dal chiamante;
+- normalizza item visibili e hidden;
+- produce sort key deterministiche;
+- ordina separatamente celle, nodi, edge e label;
+- separa label/HUD dagli overlay di mappa;
+- puo' includere item hidden per QA tramite `includeHiddenItems`;
+- produce diagnostica tramite `ArcGraphDebugOverlayQueueDiagnostics`.
+
+Hidden state gestiti:
+
+- snapshot disabilitato -> `DisabledBySnapshot`;
+- kind debug non valido -> `InvalidDebugKind`;
+- edge con estremi identici -> `DegenerateEdge`;
+- label vuota -> `MissingLabelText`.
+
+Vincoli rispettati:
+
+- nessuna lettura `World`;
+- nessuna dipendenza da `MapGridWorldView`;
+- nessun `GameObject`;
+- nessun `SpriteRenderer`;
+- nessun `LineRenderer`;
+- nessun `Canvas`;
+- nessun `Resources.Load`;
+- nessun input mouse/tastiera;
+- nessuna emissione di comandi;
+- nessuna modifica a scene, prefab o asset.
+
+QA eseguita:
+
+- `git diff --check` superato;
+- controllo statico sulle chiamate vietate eseguito: le parole vietate compaiono solo in commenti descrittivi dei vincoli;
+- compilazione Roslyn isolata riuscita sui file nuovi e sulle dipendenze ArcGraph minime.
+
+Debiti residui:
+
+- il builder non e' ancora alimentato da `DebugFovTelemetry`, `LandmarkOverlayNode`,
+  `LandmarkOverlayEdge` o `GvdDinOverlaySnapshot`;
+- non esiste ancora renderer Unity debug per disegnare cell, node, edge e label;
+- non esiste ancora bridge da `MapGridWorldView`;
+- summary cards, top bar e DevTools restano fuori scope.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37d - ArcGraph Debug Overlay Producer Bridge Audit
+```
+
+Scope consigliato:
+
+- audit mirato dei producer reali FOV, landmark e DT/GVD-DIN;
+- decidere quali DTO possono alimentare direttamente `ArcGraphDebugOverlaySnapshot`;
+- non creare ancora renderer Unity;
+- non migrare DevTools, TopBar o summary cards.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement

@@ -25,24 +25,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
+## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
 `v0.37c - ArcGraph Debug Overlay Queue Builder`
 
 STATUS:
-IN ATTESA GO OPERATORE
+IN COMPLETAMENTO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37-arcgraph-debug-overlay-migration`
+`ai-task/v0.37c-arcgraph-debug-overlay-builder`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere `v0.37b` con contratti dati debug ArcGraph passivi;
-- preparare micro-step `v0.37c` per builder queue debug passivo;
+- chiudere `v0.37c` con builder queue debug passivo da snapshot DTO;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -63,7 +62,8 @@ Regola corrente:
 - `v0.36.05` ha completato il builder meteo passivo;
 - audit `v0.37a` completato: MapGridWorldView contiene overlay di mappa, HUD, UI interattiva e strumenti operativi;
 - `v0.37b` ha introdotto contratti dati debug ArcGraph passivi;
-- il prossimo step coerente con roadmap e' `v0.37c`, cioe' builder queue debug passivo da input DTO/snapshot;
+- `v0.37c` ha introdotto builder queue debug passivo da input DTO/snapshot;
+- `main`, `ai/codex-main` e `ai-task/v0.37c-arcgraph-debug-overlay-builder` sono stati allineati allo stesso commit di integrazione;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
 
@@ -236,6 +236,27 @@ Scope immediato `v0.37c`:
 - non migrare summary cards, top bar o DevTools;
 - nessuna sostituzione di MapGrid;
 - nessuna modifica a scene, prefab o asset.
+
+Esito operativo `v0.37c`:
+
+- introdotto `ArcGraphDebugOverlaySnapshot` come contenitore DTO passivo;
+- introdotti snapshot cell/node/edge/label separati;
+- introdotto `ArcGraphDebugOverlayQueueBuilder`;
+- introdotto `ArcGraphDebugOverlayQueueBuilderHarness`;
+- QA `git diff --check` riuscita;
+- compilazione Roslyn isolata riuscita sui file nuovi e sulle dipendenze ArcGraph minime;
+- nessun collegamento a `MapGridWorldView`, `World`, scene, prefab, asset o renderer Unity.
+
+Prossimo micro-step consigliato:
+
+`v0.37d - ArcGraph Debug Overlay Producer Bridge Audit`
+
+Obiettivo:
+
+- audit mirato dei producer reali FOV, landmark e DT/GVD-DIN;
+- definire quali sorgenti possono alimentare `ArcGraphDebugOverlaySnapshot`;
+- non creare ancora renderer Unity;
+- non migrare DevTools, TopBar o summary cards.
 
 La `v0.33` ha costruito la base controllata per verificare ArcGraph contro MapGrid senza trasformare la comparazione in un percorso runtime stabile.
 
