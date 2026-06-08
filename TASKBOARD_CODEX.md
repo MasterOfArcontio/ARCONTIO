@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37g - ArcGraph Debug Overlay Runtime Feed`
+`v0.37h - ArcGraph Debug Overlay Renderer Audit`
 
 STATUS:
 IN COMPLETAMENTO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37g-arcgraph-debug-runtime-feed`
+`ai-task/v0.37h-arcgraph-debug-renderer-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -67,6 +67,7 @@ Regola corrente:
 - `v0.37e` ha introdotto bridge passivo Landmark/GVD verso `ArcGraphDebugOverlaySnapshot`;
 - `v0.37f` ha auditato il punto di alimentazione runtime del bridge debug;
 - `v0.37g` ha introdotto feed runtime debug passivo Landmark/GVD;
+- `v0.37h` ha auditato il percorso renderer/probe debug per visualizzare `ArcGraphDebugOverlayQueue`;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -227,38 +228,41 @@ DOC SYNC:
 
 OBIETTIVO:
 
-Chiudere `v0.37g - ArcGraph Debug Overlay Runtime Feed` dopo l'audit del punto di
-alimentazione runtime.
+Chiudere `v0.37h - ArcGraph Debug Overlay Renderer Audit` dopo il feed runtime
+debug passivo.
 
-Esito operativo `v0.37g`:
+Esito operativo `v0.37h`:
 
-- aggiunto `ArcGraphDebugOverlayRuntimeFeed`;
-- aggiunto `ArcGraphDebugOverlayRuntimeFeedOptions`;
-- aggiunto `ArcGraphDebugOverlayRuntimeFeedDiagnostics`;
-- aggiunto `ArcGraphDebugOverlayRuntimeFeedHarness`;
-- il feed accetta `World`, `activeNpcId` e flag debug espliciti;
-- il feed legge il `World` solo tramite `GetNpcLandmarkOverlayData(...)` e
-  `GetGvdDinOverlayData(...)`;
-- il feed produce `ArcGraphDebugOverlaySnapshot` e `ArcGraphDebugOverlayQueue`;
-- il feed possiede liste e snapshot GVD riusabili per ridurre allocazioni;
-- harness smoke copre `World` nullo e DTO Landmark/GVD minimi;
-- nessuna dipendenza da `MapGridWorldView`;
-- nessun `GameObject`, renderer Unity, asset load, input, scena o prefab;
-- FOV current cone resta escluso.
+- auditato `ArcGraphSceneProbeRenderer`;
+- auditato `ArcGraphVisualProbeFrame` e `ArcGraphVisualProbeBuilder`;
+- auditati item debug cell/node/edge/label;
+- confrontato il renderer Landmark legacy MapGrid;
+- conclusione: non estendere `ArcGraphVisualProbeFrame` per gli overlay debug;
+- conclusione: non trasformare `ArcGraphSceneProbeRenderer` in un renderer debug
+  multiuso;
+- candidato consigliato: nuovo `ArcGraphDebugOverlaySceneProbeRenderer` separato;
+- il renderer debug futuro deve consumare solo `ArcGraphDebugOverlayQueue`;
+- celle DT/GVD raw possono essere sprite runtime colorati;
+- nodi Landmark/GVD possono essere sprite runtime colorati;
+- edge Landmark/GVD richiedono `LineRenderer` temporanei o segmenti grafici dedicati;
+- labels/HUD restano fuori scope;
+- FOV current cone resta fuori scope.
 
 Prossimo micro-step consigliato:
 
-`v0.37h - ArcGraph Debug Overlay Renderer Audit`
+`v0.37i - ArcGraph Debug Overlay Scene Probe Renderer`
 
 Scope consigliato:
 
-- decidere come visualizzare la queue debug ArcGraph senza creare un renderer
-  produttivo prematuro;
-- valutare se estendere il `ArcGraphSceneProbeRenderer` temporaneo o introdurre un
-  renderer debug separato;
-- mantenere MapGrid come renderer produttivo;
-- non migrare HUD, DevTools, top bar o FOV current cone;
-- preparare un test visuale piccolo e leggibile per Landmark/GVD.
+- implementare `ArcGraphDebugOverlaySceneProbeRenderer`;
+- accettare una `ArcGraphDebugOverlayQueue` gia' prodotta;
+- aggiungere context menu per renderizzare una queue finta Landmark/GVD;
+- usare root temporaneo e cleanup confinato;
+- disegnare celle e nodi con sprite runtime 1x1;
+- disegnare edge con `LineRenderer` debug temporanei;
+- non leggere `World`;
+- non dipendere da `MapGridWorldView`;
+- non modificare scene/prefab/meta.
 
 Esito operativo `v0.37d`:
 

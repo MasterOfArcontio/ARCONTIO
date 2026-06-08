@@ -6267,6 +6267,98 @@ Scope consigliato:
 
 ---
 
+## Esito v0.37h - ArcGraph Debug Overlay Renderer Audit
+
+La `v0.37h` chiude l'audit del percorso piu' sicuro per visualizzare
+`ArcGraphDebugOverlayQueue`.
+
+File/contratti ispezionati:
+
+- `ArcGraphSceneProbeRenderer`;
+- `ArcGraphVisualProbeFrame`;
+- `ArcGraphVisualProbeBuilder`;
+- `ArcGraphDebugOverlayQueue`;
+- `ArcGraphDebugCellOverlayItem`;
+- `ArcGraphDebugNodeOverlayItem`;
+- `ArcGraphDebugEdgeOverlayItem`;
+- `ArcGraphDebugLabelOverlayItem`;
+- `ArcGraphDebugOverlayRuntimeFeed`;
+- `MapGridLandmarkOverlay` come reference legacy.
+
+Conclusione principale:
+
+```text
+ArcGraphDebugOverlayQueue
+-> ArcGraphDebugOverlaySceneProbeRenderer dedicato
+-> root Unity temporaneo debug
+-> sprite runtime per celle/nodi
+-> LineRenderer temporanei per edge
+```
+
+Scelta consigliata:
+
+- non estendere `ArcGraphVisualProbeFrame`, perche' quel frame e' nato per
+  terrain, actor/object e layer ambientali;
+- non gonfiare `ArcGraphSceneProbeRenderer`, che oggi e' un probe generico di
+  fondazione e non deve diventare contenitore di tutti i debug futuri;
+- introdurre un renderer probe separato, ad esempio
+  `ArcGraphDebugOverlaySceneProbeRenderer`, specializzato su
+  `ArcGraphDebugOverlayQueue`.
+
+Motivazione:
+
+- gli overlay debug hanno famiglie proprie: celle, nodi, edge, label/HUD;
+- le celle DT/GVD raw possono essere rese con sprite colorati come il probe
+  attuale;
+- i nodi Landmark/GVD possono essere resi con sprite colorati e scala diversa;
+- gli edge Landmark/GVD richiedono una primitiva diversa dagli sprite quadrati:
+  nel legacy `MapGridLandmarkOverlay` sono `LineRenderer`;
+- le label e HUD richiedono un canale screen-space separato e non vanno incluse
+  nel primo probe visuale.
+
+Vincoli del renderer debug futuro:
+
+- deve consumare solo `ArcGraphDebugOverlayQueue`;
+- non deve leggere `World`;
+- non deve chiamare `ArcGraphDebugOverlayRuntimeFeed`;
+- non deve dipendere da `MapGridWorldView`;
+- non deve risolvere input, NPC attivo, toggle o camera da solo salvo riferimenti
+  serializzati espliciti;
+- deve creare solo oggetti runtime temporanei sotto root dedicato;
+- deve avere cleanup confinato;
+- deve restare un probe di test, non renderer produttivo definitivo;
+- non deve modificare scene, prefab, asset o `.meta`.
+
+Policy visuale minima consigliata:
+
+- `DtHeatCell`: sprite cella con colore/intensita' da heatmap;
+- `GvdRawCell`: sprite cella ciano/azzurro trasparente;
+- `LandmarkWorldNode`: marker bianco;
+- `LandmarkKnownNode`: marker verde;
+- `LandmarkRouteNode`: marker arancione;
+- `LandmarkGvdNode`: marker viola;
+- edge world/known/route/path/GVD: `LineRenderer` con colori coerenti al legacy;
+- labels/HUD: ignorati nel primo renderer probe.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37i - ArcGraph Debug Overlay Scene Probe Renderer
+```
+
+Scope consigliato:
+
+- aggiungere `ArcGraphDebugOverlaySceneProbeRenderer`;
+- aggiungere context menu `ArcGraph/Render Default Debug Overlay Probe`;
+- generare una queue finta Landmark/GVD tramite DTO preparati o feed prepared-data;
+- disegnare celle, nodi ed edge;
+- loggare diagnostica della queue renderizzata;
+- non collegare il renderer al runtime reale;
+- non usare `World`;
+- non migrare FOV current cone, labels, HUD, DevTools o top bar.
+
+---
+
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
 
 ## Stato
