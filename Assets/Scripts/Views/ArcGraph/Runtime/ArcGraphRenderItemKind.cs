@@ -26,6 +26,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Light</b>: item derivato da <c>ArcGraphLightLayer</c>.</item>
     ///   <item><b>Effect</b>: item derivato da <c>ArcGraphEffectLayer</c>.</item>
     ///   <item><b>Weather</b>: item overlay derivato da <c>ArcGraphWeatherLayer</c>.</item>
+    ///   <item><b>Debug</b>: item diagnostico derivato da futuri snapshot debug ArcGraph.</item>
     /// </list>
     /// </summary>
     public enum ArcGraphRenderItemKind
@@ -37,6 +38,7 @@ namespace Arcontio.View.ArcGraph
         Water = 4,
         Light = 5,
         Effect = 6,
-        Weather = 7
+        Weather = 7,
+        Debug = 8
     }
 }

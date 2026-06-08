@@ -5659,6 +5659,90 @@ Scope previsto:
 - non collegare ancora MapGridWorldView;
 - non migrare DevTools, TopBar o summary cards.
 
+## Esito v0.37b - ArcGraph Debug Overlay Data Contracts
+
+La `v0.37b` introduce il vocabolario dati passivo per gli overlay debug ArcGraph.
+
+File/runtime aggiunti o aggiornati:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphRenderItemKind.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlayKind.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlaySpace.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugCellOverlayItem.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugNodeOverlayItem.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugEdgeOverlayItem.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugLabelOverlayItem.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlayQueueDiagnostics.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlayQueue.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlayContractHarness.cs
+```
+
+Elementi introdotti:
+
+- aggiunto `ArcGraphRenderItemKind.Debug`;
+- aggiunto `ArcGraphDebugOverlayKind`;
+- aggiunto `ArcGraphDebugOverlaySpace`;
+- aggiunto item cell-based per FOV, DT e GVD raw;
+- aggiunto item node-based per marker landmark/GVD;
+- aggiunto item edge-based per edge landmark, path, route e GVD;
+- aggiunto item label/HUD per label screen-space e pannelli informativi futuri;
+- aggiunta queue debug passiva separata dalla queue produttiva actor/object;
+- aggiunta diagnostica della queue debug;
+- aggiunto harness smoke dei contratti.
+
+Separazioni fissate:
+
+```text
+MapCell     -> celle FOV, celle DT, celle GVD raw
+MapNode     -> landmark world/known/route/GVD
+MapEdge     -> landmark edge, route edge, path edge
+ScreenLabel -> label ancorate alla mappa
+ScreenHud   -> pointer coords, runtime cost HUD, futuri pannelli debug
+```
+
+Vincoli rispettati:
+
+- nessun `GameObject`;
+- nessun `SpriteRenderer`;
+- nessun `LineRenderer`;
+- nessun `Canvas`;
+- nessun `Resources.Load`;
+- nessuna lettura `World`;
+- nessuna dipendenza da `MapGridWorldView`;
+- nessun input mouse/tastiera;
+- nessuna emissione di comandi.
+
+QA eseguita:
+
+- controllo statico stretto su chiamate vietate superato;
+- compilazione Roslyn isolata riuscita sui file nuovi e sulle dipendenze ArcGraph minime;
+- warning Roslyn attesi dovuti al confronto tra sorgenti locali e `Assembly-CSharp.dll`.
+
+Debiti residui:
+
+- i contratti non sono ancora alimentati da `DebugFovTelemetry`, `LandmarkOverlayNode`,
+  `LandmarkOverlayEdge` o `GvdDinOverlaySnapshot`;
+- non esiste ancora renderer Unity per questi item;
+- non esiste ancora bridge da MapGridWorldView;
+- summary cards, top bar e DevTools restano fuori scope.
+
+Prossimo micro-step:
+
+```text
+v0.37c - ArcGraph Debug Overlay Queue Builder
+```
+
+Scope previsto:
+
+- costruire un builder passivo che trasformi input DTO/snapshot in `ArcGraphDebugOverlayQueue`;
+- accettare dati gia' forniti dal chiamante, senza leggere direttamente il `World`;
+- supportare FOV cell-based, landmark node/edge e DT/GVD-DIN;
+- mantenere separati label/HUD da overlay di mappa;
+- aggiungere harness smoke;
+- non collegare ancora `MapGridWorldView`;
+- non creare renderer Unity.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement

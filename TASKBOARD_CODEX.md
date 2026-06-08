@@ -28,7 +28,7 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.37b - ArcGraph Debug Overlay Data Contracts`
+`v0.37c - ArcGraph Debug Overlay Queue Builder`
 
 STATUS:
 IN ATTESA GO OPERATORE
@@ -41,8 +41,8 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- chiudere audit `v0.37a` degli overlay/debug MapGrid;
-- preparare micro-step `v0.37b` per contratti dati debug ArcGraph;
+- chiudere `v0.37b` con contratti dati debug ArcGraph passivi;
+- preparare micro-step `v0.37c` per builder queue debug passivo;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -62,7 +62,8 @@ Regola corrente:
 - `v0.36.04` ha completato il builder effetti passivo;
 - `v0.36.05` ha completato il builder meteo passivo;
 - audit `v0.37a` completato: MapGridWorldView contiene overlay di mappa, HUD, UI interattiva e strumenti operativi;
-- il prossimo step coerente con roadmap e' `v0.37b`, cioe' contratti dati debug ArcGraph passivi;
+- `v0.37b` ha introdotto contratti dati debug ArcGraph passivi;
+- il prossimo step coerente con roadmap e' `v0.37c`, cioe' builder queue debug passivo da input DTO/snapshot;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
 
@@ -210,19 +211,27 @@ DOC SYNC:
   top bar, DevTools e contratti Core collegati;
 - classificazione overlay completata: FOV/landmark/DT sono candidati primari; pointer/HUD e landmark labels
   richiedono un canale screen-space; summary cards, top bar e DevTools sono rinviati;
-- prossimo micro-step: `v0.37b - ArcGraph Debug Overlay Data Contracts`.
+- aggiunto `ArcGraphRenderItemKind.Debug`;
+- aggiunto `ArcGraphDebugOverlayKind`;
+- aggiunto `ArcGraphDebugOverlaySpace`;
+- aggiunti item debug cell/node/edge/label;
+- aggiunta `ArcGraphDebugOverlayQueue`;
+- aggiunta `ArcGraphDebugOverlayQueueDiagnostics`;
+- aggiunto `ArcGraphDebugOverlayContractHarness`;
+- QA Roslyn isolata riuscita sui contratti debug;
+- prossimo micro-step: `v0.37c - ArcGraph Debug Overlay Queue Builder`.
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.37b - ArcGraph Debug Overlay Data Contracts` dopo audit MapGrid overlay/debug.
+Preparare il prossimo step `v0.37c - ArcGraph Debug Overlay Queue Builder` dopo definizione contratti dati debug.
 
-Scope immediato `v0.37b`:
+Scope immediato `v0.37c`:
 
-- definire contratti value-only per overlay debug ArcGraph;
-- separare overlay di mappa da HUD screen-space;
-- preparare item cell-based per FOV/DT;
-- preparare item node/edge-based per landmark/path;
-- preparare diagnostica e harness passivo;
+- costruire builder passivo da input DTO/snapshot verso `ArcGraphDebugOverlayQueue`;
+- accettare dati gia' forniti dal chiamante, senza leggere direttamente il `World`;
+- supportare FOV cell-based, landmark node/edge e DT/GVD-DIN;
+- mantenere separati label/HUD da overlay di mappa;
+- aggiungere harness smoke;
 - non collegare ancora `MapGridWorldView`;
 - non migrare summary cards, top bar o DevTools;
 - nessuna sostituzione di MapGrid;
