@@ -6949,6 +6949,111 @@ Scope consigliato:
 - eseguire gate visuale umano su scena non salvata;
 - decidere se serve un micro-step successivo per refresh manuale/periodico.
 
+## Esito v0.37p - ArcGraph Debug Runtime Adapter QA
+
+La `v0.37p` completa la QA tecnica dell'adapter MapGrid -> ArcGraph e prepara
+il gate visuale umano.
+
+QA tecnica eseguita:
+
+- `git diff --check` riuscito;
+- compilazione Roslyn isolata riuscita;
+- controllo statico chiamate vietate riuscito sul nuovo perimetro ArcGraph.
+
+Perimetro compilato:
+
+- `MapGridWorldView`;
+- `MapGridRuntimeControlTopBar`;
+- `ArcGraphDebugRuntimeMapGridAdapter`;
+- `ArcGraphDebugRuntimeSceneWrapper`;
+- `IArcGraphDebugOverlayQueueConsumer`;
+- `ArcGraphDebugRuntimeWiringFrame`;
+- `ArcGraphDebugRuntimeWiringDiagnostics`;
+- `ArcGraphDebugRuntimeWiringCoordinator`;
+- `ArcGraphDebugRuntimeWiringHarness`;
+- `ArcGraphDebugOverlayRuntimeFeedOptions`;
+- `ArcGraphDebugOverlayRuntimeFeedDiagnostics`;
+- `ArcGraphDebugOverlayProducerBridge`;
+- `ArcGraphDebugOverlayRuntimeFeed`;
+- `ArcGraphDebugOverlaySceneProbeRenderer`.
+
+Warning osservati:
+
+- conflitti di tipo dovuti alla compilazione isolata di file legacy gia'
+  presenti in `Assembly-CSharp`;
+- campi Unity serializzati assegnabili da Inspector;
+- chiamate legacy `FindObjectOfType` gia' presenti in MapGrid.
+
+Nessuno di questi warning indica un errore introdotto dall'adapter.
+
+Controllo vincoli:
+
+- nessuna chiamata operativa a `SimulationHost` nel nuovo adapter;
+- nessuna chiamata operativa a `MapGridWorldProvider` nel nuovo adapter;
+- nessun `Update`;
+- nessun polling automatico;
+- nessuna hotkey;
+- nessuna UI;
+- nessun `Resources.Load`;
+- nessuna modifica a scena, prefab, asset o `.meta`.
+
+Gate visuale umano richiesto:
+
+```text
+1. Aprire Scene_MapGrid.
+2. Non salvare la scena.
+3. Creare o selezionare un GameObject temporaneo di test.
+4. Aggiungere:
+   - ArcGraphDebugOverlaySceneProbeRenderer;
+   - ArcGraphDebugRuntimeSceneWrapper;
+   - ArcGraphDebugRuntimeMapGridAdapter.
+5. Nel wrapper assegnare:
+   - Debug Overlay Renderer = ArcGraphDebugOverlaySceneProbeRenderer;
+   - Overlay Enabled = true;
+   - Dispatch To Renderer = true.
+6. Nell'adapter assegnare:
+   - Map Grid World View = componente MapGridWorldView della scena;
+   - Target Wrapper = componente ArcGraphDebugRuntimeSceneWrapper.
+7. Entrare in Play Mode.
+8. Selezionare un NPC, se disponibile.
+9. Dal context menu dell'adapter usare:
+   ArcGraph/Push Debug Runtime Frame From MapGrid.
+10. Controllare Console.
+11. Controllare la presenza del root:
+   ArcGraphDebugOverlaySceneProbeRoot.
+12. Usare:
+   ArcGraph/Clear Debug Overlay Probe.
+13. Uscire da Play Mode.
+14. Non salvare la scena.
+```
+
+Log attesi:
+
+- adapter: `FramePushedToWrapper`;
+- `mapGridView=True`;
+- `wrapper=True`;
+- `world=True`, se MapGrid ha gia' bindato il World;
+- `selectedNpc=<id>` oppure `selectedNpc=-1`;
+- wrapper: `QueueDispatched`, se overlay, World e renderer sono validi;
+- renderer: conteggi celle/nodi/edge visibili, se il runtime produce item.
+
+Esiti ammessi:
+
+- `OverlayDisabled`: wrapper spento;
+- `RuntimeContextMissing`: adapter senza MapGridView;
+- `WorldMissing`: World non ancora bindato dalla MapGrid;
+- `QueueDispatched`: dispatch riuscito al renderer;
+- `FramePushedToWrapper`: adapter riuscito nel proprio compito.
+
+Decisione post-gate:
+
+- se il test e' positivo, `v0.37` puo' andare verso closeout della Debug/Overlay
+  Migration;
+- se il test fallisce, aprire solo un micro-step correttivo mirato alla ragione
+  osservata;
+- non introdurre refresh automatico, hotkey o UI finche' il gate manuale non e'
+  stabile.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
