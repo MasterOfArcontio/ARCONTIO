@@ -185,6 +185,26 @@ namespace Arcontio.View.MapGrid
         // - Queste property NON introducono dipendenze core->view: restiamo view-only.
         // - Sono volutamente read-only per evitare che il DevTools modifichi la config a runtime.
         public MapGridConfig RuntimeConfig => cfg;
+
+        // =============================================================================
+        // RuntimeWorld
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone in sola lettura il <c>World</c> attualmente bindato dalla view.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: lettura view-side esplicita</b></para>
+        /// <para>
+        /// La property non cerca il mondo e non lo modifica. Restituisce solo il
+        /// riferimento che <c>MapGridWorldView</c> ha gia' riallineato tramite il suo
+        /// normale rebind dopo eventuali load snapshot. In questo modo adapter debug
+        /// esterni possono consumare la stessa sorgente view-side senza chiamare
+        /// direttamente <c>MapGridWorldProvider</c>.
+        /// </para>
+        /// </summary>
+        public World RuntimeWorld => _world;
+
         public MapGridPointerInputActionsProvider RuntimePointerProvider => _pointerProvider != null ? _pointerProvider : pointerProvider;
         public Camera RuntimeWorldCamera => worldCamera != null ? worldCamera : (Camera.main != null ? Camera.main : FindObjectOfType<Camera>());
         public bool IsFovOverlayEnabled => _fovOverlayEnabled;

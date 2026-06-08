@@ -6832,6 +6832,123 @@ Scope consigliato:
 - non aggiungere `.meta`;
 - non introdurre hotkey o UI.
 
+## Esito v0.37o - ArcGraph Debug Runtime MapGrid Adapter
+
+La `v0.37o` implementa il ponte manuale e controllato tra la view MapGrid
+attualmente produttiva e il wrapper runtime debug ArcGraph.
+
+File modificato:
+
+- `MapGridWorldView`.
+
+File introdotto:
+
+- `ArcGraphDebugRuntimeMapGridAdapter`.
+
+Elemento aggiunto su MapGrid:
+
+```csharp
+public World RuntimeWorld => _world;
+```
+
+La property e' read-only e restituisce il `World` gia' bindato da
+`MapGridWorldView`. Non cerca il mondo, non chiama provider e non muta stato
+simulativo.
+
+Adapter introdotto:
+
+```text
+ArcGraphDebugRuntimeMapGridAdapter
+```
+
+Responsabilita':
+
+- ricevere da Inspector un riferimento esplicito a `MapGridWorldView`;
+- ricevere da Inspector un riferimento esplicito a
+  `ArcGraphDebugRuntimeSceneWrapper`;
+- leggere `RuntimeConfig` dalla MapGrid;
+- leggere `RuntimeWorld` dalla MapGrid;
+- leggere `NPCSelection.SelectedNpcId`;
+- costruire un context parziale:
+
+```text
+ArcGraphRuntimeContext(
+    config: mapGridWorldView.RuntimeConfig,
+    map: null,
+    world: mapGridWorldView.RuntimeWorld
+)
+```
+
+- leggere `world.Global.CurrentTickIndex` solo come dato diagnostico;
+- chiamare il wrapper tramite:
+
+```text
+targetWrapper.ProcessFrame(context, selectedNpcId, sourceTick)
+```
+
+Diagnostica introdotta:
+
+```text
+ArcGraphDebugRuntimeMapGridAdapterDiagnostics
+```
+
+Campi principali:
+
+- presenza della MapGrid view;
+- presenza del wrapper;
+- presenza della config;
+- presenza del World;
+- NPC selezionato;
+- tick sorgente;
+- diagnostica restituita dal wrapper;
+- reason sintetica.
+
+Context menu introdotto:
+
+```text
+ArcGraph/Push Debug Runtime Frame From MapGrid
+```
+
+Vincoli mantenuti:
+
+- nessun `Update`;
+- nessun polling automatico;
+- nessuna hotkey;
+- nessuna UI;
+- nessuna lettura di `SimulationHost.Instance`;
+- nessuna lettura di `MapGridWorldProvider`;
+- nessuna lettura diretta del `World` da parte del wrapper;
+- nessuna selezione NPC interna al wrapper;
+- nessuna scena modificata;
+- nessun prefab modificato;
+- nessun asset modificato;
+- nessun `.meta` aggiunto.
+
+Comportamento atteso:
+
+- se manca il wrapper, diagnostica `TargetWrapperMissing`;
+- se manca MapGrid, viene passato context nullo e il wrapper potra' produrre
+  `RuntimeContextMissing`;
+- se MapGrid esiste ma non ha ancora World, viene passato context parziale e il
+  wrapper potra' produrre `WorldMissing`;
+- se l'overlay del wrapper e' spento, il wrapper produce `OverlayDisabled`;
+- se wrapper, MapGrid, World e overlay sono pronti, il feed puo' costruire e
+  dispatchare la queue al renderer debug.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37p - ArcGraph Debug Runtime Adapter QA
+```
+
+Scope consigliato:
+
+- compilare il nuovo adapter;
+- verificare le chiamate vietate;
+- preparare istruzioni di test Inspector;
+- eseguire gate visuale umano su scena non salvata;
+- decidere se serve un micro-step successivo per refresh manuale/periodico.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
