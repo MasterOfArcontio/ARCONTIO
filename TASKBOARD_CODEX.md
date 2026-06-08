@@ -28,20 +28,20 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37m - ArcGraph Debug Runtime Scene Wrapper`
+`v0.37n - ArcGraph Debug Runtime Context Adapter Audit`
 
 STATUS:
-COMPLETATO / IN ATTESA GO v0.37n
+COMPLETATO / IN ATTESA GO v0.37o
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37m-arcgraph-debug-runtime-scene-wrapper`
+`ai-task/v0.37n-arcgraph-debug-runtime-context-adapter-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere `v0.37m` con wrapper scena passivo del wiring runtime debug ArcGraph;
+- chiudere `v0.37n` con audit del modo piu' sicuro per produrre context runtime debug ArcGraph;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -74,6 +74,7 @@ Regola corrente:
 - `v0.37k` ha auditato il wiring runtime futuro tra context, feed e renderer debug;
 - `v0.37l` ha introdotto contratto, coordinator e harness del wiring runtime debug;
 - `v0.37m` ha introdotto wrapper scena passivo, spento di default, senza lettura di `SimulationHost`, `MapGridWorldProvider`, `MapGridWorldView` o `NPCSelection`;
+- `v0.37n` ha auditato il context adapter: per debug overlay basta `World`; il candidato consigliato e' adapter separato che legge `MapGridWorldView.RuntimeWorld` read-only e passa `NPCSelection` al wrapper, senza far scegliere NPC al wrapper;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -428,6 +429,43 @@ Scope consigliato:
 - valutare come passare NPC selezionato senza far leggere `NPCSelection` al wrapper;
 - non introdurre ancora hotkey o UI;
 - non salvare scene o prefab.
+
+Esito operativo `v0.37n`:
+
+- auditato `MapGridBootstrap`;
+- auditato `MapGridWorldView`;
+- auditato `MapGridWorldProvider`;
+- auditato `MapGridData`;
+- auditato `NPCSelection`;
+- auditato `ArcGraphRuntimeContext`;
+- auditato `ArcGraphDebugRuntimeSceneWrapper`;
+- conclusione: per il debug overlay `v0.37` serve soprattutto `World`;
+- `ArcGraphRuntimeContext` puo' essere parziale: `Config` utile, `Map` non necessaria per Landmark/GVD;
+- `MapGridWorldView` gia' gestisce il rebind del `World` dopo load snapshot, ma `_world` non e' esposto;
+- `MapGridBootstrap` possiede `_map`, ma non la espone; non serve toccarlo per il debug overlay;
+- `MapGridWorldProvider` resta sorgente globale view-side esistente, ma non va letto da ArcGraph wrapper/coordinator/feed;
+- `NPCSelection.SelectedNpcId` e' sorgente view-only accettabile solo dentro adapter dedicato;
+- il wrapper ArcGraph deve restare passivo e non deve leggere `NPCSelection`;
+- candidato consigliato: adapter separato `ArcGraphDebugRuntimeMapGridAdapter`;
+- l'adapter deve referenziare esplicitamente `MapGridWorldView` e `ArcGraphDebugRuntimeSceneWrapper`;
+- l'adapter deve costruire `ArcGraphRuntimeContext(config, map:null, world)` usando world/config gia' bindati dalla view;
+- l'adapter deve passare `NPCSelection.SelectedNpcId` al wrapper;
+- l'adapter non deve scegliere fallback tipo "primo NPC", per evitare lavoro CPU e policy nascoste;
+- l'adapter non deve avere hotkey o UI;
+- eventuale refresh continuo deve restare spento di default.
+
+Prossimo micro-step consigliato:
+
+`v0.37o - ArcGraph Debug Runtime MapGrid Adapter`
+
+Scope consigliato:
+
+- aggiungere property read-only minima `RuntimeWorld` su `MapGridWorldView`;
+- implementare adapter ArcGraph separato che costruisce context parziale da `MapGridWorldView`;
+- far leggere `NPCSelection.SelectedNpcId` solo all'adapter;
+- invocare il wrapper solo tramite metodo esplicito o context menu;
+- nessun `Update` automatico attivo di default;
+- nessuna scena, prefab o `.meta` modificati.
 
 Esito operativo `v0.37d`:
 

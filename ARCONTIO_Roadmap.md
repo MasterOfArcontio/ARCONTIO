@@ -6710,6 +6710,128 @@ Scope consigliato:
 - non introdurre ancora hotkey o UI;
 - non salvare scene o prefab.
 
+## Esito v0.37n - ArcGraph Debug Runtime Context Adapter Audit
+
+La `v0.37n` e' un audit mirato: verifica da dove puo' arrivare il
+`ArcGraphRuntimeContext` reale usato dal wrapper debug senza trasformare
+ArcGraph in un lettore globale della scena o del core.
+
+File auditati:
+
+- `MapGridBootstrap`;
+- `MapGridWorldView`;
+- `MapGridWorldProvider`;
+- `MapGridData`;
+- `NPCSelection`;
+- `ArcGraphRuntimeContext`;
+- `ArcGraphDebugRuntimeSceneWrapper`.
+
+Conclusione principale:
+
+- per il debug overlay Landmark/GVD di `v0.37` non serve un context completo;
+- serve soprattutto il riferimento a `World`;
+- `MapGridConfig` e' utile per coerenza view-side, ma non indispensabile per
+  produrre la queue debug;
+- `MapGridData` non serve in questo micro-perimetro, perche' Landmark/GVD sono
+  letti dal `World`;
+- il context puo' quindi essere:
+
+```text
+ArcGraphRuntimeContext(
+    config: RuntimeConfig della MapGrid, se disponibile,
+    map: null,
+    world: RuntimeWorld della MapGrid
+)
+```
+
+Stato attuale delle sorgenti:
+
+- `MapGridWorldView` legge gia' il `World` corrente tramite
+  `MapGridWorldProvider.TryGetWorld()`;
+- `MapGridWorldView` gestisce gia' il rebind quando il `World` cambia dopo load
+  snapshot;
+- questo rende `MapGridWorldView` il punto view-side piu' stabile da cui
+  ricavare il `World` per ArcGraph debug;
+- pero' il campo `_world` e' privato e oggi non esiste una property
+  `RuntimeWorld`;
+- `MapGridBootstrap` possiede `_map`, ma non la espone;
+- non e' necessario toccare `_map` per il debug overlay `v0.37`;
+- `NPCSelection.SelectedNpcId` e' una sorgente view-only gia' esistente e
+  coerente per scegliere l'NPC attivo.
+
+Decisione consigliata:
+
+- non far leggere `MapGridWorldProvider` al wrapper ArcGraph;
+- non far leggere `NPCSelection` al wrapper ArcGraph;
+- non far scegliere al wrapper un fallback come "primo NPC disponibile";
+- introdurre invece un adapter separato:
+
+```text
+ArcGraphDebugRuntimeMapGridAdapter
+```
+
+Responsabilita' dell'adapter:
+
+- referenziare esplicitamente `MapGridWorldView`;
+- referenziare esplicitamente `ArcGraphDebugRuntimeSceneWrapper`;
+- leggere `RuntimeConfig` dalla view MapGrid;
+- leggere una futura property read-only `RuntimeWorld` dalla view MapGrid;
+- leggere `NPCSelection.SelectedNpcId`;
+- costruire un `ArcGraphRuntimeContext` parziale;
+- chiamare il wrapper con `ProcessFrame(context, npcId, sourceTick)`;
+- non creare renderer;
+- non leggere input;
+- non introdurre hotkey;
+- non introdurre UI;
+- non fare polling automatico acceso di default.
+
+Micro-modifica MapGrid consigliata:
+
+```csharp
+public World RuntimeWorld => _world;
+```
+
+Questa property e' preferibile a far usare direttamente
+`MapGridWorldProvider.TryGetWorld()` all'adapter, perche':
+
+- riusa il rebind gia' gestito da `MapGridWorldView`;
+- evita una seconda sorgente view-side parallela;
+- rende esplicito che ArcGraph debug sta consumando la view MapGrid corrente;
+- non muta il `World`;
+- non espone API di comando.
+
+Gestione NPC attivo:
+
+- l'adapter puo' leggere `NPCSelection.SelectedNpcId`;
+- se l'id e' `<= 0`, passa `-1` al wrapper;
+- non deve cercare il primo NPC esistente;
+- non deve fare scansioni di `World.NpcDna`;
+- in questo modo si evita costo CPU e si evita una policy nascosta di selezione.
+
+Gestione tick:
+
+- se `World` e' disponibile, l'adapter puo' usare
+  `world.Global.CurrentTickIndex` come `sourceTick`;
+- il tick resta diagnostico;
+- il wrapper e il coordinator non devono leggere `TickContext` o
+  `SimulationHost`.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37o - ArcGraph Debug Runtime MapGrid Adapter
+```
+
+Scope consigliato:
+
+- aggiungere property read-only minima `RuntimeWorld` su `MapGridWorldView`;
+- implementare `ArcGraphDebugRuntimeMapGridAdapter`;
+- lasciare refresh automatico spento di default;
+- fornire context menu manuale per pushare il frame corrente;
+- non salvare scene o prefab;
+- non aggiungere `.meta`;
+- non introdurre hotkey o UI.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
