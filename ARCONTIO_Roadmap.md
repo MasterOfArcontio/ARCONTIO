@@ -6459,6 +6459,105 @@ Decisione per proseguire:
 - se il probe non e' visibile, prima va corretta posizione/camera/sorting del
   probe, senza ancora collegarlo al runtime reale.
 
+## Esito v0.37k - ArcGraph Debug Runtime Wiring Audit
+
+La `v0.37k` analizza dove e come collegare in futuro il feed runtime debug
+ArcGraph al renderer probe, senza implementare ancora il collegamento operativo.
+
+Codice ispezionato:
+
+- `MapGridWorldView`;
+- `MapGridLandmarkOverlay`;
+- `MapGridFovHeatmapOverlay`;
+- `MapGridRuntimeControlTopBar`;
+- `MapGridWorldProvider`;
+- `NPCSelection`;
+- `ArcGraphRuntimeContext`;
+- `ArcGraphBootstrapRuntime`;
+- `ArcGraphDebugOverlayRuntimeFeed`;
+- `ArcGraphDebugOverlayRuntimeFeedOptions`;
+- `ArcGraphDebugOverlaySceneProbeRenderer`.
+
+Conclusione principale:
+
+- il renderer `ArcGraphDebugOverlaySceneProbeRenderer` non deve diventare il punto
+  di wiring runtime;
+- il feed `ArcGraphDebugOverlayRuntimeFeed` non deve decidere input, toggle o NPC
+  attivo;
+- il wiring futuro deve stare in un coordinatore view-side separato, piccolo,
+  disattivato di default e alimentato da context esplicito.
+
+Perimetro corretto del futuro coordinatore:
+
+- ricevere un `ArcGraphRuntimeContext` gia' costruito;
+- leggere `context.World` come sorgente runtime read-only;
+- ricevere un `activeNpcId` gia' deciso da un selector esterno;
+- ricevere opzioni esplicite `ArcGraphDebugOverlayRuntimeFeedOptions`;
+- chiamare `ArcGraphDebugOverlayRuntimeFeed.BuildFromWorld(...)`;
+- passare `feed.Queue` al renderer debug;
+- non leggere `SimulationHost.Instance`;
+- non usare `MapGridWorldProvider`;
+- non dipendere da `MapGridWorldView`;
+- non leggere direttamente tastiera, mouse o camera;
+- non risolvere hover/picking;
+- non creare GameObject produttivi permanenti;
+- non modificare scene, prefab, asset o `.meta`.
+
+Sorgenti candidate per gli input:
+
+- `World`: deve arrivare da `ArcGraphRuntimeContext`, coerente con la policy
+  definita in `v0.31`;
+- `activeNpcId`: puo' arrivare da `NPCSelection.SelectedNpcId`, perche' e' uno
+  stato view-only condiviso, ma il coordinatore deve riceverlo o leggerlo tramite
+  un adapter minimo, non duplicare il picking MapGrid;
+- toggle Landmark/GVD/DT: devono diventare stato esplicito ArcGraph debug, non
+  hotkey sparse dentro il renderer;
+- camera/posizionamento: restano responsabilita' del renderer o della scena, non
+  del feed.
+
+Perche' non copiare `MapGridWorldView.Update()`:
+
+- oggi `MapGridWorldView` concentra input, picking, overlay, selezione, render,
+  label e comandi debug;
+- copiare quel modello dentro ArcGraph creerebbe un secondo Decision/UI Layer
+  parallelo;
+- ArcGraph deve invece consumare dati gia' risolti e renderizzarli;
+- il renderer deve restare consumer grafico, non orchestratore simulativo.
+
+FOV current cone:
+
+- resta fuori scope;
+- oggi viene calcolato dentro `MapGridFovHeatmapOverlay.RenderCurrentCone(...)`;
+- non esiste ancora un producer DTO separato equivalente a Landmark/GVD;
+- portarlo ora richiederebbe estrarre un contratto dati dedicato e rischierebbe di
+  gonfiare `v0.37`.
+
+Policy prestazionale consigliata:
+
+- aggiornare il debug runtime solo quando overlay ArcGraph debug e' attivo;
+- non aggiornare ogni frame se non necessario;
+- usare una cadenza configurabile o legata a tick simulativi osservabili;
+- riusare il feed e le liste interne gia' allocate;
+- mantenere GVD/DT opzionali, perche' possono produrre molte celle;
+- loggare diagnostica sintetica, non dettagli per item.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37l - ArcGraph Debug Runtime Wiring Contract
+```
+
+Scope consigliato:
+
+- definire un contratto dati/stato per il coordinatore runtime debug;
+- non creare ancora un wrapper scena automatico;
+- non leggere `SimulationHost.Instance`;
+- non creare hotkey;
+- non aggiungere UI;
+- non migrare FOV;
+- preparare solo il punto in cui un futuro componente potra' chiamare feed e
+  renderer in modo controllato.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement

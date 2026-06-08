@@ -28,25 +28,26 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
 
 CHECKPOINT CORRENTE:
-`v0.37j - ArcGraph Debug Overlay Visual QA`
+`v0.37k - ArcGraph Debug Runtime Wiring Audit`
 
 STATUS:
-QA TECNICA COMPLETATA / IN ATTESA CONFERMA VISIVA UMANA
+COMPLETATO / IN ATTESA GO v0.37l
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37j-arcgraph-debug-overlay-visual-qa`
+`ai-task/v0.37k-arcgraph-debug-runtime-wiring-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere `v0.37i` con renderer probe separato per `ArcGraphDebugOverlayQueue`;
+- chiudere `v0.37k` con audit del wiring runtime debug ArcGraph;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
-- non migrare strumenti interattivi o dev tools prima dell'audit mirato.
+- non migrare strumenti interattivi o dev tools prima dell'audit mirato;
+- non collegare runtime reale al renderer debug prima di un contratto dedicato.
 
 PROMPT OPERATIVO - ROADMAP RESIDUA ARCGRAPH:
 
@@ -70,6 +71,7 @@ Regola corrente:
 - `v0.37h` ha auditato il percorso renderer/probe debug per visualizzare `ArcGraphDebugOverlayQueue`;
 - `v0.37i` introduce il renderer scena temporaneo separato per visualizzare `ArcGraphDebugOverlayQueue`;
 - `v0.37j` ha completato QA tecnica del renderer e preparato il gate visuale umano;
+- `v0.37k` ha auditato il wiring runtime futuro tra context, feed e renderer debug;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
@@ -230,8 +232,9 @@ DOC SYNC:
 
 OBIETTIVO:
 
-Chiudere `v0.37j - ArcGraph Debug Overlay Visual QA` distinguendo la QA tecnica
-eseguibile da Codex dalla conferma visuale umana richiesta in Unity.
+Chiudere `v0.37k - ArcGraph Debug Runtime Wiring Audit` definendo dove deve stare
+il futuro collegamento tra `ArcGraphRuntimeContext`, feed debug e renderer probe,
+senza implementare ancora il collegamento operativo.
 
 Esito operativo `v0.37h`:
 
@@ -327,6 +330,39 @@ Gate visuale umano richiesto:
 Prossimo micro-step consigliato dopo conferma visuale positiva:
 
 `v0.37k - ArcGraph Debug Runtime Wiring Audit`
+
+Esito operativo `v0.37k`:
+
+- auditato `MapGridWorldView`;
+- auditato `MapGridLandmarkOverlay`;
+- auditato `MapGridFovHeatmapOverlay`;
+- auditato `MapGridRuntimeControlTopBar`;
+- auditato `MapGridWorldProvider`;
+- auditato `NPCSelection`;
+- auditati `ArcGraphRuntimeContext` e `ArcGraphBootstrapRuntime`;
+- auditati `ArcGraphDebugOverlayRuntimeFeed`, opzioni e renderer probe;
+- conclusione: il renderer non deve diventare punto di wiring runtime;
+- conclusione: il feed non deve risolvere input, toggle o NPC attivo;
+- conclusione: serve un coordinatore view-side separato, piccolo e disattivato di default;
+- il coordinatore futuro deve ricevere context, activeNpcId e opzioni gia' risolti;
+- il coordinatore futuro deve chiamare feed e renderer, non leggere globali;
+- vietati `SimulationHost.Instance`, `MapGridWorldProvider`, `MapGridWorldView`, hotkey e picking nel coordinatore ArcGraph;
+- `NPCSelection.SelectedNpcId` e' candidato valido come sorgente view-only dell'NPC attivo, ma attraverso adapter minimo;
+- FOV current cone resta fuori scope perche' non ha ancora producer DTO separato;
+- GVD/DT devono restare opzionali per contenere il costo runtime.
+
+Prossimo micro-step consigliato:
+
+`v0.37l - ArcGraph Debug Runtime Wiring Contract`
+
+Scope consigliato:
+
+- definire contratto dati/stato del coordinatore runtime debug;
+- non creare wrapper scena automatico;
+- non leggere `SimulationHost.Instance`;
+- non aggiungere hotkey o UI;
+- non migrare FOV;
+- preparare solo il punto controllato in cui feed e renderer potranno incontrarsi.
 
 Esito operativo `v0.37d`:
 
