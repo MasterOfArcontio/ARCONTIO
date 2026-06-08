@@ -28,22 +28,22 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38a - ArcGraph Legacy Absorption Audit`
+`v0.38b - ArcGraph Scene Bootstrap Replacement Plan`
 
 STATUS:
-APERTO / AUDIT-FIRST
+IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38a-arcgraph-legacy-absorption-audit`
+`ai-task/v0.38b-arcgraph-scene-bootstrap-plan`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- auditare il perimetro legacy MapGrid da assorbire o pensionare in `v0.38`;
-- distinguere cio' che ArcGraph puo' gia' sostituire da cio' che richiede un nuovo micro-step;
-- non rimuovere legacy, non salvare scene e non creare renderer produttivi senza audit chiuso;
+- definire il piano di sostituzione bootstrap scena ArcGraph dopo audit `v0.38a`;
+- scegliere il primo wrapper/probe produttivo minimo senza doppio renderer permanente;
+- non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' `v0.38` non avra' assorbito in modo controllato terrain, actor/object e debug minimo;
@@ -83,6 +83,14 @@ Regola corrente:
 - gate visuale umano `v0.37q` superato: screenshot operatore con `FramePushedToWrapper`, `mapGridView=True`, `wrapper=True`, `config=True`, `world=True`, `selectedNpc=1`, `wrapperReason=QueueDispatched`, `wrapperBuilt=True`, `wrapperDispatched=True`;
 - `v0.37` chiusa come Debug/Overlay Migration preparatoria: la catena MapGrid -> adapter -> wrapper -> coordinator -> feed -> queue -> probe renderer funziona nel gate manuale;
 - `v0.38a` apre l'audit di assorbimento legacy: non rimuovere nulla prima della classificazione tecnica;
+- audit `v0.38a` completato:
+  - `MapGridBootstrap` possiede ancora config, layout, `MapGridData`, atlas, terrain chunks, camera, input pointer e attach di `MapGridWorldView`;
+  - `MapGridWorldView` non e' solo renderer: contiene sync NPC/oggetti, sprite cache, stock label, balloon, decision flash, input debug, selection, FOV, Landmark/GVD, DT, summary overlay, top bar, audio feedback e rebind World;
+  - `MapGridChunkRenderer` e' quasi interamente riassorbibile come tecnica terrain, perche' ArcGraph possiede gia' `ArcGraphTerrainChunkMeshBuilder`;
+  - camera/input legacy non sono riassorbibili direttamente: ArcGraph ha controller view passivo, ma manca wrapper Unity produttivo che legga mouse/camera e applichi lo stato;
+  - actor/object ArcGraph hanno snapshot e queue, ma manca renderer scena produttivo con sprite asset reali, pooling e cleanup;
+  - debug Landmark/GVD e' migrato come ponte manuale validato; FOV current cone, labels screen-space, pointer coords, top bar, summary cards e DevTools restano fuori dal renderer ArcGraph produttivo iniziale;
+  - `v0.38b` deve quindi progettare il bootstrap scena ArcGraph, non cancellare subito `MapGridWorldView`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

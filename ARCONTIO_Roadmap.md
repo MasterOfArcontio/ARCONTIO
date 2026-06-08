@@ -7155,6 +7155,111 @@ La chiusura di questa fase richiedera':
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Pending |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
+## Esito v0.38a - ArcGraph Legacy Absorption Audit
+
+La `v0.38a` ha auditato il perimetro legacy MapGrid che dovra' essere assorbito
+o pensionato durante `v0.38`.
+
+File principali auditati:
+
+- `MapGridBootstrap`;
+- `MapGridWorldView`;
+- `MapGridChunkRenderer`;
+- `MapGridCameraController`;
+- `MapGridPointerInputActionsProvider`;
+- `MapGridRuntimeDevToolsOverlay`;
+- `MapGridRuntimeControlTopBar`;
+- `MapGridLandmarkOverlay`;
+- `MapGridFovHeatmapOverlay`;
+- controparti ArcGraph gia' presenti: `ArcGraphWorldAdapter`,
+  `ArcGraphTerrainChunkMeshBuilder`, `ArcGraphRenderQueueBuilder`,
+  `ArcGraphViewController`, `ArcGraphDebugRuntimeMapGridAdapter`,
+  `ArcGraphSceneProbeRenderer`, `ArcGraphDebugOverlaySceneProbeRenderer`.
+
+Conclusione generale:
+
+```text
+ArcGraph ha gia' molti contratti e builder passivi.
+Non ha ancora il wrapper produttivo di scena che sostituisce MapGrid.
+```
+
+Quindi `v0.38` non puo' iniziare cancellando `MapGridWorldView`.
+Deve prima creare un percorso produttivo ArcGraph minimo, controllato e
+comparabile.
+
+### Classificazione legacy
+
+| Area legacy | Stato rilevato | Destino consigliato |
+|---|---|---|
+| `MapGridBootstrap` | Costruisce config, layout, `MapGridData`, atlas, chunk terrain, camera, pointer provider e `MapGridWorldView` | Da sostituire gradualmente con bootstrap scena ArcGraph |
+| `MapGridData` | Buffer view-side terreno/blocco, ancora necessario per terrain corrente | Sorgente temporanea per snapshot ArcGraph, poi da pensionare |
+| `MapGridChunkRenderer` | Mesh chunk terreno con UV atlas e policy floor/wall/wall-top | Tecnica gia' quasi riassorbita da `ArcGraphTerrainChunkMeshBuilder` |
+| `MapGridTileAtlas` | Risoluzione tileId -> UV legacy | Riusabile come concetto, non come dipendenza permanente obbligata |
+| `MapGridCameraController` | Camera Unity concreta: zoom, pan, PixelPerfectCamera, input mouse | Non riassorbibile direttamente; serve wrapper Unity per `ArcGraphViewController` |
+| `MapGridPointerInputActionsProvider` | Provider input puntatore via New Input System | Riusabile come ponte temporaneo o da replicare in wrapper ArcGraph |
+| `MapGridWorldView` | Monolite view/debug/input: NPC, oggetti, overlay, UI, dev tools, rebind World | Non cancellare subito; smontare per parti |
+| Sync NPC/oggetti | Crea `SpriteRenderer`, cache, label stock, collider, balloon, flash decisionale | Da sostituire dopo renderer actor/object produttivo ArcGraph |
+| Overlay Landmark/GVD | Gia' migrato verso queue/debug ArcGraph e validato manualmente | Assorbibile nel debug ArcGraph minimo |
+| FOV current cone | Calcolato ancora dentro `MapGridFovHeatmapOverlay` | Rinviare: richiede bridge dedicato, non e' pronto come producer ArcGraph |
+| Label Landmark, DT numerico, pointer coords | Screen-space/UI o testo debug | Rinviare a canale UI/screen-space separato |
+| Top bar e DevTools | Controlli runtime e strumenti che inviano comandi al core | Rinviare: non sono renderer, sono UI/dev tools |
+| Summary cards / Explainability panel | UI diagnostica ricca | Fuori dal primo renderer produttivo ArcGraph |
+
+### Stato ArcGraph rispetto al legacy
+
+ArcGraph possiede gia':
+
+- adapter read-only da `World` e `MapGridData`;
+- layer terrain/object/actor/debug;
+- render state e dirty state;
+- builder mesh terrain passivo;
+- queue actor/object passiva;
+- motion snapshot NPC multi-tick;
+- controller view passivo per zoom/pan/LOD;
+- layer ambientali passivi;
+- debug overlay queue;
+- feed e adapter manuale MapGrid -> ArcGraph debug;
+- probe visuali temporanei.
+
+ArcGraph non possiede ancora:
+
+- bootstrap scena produttivo;
+- renderer terrain Unity permanente;
+- renderer actor/object Unity permanente;
+- pooling produttivo di sprite e GameObject;
+- asset resolver sprite definitivo;
+- wrapper Unity che trasformi input/camera in `ArcGraphViewInputFrame`;
+- sistema UI/screen-space ArcGraph;
+- dismissione reale dei componenti MapGrid.
+
+### Decisione tecnica v0.38a
+
+Il prossimo step non deve rimuovere nulla.
+
+Il prossimo step deve progettare:
+
+```text
+v0.38b - ArcGraph Scene Bootstrap Replacement Plan
+```
+
+Scopo di `v0.38b`:
+
+- definire quale GameObject/wrapper ArcGraph vive in scena;
+- definire quali riferimenti riceve da Inspector;
+- decidere come ottiene config, camera, map data temporanea e World;
+- decidere come evita il doppio renderer permanente;
+- decidere quale renderer viene acceso per primo;
+- decidere cosa resta spento o legacy durante la transizione.
+
+Stop progettuale:
+
+```text
+Non cancellare MapGridBootstrap.
+Non cancellare MapGridWorldView.
+Non salvare scene.
+Non introdurre renderer produttivo prima del piano bootstrap.
+```
+
 ---
 
 #### v0.170 - Conseguenze Sociali Emergenti
