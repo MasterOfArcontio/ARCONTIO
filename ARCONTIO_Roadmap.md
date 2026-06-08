@@ -4668,15 +4668,14 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 | v0.36.03v | ArcGraph Visual Probe: frame dati controllato dei layer base | Completato nel perimetro data-only |
 | v0.36.03v.01 | ArcGraph Scene Probe Renderer: primo disegno debug in Unity | Completato come renderer debug temporaneo |
 | v0.36.03v.02 | ArcGraph First Visual Test QA: esecuzione e raccolta difetti visivi | Completato con test manuale positivo |
-| v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Aperto in audit preparatorio |
-| v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
+| v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Completato nel perimetro passivo |
+| v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Prossimo checkpoint |
 
 ## Prompt operativo - roadmap residua ArcGraph
 
 Prima di proseguire oltre il primo test visivo, il lavoro residuo della roadmap ArcGraph e' questo:
 
 ```text
-v0.36.04 -> Effect Renderer: fiamme, fumo, scintille, effetti locali passivi
 v0.36.05 -> Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico
 v0.37    -> Debug/Overlay Migration: migrazione progressiva overlay diagnostici da MapGridWorldView
 v0.38    -> Legacy Absorption / Retirement: assorbimento e pensionamento controllato del rendering MapGrid legacy
@@ -5378,6 +5377,111 @@ Gate:
 
 Procedere prima con audit dei contratti gia' presenti per `Effect`, poi proporre la
 patch minima solo se non emergono scelte progettuali bloccanti.
+
+## Esito v0.36.04 - Effect Renderer passivo
+
+La `v0.36.04` ha introdotto il builder visuale ambientale per effetti locali:
+fiamme, fumo, scintille e segnali locali come item renderizzabili passivi.
+
+Implementato:
+
+- `ArcGraphEffectLayer.CopySnapshotsTo(...)`;
+- `ArcGraphRenderItemKind.Effect`;
+- `ArcGraphEffectRenderItem`;
+- `ArcGraphEffectRenderQueueDiagnostics`;
+- `ArcGraphEffectRenderQueueBuilder`;
+- `ArcGraphEffectRenderQueueHarness`.
+
+Flusso:
+
+```text
+ArcGraphEffectVisualSnapshot
+-> ArcGraphEffectLayer
+-> ArcGraphEffectRenderQueueBuilder
+-> ArcGraphEffectRenderItem
+```
+
+Regole:
+
+- il builder legge solo il layer effetti;
+- il builder applica `ArcGraphZoomLodProfile`;
+- `EffectId <= 0` produce item nascosto;
+- `EffectKey` vuoto produce item nascosto;
+- `Intensity01 <= 0` produce item nascosto;
+- zoom 1 usa `StaticSignalOnly`;
+- zoom 2 usa `SimplifiedStaticEffect`;
+- zoom 3 usa `AnimatedMajorEffects`, ma abbassa gli effetti deboli a statici;
+- zoom 4 usa `FullLocalEffects`;
+- la chiave sprite e' solo una stringa derivata;
+- l'animazione e' ammessa solo se contratto, LOD e intensita' la consentono;
+- nessun incendio viene propagato;
+- nessun fumo viene simulato;
+- nessun danno viene calcolato;
+- nessun `ParticleSystem` viene creato;
+- nessun renderer Unity viene creato.
+
+Decisione di scope:
+
+Gli effetti non vengono ancora fusi nella queue globale actor/object e non vengono
+ancora disegnati dal scene probe.
+
+Motivo:
+
+- il sorting definitivo tra terrain, water, vegetation, object, actor, effect e light
+  non e' ancora stato deciso;
+- il probe visivo appena validato resta il controllo minimo dei layer gia' provati;
+- gli effetti sono ora pronti come queue passiva, ma la composizione globale resta
+  un passaggio successivo.
+
+Harness:
+
+`ArcGraphEffectRenderQueueHarness.RunDefaultSmoke()` verifica:
+
+- quattro snapshot effetto;
+- due effetti visibili;
+- due effetti nascosti per dati non validi;
+- zoom 1 con segnali statici e nessuna animazione;
+- zoom 4 con effetti animabili;
+- nessuna scena, nessun asset, nessun sistema incendi produttivo.
+
+QA:
+
+- compilazione Roslyn isolata dei file toccati e nuovi riuscita;
+- `dotnet build --no-restore` del progetto Unity non e' stato usato come verifica
+  valida perche' manca `Temp/obj/Assembly-CSharp/project.assets.json`;
+- non e' stato eseguito restore per non scrivere in `Temp`;
+- la compilazione Roslyn isolata usa output in `%TEMP%` e reference Unity
+  `netstandard 2.1`.
+
+Vincoli preservati:
+
+- nessuna simulazione effetti produttiva;
+- nessun asset load;
+- nessun `GameObject`;
+- nessun `SpriteRenderer`;
+- nessun `ParticleSystem`;
+- nessuna luce Unity;
+- nessuna modifica a scene o prefab;
+- nessuna modifica a Core, Decision Layer, Job Layer o MapGrid;
+- MapGrid resta renderer produttivo.
+
+Prossimo step:
+
+`v0.36.05 - Weather Renderer`
+
+Lo step dovra' seguire lo stesso schema: snapshot meteo gia' prodotti da sistemi
+esterni, overlay atmosferico passivo, LOD, diagnostica e harness, senza simulare
+clima, temperatura, umidita' o precipitazioni produttive.
+
+Branch aperto:
+
+```text
+ai-task/v0.36.05-arcgraph-weather-renderer
+```
+
+Gate:
+
+Attendere go operatore prima di modifiche operative sul codice meteo.
 
 ---
 

@@ -373,6 +373,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>_effects</b>: effetti visuali indicizzati per id.</item>
     ///   <item><b>ReplaceSnapshots</b>: sostituisce la cache effetti.</item>
     ///   <item><b>TryGetEffect</b>: lettura puntuale per id effetto.</item>
+    ///   <item><b>CopySnapshotsTo</b>: lettura sequenziale controllata per builder visuali.</item>
     ///   <item><b>ClearSnapshots</b>: cleanup del layer.</item>
     /// </list>
     /// </summary>
@@ -405,6 +406,42 @@ namespace Arcontio.View.ArcGraph
         public bool TryGetEffect(int effectId, out ArcGraphEffectVisualSnapshot snapshot)
         {
             return _effects.TryGetValue(effectId, out snapshot);
+        }
+
+        // =============================================================================
+        // CopySnapshotsTo
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia gli snapshot effetto in una lista fornita dal chiamante.
+        /// </para>
+        ///
+        /// <para><b>Lettura sequenziale senza autorita' causale</b></para>
+        /// <para>
+        /// I builder visuali devono poter scorrere gli effetti locali senza ricevere
+        /// il dizionario interno mutabile. Questo metodo copia snapshot value type:
+        /// non propaga fuoco, non genera fumo, non calcola danni, non influenza
+        /// memoria o percezione NPC e non crea particelle Unity.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>target</b>: lista da popolare, se non nulla.</item>
+        ///   <item><b>clearTarget</b>: se true, svuota la lista prima della copia.</item>
+        /// </list>
+        /// </summary>
+        public void CopySnapshotsTo(
+            IList<ArcGraphEffectVisualSnapshot> target,
+            bool clearTarget = true)
+        {
+            if (target == null)
+                return;
+
+            if (clearTarget)
+                target.Clear();
+
+            foreach (var pair in _effects)
+                target.Add(pair.Value);
         }
 
         public void ClearSnapshots()

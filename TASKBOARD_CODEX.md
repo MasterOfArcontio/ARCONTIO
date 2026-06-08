@@ -28,23 +28,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.36.04 - ArcGraph Effect Renderer`
+`v0.36.05 - ArcGraph Weather Renderer`
 
 STATUS:
-AUDIT PREPARATORIO IN AVVIO
+IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.36.04-arcgraph-effect-renderer`
+`ai-task/v0.36.05-arcgraph-weather-renderer`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- chiudere e pushare branch `v0.36.03v.02` con esito QA visuale positivo;
-- aprire branch successivo `v0.36.04`;
-- eseguire audit preparatorio Effect Renderer;
-- non implementare simulazione produttiva di incendi, fumo, scintille, meteo, acqua, vegetazione o luce;
+- chiudere e pushare branch `v0.36.04` con Effect Renderer passivo;
+- aprire branch successivo `v0.36.05`;
+- presentare piano operativo Weather Renderer;
+- non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
@@ -53,7 +53,6 @@ OUTPUT ATTESO:
 PROMPT OPERATIVO - ROADMAP RESIDUA ARCGRAPH:
 
 ```text
-v0.36.04 -> Effect Renderer: fiamme, fumo, scintille, effetti locali passivi
 v0.36.05 -> Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico
 v0.37    -> Debug/Overlay Migration: migrazione progressiva overlay diagnostici da MapGridWorldView
 v0.38    -> Legacy Absorption / Retirement: assorbimento e pensionamento controllato del rendering MapGrid legacy
@@ -62,7 +61,8 @@ v0.38    -> Legacy Absorption / Retirement: assorbimento e pensionamento control
 Regola corrente:
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
-- il prossimo step coerente con roadmap e' `v0.36.04`, non il collegamento alla mappa reale;
+- `v0.36.04` ha completato il builder effetti passivo;
+- il prossimo step coerente con roadmap e' `v0.36.05`, non il collegamento alla mappa reale;
 - eventuale ponte mappa reale andra' pianificato dopo i layer ambientali previsti o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
 
@@ -185,22 +185,33 @@ DOC SYNC:
 - branch `ai-task/v0.36.03v.02-arcgraph-first-visual-test-qa` aperto;
 - apertura `v0.36.03v.02` documentata: QA visuale manuale del primo scene probe;
 - QA visuale manuale `v0.36.03v.02` superata: probe visibile su `Scene_MapGrid`, camera assegnata, layer terrain/water/vegetation/object/actor/light visibili, nessuna modifica scena/prefab richiesta;
-- branch `ai-task/v0.36.04-arcgraph-effect-renderer` da aprire come prossimo checkpoint;
+- branch `ai-task/v0.36.04-arcgraph-effect-renderer` aperto come checkpoint Effect Renderer;
 - apertura `v0.36.04` documentata: Effect Renderer preparatorio, nessuna simulazione incendi o particelle produttive.
+- effect renderer passivo implementato;
+- aggiunto `ArcGraphEffectLayer.CopySnapshotsTo(...)`;
+- aggiunto `ArcGraphRenderItemKind.Effect`;
+- aggiunto `ArcGraphEffectRenderItem`;
+- aggiunto `ArcGraphEffectRenderQueueDiagnostics`;
+- aggiunto `ArcGraphEffectRenderQueueBuilder`;
+- aggiunto `ArcGraphEffectRenderQueueHarness`;
+- QA Roslyn isolata riuscita sui file toccati e nuovi;
+- effetti non ancora fusi nella queue globale actor/object;
+- branch `ai-task/v0.36.05-arcgraph-weather-renderer` da aprire come prossimo checkpoint.
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.36.04 - ArcGraph Effect Renderer` dopo QA visuale positiva del probe.
+Preparare il prossimo step `v0.36.05 - ArcGraph Weather Renderer` dopo completamento Effect Renderer passivo.
 
-Scope immediato `v0.36.04`:
+Scope immediato `v0.36.05`:
 
-- audit del placeholder `ArcGraphEffectLayer` e degli snapshot effetto gia' presenti;
-- definizione item passivi per fiamme, fumo, scintille e segnali locali;
-- applicazione LOD zoom `v0.33f` agli effetti;
-- predisposizione animazione frame-based ArcGraph, senza `Animator` Unity;
-- harness smoke per verificare item visibili/nascosti, LOD e diagnostica;
-- nessuna propagazione fuoco;
-- nessuna simulazione fumo;
+- audit del placeholder `ArcGraphWeatherLayer` e dello snapshot meteo gia' presente;
+- definizione item/overlay passivi per pioggia, neve, vento e overlay atmosferici;
+- applicazione LOD zoom `v0.33f` e flag `ShowWeatherOverlay`;
+- predisposizione animazione frame-based ArcGraph per overlay meteo, senza `Animator` Unity;
+- harness smoke per verificare meteo attivo/inattivo, LOD e diagnostica;
+- nessuna simulazione clima;
+- nessuna temperatura o umidita' produttiva;
+- nessuna generazione precipitazioni;
 - nessun `ParticleSystem`;
 - nessuna sostituzione di MapGrid;
 - nessuna modifica a scene, prefab o asset.
