@@ -5559,13 +5559,13 @@ Attendere go operatore prima di modifiche operative sul codice meteo.
 #### v0.37 - ArcGraph Debug/Overlay Migration
 
 ## Stato
-PENDING
+IN CORSO
 
 ## Obiettivo
 
 Migrare progressivamente gli overlay diagnostici fuori dal monolite `MapGridWorldView`.
 
-Ordine consigliato:
+Ordine valutato prima dell'audit:
 
 1. pointer cell coords;
 2. FOV heatmap;
@@ -5573,6 +5573,91 @@ Ordine consigliato:
 4. DT overlay;
 5. summary cards;
 6. dev tools solo dopo separazione dai renderer.
+
+## Esito v0.37a - Audit overlay/debug MapGrid
+
+Audit eseguito in sola lettura sui file MapGrid e sui contratti Core collegati.
+
+File principali ispezionati:
+
+```text
+Assets/Scripts/Views/MapGrid/Runtime/MapGridWorldView.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridFovHeatmapOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridLandmarkOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridLandmarkLabelOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridDtValueOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridPointerCoordsOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridEntitySummaryOverlay.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridRuntimeControlTopBar.cs
+Assets/Scripts/Views/MapGrid/Runtime/MapGridRuntimeDevToolsOverlay.cs
+Assets/Scripts/Core/Telemetry/DebugFovTelemetry.cs
+Assets/Scripts/Core/World/LandmarkDebugTypes.cs
+Assets/Scripts/Core/World/World.cs
+```
+
+Stato rilevato:
+
+- `MapGridWorldView` oggi coordina binding NPC/oggetti, overlay diagnostici, HUD, top bar runtime,
+  selezione debug e click-to-move;
+- gli overlay non sono tutti della stessa natura: alcuni sono overlay di mappa, altri sono HUD,
+  altri sono pannelli UI interattivi;
+- `ArcGraphDebugLayer` esiste gia', ma registra solo contatori dirty e non contiene ancora contratti
+  per overlay reali;
+- i contratti Core per landmark/GVD-DIN sono gia' abbastanza separati dalla view:
+  `LandmarkOverlayNode`, `LandmarkOverlayEdge`, `GvdDinOverlaySnapshot`;
+- il FOV ha due fonti distinte:
+  `DebugFovTelemetry` come buffer storico read-only e `MapGridFovHeatmapOverlay.RenderCurrentCone(...)`
+  come visualizzazione immediata del cono;
+- pointer coords e runtime cost observer sono HUD screen-space, non celle renderizzate nella mappa;
+- summary cards sono UI diagnostica complessa, con drag, linee canvas, testo aggregato e pannello
+  explainability;
+- DevTools e TopBar sono strumenti operativi: emettono comandi, controllano pausa/step e non devono
+  entrare nel DebugLayer passivo di ArcGraph.
+
+Classificazione dopo audit:
+
+```text
+MIGRAZIONE ALTA PRIORITA'
+- FOV current cone / FOV heatmap: overlay cell-based, buon candidato per snapshot debug ArcGraph.
+- Landmark nodes/edges/path: overlay cell/edge-based, gia' supportato da DTO Core.
+- DT/GVD-DIN heatmap: overlay cell-based, gia' supportato da GvdDinOverlaySnapshot.
+
+MIGRAZIONE MEDIA PRIORITA'
+- Pointer cell coords: utile, ma e' HUD screen-space; serve prima un canale Debug/HUD separato.
+- Landmark labels: sono UI label screen-space sopra marker, migrabili dopo i nodi/edge.
+
+MIGRAZIONE BASSA PRIORITA' / DA RINVIARE
+- Summary cards: troppo ampie e interattive per essere il primo step.
+- RuntimeControlTopBar: controllo operativo, non overlay di rendering.
+- RuntimeDevToolsOverlay: tool operativo che genera comandi; non deve entrare in ArcGraph finche'
+  input, comandi e debug renderer non sono separati.
+```
+
+Decisione tecnica provvisoria:
+
+La `v0.37` non deve iniziare disegnando UI o creando oggetti Unity.
+Il primo passo corretto e' introdurre contratti dati passivi per overlay debug ArcGraph:
+
+- item cell-based per FOV/DT;
+- item node/edge-based per landmark/path;
+- diagnostica della queue debug;
+- builder passivo che legge snapshot gia' prodotti o DTO espliciti;
+- nessun `GameObject`, `SpriteRenderer`, `LineRenderer`, `Canvas`, `Button`, `Mouse.current`,
+  `Keyboard.current`, `SimulationHost` o comando core.
+
+Prossimo micro-step:
+
+```text
+v0.37b - ArcGraph Debug Overlay Data Contracts
+```
+
+Scope previsto:
+
+- definire contratti value-only per celle, nodi, edge e label debug;
+- separare overlay di mappa da HUD screen-space;
+- preparare una queue debug passiva ordinabile;
+- non collegare ancora MapGridWorldView;
+- non migrare DevTools, TopBar o summary cards.
 
 ---
 

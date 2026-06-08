@@ -28,7 +28,7 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.37 - ArcGraph Debug/Overlay Migration`
+`v0.37b - ArcGraph Debug Overlay Data Contracts`
 
 STATUS:
 IN ATTESA GO OPERATORE
@@ -41,9 +41,8 @@ BASE DI INTEGRAZIONE:
 
 OUTPUT ATTESO:
 
-- chiudere e pushare branch `v0.36.05` con Weather Renderer passivo;
-- aprire branch successivo `v0.37`;
-- presentare piano operativo Debug/Overlay Migration;
+- chiudere audit `v0.37a` degli overlay/debug MapGrid;
+- preparare micro-step `v0.37b` per contratti dati debug ArcGraph;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
@@ -62,7 +61,8 @@ Regola corrente:
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;
 - `v0.36.05` ha completato il builder meteo passivo;
-- il prossimo step coerente con roadmap e' `v0.37`, cioe' audit e migrazione controllata degli overlay/debug;
+- audit `v0.37a` completato: MapGridWorldView contiene overlay di mappa, HUD, UI interattiva e strumenti operativi;
+- il prossimo step coerente con roadmap e' `v0.37b`, cioe' contratti dati debug ArcGraph passivi;
 - eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
 
@@ -205,19 +205,26 @@ DOC SYNC:
 - QA Roslyn isolata riuscita sui file Weather toccati e nuovi;
 - meteo non ancora fuso nella queue globale actor/object;
 - meteo non ancora disegnato dal scene probe;
-- branch `ai-task/v0.37-arcgraph-debug-overlay-migration` da aprire come prossimo checkpoint.
+- branch `ai-task/v0.37-arcgraph-debug-overlay-migration` aperto come checkpoint Debug/Overlay Migration;
+- audit `v0.37a` completato su `MapGridWorldView`, overlay FOV, landmark, DT, pointer coords, summary cards,
+  top bar, DevTools e contratti Core collegati;
+- classificazione overlay completata: FOV/landmark/DT sono candidati primari; pointer/HUD e landmark labels
+  richiedono un canale screen-space; summary cards, top bar e DevTools sono rinviati;
+- prossimo micro-step: `v0.37b - ArcGraph Debug Overlay Data Contracts`.
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.37 - ArcGraph Debug/Overlay Migration` dopo completamento Weather Renderer passivo.
+Preparare il prossimo step `v0.37b - ArcGraph Debug Overlay Data Contracts` dopo audit MapGrid overlay/debug.
 
-Scope immediato `v0.37`:
+Scope immediato `v0.37b`:
 
-- audit degli overlay diagnostici ancora gestiti da `MapGridWorldView` e componenti vicini;
-- classificazione degli overlay migrabili in ArcGraph;
-- priorita' a pointer cell coords, FOV heatmap, landmark overlay, DT overlay e summary cards;
-- definizione del confine tra overlay visuale, debug UI e strumenti interattivi;
-- nessuna migrazione dei dev tools prima di una decisione esplicita;
+- definire contratti value-only per overlay debug ArcGraph;
+- separare overlay di mappa da HUD screen-space;
+- preparare item cell-based per FOV/DT;
+- preparare item node/edge-based per landmark/path;
+- preparare diagnostica e harness passivo;
+- non collegare ancora `MapGridWorldView`;
+- non migrare summary cards, top bar o DevTools;
 - nessuna sostituzione di MapGrid;
 - nessuna modifica a scene, prefab o asset.
 
