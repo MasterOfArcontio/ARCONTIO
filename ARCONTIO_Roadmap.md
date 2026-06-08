@@ -6000,6 +6000,112 @@ Scope consigliato:
 - mantenere fuori scope pointer coords, runtime cost HUD, summary cards, top bar
   e DevTools.
 
+## Esito v0.37e - ArcGraph Landmark/GVD Debug Producer Bridge
+
+La `v0.37e` implementa il primo bridge operativo passivo tra i DTO debug gia'
+esistenti del Core e `ArcGraphDebugOverlaySnapshot`.
+
+File/runtime aggiunti:
+
+```text
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlayProducerBridge.cs
+Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphDebugOverlayProducerBridgeHarness.cs
+```
+
+Elementi introdotti:
+
+- aggiunto `ArcGraphDebugOverlayProducerBridgeDiagnostics`;
+- aggiunto `ArcGraphDebugOverlayProducerBridge`;
+- aggiunto `ArcGraphDebugOverlayProducerBridgeHarness`;
+- conversione passiva di `LandmarkOverlayNode`;
+- conversione passiva di `LandmarkOverlayEdge`;
+- conversione passiva di `GvdDinOverlaySnapshot.DtCells`;
+- conversione passiva di `GvdDinOverlaySnapshot.GvdRawCells`;
+- conversione passiva di `GvdDinOverlaySnapshot.GvdNodes`;
+- conversione passiva di `GvdDinOverlaySnapshot.GvdEdges`.
+
+Flusso dati fissato:
+
+```text
+DTO Core gia' prodotti
+-> ArcGraphDebugOverlayProducerBridge
+-> ArcGraphDebugOverlaySnapshot
+-> ArcGraphDebugOverlayQueueBuilder
+-> ArcGraphDebugOverlayQueue
+-> renderer Unity futuro
+```
+
+Mappatura Landmark:
+
+```text
+worldNodes      -> LandmarkWorldNode
+worldEdges      -> LandmarkWorldEdge
+knownNodes      -> LandmarkKnownNode
+knownEdges      -> LandmarkKnownEdge
+routeNodes      -> LandmarkRouteNode
+routeEdges      -> LandmarkRouteEdge
+lmPathEdges     -> LandmarkLmPathEdge
+directPathEdges -> LandmarkDirectPathEdge
+jumpPathEdges   -> LandmarkJumpPathEdge
+complexEdges    -> LandmarkComplexEdge
+```
+
+Mappatura GVD-DIN:
+
+```text
+DtCells     -> DtHeatCell
+GvdRawCells -> GvdRawCell
+GvdNodes    -> LandmarkGvdNode
+GvdEdges    -> LandmarkGvdEdge
+```
+
+Vincoli rispettati:
+
+- nessuna lettura diretta `World`;
+- nessuna chiamata a `World.GetNpcLandmarkOverlayData(...)`;
+- nessuna dipendenza da `MapGridWorldView`;
+- nessun `GameObject`;
+- nessun `SpriteRenderer`;
+- nessun `LineRenderer`;
+- nessun `Canvas`;
+- nessun `Resources.Load`;
+- nessun input mouse/tastiera;
+- nessuna chiamata a `SimulationHost`;
+- nessun renderer Unity;
+- nessuna modifica a scene, prefab, asset o `.meta`;
+- FOV current cone non implementato.
+
+QA eseguita:
+
+- `git diff --check` superato;
+- controllo statico sulle chiamate vietate eseguito: le parole vietate compaiono solo
+  in commenti descrittivi o nomi enum gia' esistenti;
+- compilazione Roslyn isolata riuscita sui file nuovi usando `Assembly-CSharp.dll`
+  come riferimento per i DTO Core e i contratti ArcGraph gia' compilati.
+
+Debiti residui:
+
+- il bridge non e' ancora collegato a un chiamante runtime;
+- non esiste ancora renderer Unity debug per disegnare questi item;
+- FOV current cone resta da estrarre in un producer separato;
+- `DebugFovTelemetry` heatmap storica non e' ancora bridgiata;
+- HUD, pointer coords, runtime cost, labels e summary cards restano fuori scope.
+
+Prossimo micro-step consigliato:
+
+```text
+v0.37f - ArcGraph Debug Overlay Runtime Feed Audit
+```
+
+Scope consigliato:
+
+- audit del punto piu' sicuro in cui alimentare il bridge con DTO reali;
+- decidere se il feed deve stare in `ArcGraphWorldAdapter`, in un adapter debug
+  separato o in un wrapper runtime ArcGraph;
+- non creare ancora renderer Unity;
+- non migrare FOV current cone;
+- non migrare HUD o strumenti interattivi.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
