@@ -7086,12 +7086,48 @@ ArcGraphDebugRuntimeMapGridAdapter
 deve produrre un esito manuale leggibile in Unity, almeno come dispatch corretto e
 assenza di errori runtime nel probe debug.
 
+Esito gate visuale umano:
+
+- gate superato su `Scene_MapGrid`;
+- `ArcGraphDebugRuntimeMapGridAdapter` ha prodotto `FramePushedToWrapper`;
+- diagnostica positiva osservata: `mapGridView=True`, `wrapper=True`,
+  `config=True`, `world=True`, `selectedNpc=1`;
+- `ArcGraphDebugRuntimeSceneWrapper` ha prodotto `wrapperReason=QueueDispatched`;
+- diagnostica positiva osservata: `wrapperBuilt=True`,
+  `wrapperDispatched=True`;
+- il componente `MapGridWorldView` e' stato confermato come componente aggiunto
+  runtime sullo stesso GameObject di `MapGridBootstrap`, non come GameObject
+  separato in Hierarchy.
+
+Conclusione:
+
+```text
+v0.37 - ArcGraph Debug/Overlay Migration
+= COMPLETATA NEL PERIMETRO PREPARATORIO
+```
+
+La catena manuale:
+
+```text
+MapGridWorldView
+-> ArcGraphDebugRuntimeMapGridAdapter
+-> ArcGraphDebugRuntimeSceneWrapper
+-> ArcGraphDebugRuntimeWiringCoordinator
+-> ArcGraphDebugOverlayRuntimeFeed
+-> ArcGraphDebugOverlayQueue
+-> ArcGraphDebugOverlaySceneProbeRenderer
+```
+
+e' stata validata come ponte debug read-only. Non e' ancora un renderer
+produttivo e non sostituisce `MapGridWorldView`, ma permette di aprire la fase
+successiva di assorbimento legacy.
+
 ---
 
 #### v0.38 - ArcGraph Legacy Absorption / Retirement
 
 ## Stato
-PENDING
+APERTO / AUDIT-FIRST
 
 ## Obiettivo
 
@@ -7105,6 +7141,19 @@ La chiusura di questa fase richiedera':
 - piano di dismissione `MapGridWorldView`;
 - piano di dismissione `MapGridBootstrap`;
 - mantenimento dei soli asset/helper utili.
+
+## Checkpoint v0.38
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.38a | Audit assorbimento legacy MapGrid: bootstrap, terrain, actor/object, overlay, input, UI debug e dipendenze scena | In corso |
+| v0.38b | Piano di sostituzione bootstrap scena ArcGraph, senza doppio renderer permanente | Pending |
+| v0.38c | Aggancio terrain ArcGraph produttivo controllato o comparativo finale | Pending |
+| v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Pending |
+| v0.38e | Aggancio overlay debug minimo validato | Pending |
+| v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Pending |
+| v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Pending |
+| v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
 ---
 

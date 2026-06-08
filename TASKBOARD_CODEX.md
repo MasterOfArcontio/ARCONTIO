@@ -25,28 +25,28 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.37 - ArcGraph Debug/Overlay Migration
+## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.37q - ArcGraph Debug Overlay Closeout or Fix Gate`
+`v0.38a - ArcGraph Legacy Absorption Audit`
 
 STATUS:
-IN CORSO / IN ATTESA ESITO GATE VISUALE MANUALE
+APERTO / AUDIT-FIRST
 
 RAMO BASE CORRENTE:
-`ai-task/v0.37q-arcgraph-debug-overlay-closeout-or-fix`
+`ai-task/v0.38a-arcgraph-legacy-absorption-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- governare `v0.37q` come punto di chiusura o fix mirato dopo il gate visuale manuale dell'adapter MapGrid -> ArcGraph debug runtime;
-- non dichiarare chiusa `v0.37` finche' il gate visuale umano non viene registrato come positivo;
-- se il gate fallisce, applicare solo il fix minimo collegato alla causa osservata;
+- auditare il perimetro legacy MapGrid da assorbire o pensionare in `v0.38`;
+- distinguere cio' che ArcGraph puo' gia' sostituire da cio' che richiede un nuovo micro-step;
+- non rimuovere legacy, non salvare scene e non creare renderer produttivi senza audit chiuso;
 - non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
 - non creare renderer produttivi Unity, asset load o modifiche scena;
-- mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
+- mantenere MapGrid come renderer produttivo finche' `v0.38` non avra' assorbito in modo controllato terrain, actor/object e debug minimo;
 - rispettare la policy LOD definita in `v0.33f`;
 - non migrare strumenti interattivi o dev tools prima dell'audit mirato;
 - collegare feed e renderer solo tramite context, NPC e consumer espliciti, senza accessi globali.
@@ -80,8 +80,11 @@ Regola corrente:
 - `v0.37o` ha implementato `RuntimeWorld` read-only su `MapGridWorldView` e `ArcGraphDebugRuntimeMapGridAdapter` manuale, senza `Update`, hotkey, UI o scena salvata;
 - `v0.37p` ha completato QA tecnica adapter e preparato gate visuale umano su scena non salvata;
 - `v0.37q` e' il checkpoint corrente di closeout/fix: resta fermo sul gate visuale manuale, non aggiunge feature e non apre `v0.38` senza esito positivo o correzione mirata;
+- gate visuale umano `v0.37q` superato: screenshot operatore con `FramePushedToWrapper`, `mapGridView=True`, `wrapper=True`, `config=True`, `world=True`, `selectedNpc=1`, `wrapperReason=QueueDispatched`, `wrapperBuilt=True`, `wrapperDispatched=True`;
+- `v0.37` chiusa come Debug/Overlay Migration preparatoria: la catena MapGrid -> adapter -> wrapper -> coordinator -> feed -> queue -> probe renderer funziona nel gate manuale;
+- `v0.38a` apre l'audit di assorbimento legacy: non rimuovere nulla prima della classificazione tecnica;
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
-- eventuale ponte mappa reale andra' pianificato dopo la migrazione overlay o come micro-step esplicitamente approvato;
+- eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
 
 DOC SYNC:
