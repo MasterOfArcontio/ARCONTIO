@@ -28,27 +28,43 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.36 - ArcGraph Environment Visual Layers
 
 CHECKPOINT CORRENTE:
-`v0.36.03v.02 - ArcGraph First Visual Test QA`
+`v0.36.04 - ArcGraph Effect Renderer`
 
 STATUS:
-IN ATTESA GO OPERATORE
+AUDIT PREPARATORIO IN AVVIO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.36.03v.02-arcgraph-first-visual-test-qa`
+`ai-task/v0.36.04-arcgraph-effect-renderer`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- commit e push branch `v0.36.03v.01`;
-- aprire branch successivo `v0.36.03v.02`;
-- attendere esito test operatore prima di nuove modifiche;
-- non implementare simulazione produttiva di acqua, vegetazione, luce, meteo o effetti;
-- non creare GameObject, renderer Unity, asset load o modifiche scena;
+- chiudere e pushare branch `v0.36.03v.02` con esito QA visuale positivo;
+- aprire branch successivo `v0.36.04`;
+- eseguire audit preparatorio Effect Renderer;
+- non implementare simulazione produttiva di incendi, fumo, scintille, meteo, acqua, vegetazione o luce;
+- non creare renderer produttivi Unity, asset load o modifiche scena;
 - mantenere MapGrid come renderer produttivo finche' non esiste decisione esplicita diversa;
 - rispettare la policy LOD definita in `v0.33f`;
 - usare la `v0.35` come base per actor motion, senza riaprire il Job Layer.
+
+PROMPT OPERATIVO - ROADMAP RESIDUA ARCGRAPH:
+
+```text
+v0.36.04 -> Effect Renderer: fiamme, fumo, scintille, effetti locali passivi
+v0.36.05 -> Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico
+v0.37    -> Debug/Overlay Migration: migrazione progressiva overlay diagnostici da MapGridWorldView
+v0.38    -> Legacy Absorption / Retirement: assorbimento e pensionamento controllato del rendering MapGrid legacy
+```
+
+Regola corrente:
+
+- il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
+- il prossimo step coerente con roadmap e' `v0.36.04`, non il collegamento alla mappa reale;
+- eventuale ponte mappa reale andra' pianificato dopo i layer ambientali previsti o come micro-step esplicitamente approvato;
+- non accumulare ulteriori moduli senza harness e diagnostica.
 
 DOC SYNC:
 
@@ -168,19 +184,24 @@ DOC SYNC:
 - il probe usa sprite runtime colorati, root temporaneo e context menu manuale;
 - branch `ai-task/v0.36.03v.02-arcgraph-first-visual-test-qa` aperto;
 - apertura `v0.36.03v.02` documentata: QA visuale manuale del primo scene probe;
-- prossimo step fermo in attesa esito operatore: primo test visivo ArcGraph.
+- QA visuale manuale `v0.36.03v.02` superata: probe visibile su `Scene_MapGrid`, camera assegnata, layer terrain/water/vegetation/object/actor/light visibili, nessuna modifica scena/prefab richiesta;
+- branch `ai-task/v0.36.04-arcgraph-effect-renderer` da aprire come prossimo checkpoint;
+- apertura `v0.36.04` documentata: Effect Renderer preparatorio, nessuna simulazione incendi o particelle produttive.
 
 OBIETTIVO:
 
-Preparare il prossimo step `v0.36.03v.02 - ArcGraph First Visual Test QA` e attendere l'esito del test prima di nuove modifiche.
+Preparare il prossimo step `v0.36.04 - ArcGraph Effect Renderer` dopo QA visuale positiva del probe.
 
-Scope immediato `v0.36.03v.02`:
+Scope immediato `v0.36.04`:
 
-- eseguire il primo test visivo del probe;
-- verificare che il root temporaneo venga creato e pulito correttamente;
-- verificare che terrain, acqua, vegetazione, object, actor e luce siano visibili;
-- raccogliere difetti di sorting, scala, posizione, colore e leggibilita';
-- decidere eventuali micro-fix prima di effetti/meteo;
+- audit del placeholder `ArcGraphEffectLayer` e degli snapshot effetto gia' presenti;
+- definizione item passivi per fiamme, fumo, scintille e segnali locali;
+- applicazione LOD zoom `v0.33f` agli effetti;
+- predisposizione animazione frame-based ArcGraph, senza `Animator` Unity;
+- harness smoke per verificare item visibili/nascosti, LOD e diagnostica;
+- nessuna propagazione fuoco;
+- nessuna simulazione fumo;
+- nessun `ParticleSystem`;
 - nessuna sostituzione di MapGrid;
 - nessuna modifica a scene, prefab o asset.
 

@@ -4667,9 +4667,27 @@ Questa versione non deve decidere se piove, se una pianta cresce, se una stanza 
 | v0.36.03 | Light Renderer: giorno/notte, tinta globale, buio stanze, luci locali | Completato nel perimetro passivo |
 | v0.36.03v | ArcGraph Visual Probe: frame dati controllato dei layer base | Completato nel perimetro data-only |
 | v0.36.03v.01 | ArcGraph Scene Probe Renderer: primo disegno debug in Unity | Completato come renderer debug temporaneo |
-| v0.36.03v.02 | ArcGraph First Visual Test QA: esecuzione e raccolta difetti visivi | In attesa test operatore |
-| v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Pending |
+| v0.36.03v.02 | ArcGraph First Visual Test QA: esecuzione e raccolta difetti visivi | Completato con test manuale positivo |
+| v0.36.04 | Effect Renderer: fiamme, fumo, scintille, effetti locali | Aperto in audit preparatorio |
 | v0.36.05 | Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico | Pending |
+
+## Prompt operativo - roadmap residua ArcGraph
+
+Prima di proseguire oltre il primo test visivo, il lavoro residuo della roadmap ArcGraph e' questo:
+
+```text
+v0.36.04 -> Effect Renderer: fiamme, fumo, scintille, effetti locali passivi
+v0.36.05 -> Weather Renderer: pioggia, neve, vento visuale, overlay atmosferico
+v0.37    -> Debug/Overlay Migration: migrazione progressiva overlay diagnostici da MapGridWorldView
+v0.38    -> Legacy Absorption / Retirement: assorbimento e pensionamento controllato del rendering MapGrid legacy
+```
+
+Regola di sequenza:
+
+- non introdurre effetti o meteo produttivi;
+- non sostituire MapGrid;
+- non fondere i layer ambientali in una queue globale finche' sorting e composizione non sono stati verificati;
+- usare il probe visuale appena validato come controllo anti-accumulo prima dei moduli successivi.
 
 ## Apertura v0.36a - Audit e contratto preparatorio
 
@@ -5312,6 +5330,54 @@ Scope previsto:
 Gate:
 
 Attendere esito del test operatore prima di nuove modifiche.
+
+## Esito v0.36.03v.02 - ArcGraph First Visual Test QA
+
+Il primo test visivo manuale del probe ArcGraph e' stato eseguito in Unity su
+`Scene_MapGrid`.
+
+Risultato osservato:
+
+- `ArcGraphSceneProbeRenderer` e' stato aggiunto a un GameObject temporaneo;
+- `MainCamera` e' stata assegnata correttamente al campo `Scene Camera`;
+- il context menu `ArcGraph/Render Default Probe` ha generato il probe;
+- il probe e' apparso nella scena sopra la mappa legacy senza sostituire MapGrid;
+- terrain, water, vegetation, object, actor e light sono risultati visibili;
+- il log runtime ha confermato il render del probe frame;
+- non sono state richieste modifiche a scene, prefab o asset per completare il test.
+
+Valutazione:
+
+```text
+v0.36.03v.02 superata come QA visuale minima.
+```
+
+Difetti rilevati:
+
+- nessun difetto bloccante rilevato nel test manuale;
+- la leggibilita' resta volutamente provvisoria, perche' il probe usa colori runtime
+  e sprite 1x1 generati;
+- il probe resta strumento debug temporaneo, non renderer produttivo.
+
+Prossimo step coerente con roadmap:
+
+`v0.36.04 - Effect Renderer`
+
+Lo step deve introdurre effetti locali passivi come fiamme, fumo, scintille o altri
+segnali visuali, mantenendo lo stesso modello gia' usato per vegetazione, acqua e luce:
+snapshot esterni, item renderizzabili, LOD, diagnostica e harness, senza simulare
+incendi o propagazione effetti.
+
+Branch aperto:
+
+```text
+ai-task/v0.36.04-arcgraph-effect-renderer
+```
+
+Gate:
+
+Procedere prima con audit dei contratti gia' presenti per `Effect`, poi proporre la
+patch minima solo se non emergono scelte progettuali bloccanti.
 
 ---
 
