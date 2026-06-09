@@ -8229,6 +8229,61 @@ Scopo del prossimo step:
 - verificare cleanup del root;
 - decidere se actor/object ArcGraph possono diventare candidati produttivi.
 
+## Stato v0.38d.03 - ArcGraph Actor/Object Visual Gate congelato
+
+La `v0.38d.03` resta aperta come gate visuale manuale congelato.
+
+L'operatore non puo' eseguire ora i test in Unity.
+Il gate viene quindi sospeso, non fallito.
+
+Questa distinzione e' importante:
+
+- il probe actor/object esiste;
+- la compilazione tecnica della `v0.38d.02` e' riuscita;
+- il test visuale umano non e' ancora stato eseguito;
+- actor/object ArcGraph non sono ancora promossi a candidato produttivo;
+- MapGrid resta renderer principale;
+- non e' autorizzata nessuna cancellazione legacy basata su questo gate.
+
+### Verifiche congelate
+
+Quando l'operatore potra' riprendere i test visuali, la `v0.38d.03` dovra'
+verificare:
+
+- presenza del componente probe in scena;
+- corretto collegamento con `ArcGraphTerrainRuntimeMapGridAdapter`;
+- presenza del `World` nel context runtime;
+- creazione del root temporaneo `ArcGraphActorObjectSceneProbeRoot`;
+- visibilita' di NPC e oggetti;
+- sorting coerente tra actor e object;
+- movimento actor leggibile durante transizione multi-tick;
+- cleanup del root temporaneo tramite context menu.
+
+### Regola di prosecuzione
+
+Durante il congelamento della `v0.38d.03` e' ammesso procedere solo su step
+che non dipendono dalla validazione visuale actor/object.
+
+Non e' ammesso:
+
+- dichiarare chiuso il pensionamento MapGrid actor/object;
+- eliminare componenti legacy;
+- sostituire il renderer produttivo;
+- promuovere il probe actor/object a renderer stabile.
+
+### Prossimo checkpoint
+
+```text
+v0.38e - ArcGraph Debug Minimum Absorption Audit
+```
+
+Scopo del prossimo step:
+
+- auditare la catena debug minima gia' validata nella `v0.37`;
+- distinguere debug gia' migrato, debug ancora legacy e debug da escludere dal primo ArcGraph produttivo;
+- verificare se serve un ulteriore bridge o solo documentare il perimetro minimo;
+- non richiedere nuovi test visuali manuali in questa fase congelata.
+
 ---
 
 #### v0.170 - Conseguenze Sociali Emergenti

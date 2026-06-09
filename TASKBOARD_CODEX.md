@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38d.03 - ArcGraph Actor/Object Visual Gate`
+`v0.38e - ArcGraph Debug Minimum Absorption Audit`
 
 STATUS:
-IN ATTESA GO OPERATORE
+IN CORSO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38d-03-arcgraph-actor-object-visual-gate`
+`ai-task/v0.38e-arcgraph-debug-minimum-absorption-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -44,7 +44,9 @@ OUTPUT ATTESO:
 - auditare come portare actor/object ArcGraph verso un aggancio runtime reale;
 - verificare cosa oggi MapGridWorldView gestisce per NPC, oggetti, sprite, label, collider e movimento;
 - verificare quali dati actor/object ArcGraph gia' riceve da `ArcGraphWorldAdapter`;
-- preparare e guidare il gate visuale actor/object senza salvare scena e senza sostituire ancora MapGridWorldView;
+- registrare il congelamento del gate visuale actor/object senza promuovere il probe a candidato produttivo;
+- auditare il perimetro debug minimo gia' migrato verso ArcGraph;
+- verificare quali parti debug sono gia' in catena ArcGraph e quali restano ancora legacy;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -156,7 +158,13 @@ Regola corrente:
   - aggiunti context menu `ArcGraph/Render Actor Object Scene Probe From MapGrid` e `ArcGraph/Clear Actor Object Scene Probe`;
   - nessun `Resources.Load`, nessuna scena salvata, nessuna rimozione legacy;
   - compilazione isolata riuscita; restano solo warning attesi su campi `SerializeField`.
-- prossimo checkpoint: `v0.38d.03 - ArcGraph Actor/Object Visual Gate`.
+- gate visuale `v0.38d.03` congelato su richiesta operatore:
+  - test manuale non eseguito;
+  - gate non fallito;
+  - actor/object ArcGraph non ancora promosso a candidato produttivo;
+  - il test verra' recuperato insieme agli altri gate visuali quando l'operatore potra' provarli in Unity;
+  - durante il congelamento non cancellare MapGrid e non procedere al pensionamento produttivo actor/object.
+- prossimo checkpoint: `v0.38e - ArcGraph Debug Minimum Absorption Audit`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
