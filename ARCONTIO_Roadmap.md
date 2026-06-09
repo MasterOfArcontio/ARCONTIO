@@ -7164,6 +7164,7 @@ La chiusura di questa fase richiedera':
 | v0.38f.07 | Consumer scena Pointer HUD ArcGraph, gated e senza salvataggio scena | Completato |
 | v0.38f.08 | Consumer selection ArcGraph, separato dal renderer e senza DevTools | Completato |
 | v0.38f.09 | Router consumer interattivi ArcGraph per HUD + selection modulari | Completato |
+| v0.38f.10a | Probe manuale per consegnare la render queue actor/object al wrapper interattivo | Completato |
 | v0.38f.10 | Gate visuale consumer modulari ArcGraph: wrapper -> router -> HUD + selection | Pending gate umano |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
@@ -9794,6 +9795,105 @@ wrapper -> router -> Pointer HUD + Selection
 - verificare che il click su actor selezioni solo quando il consumer selection e'
   abilitato;
 - verificare che il Pointer HUD mostri cella/actor/UI blocked.
+
+## Esito v0.38f.10a - ArcGraph Interaction RenderQueue Wiring Probe
+
+La `v0.38f.10a` introduce un micro-ponte tecnico necessario per rendere
+testabile il gate visuale dei consumer modulari ArcGraph.
+
+Il problema rilevato era semplice:
+
+```text
+wrapper -> router -> Pointer HUD + Selection
+```
+
+esisteva gia', ma il wrapper interattivo non riceveva ancora una
+`ArcGraphRenderQueue` actor/object reale. Senza quella queue, il boundary poteva
+risolvere la cella sotto il mouse, ma non poteva riconoscere actor e object in
+modo utile per HUD e selection.
+
+### File introdotto
+
+- `Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphInteractionRenderQueueWiringProbe.cs`.
+
+### Funzionamento
+
+Il probe usa riferimenti espliciti assegnati da Inspector:
+
+```text
+ArcGraphTerrainRuntimeMapGridAdapter
+-> ArcGraphRuntimeContext
+-> ArcGraphBootstrapRuntime temporaneo
+-> ArcGraphActorLayer + ArcGraphObjectLayer
+-> ArcGraphRenderQueue
+-> ArcGraphInteractionSceneAdapterWrapper.SetRenderQueue(...)
+```
+
+Il componente aggiunge un context menu manuale:
+
+```text
+ArcGraph/Push Interaction Render Queue To Wrapper
+```
+
+Questo consente al gate umano di spingere la queue actor/object nel wrapper
+senza salvare scene, senza introdurre un renderer produttivo e senza creare
+tool operativi.
+
+### Confini preservati
+
+La `v0.38f.10a` non introduce:
+
+- salvataggio scena;
+- prefab;
+- DevTools;
+- top bar;
+- comandi;
+- input fisico Unity;
+- `SimulationHost`;
+- lettura diretta di `MapGridWorldView`;
+- `Resources.Load`;
+- renderer produttivo permanente;
+- accessi globali nascosti.
+
+Il probe resta un componente di gate manuale. Costruisce una queue temporanea,
+la consegna al wrapper e conserva diagnostica leggibile.
+
+### QA tecnica
+
+La ricerca statica sul nuovo file non trova dipendenze vietate da:
+
+- `SimulationHost`;
+- `MapGridWorldView`;
+- `MapGridWorldProvider`;
+- input fisico Unity;
+- `Resources.Load`;
+- DevTools;
+- top bar;
+- `NPCSelection`.
+
+Il tentativo di `dotnet build Assembly-CSharp.csproj --no-restore` non e'
+conclusivo perche' il progetto Unity generato richiede il file temporaneo
+`Temp/obj/Assembly-CSharp/project.assets.json`. Non e' stato eseguito restore
+per evitare modifiche nelle cartelle temporanee Unity.
+
+### Stato dopo il micro-step
+
+Il gate visuale `v0.38f.10` torna eseguibile:
+
+```text
+runtime adapter
+-> render queue wiring probe
+-> interaction wrapper
+-> router
+-> Pointer HUD + Selection
+```
+
+Il prossimo passaggio non deve aggiungere codice. Deve verificare in Unity che:
+
+- il wrapper riceva una queue actor/object;
+- il Pointer HUD mostri cella, actor o UI blocked;
+- il click primario sopra actor attivi il consumer selection;
+- HUD e selection convivano senza conoscersi direttamente.
 
 ---
 

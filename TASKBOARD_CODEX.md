@@ -34,7 +34,7 @@ STATUS:
 IN ATTESA GATE UMANO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-10-arcgraph-interaction-consumers-visual-gate`
+`ai-task/v0.38f-10-arcgraph-interaction-consumers-visual-gate-ready`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -42,7 +42,8 @@ BASE DI INTEGRAZIONE:
 OUTPUT ATTESO:
 
 - verificare in Unity il wiring wrapper -> router -> Pointer HUD + Selection;
-- non aggiungere codice nuovo prima del gate visuale;
+- usare il probe `ArcGraphInteractionRenderQueueWiringProbe` per consegnare al wrapper la queue actor/object prima del gate;
+- non aggiungere altro codice nuovo prima del gate visuale;
 - controllare che il Pointer HUD mostri cella, actor e UI blocked;
 - controllare che la selection avvenga solo su click primario sopra actor;
 - controllare che HUD e selection convivano senza dipendere tra loro;
@@ -264,6 +265,15 @@ Regola corrente:
   - nessun DevTools, top bar, comando, `SimulationHost`, input fisico Unity o lettura `MapGridWorldView`;
   - compilazione isolata riuscita con Roslyn `csc` e assembly Unity necessari, con soli warning attesi su campi `SerializeField`;
   - prossimo checkpoint: `v0.38f.10 - Gate visuale consumer modulari ArcGraph`.
+- micro-step `v0.38f.10a` completato:
+  - introdotto `ArcGraphInteractionRenderQueueWiringProbe`;
+  - il probe costruisce una `ArcGraphRenderQueue` actor/object partendo dal `ArcGraphTerrainRuntimeMapGridAdapter`;
+  - il probe consegna la queue al `ArcGraphInteractionSceneAdapterWrapper` tramite `SetRenderQueue(...)`;
+  - aggiunto context menu `ArcGraph/Push Interaction Render Queue To Wrapper`;
+  - nessuna scena salvata, nessun prefab, nessun renderer produttivo, nessun DevTools, nessun top bar e nessun comando;
+  - ricerca statica sulle dipendenze vietate superata;
+  - `dotnet build Assembly-CSharp.csproj --no-restore` non conclusivo per mancanza del file temporaneo Unity `Temp/obj/Assembly-CSharp/project.assets.json`, restore non eseguito per non toccare cartelle temporanee;
+  - il gate `v0.38f.10` resta in attesa di test umano, ora con queue actor/object collegabile al wrapper.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
