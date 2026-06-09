@@ -23,6 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>MouseDeltaPixelsX/Y</b>: movimento mouse in pixel del frame.</item>
     ///   <item><b>PointerScreenX/Y</b>: posizione puntatore, se disponibile.</item>
     ///   <item><b>IsPointerOverUi</b>: blocco input quando la UI ha priorita'.</item>
+    ///   <item><b>IsPrimaryPointerPressedThisFrame</b>: click primario normalizzato per consumer selection/debug.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphViewInputFrame
@@ -35,6 +36,7 @@ namespace Arcontio.View.ArcGraph
         public readonly float PointerScreenY;
         public readonly bool HasPointerScreenPosition;
         public readonly bool IsPointerOverUi;
+        public readonly bool IsPrimaryPointerPressedThisFrame;
 
         // =============================================================================
         // ArcGraphViewInputFrame
@@ -58,7 +60,8 @@ namespace Arcontio.View.ArcGraph
             float pointerScreenX,
             float pointerScreenY,
             bool hasPointerScreenPosition,
-            bool isPointerOverUi)
+            bool isPointerOverUi,
+            bool isPrimaryPointerPressedThisFrame = false)
         {
             WheelStepDelta = wheelStepDelta;
             IsMiddleMouseHeld = isMiddleMouseHeld;
@@ -68,6 +71,7 @@ namespace Arcontio.View.ArcGraph
             PointerScreenY = pointerScreenY;
             HasPointerScreenPosition = hasPointerScreenPosition;
             IsPointerOverUi = isPointerOverUi;
+            IsPrimaryPointerPressedThisFrame = isPrimaryPointerPressedThisFrame;
         }
 
         // =============================================================================

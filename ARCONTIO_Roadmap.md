@@ -7162,7 +7162,8 @@ La chiusura di questa fase richiedera':
 | v0.38f.05 | Audit consumer interattivi: selection, pointer HUD, DevTools, top bar e side panel | Completato audit |
 | v0.38f.06 | Contratto passivo Pointer HUD ArcGraph, senza UI scena e senza comandi | Completato |
 | v0.38f.07 | Consumer scena Pointer HUD ArcGraph, gated e senza salvataggio scena | Completato |
-| v0.38f.08 | Consumer selection ArcGraph, separato dal renderer e senza DevTools | Pending |
+| v0.38f.08 | Consumer selection ArcGraph, separato dal renderer e senza DevTools | Completato |
+| v0.38f.09 | Router consumer interattivi ArcGraph per HUD + selection modulari | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9581,6 +9582,121 @@ Scopo:
 - non inviare comandi;
 - non leggere direttamente `MapGridWorldView`;
 - mantenere `NPCSelection` come servizio view-side esistente.
+
+## Esito v0.38f.08 - ArcGraph Selection Consumer
+
+La `v0.38f.08` introduce il consumer selection ArcGraph separato dal renderer.
+
+### File introdotto
+
+- `ArcGraphSelectionSceneConsumer`.
+
+### File modificati
+
+- `ArcGraphViewInputFrame`;
+- `ArcGraphInteractionSceneAdapterWrapper`.
+
+### Perche' e' stato esteso `ArcGraphViewInputFrame`
+
+Il boundary interattivo sapeva gia':
+
+- quale cella e' sotto il puntatore;
+- quale actor e' sotto il puntatore;
+- quale object e' sotto il puntatore;
+- se la UI blocca il puntatore.
+
+Pero' non sapeva se era stato premuto il click primario.
+
+Per fare selection corretta non basta il puntamento.
+Selezionare su hover sarebbe sbagliato.
+
+Quindi e' stato aggiunto:
+
+```text
+IsPrimaryPointerPressedThisFrame
+```
+
+Questo campo viene valorizzato solo dal wrapper Unity, cioe' dall'unico punto
+autorizzato a leggere input fisico.
+
+### Funzionamento
+
+Il flusso selection e':
+
+```text
+Mouse.leftButton.wasPressedThisFrame
+-> ArcGraphViewInputFrame.IsPrimaryPointerPressedThisFrame
+-> ArcGraphInteractionFrame
+-> ArcGraphSelectionSceneConsumer
+-> NPCSelection.Select(actorId)
+```
+
+Il consumer seleziona solo quando:
+
+- `selectionEnabled` e' attivo;
+- il puntatore non e' sopra UI;
+- il frame contiene click primario;
+- il target e' `Actor`;
+- l'actor id e' valido.
+
+Non seleziona su hover.
+Non fa clear automatico su cella vuota.
+Non seleziona object.
+Non invia comandi.
+
+### Coerenza con MapGrid legacy
+
+Il comportamento legacy di `MapGridWorldView` seleziona solo su left click sopra
+NPC e non fa nulla su cella vuota.
+
+Il consumer ArcGraph mantiene la stessa semantica di base, ma sposta la
+responsabilita' fuori dal renderer.
+
+### QA tecnica
+
+La compilazione isolata del consumer selection e del wrapper modificato e'
+riuscita con Roslyn `csc`, reference pack .NET, assembly Unity e
+`Unity.InputSystem`.
+
+Sono presenti solo warning attesi su campi `SerializeField` non assegnati nel
+controllo isolato.
+
+La ricerca statica conferma che:
+
+- l'input fisico resta nel wrapper;
+- il consumer selection non legge mouse;
+- il consumer selection non legge `MapGridWorldView`;
+- il consumer selection non legge `SimulationHost`;
+- il consumer selection non apre DevTools.
+
+### Nodo tecnico emerso
+
+Ora esistono almeno due consumer interattivi:
+
+- Pointer HUD;
+- Selection.
+
+Il wrapper attuale puo' dispatchare a un solo consumer.
+
+Serve quindi un router/fan-out consumer per collegare piu' moduli senza farli
+dipendere tra loro.
+
+### Prossimo micro-step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.09 - ArcGraph Interaction Consumer Router
+```
+
+Scopo:
+
+- introdurre un consumer composito;
+- inoltrare lo stesso frame a piu' consumer espliciti;
+- mantenere ogni consumer modulare;
+- non introdurre DevTools;
+- non inviare comandi;
+- non salvare scene.
 
 ---
 

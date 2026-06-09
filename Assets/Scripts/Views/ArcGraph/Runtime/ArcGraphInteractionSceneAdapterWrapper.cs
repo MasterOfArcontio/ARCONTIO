@@ -356,7 +356,8 @@ namespace Arcontio.View.ArcGraph
                 viewportPoint.x,
                 viewportPoint.y,
                 true,
-                isPointerOverUi);
+                isPointerOverUi,
+                mouse.leftButton.wasPressedThisFrame);
         }
 
         private static int ResolveWheelStep(float scrollY)
