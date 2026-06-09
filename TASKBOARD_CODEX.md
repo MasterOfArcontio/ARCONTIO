@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f - Separazione strumenti interattivi/dev tools dal renderer legacy`
+`v0.38f.01 - ArcGraph Interactive Tool Boundary Contract`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-arcgraph-interactive-tools-separation-audit`
+`ai-task/v0.38f-01-arcgraph-interactive-tool-boundary-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -45,9 +45,9 @@ OUTPUT ATTESO:
 - verificare cosa oggi MapGridWorldView gestisce per NPC, oggetti, sprite, label, collider e movimento;
 - verificare quali dati actor/object ArcGraph gia' riceve da `ArcGraphWorldAdapter`;
 - registrare il congelamento del gate visuale actor/object senza promuovere il probe a candidato produttivo;
-- auditare top bar, DevTools, click-to-move, pointer HUD, summary cards e selection;
-- separare strumenti interattivi/dev tools dal renderer legacy MapGrid;
-- distinguere cosa resta UI/tool separato da cosa puo' diventare overlay ArcGraph;
+- definire il confine tra renderer mappa ArcGraph e strumenti interattivi/debug;
+- preparare un contratto dati/eventi per picking cella, picking actor, coordinate e input view-side;
+- evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -170,7 +170,14 @@ Regola corrente:
   - la catena MapGridWorldView -> adapter -> wrapper -> coordinator -> feed -> queue -> probe renderer resta valida come ponte manuale read-only;
   - FOV current cone, FOV historical heatmap, pointer HUD, runtime cost HUD, label screen-space, summary cards, top bar, DevTools, click-to-move e selection restano fuori dal debug minimo;
   - questi elementi vanno auditati come strumenti interattivi/UI, non come semplice renderer.
-- prossimo checkpoint: `v0.38f - Separazione strumenti interattivi/dev tools dal renderer legacy`.
+- audit `v0.38f` completato:
+  - `MapGridWorldView` concentra ancora rendering, selection, click-to-move, FOV, summary overlay, pointer HUD, top bar, DevTools, audio feedback e rebind World;
+  - top bar e DevTools sono strumenti operativi, non renderer;
+  - summary cards, movement/MBQD panel, pointer HUD e runtime cost HUD sono UI/debug screen-space, non renderer mappa;
+  - `NPCSelection` e' gia' un servizio separato da conservare;
+  - il picking NPC/cella resta ancora dentro MapGrid e va spostato dietro un boundary;
+  - `v0.38g` non puo' partire davvero finche' il gate actor/object resta congelato e gli strumenti non hanno boundary separato.
+- prossimo checkpoint: `v0.38f.01 - ArcGraph Interactive Tool Boundary Contract`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

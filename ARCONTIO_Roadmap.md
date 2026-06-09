@@ -7154,8 +7154,8 @@ La chiusura di questa fase richiedera':
 | v0.38c.03 | Gate visuale terrain ArcGraph vs MapGrid | Completato |
 | v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Gate visuale congelato |
 | v0.38e | Aggancio overlay debug minimo validato | Completato audit |
-| v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Prossimo |
-| v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Pending |
+| v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Completato audit |
+| v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
 ## Esito v0.38a - ArcGraph Legacy Absorption Audit
@@ -8423,6 +8423,319 @@ Scopo del prossimo step:
 - distinguere cosa deve restare UI/tool separato da cosa puo' diventare overlay ArcGraph;
 - impedire che ArcGraph diventi un contenitore di comandi e strumenti operativi;
 - preparare il futuro pensionamento MapGrid senza perdere strumenti utili.
+
+## Esito v0.38f - Separazione strumenti interattivi/dev tools dal renderer legacy
+
+La `v0.38f` ha auditato gli strumenti interattivi e debug operativi che oggi
+vivono dentro o attorno a `MapGridWorldView`.
+
+L'obiettivo non era spostarli subito in ArcGraph, ma classificarli.
+Il risultato dell'audit e' netto: molti di questi elementi non sono rendering.
+Sono UI, input, selezione, strumenti operativi o comandi debug.
+
+### File principali auditati
+
+- `MapGridWorldView`;
+- `MapGridRuntimeControlTopBar`;
+- `MapGridRuntimeDevToolsOverlay`;
+- `MapGridPointerCoordsOverlay`;
+- `MapGridEntitySummaryOverlay`;
+- `MapGridRuntimeDebugAudioFeedback`;
+- `MapGridNpcViewHandle`;
+- `NPCSelection`.
+
+### Classificazione funzionale
+
+| Blocco | Natura reale | Destinazione corretta |
+|---|---|---|
+| Terrain legacy | Rendering mappa | ArcGraph terrain |
+| NPC/object sprite | Rendering entita' | ArcGraph actor/object |
+| FOV heatmap | Overlay diagnostico mappa | Futuro overlay ArcGraph, separato dal renderer principale |
+| Landmark/GVD/DT | Overlay diagnostico mappa | Gia' coperto dal debug minimo ArcGraph |
+| Landmark labels | UI screen-space | Canale UI separato, non mesh renderer |
+| Pointer cell coords | HUD screen-space | UI/debug HUD separato |
+| Runtime cost HUD | HUD diagnostico | UI/debug HUD separato |
+| Summary cards | UI diagnostica complessa | Modulo observer/debug separato |
+| Movement/MBQD panel | Explainability UI | Modulo observer/debug separato |
+| Top bar | Controllo runtime | Tool operativo separato |
+| DevTools overlay | Editor/debug operativo | Tool operativo separato |
+| Click-to-move | Comando debug verso job system | Tool operativo separato |
+| Selection NPC | Stato view-side condiviso | Servizio selection separato dal renderer |
+| Debug audio feedback | Presentazione/feedback audio | Modulo feedback separato |
+
+### Responsabilita' oggi concentrate in MapGridWorldView
+
+`MapGridWorldView` oggi contiene o coordina:
+
+- sync NPC e oggetti;
+- cache sprite;
+- stock label;
+- balloon;
+- flash decisionale;
+- collider/handle NPC;
+- selection tramite click;
+- click-to-move debug;
+- toggle FOV;
+- toggle landmark/GVD/DT;
+- pointer coordinates HUD;
+- summary overlay;
+- top bar runtime;
+- DevTools;
+- audio feedback;
+- rebind al `World` dopo load.
+
+Questo conferma che `MapGridWorldView` non puo' essere cancellato solo perche'
+ArcGraph disegna terrain o actor/object.
+Prima bisogna separare gli strumenti non-renderer.
+
+### Top bar
+
+`MapGridRuntimeControlTopBar` e' una UI operativa.
+
+Invia o attiva:
+
+- toggle DevTools/spawn;
+- pausa/riprendi;
+- step singolo;
+- step multiplo;
+- toggle FOV;
+- pin FOV.
+
+La top bar usa `SimulationHost.Instance` per pausa e step.
+Questo e' accettabile come tool debug/runtime, ma non deve entrare nel renderer
+ArcGraph.
+
+Destinazione corretta:
+
+```text
+RuntimeControlUI / DebugControlPanel
+```
+
+non:
+
+```text
+ArcGraphRenderer
+```
+
+### DevTools
+
+`MapGridRuntimeDevToolsOverlay` e' un editor/debug operativo runtime.
+
+Gestisce:
+
+- placement oggetti;
+- erase oggetti;
+- spawn NPC;
+- orientamento NPC;
+- erase NPC;
+- piazzamento porte;
+- piazzamento cibo;
+- save/load dev map;
+- save/load world snapshot;
+- assegnazione forzata transport object job;
+- comandi esterni verso `SimulationHost`.
+
+Usa:
+
+- `SimulationHost.Instance`;
+- `MapGridWorldProvider.TryGetWorld()`;
+- input tastiera/mouse;
+- IMGUI;
+- camera;
+- provider puntatore;
+- comandi `ICommand`.
+
+Quindi non e' un renderer e non deve essere assorbito da ArcGraph.
+
+Destinazione corretta:
+
+```text
+DevTools runtime separato con adapter mappa
+```
+
+L'adapter mappa potra' cambiare da MapGrid ad ArcGraph, ma il tool resta tool.
+
+### Selection
+
+`NPCSelection` e' gia' un servizio separato e condiviso.
+
+Aspetto positivo:
+
+- non dipende da MapGrid;
+- espone `SelectedNpcId`;
+- notifica tramite `OnSelectionChanged`;
+- viene usato anche da AtomViewer.
+
+Aspetto da migliorare in futuro:
+
+- il picking dell'NPC e' ancora dentro `MapGridWorldView`;
+- la selezione tramite click dipende dal renderer legacy;
+- ArcGraph dovra' avere un proprio adapter di picking che chiama lo stesso
+  servizio `NPCSelection`.
+
+Decisione:
+
+```text
+NPCSelection resta.
+Il picking va separato dal renderer.
+```
+
+### Click-to-move
+
+Il click-to-move debug oggi vive dentro `MapGridWorldView`.
+
+Fa due cose diverse:
+
+- interpreta input mappa;
+- chiama `SimulationHost.ForceAssignMoveToCellJobFromDevTools(...)`.
+
+Questo non e' rendering.
+E' un tool operativo che genera un job debug.
+
+Destinazione corretta:
+
+```text
+DebugCommandTool / ClickMoveTool
+```
+
+con input/picking forniti da un adapter visuale.
+
+### Summary cards e explainability
+
+`MapGridEntitySummaryOverlay` e' UI diagnostica complessa.
+
+Contiene:
+
+- card NPC;
+- card oggetti;
+- drag delle card;
+- linee UI;
+- dati memoria;
+- dati comunicazione;
+- dati inventory;
+- dati action/job;
+- explainability movement;
+- explainability MBQD;
+- refresh testuale throttled.
+
+Non deve essere trasformato in overlay ArcGraph.
+Deve diventare un modulo observer/debug separato, alimentato da:
+
+- `World`;
+- `NPCSelection`;
+- camera/coordinate mapping.
+
+ArcGraph puo' solo fornire coordinate/anchor, non possedere la logica della card.
+
+### Pointer HUD e runtime cost
+
+`MapGridPointerCoordsOverlay` e' HUD screen-space.
+
+Mostra:
+
+- coordinate cella;
+- stato in/out bounds;
+- costi runtime se `RuntimeCostObserver` e' attivo;
+- stato percettivo dell'NPC selezionato.
+
+Non e' rendering mappa.
+E' HUD diagnostico.
+
+Destinazione corretta:
+
+```text
+DebugHud separato
+```
+
+che riceve coordinate cella da un adapter mappa.
+
+### Debug audio
+
+`MapGridRuntimeDebugAudioFeedback` e' presentazione audio debug.
+
+Legge:
+
+- NPC selezionato;
+- movimento;
+- decision flash;
+- stato job;
+- job failure.
+
+Non produce comandi e non muta il mondo.
+Non e' renderer.
+
+Destinazione corretta:
+
+```text
+DebugFeedback separato
+```
+
+### Decisione tecnica v0.38f
+
+ArcGraph deve assorbire il rendering, non gli strumenti.
+
+La separazione corretta e':
+
+```text
+Simulation/World
+-> snapshot/render queue
+-> ArcGraph renderer
+
+Simulation/World + Selection + Input Adapter
+-> Debug/Observer/UI tools
+
+Debug/Observer/UI tools
+-> opzionalmente commands verso SimulationHost
+```
+
+ArcGraph puo' fornire:
+
+- conversione coordinate schermo/cella;
+- anchor visuali;
+- dati di picking;
+- eventi view-side come "cella cliccata" o "actor cliccato".
+
+ArcGraph non deve possedere:
+
+- DevTools;
+- top bar;
+- save/load;
+- spawn;
+- forced job assignment;
+- summary cards;
+- explainability panels;
+- audio debug;
+- policy di selezione globale.
+
+### Implicazione sulla v0.38g
+
+La `v0.38g`, cioe' il pensionamento controllato dei componenti MapGrid assorbiti,
+non puo' partire in modo completo ora.
+
+Motivi:
+
+- il gate visuale actor/object `v0.38d.03` e' congelato;
+- gli strumenti interattivi sono ancora agganciati a `MapGridWorldView`;
+- top bar, DevTools, summary e pointer HUD non hanno ancora adapter ArcGraph;
+- cancellare MapGrid ora farebbe perdere strumenti operativi utili.
+
+### Prossimo lavoro consigliato
+
+Prima del pensionamento MapGrid serve un micro-step preparatorio:
+
+```text
+v0.38f.01 - ArcGraph Interactive Tool Boundary Contract
+```
+
+Scopo:
+
+- definire un contratto dati/eventi tra renderer mappa e strumenti debug;
+- evitare che DevTools dipenda direttamente da MapGrid;
+- evitare che ArcGraph possieda DevTools;
+- preparare adapter futuri per picking cella, picking actor, camera e coordinate.
+
+Questo micro-step puo' essere progettuale o implementativo leggero, ma non deve
+ancora cancellare legacy.
 
 ---
 
