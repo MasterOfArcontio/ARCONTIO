@@ -28,24 +28,26 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.06 - ArcGraph Pointer HUD Passive Contract`
+`v0.38f.07 - ArcGraph Pointer HUD Scene Consumer`
 
 STATUS:
 OPERATIVO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-06-arcgraph-pointer-hud-contract`
+`ai-task/v0.38f-07-arcgraph-pointer-hud-scene-consumer`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- introdurre un contratto passivo per il Pointer HUD ArcGraph;
-- trasformare `ArcGraphInteractionFrame` in uno snapshot HUD leggibile;
-- mostrare cella, target actor/object/cell, stato UI bloccante e ragione diagnostica;
-- restare data-only, senza UI Unity produttiva;
-- preparare il futuro pannello laterale/superiore senza copiarlo da MapGrid;
+- introdurre un consumer Unity gated per il Pointer HUD ArcGraph;
+- usare `ArcGraphPointerHudSnapshotBuilder` come sorgente dati;
+- implementare `IArcGraphInteractionFrameConsumer`;
+- creare UI temporanea solo se esplicitamente abilitata;
+- non salvare scene e non modificare prefab;
+- non copiare il monolite `MapGridPointerCoordsOverlay`;
+- non introdurre selection, DevTools, top bar o comandi;
 - mantenere il wrapper `v0.38f.04` come frontiera input, non come tool host;
 - evitare di trasformare subito ArcGraph in gestore operativo UI;
 - evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
@@ -223,6 +225,15 @@ Regola corrente:
   - FOV current cone richiede un producer overlay dedicato e non appartiene al primo consumer;
   - ordine consigliato: Pointer HUD, selection, overlay NPC, side panel, top bar separata, DevTools command tool, FOV producer;
   - prossimo checkpoint: `v0.38f.06 - ArcGraph Pointer HUD Passive Contract`.
+- micro-step `v0.38f.06` completato:
+  - introdotto `ArcGraphPointerHudSnapshot`;
+  - introdotta diagnostica `ArcGraphPointerHudDiagnostics`;
+  - introdotto `ArcGraphPointerHudSnapshotBuilder`;
+  - introdotto harness `ArcGraphPointerHudSnapshotBuilderHarness`;
+  - il builder trasforma `ArcGraphInteractionFrame` in testo HUD minimale: cella, actor, object, UI blocked o unknown;
+  - nessun `GameObject`, `MonoBehaviour`, `Canvas`, `Resources.Load`, `SimulationHost`, `MapGridWorldView`, `MapGridWorldProvider`, `NPCSelection` o input fisico Unity;
+  - compilazione isolata riuscita con Roslyn `csc` e reference pack .NET;
+  - prossimo checkpoint: `v0.38f.07 - ArcGraph Pointer HUD Scene Consumer`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

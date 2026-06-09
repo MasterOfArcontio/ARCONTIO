@@ -7160,7 +7160,8 @@ La chiusura di questa fase richiedera':
 | v0.38f.03 | Contratto adapter scena interazione ArcGraph, senza migrazione pannelli | Completato |
 | v0.38f.04 | Wrapper Unity passivo per input scena ArcGraph, spento/gated e senza tool migration | Completato |
 | v0.38f.05 | Audit consumer interattivi: selection, pointer HUD, DevTools, top bar e side panel | Completato audit |
-| v0.38f.06 | Contratto passivo Pointer HUD ArcGraph, senza UI scena e senza comandi | Pending |
+| v0.38f.06 | Contratto passivo Pointer HUD ArcGraph, senza UI scena e senza comandi | Completato |
+| v0.38f.07 | Consumer scena Pointer HUD ArcGraph, gated e senza salvataggio scena | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9377,6 +9378,113 @@ Scopo:
 - non leggere `SimulationHost`;
 - non agganciarsi a `MapGridWorldView`;
 - non salvare scene.
+
+## Esito v0.38f.06 - ArcGraph Pointer HUD Passive Contract
+
+La `v0.38f.06` introduce il primo consumer passivo concreto del boundary
+interattivo ArcGraph.
+
+Non e' ancora un pannello Unity.
+Non crea Canvas.
+Non crea GameObject.
+Non legge mouse fisico.
+Non legge `World`.
+Non legge `SimulationHost`.
+Non dipende da `MapGridWorldView`.
+
+### File introdotti
+
+- `ArcGraphPointerHudSnapshot`;
+- `ArcGraphPointerHudDiagnostics`;
+- `ArcGraphPointerHudSnapshotBuilder`;
+- `ArcGraphPointerHudSnapshotBuilderHarness`.
+
+### Funzionamento
+
+Il flusso dati e':
+
+```text
+ArcGraphInteractionFrame
+-> ArcGraphPointerHudSnapshotBuilder
+-> ArcGraphPointerHudSnapshot
+-> futuro consumer UI
+```
+
+Lo snapshot contiene:
+
+- visibilita' logica;
+- presenza del frame interattivo;
+- presenza puntatore;
+- cella valida;
+- blocco UI;
+- target prioritario;
+- id actor;
+- id object;
+- motivo interattivo;
+- motivo adapter;
+- testo display minimale.
+
+Esempi di testo prodotto:
+
+```text
+Cell: 12,14 | Actor #7
+Cell: 2,3
+Cell: -,- | UI blocked
+Cell: -,-
+```
+
+### Scopo tecnico
+
+Questo step permette di testare il primo consumer senza introdurre UI reale.
+
+Il Pointer HUD diventa quindi:
+
+```text
+consumer passivo del frame
+```
+
+e non:
+
+```text
+lettore autonomo di mouse/camera/world
+```
+
+### QA tecnica
+
+La compilazione isolata dei file nuovi e delle dipendenze strette e' riuscita
+con Roslyn `csc` e reference pack .NET.
+
+La ricerca statica non trova dipendenze operative da:
+
+- `GameObject`;
+- `MonoBehaviour`;
+- `Canvas`;
+- `Resources.Load`;
+- `SimulationHost`;
+- `MapGridWorldView`;
+- `MapGridWorldProvider`;
+- `NPCSelection`;
+- input fisico Unity.
+
+Le occorrenze residue di parole come `GameObject`, `Canvas` e `Text` sono solo
+commenti o campi dati come `DisplayText`.
+
+### Prossimo micro-step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.07 - ArcGraph Pointer HUD Scene Consumer
+```
+
+Scopo:
+
+- introdurre un consumer Unity gated che implementi `IArcGraphInteractionFrameConsumer`;
+- usare lo snapshot `v0.38f.06`;
+- creare un HUD di scena temporaneo solo se abilitato;
+- non salvare scene;
+- non copiare il monolite `MapGridPointerCoordsOverlay`;
+- non introdurre DevTools, selection o comandi.
 
 ---
 
