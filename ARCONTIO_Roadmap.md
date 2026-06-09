@@ -7166,6 +7166,7 @@ La chiusura di questa fase richiedera':
 | v0.38f.09 | Router consumer interattivi ArcGraph per HUD + selection modulari | Completato |
 | v0.38f.10a | Probe manuale per consegnare la render queue actor/object al wrapper interattivo | Completato |
 | v0.38f.10 | Gate visuale consumer modulari ArcGraph: wrapper -> router -> HUD + selection | Gate visuale congelato |
+| v0.38g.00 | Audit dipendenze pensionamento MapGrid dopo gate visuali congelati | Completato audit |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9945,6 +9946,121 @@ Non bisogna ancora:
 
 Il prossimo lavoro puo' proseguire solo su blocchi che non dipendono dall'esito
 visivo di questo gate, oppure deve restare preparatorio/audit-first.
+
+## Esito v0.38g.00 - ArcGraph Legacy Retirement Dependency Audit
+
+La `v0.38g.00` auditata chiarisce cosa puo' essere preparato per il
+pensionamento di MapGrid e cosa invece resta bloccato dai gate visuali
+congelati.
+
+L'audit e' stato eseguito in sola lettura.
+Non sono stati modificati file runtime, scene, prefab o asset.
+
+### Conclusione principale
+
+Il pensionamento reale di `MapGridWorldView`, `MapGridBootstrap` e strumenti
+collegati non puo' partire ora.
+
+Il motivo non e' che ArcGraph non abbia contratti: molti contratti esistono.
+Il motivo e' che una parte critica della catena visuale non e' ancora validata
+in Unity:
+
+- actor/object ArcGraph esiste come probe, ma il gate visuale resta congelato;
+- interazione ArcGraph HUD + selection esiste come catena tecnica, ma il gate
+  visuale resta congelato;
+- il terrain ArcGraph e' il solo blocco visuale gia' verificato positivamente;
+- top bar, DevTools, summary UI, click-to-move, FOV current cone e label
+  screen-space restano ancora MapGrid-centrici o non migrati.
+
+### Matrice dipendenze
+
+| Componente MapGrid | Responsabilita' attuale | Equivalente ArcGraph esiste? | Validato? | Pensionabile ora? | Bloccante residuo |
+|---|---|---|---|---|---|
+| `MapGridChunkRenderer` | Rendering mesh terrain chunked | Si': `ArcGraphTerrainChunkMeshBuilder` + `ArcGraphTerrainSceneProbeRenderer` | Si', gate terrain superato | Non ancora fisicamente | Manca renderer terrain produttivo permanente e piano bootstrap ArcGraph |
+| `MapGridData` | Buffer view-side terrain/blocco | Parziale: sorgente legacy via `ArcGraphTerrainRuntimeMapGridAdapter` | Si' per terrain snapshot | No | Resta sorgente temporanea finche' non esiste modello mappa ArcGraph/World definitivo |
+| `MapGridTileAtlas` | UV atlas tile legacy | Parziale: `ArcGraphTerrainTileUvMap` deriva da config | Si' nel probe terrain | No | Serve asset/UV policy definitiva, non solo bridge legacy |
+| `MapGridBootstrap` | Carica config/layout, costruisce `MapGridData`, chunk terrain, camera, pointer provider e attach view | Parziale: ArcGraph ha bootstrap runtime data-only, non bootstrap scena produttivo | No | No | Troppa responsabilita' ancora concentrata nel bootstrap MapGrid |
+| `MapGridCameraController` | Camera concreta, pan, zoom, PixelPerfectCamera, input mouse | Parziale: `ArcGraphViewController`, `ArcGraphViewState`, `ArcGraphInteractionSceneAdapterWrapper` | No | No | Manca wrapper camera/viewport produttivo e gate zoom/pan visuale completo |
+| `MapGridPointerInputActionsProvider` | Provider puntatore New Input System per MapGrid | Parziale: wrapper interazione ArcGraph legge input fisico direttamente | No | No | Gate interazione congelato, politica definitiva input ancora da stabilizzare |
+| `MapGridWorldView` actor sync | Crea/aggiorna `SpriteRenderer` NPC, collider, handle, flash decisionale e balloon | Parziale: `ArcGraphWorldAdapter`, actor layer, render queue, actor/object probe | Gate actor/object congelato | No | Manca renderer actor/object produttivo, pooling, asset resolver definitivo, validazione scena |
+| `MapGridWorldView` object sync | Crea/aggiorna sprite oggetti, stock label, cleanup | Parziale: object snapshot, object layer, render queue, actor/object probe | Gate actor/object congelato | No | Stock label e asset resolver non sono ancora equivalenti produttivi |
+| `MapGridWorldView` selection | Click sinistro su NPC aggiorna `NPCSelection` | Si': `ArcGraphSelectionSceneConsumer` | Gate interazione congelato | No | Picking actor e click selection non validati in Unity |
+| `MapGridWorldView` click-to-move | Tool debug K + click cella verso `SimulationHost` | No come ArcGraph tool | No | No | Va separato come DevTools command tool esterno ad ArcGraph renderer |
+| `MapGridRuntimeDevToolsOverlay` | DevTools F3, place/erase/spawn/orient/transport, comandi core | No come modulo separato ArcGraph | No | No | Dipende ancora da MapGridWorldView, pointer provider, camera, `SimulationHost` |
+| `MapGridRuntimeControlTopBar` | Barra runtime pausa/step/spawn/FOV | No come modulo UI separato ArcGraph | No | No | Usa `SimulationHost`, `MapGridWorldView`, DevTools e Canvas creato runtime |
+| `MapGridPointerCoordsOverlay` | HUD coordinate cella + runtime cost | Parziale: `ArcGraphPointerHudSceneConsumer` | Gate interazione congelato | No | HUD ArcGraph non validato in scena; runtime cost non ancora migrato |
+| `MapGridFovHeatmapOverlay` | FOV current cone e heatmap debug | Parziale per overlay debug generico, non per current cone | No | No | Serve producer ArcGraph dedicato per FOV current cone |
+| `MapGridLandmarkOverlay` | Landmark, route, GVD-DIN, edge, DT heatmap | Parziale/si': debug overlay queue + runtime feed Landmark/GVD | Si' per ponte manuale debug v0.37 | Non fisicamente | Label screen-space e wiring produttivo restano fuori |
+| `MapGridLandmarkLabelOverlay` | Label Canvas per nodi Landmark/GVD | No equivalente definitivo | No | No | Serve canale UI/screen-space separato |
+| `MapGridDtValueOverlay` | Valori numerici DT su Canvas/screen-space | Parziale come debug data, non come label UI | No | No | Serve canale testo overlay ArcGraph |
+| `MapGridEntitySummaryOverlay` | Summary cards NPC/oggetti | No | No | No | Da riprogettare come pannello/overlay UI modulare, non renderer |
+| `MapGridNpcBalloonView` | Balloon sopra NPC per eventi/token | No equivalente ArcGraph | No | No | Richiede overlay NPC/anchor layer separato |
+| `MapGridStockLabel` | Label quantita' stock su oggetti | No equivalente produttivo | No | No | Va deciso se label world-space o UI overlay |
+| `MapGridRuntimeDebugAudioFeedback` | Feedback audio debug da World | No equivalente ArcGraph | No | No | Non e' renderer, va separato come consumer debug/audio |
+| `MapGridWorldProvider` | Provider statico del World per MapGrid | ArcGraph evita accesso globale, usa adapter espliciti | Parziale | No | Serve sorgente neutra/bootstrap scena prima della rimozione |
+
+### Classificazione operativa
+
+Blocchi quasi pronti ma non eliminabili subito:
+
+- terrain rendering legacy;
+- Landmark/GVD debug bridge preparatorio.
+
+Blocchi tecnicamente implementati ma congelati da test visuali:
+
+- actor/object scene probe;
+- render queue actor/object verso wrapper interattivo;
+- Pointer HUD ArcGraph;
+- selection ArcGraph;
+- router consumer interattivi.
+
+Blocchi ancora da progettare o migrare:
+
+- camera/input produttivi ArcGraph;
+- renderer terrain produttivo permanente;
+- renderer actor/object produttivo con pooling;
+- asset resolver sprite definitivo;
+- top bar modulare;
+- DevTools command tool separato;
+- click-to-move debug;
+- summary cards;
+- overlay NPC/balloon;
+- stock label;
+- FOV current cone;
+- label screen-space Landmark/GVD/DT;
+- audio feedback debug.
+
+### Decisione tecnica v0.38g.00
+
+`v0.38g` non deve ancora cancellare componenti MapGrid.
+
+La forma corretta del prossimo lavoro non e' "rimuovere MapGrid", ma consolidare
+il backlog dei gate visuali e preparare un piano di recupero test:
+
+```text
+v0.38g.01 - ArcGraph Frozen Visual Gates Backlog Plan
+```
+
+Scopo consigliato:
+
+- raccogliere in una sola lista i gate visuali congelati;
+- definire l'ordine in cui testarli quando l'operatore potra' usare Unity;
+- indicare per ogni gate quali componenti Inspector servono;
+- indicare quali blocchi `v0.38g` restano bloccati da quel gate;
+- evitare di aggiungere nuovi moduli prima di sapere quali probe funzionano in
+  scena.
+
+### Stop confermato
+
+```text
+Non cancellare MapGridWorldView.
+Non cancellare MapGridBootstrap.
+Non cancellare MapGridRuntimeDevToolsOverlay.
+Non pensionare selection legacy.
+Non dichiarare actor/object ArcGraph produttivo.
+Non dichiarare interaction HUD/selection validati.
+Non procedere a rimozione fisica finche' i gate congelati non sono recuperati.
+```
 
 ---
 

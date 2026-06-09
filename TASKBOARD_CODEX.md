@@ -28,27 +28,26 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.10 - ArcGraph Interaction Modular Consumers Visual Gate`
+`v0.38g.00 - ArcGraph Legacy Retirement Dependency Audit`
 
 STATUS:
-GATE VISUALE CONGELATO
+COMPLETATO AUDIT / IN ATTESA PROSSIMO GO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-10-arcgraph-interaction-consumers-visual-gate-ready`
+`ai-task/v0.38g-00-arcgraph-legacy-retirement-dependency-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- verificare in Unity il wiring wrapper -> router -> Pointer HUD + Selection;
-- usare il probe `ArcGraphInteractionRenderQueueWiringProbe` per consegnare al wrapper la queue actor/object prima del gate;
-- non aggiungere altro codice nuovo prima del gate visuale;
-- controllare che il Pointer HUD mostri cella, actor e UI blocked;
-- controllare che la selection avvenga solo su click primario sopra actor;
-- controllare che HUD e selection convivano senza dipendere tra loro;
-- gate visuale congelato su richiesta dell'operatore: i test verranno recuperati insieme agli altri test Unity;
+- auditare le dipendenze residue prima del pensionamento MapGrid;
+- distinguere componenti assorbiti, componenti congelati da gate visuali e componenti non ancora migrati;
+- non cancellare componenti MapGrid;
+- non modificare codice runtime;
 - non salvare scene e non modificare prefab;
+- non dichiarare produttivo ArcGraph actor/object o interaction finche' i gate visuali restano congelati;
+- preparare il prossimo step come piano di recupero dei gate visuali congelati;
 - non introdurre DevTools, top bar o comandi;
 - non leggere direttamente `MapGridWorldView`;
 - mantenere il wrapper `v0.38f.04` come frontiera input, non come tool host;
@@ -281,6 +280,15 @@ Regola corrente:
   - catena tecnica pronta ma non validata in scena;
   - da recuperare insieme agli altri test visuali congelati;
   - non considerare completata la migrazione interattiva ArcGraph finche' Pointer HUD, picking actor e selection non saranno verificati manualmente.
+- audit `v0.38g.00` completato:
+  - `MapGridChunkRenderer` e' il blocco piu' vicino al pensionamento, ma manca ancora renderer terrain produttivo permanente;
+  - actor/object ArcGraph esiste come probe ma resta bloccato dal gate visuale congelato;
+  - interaction ArcGraph HUD/selection esiste come catena tecnica ma resta bloccata dal gate visuale congelato;
+  - `MapGridWorldView` non e' pensionabile perche' contiene ancora sync NPC/oggetti, selection, click-to-move, FOV, Landmark/GVD, DT, pointer coords, summary, top bar bridge, audio e rebind World;
+  - `MapGridRuntimeDevToolsOverlay` e `MapGridRuntimeControlTopBar` non sono renderer e devono diventare moduli UI/tool separati prima di qualunque rimozione;
+  - FOV current cone, label screen-space, balloon NPC, stock label e summary cards non hanno ancora equivalente ArcGraph produttivo;
+  - `v0.38g` resta bloccato come pensionamento reale;
+  - prossimo step consigliato: `v0.38g.01 - ArcGraph Frozen Visual Gates Backlog Plan`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
