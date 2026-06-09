@@ -10923,6 +10923,128 @@ Il prossimo step accelerato puo' passare al renderer NPC minimo.
 
 ---
 
+## Esito v0.38h.03 - ArcGraph NPC Runtime Renderer Minimo
+
+La `v0.38h.03` accelera contratto e implementazione del renderer NPC runtime
+minimo nello stesso step.
+
+### File introdotti
+
+- `ArcGraphNpcRuntimeSceneRendererContract`;
+- `ArcGraphNpcRuntimeSceneRendererDiagnostics`;
+- `ArcGraphNpcRuntimeSceneRenderer`.
+
+### Funzione
+
+Il nuovo renderer materializza gli NPC ArcGraph in scena usando una
+`ArcGraphRenderQueue` gia' preparata dal percorso runtime:
+
+```text
+ArcGraphMinimalRuntimeSceneWrapper
+-> ArcGraphMinimalRuntimeCoordinator
+-> ArcGraphRenderQueue
+-> ArcGraphActorObjectSceneRenderPlanBuilder
+-> ArcGraphNpcRuntimeSceneRenderer
+```
+
+Il renderer non disegna oggetti generici. Filtra solo le entry `Actor` e lascia
+gli object a un renderer dedicato futuro.
+
+### Differenza rispetto al probe actor/object
+
+Il probe actor/object resta un test temporaneo:
+
+- costruisce un root di probe;
+- crea sprite scene-side per validare il percorso;
+- non mantiene un pool runtime pensato per uso stabile.
+
+Il renderer NPC runtime invece:
+
+- mantiene un root locale stabile;
+- conserva un pool per `actorId`;
+- riusa `GameObject` e `SpriteRenderer` per NPC gia' presenti;
+- aggiorna posizione, sorting e sprite;
+- disattiva opzionalmente gli actor non piu' presenti nella queue;
+- e' pronto per essere collegato al wrapper minimo nello step successivo.
+
+### Entry point
+
+Il renderer espone:
+
+- `RenderFromQueue`, per il futuro collegamento diretto col wrapper/coordinator;
+- `RenderFromRuntimeWrapper`, per test manuale usando la queue gia' esposta dal wrapper;
+- context menu `ArcGraph/Render NPC Runtime From Wrapper Queue`;
+- context menu `ArcGraph/Clear NPC Runtime Renderer`.
+
+### Sprite
+
+Il renderer usa `IArcGraphSpriteResolver` se un resolver e' assegnato da
+Inspector.
+
+Se non esiste ancora uno sprite asset definitivo, il renderer puo' generare un
+fallback magenta opzionale. Questo fallback serve solo a non bloccare il gate
+visuale tecnico: non e' una soluzione artistica definitiva.
+
+### Confini preservati
+
+Il renderer:
+
+- e' spento di default;
+- non legge `SimulationHost`;
+- non legge `MapGridWorldProvider`;
+- non legge `MapGridWorldView`;
+- non legge `NPCSelection`;
+- non usa `FindObjectOfType`;
+- non usa `Resources.Load`;
+- non invia comandi;
+- non salva scene o prefab;
+- non cancella MapGrid;
+- non renderizza oggetti generici;
+- non sostituisce ancora `MapGridWorldView`.
+
+### Diagnostica
+
+La diagnostica misura:
+
+- renderer abilitato;
+- contratto valido;
+- queue presente;
+- resolver sprite presente;
+- piano actor/object costruito;
+- entry totali in queue;
+- actor item presenti;
+- actor entry pianificate;
+- NPC renderizzati;
+- oggetti NPC creati;
+- oggetti NPC riusati;
+- oggetti NPC disattivati;
+- oggetti NPC attivi;
+- sprite mancanti;
+- fallback generati.
+
+### QA tecnica
+
+La ricerca statica sui nuovi file non rileva dipendenze vietate.
+
+E' stato eseguito un controllo Roslyn isolato sui tre file nuovi usando assembly
+Unity gia' disponibili. Il controllo e' riuscito con un solo warning atteso su
+campo `SerializeField` assegnabile da Inspector.
+
+### Stato dopo v0.38h.03
+
+ArcGraph possiede ora:
+
+- renderer runtime terrain minimo;
+- renderer runtime NPC minimo;
+- wrapper/coordinator minimo che gia' produce una queue actor/object;
+- probe e gate precedenti ancora disponibili per confronto.
+
+Manca ancora il cablaggio automatico tra wrapper/coordinator e renderer terrain +
+NPC. Il prossimo step deve collegare questi componenti in modo esplicito, gated e
+spento di default, preparando un gate visuale unico.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38h.02 - ArcGraph Terrain Runtime Renderer Minimo`
+`v0.38h.03 - ArcGraph NPC Runtime Renderer Minimo`
 
 STATUS:
-TERRAIN RUNTIME MINIMO IMPLEMENTATO / PROSSIMO STEP NPC RUNTIME
+NPC RUNTIME MINIMO IMPLEMENTATO / PROSSIMO STEP WIRING WRAPPER + GATE
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38h-arcgraph-terrain-npc-minimal-runtime`
@@ -404,6 +404,26 @@ Regola corrente:
   - `dotnet build Assembly-CSharp.csproj --no-restore` non conclusivo per mancanza del file Unity temporaneo `Temp/obj/Assembly-CSharp/project.assets.json`;
   - controllo Roslyn isolato sui tre file nuovi riuscito, con solo warning atteso su campo `SerializeField` assegnabile da Inspector;
   - prossimo step accelerato: `v0.38h.03 - ArcGraph NPC Runtime Renderer Minimo`.
+- micro-step `v0.38h.03` completato:
+  - introdotto `ArcGraphNpcRuntimeSceneRendererContract`;
+  - introdotto `ArcGraphNpcRuntimeSceneRendererDiagnostics`;
+  - introdotto `ArcGraphNpcRuntimeSceneRenderer`;
+  - il renderer NPC runtime e' spento di default;
+  - consuma una `ArcGraphRenderQueue` gia' prodotta dal wrapper/coordinator;
+  - puo' renderizzare manualmente dalla queue esposta da `ArcGraphMinimalRuntimeSceneWrapper`;
+  - riusa il builder passivo actor/object per posizione mondo, sorting order e sprite request;
+  - filtra solo entry `Actor`, lasciando gli oggetti a un renderer dedicato futuro;
+  - mantiene un root locale stabile `ArcGraphNpcRuntimeRoot`;
+  - mantiene un pool per `actorId`;
+  - riusa `GameObject` e `SpriteRenderer` per NPC gia' esistenti;
+  - disattiva opzionalmente gli actor non piu' presenti nel frame;
+  - usa `IArcGraphSpriteResolver` se assegnato da Inspector;
+  - puo' generare un fallback magenta opzionale per non bloccare il gate senza asset definitivi;
+  - non legge `SimulationHost`, `MapGridWorldProvider`, `MapGridWorldView`, `NPCSelection` o globali scena;
+  - non usa `FindObjectOfType`, non carica asset, non invia comandi e non salva scene;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn isolato sui tre file nuovi riuscito, con solo warning atteso su campo `SerializeField` assegnabile da Inspector;
+  - prossimo step: `v0.38h.04 - ArcGraph Minimal Runtime Wiring + Gate`.
 
 DOC SYNC:
 
