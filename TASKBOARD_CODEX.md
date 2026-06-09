@@ -28,23 +28,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.02 - ArcGraph Interaction Scene Adapter Audit`
+`v0.38f.03 - ArcGraph Interaction Scene Adapter Contract`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-02-arcgraph-interaction-scene-adapter-audit`
+`ai-task/v0.38f-03-arcgraph-interaction-scene-adapter-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- auditare il punto scena piu' sicuro per produrre `ArcGraphInteractionFrame`;
-- verificare dove leggere mouse, camera, viewport e stato UI senza accoppiare ArcGraph ai tool;
-- mantenere pannello laterale, barra superiore, overlay NPC e strumenti debug come moduli separati;
-- usare il boundary `v0.38f.01` come contratto passivo, non come host dei tool;
+- introdurre un contratto passivo per il futuro `ArcGraphInteractionSceneAdapter`;
+- definire diagnostica minima di input, viewport, UI block e frame interattivo;
+- valutare se serve una interfaccia consumer per tool esterni;
+- mantenere il contratto separato da DevTools, SelectionTool, TopBar, SidePanel e NpcOverlay;
 - evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
 - evitare che i tool continuino a dipendere direttamente da `MapGridWorldView`;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
@@ -187,7 +187,13 @@ Regola corrente:
   - nessun `GameObject`, `SpriteRenderer`, input fisico Unity, command tool, selection globale, `SimulationHost` o `MapGridWorldView`;
   - compilazione isolata riuscita con `dotnet csc`;
   - ricerca statica: dipendenze vietate assenti nel codice operativo, occorrenze solo nei commenti.
-- prossimo checkpoint: `v0.38f.02 - ArcGraph Interaction Scene Adapter Audit`.
+- audit `v0.38f.02` completato:
+  - `MapGridWorldView` legge direttamente keyboard, mouse, EventSystem, provider puntatore e camera per hotkey, selection, FOV, pointer HUD e click-to-move;
+  - `MapGridRuntimeDevToolsOverlay` e' separato ma dipende ancora da MapGridWorldView, provider puntatore, camera, Mouse/Keyboard/EventSystem e SimulationHost per i comandi;
+  - `MapGridCameraController` non e' riutilizzabile come base ArcGraph: ArcGraph possiede gia' `ArcGraphViewInputFrame`, `ArcGraphViewController` e mapper viewport/cella;
+  - il futuro adapter scena deve leggere input Unity e produrre frame passivi, non selezionare NPC o inviare comandi;
+  - pannello laterale, barra superiore, overlay NPC, pointer HUD e DevTools vanno trattati come moduli consumer separati.
+- prossimo checkpoint: `v0.38f.03 - ArcGraph Interaction Scene Adapter Contract`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

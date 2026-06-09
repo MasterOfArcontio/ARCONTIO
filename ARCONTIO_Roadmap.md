@@ -7156,7 +7156,8 @@ La chiusura di questa fase richiedera':
 | v0.38e | Aggancio overlay debug minimo validato | Completato audit |
 | v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Completato audit |
 | v0.38f.01 | Contratto passivo boundary interattivo ArcGraph per picking cella/actor/object | Completato |
-| v0.38f.02 | Audit adapter scena interazione ArcGraph, input, camera e pannelli debug modulari | Pending |
+| v0.38f.02 | Audit adapter scena interazione ArcGraph, input, camera e pannelli debug modulari | Completato audit |
+| v0.38f.03 | Contratto adapter scena interazione ArcGraph, senza migrazione pannelli | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -8830,6 +8831,195 @@ Scopo:
 - mantenere separati pannello laterale, barra superiore, overlay NPC e strumenti debug;
 - evitare che ArcGraph diventi host dei tool;
 - evitare che i tool restino agganciati direttamente a `MapGridWorldView`.
+
+## Esito v0.38f.02 - ArcGraph Interaction Scene Adapter Audit
+
+La `v0.38f.02` auditata stabilisce dove deve vivere il futuro adapter scena
+responsabile di input, viewport, stato UI e dispatch dei frame interattivi
+ArcGraph.
+
+Il risultato principale e' che non bisogna copiare `MapGridWorldView` dentro
+ArcGraph. La MapGrid oggi concentra troppe responsabilita' nello stesso
+componente:
+
+- rendering NPC/oggetti;
+- hotkey debug;
+- selezione NPC;
+- click-to-move;
+- FOV/landmark/GVD/DT;
+- pointer coordinates HUD;
+- summary cards;
+- top bar;
+- audio debug;
+- rebind del World;
+- bridge DevTools.
+
+ArcGraph non deve ereditare questa forma.
+
+### Stato MapGrid attuale
+
+`MapGridWorldView` legge direttamente input Unity:
+
+- `Keyboard.current` per F9, L, G, D e K;
+- `Mouse.current.leftButton` per selezione NPC e click-to-move;
+- `EventSystem.current.IsPointerOverGameObject()` per evitare click sulla UI;
+- `MapGridPointerInputActionsProvider` per leggere il puntatore;
+- `Camera.ScreenToWorldPoint` per trasformare lo schermo in celle.
+
+Inoltre `MapGridWorldView` modifica `NPCSelection` quando il click sinistro
+colpisce un NPC e puo' chiamare `SimulationHost.ForceAssignMoveToCellJobFromDevTools`
+quando il click-to-move debug e' attivo.
+
+Questo comportamento non deve passare nel renderer ArcGraph.
+
+### Stato DevTools attuale
+
+`MapGridRuntimeDevToolsOverlay` e' gia' concettualmente separato dalla view, ma
+ha ancora dipendenze legacy:
+
+- auto-bind tramite `FindObjectOfType<MapGridWorldView>`;
+- fallback su `FindObjectOfType<MapGridPointerInputActionsProvider>`;
+- fallback su `Camera.main` o `FindObjectOfType<Camera>`;
+- lettura diretta di `Mouse.current`;
+- lettura diretta di `Keyboard.current`;
+- uso di `EventSystem.current.IsPointerOverGameObject()`;
+- conversione puntatore/cella interna;
+- emissione comandi verso `SimulationHost.Instance.EnqueueExternalCommand`.
+
+Per ArcGraph questo significa: i DevTools non devono essere assorbiti dal renderer,
+ma devono ricevere un frame interattivo gia' pronto da un adapter esterno.
+
+### Stato camera/pan/zoom legacy
+
+`MapGridCameraController` gestisce zoom e pan leggendo direttamente:
+
+- rotellina mouse;
+- tasto destro per drag pan;
+- `Mouse.delta`;
+- `EventSystem.current`;
+- coordinate mouse per zoom-to-cursor.
+
+ArcGraph ha gia' un modello diverso e piu' pulito:
+
+- `ArcGraphViewInputFrame`;
+- `ArcGraphViewController`;
+- `ArcGraphViewCoordinateMapper`;
+- `ArcGraphInteractionBoundaryBuilder`.
+
+Quindi il futuro adapter scena non deve riusare `MapGridCameraController`.
+Deve solo leggere input Unity e convertirlo in `ArcGraphViewInputFrame`.
+
+### Modello consigliato
+
+Il futuro componente scena consigliato e':
+
+```text
+ArcGraphInteractionSceneAdapter
+```
+
+Responsabilita':
+
+- leggere mouse/rotellina/tasto centrale da Unity;
+- leggere se il puntatore e' sopra UI;
+- conoscere camera o viewport solo per ricavare coordinate viewport;
+- costruire `ArcGraphViewInputFrame`;
+- aggiornare `ArcGraphViewState` tramite `ArcGraphViewController`;
+- costruire `ArcGraphInteractionFrame` tramite `ArcGraphInteractionBoundaryBuilder`;
+- esporre `LastInputFrame`, `LastInteractionFrame` e diagnostica;
+- opzionalmente notificare consumer esterni tramite metodo o interfaccia passiva.
+
+Non deve:
+
+- selezionare NPC;
+- emettere comandi;
+- aprire DevTools;
+- creare pannelli;
+- leggere `SimulationHost`;
+- leggere `World` direttamente;
+- leggere `MapGridWorldView`;
+- modificare `NPCSelection`;
+- possedere top bar, summary cards o overlay NPC.
+
+### Separazione pannelli consigliata
+
+La riorganizzazione debug/UI deve procedere a moduli separati:
+
+```text
+ArcGraph renderer
+-> disegna mappa, actor, oggetti, debug minimo
+
+ArcGraphInteractionSceneAdapter
+-> produce input frame e interaction frame
+
+SelectionTool
+-> usa InteractionFrame e aggiorna NPCSelection
+
+DebugCommandTool / DevTools
+-> usa InteractionFrame e invia comandi espliciti
+
+SidePanel
+-> legge World/NPCSelection/explainability
+
+TopBar
+-> controlli runtime, pausa, step, toggle tool
+
+NpcOverlay
+-> label/card/anchor sopra actor selezionati
+
+PointerHud
+-> coordinate cella e diagnostica puntatore
+```
+
+Questa separazione evita due errori:
+
+1. trasformare ArcGraph in un God Manager UI;
+2. mantenere i tool legati a `MapGridWorldView`.
+
+### Scelta su UI bloccante
+
+La UI bloccante deve essere decisa dall'adapter scena, non dal builder passivo.
+
+Esempio:
+
+- il mouse e' sopra top bar;
+- l'adapter legge `EventSystem.current.IsPointerOverGameObject()`;
+- produce `ArcGraphViewInputFrame.IsPointerOverUi = true`;
+- il controller ArcGraph non applica pan/zoom;
+- il boundary restituisce `UiBlocked`;
+- i tool non interpretano quel click come click mappa.
+
+### Scelta su coordinate viewport
+
+`ArcGraphViewCoordinateMapper` lavora gia' con coordinate viewport, non con
+coordinate world Unity.
+
+Questo e' corretto per il futuro perche':
+
+- ArcGraph vuole controllare zoom discreto e pan tramite `ArcGraphViewState`;
+- la mappa 250x250 non deve dipendere dalla posizione fisica della camera legacy;
+- i test restano eseguibili senza scena;
+- il renderer puo' cambiare implementazione senza cambiare il picking logico.
+
+Il futuro adapter dovra' quindi convertire la posizione schermo in punto viewport
+ArcGraph, non chiamare `ScreenToWorldPoint` per dedurre la cella come fa MapGrid.
+
+### Prossimo micro-step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.03 - ArcGraph Interaction Scene Adapter Contract
+```
+
+Scopo:
+
+- introdurre un contratto C# passivo per l'adapter scena;
+- definire diagnostica minima;
+- definire eventuale interfaccia consumer;
+- non implementare ancora DevTools, SelectionTool, TopBar o SidePanel;
+- non salvare scene;
+- non creare pannelli;
+- non rimuovere MapGrid.
 
 ---
 
