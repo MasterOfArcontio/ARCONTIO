@@ -7743,6 +7743,234 @@ Scopo del prossimo step:
 - mantenere MapGridWorldView attivo finche' actor/object ArcGraph non sono
   verificati.
 
+## Esito v0.38d - ArcGraph Actor/Object Runtime Bridge Audit
+
+La `v0.38d` ha auditato il percorso necessario per portare actor e oggetti
+runtime dentro ArcGraph dopo il gate terrain riuscito.
+
+L'esito principale e':
+
+```text
+ArcGraph possiede gia' i dati actor/object fino alla render queue.
+Manca il wrapper scena Unity che consumi la queue e disegni sprite reali.
+```
+
+### File principali auditati
+
+- `MapGridWorldView`;
+- `ArcGraphWorldAdapter`;
+- `ArcGraphRuntimeContext`;
+- `ArcGraphBootstrapRuntime`;
+- `ArcGraphActorVisualSnapshot`;
+- `ArcGraphObjectVisualSnapshot`;
+- `ArcGraphActorLayer`;
+- `ArcGraphObjectLayer`;
+- `ArcGraphActorRenderQueueBuilder`;
+- `ArcGraphObjectRenderQueueBuilder`;
+- `ArcGraphRenderQueueBuilder`;
+- `ArcGraphRenderQueue`;
+- `ArcGraphSceneProbeRenderer`;
+- `ArcGraphTerrainRuntimeMapGridAdapter`.
+
+### Stato tecnico rilevato
+
+Il vecchio `MapGridWorldView` gestisce insieme molte responsabilita':
+
+- crea `SpriteRenderer` per NPC e oggetti;
+- carica sprite via `Resources.Load`;
+- conserva cache sprite;
+- posiziona NPC e oggetti al centro cella;
+- gestisce sorting order;
+- nasconde oggetti trasportati;
+- disegna label degli stock alimentari;
+- aggiunge collider e handle agli NPC;
+- aggiunge balloon sugli NPC;
+- applica flash decisionale;
+- gestisce input/debug, selezione, click-to-move e overlay diagnostici.
+
+Questa classe non puo' essere copiata dentro ArcGraph come renderer definitivo,
+perche' mescola rendering, input, diagnostica, UI e lettura diretta del `World`.
+
+ArcGraph, invece, possiede gia' una catena passiva:
+
+```text
+World
+-> ArcGraphWorldAdapter
+-> ArcGraphObjectVisualSnapshot / ArcGraphActorVisualSnapshot
+-> ArcGraphObjectLayer / ArcGraphActorLayer
+-> ArcGraphObjectRenderQueueBuilder / ArcGraphActorRenderQueueBuilder
+-> ArcGraphRenderQueueBuilder
+-> ArcGraphRenderQueue
+```
+
+Questa catena:
+
+- legge il `World` solo tramite adapter read-only;
+- copia snapshot;
+- include gli oggetti non trasportati;
+- include gli stock alimentari come dato visuale;
+- assegna sprite key a oggetti e NPC;
+- legge il movimento NPC multi-tick tipizzato dal `JobRuntimeState`;
+- produce posizione visuale frazionaria degli actor;
+- produce una queue globale ordinata actor/object;
+- non crea `GameObject`;
+- non carica asset;
+- non modifica `World`, job, movimento o inventario.
+
+### Punto mancante
+
+Il punto mancante non e' il modello dati.
+
+Il punto mancante e':
+
+```text
+ArcGraph actor/object scene renderer
+```
+
+Questo componente futuro deve:
+
+- ricevere un `ArcGraphRuntimeContext` esplicito;
+- inizializzare o aggiornare un `ArcGraphBootstrapRuntime`;
+- leggere `ArcGraphActorLayer` e `ArcGraphObjectLayer`;
+- costruire una `ArcGraphRenderQueue`;
+- creare o aggiornare sprite scene-side;
+- usare un root temporaneo o dedicato;
+- mantenere pooling e cleanup confinati;
+- restare gated/spento/manuale finche' MapGrid resta produttivo.
+
+### Scelta progettuale emersa
+
+La scelta da non fare in modo cieco riguarda la risoluzione delle sprite.
+
+Il vecchio renderer usa:
+
+```text
+Resources.Load<Sprite>(spriteKey)
+```
+
+ArcGraph core finora ha evitato asset load.
+
+Per mantenere la separazione, la soluzione consigliata e':
+
+```text
+core ArcGraph
+-> produce sprite key
+
+wrapper scena ArcGraph
+-> risolve sprite key in Sprite
+```
+
+Questa risoluzione deve restare lato scena o lato asset resolver, non dentro i
+builder passivi. In questo modo ArcGraph continua a preparare dati visuali, ma
+non diventa un sistema onnisciente che cerca asset o interroga la scena.
+
+### Perimetro del primo bridge actor/object
+
+Il primo bridge deve disegnare solo:
+
+- NPC come sprite singola;
+- oggetti come sprite singola;
+- posizione actor interpolata se esiste motion snapshot;
+- oggetti trasportati nascosti;
+- ordinamento stabile actor/object;
+- diagnostica minima in console.
+
+Non deve ancora migrare:
+
+- balloon NPC;
+- stock label;
+- collider hover;
+- click-to-move;
+- selezione NPC;
+- summary card;
+- decision flash;
+- overlay FOV;
+- Landmark/GVD debug;
+- top bar e DevTools;
+- UI screen-space.
+
+Questi elementi non sono puro rendering base: vanno portati in step separati,
+altrimenti il nuovo renderer rischia di ricostruire il monolite
+`MapGridWorldView`.
+
+### Rischi principali
+
+1. Copiare `MapGridWorldView` dentro ArcGraph.
+
+   Rischio alto. Porterebbe dentro ArcGraph input, debug, UI e dipendenze dal
+   `World`, annullando la separazione ottenuta finora.
+
+2. Mettere `Resources.Load` nei builder ArcGraph.
+
+   Rischio medio/alto. I builder diventerebbero dipendenti dagli asset Unity e
+   non sarebbero piu' contratti passivi testabili.
+
+3. Disegnare actor/object sopra MapGrid in modo permanente.
+
+   Rischio medio. Per ora e' ammesso solo un probe temporaneo o gated, per
+   evitare doppio renderer produttivo.
+
+4. Migrare label, collider e UI insieme agli sprite.
+
+   Rischio medio. Allarga troppo il perimetro e rende difficile capire se il
+   bridge base funziona.
+
+5. Ignorare la motion queue gia' esistente.
+
+   Rischio basso ma concreto. La posizione frazionaria degli actor e' gia'
+   preparata da `ArcGraphActorRenderItem`; il renderer scena deve usarla, non
+   ricalcolarla dal `World`.
+
+### Micro-roadmap consigliata dopo audit
+
+1. `v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract`
+   - definire il contratto del renderer scena actor/object;
+   - definire asset resolver temporaneo;
+   - definire root, pooling, cleanup, diagnostica e gate;
+   - nessun rendering produttivo.
+
+2. `v0.38d.02 - ArcGraph Actor/Object Scene Probe`
+   - implementare probe temporaneo actor/object;
+   - consumare `ArcGraphRenderQueue`;
+   - disegnare sprite reali o fallback controllati;
+   - non salvare scena.
+
+3. `v0.38d.03 - ArcGraph Actor/Object Visual Gate`
+   - test manuale in Unity;
+   - verifica posizione, sorting, sprite, oggetti nascosti e movimento;
+   - confronto con MapGrid.
+
+4. `v0.38d.04 - Actor/Object Bridge Closeout`
+   - documentare esito;
+   - decidere se actor/object ArcGraph possono diventare candidati produttivi;
+   - non cancellare ancora `MapGridWorldView`.
+
+### Stop progettuali confermati
+
+```text
+Non cancellare MapGridWorldView.
+Non salvare Scene_MapGrid.
+Non creare renderer actor/object permanente.
+Non migrare input, UI o DevTools nel primo bridge.
+Non mettere asset load nei builder passivi.
+Non far leggere il World direttamente al renderer scena.
+```
+
+### Prossimo checkpoint
+
+```text
+v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract
+```
+
+Scopo del prossimo step:
+
+- progettare il componente scena che consumera' `ArcGraphRenderQueue`;
+- stabilire dove risolvere le sprite;
+- stabilire come usare posizione frazionaria actor;
+- stabilire come fare pooling/cleanup senza scena salvata;
+- preparare il probe actor/object senza ancora implementare sostituzione
+  produttiva.
+
 ---
 
 #### v0.170 - Conseguenze Sociali Emergenti

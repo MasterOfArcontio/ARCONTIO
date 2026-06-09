@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38d - ArcGraph Actor/Object Runtime Bridge Audit`
+`v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38d-arcgraph-actor-object-runtime-bridge-audit`
+`ai-task/v0.38d-01-arcgraph-actor-object-scene-renderer-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -44,7 +44,7 @@ OUTPUT ATTESO:
 - auditare come portare actor/object ArcGraph verso un aggancio runtime reale;
 - verificare cosa oggi MapGridWorldView gestisce per NPC, oggetti, sprite, label, collider e movimento;
 - verificare quali dati actor/object ArcGraph gia' riceve da `ArcGraphWorldAdapter`;
-- definire il primo ponte produttivo minimo senza salvare scena e senza sostituire ancora MapGridWorldView;
+- definire il contratto del primo ponte scene-side actor/object senza salvare scena e senza sostituire ancora MapGridWorldView;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -129,7 +129,15 @@ Regola corrente:
   - `ArcGraphTerrainSceneProbeRenderer` viene considerato sufficiente per chiudere il gate terrain;
   - il terrain ArcGraph puo' diventare candidato per il successivo percorso produttivo controllato;
   - MapGrid resta comunque renderer principale fino all'assorbimento di actor/object, debug minimo, camera/input e UI/dev tools.
-- prossimo checkpoint: `v0.38d - ArcGraph Actor/Object Runtime Bridge Audit`.
+- audit `v0.38d` completato:
+  - `MapGridWorldView` gestisce insieme sprite NPC/oggetti, cache, sorting, stock label, balloon, collider, flash decisionale, input/debug, selection e overlay;
+  - ArcGraph possiede gia' snapshot actor/object, layer actor/object e `ArcGraphRenderQueue` globale ordinata;
+  - `ArcGraphWorldAdapter` copia actor, oggetti, stock e movimento NPC multi-tick in sola lettura;
+  - il punto mancante non e' il dato actor/object, ma il wrapper scena Unity che consumi la queue;
+  - il primo bridge non deve migrare input, UI, collider, balloon, stock label o DevTools;
+  - la risoluzione sprite deve restare lato wrapper/asset resolver, non dentro i builder passivi;
+  - il prossimo micro-step e' `v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract`.
+- prossimo checkpoint: `v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
