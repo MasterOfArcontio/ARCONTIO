@@ -10823,6 +10823,104 @@ Scopo:
 - non implementare ancora NPC nello stesso step;
 - non cancellare probe terrain.
 
+## Esito v0.38h.02 - ArcGraph Terrain Runtime Renderer Minimo
+
+La `v0.38h.02` accelera contratto e implementazione del renderer terrain runtime
+minimo nello stesso step.
+
+### File introdotti
+
+- `ArcGraphTerrainRuntimeSceneRendererContract`;
+- `ArcGraphTerrainRuntimeSceneRendererDiagnostics`;
+- `ArcGraphTerrainRuntimeSceneRenderer`.
+
+### Funzione
+
+Il nuovo renderer materializza chunk terrain ArcGraph in scena usando dati gia'
+preparati da ArcGraph:
+
+```text
+ArcGraphRuntimeContext
+-> ArcGraphBootstrapRuntime
+-> ArcGraphTerrainLayer
+-> ArcGraphTerrainChunkMeshBuilder
+-> ArcGraphTerrainRuntimeSceneRenderer
+```
+
+Il renderer e' diverso dal probe terrain:
+
+- il probe crea chunk temporanei per un gate manuale;
+- il renderer runtime mantiene un root stabile;
+- il renderer runtime conserva un pool locale di chunk;
+- il renderer runtime riusa `GameObject` e `Mesh` per chunk gia' esistenti;
+- il renderer runtime aggiorna solo chunk dirty.
+
+### Entry point
+
+Il renderer espone:
+
+- `RenderFromMapGridRuntime`, per test manuale da adapter MapGrid;
+- `RenderFromRuntime`, per il futuro collegamento col wrapper/coordinator;
+- context menu `ArcGraph/Render Terrain Runtime From MapGrid`;
+- context menu `ArcGraph/Clear Terrain Runtime Renderer`.
+
+### Confini preservati
+
+Il renderer:
+
+- e' spento di default;
+- non legge `SimulationHost`;
+- non legge `MapGridWorldProvider`;
+- non legge `MapGridWorldView`;
+- non usa `FindObjectOfType`;
+- non carica asset;
+- non invia comandi;
+- non salva scene o prefab;
+- non cancella MapGrid;
+- non sostituisce ancora `MapGridChunkRenderer`.
+
+### Diagnostica
+
+La diagnostica misura:
+
+- renderer abilitato;
+- contratto valido;
+- context/config/mappa disponibili;
+- runtime/render state/terrain layer disponibili;
+- chunk dirty iniziali;
+- chunk costruiti;
+- chunk non vuoti;
+- chunk applicati;
+- oggetti chunk creati;
+- oggetti chunk riusati;
+- oggetti chunk disattivati;
+- chunk attivi;
+- fallback UV;
+- dirty state pulito o meno.
+
+### QA tecnica
+
+La ricerca statica sui nuovi file non rileva dipendenze vietate.
+
+`dotnet build Assembly-CSharp.csproj --no-restore` resta non conclusivo per la
+mancanza del file temporaneo Unity:
+
+```text
+Temp/obj/Assembly-CSharp/project.assets.json
+```
+
+E' stato eseguito un controllo Roslyn isolato sui tre file nuovi usando assembly
+Unity gia' disponibili. Il controllo e' riuscito con un solo warning atteso su
+campo `SerializeField` assegnabile da Inspector.
+
+### Stato dopo v0.38h.02
+
+Terrain ora ha un primo renderer runtime minimo. Non e' ancora collegato in modo
+automatico al wrapper minimo e non e' ancora stato validato in Unity come gate
+visuale.
+
+Il prossimo step accelerato puo' passare al renderer NPC minimo.
+
 ---
 
 #### v0.170 - Conseguenze Sociali Emergenti

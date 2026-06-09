@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38h.01 - ArcGraph Terrain + NPC Minimal Runtime Audit`
+`v0.38h.02 - ArcGraph Terrain Runtime Renderer Minimo`
 
 STATUS:
-AUDIT OPERATIVO COMPLETATO / PROSSIMO STEP TERRAIN RUNTIME CONTRACT
+TERRAIN RUNTIME MINIMO IMPLEMENTATO / PROSSIMO STEP NPC RUNTIME
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38h-arcgraph-terrain-npc-minimal-runtime`
@@ -386,6 +386,24 @@ Regola corrente:
   - decisione tecnica: introdurre renderer separati terrain e NPC, entrambi gated, spenti di default, con root locale, cleanup confinato, diagnostica e nessun accesso globale;
   - ordine consigliato: terrain contract, terrain renderer minimo, NPC contract, NPC renderer minimo, collegamento al wrapper, gate visuale Unity;
   - prossimo micro-step: `v0.38h.02 - ArcGraph Terrain Runtime Renderer Contract`.
+- micro-step `v0.38h.02` completato:
+  - introdotto `ArcGraphTerrainRuntimeSceneRendererContract`;
+  - introdotto `ArcGraphTerrainRuntimeSceneRendererDiagnostics`;
+  - introdotto `ArcGraphTerrainRuntimeSceneRenderer`;
+  - il renderer terrain runtime e' spento di default;
+  - puo' renderizzare manualmente da `ArcGraphTerrainRuntimeMapGridAdapter`;
+  - puo' ricevere in futuro `ArcGraphRuntimeContext` e `ArcGraphBootstrapRuntime` dal wrapper/coordinator;
+  - mantiene un root locale stabile;
+  - mantiene un pool per `ArcGraphChunkCoord`;
+  - riusa `GameObject`, `MeshFilter`, `MeshRenderer` e `Mesh` per chunk gia' esistenti;
+  - aggiorna solo chunk dirty;
+  - puo' pulire il dirty state dopo render;
+  - non legge `SimulationHost`, `MapGridWorldProvider`, `MapGridWorldView`, `NPCSelection` o globali scena;
+  - non usa `FindObjectOfType`, non carica asset, non invia comandi e non salva scene;
+  - ricerca statica sulle dipendenze vietate superata;
+  - `dotnet build Assembly-CSharp.csproj --no-restore` non conclusivo per mancanza del file Unity temporaneo `Temp/obj/Assembly-CSharp/project.assets.json`;
+  - controllo Roslyn isolato sui tre file nuovi riuscito, con solo warning atteso su campo `SerializeField` assegnabile da Inspector;
+  - prossimo step accelerato: `v0.38h.03 - ArcGraph NPC Runtime Renderer Minimo`.
 
 DOC SYNC:
 
