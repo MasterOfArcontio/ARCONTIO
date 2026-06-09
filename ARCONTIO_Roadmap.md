@@ -10642,6 +10642,189 @@ Non trasformare i probe temporanei in sistemi produttivi senza checkpoint dedica
 
 ---
 
+#### v0.38h - ArcGraph Terrain + NPC Minimal Runtime
+
+## Stato
+APERTA / AUDIT OPERATIVO INIZIALE
+
+## Obiettivo
+
+Trasformare terrain e NPC da probe separati a primo runtime visuale ArcGraph
+controllato, mantenendo MapGrid come renderer produttivo principale durante la
+transizione.
+
+Questa fase non deve introdurre acqua, vegetazione, luci, meteo, incendi,
+DevTools, top bar o pensionamento MapGrid.
+
+## Regola di transizione
+
+Il runtime minimo terrain + NPC deve nascere come sistema gated:
+
+```text
+MapGrid resta renderer produttivo
+ArcGraph riceve dati read-only
+ArcGraph aggiorna renderer minimi controllati
+ArcGraph espone diagnostica
+MapGrid non viene cancellato
+```
+
+## Esito v0.38h.01 - Audit renderer produttivo minimo terrain + NPC
+
+La `v0.38h.01` auditata i componenti ArcGraph gia' presenti che oggi
+visualizzano terrain e actor/object.
+
+File auditati:
+
+- `ArcGraphTerrainSceneProbeRenderer`;
+- `ArcGraphActorObjectSceneProbeRenderer`;
+- `ArcGraphMinimalRuntimeSceneWrapper`;
+- `ArcGraphTerrainChunkMeshBuilder`;
+- `ArcGraphActorObjectSceneRenderPlanBuilder`.
+
+### Stato terrain
+
+Il terrain ArcGraph possiede gia':
+
+- snapshot terrain;
+- layer terrain;
+- dirty chunk;
+- builder mesh chunk;
+- UV map derivabile dalla config MapGrid;
+- probe scena validato.
+
+Il probe terrain pero' non e' ancora un renderer produttivo perche':
+
+- crea `GameObject` chunk temporanei;
+- distrugge e ricrea il root nel cleanup;
+- non possiede pooling stabile;
+- non possiede lifecycle incrementale;
+- non consuma direttamente il coordinator minimo;
+- non dichiara ancora una policy runtime per quando aggiornare solo chunk sporchi;
+- resta legato a context menu/manual probe.
+
+### Stato NPC / actor
+
+Actor/object ArcGraph possiede gia':
+
+- snapshot actor/object;
+- actor/object layer;
+- render queue ordinata;
+- render plan scene-side;
+- sprite resolve request;
+- sprite resolver serializzato preparatorio;
+- probe scena validato;
+- interazione base validata tramite queue.
+
+Il probe actor/object pero' non e' ancora renderer produttivo perche':
+
+- crea `SpriteRenderer` temporanei;
+- non possiede pooling per entity id;
+- non possiede lifecycle stabile per spawn/update/despawn;
+- puo' usare fallback sprite generati;
+- non impone ancora asset resolver reale;
+- non gestisce label stock, balloon, collider, flash decisionale o overlay NPC;
+- non e' ancora integrato in un runtime frame unico terrain + NPC.
+
+### Stato wrapper minimo
+
+`ArcGraphMinimalRuntimeSceneWrapper` e' il punto corretto da cui partire per il
+runtime minimo perche':
+
+- riceve un adapter dati esplicito;
+- costruisce context runtime;
+- chiama il coordinator;
+- produce queue actor/object;
+- puo' passare la queue all'interaction wrapper.
+
+Pero' il wrapper non deve diventare renderer. Deve solo orchestrare e inoltrare
+dati derivati a renderer separati.
+
+### Decisione tecnica per v0.38h
+
+Il prossimo blocco deve introdurre due renderer minimi distinti:
+
+```text
+ArcGraphTerrainRuntimeSceneRenderer
+ArcGraphNpcRuntimeSceneRenderer
+```
+
+Nomi indicativi, da confermare nello step implementativo.
+
+Entrambi devono essere:
+
+- `MonoBehaviour` scena;
+- spenti di default;
+- alimentati da frame/queue espliciti;
+- privi di accessi globali;
+- privi di comandi;
+- privi di salvataggio scena;
+- dotati di diagnostica;
+- dotati di root locale;
+- dotati di cleanup confinato.
+
+### Differenza tra probe e renderer runtime
+
+Probe:
+
+```text
+click manuale
+-> costruisce tutto
+-> crea oggetti temporanei
+-> serve a vedere se il dato funziona
+```
+
+Renderer runtime:
+
+```text
+frame controllato
+-> riceve dati gia' preparati
+-> aggiorna solo cio' che serve
+-> riusa oggetti scena dove possibile
+-> conserva diagnostica
+```
+
+### Ordine consigliato
+
+1. Definire contratto renderer terrain runtime.
+2. Implementare renderer terrain runtime minimo con root stabile e riuso chunk.
+3. Definire contratto renderer NPC runtime.
+4. Implementare renderer NPC runtime minimo con pool per actor id.
+5. Collegare entrambi al wrapper minimo.
+6. Preparare gate visuale Unity terrain + NPC.
+
+### Fuori scope confermato
+
+Restano fuori:
+
+- acqua;
+- vegetazione;
+- luci;
+- meteo;
+- incendi;
+- animazioni sprite;
+- vestizione NPC;
+- UI avanzata;
+- DevTools;
+- top bar;
+- click-to-move;
+- cancellazione MapGrid.
+
+### Prossimo micro-step consigliato
+
+```text
+v0.38h.02 - ArcGraph Terrain Runtime Renderer Contract
+```
+
+Scopo:
+
+- definire input, output e diagnostica del renderer terrain produttivo minimo;
+- stabilire come riceve mesh chunk o layer terrain;
+- decidere root, pooling e cleanup;
+- non implementare ancora NPC nello stesso step;
+- non cancellare probe terrain.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

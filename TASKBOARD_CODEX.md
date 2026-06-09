@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38g.06 - ArcGraph Minimal Stable Structure Closeout`
+`v0.38h.01 - ArcGraph Terrain + NPC Minimal Runtime Audit`
 
 STATUS:
-STRUTTURA MINIMA STABILE CHIUSA / PROSSIMO BLOCCO TERRAIN + NPC
+AUDIT OPERATIVO COMPLETATO / PROSSIMO STEP TERRAIN RUNTIME CONTRACT
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38g-06-arcgraph-minimal-structure-closeout`
+`ai-task/v0.38h-arcgraph-terrain-npc-minimal-runtime`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -74,6 +74,10 @@ OUTPUT ATTESO:
 - rispettare la policy LOD definita in `v0.33f`;
 - non migrare strumenti interattivi o dev tools prima dell'audit mirato;
 - collegare feed e renderer solo tramite context, NPC e consumer espliciti, senza accessi globali.
+- avviare il blocco `v0.38h` concentrandosi solo su terrain + NPC;
+- trasformare progressivamente i probe terrain/NPC in runtime renderer controllati;
+- non introdurre environment layers in questo blocco;
+- non pensionare MapGrid in questo blocco iniziale.
 
 PROMPT OPERATIVO - ROADMAP RESIDUA ARCGRAPH:
 
@@ -372,6 +376,16 @@ Regola corrente:
   - restano fuori scope acqua, vegetazione, luci, meteo, incendi, DevTools, top bar e pensionamento MapGrid;
   - prima della promozione produttiva vanno rieseguiti i gate manuali del `ArcGraphMinimalRuntimeSceneWrapper` in Unity;
   - prossimo blocco consigliato: `v0.38h - ArcGraph Terrain + NPC Minimal Runtime`.
+- audit `v0.38h.01` completato:
+  - auditati `ArcGraphTerrainSceneProbeRenderer`, `ArcGraphActorObjectSceneProbeRenderer`, `ArcGraphMinimalRuntimeSceneWrapper`, `ArcGraphTerrainChunkMeshBuilder` e `ArcGraphActorObjectSceneRenderPlanBuilder`;
+  - terrain possiede gia' snapshot, layer, dirty chunk, mesh builder, UV map e probe visuale validato;
+  - terrain probe non e' produttivo perche' crea/distrugge root e chunk temporanei, non ha pooling stabile e non consuma direttamente un frame runtime unico;
+  - NPC/actor possiede gia' snapshot, layer, render queue, render plan, sprite request, resolver preparatorio e probe visuale validato;
+  - NPC probe non e' produttivo perche' crea SpriteRenderer temporanei, non ha pool per actor id, puo' usare fallback sprite e non gestisce lifecycle spawn/update/despawn;
+  - `ArcGraphMinimalRuntimeSceneWrapper` e' il punto corretto di orchestrazione, ma non deve diventare renderer;
+  - decisione tecnica: introdurre renderer separati terrain e NPC, entrambi gated, spenti di default, con root locale, cleanup confinato, diagnostica e nessun accesso globale;
+  - ordine consigliato: terrain contract, terrain renderer minimo, NPC contract, NPC renderer minimo, collegamento al wrapper, gate visuale Unity;
+  - prossimo micro-step: `v0.38h.02 - ArcGraph Terrain Runtime Renderer Contract`.
 
 DOC SYNC:
 
