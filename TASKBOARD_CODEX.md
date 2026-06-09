@@ -28,22 +28,23 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38c.03 - ArcGraph Terrain Visual Gate`
+`v0.38d - ArcGraph Actor/Object Runtime Bridge Audit`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38c-03-arcgraph-terrain-visual-gate`
+`ai-task/v0.38d-arcgraph-actor-object-runtime-bridge-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- eseguire gate visuale terrain ArcGraph vs MapGrid;
-- verificare scala, posizione, UV, chunk, sorting, cleanup e diagnostica del probe;
-- preparare istruzioni manuali chiare per l'operatore Unity;
+- auditare come portare actor/object ArcGraph verso un aggancio runtime reale;
+- verificare cosa oggi MapGridWorldView gestisce per NPC, oggetti, sprite, label, collider e movimento;
+- verificare quali dati actor/object ArcGraph gia' riceve da `ArcGraphWorldAdapter`;
+- definire il primo ponte produttivo minimo senza salvare scena e senza sostituire ancora MapGridWorldView;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -122,7 +123,13 @@ Regola corrente:
   - il materiale terrain deve essere assegnato da Inspector: nessun asset load dentro ArcGraph;
   - aggiunti context menu `ArcGraph/Render Terrain Scene Probe From MapGrid` e `ArcGraph/Clear Terrain Scene Probe`;
   - nessun salvataggio scena, nessun renderer permanente, nessuna rimozione legacy.
-- prossimo micro-step: `v0.38c.03 - ArcGraph Terrain Visual Gate`.
+- gate visuale umano `v0.38c.03` superato:
+  - l'operatore ha eseguito il test terrain ArcGraph in Unity;
+  - il probe terrain funziona;
+  - `ArcGraphTerrainSceneProbeRenderer` viene considerato sufficiente per chiudere il gate terrain;
+  - il terrain ArcGraph puo' diventare candidato per il successivo percorso produttivo controllato;
+  - MapGrid resta comunque renderer principale fino all'assorbimento di actor/object, debug minimo, camera/input e UI/dev tools.
+- prossimo checkpoint: `v0.38d - ArcGraph Actor/Object Runtime Bridge Audit`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

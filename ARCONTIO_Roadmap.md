@@ -7151,8 +7151,8 @@ La chiusura di questa fase richiedera':
 | v0.38c | Piano ponte terrain ArcGraph controllato o comparativo finale | Completato |
 | v0.38c.01 | Contratto accesso read-only alla mappa runtime per snapshot terrain ArcGraph | Completato |
 | v0.38c.02 | Probe scena terrain ArcGraph temporaneo e gated | Completato |
-| v0.38c.03 | Gate visuale terrain ArcGraph vs MapGrid | Prossimo |
-| v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Pending |
+| v0.38c.03 | Gate visuale terrain ArcGraph vs MapGrid | Completato |
+| v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Prossimo |
 | v0.38e | Aggancio overlay debug minimo validato | Pending |
 | v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Pending |
@@ -7686,6 +7686,62 @@ Scopo del prossimo step:
 - verificare che le UV terrain siano coerenti;
 - verificare che il cleanup rimuova il root temporaneo;
 - decidere se il terrain ArcGraph puo' diventare candidato produttivo.
+
+## Esito v0.38c.03 - ArcGraph Terrain Visual Gate
+
+La `v0.38c.03` ha chiuso il gate visuale umano del terrain ArcGraph.
+
+L'operatore ha eseguito il test in Unity e ha confermato:
+
+```text
+funziona
+```
+
+Questa conferma rende valido il primo ponte terrain controllato:
+
+```text
+MapGrid runtime
+-> ArcGraphRuntimeContext
+-> ArcGraphTerrainLayer
+-> ArcGraphTerrainChunkMeshBuilder
+-> ArcGraphTerrainSceneProbeRenderer
+```
+
+### Esito tecnico
+
+- il probe terrain ArcGraph viene considerato visualmente funzionante;
+- il context MapGrid -> ArcGraph e' sufficiente per alimentare il terrain;
+- il renderer temporaneo e gated e' valido per test comparativi;
+- il cleanup del probe resta parte del flusso manuale;
+- il terrain ArcGraph puo' diventare candidato per il successivo percorso
+  produttivo controllato.
+
+### Limiti ancora attivi
+
+Il superamento del gate terrain non chiude ancora `v0.38`.
+
+MapGrid resta renderer principale perche' devono ancora essere assorbiti:
+
+- actor/object runtime;
+- movimento visuale multi-tick;
+- debug minimo validato;
+- camera/input;
+- UI e dev tools non renderer;
+- piano di pensionamento componenti legacy.
+
+### Prossimo checkpoint
+
+```text
+v0.38d - ArcGraph Actor/Object Runtime Bridge Audit
+```
+
+Scopo del prossimo step:
+
+- auditare la gestione attuale di NPC e oggetti in `MapGridWorldView`;
+- verificare quali snapshot actor/object ArcGraph possiede gia';
+- capire come collegare actor/object runtime senza duplicare renderer permanenti;
+- mantenere MapGridWorldView attivo finche' actor/object ArcGraph non sono
+  verificati.
 
 ---
 
