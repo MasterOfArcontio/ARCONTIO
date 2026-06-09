@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38d.02 - ArcGraph Actor/Object Scene Probe`
+`v0.38d.03 - ArcGraph Actor/Object Visual Gate`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38d-02-arcgraph-actor-object-scene-probe`
+`ai-task/v0.38d-03-arcgraph-actor-object-visual-gate`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -44,7 +44,7 @@ OUTPUT ATTESO:
 - auditare come portare actor/object ArcGraph verso un aggancio runtime reale;
 - verificare cosa oggi MapGridWorldView gestisce per NPC, oggetti, sprite, label, collider e movimento;
 - verificare quali dati actor/object ArcGraph gia' riceve da `ArcGraphWorldAdapter`;
-- implementare il primo probe scene-side actor/object senza salvare scena e senza sostituire ancora MapGridWorldView;
+- preparare e guidare il gate visuale actor/object senza salvare scena e senza sostituire ancora MapGridWorldView;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -148,7 +148,15 @@ Regola corrente:
   - il plan traduce `ArcGraphRenderQueue` in entry scene-side con posizione mondo, sorting order, sprite request e motion actor;
   - nessun GameObject, nessun asset load, nessuna scena salvata, nessuna modifica a `MapGridWorldView`;
   - compilazione isolata dei nuovi file riuscita con `dotnet csc`.
-- prossimo checkpoint: `v0.38d.02 - ArcGraph Actor/Object Scene Probe`.
+- micro-step `v0.38d.02` completato:
+  - introdotto `ArcGraphSerializedSpriteResolver` con mapping sprite serializzati da Inspector;
+  - introdotto `ArcGraphActorObjectSceneProbeRenderer`;
+  - il probe costruisce `ArcGraphBootstrapRuntime` temporaneo, `ArcGraphRenderQueue` e `ArcGraphActorObjectSceneRenderPlan`;
+  - il probe crea `SpriteRenderer` solo sotto `ArcGraphActorObjectSceneProbeRoot`;
+  - aggiunti context menu `ArcGraph/Render Actor Object Scene Probe From MapGrid` e `ArcGraph/Clear Actor Object Scene Probe`;
+  - nessun `Resources.Load`, nessuna scena salvata, nessuna rimozione legacy;
+  - compilazione isolata riuscita; restano solo warning attesi su campi `SerializeField`.
+- prossimo checkpoint: `v0.38d.03 - ArcGraph Actor/Object Visual Gate`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

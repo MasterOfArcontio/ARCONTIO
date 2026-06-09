@@ -8105,6 +8105,130 @@ Scopo del prossimo step:
 - non salvare scena;
 - non migrare input, UI, label, collider, balloon o DevTools.
 
+## Esito v0.38d.02 - ArcGraph Actor/Object Scene Probe
+
+La `v0.38d.02` ha introdotto il primo probe scena actor/object ArcGraph.
+
+Il probe e' temporaneo, manuale e confinato.
+Non sostituisce `MapGridWorldView`.
+Non salva scena.
+Non migra input, UI, collider, balloon, stock label o DevTools.
+
+### Modifiche introdotte
+
+- aggiunto `ArcGraphSerializedSpriteResolver`;
+- aggiunta entry serializzabile `ArcGraphSerializedSpriteResolverEntry`;
+- aggiunto `ArcGraphActorObjectSceneProbeRenderer`;
+- aggiunta diagnostica `ArcGraphActorObjectSceneProbeRendererDiagnostics`;
+- aggiunto context menu manuale:
+
+```text
+ArcGraph/Render Actor Object Scene Probe From MapGrid
+```
+
+- aggiunto context menu cleanup:
+
+```text
+ArcGraph/Clear Actor Object Scene Probe
+```
+
+### Flusso operativo
+
+Il percorso visuale temporaneo diventa:
+
+```text
+ArcGraphTerrainRuntimeMapGridAdapter
+-> ArcGraphRuntimeContext(config, map, world)
+-> ArcGraphBootstrapRuntime temporaneo
+-> ArcGraphActorLayer / ArcGraphObjectLayer
+-> ArcGraphRenderQueueBuilder
+-> ArcGraphActorObjectSceneRenderPlanBuilder
+-> ArcGraphActorObjectSceneProbeRoot
+-> SpriteRenderer temporanei
+```
+
+### Resolver sprite
+
+Il resolver introdotto e':
+
+```text
+ArcGraphSerializedSpriteResolver
+```
+
+Funziona tramite mapping assegnati da Inspector:
+
+```text
+sprite key -> Sprite
+```
+
+Non chiama `Resources.Load`.
+Non cerca asset globalmente.
+Non legge il `World`.
+
+Se il resolver non viene assegnato o non trova una sprite, il probe puo' usare
+fallback generati 1x1 colorati, solo per rendere visibile il gate:
+
+- actor: colore magenta;
+- object: colore arancione.
+
+### Root temporaneo
+
+Gli oggetti vengono creati solo sotto:
+
+```text
+ArcGraphActorObjectSceneProbeRoot
+```
+
+Il cleanup agisce solo su questo root.
+
+### QA eseguita
+
+Eseguita compilazione isolata dei file actor/object scene probe con:
+
+```text
+dotnet csc
+netstandard2.1 refs
+Assembly-CSharp.dll
+UnityEngine.CoreModule.dll
+```
+
+Esito:
+
+```text
+compilazione riuscita
+```
+
+Warning residui:
+
+- campi `SerializeField` non assegnati da codice.
+
+Questi warning sono attesi per componenti Unity configurabili da Inspector.
+
+### Limiti confermati
+
+Il probe non e' ancora validato visualmente dall'operatore.
+
+La `v0.38d.02` non abilita renderer permanente.
+La `v0.38d.02` non cancella MapGrid.
+La `v0.38d.02` non crea una scena ArcGraph separata.
+
+### Prossimo checkpoint
+
+```text
+v0.38d.03 - ArcGraph Actor/Object Visual Gate
+```
+
+Scopo del prossimo step:
+
+- guidare il test manuale in Unity;
+- verificare che il probe actor/object riceva il `World`;
+- verificare che il root temporaneo venga creato;
+- verificare actor e oggetti visibili;
+- verificare sorting object/actor;
+- verificare interpolazione actor durante movimento;
+- verificare cleanup del root;
+- decidere se actor/object ArcGraph possono diventare candidati produttivi.
+
 ---
 
 #### v0.170 - Conseguenze Sociali Emergenti
