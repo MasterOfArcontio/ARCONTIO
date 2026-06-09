@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.02 - ArcGraph NPC Visual Catalog Data-Driven`
+`v0.38i.03 - ArcGraph NPC Layered Runtime Renderer`
 
 STATUS:
-NPC VISUAL CATALOG JSON INTRODOTTO / PROSSIMO STEP RENDERER NPC MODULARE
+NPC RENDERER MODULARE INTRODOTTO / PROSSIMO STEP ASSET E GATE VISUALE
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -467,6 +467,19 @@ Regola corrente:
   - controllo JSON PowerShell riuscito: `human_default parts=4 frames=48`;
   - controllo Roslyn isolato riuscito con modulo Unity JSONSerialize incluso;
   - prossimo step: collegare il catalogo al renderer NPC creando handle modulari corpo/testa/gambe/piedi.
+- micro-step `v0.38i.03` completato:
+  - `ArcGraphNpcRuntimeSceneRenderer` puo' ora ricevere un `TextAsset` `npcVisualCatalogJson`;
+  - aggiunto gate `useLayeredActorCatalog`, spento di default;
+  - `ActorHandle` mantiene ora renderer per parti NPC oltre al renderer singolo fallback;
+  - se il catalogo e' valido e il gate e' attivo, il renderer prova a disegnare `body`, `head`, `legs`, `feet`;
+  - se il rendering modulare non produce parti valide, resta attivo il fallback a sprite singolo;
+  - la direzione viene risolta in modo semplice da movimento visuale: `north`, `south`, `east`, `west`;
+  - l'animazione usa `walk` quando esiste motion, altrimenti `idle`;
+  - il frame walk iniziale usa `motionProgress01` per scegliere frame 0 o 1;
+  - ogni parte usa `sortingOffset` del catalogo;
+  - diagnostica estesa con actor modulari, part renderer creati/riusati e frame catalogo mancanti;
+  - controllo Roslyn isolato riuscito; warning attesi su campi `SerializeField`;
+  - prossimo step: produrre/assegnare asset sprite reali o fare gate visuale con fallback magenta.
 
 DOC SYNC:
 

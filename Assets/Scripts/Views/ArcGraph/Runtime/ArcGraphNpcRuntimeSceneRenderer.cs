@@ -34,6 +34,8 @@ namespace Arcontio.View.ArcGraph
     {
         [SerializeField] private ArcGraphMinimalRuntimeSceneWrapper runtimeWrapper;
         [SerializeField] private MonoBehaviour spriteResolverBehaviour;
+        [SerializeField] private TextAsset npcVisualCatalogJson;
+        [SerializeField] private bool useLayeredActorCatalog;
         [SerializeField] private bool rendererEnabled;
         [SerializeField] private bool renderOnStart;
         [SerializeField] private bool logDiagnostics = true;
@@ -50,6 +52,8 @@ namespace Arcontio.View.ArcGraph
         private readonly ArcGraphActorObjectSceneRenderPlanBuilder _planBuilder = new();
         private Transform _root;
         private Sprite _generatedFallbackSprite;
+        private ArcGraphNpcVisualCatalog _npcVisualCatalog;
+        private string _npcVisualCatalogSourceText;
         private ArcGraphNpcRuntimeSceneRendererDiagnostics _lastDiagnostics;
 
         public ArcGraphNpcRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
@@ -85,6 +89,7 @@ namespace Arcontio.View.ArcGraph
             public int ActorId;
             public GameObject GameObject;
             public SpriteRenderer Renderer;
+            public readonly Dictionary<string, SpriteRenderer> PartRenderers = new();
             public bool WasTouchedThisFrame;
         }
 
@@ -150,6 +155,21 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetNpcVisualCatalogJson
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il catalogo visuale NPC usato per il rendering modulare a parti.
+        /// </para>
+        /// </summary>
+        public void SetNpcVisualCatalogJson(TextAsset catalogJson)
+        {
+            npcVisualCatalogJson = catalogJson;
+            _npcVisualCatalog = null;
+            _npcVisualCatalogSourceText = null;
+        }
+
+        // =============================================================================
         // RenderFromRuntimeWrapperContextMenu
         // =============================================================================
         /// <summary>
@@ -207,13 +227,13 @@ namespace Arcontio.View.ArcGraph
             bool hasSpriteResolver = spriteResolver != null;
 
             if (!rendererEnabled)
-                return StoreAndLogDiagnostics(contract, queue, hasSpriteResolver, false, 0, 0, 0, 0, 0, 0, 0, "RendererDisabled");
+                return StoreAndLogDiagnostics(contract, queue, hasSpriteResolver, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "RendererDisabled");
 
             if (!contract.IsRuntimeSafe)
-                return StoreAndLogDiagnostics(contract, queue, hasSpriteResolver, false, 0, 0, 0, 0, 0, 0, 0, "UnsafeContract");
+                return StoreAndLogDiagnostics(contract, queue, hasSpriteResolver, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "UnsafeContract");
 
             if (queue == null)
-                return StoreAndLogDiagnostics(contract, queue, hasSpriteResolver, false, 0, 0, 0, 0, 0, 0, 0, "QueueMissing");
+                return StoreAndLogDiagnostics(contract, queue, hasSpriteResolver, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "QueueMissing");
 
             ArcGraphActorObjectSceneRendererContract planContract = contract.CreateActorObjectPlanContract();
             ArcGraphActorObjectSceneRendererDiagnostics planDiagnostics = _planBuilder.Build(
@@ -224,7 +244,7 @@ namespace Arcontio.View.ArcGraph
                 clearPlan: true);
 
             if (!planDiagnostics.ContractSafe)
-                return StoreAndLogDiagnostics(contract, queue, hasSpriteResolver, false, 0, 0, 0, 0, 0, 0, 0, "UnsafePlanContract");
+                return StoreAndLogDiagnostics(contract, queue, hasSpriteResolver, false, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, "UnsafePlanContract");
 
             ApplyActorEntries(
                 _plan,
@@ -235,7 +255,11 @@ namespace Arcontio.View.ArcGraph
                 out int reused,
                 out int disabled,
                 out int missingSprites,
-                out int generatedFallbacks);
+                out int generatedFallbacks,
+                out int layeredActors,
+                out int createdPartRenderers,
+                out int reusedPartRenderers,
+                out int missingCatalogFrames);
 
             string reason = rendered > 0
                 ? "NpcRuntimeRendered"
@@ -253,6 +277,10 @@ namespace Arcontio.View.ArcGraph
                 disabled,
                 missingSprites,
                 generatedFallbacks,
+                layeredActors,
+                createdPartRenderers,
+                reusedPartRenderers,
+                missingCatalogFrames,
                 reason);
         }
 
@@ -318,7 +346,11 @@ namespace Arcontio.View.ArcGraph
             out int reused,
             out int disabled,
             out int missingSprites,
-            out int generatedFallbacks)
+            out int generatedFallbacks,
+            out int layeredActors,
+            out int createdPartRenderers,
+            out int reusedPartRenderers,
+            out int missingCatalogFrames)
         {
             rendered = 0;
             created = 0;
@@ -326,6 +358,10 @@ namespace Arcontio.View.ArcGraph
             disabled = 0;
             missingSprites = 0;
             generatedFallbacks = 0;
+            layeredActors = 0;
+            createdPartRenderers = 0;
+            reusedPartRenderers = 0;
+            missingCatalogFrames = 0;
 
             if (plan == null)
                 return;
@@ -340,19 +376,43 @@ namespace Arcontio.View.ArcGraph
                 if (entry.Kind != ArcGraphRenderItemKind.Actor)
                     continue;
 
-                Sprite sprite = ResolveSprite(entry, spriteResolver, out bool usedGeneratedFallback);
-                if (sprite == null)
+                ActorHandle handle = GetOrCreateActorHandle(entry.EntityId, contract, out bool wasCreated);
+                bool renderedLayered = TryApplyLayeredActorEntry(
+                    handle,
+                    entry,
+                    contract,
+                    spriteResolver,
+                    out int entryMissingSprites,
+                    out int entryGeneratedFallbacks,
+                    out int entryCreatedParts,
+                    out int entryReusedParts,
+                    out int entryMissingCatalogFrames);
+
+                if (renderedLayered)
                 {
-                    missingSprites++;
-                    continue;
+                    layeredActors++;
+                    missingSprites += entryMissingSprites;
+                    generatedFallbacks += entryGeneratedFallbacks;
+                    createdPartRenderers += entryCreatedParts;
+                    reusedPartRenderers += entryReusedParts;
+                    missingCatalogFrames += entryMissingCatalogFrames;
+                }
+                else
+                {
+                    Sprite sprite = ResolveSprite(entry, spriteResolver, out bool usedGeneratedFallback);
+                    if (sprite == null)
+                    {
+                        missingSprites++;
+                        continue;
+                    }
+
+                    ApplyActorEntry(handle, entry, sprite, contract);
+
+                    if (usedGeneratedFallback)
+                        generatedFallbacks++;
                 }
 
-                ActorHandle handle = GetOrCreateActorHandle(entry.EntityId, contract, out bool wasCreated);
-                ApplyActorEntry(handle, entry, sprite, contract);
-
                 rendered++;
-                if (usedGeneratedFallback)
-                    generatedFallbacks++;
 
                 if (wasCreated)
                     created++;
@@ -430,8 +490,153 @@ namespace Arcontio.View.ArcGraph
             handle.GameObject.transform.localScale = Vector3.one * contract.ActorScale;
             handle.Renderer.sprite = sprite;
             handle.Renderer.sortingOrder = entry.SortingOrder;
+            handle.Renderer.enabled = true;
+            SetPartRenderersEnabled(handle, false);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
+        }
+
+        private bool TryApplyLayeredActorEntry(
+            ActorHandle handle,
+            ArcGraphActorObjectSceneRenderEntry entry,
+            ArcGraphNpcRuntimeSceneRendererContract contract,
+            IArcGraphSpriteResolver spriteResolver,
+            out int missingSprites,
+            out int generatedFallbacks,
+            out int createdPartRenderers,
+            out int reusedPartRenderers,
+            out int missingCatalogFrames)
+        {
+            missingSprites = 0;
+            generatedFallbacks = 0;
+            createdPartRenderers = 0;
+            reusedPartRenderers = 0;
+            missingCatalogFrames = 0;
+
+            if (!useLayeredActorCatalog || entry.SpriteRequest.UsesSimplifiedRepresentation)
+                return false;
+
+            ArcGraphNpcVisualCatalog catalog = GetOrParseNpcVisualCatalog();
+            if (catalog == null || catalog.PartCount <= 0)
+                return false;
+
+            string direction = ResolveDirection(entry, contract);
+            string animation = entry.HasMotion ? "walk" : catalog.DefaultAnimationKey;
+            int frameIndex = entry.HasMotion && entry.MotionProgress01 >= 0.5f ? 1 : 0;
+            bool appliedAnyPart = false;
+
+            for (int i = 0; i < catalog.Parts.Count; i++)
+            {
+                string partKey = catalog.Parts[i];
+                if (!catalog.TryResolveFrame(
+                        catalog.DefaultVisualKey,
+                        partKey,
+                        direction,
+                        animation,
+                        frameIndex,
+                        out ArcGraphNpcVisualFrame visualFrame)
+                    && !catalog.TryResolveFrame(
+                        catalog.DefaultVisualKey,
+                        partKey,
+                        direction,
+                        catalog.DefaultAnimationKey,
+                        0,
+                        out visualFrame))
+                {
+                    missingCatalogFrames++;
+                    continue;
+                }
+
+                var request = new ArcGraphSpriteResolveRequest(
+                    ArcGraphRenderItemKind.Actor,
+                    entry.EntityId,
+                    visualFrame.SpriteKey,
+                    visualFrame.PartKey,
+                    usesSimplifiedRepresentation: false);
+
+                Sprite sprite = ResolveSprite(request, spriteResolver, out bool usedGeneratedFallback);
+                if (sprite == null)
+                {
+                    missingSprites++;
+                    continue;
+                }
+
+                SpriteRenderer partRenderer = GetOrCreatePartRenderer(
+                    handle,
+                    visualFrame.PartKey,
+                    out bool wasCreated);
+                ApplyPartRenderer(handle, partRenderer, visualFrame, entry, sprite, contract);
+
+                appliedAnyPart = true;
+                if (usedGeneratedFallback)
+                    generatedFallbacks++;
+
+                if (wasCreated)
+                    createdPartRenderers++;
+                else
+                    reusedPartRenderers++;
+            }
+
+            if (!appliedAnyPart)
+                return false;
+
+            handle.Renderer.enabled = false;
+            handle.GameObject.SetActive(true);
+            handle.WasTouchedThisFrame = true;
+            return true;
+        }
+
+        private SpriteRenderer GetOrCreatePartRenderer(
+            ActorHandle handle,
+            string partKey,
+            out bool wasCreated)
+        {
+            string safePartKey = string.IsNullOrWhiteSpace(partKey) ? "part" : partKey;
+            if (handle.PartRenderers.TryGetValue(safePartKey, out SpriteRenderer renderer)
+                && renderer != null)
+            {
+                wasCreated = false;
+                return renderer;
+            }
+
+            var go = new GameObject("ArcGraphNpcPart_" + handle.ActorId + "_" + safePartKey);
+            go.transform.SetParent(handle.GameObject.transform, false);
+            renderer = go.AddComponent<SpriteRenderer>();
+            handle.PartRenderers[safePartKey] = renderer;
+            wasCreated = true;
+            return renderer;
+        }
+
+        private void ApplyPartRenderer(
+            ActorHandle handle,
+            SpriteRenderer partRenderer,
+            ArcGraphNpcVisualFrame visualFrame,
+            ArcGraphActorObjectSceneRenderEntry entry,
+            Sprite sprite,
+            ArcGraphNpcRuntimeSceneRendererContract contract)
+        {
+            handle.GameObject.transform.localPosition = contract.OriginOffset + new Vector3(
+                entry.WorldX,
+                entry.WorldY,
+                entry.WorldZ + contract.ZOffset);
+            handle.GameObject.transform.localScale = Vector3.one * contract.ActorScale;
+
+            partRenderer.transform.localPosition = Vector3.zero;
+            partRenderer.transform.localScale = Vector3.one;
+            partRenderer.sprite = sprite;
+            partRenderer.sortingOrder = entry.SortingOrder + visualFrame.SortingOffset;
+            partRenderer.enabled = true;
+        }
+
+        private void SetPartRenderersEnabled(
+            ActorHandle handle,
+            bool enabled)
+        {
+            foreach (var pair in handle.PartRenderers)
+            {
+                if (pair.Value != null)
+                    pair.Value.enabled = enabled;
+            }
         }
 
         private void EnsureRoot(ArcGraphNpcRuntimeSceneRendererContract contract)
@@ -509,6 +714,10 @@ namespace Arcontio.View.ArcGraph
             int disabledActorObjectCount,
             int missingSpriteCount,
             int generatedFallbackSpriteCount,
+            int layeredActorCount,
+            int createdPartRendererCount,
+            int reusedPartRendererCount,
+            int missingCatalogFrameCount,
             string reason)
         {
             _lastDiagnostics = new ArcGraphNpcRuntimeSceneRendererDiagnostics(
@@ -528,6 +737,10 @@ namespace Arcontio.View.ArcGraph
                 CountActiveActorObjects(),
                 missingSpriteCount,
                 generatedFallbackSpriteCount,
+                layeredActorCount,
+                createdPartRendererCount,
+                reusedPartRendererCount,
+                missingCatalogFrameCount,
                 reason);
 
             LogLastDiagnostics();
@@ -555,7 +768,11 @@ namespace Arcontio.View.ArcGraph
                 ", disabled=" + _lastDiagnostics.DisabledActorObjectCount +
                 ", active=" + _lastDiagnostics.ActiveActorObjectCount +
                 ", missingSprites=" + _lastDiagnostics.MissingSpriteCount +
-                ", generatedFallbacks=" + _lastDiagnostics.GeneratedFallbackSpriteCount);
+                ", generatedFallbacks=" + _lastDiagnostics.GeneratedFallbackSpriteCount +
+                ", layeredActors=" + _lastDiagnostics.LayeredActorCount +
+                ", createdParts=" + _lastDiagnostics.CreatedPartRendererCount +
+                ", reusedParts=" + _lastDiagnostics.ReusedPartRendererCount +
+                ", missingCatalogFrames=" + _lastDiagnostics.MissingCatalogFrameCount);
         }
 
         private int CountActiveActorObjects()
@@ -586,6 +803,66 @@ namespace Arcontio.View.ArcGraph
             }
 
             return count;
+        }
+
+        private ArcGraphNpcVisualCatalog GetOrParseNpcVisualCatalog()
+        {
+            string json = npcVisualCatalogJson != null
+                ? npcVisualCatalogJson.text
+                : null;
+
+            if (_npcVisualCatalog != null && _npcVisualCatalogSourceText == json)
+                return _npcVisualCatalog;
+
+            if (!ArcGraphNpcVisualCatalogJson.TryParse(json, out _npcVisualCatalog))
+            {
+                _npcVisualCatalog = null;
+                _npcVisualCatalogSourceText = null;
+                return null;
+            }
+
+            _npcVisualCatalogSourceText = json;
+            return _npcVisualCatalog;
+        }
+
+        private static string ResolveDirection(
+            ArcGraphActorObjectSceneRenderEntry entry,
+            ArcGraphNpcRuntimeSceneRendererContract contract)
+        {
+            if (!entry.HasMotion)
+                return "south";
+
+            float tileSize = contract.TileWorldSize > 0f ? contract.TileWorldSize : 1f;
+            float visualX = (entry.WorldX / tileSize) - 0.5f;
+            float visualY = (entry.WorldY / tileSize) - 0.5f;
+            float dx = visualX - entry.DiscreteCell.X;
+            float dy = visualY - entry.DiscreteCell.Y;
+
+            if (Mathf.Abs(dx) >= Mathf.Abs(dy))
+                return dx >= 0f ? "east" : "west";
+
+            return dy >= 0f ? "north" : "south";
+        }
+
+        private Sprite ResolveSprite(
+            ArcGraphSpriteResolveRequest request,
+            IArcGraphSpriteResolver spriteResolver,
+            out bool usedGeneratedFallback)
+        {
+            usedGeneratedFallback = false;
+
+            if (spriteResolver != null
+                && spriteResolver.TryResolveSprite(request, out Sprite resolved)
+                && resolved != null)
+            {
+                return resolved;
+            }
+
+            if (!allowGeneratedFallbackSprites)
+                return null;
+
+            usedGeneratedFallback = true;
+            return GetOrCreateFallbackSprite();
         }
 
         private static void DestroyUnityObject(Object unityObject)

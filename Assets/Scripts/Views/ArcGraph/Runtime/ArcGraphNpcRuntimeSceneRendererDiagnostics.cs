@@ -48,6 +48,10 @@ namespace Arcontio.View.ArcGraph
         public readonly int ActiveActorObjectCount;
         public readonly int MissingSpriteCount;
         public readonly int GeneratedFallbackSpriteCount;
+        public readonly int LayeredActorCount;
+        public readonly int CreatedPartRendererCount;
+        public readonly int ReusedPartRendererCount;
+        public readonly int MissingCatalogFrameCount;
         public readonly string Reason;
 
         // =============================================================================
@@ -75,6 +79,10 @@ namespace Arcontio.View.ArcGraph
             int activeActorObjectCount,
             int missingSpriteCount,
             int generatedFallbackSpriteCount,
+            int layeredActorCount,
+            int createdPartRendererCount,
+            int reusedPartRendererCount,
+            int missingCatalogFrameCount,
             string reason)
         {
             RendererEnabled = rendererEnabled;
@@ -93,6 +101,10 @@ namespace Arcontio.View.ArcGraph
             ActiveActorObjectCount = ClampCount(activeActorObjectCount);
             MissingSpriteCount = ClampCount(missingSpriteCount);
             GeneratedFallbackSpriteCount = ClampCount(generatedFallbackSpriteCount);
+            LayeredActorCount = ClampCount(layeredActorCount);
+            CreatedPartRendererCount = ClampCount(createdPartRendererCount);
+            ReusedPartRendererCount = ClampCount(reusedPartRendererCount);
+            MissingCatalogFrameCount = ClampCount(missingCatalogFrameCount);
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
         }
 

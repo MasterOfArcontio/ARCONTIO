@@ -11524,6 +11524,187 @@ l'attuale sprite singolo in handle modulare corpo/testa/gambe/piedi.
 
 ---
 
+## Esito v0.38i.03 - ArcGraph NPC Layered Runtime Renderer
+
+La `v0.38i.03` collega il catalogo visuale NPC al renderer runtime NPC.
+
+### Obiettivo dello step
+
+Trasformare il renderer NPC da solo sprite singolo a renderer capace di montare
+un NPC da piu' parti:
+
+```text
+NPC root
+├─ body renderer
+├─ head renderer
+├─ legs renderer
+└─ feet renderer
+```
+
+Il comportamento resta gated e spento di default.
+
+### Modifiche principali
+
+`ArcGraphNpcRuntimeSceneRenderer` ora possiede:
+
+```text
+npcVisualCatalogJson
+useLayeredActorCatalog
+```
+
+`npcVisualCatalogJson` e' un `TextAsset` assegnabile da Inspector.
+
+`useLayeredActorCatalog` abilita il tentativo di rendering modulare.
+
+Se il flag e' spento, il renderer continua a usare lo sprite singolo precedente.
+
+### ActorHandle
+
+L'handle runtime NPC mantiene ora:
+
+```text
+GameObject root actor
+SpriteRenderer singolo fallback
+Dictionary<string, SpriteRenderer> partRenderers
+```
+
+Questo permette di riusare i renderer delle parti senza crearli ogni frame.
+
+### Flusso modulare
+
+Quando il renderer riceve una entry actor:
+
+```text
+entry actor
+-> direzione
+-> animazione
+-> frame index
+-> catalogo NPC
+-> frame per body/head/legs/feet
+-> sprite resolver
+-> SpriteRenderer per parte
+```
+
+Se il catalogo non e' valido o non produce parti renderizzabili, il renderer torna
+al fallback a sprite singolo.
+
+### Direzione
+
+La direzione viene risolta in modo semplice:
+
+- se non c'e' motion: `south`;
+- se c'e' motion: confronto tra posizione visuale e cella discreta;
+- asse principale X: `east` / `west`;
+- asse principale Y: `north` / `south`.
+
+Questa e' una soluzione minima. Una direzione esplicita read-only potra' essere
+aggiunta in futuro allo snapshot actor.
+
+### Animazione
+
+La scelta animazione e':
+
+```text
+motion attivo -> walk
+nessun motion -> idle
+```
+
+Per `walk`, il frame index iniziale usa:
+
+```text
+motionProgress01 < 0.5 -> frame 0
+motionProgress01 >= 0.5 -> frame 1
+```
+
+Questa e' una prima animazione leggera a due frame. Non usa ancora un timer
+grafico indipendente.
+
+### Sorting
+
+Ogni parte usa:
+
+```text
+entry.SortingOrder + visualFrame.SortingOffset
+```
+
+Il catalogo iniziale usa:
+
+```text
+body = 0
+legs = 1
+feet = 2
+head = 3
+```
+
+### Diagnostica
+
+La diagnostica NPC ora espone anche:
+
+- `LayeredActorCount`;
+- `CreatedPartRendererCount`;
+- `ReusedPartRendererCount`;
+- `MissingCatalogFrameCount`.
+
+Il log del renderer include:
+
+```text
+layeredActors
+createdParts
+reusedParts
+missingCatalogFrames
+```
+
+### Confini preservati
+
+Il renderer:
+
+- non carica sprite direttamente;
+- non usa `Resources.Load`;
+- non legge World;
+- non modifica job o movimento;
+- non cerca MapGrid;
+- non salva scena;
+- non richiede asset reali per compilare.
+
+La risoluzione sprite resta demandata a `IArcGraphSpriteResolver`.
+
+### QA tecnica
+
+Il controllo Roslyn isolato e' riuscito includendo:
+
+- catalogo NPC;
+- parser JSON;
+- renderer NPC;
+- diagnostica renderer NPC;
+- modulo Unity JSONSerialize.
+
+Warning attesi:
+
+- campi `SerializeField` assegnabili da Inspector.
+
+La ricerca statica non rileva usi operativi di dipendenze vietate. L'unica
+occorrenza di `Resources.Load` e' in un commento esplicativo del parser JSON.
+
+### Stato dopo v0.38i.03
+
+ArcGraph puo' ora:
+
+- leggere catalogo terrain da file;
+- leggere catalogo NPC visuale da file;
+- usare renderer NPC a sprite singolo;
+- usare renderer NPC modulare corpo/testa/gambe/piedi se abilitato;
+- scegliere direzione base a 4 sensi;
+- scegliere animazione `idle` o `walk` minima.
+
+Mancano ancora:
+
+- asset sprite reali nelle path dichiarate;
+- resolver configurato con quegli asset;
+- gate visuale Unity del rendering modulare;
+- eventuale direzione actor esplicita nello snapshot invece dell'inferenza minima.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
