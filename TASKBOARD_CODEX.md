@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38g.01 - ArcGraph Frozen Visual Gates Backlog Plan`
+`v0.38g.02 - ArcGraph Interaction Gate Recovery`
 
 STATUS:
-COMPLETATO BACKLOG / IN ATTESA PROSSIMO GO
+COMPLETATO GATE INTERACTION / IN ATTESA PROSSIMO GO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38g-01-arcgraph-frozen-visual-gates-backlog`
+`ai-task/v0.38g-02-arcgraph-interaction-gate-recovery`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -46,10 +46,12 @@ OUTPUT ATTESO:
 - registrare i gate visuali gia' recuperati manualmente dall'operatore;
 - distinguere test data-only, test visuali e test interaction;
 - ordinare il backlog residuo prima di qualunque pensionamento reale;
+- registrare il superamento del gate interaction `wrapper -> router -> HUD + selection`;
+- aggiornare lo stato dei blocchi ancora non pensionabili dopo il recupero dei tre gate minimi;
 - non cancellare componenti MapGrid;
 - non modificare codice runtime;
 - non salvare scene e non modificare prefab;
-- non dichiarare produttivo ArcGraph actor/object o interaction finche' i gate visuali restano congelati;
+- non dichiarare produttivo ArcGraph actor/object o interaction solo perche' i probe sono stati validati manualmente;
 - preparare il prossimo step operativo solo dopo avere chiarito quali gate sono passati e quali restano bloccanti;
 - non introdurre DevTools, top bar o comandi;
 - non leggere direttamente `MapGridWorldView`;
@@ -283,10 +285,11 @@ Regola corrente:
   - catena tecnica pronta ma non validata in scena;
   - da recuperare insieme agli altri test visuali congelati;
   - non considerare completata la migrazione interattiva ArcGraph finche' Pointer HUD, picking actor e selection non saranno verificati manualmente.
+  - aggiornamento successivo: il gate e' stato recuperato e superato in `v0.38g.02`.
 - audit `v0.38g.00` completato:
   - `MapGridChunkRenderer` e' il blocco piu' vicino al pensionamento, ma manca ancora renderer terrain produttivo permanente;
   - actor/object ArcGraph esiste come probe ma resta bloccato dal gate visuale congelato;
-  - interaction ArcGraph HUD/selection esiste come catena tecnica ma resta bloccata dal gate visuale congelato;
+  - interaction ArcGraph HUD/selection esiste come catena tecnica e, dopo `v0.38g.02`, non e' piu' bloccata dal gate visuale;
   - `MapGridWorldView` non e' pensionabile perche' contiene ancora sync NPC/oggetti, selection, click-to-move, FOV, Landmark/GVD, DT, pointer coords, summary, top bar bridge, audio e rebind World;
   - `MapGridRuntimeDevToolsOverlay` e `MapGridRuntimeControlTopBar` non sono renderer e devono diventare moduli UI/tool separati prima di qualunque rimozione;
   - FOV current cone, label screen-space, balloon NPC, stock label e summary cards non hanno ancora equivalente ArcGraph produttivo;
@@ -302,6 +305,15 @@ Regola corrente:
   - finche' il gate interaction non produce `consumer=True`, `queue=True` e target cella/actor coerenti, non promuovere HUD/selection ArcGraph;
   - `v0.38g` resta preparatoria: niente cancellazione MapGrid, niente renderer produttivo permanente, niente salvataggio scena.
   - prossimo step consigliato: `v0.38g.02 - ArcGraph Interaction Gate Recovery`, focalizzato solo sul recupero del wiring e sulla conferma del gate interaction.
+- micro-step `v0.38g.02` completato:
+  - l'operatore ha confermato il superamento del test 3 interaction;
+  - il gate `wrapper -> router -> Pointer HUD + Selection` viene considerato superato a livello visuale/manuale;
+  - risultano ora recuperati i tre gate minimi: terrain, actor/object probe e interaction base;
+  - questa conferma abilita la pianificazione del percorso minimo stabile ArcGraph, ma non abilita ancora il pensionamento fisico di MapGrid;
+  - actor/object resta probe temporaneo e non renderer produttivo con pooling;
+  - terrain resta probe/contratto validato, ma non ancora bootstrap terrain produttivo permanente;
+  - interaction resta base validata, ma DevTools, top bar, click-to-move, summary card, FOV current cone, label screen-space, balloon NPC e stock label non sono ancora migrati;
+  - prossimo step consigliato: `v0.38g.03 - ArcGraph Minimal Stable Runtime Path Audit`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

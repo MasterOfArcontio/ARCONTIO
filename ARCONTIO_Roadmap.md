@@ -7165,11 +7165,12 @@ La chiusura di questa fase richiedera':
 | v0.38f.08 | Consumer selection ArcGraph, separato dal renderer e senza DevTools | Completato |
 | v0.38f.09 | Router consumer interattivi ArcGraph per HUD + selection modulari | Completato |
 | v0.38f.10a | Probe manuale per consegnare la render queue actor/object al wrapper interattivo | Completato |
-| v0.38f.10 | Gate visuale consumer modulari ArcGraph: wrapper -> router -> HUD + selection | Gate visuale congelato |
+| v0.38f.10 | Gate visuale consumer modulari ArcGraph: wrapper -> router -> HUD + selection | Completato |
 | v0.38g.00 | Audit dipendenze pensionamento MapGrid dopo gate visuali congelati | Completato audit |
 | v0.38g.01 | Backlog ordinato dei gate visuali ArcGraph recuperati/congelati | Completato |
-| v0.38g.02 | Recupero gate interaction ArcGraph: wrapper -> router -> HUD + selection | Pending |
-| v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
+| v0.38g.02 | Recupero gate interaction ArcGraph: wrapper -> router -> HUD + selection | Completato |
+| v0.38g.03 | Audit percorso runtime minimo stabile ArcGraph dopo gate validati | Pending |
+| v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da mancanza percorso produttivo stabile |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
 ## Esito v0.38a - ArcGraph Legacy Absorption Audit
@@ -9898,7 +9899,7 @@ Il prossimo passaggio non deve aggiungere codice. Deve verificare in Unity che:
 - il click primario sopra actor attivi il consumer selection;
 - HUD e selection convivano senza conoscersi direttamente.
 
-## Esito v0.38f.10 - Gate visuale consumer modulari ArcGraph congelato
+## Esito v0.38f.10 - Gate visuale consumer modulari ArcGraph congelato e poi recuperato
 
 Il gate visuale `v0.38f.10` viene segnato come congelato su richiesta
 dell'operatore.
@@ -9937,6 +9938,10 @@ confermare:
 
 Durante il congelamento non bisogna considerare completata la parte visuale
 interattiva.
+
+Aggiornamento successivo: il gate interaction e' stato recuperato e superato in
+`v0.38g.02`. La sezione resta come memoria storica del congelamento iniziale,
+non come stato operativo corrente.
 
 Non bisogna ancora:
 
@@ -10155,21 +10160,85 @@ camera/input produttivi
 -> pensionamento progressivo MapGrid
 ```
 
+## Esito v0.38g.02 - ArcGraph Interaction Gate Recovery
+
+La `v0.38g.02` registra il recupero positivo del gate interaction ArcGraph.
+
+L'operatore ha confermato che il test 3 e' superato. Questo significa che il
+percorso:
+
+```text
+ArcGraphInteractionSceneAdapterWrapper
+-> ArcGraphInteractionConsumerRouter
+-> ArcGraphPointerHudSceneConsumer
+-> ArcGraphSelectionSceneConsumer
+```
+
+puo' essere considerato validato nel gate manuale Unity.
+
+### Cosa viene validato
+
+Il gate conferma:
+
+- il wrapper interaction puo' ricevere input scena;
+- il wrapper puo' dispatchare verso il router;
+- il router puo' fan-out verso piu' consumer modulari;
+- Pointer HUD e Selection possono convivere senza dipendere direttamente l'uno
+  dall'altra;
+- la catena interaction base non resta piu' congelata.
+
+### Cosa non viene ancora validato
+
+Il gate non rende ancora ArcGraph renderer produttivo principale.
+
+Restano fuori:
+
+- renderer terrain permanente;
+- renderer actor/object produttivo con pooling;
+- asset resolver definitivo;
+- camera/input produttivi completi;
+- DevTools;
+- top bar;
+- click-to-move;
+- summary cards;
+- FOV current cone;
+- label screen-space Landmark/GVD/DT;
+- balloon NPC;
+- stock label.
+
+### Stato dopo i tre gate minimi
+
+I tre gate minimi sono ora recuperati:
+
+```text
+terrain
+actor/object probe
+interaction base
+```
+
+Questo consente di spostare il lavoro dal semplice recupero dei gate al disegno
+del percorso runtime minimo stabile.
+
+Non consente ancora il pensionamento fisico di `MapGridWorldView` o
+`MapGridBootstrap`.
+
 ### Prossimo step consigliato
 
 Il prossimo micro-step e':
 
 ```text
-v0.38g.02 - ArcGraph Interaction Gate Recovery
+v0.38g.03 - ArcGraph Minimal Stable Runtime Path Audit
 ```
 
 Scopo:
 
-- recuperare il gate interaction senza introdurre nuove feature;
-- verificare o facilitare il wiring `wrapper -> router`;
-- confermare in Console `consumer=True` e `queue=True`;
-- distinguere eventuale errore di configurazione Inspector da eventuale errore di mapping viewport/cella;
-- non migrare DevTools, top bar, click-to-move o pannelli avanzati.
+- definire il percorso minimo stabile dopo i gate validati;
+- distinguere probe temporanei, wrapper scena e futuri componenti produttivi;
+- capire quali componenti MapGrid restano sorgenti temporanee e quali possono
+  iniziare a essere assorbiti;
+- non cancellare ancora MapGrid;
+- non salvare scene;
+- non introdurre DevTools, top bar, click-to-move o pannelli avanzati.
 
 ### Stop confermato
 
@@ -10177,7 +10246,7 @@ Scopo:
 Non cancellare MapGridWorldView.
 Non cancellare MapGridBootstrap.
 Non dichiarare ArcGraph renderer principale.
-Non dichiarare interaction validata finche' il wrapper non mostra consumer=True e queue=True.
+Non trasformare interaction validata in tool host operativo.
 Non trasformare i probe temporanei in sistemi produttivi senza checkpoint dedicato.
 ```
 
