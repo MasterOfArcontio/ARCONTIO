@@ -7155,6 +7155,8 @@ La chiusura di questa fase richiedera':
 | v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Gate visuale congelato |
 | v0.38e | Aggancio overlay debug minimo validato | Completato audit |
 | v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Completato audit |
+| v0.38f.01 | Contratto passivo boundary interattivo ArcGraph per picking cella/actor/object | Completato |
+| v0.38f.02 | Audit adapter scena interazione ArcGraph, input, camera e pannelli debug modulari | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -8736,6 +8738,98 @@ Scopo:
 
 Questo micro-step puo' essere progettuale o implementativo leggero, ma non deve
 ancora cancellare legacy.
+
+## Esito v0.38f.01 - ArcGraph Interactive Tool Boundary Contract
+
+La `v0.38f.01` introduce il primo contratto passivo per separare strumenti
+interattivi/debug dal renderer MapGrid legacy.
+
+Il punto non migra ancora pannelli, DevTools, top bar, summary cards o
+click-to-move. Introduce invece il vocabolario minimo che servira' a questi
+moduli per non leggere direttamente `MapGridWorldView`.
+
+### Cosa viene introdotto
+
+- `ArcGraphInteractionTargetKind`;
+- `ArcGraphInteractionFrame`;
+- `ArcGraphInteractionBoundaryDiagnostics`;
+- `ArcGraphInteractionBoundaryBuilder`;
+- `ArcGraphInteractionBoundaryHarness`.
+
+Il boundary riceve:
+
+- input view-side gia' normalizzato;
+- stato vista ArcGraph;
+- dimensione viewport;
+- queue o liste actor/object gia' prodotte.
+
+Il boundary restituisce:
+
+- cella sotto il puntatore;
+- actor visibile sotto il puntatore, se presente;
+- oggetto visibile sotto il puntatore, se presente;
+- blocco UI quando il puntatore e' sopra interfaccia;
+- reason diagnostica spiegabile.
+
+### Regola di priorita'
+
+La priorita' dichiarata e':
+
+```text
+UI bloccante
+-> actor
+-> object
+-> cella
+-> nessun target
+```
+
+Esempio:
+
+- se il mouse e' sopra un pannello UI, ArcGraph restituisce `UiBlocked`;
+- se il mouse e' su una cella con NPC, restituisce `Actor`;
+- se il mouse e' su una cella con oggetto ma senza NPC, restituisce `Object`;
+- se il mouse e' su una cella vuota valida, restituisce `Cell`.
+
+### Confine architetturale
+
+La `v0.38f.01` non introduce:
+
+- `GameObject`;
+- `SpriteRenderer`;
+- `Resources.Load`;
+- `FindObjectOfType`;
+- lettura diretta di `SimulationHost`;
+- lettura diretta di `MapGridWorldView`;
+- input fisico Unity;
+- comandi di simulazione;
+- selection globale;
+- pannelli UI concreti.
+
+ArcGraph espone solo fatti view-side.
+I tool futuri decideranno cosa fare con quei fatti.
+
+### QA tecnica
+
+La compilazione isolata dei nuovi file e' riuscita con `dotnet csc`.
+
+La ricerca statica sulle chiamate vietate non trova dipendenze operative vietate:
+le occorrenze residue sono solo citazioni nei commenti architetturali.
+
+### Prossimo lavoro consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.02 - ArcGraph Interaction Scene Adapter Audit
+```
+
+Scopo:
+
+- auditare dove leggere mouse, camera e dimensioni viewport in Unity;
+- definire un adapter scena che produca `ArcGraphInteractionFrame`;
+- mantenere separati pannello laterale, barra superiore, overlay NPC e strumenti debug;
+- evitare che ArcGraph diventi host dei tool;
+- evitare che i tool restino agganciati direttamente a `MapGridWorldView`.
 
 ---
 

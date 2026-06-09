@@ -28,26 +28,25 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.01 - ArcGraph Interactive Tool Boundary Contract`
+`v0.38f.02 - ArcGraph Interaction Scene Adapter Audit`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-01-arcgraph-interactive-tool-boundary-contract`
+`ai-task/v0.38f-02-arcgraph-interaction-scene-adapter-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- auditare come portare actor/object ArcGraph verso un aggancio runtime reale;
-- verificare cosa oggi MapGridWorldView gestisce per NPC, oggetti, sprite, label, collider e movimento;
-- verificare quali dati actor/object ArcGraph gia' riceve da `ArcGraphWorldAdapter`;
-- registrare il congelamento del gate visuale actor/object senza promuovere il probe a candidato produttivo;
-- definire il confine tra renderer mappa ArcGraph e strumenti interattivi/debug;
-- preparare un contratto dati/eventi per picking cella, picking actor, coordinate e input view-side;
+- auditare il punto scena piu' sicuro per produrre `ArcGraphInteractionFrame`;
+- verificare dove leggere mouse, camera, viewport e stato UI senza accoppiare ArcGraph ai tool;
+- mantenere pannello laterale, barra superiore, overlay NPC e strumenti debug come moduli separati;
+- usare il boundary `v0.38f.01` come contratto passivo, non come host dei tool;
 - evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
+- evitare che i tool continuino a dipendere direttamente da `MapGridWorldView`;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -177,7 +176,18 @@ Regola corrente:
   - `NPCSelection` e' gia' un servizio separato da conservare;
   - il picking NPC/cella resta ancora dentro MapGrid e va spostato dietro un boundary;
   - `v0.38g` non puo' partire davvero finche' il gate actor/object resta congelato e gli strumenti non hanno boundary separato.
-- prossimo checkpoint: `v0.38f.01 - ArcGraph Interactive Tool Boundary Contract`.
+- micro-step `v0.38f.01` completato:
+  - introdotto `ArcGraphInteractionTargetKind`;
+  - introdotto `ArcGraphInteractionFrame`;
+  - introdotta diagnostica `ArcGraphInteractionBoundaryDiagnostics`;
+  - introdotto `ArcGraphInteractionBoundaryBuilder`;
+  - introdotto harness `ArcGraphInteractionBoundaryHarness`;
+  - il boundary risolve UI bloccante, cella, actor e object da input view-side gia' normalizzato;
+  - priorita' target dichiarata: UI, actor, object, cella;
+  - nessun `GameObject`, `SpriteRenderer`, input fisico Unity, command tool, selection globale, `SimulationHost` o `MapGridWorldView`;
+  - compilazione isolata riuscita con `dotnet csc`;
+  - ricerca statica: dipendenze vietate assenti nel codice operativo, occorrenze solo nei commenti.
+- prossimo checkpoint: `v0.38f.02 - ArcGraph Interaction Scene Adapter Audit`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
