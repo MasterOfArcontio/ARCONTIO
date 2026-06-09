@@ -7169,7 +7169,8 @@ La chiusura di questa fase richiedera':
 | v0.38g.00 | Audit dipendenze pensionamento MapGrid dopo gate visuali congelati | Completato audit |
 | v0.38g.01 | Backlog ordinato dei gate visuali ArcGraph recuperati/congelati | Completato |
 | v0.38g.02 | Recupero gate interaction ArcGraph: wrapper -> router -> HUD + selection | Completato |
-| v0.38g.03 | Audit percorso runtime minimo stabile ArcGraph dopo gate validati | Pending |
+| v0.38g.03 | Audit percorso runtime minimo stabile ArcGraph dopo gate validati | Completato audit |
+| v0.38g.04 | Contratto coordinator runtime minimo ArcGraph, gated e senza pensionamento MapGrid | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da mancanza percorso produttivo stabile |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -10222,20 +10223,117 @@ del percorso runtime minimo stabile.
 Non consente ancora il pensionamento fisico di `MapGridWorldView` o
 `MapGridBootstrap`.
 
+## Esito v0.38g.03 - ArcGraph Minimal Stable Runtime Path Audit
+
+La `v0.38g.03` chiarisce cosa fare dopo il recupero dei tre gate minimi.
+
+I gate validati dimostrano che ArcGraph puo' ricevere dati, visualizzare
+terrain, visualizzare actor/object in probe e gestire una base interaction
+modulare. Non dimostrano ancora che esista un percorso runtime stabile.
+
+### Stato reale dei blocchi validati
+
+| Blocco | Stato attuale | Perche' non e' ancora produttivo |
+|---|---|---|
+| Terrain | Probe visuale validato | Crea mesh temporanee sotto root dedicato; manca un renderer terrain stabile con lifecycle dichiarato |
+| Actor/Object | Probe visuale validato | Crea `SpriteRenderer` temporanei; manca pooling, cleanup stabile, asset resolver obbligatorio e policy lifecycle |
+| Interaction | Gate wrapper/router/HUD/selection validato | Funziona come base consumer, ma non deve diventare host DevTools o command tool |
+| Runtime context | Funziona tramite adapter MapGrid | Dipende ancora da `MapGridBootstrap.RuntimeMap` e `MapGridWorldView.RuntimeWorld` |
+| Bootstrap ArcGraph | Nucleo C# passivo valido | Viene ancora creato spesso come runtime temporaneo nei probe |
+
+### Dipendenze MapGrid ancora necessarie
+
+ArcGraph oggi riceve i dati minimi da:
+
+```text
+MapGridBootstrap.RuntimeConfig
+MapGridBootstrap.RuntimeMap
+MapGridWorldView.RuntimeWorld
+```
+
+Questa dipendenza e' accettabile solo come sorgente temporanea dichiarata.
+
+Non e' invece accettabile trasformare ArcGraph in figlio logico di:
+
+```text
+MapGridChunkRenderer
+MapGridWorldView actor/object sync
+MapGridRuntimeDevToolsOverlay
+MapGridRuntimeControlTopBar
+```
+
+### Forma consigliata del prossimo passaggio
+
+Il prossimo passaggio non deve essere una cancellazione MapGrid.
+
+Il prossimo passaggio deve essere un contratto/coordinator minimo:
+
+```text
+ArcGraphMinimalRuntimeCoordinator
+```
+
+Il coordinator dovrebbe:
+
+- ricevere riferimenti espliciti da Inspector o setter;
+- costruire un solo `ArcGraphRuntimeContext`;
+- inizializzare o aggiornare un solo `ArcGraphBootstrapRuntime`;
+- ordinare il refresh snapshot;
+- consegnare dati terrain al renderer terrain stabile futuro;
+- consegnare queue actor/object al renderer actor/object stabile futuro;
+- consegnare queue actor/object al wrapper interaction;
+- mantenere tutto gated e spento di default;
+- esporre diagnostica chiara.
+
+### Cosa non deve fare il coordinator
+
+Il coordinator non deve:
+
+- leggere `SimulationHost.Instance`;
+- chiamare `MapGridWorldProvider`;
+- cercare oggetti con `FindObjectOfType`;
+- salvare scene;
+- creare DevTools;
+- inviare comandi;
+- possedere top bar;
+- possedere click-to-move;
+- possedere summary cards;
+- diventare un nuovo `MapGridWorldView`.
+
+### Decisione operativa
+
+Il percorso minimo stabile deve nascere cosi':
+
+```text
+adapter dichiarato MapGrid temporaneo
+-> runtime context ArcGraph
+-> bootstrap runtime riusabile
+-> coordinator minimo
+-> renderer terrain/actor/object separati
+-> interaction wrapper/router gia' validati
+```
+
+La cancellazione di MapGrid resta bloccata finche' non esiste almeno:
+
+- coordinator minimo;
+- renderer terrain stabile;
+- renderer actor/object stabile;
+- asset resolver reale;
+- camera/input runtime controllati;
+- piano separato per UI/tool legacy.
+
 ### Prossimo step consigliato
 
 Il prossimo micro-step e':
 
 ```text
-v0.38g.03 - ArcGraph Minimal Stable Runtime Path Audit
+v0.38g.04 - ArcGraph Minimal Runtime Coordinator Contract
 ```
 
 Scopo:
 
-- definire il percorso minimo stabile dopo i gate validati;
-- distinguere probe temporanei, wrapper scena e futuri componenti produttivi;
-- capire quali componenti MapGrid restano sorgenti temporanee e quali possono
-  iniziare a essere assorbiti;
+- definire il contratto value-side e scene-side del coordinator;
+- dichiarare input, output, diagnostica e gate;
+- decidere quali probe vengono solo orchestrati e quali restano fuori;
 - non cancellare ancora MapGrid;
 - non salvare scene;
 - non introdurre DevTools, top bar, click-to-move o pannelli avanzati.

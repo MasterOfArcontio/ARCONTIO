@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38g.02 - ArcGraph Interaction Gate Recovery`
+`v0.38g.03 - ArcGraph Minimal Stable Runtime Path Audit`
 
 STATUS:
-COMPLETATO GATE INTERACTION / IN ATTESA PROSSIMO GO
+COMPLETATO AUDIT / IN ATTESA PROSSIMO GO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38g-02-arcgraph-interaction-gate-recovery`
+`ai-task/v0.38g-03-arcgraph-minimal-stable-runtime-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -48,6 +48,9 @@ OUTPUT ATTESO:
 - ordinare il backlog residuo prima di qualunque pensionamento reale;
 - registrare il superamento del gate interaction `wrapper -> router -> HUD + selection`;
 - aggiornare lo stato dei blocchi ancora non pensionabili dopo il recupero dei tre gate minimi;
+- auditare il percorso minimo stabile ArcGraph dopo gate terrain, actor/object e interaction validati;
+- distinguere probe temporanei da futuri componenti produttivi;
+- individuare il prossimo micro-step tecnico senza cancellare MapGrid;
 - non cancellare componenti MapGrid;
 - non modificare codice runtime;
 - non salvare scene e non modificare prefab;
@@ -314,6 +317,16 @@ Regola corrente:
   - terrain resta probe/contratto validato, ma non ancora bootstrap terrain produttivo permanente;
   - interaction resta base validata, ma DevTools, top bar, click-to-move, summary card, FOV current cone, label screen-space, balloon NPC e stock label non sono ancora migrati;
   - prossimo step consigliato: `v0.38g.03 - ArcGraph Minimal Stable Runtime Path Audit`.
+- audit `v0.38g.03` completato:
+  - i tre gate minimi sono validati ma vivono ancora come probe/manual wiring;
+  - `ArcGraphTerrainRuntimeMapGridAdapter` resta la sorgente temporanea dichiarata: legge `MapGridBootstrap.RuntimeConfig`, `MapGridBootstrap.RuntimeMap` e `MapGridWorldView.RuntimeWorld`;
+  - `ArcGraphTerrainSceneProbeRenderer` crea mesh terrain temporanee sotto root dedicato, ma non e' renderer produttivo permanente;
+  - `ArcGraphActorObjectSceneProbeRenderer` crea `SpriteRenderer` temporanei sotto root dedicato, ma non possiede pooling, lifecycle stabile o asset resolver obbligatorio;
+  - `ArcGraphInteractionSceneAdapterWrapper` e `ArcGraphInteractionConsumerRouter` formano una base valida per input/HUD/selection, ma non devono diventare host di DevTools o comandi;
+  - il prossimo passaggio tecnico non deve cancellare MapGrid: deve introdurre un contratto/coordinator di percorso runtime minimo stabile;
+  - il candidato prossimo e' `v0.38g.04 - ArcGraph Minimal Runtime Coordinator Contract`;
+  - scopo del coordinator: orchestrare context, refresh snapshot, terrain, actor/object e interaction in modo esplicito e gated;
+  - divieto confermato: niente DevTools, top bar, click-to-move, summary card, FOV current cone, label screen-space, balloon NPC o stock label in questo passaggio.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
