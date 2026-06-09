@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38g.03 - ArcGraph Minimal Stable Runtime Path Audit`
+`v0.38g.04 - ArcGraph Minimal Runtime Coordinator Contract`
 
 STATUS:
-COMPLETATO AUDIT / IN ATTESA PROSSIMO GO
+COMPLETATO CONTRATTO / IN ATTESA PROSSIMO GO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38g-03-arcgraph-minimal-stable-runtime-audit`
+`ai-task/v0.38g-04-arcgraph-minimal-runtime-coordinator-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -51,6 +51,9 @@ OUTPUT ATTESO:
 - auditare il percorso minimo stabile ArcGraph dopo gate terrain, actor/object e interaction validati;
 - distinguere probe temporanei da futuri componenti produttivi;
 - individuare il prossimo micro-step tecnico senza cancellare MapGrid;
+- introdurre un coordinator C# passivo e riusabile per il percorso runtime minimo;
+- non introdurre ancora wrapper scena produttivo;
+- non agganciare automaticamente ArcGraph alla scena;
 - non cancellare componenti MapGrid;
 - non modificare codice runtime;
 - non salvare scene e non modificare prefab;
@@ -327,6 +330,21 @@ Regola corrente:
   - il candidato prossimo e' `v0.38g.04 - ArcGraph Minimal Runtime Coordinator Contract`;
   - scopo del coordinator: orchestrare context, refresh snapshot, terrain, actor/object e interaction in modo esplicito e gated;
   - divieto confermato: niente DevTools, top bar, click-to-move, summary card, FOV current cone, label screen-space, balloon NPC o stock label in questo passaggio.
+- micro-step `v0.38g.04` completato:
+  - introdotto `ArcGraphMinimalRuntimeCoordinatorFrame`;
+  - introdotto `ArcGraphMinimalRuntimeCoordinatorDiagnostics`;
+  - introdotto `ArcGraphMinimalRuntimeCoordinator`;
+  - introdotto `ArcGraphMinimalRuntimeCoordinatorHarness`;
+  - il coordinator e' C# passivo, non `MonoBehaviour`;
+  - il coordinator riceve `ArcGraphRuntimeContext` gia' costruito da un adapter esterno;
+  - il coordinator inizializza o riusa `ArcGraphBootstrapRuntime`;
+  - il coordinator ricrea il runtime solo quando cambiano le sorgenti config/mappa/world;
+  - il coordinator puo' rinfrescare snapshot e costruire `ArcGraphRenderQueue` actor/object;
+  - la queue viene pulita sui gate falliti per evitare dati derivati vecchi;
+  - nessun `GameObject`, asset load, input fisico, `SimulationHost`, `MapGridWorldProvider`, `FindObjectOfType`, DevTools, top bar o comando introdotto;
+  - QA statica sulle dipendenze vietate superata nel codice operativo;
+  - `dotnet build Assembly-CSharp.csproj --no-restore` non conclusivo per mancanza del file Unity temporaneo `Temp/obj/Assembly-CSharp/project.assets.json`;
+  - prossimo step consigliato: `v0.38g.05 - ArcGraph Minimal Runtime Scene Wrapper Contract`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

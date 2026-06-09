@@ -7170,7 +7170,8 @@ La chiusura di questa fase richiedera':
 | v0.38g.01 | Backlog ordinato dei gate visuali ArcGraph recuperati/congelati | Completato |
 | v0.38g.02 | Recupero gate interaction ArcGraph: wrapper -> router -> HUD + selection | Completato |
 | v0.38g.03 | Audit percorso runtime minimo stabile ArcGraph dopo gate validati | Completato audit |
-| v0.38g.04 | Contratto coordinator runtime minimo ArcGraph, gated e senza pensionamento MapGrid | Pending |
+| v0.38g.04 | Contratto coordinator runtime minimo ArcGraph, gated e senza pensionamento MapGrid | Completato |
+| v0.38g.05 | Wrapper scena minimo per alimentare il coordinator runtime ArcGraph | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da mancanza percorso produttivo stabile |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -10321,19 +10322,97 @@ La cancellazione di MapGrid resta bloccata finche' non esiste almeno:
 - camera/input runtime controllati;
 - piano separato per UI/tool legacy.
 
+## Esito v0.38g.04 - ArcGraph Minimal Runtime Coordinator Contract
+
+La `v0.38g.04` introduce il contratto C# passivo del coordinator runtime minimo
+ArcGraph.
+
+### File introdotti
+
+- `ArcGraphMinimalRuntimeCoordinatorFrame`;
+- `ArcGraphMinimalRuntimeCoordinatorDiagnostics`;
+- `ArcGraphMinimalRuntimeCoordinator`;
+- `ArcGraphMinimalRuntimeCoordinatorHarness`.
+
+### Funzione del coordinator
+
+Il coordinator riceve un `ArcGraphRuntimeContext` gia' costruito da un adapter
+esterno e orchestra:
+
+```text
+ArcGraphRuntimeContext
+-> ArcGraphBootstrapRuntime
+-> RefreshSnapshots
+-> ArcGraphRenderQueue actor/object
+```
+
+Il coordinator non disegna e non crea oggetti scena.
+
+### Confini preservati
+
+Il coordinator non e':
+
+- un `MonoBehaviour`;
+- un renderer;
+- un tool host;
+- un DevTools manager;
+- un sostituto di `MapGridWorldView`;
+- un accesso globale al `World`.
+
+Non introduce:
+
+- `GameObject`;
+- `AddComponent`;
+- input fisico Unity;
+- `SimulationHost`;
+- `MapGridWorldProvider`;
+- `FindObjectOfType`;
+- `Resources.Load`;
+- comandi;
+- top bar;
+- click-to-move;
+- summary cards.
+
+### Comportamento tecnico
+
+Il coordinator:
+
+- inizializza un `ArcGraphBootstrapRuntime` quando il context e' valido;
+- riusa il runtime se config, mappa e world sono gli stessi riferimenti;
+- ricrea il runtime se cambia una sorgente, per esempio dopo load snapshot;
+- puo' rinfrescare snapshot;
+- puo' costruire una `ArcGraphRenderQueue` actor/object;
+- pulisce la queue nei gate falliti, evitando dati derivati vecchi;
+- espone diagnostica con sorgenti disponibili, layer presenti, snapshot e conteggi queue.
+
+### QA
+
+La ricerca statica sui nuovi file non trova dipendenze operative vietate.
+
+`dotnet build Assembly-CSharp.csproj --no-restore` non e' conclusivo perche'
+manca il file temporaneo Unity:
+
+```text
+Temp/obj/Assembly-CSharp/project.assets.json
+```
+
+Non e' stato eseguito restore per evitare modifiche nelle cartelle temporanee
+Unity.
+
 ### Prossimo step consigliato
 
 Il prossimo micro-step e':
 
 ```text
-v0.38g.04 - ArcGraph Minimal Runtime Coordinator Contract
+v0.38g.05 - ArcGraph Minimal Runtime Scene Wrapper Contract
 ```
 
 Scopo:
 
-- definire il contratto value-side e scene-side del coordinator;
-- dichiarare input, output, diagnostica e gate;
-- decidere quali probe vengono solo orchestrati e quali restano fuori;
+- creare un wrapper scena minimale, spento di default;
+- alimentare il coordinator con `ArcGraphTerrainRuntimeMapGridAdapter`;
+- consegnare la queue prodotta al wrapper interaction gia' validato;
+- non creare renderer produttivi;
 - non cancellare ancora MapGrid;
 - non salvare scene;
 - non introdurre DevTools, top bar, click-to-move o pannelli avanzati.
