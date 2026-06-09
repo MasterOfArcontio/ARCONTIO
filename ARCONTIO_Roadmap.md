@@ -11349,6 +11349,181 @@ Il prossimo step puo' essere uno tra:
 
 ---
 
+## Esito v0.38i.02 - ArcGraph NPC Visual Catalog Data-Driven
+
+La `v0.38i.02` introduce il primo catalogo visuale data-driven per NPC modulari.
+
+### Obiettivo dello step
+
+Preparare la futura costruzione dell'NPC a layer:
+
+```text
+NPC root
+├─ body
+├─ head
+├─ legs
+└─ feet
+```
+
+Questo step non modifica ancora il renderer NPC. Definisce prima il formato dati
+che il renderer usera' nello step successivo.
+
+### File introdotti
+
+- `ArcGraphNpcVisualFrame`;
+- `ArcGraphNpcVisualCatalog`;
+- `ArcGraphNpcVisualCatalogJson`;
+- `Assets/Resources/ArcGraph/Config/ArcGraphNpcVisualCatalog.json`.
+
+### Struttura del catalogo
+
+Il catalogo JSON contiene:
+
+```text
+defaultVisualKey
+defaultAnimationKey
+pixelsPerUnit
+parts[]
+frames[]
+```
+
+Le parti iniziali sono:
+
+```text
+body
+head
+legs
+feet
+```
+
+Le direzioni iniziali sono:
+
+```text
+north
+south
+east
+west
+```
+
+Le animazioni iniziali sono:
+
+```text
+idle
+walk
+```
+
+### Frame
+
+Ogni frame dichiara:
+
+```text
+visualKey
+partKey
+directionKey
+animationKey
+frameIndex
+spriteKey
+durationTicks
+sortingOffset
+```
+
+Il catalogo di esempio contiene 48 frame:
+
+- `idle`: 4 direzioni x 1 frame x 4 parti = 16 frame;
+- `walk`: 4 direzioni x 2 frame x 4 parti = 32 frame.
+
+### Naming sprite previsto
+
+Il catalogo prepara questa convenzione:
+
+```text
+ArcGraph/NPC/human_default/body/south_idle_00
+ArcGraph/NPC/human_default/head/south_idle_00
+ArcGraph/NPC/human_default/legs/south_idle_00
+ArcGraph/NPC/human_default/feet/south_idle_00
+```
+
+Per la camminata:
+
+```text
+ArcGraph/NPC/human_default/body/south_walk_00
+ArcGraph/NPC/human_default/body/south_walk_01
+```
+
+Lo stesso schema vale per:
+
+```text
+north
+south
+east
+west
+```
+
+### Confine importante
+
+Il catalogo non contiene asset Unity.
+
+Contiene solo `spriteKey`.
+
+La risoluzione:
+
+```text
+spriteKey -> Sprite Unity
+```
+
+resta responsabilita' di un resolver scene-side.
+
+### Performance
+
+Il catalogo runtime costruisce un dizionario interno:
+
+```text
+visualKey|partKey|directionKey|animationKey|frameIndex -> frame
+```
+
+Questo evita che il renderer debba scansionare tutti i frame a ogni update.
+
+### Confini preservati
+
+Il parser:
+
+- non usa `Resources.Load`;
+- non crea sprite;
+- non crea GameObject;
+- non modifica World;
+- non modifica job;
+- non tocca MapGrid;
+- non salva scene o prefab.
+
+### QA tecnica
+
+Il JSON e' stato validato con `ConvertFrom-Json` PowerShell:
+
+```text
+human_default parts=4 frames=48
+```
+
+Il controllo Roslyn isolato e' riuscito includendo il modulo Unity
+`UnityEngine.JSONSerializeModule`.
+
+La ricerca statica non rileva usi operativi di dipendenze vietate. L'unica
+occorrenza di `Resources.Load` e' in un commento che spiega che il parser non lo
+usa.
+
+### Stato dopo v0.38i.02
+
+ArcGraph possiede ora:
+
+- catalogo terrain da file;
+- catalogo visuale NPC da file;
+- convenzione di naming per sprite NPC modulari;
+- base dati per animazione a 4 direzioni.
+
+Il prossimo step deve collegare questo catalogo al renderer NPC, trasformando
+l'attuale sprite singolo in handle modulare corpo/testa/gambe/piedi.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

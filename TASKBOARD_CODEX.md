@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.01 - ArcGraph Terrain Catalog Data-Driven`
+`v0.38i.02 - ArcGraph NPC Visual Catalog Data-Driven`
 
 STATUS:
-TERRAIN CATALOG JSON INTRODOTTO / PROSSIMO STEP MAP DATA ARCGHAPH O NPC VISUAL CATALOG
+NPC VISUAL CATALOG JSON INTRODOTTO / PROSSIMO STEP RENDERER NPC MODULARE
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -452,6 +452,21 @@ Regola corrente:
   - controllo JSON PowerShell riuscito: path atlas, tile pixels e numero tile validi;
   - controllo Roslyn isolato riuscito con modulo Unity JSONSerialize incluso; warning atteso su `SerializeField`;
   - prossimo step possibile: catalogo conformazione mappa ArcGraph o catalogo visuale NPC.
+- micro-step `v0.38i.02` completato:
+  - introdotto `ArcGraphNpcVisualFrame`;
+  - introdotto `ArcGraphNpcVisualCatalog`;
+  - introdotto `ArcGraphNpcVisualCatalogJson`;
+  - aggiunto file `Assets/Resources/ArcGraph/Config/ArcGraphNpcVisualCatalog.json`;
+  - il catalogo descrive parti NPC modulari: `body`, `head`, `legs`, `feet`;
+  - il catalogo descrive quattro direzioni: `north`, `south`, `east`, `west`;
+  - il catalogo descrive animazioni minime: `idle` e `walk`;
+  - il catalogo di esempio contiene 48 frame: idle a 1 frame per direzione e walk a 2 frame per direzione, per 4 parti;
+  - i frame contengono solo `spriteKey`, non asset Unity;
+  - il catalogo runtime costruisce un dizionario interno per lookup diretto, evitando scansioni per frame;
+  - il parser JSON non usa `Resources.Load`, non crea sprite, non crea GameObject e non tocca simulazione;
+  - controllo JSON PowerShell riuscito: `human_default parts=4 frames=48`;
+  - controllo Roslyn isolato riuscito con modulo Unity JSONSerialize incluso;
+  - prossimo step: collegare il catalogo al renderer NPC creando handle modulari corpo/testa/gambe/piedi.
 
 DOC SYNC:
 
