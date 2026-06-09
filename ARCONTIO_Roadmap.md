@@ -7167,6 +7167,8 @@ La chiusura di questa fase richiedera':
 | v0.38f.10a | Probe manuale per consegnare la render queue actor/object al wrapper interattivo | Completato |
 | v0.38f.10 | Gate visuale consumer modulari ArcGraph: wrapper -> router -> HUD + selection | Gate visuale congelato |
 | v0.38g.00 | Audit dipendenze pensionamento MapGrid dopo gate visuali congelati | Completato audit |
+| v0.38g.01 | Backlog ordinato dei gate visuali ArcGraph recuperati/congelati | Completato |
+| v0.38g.02 | Recupero gate interaction ArcGraph: wrapper -> router -> HUD + selection | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -10060,6 +10062,123 @@ Non pensionare selection legacy.
 Non dichiarare actor/object ArcGraph produttivo.
 Non dichiarare interaction HUD/selection validati.
 Non procedere a rimozione fisica finche' i gate congelati non sono recuperati.
+```
+
+## Esito v0.38g.01 - ArcGraph Frozen Visual Gates Backlog Plan
+
+La `v0.38g.01` ordina lo stato reale dei gate visuali ArcGraph dopo il recupero
+manuale parziale eseguito in Unity dall'operatore.
+
+Questo step non introduce codice runtime, non salva scene, non crea prefab e non
+pensiona componenti MapGrid. Serve solo a rendere esplicito quali pezzi sono
+stati verificati e quali restano bloccanti.
+
+### Stato dei gate recuperati
+
+| Gate | Esito attuale | Evidenza | Cosa valida | Cosa non valida ancora |
+|---|---|---|---|---|
+| Terrain data-only | OK | `TerrainSnapshotsBuilt`, `terrainSnapshots=16384`, `layerCount=4` | L'adapter legge config, mappa e world runtime e produce snapshot terrain | Non e' una validazione del renderer produttivo permanente |
+| Terrain visuale probe | Gia' considerato OK dal gate `v0.38c.03` | Test Unity precedente dell'operatore | Il probe terrain puo' disegnare la mappa come scena temporanea | Non sostituisce ancora `MapGridChunkRenderer` in produzione |
+| Actor/Object probe | OK tecnico e visuale provvisorio | `ActorObjectSceneProbeRendered`, `queueEntries=1`, `createdObjects=1`, `missingSprites=0` | La queue actor/object arriva al probe e crea almeno un oggetto scena | `spriteResolver=False` implica fallback sprite; asset resolver, pooling, label stock e renderer permanente non sono validati |
+| Interaction wrapper/router/HUD/selection | Non ancora OK | Diagnostica screenshot con `consumer=False` | Il wrapper esiste, legge input e puo' ricevere queue | Il consumer router non era collegato nel campo Inspector `Interaction Consumer Behaviour`; HUD e selection non sono ancora validati |
+
+### Ordine consigliato dei prossimi test manuali
+
+1. Interaction wiring minimo:
+
+   ```text
+   ArcGraphInteractionSceneAdapterWrapper.Interaction Consumer Behaviour
+   -> ArcGraphInteractionConsumerRouter
+   ```
+
+   Esito atteso in Console:
+
+   ```text
+   consumer=True
+   queue=True
+   ```
+
+2. Pointer HUD:
+
+   - mouse dentro la Game View;
+   - HUD deve mostrare cella, UI blocked, actor o object;
+   - se compare `PointOutsideViewport`, il mouse e' fuori dalla viewport usata dal wrapper o sopra finestre non Game View.
+
+3. Selection:
+
+   - click sinistro sopra NPC;
+   - il target deve essere `Actor`;
+   - `ArcGraphSelectionSceneConsumer` deve aggiornare `NPCSelection`;
+   - il click su cella vuota non deve fare clear automatico, coerentemente con MapGrid legacy.
+
+4. Actor/Object con sprite resolver:
+
+   - collegare un `ArcGraphSerializedSpriteResolver`;
+   - sostituire fallback sprite con sprite reale;
+   - verificare `generatedFallback=False` o riduzione dei fallback attesi.
+
+5. Terrain visuale ripetibile:
+
+   - ripetere render probe terrain dopo eventuali cambi scena;
+   - confermare che il materiale terrain assegnato da Inspector resta leggibile e non viene caricato via codice.
+
+### Blocchi ancora non pensionabili
+
+Anche con Terrain e Actor/Object probe positivi, non si puo' ancora cancellare
+`MapGridWorldView`.
+
+I motivi sono:
+
+- non esiste renderer actor/object produttivo con pooling;
+- non esiste asset resolver definitivo obbligatorio;
+- interaction HUD/selection non e' ancora validata;
+- top bar, DevTools, click-to-move, summary cards, FOV current cone, label
+  screen-space, balloon NPC e stock label restano fuori da ArcGraph produttivo;
+- ArcGraph non possiede ancora bootstrap scena produttivo completo.
+
+### Decisione operativa
+
+Il prossimo sviluppo non deve aggiungere moduli ambientali nuovi.
+
+La direzione piu' sicura e' completare il nucleo minimo:
+
+```text
+terrain + actor/object + interaction base
+```
+
+solo dopo:
+
+```text
+camera/input produttivi
+-> debug minimo
+-> UI/tool modulari
+-> pensionamento progressivo MapGrid
+```
+
+### Prossimo step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38g.02 - ArcGraph Interaction Gate Recovery
+```
+
+Scopo:
+
+- recuperare il gate interaction senza introdurre nuove feature;
+- verificare o facilitare il wiring `wrapper -> router`;
+- confermare in Console `consumer=True` e `queue=True`;
+- distinguere eventuale errore di configurazione Inspector da eventuale errore di mapping viewport/cella;
+- non migrare DevTools, top bar, click-to-move o pannelli avanzati.
+
+### Stop confermato
+
+```text
+Non cancellare MapGridWorldView.
+Non cancellare MapGridBootstrap.
+Non dichiarare ArcGraph renderer principale.
+Non dichiarare interaction validata finche' il wrapper non mostra consumer=True e queue=True.
+Non trasformare i probe temporanei in sistemi produttivi senza checkpoint dedicato.
 ```
 
 ---

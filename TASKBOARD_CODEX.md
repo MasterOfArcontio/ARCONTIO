@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38g.00 - ArcGraph Legacy Retirement Dependency Audit`
+`v0.38g.01 - ArcGraph Frozen Visual Gates Backlog Plan`
 
 STATUS:
-COMPLETATO AUDIT / IN ATTESA PROSSIMO GO
+COMPLETATO BACKLOG / IN ATTESA PROSSIMO GO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38g-00-arcgraph-legacy-retirement-dependency-audit`
+`ai-task/v0.38g-01-arcgraph-frozen-visual-gates-backlog`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -43,11 +43,14 @@ OUTPUT ATTESO:
 
 - auditare le dipendenze residue prima del pensionamento MapGrid;
 - distinguere componenti assorbiti, componenti congelati da gate visuali e componenti non ancora migrati;
+- registrare i gate visuali gia' recuperati manualmente dall'operatore;
+- distinguere test data-only, test visuali e test interaction;
+- ordinare il backlog residuo prima di qualunque pensionamento reale;
 - non cancellare componenti MapGrid;
 - non modificare codice runtime;
 - non salvare scene e non modificare prefab;
 - non dichiarare produttivo ArcGraph actor/object o interaction finche' i gate visuali restano congelati;
-- preparare il prossimo step come piano di recupero dei gate visuali congelati;
+- preparare il prossimo step operativo solo dopo avere chiarito quali gate sono passati e quali restano bloccanti;
 - non introdurre DevTools, top bar o comandi;
 - non leggere direttamente `MapGridWorldView`;
 - mantenere il wrapper `v0.38f.04` come frontiera input, non come tool host;
@@ -289,6 +292,16 @@ Regola corrente:
   - FOV current cone, label screen-space, balloon NPC, stock label e summary cards non hanno ancora equivalente ArcGraph produttivo;
   - `v0.38g` resta bloccato come pensionamento reale;
   - prossimo step consigliato: `v0.38g.01 - ArcGraph Frozen Visual Gates Backlog Plan`.
+- micro-step `v0.38g.01` completato:
+  - l'operatore ha recuperato manualmente parte dei gate visuali dentro Unity;
+  - test terrain data-only confermato con `TerrainSnapshotsBuilt`, `terrainSnapshots=16384`, `layerCount=4`;
+  - test actor/object confermato tecnicamente e visivamente come probe temporaneo: `ActorObjectSceneProbeRendered`, `queueEntries=1`, `plannedEntries=1`, `createdObjects=1`, `missingSprites=0`;
+  - actor/object usa ancora fallback sprite quando `spriteResolver=False`, quindi il gate dimostra il flusso dati/render probe ma non valida ancora asset resolver definitivo;
+  - interaction non e' ancora validata: nello screenshot il wrapper risulta operativo ma `Interaction Consumer Behaviour` non era collegato al router, con diagnostica `consumer=False`;
+  - il fix richiesto per il gate interaction e' wiring Inspector: `ArcGraphInteractionSceneAdapterWrapper.Interaction Consumer Behaviour` deve puntare a `ArcGraphInteractionConsumerRouter`;
+  - finche' il gate interaction non produce `consumer=True`, `queue=True` e target cella/actor coerenti, non promuovere HUD/selection ArcGraph;
+  - `v0.38g` resta preparatoria: niente cancellazione MapGrid, niente renderer produttivo permanente, niente salvataggio scena.
+  - prossimo step consigliato: `v0.38g.02 - ArcGraph Interaction Gate Recovery`, focalizzato solo sul recupero del wiring e sulla conferma del gate interaction.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
