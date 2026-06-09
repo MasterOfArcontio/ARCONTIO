@@ -31,7 +31,7 @@ CHECKPOINT CORRENTE:
 `v0.38f.10 - ArcGraph Interaction Modular Consumers Visual Gate`
 
 STATUS:
-IN ATTESA GATE UMANO
+GATE VISUALE CONGELATO
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38f-10-arcgraph-interaction-consumers-visual-gate-ready`
@@ -47,6 +47,7 @@ OUTPUT ATTESO:
 - controllare che il Pointer HUD mostri cella, actor e UI blocked;
 - controllare che la selection avvenga solo su click primario sopra actor;
 - controllare che HUD e selection convivano senza dipendere tra loro;
+- gate visuale congelato su richiesta dell'operatore: i test verranno recuperati insieme agli altri test Unity;
 - non salvare scene e non modificare prefab;
 - non introdurre DevTools, top bar o comandi;
 - non leggere direttamente `MapGridWorldView`;
@@ -274,6 +275,12 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - `dotnet build Assembly-CSharp.csproj --no-restore` non conclusivo per mancanza del file temporaneo Unity `Temp/obj/Assembly-CSharp/project.assets.json`, restore non eseguito per non toccare cartelle temporanee;
   - il gate `v0.38f.10` resta in attesa di test umano, ora con queue actor/object collegabile al wrapper.
+- gate visuale `v0.38f.10` congelato su richiesta dell'operatore:
+  - nessun test Unity eseguito ora;
+  - gate non fallito;
+  - catena tecnica pronta ma non validata in scena;
+  - da recuperare insieme agli altri test visuali congelati;
+  - non considerare completata la migrazione interattiva ArcGraph finche' Pointer HUD, picking actor e selection non saranno verificati manualmente.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

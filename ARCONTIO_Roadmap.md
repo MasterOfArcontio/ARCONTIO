@@ -7165,7 +7165,7 @@ La chiusura di questa fase richiedera':
 | v0.38f.08 | Consumer selection ArcGraph, separato dal renderer e senza DevTools | Completato |
 | v0.38f.09 | Router consumer interattivi ArcGraph per HUD + selection modulari | Completato |
 | v0.38f.10a | Probe manuale per consegnare la render queue actor/object al wrapper interattivo | Completato |
-| v0.38f.10 | Gate visuale consumer modulari ArcGraph: wrapper -> router -> HUD + selection | Pending gate umano |
+| v0.38f.10 | Gate visuale consumer modulari ArcGraph: wrapper -> router -> HUD + selection | Gate visuale congelato |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9894,6 +9894,57 @@ Il prossimo passaggio non deve aggiungere codice. Deve verificare in Unity che:
 - il Pointer HUD mostri cella, actor o UI blocked;
 - il click primario sopra actor attivi il consumer selection;
 - HUD e selection convivano senza conoscersi direttamente.
+
+## Esito v0.38f.10 - Gate visuale consumer modulari ArcGraph congelato
+
+Il gate visuale `v0.38f.10` viene segnato come congelato su richiesta
+dell'operatore.
+
+Il congelamento non rappresenta un fallimento tecnico.
+Significa invece che il test manuale in Unity non viene eseguito ora e sara'
+recuperato piu' avanti insieme agli altri gate visuali congelati.
+
+### Stato della catena da testare
+
+La catena tecnica resta pronta:
+
+```text
+ArcGraphTerrainRuntimeMapGridAdapter
+-> ArcGraphInteractionRenderQueueWiringProbe
+-> ArcGraphInteractionSceneAdapterWrapper
+-> ArcGraphInteractionConsumerRouter
+-> ArcGraphPointerHudSceneConsumer
+-> ArcGraphSelectionSceneConsumer
+```
+
+### Cosa resta da verificare quando i test verranno riaperti
+
+Quando l'operatore potra' eseguire i test visuali, questo gate dovra'
+confermare:
+
+- il push della `ArcGraphRenderQueue` actor/object verso il wrapper;
+- la presenza di `queue=True` nella diagnostica del wrapper;
+- la visualizzazione del Pointer HUD;
+- il riconoscimento di cella, actor e UI blocked;
+- la selection su click primario sopra actor;
+- la convivenza di Pointer HUD e Selection tramite router, senza dipendenze
+  dirette tra consumer.
+
+### Vincoli durante il congelamento
+
+Durante il congelamento non bisogna considerare completata la parte visuale
+interattiva.
+
+Non bisogna ancora:
+
+- promuovere i consumer ArcGraph a sistema UI definitivo;
+- cancellare la selection legacy MapGrid;
+- cancellare o pensionare `MapGridWorldView`;
+- procedere al pensionamento reale degli strumenti interattivi legacy;
+- assumere che picking actor, HUD e selection siano validati in scena.
+
+Il prossimo lavoro puo' proseguire solo su blocchi che non dipendono dall'esito
+visivo di questo gate, oppure deve restare preparatorio/audit-first.
 
 ---
 
