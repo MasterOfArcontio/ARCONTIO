@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract`
+`v0.38d.02 - ArcGraph Actor/Object Scene Probe`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38d-01-arcgraph-actor-object-scene-renderer-contract`
+`ai-task/v0.38d-02-arcgraph-actor-object-scene-probe`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -44,7 +44,7 @@ OUTPUT ATTESO:
 - auditare come portare actor/object ArcGraph verso un aggancio runtime reale;
 - verificare cosa oggi MapGridWorldView gestisce per NPC, oggetti, sprite, label, collider e movimento;
 - verificare quali dati actor/object ArcGraph gia' riceve da `ArcGraphWorldAdapter`;
-- definire il contratto del primo ponte scene-side actor/object senza salvare scena e senza sostituire ancora MapGridWorldView;
+- implementare il primo probe scene-side actor/object senza salvare scena e senza sostituire ancora MapGridWorldView;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -137,7 +137,18 @@ Regola corrente:
   - il primo bridge non deve migrare input, UI, collider, balloon, stock label o DevTools;
   - la risoluzione sprite deve restare lato wrapper/asset resolver, non dentro i builder passivi;
   - il prossimo micro-step e' `v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract`.
-- prossimo checkpoint: `v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract`.
+- micro-step `v0.38d.01` completato:
+  - introdotto `ArcGraphSpriteResolveRequest`;
+  - introdotto `IArcGraphSpriteResolver`;
+  - introdotto `ArcGraphActorObjectSceneRendererContract`;
+  - introdotta diagnostica `ArcGraphActorObjectSceneRendererDiagnostics`;
+  - introdotto piano scena passivo `ArcGraphActorObjectSceneRenderPlan`;
+  - introdotto `ArcGraphActorObjectSceneRenderPlanBuilder`;
+  - introdotto harness `ArcGraphActorObjectSceneRendererContractHarness`;
+  - il plan traduce `ArcGraphRenderQueue` in entry scene-side con posizione mondo, sorting order, sprite request e motion actor;
+  - nessun GameObject, nessun asset load, nessuna scena salvata, nessuna modifica a `MapGridWorldView`;
+  - compilazione isolata dei nuovi file riuscita con `dotnet csc`.
+- prossimo checkpoint: `v0.38d.02 - ArcGraph Actor/Object Scene Probe`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

@@ -7971,6 +7971,140 @@ Scopo del prossimo step:
 - preparare il probe actor/object senza ancora implementare sostituzione
   produttiva.
 
+## Esito v0.38d.01 - ArcGraph Actor/Object Scene Renderer Contract
+
+La `v0.38d.01` ha introdotto il contratto passivo del futuro renderer scena
+actor/object ArcGraph.
+
+Non e' stato ancora creato alcun renderer Unity produttivo.
+Non e' stato creato alcun `GameObject`.
+Non e' stato introdotto asset load.
+Non e' stata salvata alcuna scena.
+
+### Modifiche introdotte
+
+- aggiunto `ArcGraphSpriteResolveRequest`;
+- aggiunto `IArcGraphSpriteResolver`;
+- aggiunto `ArcGraphActorObjectSceneRendererContract`;
+- aggiunto `ArcGraphActorObjectSceneRendererDiagnostics`;
+- aggiunto `ArcGraphActorObjectSceneRenderEntry`;
+- aggiunto `ArcGraphActorObjectSceneRenderPlan`;
+- aggiunto `ArcGraphActorObjectSceneRenderPlanBuilder`;
+- aggiunto `ArcGraphActorObjectSceneRendererContractHarness`.
+
+### Forma del contratto
+
+Il nuovo percorso passivo e':
+
+```text
+ArcGraphRenderQueue
+-> ArcGraphActorObjectSceneRendererContract
+-> ArcGraphActorObjectSceneRenderPlanBuilder
+-> ArcGraphActorObjectSceneRenderPlan
+-> ArcGraphActorObjectSceneRenderEntry
+```
+
+Il plan contiene:
+
+- tipo item actor/object;
+- id entita';
+- cella discreta;
+- posizione mondo gia' scalata;
+- sorting order;
+- richiesta sprite;
+- stato movimento actor;
+- progresso movimento actor.
+
+Questo permette di testare il ponte scene-side prima di introdurre il
+`MonoBehaviour` che creera' materialmente gli sprite in Unity.
+
+### Decisioni tecniche fissate
+
+1. La sprite key resta un dato.
+
+   ArcGraph core produce `SpriteKey`, ma non carica asset.
+
+2. La risoluzione asset vive in un resolver scene-side.
+
+   Il contratto `IArcGraphSpriteResolver` potra' essere implementato nel wrapper
+   futuro, ma non nei builder passivi.
+
+3. Il sorting order deriva dall'ordine della `ArcGraphRenderQueue`.
+
+   Il renderer scena non deve rileggere `World` o ricalcolare il sorting dal
+   legacy `MapGridWorldView`.
+
+4. Gli actor usano la posa visuale gia' interpolata.
+
+   Il piano scena usa `VisualX` e `VisualY` prodotti da
+   `ArcGraphActorRenderItem`. Non ricalcola movimento dal job runtime.
+
+5. Il root resta temporaneo e confinato.
+
+   Il contratto default usa:
+
+```text
+ArcGraphActorObjectSceneProbeRoot
+```
+
+6. Input e UI restano esclusi.
+
+   Il contratto blocca migrazione di input, UI, lettura diretta del `World` e
+   asset load nei builder.
+
+### QA eseguita
+
+Eseguita compilazione isolata dei nuovi file con:
+
+```text
+dotnet csc
+netstandard2.1 refs
+Assembly-CSharp.dll
+UnityEngine.CoreModule.dll
+```
+
+Esito:
+
+```text
+compilazione riuscita
+```
+
+Controlli statici:
+
+- nessun `new GameObject`;
+- nessun `AddComponent`;
+- nessun `Resources.Load` eseguibile;
+- nessun `FindObjectOfType`;
+- nessuna lettura `SimulationHost.Instance`;
+- nessuna modifica a `World`;
+- nessuna modifica a `MapGridWorldView`;
+- nessuna modifica scena;
+- nessun file `.meta` tracciato.
+
+### Limiti confermati
+
+La `v0.38d.01` non disegna ancora nulla in Unity.
+
+Il renderer scena reale resta da introdurre nel prossimo micro-step come probe
+temporaneo e gated.
+
+### Prossimo checkpoint
+
+```text
+v0.38d.02 - ArcGraph Actor/Object Scene Probe
+```
+
+Scopo del prossimo step:
+
+- creare un probe `MonoBehaviour` temporaneo;
+- consumare `ArcGraphRenderQueue`;
+- costruire `ArcGraphActorObjectSceneRenderPlan`;
+- risolvere sprite tramite resolver scene-side;
+- creare `SpriteRenderer` solo sotto root temporaneo;
+- aggiungere context menu manuale;
+- non salvare scena;
+- non migrare input, UI, label, collider, balloon o DevTools.
+
 ---
 
 #### v0.170 - Conseguenze Sociali Emergenti
