@@ -28,24 +28,24 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.04 - ArcGraph Interaction Scene Adapter Wrapper`
+`v0.38f.05 - ArcGraph Interaction Consumer Audit`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-04-arcgraph-interaction-scene-adapter-wrapper`
+`ai-task/v0.38f-05-arcgraph-interaction-consumer-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- introdurre un wrapper Unity passivo per leggere input scena ArcGraph;
-- trasformare mouse/rotellina/tasto centrale/stato UI in `ArcGraphInteractionSceneFrame`;
-- chiamare `ArcGraphInteractionSceneAdapterContract`;
-- esporre diagnostica senza creare tool o pannelli;
-- mantenere il wrapper separato da DevTools, SelectionTool, TopBar, SidePanel e NpcOverlay;
+- auditare quale consumer interattivo migrare per primo;
+- distinguere selection, pointer HUD, DevTools, top bar, side panel e overlay NPC;
+- decidere quali consumer restano passivi e quali potranno inviare comandi;
+- mantenere il wrapper `v0.38f.04` come frontiera input, non come tool host;
+- evitare di trasformare subito ArcGraph in gestore operativo UI;
 - evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
 - evitare che i tool continuino a dipendere direttamente da `MapGridWorldView`;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
@@ -204,7 +204,16 @@ Regola corrente:
   - nessuna lettura di input Unity, nessun `MonoBehaviour`, nessun `GameObject`, nessun `SimulationHost`, nessun `MapGridWorldView`;
   - compilazione isolata riuscita con `dotnet csc`;
   - ricerca statica: dipendenze vietate assenti nel codice operativo, occorrenze solo nei commenti.
-- prossimo checkpoint: `v0.38f.04 - ArcGraph Interaction Scene Adapter Wrapper`.
+- micro-step `v0.38f.04` completato:
+  - introdotto `ArcGraphInteractionSceneAdapterWrapper`;
+  - introdotta diagnostica `ArcGraphInteractionSceneAdapterWrapperDiagnostics`;
+  - il wrapper legge input fisico Unity solo dentro la frontiera autorizzata;
+  - gate `adapterEnabled` e `processInUpdate` falsi di default;
+  - supporto viewport schermo intero o viewport manuale;
+  - supporto consumer opzionale tramite setter o `MonoBehaviour` che implementa `IArcGraphInteractionFrameConsumer`;
+  - nessun DevTools, SelectionTool, TopBar, SidePanel, NpcOverlay, `SimulationHost`, `MapGridWorldView`, `Resources.Load`, `GameObject`, `AddComponent` o salvataggio scena;
+  - compilazione isolata riuscita con `dotnet csc`, con soli warning attesi sui campi `SerializeField`.
+- prossimo checkpoint: `v0.38f.05 - ArcGraph Interaction Consumer Audit`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

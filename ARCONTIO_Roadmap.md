@@ -7158,7 +7158,8 @@ La chiusura di questa fase richiedera':
 | v0.38f.01 | Contratto passivo boundary interattivo ArcGraph per picking cella/actor/object | Completato |
 | v0.38f.02 | Audit adapter scena interazione ArcGraph, input, camera e pannelli debug modulari | Completato audit |
 | v0.38f.03 | Contratto adapter scena interazione ArcGraph, senza migrazione pannelli | Completato |
-| v0.38f.04 | Wrapper Unity passivo per input scena ArcGraph, spento/gated e senza tool migration | Pending |
+| v0.38f.04 | Wrapper Unity passivo per input scena ArcGraph, spento/gated e senza tool migration | Completato |
+| v0.38f.05 | Audit consumer interattivi: selection, pointer HUD, DevTools, top bar e side panel | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9138,6 +9139,118 @@ Scopo:
 - non migrare ancora DevTools, SelectionTool, TopBar, SidePanel o NpcOverlay;
 - non salvare scene;
 - non rimuovere MapGrid.
+
+## Esito v0.38f.04 - ArcGraph Interaction Scene Adapter Wrapper
+
+La `v0.38f.04` introduce il primo wrapper Unity passivo per alimentare il
+contratto interattivo ArcGraph con input fisico.
+
+Il wrapper e' spento di default.
+Il wrapper non salva scene.
+Il wrapper non crea pannelli.
+Il wrapper non seleziona NPC.
+Il wrapper non invia comandi.
+Il wrapper non legge `World`.
+Il wrapper non cerca `MapGridWorldView`.
+
+### File introdotto
+
+- `ArcGraphInteractionSceneAdapterWrapper`;
+- `ArcGraphInteractionSceneAdapterWrapperDiagnostics`.
+
+### Funzionamento
+
+Il flusso runtime del wrapper e':
+
+```text
+Mouse.current / EventSystem.current
+-> ArcGraphViewInputFrame
+-> ArcGraphInteractionSceneFrame
+-> ArcGraphInteractionSceneAdapterContract
+-> ArcGraphInteractionFrame
+-> consumer opzionale
+```
+
+### Gate di sicurezza
+
+Il wrapper ha due gate:
+
+- `adapterEnabled`;
+- `processInUpdate`.
+
+Entrambi sono falsi di default.
+
+Quindi il componente non introduce costo per frame se non viene esplicitamente
+abilitato. In alternativa puo' essere chiamato manualmente da Inspector tramite
+context menu.
+
+### Viewport
+
+Il wrapper supporta due modalita':
+
+- viewport = schermo intero;
+- viewport manuale con dimensioni e origine in pixel.
+
+La modalita' schermo intero e' il default provvisorio.
+La modalita' manuale prepara il futuro aggancio a un viewport ArcGraph dedicato.
+
+### Consumer
+
+Il wrapper puo' ricevere:
+
+- un consumer impostato via metodo `SetConsumer`;
+- un `MonoBehaviour` serializzato che implementa `IArcGraphInteractionFrameConsumer`.
+
+Se nessun consumer e' presente, il wrapper produce comunque diagnostica e
+`LastInteractionFrame`.
+
+### Confine preservato
+
+La `v0.38f.04` non introduce:
+
+- DevTools;
+- SelectionTool;
+- TopBar;
+- SidePanel;
+- NpcOverlay;
+- `SimulationHost`;
+- `MapGridWorldView`;
+- `MapGridWorldProvider`;
+- `Resources.Load`;
+- `GameObject`;
+- `AddComponent`;
+- salvataggio scena.
+
+Le uniche letture fisiche Unity presenti sono confinate nel wrapper:
+
+- `Mouse.current`;
+- `EventSystem.current`.
+
+Questo e' intenzionale: il wrapper e' il punto di frontiera autorizzato.
+
+### QA tecnica
+
+La compilazione isolata del wrapper e dei contratti dipendenti e' riuscita con
+`dotnet csc`.
+
+Sono presenti solo warning attesi su campi `SerializeField` non assegnati nel
+controllo isolato. In Unity quei campi sono pensati per Inspector o per setter
+espliciti.
+
+### Prossimo micro-step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.05 - ArcGraph Interaction Consumer Audit
+```
+
+Scopo:
+
+- auditare quale consumer migrare per primo;
+- distinguere selection, pointer HUD, DevTools, top bar, side panel e overlay NPC;
+- decidere quali consumer possono essere passivi e quali invece inviano comandi;
+- evitare di trasformare subito il wrapper in un gestore operativo.
 
 ---
 
