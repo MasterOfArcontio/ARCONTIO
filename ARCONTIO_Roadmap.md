@@ -7157,7 +7157,8 @@ La chiusura di questa fase richiedera':
 | v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Completato audit |
 | v0.38f.01 | Contratto passivo boundary interattivo ArcGraph per picking cella/actor/object | Completato |
 | v0.38f.02 | Audit adapter scena interazione ArcGraph, input, camera e pannelli debug modulari | Completato audit |
-| v0.38f.03 | Contratto adapter scena interazione ArcGraph, senza migrazione pannelli | Pending |
+| v0.38f.03 | Contratto adapter scena interazione ArcGraph, senza migrazione pannelli | Completato |
+| v0.38f.04 | Wrapper Unity passivo per input scena ArcGraph, spento/gated e senza tool migration | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9019,6 +9020,123 @@ Scopo:
 - non implementare ancora DevTools, SelectionTool, TopBar o SidePanel;
 - non salvare scene;
 - non creare pannelli;
+- non rimuovere MapGrid.
+
+## Esito v0.38f.03 - ArcGraph Interaction Scene Adapter Contract
+
+La `v0.38f.03` introduce il contratto C# passivo del futuro adapter scena
+interattivo ArcGraph.
+
+Il contratto non legge input Unity.
+Il contratto non e' un `MonoBehaviour`.
+Il contratto non crea oggetti scena.
+Il contratto non seleziona NPC.
+Il contratto non invia comandi.
+
+### File introdotti
+
+- `ArcGraphInteractionSceneFrame`;
+- `ArcGraphInteractionSceneAdapterDiagnostics`;
+- `IArcGraphInteractionFrameConsumer`;
+- `ArcGraphInteractionSceneAdapterContract`;
+- `ArcGraphInteractionSceneAdapterContractHarness`.
+
+### Funzionamento
+
+Il flusso del contratto e':
+
+```text
+ArcGraphInteractionSceneFrame
+-> ArcGraphViewController
+-> ArcGraphInteractionBoundaryBuilder
+-> ArcGraphInteractionFrame
+-> consumer opzionale
+```
+
+Il frame scena contiene:
+
+- input view-side gia' normalizzato;
+- dimensione viewport;
+- flag di dispatch verso consumer;
+- indice frame sorgente opzionale.
+
+La diagnostica contiene:
+
+- presenza config;
+- presenza view state;
+- validita' viewport;
+- presenza puntatore;
+- blocco UI;
+- zoom/pan applicati;
+- target risolto;
+- actor/object id;
+- dispatch o mancato dispatch.
+
+### Consumer esterno
+
+E' stata introdotta l'interfaccia:
+
+```text
+IArcGraphInteractionFrameConsumer
+```
+
+Questa interfaccia permette a tool futuri di ricevere il frame interattivo senza
+essere posseduti dal renderer ArcGraph.
+
+Esempi futuri:
+
+- `SelectionTool`;
+- `PointerHud`;
+- `DebugCommandTool`;
+- `NpcOverlay`;
+- pannello laterale diagnostico.
+
+### Confine preservato
+
+La `v0.38f.03` non introduce:
+
+- `Mouse.current`;
+- `Keyboard.current`;
+- `EventSystem.current`;
+- `Camera.main`;
+- `ScreenToWorldPoint`;
+- `SimulationHost`;
+- `MapGridWorldView`;
+- `MapGridWorldProvider`;
+- `Resources.Load`;
+- `GameObject`;
+- `AddComponent`;
+- DevTools;
+- SelectionTool;
+- TopBar;
+- SidePanel;
+- NpcOverlay.
+
+### QA tecnica
+
+La compilazione isolata dei nuovi file e dei contratti `v0.38f.01` e' riuscita
+con `dotnet csc`.
+
+La ricerca statica sulle dipendenze vietate non trova chiamate operative vietate.
+Le occorrenze residue sono solo citazioni nei commenti architetturali.
+
+### Prossimo micro-step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.04 - ArcGraph Interaction Scene Adapter Wrapper
+```
+
+Scopo:
+
+- introdurre un wrapper Unity passivo e gated;
+- leggere input fisico Unity solo nel wrapper;
+- trasformare input fisico in `ArcGraphInteractionSceneFrame`;
+- chiamare `ArcGraphInteractionSceneAdapterContract`;
+- esporre diagnostica da Inspector/log;
+- non migrare ancora DevTools, SelectionTool, TopBar, SidePanel o NpcOverlay;
+- non salvare scene;
 - non rimuovere MapGrid.
 
 ---

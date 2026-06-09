@@ -28,23 +28,24 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.03 - ArcGraph Interaction Scene Adapter Contract`
+`v0.38f.04 - ArcGraph Interaction Scene Adapter Wrapper`
 
 STATUS:
 IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-03-arcgraph-interaction-scene-adapter-contract`
+`ai-task/v0.38f-04-arcgraph-interaction-scene-adapter-wrapper`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- introdurre un contratto passivo per il futuro `ArcGraphInteractionSceneAdapter`;
-- definire diagnostica minima di input, viewport, UI block e frame interattivo;
-- valutare se serve una interfaccia consumer per tool esterni;
-- mantenere il contratto separato da DevTools, SelectionTool, TopBar, SidePanel e NpcOverlay;
+- introdurre un wrapper Unity passivo per leggere input scena ArcGraph;
+- trasformare mouse/rotellina/tasto centrale/stato UI in `ArcGraphInteractionSceneFrame`;
+- chiamare `ArcGraphInteractionSceneAdapterContract`;
+- esporre diagnostica senza creare tool o pannelli;
+- mantenere il wrapper separato da DevTools, SelectionTool, TopBar, SidePanel e NpcOverlay;
 - evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
 - evitare che i tool continuino a dipendere direttamente da `MapGridWorldView`;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
@@ -193,7 +194,17 @@ Regola corrente:
   - `MapGridCameraController` non e' riutilizzabile come base ArcGraph: ArcGraph possiede gia' `ArcGraphViewInputFrame`, `ArcGraphViewController` e mapper viewport/cella;
   - il futuro adapter scena deve leggere input Unity e produrre frame passivi, non selezionare NPC o inviare comandi;
   - pannello laterale, barra superiore, overlay NPC, pointer HUD e DevTools vanno trattati come moduli consumer separati.
-- prossimo checkpoint: `v0.38f.03 - ArcGraph Interaction Scene Adapter Contract`.
+- micro-step `v0.38f.03` completato:
+  - introdotto `ArcGraphInteractionSceneFrame`;
+  - introdotta diagnostica `ArcGraphInteractionSceneAdapterDiagnostics`;
+  - introdotta interfaccia `IArcGraphInteractionFrameConsumer`;
+  - introdotto `ArcGraphInteractionSceneAdapterContract`;
+  - introdotto harness `ArcGraphInteractionSceneAdapterContractHarness`;
+  - il contract applica `ArcGraphViewController`, poi `ArcGraphInteractionBoundaryBuilder`, poi consumer opzionale;
+  - nessuna lettura di input Unity, nessun `MonoBehaviour`, nessun `GameObject`, nessun `SimulationHost`, nessun `MapGridWorldView`;
+  - compilazione isolata riuscita con `dotnet csc`;
+  - ricerca statica: dipendenze vietate assenti nel codice operativo, occorrenze solo nei commenti.
+- prossimo checkpoint: `v0.38f.04 - ArcGraph Interaction Scene Adapter Wrapper`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
