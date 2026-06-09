@@ -7161,7 +7161,8 @@ La chiusura di questa fase richiedera':
 | v0.38f.04 | Wrapper Unity passivo per input scena ArcGraph, spento/gated e senza tool migration | Completato |
 | v0.38f.05 | Audit consumer interattivi: selection, pointer HUD, DevTools, top bar e side panel | Completato audit |
 | v0.38f.06 | Contratto passivo Pointer HUD ArcGraph, senza UI scena e senza comandi | Completato |
-| v0.38f.07 | Consumer scena Pointer HUD ArcGraph, gated e senza salvataggio scena | Pending |
+| v0.38f.07 | Consumer scena Pointer HUD ArcGraph, gated e senza salvataggio scena | Completato |
+| v0.38f.08 | Consumer selection ArcGraph, separato dal renderer e senza DevTools | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9485,6 +9486,101 @@ Scopo:
 - non salvare scene;
 - non copiare il monolite `MapGridPointerCoordsOverlay`;
 - non introdurre DevTools, selection o comandi.
+
+## Esito v0.38f.07 - ArcGraph Pointer HUD Scene Consumer
+
+La `v0.38f.07` introduce il primo consumer scena del Pointer HUD ArcGraph.
+
+Il consumer implementa:
+
+```text
+IArcGraphInteractionFrameConsumer
+```
+
+e riceve frame dal wrapper `v0.38f.04`.
+
+### File introdotto
+
+- `ArcGraphPointerHudSceneConsumer`.
+
+### Funzionamento
+
+Il flusso dati e':
+
+```text
+ArcGraphInteractionSceneAdapterWrapper
+-> IArcGraphInteractionFrameConsumer
+-> ArcGraphPointerHudSceneConsumer
+-> ArcGraphPointerHudSnapshotBuilder
+-> OnGUI provvisorio
+```
+
+Il consumer:
+
+- consuma `ArcGraphInteractionFrame`;
+- conserva `LastSnapshot`;
+- conserva `LastDiagnostics`;
+- mostra il testo solo se `hudEnabled` e' attivo;
+- usa `OnGUI` come visualizzazione temporanea;
+- non crea Canvas;
+- non crea prefab;
+- non salva scene;
+- non legge mouse fisico;
+- non legge `World`;
+- non legge `SimulationHost`;
+- non seleziona NPC;
+- non invia comandi.
+
+### Perche' OnGUI in questo micro-step
+
+L'uso di `OnGUI` e' temporaneo e intenzionale.
+
+Permette di vedere subito il valore del Pointer HUD senza costruire il sistema
+definitivo dei pannelli modulari.
+
+Il sistema pannelli definitivo resta un tema successivo e dovra' separare:
+
+- pannello superiore;
+- pannello laterale;
+- overlay sopra NPC;
+- command tools;
+- debug tools.
+
+### QA tecnica
+
+La compilazione isolata con Roslyn `csc` e assembly Unity necessari e' riuscita.
+
+E' presente solo un warning atteso su un campo `SerializeField` non assegnato nel
+controllo isolato.
+
+La ricerca statica non trova dipendenze operative da:
+
+- `SimulationHost`;
+- `MapGridWorldView`;
+- `MapGridWorldProvider`;
+- `NPCSelection`;
+- input fisico Unity;
+- DevTools;
+- SelectionTool;
+- runtime control top bar.
+
+### Prossimo micro-step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.08 - ArcGraph Selection Consumer
+```
+
+Scopo:
+
+- introdurre un consumer selection separato dal renderer;
+- usare `ArcGraphInteractionFrame` come input;
+- selezionare solo actor validi;
+- non introdurre DevTools;
+- non inviare comandi;
+- non leggere direttamente `MapGridWorldView`;
+- mantenere `NPCSelection` come servizio view-side esistente.
 
 ---
 

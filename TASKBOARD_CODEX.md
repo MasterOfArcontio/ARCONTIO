@@ -28,26 +28,27 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.07 - ArcGraph Pointer HUD Scene Consumer`
+`v0.38f.08 - ArcGraph Selection Consumer`
 
 STATUS:
 OPERATIVO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-07-arcgraph-pointer-hud-scene-consumer`
+`ai-task/v0.38f-08-arcgraph-selection-consumer`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- introdurre un consumer Unity gated per il Pointer HUD ArcGraph;
-- usare `ArcGraphPointerHudSnapshotBuilder` come sorgente dati;
+- introdurre un consumer selection ArcGraph separato dal renderer;
+- usare `ArcGraphInteractionFrame` come sorgente dati;
 - implementare `IArcGraphInteractionFrameConsumer`;
-- creare UI temporanea solo se esplicitamente abilitata;
+- selezionare solo actor validi;
 - non salvare scene e non modificare prefab;
-- non copiare il monolite `MapGridPointerCoordsOverlay`;
-- non introdurre selection, DevTools, top bar o comandi;
+- non introdurre DevTools, top bar o comandi;
+- non leggere direttamente `MapGridWorldView`;
+- mantenere `NPCSelection` come servizio view-side esistente;
 - mantenere il wrapper `v0.38f.04` come frontiera input, non come tool host;
 - evitare di trasformare subito ArcGraph in gestore operativo UI;
 - evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
@@ -234,6 +235,15 @@ Regola corrente:
   - nessun `GameObject`, `MonoBehaviour`, `Canvas`, `Resources.Load`, `SimulationHost`, `MapGridWorldView`, `MapGridWorldProvider`, `NPCSelection` o input fisico Unity;
   - compilazione isolata riuscita con Roslyn `csc` e reference pack .NET;
   - prossimo checkpoint: `v0.38f.07 - ArcGraph Pointer HUD Scene Consumer`.
+- micro-step `v0.38f.07` completato:
+  - introdotto `ArcGraphPointerHudSceneConsumer`;
+  - il consumer implementa `IArcGraphInteractionFrameConsumer`;
+  - il consumer usa `ArcGraphPointerHudSnapshotBuilder` e conserva `LastSnapshot` / `LastDiagnostics`;
+  - il disegno HUD e' gated tramite `hudEnabled`;
+  - visualizzazione temporanea tramite `OnGUI`, senza Canvas, prefab o salvataggio scena;
+  - nessuna lettura di mouse fisico, `World`, `SimulationHost`, `MapGridWorldView`, `MapGridWorldProvider`, `NPCSelection`, DevTools o top bar;
+  - compilazione isolata riuscita con Roslyn `csc` e assembly Unity necessari, con solo warning atteso su campo `SerializeField`;
+  - prossimo checkpoint: `v0.38f.08 - ArcGraph Selection Consumer`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
