@@ -10508,6 +10508,128 @@ Restano comunque fuori scope:
 - salvataggio scena;
 - pensionamento MapGrid.
 
+## Esito v0.38g.06 - ArcGraph Minimal Stable Structure Closeout
+
+La `v0.38g.06` chiude la struttura minima stabile di ArcGraph come base
+preparatoria per il primo runtime controllato terreno + NPC.
+
+Questo closeout non introduce nuovo codice. Serve a fissare il confine tra:
+
+```text
+struttura minima ArcGraph pronta
+-> primo runtime terrain + NPC ancora da implementare
+-> pensionamento MapGrid ancora non autorizzato
+```
+
+### Struttura minima considerata pronta
+
+ArcGraph dispone ora di:
+
+- contratti coordinate, chunk, layer, dirty state e z-level;
+- layer passivi foundation: Terrain, Object, Actor, Debug;
+- placeholder passivi per Water, Vegetation, Light, Weather ed Effect;
+- adapter read-only verso MapGrid/World;
+- bootstrap runtime C# passivo;
+- terrain snapshot e terrain mesh builder;
+- policy zoom/LOD;
+- actor/object snapshot;
+- actor/object render queue;
+- contratti actor/object scene-side;
+- sprite resolver serializzato preparatorio;
+- probe terrain validato;
+- probe actor/object validato;
+- boundary interazione;
+- wrapper input Unity confinato;
+- router consumer interattivi;
+- Pointer HUD passivo;
+- selection consumer;
+- debug overlay queue/feed/wrapper/probe;
+- coordinator runtime minimo;
+- wrapper scena minimo per alimentare coordinator e interaction wrapper.
+
+### Cosa significa "struttura minima stabile"
+
+In questa fase "stabile" non significa "renderer definitivo".
+
+Significa invece che ArcGraph ha una catena ordinata:
+
+```text
+dati runtime espliciti
+-> context ArcGraph
+-> bootstrap/coordinator
+-> snapshot/layer
+-> queue render
+-> probe o wrapper controllati
+```
+
+La catena non deve piu' essere inventata ogni volta con componenti scollegati.
+I dati arrivano tramite adapter dichiarati, la logica resta passiva e i punti
+Unity sono frontiere sottili.
+
+### Gate visuali e tecnici gia' recuperati
+
+Sono considerati recuperati:
+
+- terrain data-only: `TerrainSnapshotsBuilt`, `terrainSnapshots=16384`, `layerCount=4`;
+- probe terrain visuale;
+- probe actor/object visuale temporaneo;
+- interaction base `wrapper -> router -> Pointer HUD + Selection`.
+
+### Test manuali da rieseguire prima della promozione produttiva
+
+Prima di dichiarare produttivo terrain + NPC servira' rieseguire in Unity:
+
+1. `ArcGraphMinimalRuntimeSceneWrapper` con `wrapperEnabled = true`;
+2. `ArcGraph/Process Minimal Runtime Frame`;
+3. verifica log con context valido, snapshot terrain e queue actor/object;
+4. push opzionale verso `ArcGraphInteractionSceneAdapterWrapper`;
+5. verifica hover/cella/actor nel Pointer HUD;
+6. verifica selection su click sinistro sopra NPC;
+7. verifica che MapGrid continui a funzionare come renderer produttivo principale.
+
+### Componenti non ancora produttivi
+
+Restano non produttivi:
+
+- `ArcGraphTerrainSceneProbeRenderer`;
+- `ArcGraphActorObjectSceneProbeRenderer`;
+- `ArcGraphInteractionRenderQueueWiringProbe`;
+- tutti i renderer ambientali futuri;
+- debug overlay scene probe;
+- `OnGUI` temporaneo del Pointer HUD.
+
+Questi componenti sono validi come probe, gate o diagnostica, non come sistema
+grafico finale.
+
+### Prossimo blocco operativo
+
+Il prossimo blocco deve iniziare il runtime controllato terreno + NPC.
+
+Nome consigliato:
+
+```text
+v0.38h - ArcGraph Terrain + NPC Minimal Runtime
+```
+
+Obiettivo:
+
+- trasformare terrain e NPC da probe separati a primo runtime visuale controllato;
+- mantenere MapGrid come renderer produttivo principale durante la transizione;
+- introdurre renderer produttivi solo con lifecycle, pooling e cleanup dichiarati;
+- non migrare ancora acqua, vegetazione, luci, meteo, incendi, DevTools o top bar;
+- non cancellare MapGrid.
+
+### Stop confermato
+
+```text
+Struttura minima ArcGraph chiusa.
+Non dichiarare ArcGraph sistema grafico definitivo.
+Non cancellare MapGrid.
+Non avviare environment layers.
+Non migrare DevTools o top bar.
+Partire dal binomio terreno + NPC.
+```
+
 ### Stop confermato
 
 ```text

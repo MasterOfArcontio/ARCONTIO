@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38g.05 - ArcGraph Minimal Runtime Scene Wrapper Contract`
+`v0.38g.06 - ArcGraph Minimal Stable Structure Closeout`
 
 STATUS:
-COMPLETATO WRAPPER MINIMO / IN PREPARAZIONE CHIUSURA STRUTTURA MINIMA
+STRUTTURA MINIMA STABILE CHIUSA / PROSSIMO BLOCCO TERRAIN + NPC
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38g-05-arcgraph-minimal-runtime-scene-wrapper-contract`
+`ai-task/v0.38g-06-arcgraph-minimal-structure-closeout`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -363,6 +363,15 @@ Regola corrente:
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
+- closeout `v0.38g.06` completato:
+  - la struttura minima stabile ArcGraph viene considerata chiusa come base preparatoria;
+  - non e' stato introdotto nuovo codice;
+  - ArcGraph possiede ora contratti, layer passivi, adapter read-only, bootstrap runtime, coordinator, wrapper scena minimo, queue actor/object, interaction boundary, router, Pointer HUD, selection e probe/gate gia' recuperati;
+  - "stabile" significa catena ordinata dati -> context -> bootstrap/coordinator -> snapshot/layer -> queue -> probe/wrapper, non renderer definitivo;
+  - restano non produttivi terrain probe, actor/object probe, wiring probe, debug probe e HUD OnGUI temporaneo;
+  - restano fuori scope acqua, vegetazione, luci, meteo, incendi, DevTools, top bar e pensionamento MapGrid;
+  - prima della promozione produttiva vanno rieseguiti i gate manuali del `ArcGraphMinimalRuntimeSceneWrapper` in Unity;
+  - prossimo blocco consigliato: `v0.38h - ArcGraph Terrain + NPC Minimal Runtime`.
 
 DOC SYNC:
 
