@@ -28,23 +28,24 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.09 - ArcGraph Interaction Consumer Router`
+`v0.38f.10 - ArcGraph Interaction Modular Consumers Visual Gate`
 
 STATUS:
-OPERATIVO
+IN ATTESA GATE UMANO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-09-arcgraph-interaction-consumer-router`
+`ai-task/v0.38f-10-arcgraph-interaction-consumers-visual-gate`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- introdurre un router/fan-out per consumer interattivi ArcGraph;
-- inoltrare lo stesso `ArcGraphInteractionFrame` a piu' consumer espliciti;
-- implementare `IArcGraphInteractionFrameConsumer`;
-- permettere collegamento simultaneo di Pointer HUD e Selection;
+- verificare in Unity il wiring wrapper -> router -> Pointer HUD + Selection;
+- non aggiungere codice nuovo prima del gate visuale;
+- controllare che il Pointer HUD mostri cella, actor e UI blocked;
+- controllare che la selection avvenga solo su click primario sopra actor;
+- controllare che HUD e selection convivano senza dipendere tra loro;
 - non salvare scene e non modificare prefab;
 - non introdurre DevTools, top bar o comandi;
 - non leggere direttamente `MapGridWorldView`;
@@ -253,6 +254,16 @@ Regola corrente:
   - compilazione isolata riuscita sul consumer e sul wrapper modificato con Roslyn `csc`, assembly Unity e `Unity.InputSystem`;
   - nodo tecnico emerso: il wrapper oggi dispatcha a un solo consumer, quindi serve un router per HUD + selection;
   - prossimo checkpoint: `v0.38f.09 - ArcGraph Interaction Consumer Router`.
+- micro-step `v0.38f.09` completato:
+  - introdotto `ArcGraphInteractionConsumerRouter`;
+  - il router implementa `IArcGraphInteractionFrameConsumer`;
+  - il wrapper puo' puntare a un solo consumer, cioe' il router;
+  - il router inoltra lo stesso frame a piu' consumer modulari, per esempio Pointer HUD e Selection;
+  - il router e' gated tramite `routerEnabled`;
+  - diagnostica: consumer candidati, dispatchati, saltati, target, actor e reason;
+  - nessun DevTools, top bar, comando, `SimulationHost`, input fisico Unity o lettura `MapGridWorldView`;
+  - compilazione isolata riuscita con Roslyn `csc` e assembly Unity necessari, con soli warning attesi su campi `SerializeField`;
+  - prossimo checkpoint: `v0.38f.10 - Gate visuale consumer modulari ArcGraph`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

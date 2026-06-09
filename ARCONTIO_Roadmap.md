@@ -7163,7 +7163,8 @@ La chiusura di questa fase richiedera':
 | v0.38f.06 | Contratto passivo Pointer HUD ArcGraph, senza UI scena e senza comandi | Completato |
 | v0.38f.07 | Consumer scena Pointer HUD ArcGraph, gated e senza salvataggio scena | Completato |
 | v0.38f.08 | Consumer selection ArcGraph, separato dal renderer e senza DevTools | Completato |
-| v0.38f.09 | Router consumer interattivi ArcGraph per HUD + selection modulari | Pending |
+| v0.38f.09 | Router consumer interattivi ArcGraph per HUD + selection modulari | Completato |
+| v0.38f.10 | Gate visuale consumer modulari ArcGraph: wrapper -> router -> HUD + selection | Pending gate umano |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9697,6 +9698,102 @@ Scopo:
 - non introdurre DevTools;
 - non inviare comandi;
 - non salvare scene.
+
+## Esito v0.38f.09 - ArcGraph Interaction Consumer Router
+
+La `v0.38f.09` introduce un router/fan-out per consumer interattivi ArcGraph.
+
+### File introdotto
+
+- `ArcGraphInteractionConsumerRouter`.
+
+### Funzionamento
+
+Il wrapper scena continua a vedere un solo consumer:
+
+```text
+ArcGraphInteractionSceneAdapterWrapper
+-> ArcGraphInteractionConsumerRouter
+```
+
+Il router inoltra poi lo stesso frame a piu' consumer:
+
+```text
+ArcGraphInteractionConsumerRouter
+-> ArcGraphPointerHudSceneConsumer
+-> ArcGraphSelectionSceneConsumer
+-> futuri consumer modulari
+```
+
+### Scopo tecnico
+
+Questo evita che:
+
+- il wrapper diventi un host di tool;
+- il Pointer HUD conosca la selection;
+- la selection conosca il Pointer HUD;
+- ArcGraph ricrei il monolite `MapGridWorldView`.
+
+Ogni consumer resta responsabile della propria semantica.
+
+### Gate e diagnostica
+
+Il router e' gated tramite:
+
+```text
+routerEnabled
+```
+
+La diagnostica registra:
+
+- frame ricevuto;
+- router abilitato;
+- consumer candidati;
+- consumer chiamati;
+- consumer saltati;
+- target del frame;
+- actor id;
+- reason.
+
+### QA tecnica
+
+La compilazione isolata del router insieme a HUD e selection e' riuscita con
+Roslyn `csc` e assembly Unity necessari.
+
+Sono presenti solo warning attesi su campi `SerializeField` non assegnati nel
+controllo isolato.
+
+La ricerca statica non trova dipendenze operative da:
+
+- `SimulationHost`;
+- `MapGridWorldView`;
+- `MapGridWorldProvider`;
+- input fisico Unity;
+- DevTools;
+- top bar.
+
+### Prossimo micro-step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.10 - Gate visuale consumer modulari ArcGraph
+```
+
+Scopo:
+
+- verificare in Unity il wiring:
+
+```text
+wrapper -> router -> Pointer HUD + Selection
+```
+
+- non aggiungere codice nuovo prima del gate;
+- non salvare scene senza conferma;
+- verificare che HUD e selection possano convivere;
+- verificare che il click su actor selezioni solo quando il consumer selection e'
+  abilitato;
+- verificare che il Pointer HUD mostri cella/actor/UI blocked.
 
 ---
 
