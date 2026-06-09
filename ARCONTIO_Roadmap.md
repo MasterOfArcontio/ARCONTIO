@@ -7159,7 +7159,8 @@ La chiusura di questa fase richiedera':
 | v0.38f.02 | Audit adapter scena interazione ArcGraph, input, camera e pannelli debug modulari | Completato audit |
 | v0.38f.03 | Contratto adapter scena interazione ArcGraph, senza migrazione pannelli | Completato |
 | v0.38f.04 | Wrapper Unity passivo per input scena ArcGraph, spento/gated e senza tool migration | Completato |
-| v0.38f.05 | Audit consumer interattivi: selection, pointer HUD, DevTools, top bar e side panel | Pending |
+| v0.38f.05 | Audit consumer interattivi: selection, pointer HUD, DevTools, top bar e side panel | Completato audit |
+| v0.38f.06 | Contratto passivo Pointer HUD ArcGraph, senza UI scena e senza comandi | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da gate visuali congelati |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -9251,6 +9252,131 @@ Scopo:
 - distinguere selection, pointer HUD, DevTools, top bar, side panel e overlay NPC;
 - decidere quali consumer possono essere passivi e quali invece inviano comandi;
 - evitare di trasformare subito il wrapper in un gestore operativo.
+
+## Esito v0.38f.05 - ArcGraph Interaction Consumer Audit
+
+La `v0.38f.05` ha auditato i consumer interattivi ancora assorbiti nel
+perimetro MapGrid legacy.
+
+L'obiettivo non era implementare nuovi pannelli.
+L'obiettivo era decidere in quale ordine migrare i consumer sopra il nuovo
+boundary interattivo ArcGraph introdotto tra `v0.38f.01` e `v0.38f.04`.
+
+### File auditati
+
+- `MapGridPointerCoordsOverlay`;
+- `NPCSelection`;
+- `MapGridRuntimeDevToolsOverlay`;
+- `MapGridRuntimeControlTopBar`;
+- `MapGridEntitySummaryOverlay`;
+- `MapGridMovementExplainabilityPanelView`;
+- `MapGridFovHeatmapOverlay`;
+- `MapGridLandmarkOverlay`;
+- `MapGridDtValueOverlay`;
+- punti interattivi ancora presenti in `MapGridWorldView`.
+
+### Classificazione dei consumer
+
+| Consumer legacy | Tipo | Rischio | Destino consigliato |
+|---|---|---|---|
+| Pointer cell HUD | HUD screen-space passivo | Basso | Primo consumer da migrare |
+| `NPCSelection` | Servizio selection view-side | Medio-basso | Secondo step, dopo verifica del frame |
+| Overlay NPC / summary card | UI diagnostica su NPC selezionato | Medio | Dopo selection stabile |
+| Movement explainability panel | Pannello laterale diagnostico | Medio | Dopo selection e World read-only dichiarato |
+| Top bar runtime | UI operativa pausa/step/toggle | Medio-alto | Separare da ArcGraph renderer |
+| DevTools runtime | Tool operativo che invia comandi | Alto | Migrare per ultimo, come command tool esplicito |
+| Click-to-move debug | Comando debug verso simulazione | Alto | Non appartiene al renderer |
+| FOV current cone | Overlay diagnostico dinamico | Medio | Rinviare a producer dedicato |
+
+### Conclusione tecnica
+
+Il primo consumer da migrare deve essere il Pointer HUD.
+
+Motivo:
+
+- consuma gia' informazione di cella;
+- non seleziona NPC;
+- non invia comandi;
+- non legge `SimulationHost`;
+- non richiede DevTools;
+- permette di verificare subito se `ArcGraphInteractionFrame` e' leggibile;
+- puo' mostrare `Cell`, `Actor`, `Object`, `UI blocked` e motivo diagnostico;
+- puo' restare data-only prima di creare qualunque UI Unity.
+
+Esempio pratico:
+
+```text
+ArcGraphInteractionSceneAdapterWrapper
+-> ArcGraphInteractionFrame
+-> ArcGraphPointerHudSnapshot
+-> futuro pannello HUD
+```
+
+In questa forma il Pointer HUD non e' ancora un pannello Unity.
+E' solo uno snapshot leggibile che prepara il pannello.
+
+### Perche' non partire da SelectionTool
+
+La selection e' piccola, ma modifica stato condiviso tramite `NPCSelection`.
+
+Quindi e' meno rischiosa dei DevTools, ma piu' invasiva del Pointer HUD.
+
+Ordine consigliato:
+
+```text
+prima: verifico cosa sto puntando
+poi: permetto di selezionare cio' che sto puntando
+```
+
+### Perche' non partire da DevTools o top bar
+
+Top bar e DevTools sono strumenti operativi.
+
+Non sono renderer.
+Non sono semplici consumer passivi.
+
+Il loro rischio principale e' reintrodurre dentro ArcGraph un secondo punto di
+comando della simulazione.
+
+Il futuro DevTools ArcGraph dovra' quindi essere un modulo separato:
+
+```text
+InteractionFrame
+-> DebugCommandTool
+-> comando esplicito verso SimulationHost
+```
+
+Questo non deve accadere dentro il renderer.
+
+### Ordine di migrazione consigliato
+
+1. Pointer HUD passivo.
+2. Selection consumer.
+3. Overlay NPC sopra actor selezionato.
+4. Side panel / explainability panel modulare.
+5. Top bar runtime separata.
+6. DevTools e click-to-move come command tool espliciti.
+7. FOV current cone come producer overlay dedicato.
+
+### Prossimo micro-step consigliato
+
+Il prossimo micro-step e':
+
+```text
+v0.38f.06 - ArcGraph Pointer HUD Passive Contract
+```
+
+Scopo:
+
+- introdurre `ArcGraphPointerHudSnapshot`;
+- introdurre diagnostica passiva del Pointer HUD;
+- introdurre un builder data-only che legge `ArcGraphInteractionFrame`;
+- non creare UI Unity;
+- non creare `GameObject`;
+- non leggere `World`;
+- non leggere `SimulationHost`;
+- non agganciarsi a `MapGridWorldView`;
+- non salvare scene.
 
 ---
 

@@ -28,22 +28,24 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38f.05 - ArcGraph Interaction Consumer Audit`
+`v0.38f.06 - ArcGraph Pointer HUD Passive Contract`
 
 STATUS:
-IN ATTESA GO OPERATORE
+OPERATIVO
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38f-05-arcgraph-interaction-consumer-audit`
+`ai-task/v0.38f-06-arcgraph-pointer-hud-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- auditare quale consumer interattivo migrare per primo;
-- distinguere selection, pointer HUD, DevTools, top bar, side panel e overlay NPC;
-- decidere quali consumer restano passivi e quali potranno inviare comandi;
+- introdurre un contratto passivo per il Pointer HUD ArcGraph;
+- trasformare `ArcGraphInteractionFrame` in uno snapshot HUD leggibile;
+- mostrare cella, target actor/object/cell, stato UI bloccante e ragione diagnostica;
+- restare data-only, senza UI Unity produttiva;
+- preparare il futuro pannello laterale/superiore senza copiarlo da MapGrid;
 - mantenere il wrapper `v0.38f.04` come frontiera input, non come tool host;
 - evitare di trasformare subito ArcGraph in gestore operativo UI;
 - evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
@@ -213,7 +215,14 @@ Regola corrente:
   - supporto consumer opzionale tramite setter o `MonoBehaviour` che implementa `IArcGraphInteractionFrameConsumer`;
   - nessun DevTools, SelectionTool, TopBar, SidePanel, NpcOverlay, `SimulationHost`, `MapGridWorldView`, `Resources.Load`, `GameObject`, `AddComponent` o salvataggio scena;
   - compilazione isolata riuscita con `dotnet csc`, con soli warning attesi sui campi `SerializeField`.
-- prossimo checkpoint: `v0.38f.05 - ArcGraph Interaction Consumer Audit`.
+- audit `v0.38f.05` completato:
+  - `MapGridPointerCoordsOverlay` e' il consumer piu' sicuro da migrare per primo, perche' e' HUD passivo e non invia comandi;
+  - `NPCSelection` resta candidato secondo, perche' e' semplice ma muta stato view-side condiviso;
+  - summary card, movement panel e overlay NPC vanno dopo selection e frame interattivo stabile;
+  - top bar, DevTools e click-to-move sono strumenti operativi, non renderer, e non devono essere posseduti da ArcGraph;
+  - FOV current cone richiede un producer overlay dedicato e non appartiene al primo consumer;
+  - ordine consigliato: Pointer HUD, selection, overlay NPC, side panel, top bar separata, DevTools command tool, FOV producer;
+  - prossimo checkpoint: `v0.38f.06 - ArcGraph Pointer HUD Passive Contract`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
