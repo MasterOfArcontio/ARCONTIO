@@ -36,6 +36,7 @@ namespace Arcontio.View.ArcGraph
     {
         [SerializeField] private ArcGraphTerrainRuntimeMapGridAdapter runtimeMapAdapter;
         [SerializeField] private Material terrainMaterial;
+        [SerializeField] private TextAsset terrainCatalogJson;
         [SerializeField] private bool rendererEnabled;
         [SerializeField] private bool renderOnStart;
         [SerializeField] private bool clearDirtyAfterRender = true;
@@ -47,6 +48,8 @@ namespace Arcontio.View.ArcGraph
 
         private readonly Dictionary<ArcGraphChunkCoord, ChunkHandle> _chunkPool = new();
         private Transform _root;
+        private ArcGraphTerrainCatalog _terrainCatalog;
+        private string _terrainCatalogSourceText;
         private ArcGraphTerrainRuntimeSceneRendererDiagnostics _lastDiagnostics;
 
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
@@ -146,6 +149,21 @@ namespace Arcontio.View.ArcGraph
         public void SetTerrainMaterial(Material material)
         {
             terrainMaterial = material;
+        }
+
+        // =============================================================================
+        // SetTerrainCatalogJson
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il JSON terrain catalog usato per risolvere tile id -> UV atlas.
+        /// </para>
+        /// </summary>
+        public void SetTerrainCatalogJson(TextAsset catalogJson)
+        {
+            terrainCatalogJson = catalogJson;
+            _terrainCatalog = null;
+            _terrainCatalogSourceText = null;
         }
 
         // =============================================================================
@@ -574,10 +592,13 @@ namespace Arcontio.View.ArcGraph
             return count;
         }
 
-        private static ArcGraphTerrainTileUvMap CreateUvMap(
+        private ArcGraphTerrainTileUvMap CreateUvMap(
             MapGridConfig config,
             Material material)
         {
+            if (TryCreateCatalogUvMap(material, out var catalogUvMap))
+                return catalogUvMap;
+
             int tilePixels = config != null && config.tilePixels > 0
                 ? config.tilePixels
                 : 32;
@@ -632,6 +653,46 @@ namespace Arcontio.View.ArcGraph
             }
 
             return (maxCell + 1) * Mathf.Max(1, tilePixels);
+        }
+
+        private bool TryCreateCatalogUvMap(
+            Material material,
+            out ArcGraphTerrainTileUvMap uvMap)
+        {
+            uvMap = null;
+
+            if (terrainCatalogJson == null)
+                return false;
+
+            ArcGraphTerrainCatalog catalog = GetOrParseTerrainCatalog();
+            if (catalog == null || catalog.EntryCount <= 0)
+                return false;
+
+            Texture texture = material != null ? material.mainTexture : null;
+            uvMap = catalog.BuildUvMap(texture);
+            return uvMap != null;
+        }
+
+        private ArcGraphTerrainCatalog GetOrParseTerrainCatalog()
+        {
+            string json = terrainCatalogJson != null
+                ? terrainCatalogJson.text
+                : null;
+
+            // Il TextAsset viene parsato solo quando cambia il testo sorgente. In
+            // runtime normale questo evita parsing ripetuto a ogni frame/chunk.
+            if (_terrainCatalog != null && _terrainCatalogSourceText == json)
+                return _terrainCatalog;
+
+            if (!ArcGraphTerrainCatalogJson.TryParse(json, out _terrainCatalog))
+            {
+                _terrainCatalog = null;
+                _terrainCatalogSourceText = null;
+                return null;
+            }
+
+            _terrainCatalogSourceText = json;
+            return _terrainCatalog;
         }
 
         private static void DestroyUnityObject(Object unityObject)

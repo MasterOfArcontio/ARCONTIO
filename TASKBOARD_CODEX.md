@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38h.04 - ArcGraph Minimal Runtime Wiring + Gate`
+`v0.38i.01 - ArcGraph Terrain Catalog Data-Driven`
 
 STATUS:
-WRAPPER MINIMO CABLATO A TERRAIN + NPC RUNTIME / PROSSIMO STEP GATE VISUALE UNICO
+TERRAIN CATALOG JSON INTRODOTTO / PROSSIMO STEP MAP DATA ARCGHAPH O NPC VISUAL CATALOG
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38h-arcgraph-terrain-npc-minimal-runtime`
+`ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -436,6 +436,22 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata; unica occorrenza e' nel commento architetturale gia' esistente;
   - controllo Roslyn isolato riuscito includendo wrapper, renderer terrain e renderer NPC; warning attesi da `SerializeField` e dal controllo isolato;
   - prossimo step: gate visuale umano unico terrain + NPC runtime.
+- micro-step `v0.38i.01` completato:
+  - aperto branch `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`;
+  - introdotto `ArcGraphTerrainCatalogEntry`;
+  - introdotto `ArcGraphTerrainCatalog`;
+  - introdotto `ArcGraphTerrainCatalogJson`;
+  - aggiunto file `Assets/Resources/ArcGraph/Config/ArcGraphTerrainCatalog.json`;
+  - il catalogo JSON descrive tile id, nome leggibile e coordinate UV nell'atlas;
+  - `ArcGraphTerrainRuntimeSceneRenderer` puo' ricevere un `TextAsset` catalogo terrain da Inspector;
+  - se il catalogo e' assegnato e valido, il renderer costruisce la UV map dal catalogo ArcGraph;
+  - se il catalogo manca o non e' valido, il renderer mantiene fallback compatibile con `MapGridConfig`;
+  - il parser JSON non usa `Resources.Load`, non carica texture e non tocca scena o simulazione;
+  - il catalogo runtime viene parsato solo quando cambia il testo del `TextAsset`, evitando parsing per frame;
+  - la conformazione mappa non e' ancora migrata: per ora il catalogo governa solo la resa sprite/UV del terreno;
+  - controllo JSON PowerShell riuscito: path atlas, tile pixels e numero tile validi;
+  - controllo Roslyn isolato riuscito con modulo Unity JSONSerialize incluso; warning atteso su `SerializeField`;
+  - prossimo step possibile: catalogo conformazione mappa ArcGraph o catalogo visuale NPC.
 
 DOC SYNC:
 

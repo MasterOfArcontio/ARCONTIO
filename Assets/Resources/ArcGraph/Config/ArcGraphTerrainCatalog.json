@@ -1,0 +1,20 @@
+{
+  "terrainAtlasResourcePath": "MapGrid/Atlas/TerrainAtlas",
+  "tilePixels": 32,
+  "atlasWidthPixels": 64,
+  "atlasHeightPixels": 32,
+  "tiles": [
+    {
+      "id": 0,
+      "name": "iron_barren",
+      "uvX": 0,
+      "uvY": 0
+    },
+    {
+      "id": 1,
+      "name": "rocky",
+      "uvX": 1,
+      "uvY": 0
+    }
+  ]
+}

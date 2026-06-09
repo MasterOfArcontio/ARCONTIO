@@ -11184,6 +11184,171 @@ visuale umano unico terrain + NPC runtime.
 
 ---
 
+## Esito v0.38i.01 - ArcGraph Terrain Catalog Data-Driven
+
+La `v0.38i.01` apre il ramo data-driven per completare progressivamente terreno
+e NPC visuali in ArcGraph.
+
+### Branch
+
+Branch operativo:
+
+```text
+ai-task/v0.38i-arcgraph-data-driven-terrain-npc
+```
+
+### Obiettivo dello step
+
+Separare la resa visuale del terreno dalla configurazione legacy MapGrid.
+
+Prima di questo step il terrain renderer runtime costruiva la UV map usando le
+`tileDefs` di `MapGridConfig`. Dopo questo step puo' invece ricevere un catalogo
+ArcGraph dedicato.
+
+### File introdotti
+
+- `ArcGraphTerrainCatalogEntry`;
+- `ArcGraphTerrainCatalog`;
+- `ArcGraphTerrainCatalogJson`;
+- `Assets/Resources/ArcGraph/Config/ArcGraphTerrainCatalog.json`.
+
+### Struttura del catalogo JSON
+
+Il file JSON contiene:
+
+```text
+terrainAtlasResourcePath
+tilePixels
+atlasWidthPixels
+atlasHeightPixels
+tiles[]
+```
+
+Ogni tile dichiara:
+
+```text
+id
+name
+uvX
+uvY
+```
+
+Per ora il catalogo di esempio replica le due tile gia' presenti nella config
+MapGrid:
+
+- `0 -> iron_barren`;
+- `1 -> rocky`.
+
+### Uso nel renderer terrain
+
+`ArcGraphTerrainRuntimeSceneRenderer` ora possiede un campo:
+
+```text
+terrainCatalogJson
+```
+
+Il campo e' un `TextAsset` assegnabile da Inspector.
+
+Se il catalogo e' assegnato e valido:
+
+```text
+TextAsset JSON
+-> ArcGraphTerrainCatalogJson
+-> ArcGraphTerrainCatalog
+-> ArcGraphTerrainTileUvMap
+-> ArcGraphTerrainChunkMeshBuilder
+```
+
+Se il catalogo manca o non e' valido, il renderer resta compatibile con il
+fallback precedente basato su `MapGridConfig`.
+
+### Confine importante
+
+Questo step non migra ancora la conformazione della mappa.
+
+Quindi:
+
+- la mappa/celle possono ancora arrivare da `MapGridData`;
+- lo sprite/UV del terreno puo' arrivare dal catalogo ArcGraph;
+- il renderer non dipende piu' necessariamente dalle `tileDefs` MapGrid per la
+  resa visuale.
+
+Questa separazione prepara il passaggio successivo:
+
+```text
+ArcGraph map data file
+-> celle terrain
+-> tileId
+-> ArcGraph terrain catalog
+-> sprite/UV
+```
+
+### Performance
+
+Il JSON non viene parsato a ogni frame.
+
+Il renderer conserva:
+
+- ultimo catalogo parsato;
+- ultimo testo sorgente.
+
+Se il `TextAsset` non cambia, il catalogo runtime viene riusato.
+
+### Confini preservati
+
+Il parser:
+
+- non usa `Resources.Load`;
+- non carica texture;
+- non crea materiali;
+- non cerca oggetti in scena;
+- non tocca World;
+- non tocca MapGrid;
+- non invia comandi.
+
+Il renderer:
+
+- usa il catalogo solo per costruire la UV map;
+- mantiene fallback legacy;
+- non salva scene;
+- non elimina MapGrid.
+
+### QA tecnica
+
+Il JSON e' stato validato con `ConvertFrom-Json` PowerShell:
+
+```text
+MapGrid/Atlas/TerrainAtlas 32 tiles=2
+```
+
+Il controllo Roslyn isolato e' riuscito includendo il modulo Unity
+`UnityEngine.JSONSerializeModule`.
+
+Warning atteso:
+
+- campo `SerializeField` assegnabile da Inspector.
+
+La ricerca statica non rileva usi operativi di dipendenze vietate. L'unica
+occorrenza di `Resources.Load` e' in un commento che spiega che il parser non lo
+usa.
+
+### Stato dopo v0.38i.01
+
+Il terreno ArcGraph ha ora:
+
+- dati cella ancora compatibili col ponte MapGrid;
+- renderer runtime a chunk;
+- catalogo visuale JSON ArcGraph;
+- fallback compatibile con `MapGridConfig`.
+
+Il prossimo step puo' essere uno tra:
+
+- catalogo/file della conformazione mappa ArcGraph;
+- catalogo visuale NPC modulare;
+- gate visuale terrain + NPC runtime se l'operatore puo' testare Unity.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
