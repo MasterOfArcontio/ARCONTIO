@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38h.03 - ArcGraph NPC Runtime Renderer Minimo`
+`v0.38h.04 - ArcGraph Minimal Runtime Wiring + Gate`
 
 STATUS:
-NPC RUNTIME MINIMO IMPLEMENTATO / PROSSIMO STEP WIRING WRAPPER + GATE
+WRAPPER MINIMO CABLATO A TERRAIN + NPC RUNTIME / PROSSIMO STEP GATE VISUALE UNICO
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38h-arcgraph-terrain-npc-minimal-runtime`
@@ -424,6 +424,18 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn isolato sui tre file nuovi riuscito, con solo warning atteso su campo `SerializeField` assegnabile da Inspector;
   - prossimo step: `v0.38h.04 - ArcGraph Minimal Runtime Wiring + Gate`.
+- micro-step `v0.38h.04` completato:
+  - `ArcGraphMinimalRuntimeSceneWrapper` puo' ora ricevere riferimenti espliciti a `ArcGraphTerrainRuntimeSceneRenderer` e `ArcGraphNpcRuntimeSceneRenderer`;
+  - aggiunti gate separati per render terrain runtime e render NPC runtime;
+  - aggiunti flag opzionali per abilitare i renderer prima del render manuale;
+  - il wrapper, dopo il coordinator, puo' chiamare `RenderFromRuntime(context, runtime)` sul terrain renderer;
+  - il wrapper, dopo la costruzione della queue, puo' chiamare `RenderFromQueue(queue)` sul renderer NPC;
+  - il wrapper resta orchestratore sottile: non crea mesh, non crea sprite, non mantiene pool e non diventa renderer;
+  - la diagnostica wrapper ora espone presenza renderer, render richiesto, render eseguito e diagnostiche nested terrain/NPC;
+  - il flusso minimo unico e' ora: context -> coordinator -> terrain renderer -> NPC renderer -> interaction opzionale;
+  - ricerca statica sulle dipendenze vietate superata; unica occorrenza e' nel commento architetturale gia' esistente;
+  - controllo Roslyn isolato riuscito includendo wrapper, renderer terrain e renderer NPC; warning attesi da `SerializeField` e dal controllo isolato;
+  - prossimo step: gate visuale umano unico terrain + NPC runtime.
 
 DOC SYNC:
 

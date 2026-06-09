@@ -11045,6 +11045,145 @@ spento di default, preparando un gate visuale unico.
 
 ---
 
+## Esito v0.38h.04 - ArcGraph Minimal Runtime Wiring + Gate
+
+La `v0.38h.04` collega il wrapper runtime minimo ai renderer runtime terrain e
+NPC.
+
+### Funzione
+
+Il flusso minimo ArcGraph puo' ora essere eseguito in un unico passaggio:
+
+```text
+ArcGraphTerrainRuntimeMapGridAdapter
+-> ArcGraphRuntimeContext
+-> ArcGraphMinimalRuntimeCoordinator
+-> ArcGraphBootstrapRuntime
+-> ArcGraphTerrainRuntimeSceneRenderer
+-> ArcGraphNpcRuntimeSceneRenderer
+-> ArcGraphInteractionSceneAdapterWrapper opzionale
+```
+
+Il wrapper non renderizza direttamente. Coordina soltanto:
+
+- costruzione context;
+- processing del coordinator;
+- chiamata opzionale al renderer terrain;
+- chiamata opzionale al renderer NPC;
+- inoltro opzionale della queue al wrapper interattivo.
+
+### Modifiche al wrapper
+
+`ArcGraphMinimalRuntimeSceneWrapper` ora puo' ricevere da Inspector:
+
+- `ArcGraphTerrainRuntimeSceneRenderer`;
+- `ArcGraphNpcRuntimeSceneRenderer`.
+
+Sono stati aggiunti gate separati:
+
+- `renderTerrainRuntime`;
+- `renderNpcRuntime`;
+- `enableTerrainRendererBeforeRender`;
+- `enableNpcRendererBeforeRender`.
+
+Questi flag mantengono il comportamento spento di default. Il wrapper puo'
+restare in scena senza creare mesh o sprite finche' l'operatore non abilita
+esplicitamente il percorso.
+
+### Sequenza runtime
+
+Dopo il processing del coordinator:
+
+- il terrain renderer riceve `context` e `ArcGraphBootstrapRuntime`;
+- il renderer NPC riceve la `ArcGraphRenderQueue`;
+- l'interaction wrapper puo' ancora ricevere la stessa queue se il relativo gate
+  e' attivo.
+
+Il terrain renderer usa quindi:
+
+```text
+ArcGraphRuntimeContext + ArcGraphBootstrapRuntime
+```
+
+Il renderer NPC usa invece:
+
+```text
+ArcGraphRenderQueue
+```
+
+Questa distinzione e' importante: il terreno lavora sui layer/chunk, gli NPC
+lavorano sulla queue actor/object.
+
+### Diagnostica
+
+La diagnostica del wrapper ora espone anche:
+
+- presenza terrain renderer;
+- presenza NPC renderer;
+- richiesta render terrain;
+- richiesta render NPC;
+- render terrain effettivamente chiamato;
+- render NPC effettivamente chiamato;
+- diagnostica nested del terrain renderer;
+- diagnostica nested del renderer NPC.
+
+Il log del wrapper include anche le ragioni dei renderer:
+
+```text
+terrainReason=...
+npcReason=...
+```
+
+### Confini preservati
+
+Il wrapper:
+
+- non crea `GameObject`;
+- non crea `Mesh`;
+- non crea `SpriteRenderer`;
+- non carica asset;
+- non legge direttamente il World;
+- non cerca oggetti in scena;
+- non invia comandi;
+- non salva scene o prefab;
+- non sostituisce ancora MapGrid;
+- non possiede pool terrain o NPC.
+
+Le responsabilita' restano separate:
+
+- coordinator: prepara runtime e queue;
+- terrain renderer: materializza chunk terrain;
+- NPC renderer: materializza actor/NPC;
+- interaction wrapper: gestisce boundary/input se abilitato.
+
+### QA tecnica
+
+La ricerca statica sulle dipendenze vietate non rileva usi operativi. L'unica
+occorrenza trovata e' dentro un commento architetturale gia' esistente.
+
+Il controllo Roslyn isolato e' riuscito includendo wrapper, renderer terrain e
+renderer NPC. I warning rilevati sono attesi:
+
+- campi `SerializeField` assegnabili da Inspector;
+- conflitti fittizi del controllo isolato, dovuti al confronto con
+  `Assembly-CSharp.dll` gia' compilato.
+
+### Stato dopo v0.38h.04
+
+ArcGraph ha ora un percorso minimo unitario per:
+
+- costruire dati runtime;
+- aggiornare snapshot;
+- costruire queue actor/object;
+- renderizzare terreno;
+- renderizzare NPC;
+- inoltrare interaction in modo opzionale.
+
+Il prossimo step non deve aggiungere feature: deve preparare ed eseguire il gate
+visuale umano unico terrain + NPC runtime.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
