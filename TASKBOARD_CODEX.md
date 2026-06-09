@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38e - ArcGraph Debug Minimum Absorption Audit`
+`v0.38f - Separazione strumenti interattivi/dev tools dal renderer legacy`
 
 STATUS:
-IN CORSO
+IN ATTESA GO OPERATORE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38e-arcgraph-debug-minimum-absorption-audit`
+`ai-task/v0.38f-arcgraph-interactive-tools-separation-audit`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -45,8 +45,9 @@ OUTPUT ATTESO:
 - verificare cosa oggi MapGridWorldView gestisce per NPC, oggetti, sprite, label, collider e movimento;
 - verificare quali dati actor/object ArcGraph gia' riceve da `ArcGraphWorldAdapter`;
 - registrare il congelamento del gate visuale actor/object senza promuovere il probe a candidato produttivo;
-- auditare il perimetro debug minimo gia' migrato verso ArcGraph;
-- verificare quali parti debug sono gia' in catena ArcGraph e quali restano ancora legacy;
+- auditare top bar, DevTools, click-to-move, pointer HUD, summary cards e selection;
+- separare strumenti interattivi/dev tools dal renderer legacy MapGrid;
+- distinguere cosa resta UI/tool separato da cosa puo' diventare overlay ArcGraph;
 - mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
 - non creare renderer terrain produttivi permanenti;
 - non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
@@ -164,7 +165,12 @@ Regola corrente:
   - actor/object ArcGraph non ancora promosso a candidato produttivo;
   - il test verra' recuperato insieme agli altri gate visuali quando l'operatore potra' provarli in Unity;
   - durante il congelamento non cancellare MapGrid e non procedere al pensionamento produttivo actor/object.
-- prossimo checkpoint: `v0.38e - ArcGraph Debug Minimum Absorption Audit`.
+- audit `v0.38e` completato:
+  - il debug minimo assorbito in ArcGraph e' limitato a Landmark + GVD-DIN + DT heatmap;
+  - la catena MapGridWorldView -> adapter -> wrapper -> coordinator -> feed -> queue -> probe renderer resta valida come ponte manuale read-only;
+  - FOV current cone, FOV historical heatmap, pointer HUD, runtime cost HUD, label screen-space, summary cards, top bar, DevTools, click-to-move e selection restano fuori dal debug minimo;
+  - questi elementi vanno auditati come strumenti interattivi/UI, non come semplice renderer.
+- prossimo checkpoint: `v0.38f - Separazione strumenti interattivi/dev tools dal renderer legacy`.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.

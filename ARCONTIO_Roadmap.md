@@ -7152,9 +7152,9 @@ La chiusura di questa fase richiedera':
 | v0.38c.01 | Contratto accesso read-only alla mappa runtime per snapshot terrain ArcGraph | Completato |
 | v0.38c.02 | Probe scena terrain ArcGraph temporaneo e gated | Completato |
 | v0.38c.03 | Gate visuale terrain ArcGraph vs MapGrid | Completato |
-| v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Prossimo |
-| v0.38e | Aggancio overlay debug minimo validato | Pending |
-| v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Pending |
+| v0.38d | Aggancio actor/object ArcGraph produttivo con movimento multi-tick | Gate visuale congelato |
+| v0.38e | Aggancio overlay debug minimo validato | Completato audit |
+| v0.38f | Separazione strumenti interattivi/dev tools dal renderer legacy | Prossimo |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Pending |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 
@@ -8283,6 +8283,146 @@ Scopo del prossimo step:
 - distinguere debug gia' migrato, debug ancora legacy e debug da escludere dal primo ArcGraph produttivo;
 - verificare se serve un ulteriore bridge o solo documentare il perimetro minimo;
 - non richiedere nuovi test visuali manuali in questa fase congelata.
+
+## Esito v0.38e - ArcGraph Debug Minimum Absorption Audit
+
+La `v0.38e` ha auditato il perimetro debug minimo assorbibile da ArcGraph senza
+richiedere nuovi test visuali manuali.
+
+Il punto di partenza e' la catena gia' validata nella `v0.37`:
+
+```text
+MapGridWorldView
+-> ArcGraphDebugRuntimeMapGridAdapter
+-> ArcGraphDebugRuntimeSceneWrapper
+-> ArcGraphDebugRuntimeWiringCoordinator
+-> ArcGraphDebugOverlayRuntimeFeed
+-> ArcGraphDebugOverlayQueue
+-> ArcGraphDebugOverlaySceneProbeRenderer
+```
+
+Questa catena resta manuale, esplicita e read-only.
+Non e' un renderer produttivo e non sostituisce MapGrid.
+
+### Debug gia' assorbito nel perimetro minimo
+
+Il perimetro debug minimo gia' disponibile in ArcGraph comprende:
+
+- Landmark world nodes;
+- Landmark known nodes;
+- Landmark route nodes;
+- Landmark world edges;
+- Landmark known edges;
+- Landmark route edges;
+- path edges Landmark/Direct/Jump/Complex;
+- celle DT heatmap;
+- celle GVD raw;
+- nodi GVD;
+- edge GVD.
+
+Questi dati arrivano tramite:
+
+```text
+World.GetNpcLandmarkOverlayData(...)
+World.GetGvdDinOverlayData(...)
+```
+
+Il feed ArcGraph li legge solo come dati debug gia' prodotti dal Core.
+Non calcola pathfinding.
+Non calcola percezione.
+Non modifica il World.
+Non sceglie autonomamente l'NPC attivo.
+
+### Contratti ArcGraph coinvolti
+
+I file principali del perimetro sono:
+
+- `ArcGraphDebugOverlayKind`;
+- `ArcGraphDebugOverlaySnapshot`;
+- `ArcGraphDebugOverlayProducerBridge`;
+- `ArcGraphDebugOverlayQueueBuilder`;
+- `ArcGraphDebugOverlayRuntimeFeed`;
+- `ArcGraphDebugRuntimeWiringFrame`;
+- `ArcGraphDebugRuntimeWiringCoordinator`;
+- `ArcGraphDebugRuntimeSceneWrapper`;
+- `ArcGraphDebugRuntimeMapGridAdapter`;
+- `ArcGraphDebugOverlaySceneProbeRenderer`.
+
+Il disegno temporaneo resta confinato al probe:
+
+```text
+ArcGraphDebugOverlaySceneProbeRoot
+```
+
+### Debug ancora legacy
+
+Restano dentro MapGrid o fuori dal perimetro minimo ArcGraph:
+
+- FOV current cone;
+- FOV historical heatmap;
+- pointer cell coordinates HUD;
+- runtime cost HUD;
+- Landmark labels screen-space;
+- DT value labels;
+- summary cards;
+- top bar runtime;
+- DevTools;
+- click-to-move debug;
+- selection UX;
+- tooltip e pannelli interattivi.
+
+Questi elementi non sono equivalenti al debug minimo gia' migrato.
+Molti di essi sono UI, input o strumenti operativi, non semplici overlay mappa.
+
+### Decisione tecnica v0.38e
+
+La `v0.38e` considera assorbito solo il debug minimo Landmark/GVD/DT.
+
+Non viene aggiunto un nuovo bridge FOV in questa fase.
+Il FOV e gli HUD richiedono un audit separato perche':
+
+- leggono stato di selezione/puntatore;
+- dipendono da input e camera;
+- producono output screen-space;
+- possono richiedere policy UI diversa dal renderer mappa;
+- non devono entrare nel renderer ArcGraph come responsabilita' nascosta.
+
+### Vincoli confermati
+
+- ArcGraph debug non deve leggere `SimulationHost.Instance`.
+- ArcGraph debug non deve usare `FindObjectOfType` per recuperare il mondo.
+- ArcGraph debug non deve dipendere da `MapGridWorldProvider`.
+- Il wrapper scena non deve scegliere autonomamente l'NPC.
+- Il renderer probe deve consumare solo queue gia' prodotte.
+- Nessun DevTools deve essere inglobato nel renderer ArcGraph.
+
+### Esito
+
+```text
+v0.38e = COMPLETATA COME AUDIT DI ASSORBIMENTO DEBUG MINIMO
+```
+
+Il debug minimo da considerare assorbito per la futura chiusura `v0.38` e':
+
+```text
+Landmark + GVD-DIN + DT heatmap
+```
+
+Il resto va trattato nel checkpoint successivo come separazione di strumenti
+interattivi e UI debug, non come semplice estensione del renderer.
+
+### Prossimo checkpoint
+
+```text
+v0.38f - Separazione strumenti interattivi/dev tools dal renderer legacy
+```
+
+Scopo del prossimo step:
+
+- auditare top bar, DevTools, click-to-move, pointer HUD, summary cards e selection;
+- distinguere cosa deve restare UI/tool separato da cosa puo' diventare overlay ArcGraph;
+- impedire che ArcGraph diventi un contenitore di comandi e strumenti operativi;
+- preparare il futuro pensionamento MapGrid senza perdere strumenti utili.
 
 ---
 
