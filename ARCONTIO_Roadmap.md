@@ -10417,6 +10417,97 @@ Scopo:
 - non salvare scene;
 - non introdurre DevTools, top bar, click-to-move o pannelli avanzati.
 
+## Esito v0.38g.05 - ArcGraph Minimal Runtime Scene Wrapper Contract
+
+La `v0.38g.05` introduce il wrapper Unity minimale che collega il coordinator
+runtime minimo ArcGraph alla scena in modo esplicito e controllato.
+
+### File introdotti
+
+- `ArcGraphMinimalRuntimeSceneWrapper`;
+- `ArcGraphMinimalRuntimeSceneWrapperDiagnostics`.
+
+### Funzione del wrapper
+
+Il wrapper e' il primo punto scena unico per il percorso minimo:
+
+```text
+ArcGraphTerrainRuntimeMapGridAdapter
+-> ArcGraphRuntimeContext
+-> ArcGraphMinimalRuntimeCoordinator
+-> ArcGraphRenderQueue actor/object
+-> opzionale ArcGraphInteractionSceneAdapterWrapper
+```
+
+Il componente resta spento di default.
+
+### Gate principali
+
+Il wrapper espone gate separati:
+
+- `wrapperEnabled`: abilita il wrapper;
+- `processInUpdate`: permette processing continuo, falso di default;
+- `refreshSnapshots`: richiede refresh snapshot;
+- `buildActorObjectQueue`: richiede costruzione queue actor/object;
+- `pushQueueToInteractionWrapper`: consegna opzionalmente la queue al wrapper input;
+- `enableInteractionWrapperAfterPush`: puo' accendere il wrapper interaction, falso di default.
+
+### Confini preservati
+
+Il wrapper:
+
+- non crea `GameObject`;
+- non crea renderer;
+- non carica asset;
+- non legge `SimulationHost`;
+- non legge `MapGridWorldProvider`;
+- non usa `FindObjectOfType`;
+- non invia comandi;
+- non possiede DevTools, top bar, click-to-move o pannelli avanzati;
+- non salva scene o prefab.
+
+### Diagnostica
+
+La diagnostica espone:
+
+- presenza del runtime adapter;
+- presenza del wrapper interaction opzionale;
+- stato dei gate;
+- esito del coordinator;
+- conteggio snapshot/queue tramite diagnostica del coordinator;
+- eventuale push della queue al wrapper interaction;
+- ragione sintetica del frame.
+
+### QA
+
+La ricerca statica sui nuovi file non rileva dipendenze operative vietate. Le
+occorrenze trovate sono solo testo nei commenti o il nome Unity `OnDestroy`,
+non chiamate operative distruttive.
+
+`dotnet build Assembly-CSharp.csproj --no-restore` resta non conclusivo per la
+mancanza del file temporaneo Unity:
+
+```text
+Temp/obj/Assembly-CSharp/project.assets.json
+```
+
+Non e' stato eseguito restore per evitare modifiche nelle cartelle temporanee.
+
+### Stato dopo v0.38g.05
+
+La struttura minima stabile e' ora piu' vicina alla chiusura perche' non dipende
+piu' solo da probe manuali separati per costruire context, refresh snapshot,
+queue actor/object e input wrapper.
+
+Restano comunque fuori scope:
+
+- renderer terrain produttivo;
+- renderer actor/object produttivo;
+- pooling;
+- asset resolver obbligatorio;
+- salvataggio scena;
+- pensionamento MapGrid.
+
 ### Stop confermato
 
 ```text

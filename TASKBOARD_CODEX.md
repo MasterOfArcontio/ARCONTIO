@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38g.04 - ArcGraph Minimal Runtime Coordinator Contract`
+`v0.38g.05 - ArcGraph Minimal Runtime Scene Wrapper Contract`
 
 STATUS:
-COMPLETATO CONTRATTO / IN ATTESA PROSSIMO GO
+COMPLETATO WRAPPER MINIMO / IN PREPARAZIONE CHIUSURA STRUTTURA MINIMA
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38g-04-arcgraph-minimal-runtime-coordinator-contract`
+`ai-task/v0.38g-05-arcgraph-minimal-runtime-scene-wrapper-contract`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -52,7 +52,7 @@ OUTPUT ATTESO:
 - distinguere probe temporanei da futuri componenti produttivi;
 - individuare il prossimo micro-step tecnico senza cancellare MapGrid;
 - introdurre un coordinator C# passivo e riusabile per il percorso runtime minimo;
-- non introdurre ancora wrapper scena produttivo;
+- introdurre un wrapper scena minimo, spento di default, come frontiera controllata del coordinator;
 - non agganciare automaticamente ArcGraph alla scena;
 - non cancellare componenti MapGrid;
 - non modificare codice runtime;
@@ -345,6 +345,21 @@ Regola corrente:
   - QA statica sulle dipendenze vietate superata nel codice operativo;
   - `dotnet build Assembly-CSharp.csproj --no-restore` non conclusivo per mancanza del file Unity temporaneo `Temp/obj/Assembly-CSharp/project.assets.json`;
   - prossimo step consigliato: `v0.38g.05 - ArcGraph Minimal Runtime Scene Wrapper Contract`.
+- micro-step `v0.38g.05` completato:
+  - introdotto `ArcGraphMinimalRuntimeSceneWrapper`;
+  - introdotta diagnostica `ArcGraphMinimalRuntimeSceneWrapperDiagnostics`;
+  - il wrapper e' un `MonoBehaviour` frontiera, spento di default;
+  - riceve da Inspector `ArcGraphTerrainRuntimeMapGridAdapter` e opzionalmente `ArcGraphInteractionSceneAdapterWrapper`;
+  - usa internamente `ArcGraphMinimalRuntimeCoordinator`;
+  - espone context menu `ArcGraph/Process Minimal Runtime Frame`;
+  - puo' costruire context runtime, refresh snapshot e queue actor/object tramite coordinator;
+  - puo' consegnare opzionalmente la queue al wrapper interaction gia' validato;
+  - non crea `GameObject`, renderer, asset load, DevTools, top bar, click-to-move, comandi o pannelli avanzati;
+  - non legge `SimulationHost`, `MapGridWorldProvider` o scene globali tramite `FindObjectOfType`;
+  - non salva scene o prefab;
+  - QA statica sulle dipendenze vietate superata nel codice operativo, con occorrenze solo testuali/commento o nome Unity `OnDestroy`;
+  - `dotnet build Assembly-CSharp.csproj --no-restore` non conclusivo per mancanza del file Unity temporaneo `Temp/obj/Assembly-CSharp/project.assets.json`;
+  - prossimo passo logico: chiudere la struttura minima stabile e poi iniziare il blocco terrain + NPC produttivo controllato.
 - `main`, `ai/codex-main` e branch task chiuso vengono allineati a fine step;
 - eventuale ponte mappa reale andra' pianificato dentro `v0.38` come micro-step esplicitamente approvato;
 - non accumulare ulteriori moduli senza harness e diagnostica.
