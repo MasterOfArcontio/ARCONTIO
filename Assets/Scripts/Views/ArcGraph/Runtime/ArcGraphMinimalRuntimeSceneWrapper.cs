@@ -137,6 +137,34 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetRuntimeRendering
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Configura i gate di rendering runtime terrain e NPC.
+        /// </para>
+        ///
+        /// <para><b>Switch visuale controllato</b></para>
+        /// <para>
+        /// Questo metodo serve al componente di switch MapGrid/ArcGraph per
+        /// preparare il wrapper senza manipolare campi serializzati in modo
+        /// implicito. Il wrapper resta il solo punto che decide se inoltrare dati
+        /// al renderer terrain e al renderer NPC.
+        /// </para>
+        /// </summary>
+        public void SetRuntimeRendering(
+            bool renderTerrain,
+            bool renderNpc,
+            bool enableTerrainBeforeRender,
+            bool enableNpcBeforeRender)
+        {
+            renderTerrainRuntime = renderTerrain;
+            renderNpcRuntime = renderNpc;
+            enableTerrainRendererBeforeRender = enableTerrainBeforeRender;
+            enableNpcRendererBeforeRender = enableNpcBeforeRender;
+        }
+
+        // =============================================================================
         // SetRuntimeMapAdapter
         // =============================================================================
         /// <summary>

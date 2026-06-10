@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -129,6 +130,7 @@ namespace Arcontio.View.ArcGraph
         public int pixelsPerUnit = 32;
         public string[] parts;
         public ArcGraphNpcVisualFrameDto[] frames;
+        public ArcGraphNpcVisualFramePatternDto[] framePatterns;
 
         // =============================================================================
         // ToRuntimeCatalog
@@ -150,7 +152,10 @@ namespace Arcontio.View.ArcGraph
 
         private ArcGraphNpcVisualFrame[] BuildFrames()
         {
-            if (frames == null || frames.Length == 0)
+            int explicitFrameCount = frames != null ? frames.Length : 0;
+            int patternFrameCount = CountPatternFrames();
+
+            if (explicitFrameCount == 0 && patternFrameCount == 0)
             {
                 return new[]
                 {
@@ -166,16 +171,62 @@ namespace Arcontio.View.ArcGraph
                 };
             }
 
-            var result = new ArcGraphNpcVisualFrame[frames.Length];
-            for (int i = 0; i < frames.Length; i++)
+            var result = new List<ArcGraphNpcVisualFrame>(explicitFrameCount + patternFrameCount);
+
+            for (int i = 0; i < explicitFrameCount; i++)
             {
                 ArcGraphNpcVisualFrameDto frame = frames[i];
-                result[i] = frame != null
+                result.Add(frame != null
                     ? frame.ToRuntimeFrame(defaultVisualKey, defaultAnimationKey)
-                    : new ArcGraphNpcVisualFrame(defaultVisualKey, "body", "south", defaultAnimationKey, 0, string.Empty, 8, 0);
+                    : new ArcGraphNpcVisualFrame(defaultVisualKey, "body", "south", defaultAnimationKey, 0, string.Empty, 8, 0));
             }
 
-            return result;
+            AppendPatternFrames(result);
+            return result.ToArray();
+        }
+
+        private int CountPatternFrames()
+        {
+            if (framePatterns == null || framePatterns.Length == 0)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < framePatterns.Length; i++)
+            {
+                ArcGraphNpcVisualFramePatternDto pattern = framePatterns[i];
+                if (pattern == null)
+                    continue;
+
+                int partCount = pattern.partKeys != null && pattern.partKeys.Length > 0
+                    ? pattern.partKeys.Length
+                    : 1;
+                int directionCount = pattern.directionKeys != null && pattern.directionKeys.Length > 0
+                    ? pattern.directionKeys.Length
+                    : 1;
+                int frameCount = pattern.frameCount > 0 ? pattern.frameCount : 1;
+
+                count += partCount * directionCount * frameCount;
+            }
+
+            return count;
+        }
+
+        private void AppendPatternFrames(List<ArcGraphNpcVisualFrame> result)
+        {
+            if (framePatterns == null || framePatterns.Length == 0)
+                return;
+
+            for (int i = 0; i < framePatterns.Length; i++)
+            {
+                ArcGraphNpcVisualFramePatternDto pattern = framePatterns[i];
+                if (pattern == null)
+                    continue;
+
+                pattern.AppendRuntimeFrames(
+                    result,
+                    defaultVisualKey,
+                    defaultAnimationKey);
+            }
         }
     }
 
@@ -227,6 +278,139 @@ namespace Arcontio.View.ArcGraph
                 spriteKey,
                 durationTicks,
                 sortingOffset);
+        }
+    }
+
+    // =============================================================================
+    // ArcGraphNpcVisualFramePatternDto
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile per generare piu' frame NPC con una regola compatta.
+    /// </para>
+    ///
+    /// <para><b>Catalogo leggibile e non esplosivo</b></para>
+    /// <para>
+    /// Una animazione modulare moltiplica parti, direzioni e frame. Scrivere ogni
+    /// combinazione a mano renderebbe il JSON fragile. Questo pattern mantiene il
+    /// file corto, ma produce comunque frame runtime normali, identici a quelli
+    /// dichiarati esplicitamente.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class ArcGraphNpcVisualFramePatternDto
+    {
+        public string visualKey;
+        public string[] partKeys;
+        public string[] directionKeys;
+        public string animationKey;
+        public int frameCount = 1;
+        public string spriteKeyPattern;
+        public int durationTicks = 8;
+        public int[] sortingOffsets;
+
+        // =============================================================================
+        // AppendRuntimeFrames
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espande il pattern in frame runtime e li aggiunge alla lista ricevuta.
+        /// </para>
+        /// </summary>
+        public void AppendRuntimeFrames(
+            List<ArcGraphNpcVisualFrame> result,
+            string fallbackVisualKey,
+            string fallbackAnimationKey)
+        {
+            if (result == null)
+                return;
+
+            string resolvedVisualKey = string.IsNullOrWhiteSpace(visualKey)
+                ? fallbackVisualKey
+                : visualKey;
+            string resolvedAnimationKey = string.IsNullOrWhiteSpace(animationKey)
+                ? fallbackAnimationKey
+                : animationKey;
+            string[] resolvedParts = partKeys != null && partKeys.Length > 0
+                ? partKeys
+                : new[] { "body" };
+            string[] resolvedDirections = directionKeys != null && directionKeys.Length > 0
+                ? directionKeys
+                : new[] { "south" };
+            int resolvedFrameCount = frameCount > 0 ? frameCount : 1;
+
+            for (int partIndex = 0; partIndex < resolvedParts.Length; partIndex++)
+            {
+                string partKey = resolvedParts[partIndex];
+                int sortingOffset = ResolveSortingOffset(partIndex, partKey);
+
+                for (int directionIndex = 0; directionIndex < resolvedDirections.Length; directionIndex++)
+                {
+                    string directionKey = resolvedDirections[directionIndex];
+
+                    for (int frameIndex = 0; frameIndex < resolvedFrameCount; frameIndex++)
+                    {
+                        result.Add(new ArcGraphNpcVisualFrame(
+                            resolvedVisualKey,
+                            partKey,
+                            directionKey,
+                            resolvedAnimationKey,
+                            frameIndex,
+                            BuildSpriteKey(
+                                resolvedVisualKey,
+                                partKey,
+                                directionKey,
+                                resolvedAnimationKey,
+                                frameIndex),
+                            durationTicks,
+                            sortingOffset));
+                    }
+                }
+            }
+        }
+
+        private int ResolveSortingOffset(
+            int partIndex,
+            string partKey)
+        {
+            if (sortingOffsets != null
+                && partIndex >= 0
+                && partIndex < sortingOffsets.Length)
+            {
+                return sortingOffsets[partIndex];
+            }
+
+            string normalizedPart = ArcGraphNpcVisualFrame.NormalizeKey(partKey, "body");
+            if (normalizedPart == "legs")
+                return 1;
+            if (normalizedPart == "feet")
+                return 2;
+            if (normalizedPart == "head")
+                return 3;
+
+            return 0;
+        }
+
+        private string BuildSpriteKey(
+            string resolvedVisualKey,
+            string partKey,
+            string directionKey,
+            string resolvedAnimationKey,
+            int frameIndex)
+        {
+            string pattern = string.IsNullOrWhiteSpace(spriteKeyPattern)
+                ? "ArcGraph/NPC/{visual}/{part}/{direction}_{animation}_{frame00}"
+                : spriteKeyPattern;
+
+            // La sostituzione e' volutamente semplice e dichiarativa: il JSON
+            // decide il nome asset, il codice evita solo di duplicare 208 entry.
+            return pattern
+                .Replace("{visual}", resolvedVisualKey)
+                .Replace("{part}", partKey)
+                .Replace("{direction}", directionKey)
+                .Replace("{animation}", resolvedAnimationKey)
+                .Replace("{frame00}", frameIndex.ToString("00"))
+                .Replace("{frame}", frameIndex.ToString());
         }
     }
 }

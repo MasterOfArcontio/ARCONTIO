@@ -118,6 +118,7 @@ namespace Arcontio.View.ArcGraph
         private readonly string[] _parts;
         private readonly ArcGraphNpcVisualFrame[] _frames;
         private readonly Dictionary<string, ArcGraphNpcVisualFrame> _framesByKey = new();
+        private readonly Dictionary<string, int> _frameCountByAnimationKey = new();
 
         public string DefaultVisualKey { get; }
         public string DefaultAnimationKey { get; }
@@ -183,9 +184,42 @@ namespace Arcontio.View.ArcGraph
             return _framesByKey.TryGetValue(key, out frame);
         }
 
+        // =============================================================================
+        // ResolveFrameCount
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce quanti frame esistono per una combinazione parte/direzione/animazione.
+        /// </para>
+        ///
+        /// <para><b>Animazione senza scansione runtime</b></para>
+        /// <para>
+        /// Il renderer deve scegliere il frame molte volte. Per evitare di contare
+        /// i frame durante ogni render, il catalogo prepara un indice compatto alla
+        /// costruzione e qui restituisce solo un intero gia' calcolato.
+        /// </para>
+        /// </summary>
+        public int ResolveFrameCount(
+            string visualKey,
+            string partKey,
+            string directionKey,
+            string animationKey)
+        {
+            string key = CreateAnimationKey(
+                ArcGraphNpcVisualFrame.NormalizeKey(visualKey, DefaultVisualKey),
+                ArcGraphNpcVisualFrame.NormalizeKey(partKey, "body"),
+                ArcGraphNpcVisualFrame.NormalizeDirection(directionKey),
+                ArcGraphNpcVisualFrame.NormalizeKey(animationKey, DefaultAnimationKey));
+
+            return _frameCountByAnimationKey.TryGetValue(key, out int frameCount) && frameCount > 0
+                ? frameCount
+                : 1;
+        }
+
         private void BuildFrameIndex()
         {
             _framesByKey.Clear();
+            _frameCountByAnimationKey.Clear();
 
             for (int i = 0; i < _frames.Length; i++)
             {
@@ -197,6 +231,21 @@ namespace Arcontio.View.ArcGraph
                     frame.AnimationKey,
                     frame.FrameIndex);
                 _framesByKey[key] = frame;
+
+                // Salviamo il conteggio come "indice massimo + 1": il catalogo
+                // non richiede frame obbligatoriamente continui, ma per le
+                // animazioni dichiarate da pattern produce proprio sequenze 0..N.
+                string animationKey = CreateAnimationKey(
+                    frame.VisualKey,
+                    frame.PartKey,
+                    frame.DirectionKey,
+                    frame.AnimationKey);
+                int candidateCount = frame.FrameIndex + 1;
+                if (!_frameCountByAnimationKey.TryGetValue(animationKey, out int currentCount)
+                    || candidateCount > currentCount)
+                {
+                    _frameCountByAnimationKey[animationKey] = candidateCount;
+                }
             }
         }
 
@@ -227,6 +276,15 @@ namespace Arcontio.View.ArcGraph
             int frameIndex)
         {
             return visualKey + "|" + partKey + "|" + directionKey + "|" + animationKey + "|" + frameIndex;
+        }
+
+        private static string CreateAnimationKey(
+            string visualKey,
+            string partKey,
+            string directionKey,
+            string animationKey)
+        {
+            return visualKey + "|" + partKey + "|" + directionKey + "|" + animationKey;
         }
     }
 }

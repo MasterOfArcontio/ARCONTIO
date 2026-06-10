@@ -8,61 +8,56 @@
     "legs",
     "feet"
   ],
-  "frames": [
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "south", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/body/south_idle_00", "durationTicks": 8, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "south", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/head/south_idle_00", "durationTicks": 8, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "south", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/legs/south_idle_00", "durationTicks": 8, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "south", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/feet/south_idle_00", "durationTicks": 8, "sortingOffset": 2 },
-
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "north", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/body/north_idle_00", "durationTicks": 8, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "north", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/head/north_idle_00", "durationTicks": 8, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "north", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/legs/north_idle_00", "durationTicks": 8, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "north", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/feet/north_idle_00", "durationTicks": 8, "sortingOffset": 2 },
-
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "east", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/body/east_idle_00", "durationTicks": 8, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "east", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/head/east_idle_00", "durationTicks": 8, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "east", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/legs/east_idle_00", "durationTicks": 8, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "east", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/feet/east_idle_00", "durationTicks": 8, "sortingOffset": 2 },
-
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "west", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/body/west_idle_00", "durationTicks": 8, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "west", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/head/west_idle_00", "durationTicks": 8, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "west", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/legs/west_idle_00", "durationTicks": 8, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "west", "animationKey": "idle", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/feet/west_idle_00", "durationTicks": 8, "sortingOffset": 2 },
-
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "south", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/body/south_walk_00", "durationTicks": 4, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "south", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/head/south_walk_00", "durationTicks": 4, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "south", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/legs/south_walk_00", "durationTicks": 4, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "south", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/feet/south_walk_00", "durationTicks": 4, "sortingOffset": 2 },
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "south", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/body/south_walk_01", "durationTicks": 4, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "south", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/head/south_walk_01", "durationTicks": 4, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "south", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/legs/south_walk_01", "durationTicks": 4, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "south", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/feet/south_walk_01", "durationTicks": 4, "sortingOffset": 2 },
-
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "north", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/body/north_walk_00", "durationTicks": 4, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "north", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/head/north_walk_00", "durationTicks": 4, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "north", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/legs/north_walk_00", "durationTicks": 4, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "north", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/feet/north_walk_00", "durationTicks": 4, "sortingOffset": 2 },
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "north", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/body/north_walk_01", "durationTicks": 4, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "north", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/head/north_walk_01", "durationTicks": 4, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "north", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/legs/north_walk_01", "durationTicks": 4, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "north", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/feet/north_walk_01", "durationTicks": 4, "sortingOffset": 2 },
-
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "east", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/body/east_walk_00", "durationTicks": 4, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "east", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/head/east_walk_00", "durationTicks": 4, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "east", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/legs/east_walk_00", "durationTicks": 4, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "east", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/feet/east_walk_00", "durationTicks": 4, "sortingOffset": 2 },
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "east", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/body/east_walk_01", "durationTicks": 4, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "east", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/head/east_walk_01", "durationTicks": 4, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "east", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/legs/east_walk_01", "durationTicks": 4, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "east", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/feet/east_walk_01", "durationTicks": 4, "sortingOffset": 2 },
-
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "west", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/body/west_walk_00", "durationTicks": 4, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "west", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/head/west_walk_00", "durationTicks": 4, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "west", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/legs/west_walk_00", "durationTicks": 4, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "west", "animationKey": "walk", "frameIndex": 0, "spriteKey": "ArcGraph/NPC/human_default/feet/west_walk_00", "durationTicks": 4, "sortingOffset": 2 },
-    { "visualKey": "human_default", "partKey": "body", "directionKey": "west", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/body/west_walk_01", "durationTicks": 4, "sortingOffset": 0 },
-    { "visualKey": "human_default", "partKey": "head", "directionKey": "west", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/head/west_walk_01", "durationTicks": 4, "sortingOffset": 3 },
-    { "visualKey": "human_default", "partKey": "legs", "directionKey": "west", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/legs/west_walk_01", "durationTicks": 4, "sortingOffset": 1 },
-    { "visualKey": "human_default", "partKey": "feet", "directionKey": "west", "animationKey": "walk", "frameIndex": 1, "spriteKey": "ArcGraph/NPC/human_default/feet/west_walk_01", "durationTicks": 4, "sortingOffset": 2 }
+  "framePatterns": [
+    {
+      "visualKey": "human_default",
+      "partKeys": [
+        "body",
+        "head",
+        "legs",
+        "feet"
+      ],
+      "directionKeys": [
+        "south",
+        "north",
+        "east",
+        "west"
+      ],
+      "animationKey": "idle",
+      "frameCount": 4,
+      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/{direction}_{animation}_{frame00}",
+      "durationTicks": 8,
+      "sortingOffsets": [
+        0,
+        3,
+        1,
+        2
+      ]
+    },
+    {
+      "visualKey": "human_default",
+      "partKeys": [
+        "body",
+        "head",
+        "legs",
+        "feet"
+      ],
+      "directionKeys": [
+        "south",
+        "north",
+        "east",
+        "west"
+      ],
+      "animationKey": "walk",
+      "frameCount": 9,
+      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/{direction}_{animation}_{frame00}",
+      "durationTicks": 4,
+      "sortingOffsets": [
+        0,
+        3,
+        1,
+        2
+      ]
+    }
   ]
 }

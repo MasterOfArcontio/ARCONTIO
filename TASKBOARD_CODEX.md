@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.03 - ArcGraph NPC Layered Runtime Renderer`
+`v0.38i.04 - ArcGraph F12 View Switch + NPC Animation Frame Counts`
 
 STATUS:
-NPC RENDERER MODULARE INTRODOTTO / PROSSIMO STEP ASSET E GATE VISUALE
+SWITCH VISUALE F12 INTRODOTTO / IDLE 4 FRAME E WALK 9 FRAME CONFIGURATI / PROSSIMO STEP GATE VISUALE UNITY
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -480,6 +480,19 @@ Regola corrente:
   - diagnostica estesa con actor modulari, part renderer creati/riusati e frame catalogo mancanti;
   - controllo Roslyn isolato riuscito; warning attesi su campi `SerializeField`;
   - prossimo step: produrre/assegnare asset sprite reali o fare gate visuale con fallback magenta.
+- micro-step `v0.38i.04` completato:
+  - introdotto `ArcGraphViewModeSwitcher` come switch visuale esplicito MapGrid/ArcGraph;
+  - tasto predefinito: `F12`;
+  - lo switcher accende/spegne solo radici visuali assegnate da Inspector, senza cercare oggetti globali;
+  - quando entra in modalita' ArcGraph puo' abilitare wrapper, renderer terrain, renderer NPC e processare un frame;
+  - quando torna in modalita' MapGrid puo' spegnere ArcGraph e, opzionalmente, pulire i renderer runtime;
+  - `ArcGraphMinimalRuntimeSceneWrapper` espone ora un setter pubblico per i gate runtime terrain/NPC;
+  - il catalogo NPC supporta `framePatterns` compatti per evitare JSON enormi;
+  - il catalogo configurato genera runtime 208 frame: idle 4 frame e walk 9 frame per 4 parti e 4 direzioni;
+  - il renderer NPC sceglie il frame walk usando `motionProgress01` e cicla idle con `idleFrameStep`;
+  - controllo JSON PowerShell riuscito;
+  - `dotnet build --no-restore` non eseguibile per assenza di `Temp/obj/Assembly-CSharp/project.assets.json`; restore non lanciato per non scrivere in `Temp`;
+  - prossimo step: gate visuale Unity dello switch F12 e assegnazione sprite/resolver.
 
 DOC SYNC:
 

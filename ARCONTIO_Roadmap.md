@@ -11705,6 +11705,322 @@ Mancano ancora:
 
 ---
 
+## Esito v0.38i.04 - ArcGraph F12 View Switch + NPC Animation Frame Counts
+
+La `v0.38i.04` introduce il primo switch visuale esplicito tra MapGrid e
+ArcGraph e aggiorna il sistema NPC modulare ai conteggi frame richiesti.
+
+### Obiettivo dello step
+
+Rendere possibile un confronto runtime rapido:
+
+```text
+F12
+-> MapGrid visibile / ArcGraph spento
+-> ArcGraph visibile / MapGrid spento
+```
+
+Lo switch riguarda solo la visualizzazione. Non ferma la simulazione, non cambia
+la sorgente dati e non cancella MapGrid.
+
+### Switch visuale
+
+E' stato introdotto:
+
+```text
+ArcGraphViewModeSwitcher
+```
+
+Il componente usa:
+
+```text
+toggleKey = F12
+```
+
+Da Inspector riceve:
+
+- radici visuali MapGrid;
+- radici visuali ArcGraph;
+- `ArcGraphMinimalRuntimeSceneWrapper`;
+- `ArcGraphTerrainRuntimeSceneRenderer`;
+- `ArcGraphNpcRuntimeSceneRenderer`.
+
+Quando passa ad ArcGraph:
+
+- spegne le radici visuali MapGrid assegnate;
+- accende le radici visuali ArcGraph assegnate;
+- abilita wrapper e renderer runtime;
+- opzionalmente abilita il processing in `Update`;
+- opzionalmente processa subito un frame ArcGraph.
+
+Quando torna a MapGrid:
+
+- riaccende le radici MapGrid;
+- spegne le radici ArcGraph;
+- disabilita wrapper e renderer ArcGraph;
+- opzionalmente pulisce i renderer runtime ArcGraph.
+
+### Confine importante
+
+Lo switcher non usa:
+
+- `FindObjectOfType`;
+- `SimulationHost`;
+- accessi globali;
+- comandi verso NPC;
+- modifiche al World;
+- salvataggio scena;
+- cancellazione legacy.
+
+Tutto avviene tramite riferimenti espliciti assegnati da Inspector.
+
+### Animazioni NPC
+
+Il catalogo visuale NPC passa a:
+
+```text
+idle = 4 frame
+walk = 9 frame
+```
+
+Per ogni:
+
+```text
+4 parti: body, head, legs, feet
+4 direzioni: south, north, east, west
+```
+
+Il totale runtime generato e':
+
+```text
+idle: 4 parti x 4 direzioni x 4 frame = 64 frame
+walk: 4 parti x 4 direzioni x 9 frame = 144 frame
+totale = 208 frame
+```
+
+Il JSON non elenca piu' tutti i 208 frame manualmente. Usa `framePatterns`, che
+generano i frame runtime al caricamento del catalogo.
+
+### Movimento e frame walk
+
+La camminata usa:
+
+```text
+MotionProgress01
+```
+
+Esempio:
+
+- progresso 0.00 -> frame 0;
+- progresso 0.50 -> frame circa centrale;
+- progresso 0.99 -> ultimo frame;
+- progresso 1.00 -> ultimo frame clampato.
+
+Questo collega l'animazione walk al movimento multi-tick tra celle.
+
+### Idle
+
+L'idle non ha progresso di movimento. Per questo usa un contatore visuale locale:
+
+```text
+idleFrameStep
+```
+
+Default:
+
+```text
+12 frame Unity per cambio frame idle
+```
+
+Il costo e' minimo: nessuna allocazione e nessun accesso al World.
+
+### PNG richiesti
+
+Per il visuale iniziale `human_default` servono 208 sprite PNG.
+
+Dimensione consigliata:
+
+```text
+32 x 32 px
+```
+
+Import Unity consigliato:
+
+```text
+Texture Type: Sprite (2D and UI)
+Sprite Mode: Single
+Pixels Per Unit: 32
+Filter Mode: Point
+Compression: None
+```
+
+Percorsi logici attesi dal catalogo:
+
+```text
+ArcGraph/NPC/human_default/body/{direction}_{animation}_{frame00}
+ArcGraph/NPC/human_default/head/{direction}_{animation}_{frame00}
+ArcGraph/NPC/human_default/legs/{direction}_{animation}_{frame00}
+ArcGraph/NPC/human_default/feet/{direction}_{animation}_{frame00}
+```
+
+In `Resources`, questi sprite dovranno essere collocati idealmente sotto:
+
+```text
+Assets/Resources/ArcGraph/NPC/human_default/body/
+Assets/Resources/ArcGraph/NPC/human_default/head/
+Assets/Resources/ArcGraph/NPC/human_default/legs/
+Assets/Resources/ArcGraph/NPC/human_default/feet/
+```
+
+Nomi idle richiesti per ogni parte:
+
+```text
+south_idle_00.png
+south_idle_01.png
+south_idle_02.png
+south_idle_03.png
+north_idle_00.png
+north_idle_01.png
+north_idle_02.png
+north_idle_03.png
+east_idle_00.png
+east_idle_01.png
+east_idle_02.png
+east_idle_03.png
+west_idle_00.png
+west_idle_01.png
+west_idle_02.png
+west_idle_03.png
+```
+
+Nomi walk richiesti per ogni parte:
+
+```text
+south_walk_00.png
+south_walk_01.png
+south_walk_02.png
+south_walk_03.png
+south_walk_04.png
+south_walk_05.png
+south_walk_06.png
+south_walk_07.png
+south_walk_08.png
+north_walk_00.png
+north_walk_01.png
+north_walk_02.png
+north_walk_03.png
+north_walk_04.png
+north_walk_05.png
+north_walk_06.png
+north_walk_07.png
+north_walk_08.png
+east_walk_00.png
+east_walk_01.png
+east_walk_02.png
+east_walk_03.png
+east_walk_04.png
+east_walk_05.png
+east_walk_06.png
+east_walk_07.png
+east_walk_08.png
+west_walk_00.png
+west_walk_01.png
+west_walk_02.png
+west_walk_03.png
+west_walk_04.png
+west_walk_05.png
+west_walk_06.png
+west_walk_07.png
+west_walk_08.png
+```
+
+La lista sopra va ripetuta in ciascuna cartella parte:
+
+```text
+body
+head
+legs
+feet
+```
+
+### JSON da modificare in futuro
+
+Il file interessato e':
+
+```text
+Assets/Resources/ArcGraph/Config/ArcGraphNpcVisualCatalog.json
+```
+
+Per cambiare numero frame:
+
+```text
+"animationKey": "idle",
+"frameCount": 4
+```
+
+oppure:
+
+```text
+"animationKey": "walk",
+"frameCount": 9
+```
+
+Per cambiare convenzione nome asset:
+
+```text
+"spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/{direction}_{animation}_{frame00}"
+```
+
+Per cambiare l'ordine visivo delle parti:
+
+```text
+"sortingOffsets": [0, 3, 1, 2]
+```
+
+Con l'ordine attuale:
+
+- body = 0;
+- head = 3;
+- legs = 1;
+- feet = 2.
+
+### QA tecnica
+
+Il JSON e' stato validato con `ConvertFrom-Json`.
+
+Il build `dotnet build --no-restore` non e' stato eseguito con successo perche'
+manca:
+
+```text
+Temp/obj/Assembly-CSharp/project.assets.json
+```
+
+Non e' stato lanciato `restore`, per non scrivere in `Temp`.
+
+### Stato dopo v0.38i.04
+
+ArcGraph possiede ora:
+
+- switch visuale F12 MapGrid/ArcGraph;
+- renderer terrain runtime minimo;
+- renderer NPC runtime minimo;
+- NPC modulare a parti;
+- catalogo NPC compatto con `idle` a 4 frame;
+- catalogo NPC compatto con `walk` a 9 frame;
+- animazione walk agganciata a `MotionProgress01`;
+- animazione idle ciclica leggera.
+
+Restano da validare in Unity:
+
+- cablaggio Inspector dello switcher;
+- scelta delle radici MapGrid da spegnere;
+- scelta delle radici ArcGraph da accendere;
+- comportamento F12 in Play Mode;
+- assegnazione sprite reali o resolver;
+- resa visiva del movimento NPC.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

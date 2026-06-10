@@ -41,6 +41,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool logDiagnostics = true;
         [SerializeField] private bool allowGeneratedFallbackSprites = true;
         [SerializeField] private bool disableMissingActorsAfterRender = true;
+        [SerializeField] private int idleFrameStep = 12;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float actorZOffset = -0.02f;
@@ -522,12 +523,18 @@ namespace Arcontio.View.ArcGraph
 
             string direction = ResolveDirection(entry, contract);
             string animation = entry.HasMotion ? "walk" : catalog.DefaultAnimationKey;
-            int frameIndex = entry.HasMotion && entry.MotionProgress01 >= 0.5f ? 1 : 0;
             bool appliedAnyPart = false;
 
             for (int i = 0; i < catalog.Parts.Count; i++)
             {
                 string partKey = catalog.Parts[i];
+                int frameIndex = ResolveAnimationFrameIndex(
+                    catalog,
+                    partKey,
+                    direction,
+                    animation,
+                    entry);
+
                 if (!catalog.TryResolveFrame(
                         catalog.DefaultVisualKey,
                         partKey,
@@ -584,6 +591,39 @@ namespace Arcontio.View.ArcGraph
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
             return true;
+        }
+
+        private int ResolveAnimationFrameIndex(
+            ArcGraphNpcVisualCatalog catalog,
+            string partKey,
+            string direction,
+            string animation,
+            ArcGraphActorObjectSceneRenderEntry entry)
+        {
+            int frameCount = catalog.ResolveFrameCount(
+                catalog.DefaultVisualKey,
+                partKey,
+                direction,
+                animation);
+
+            if (frameCount <= 1)
+                return 0;
+
+            if (entry.HasMotion)
+            {
+                // Il movimento multi-tick possiede gia' un progresso 0..1. Lo
+                // usiamo come timeline naturale della camminata, cosi' velocita'
+                // diverse attraversano comunque tutti i frame disponibili.
+                int walkFrame = Mathf.FloorToInt(entry.MotionProgress01 * frameCount);
+                return Mathf.Clamp(walkFrame, 0, frameCount - 1);
+            }
+
+            // L'idle non ha progresso di movimento. Usiamo un contatore visuale
+            // locale Unity molto economico: nessuna allocazione, nessun accesso al
+            // World, solo cambio frame ogni N frame render.
+            int safeStep = idleFrameStep > 0 ? idleFrameStep : 12;
+            int idleFrame = Time.frameCount / safeStep;
+            return idleFrame % frameCount;
         }
 
         private SpriteRenderer GetOrCreatePartRenderer(
