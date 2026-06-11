@@ -12211,6 +12211,150 @@ e' praticabile come soluzione di lavoro ordinaria.
 
 ---
 
+## Esito v0.38i.06 - ArcGraph NPC Sprite Resolver Practical Wiring
+
+La `v0.38i.06` rende praticabile l'uso degli sprite NPC modulari reali senza
+obbligare l'operatore a trascinare manualmente centinaia di PNG nel resolver
+Unity.
+
+### Obiettivo dello step
+
+Il problema operativo era questo:
+
+```text
+4 parti NPC
+4 direzioni
+idle 4 frame
+walk 9 frame
+= 208 PNG per un solo set visuale
+```
+
+Un mapping manuale in Inspector e' utile per override piccoli, ma non e'
+sostenibile come metodo ordinario per ogni frame.
+
+Lo step introduce quindi un lookup automatico da `Assets/Resources`, mantenendo
+pero' il caricamento asset dentro il bordo scena e fuori dal core passivo
+ArcGraph.
+
+### Modello di risoluzione sprite
+
+`ArcGraphSerializedSpriteResolver` ora risolve una richiesta sprite in questo
+ordine:
+
+```text
+1. mapping manuale da Inspector
+2. lookup opzionale in Assets/Resources
+3. fallback actor/object
+4. fallimento diagnostico
+```
+
+Il mapping manuale resta il primo livello perche' permette override mirati.
+
+Esempio:
+
+```text
+spriteKey richiesta:
+ArcGraph/NPC/human_default/body/south_idle_00
+
+path file atteso:
+Assets/Resources/ArcGraph/NPC/human_default/body/south_idle_00.png
+```
+
+Unity carica da `Resources` usando il path senza estensione:
+
+```text
+ArcGraph/NPC/human_default/body/south_idle_00
+```
+
+### Cache
+
+Il resolver mantiene cache locali per:
+
+- hit manuali da Inspector;
+- hit da `Resources`;
+- miss da `Resources`;
+- fallback usati.
+
+Questo evita di ripetere ogni frame lookup falliti sugli stessi path mancanti.
+
+Il principio e' semplice:
+
+```text
+se uno sprite esiste, lo ricordo
+se uno sprite manca, ricordo anche il miss
+```
+
+In questo modo il gate visuale puo' essere fatto anche con set incompleti di
+asset senza trasformare ogni frame in una scansione ripetuta.
+
+### Menu di servizio
+
+Il resolver espone il context menu:
+
+```text
+ArcGraph/Clear Sprite Resolver Runtime Cache
+```
+
+Serve durante i test Unity quando si importano o si sostituiscono PNG mentre la
+scena e' aperta.
+
+### Confini architetturali preservati
+
+Lo step:
+
+- non modifica World;
+- non modifica Decision Layer;
+- non modifica Job Layer;
+- non modifica movimento;
+- non salva scene;
+- non salva prefab;
+- non elimina MapGrid;
+- non carica asset dentro builder passivi;
+- non trasforma ArcGraph in sorgente di verita' simulativa.
+
+Il caricamento `Resources.Load<Sprite>` e' presente solo nel resolver
+scene-side:
+
+```text
+ArcGraphSerializedSpriteResolver
+```
+
+Cataloghi, snapshot, queue e builder ArcGraph restano data-only.
+
+### Stato dopo v0.38i.06
+
+ArcGraph NPC possiede ora:
+
+- catalogo visuale data-driven;
+- frame `32x48`;
+- parti `body/head/legs/feet`;
+- idle a 4 frame;
+- walk a 9 frame;
+- ombra NPC separata;
+- resolver sprite pratico da `Resources`;
+- fallback manuali ancora disponibili;
+- cache hit/miss per ridurre lavoro inutile.
+
+Prossimo step consigliato:
+
+```text
+gate visuale Unity con sprite reali minimi o set completo
+```
+
+Il test consigliato e':
+
+```text
+1. mettere alcuni PNG reali sotto Assets/Resources/ArcGraph/NPC/...
+2. attivare Use Layered Actor Catalog
+3. assegnare ArcGraphSerializedSpriteResolver
+4. lasciare Enable Resources Lookup attivo
+5. entrare in Play Mode
+6. premere F12
+7. verificare MissingSprites, fallback e frame visibili
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

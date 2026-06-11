@@ -13,11 +13,12 @@ namespace Arcontio.View.ArcGraph
     /// <see cref="Sprite"/> Unity assegnata da Inspector.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: asset espliciti, non caricati globalmente</b></para>
+    /// <para><b>Principio architetturale: mapping esplicito prima del lookup asset</b></para>
     /// <para>
-    /// Il primo probe actor/object non deve chiamare <c>Resources.Load</c>. Questa
-    /// entry permette invece di assegnare manualmente gli asset al resolver scena,
-    /// mantenendo il caricamento fuori dai builder passivi ArcGraph.
+    /// Questa entry permette di assegnare manualmente asset specifici al resolver
+    /// scena. Il mapping esplicito ha priorita' rispetto al lookup opzionale in
+    /// <c>Resources</c>, cosi' eventuali override locali restano controllabili da
+    /// Inspector senza modificare il catalogo dati.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -40,23 +41,28 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Resolver sprite scene-side basato su mapping serializzati da Inspector.
+    /// Resolver sprite scene-side basato su mapping serializzati da Inspector e
+    /// lookup opzionale in <c>Assets/Resources</c>.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: resolver temporaneo senza asset load</b></para>
+    /// <para><b>Principio architetturale: asset load confinato al bordo scena</b></para>
     /// <para>
     /// Questo componente implementa <see cref="IArcGraphSpriteResolver"/> per il
-    /// probe actor/object. Non legge <c>World</c>, non usa <c>Resources.Load</c>,
-    /// non cerca asset nella scena e non modifica ArcGraph. Traduce soltanto
-    /// richieste sprite in riferimenti assegnati esplicitamente.
+    /// probe actor/object. Non legge <c>World</c>, non cerca oggetti nella scena e
+    /// non modifica ArcGraph. L'unico caricamento dinamico ammesso qui e'
+    /// <c>Resources.Load&lt;Sprite&gt;</c>, confinato a questo resolver scene-side:
+    /// i builder passivi ArcGraph continuano a produrre solo chiavi e richieste
+    /// dati, senza conoscere Unity asset database o cartelle progetto.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>entries</b>: mapping specifici sprite key -> sprite.</item>
     ///   <item><b>defaultActorSprite/defaultObjectSprite</b>: fallback dichiarati.</item>
+    ///   <item><b>enableResourcesLookup</b>: abilita lookup automatico da Resources.</item>
     ///   <item><b>TryResolveSprite</b>: risoluzione richiesta dal probe.</item>
     ///   <item><b>BuildCacheIfNeeded</b>: cache locale delle entry serializzate.</item>
+    ///   <item><b>ResolveFromResources</b>: lookup scene-side con cache hit/miss.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphSerializedSpriteResolver : MonoBehaviour, IArcGraphSpriteResolver
@@ -64,23 +70,42 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private List<ArcGraphSerializedSpriteResolverEntry> entries = new();
         [SerializeField] private Sprite defaultActorSprite;
         [SerializeField] private Sprite defaultObjectSprite;
+        [SerializeField] private bool enableResourcesLookup = true;
+        [SerializeField] private bool cacheResourcesHits = true;
+        [SerializeField] private bool cacheResourcesMisses = true;
+        [SerializeField] private bool logDiagnostics;
 
         private readonly Dictionary<string, Sprite> _spritesByTypedKey = new();
+        private readonly Dictionary<string, Sprite> _resourceSpritesByKey = new();
+        private readonly HashSet<string> _resourceMissesByKey = new();
         private bool _cacheDirty = true;
+        private int _manualHitCount;
+        private int _resourceHitCount;
+        private int _resourceMissCount;
+        private int _fallbackHitCount;
+
+        public int ManualHitCount => _manualHitCount;
+        public int ResourceHitCount => _resourceHitCount;
+        public int ResourceMissCount => _resourceMissCount;
+        public int FallbackHitCount => _fallbackHitCount;
 
         // =============================================================================
         // TryResolveSprite
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Prova a risolvere una sprite key usando mapping e fallback serializzati.
+        /// Prova a risolvere una sprite key usando mapping manuale, lookup
+        /// <c>Resources</c> opzionale e fallback serializzati.
         /// </para>
         ///
-        /// <para><b>Risoluzione confinata</b></para>
+        /// <para><b>Ordine di risoluzione stabile</b></para>
         /// <para>
-        /// Il metodo non effettua caricamenti dinamici. Se la chiave non e' mappata,
-        /// usa il fallback actor/object assegnato dall'Inspector. Se anche il
-        /// fallback manca, restituisce <c>false</c> e lascia al probe la diagnostica.
+        /// Prima vengono rispettati gli override dell'Inspector. Solo se non esiste
+        /// un mapping esplicito, il resolver prova a caricare la sprite da
+        /// <c>Assets/Resources</c> usando la sprite key ArcGraph come path. Se anche
+        /// quel tentativo fallisce, usa il fallback actor/object assegnato da
+        /// Inspector. Se manca anche il fallback, restituisce <c>false</c> e lascia
+        /// al renderer la diagnostica visuale.
         /// </para>
         /// </summary>
         public bool TryResolveSprite(
@@ -91,15 +116,62 @@ namespace Arcontio.View.ArcGraph
 
             string typedKey = CreateTypedKey(request.Kind, request.SpriteKey);
             if (_spritesByTypedKey.TryGetValue(typedKey, out sprite) && sprite != null)
+            {
+                _manualHitCount++;
                 return true;
+            }
+
+            if (ResolveFromResources(request.SpriteKey, out sprite))
+            {
+                _resourceHitCount++;
+                return true;
+            }
 
             sprite = ResolveFallback(request.Kind);
-            return sprite != null;
+            if (sprite == null)
+                return false;
+
+            _fallbackHitCount++;
+            return true;
+        }
+
+        // =============================================================================
+        // ClearRuntimeCacheFromContextMenu
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Svuota manualmente le cache runtime del resolver da menu contestuale Unity.
+        /// </para>
+        ///
+        /// <para><b>Uso previsto durante test asset</b></para>
+        /// <para>
+        /// Serve quando si cambiano PNG o import settings mentre la scena e' aperta:
+        /// il mapping Inspector viene ricostruito, gli hit/miss <c>Resources</c>
+        /// vengono dimenticati e i contatori diagnostici tornano a zero.
+        /// </para>
+        /// </summary>
+        [ContextMenu("ArcGraph/Clear Sprite Resolver Runtime Cache")]
+        public void ClearRuntimeCacheFromContextMenu()
+        {
+            ClearRuntimeCache();
         }
 
         private void OnValidate()
         {
             _cacheDirty = true;
+            _resourceMissesByKey.Clear();
+        }
+
+        private void ClearRuntimeCache()
+        {
+            _cacheDirty = true;
+            _spritesByTypedKey.Clear();
+            _resourceSpritesByKey.Clear();
+            _resourceMissesByKey.Clear();
+            _manualHitCount = 0;
+            _resourceHitCount = 0;
+            _resourceMissCount = 0;
+            _fallbackHitCount = 0;
         }
 
         private void BuildCacheIfNeeded()
@@ -123,6 +195,47 @@ namespace Arcontio.View.ArcGraph
             }
 
             _cacheDirty = false;
+        }
+
+        private bool ResolveFromResources(
+            string spriteKey,
+            out Sprite sprite)
+        {
+            sprite = null;
+
+            if (!enableResourcesLookup || string.IsNullOrWhiteSpace(spriteKey))
+                return false;
+
+            // Resources.Load vuole un path relativo alla cartella Resources e senza
+            // estensione. Le sprite key del catalogo NPC sono gia' prodotte in
+            // quella forma, per esempio:
+            // ArcGraph/NPC/human_default/body/south_idle_00
+            if (_resourceSpritesByKey.TryGetValue(spriteKey, out sprite) && sprite != null)
+                return true;
+
+            if (_resourceMissesByKey.Contains(spriteKey))
+                return false;
+
+            sprite = Resources.Load<Sprite>(spriteKey);
+            if (sprite != null)
+            {
+                if (cacheResourcesHits)
+                    _resourceSpritesByKey[spriteKey] = sprite;
+
+                if (logDiagnostics)
+                    Debug.Log("[ArcGraphSerializedSpriteResolver] Resources hit: " + spriteKey, this);
+
+                return true;
+            }
+
+            _resourceMissCount++;
+            if (cacheResourcesMisses)
+                _resourceMissesByKey.Add(spriteKey);
+
+            if (logDiagnostics)
+                Debug.Log("[ArcGraphSerializedSpriteResolver] Resources miss: " + spriteKey, this);
+
+            return false;
         }
 
         private Sprite ResolveFallback(ArcGraphRenderItemKind kind)

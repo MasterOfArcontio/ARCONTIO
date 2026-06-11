@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.05 - ArcGraph NPC Visual Asset Contract Refinement`
+`v0.38i.06 - ArcGraph NPC Sprite Resolver Practical Wiring`
 
 STATUS:
-CONTRATTO NPC 32X48 E OMBRA RUNTIME INTRODOTTI / PROSSIMO STEP RESOLVER SPRITE PRATICO O GATE VISUALE UNITY
+RESOLVER SPRITE NPC COLLEGATO A RESOURCES CON CACHE / PROSSIMO STEP GATE VISUALE UNITY O RIFINITURA TERRENO/NPC MINIMA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -502,6 +502,16 @@ Regola corrente:
   - l'ombra segue il root NPC, usa offset locale configurabile, tint configurabile e sorting sotto le parti;
   - chiarito nel documento istruzioni che frame animazione e durata movimento restano separati: i tick simulativi non devono adeguarsi forzatamente al numero frame walk;
   - prossimo step possibile: resolver sprite pratico per evitare mapping manuale esteso, oppure gate visuale Unity con set asset minimo.
+- micro-step `v0.38i.06` completato:
+  - `ArcGraphSerializedSpriteResolver` resta il bordo scena autorizzato per tradurre sprite key ArcGraph in `Sprite` Unity;
+  - il resolver mantiene priorita' al mapping manuale da Inspector, utile per override e test mirati;
+  - aggiunto lookup opzionale da `Assets/Resources` usando direttamente la sprite key, per esempio `ArcGraph/NPC/human_default/body/south_idle_00`;
+  - aggiunte cache separate per hit e miss `Resources`, cosi' i frame mancanti non generano lookup ripetuti ogni frame;
+  - aggiunti contatori diagnostici per hit manuali, hit Resources, miss Resources e fallback;
+  - aggiunto context menu `ArcGraph/Clear Sprite Resolver Runtime Cache`;
+  - il caricamento asset resta confinato al resolver scene-side: builder, cataloghi, snapshot e queue ArcGraph continuano a produrre solo dati passivi;
+  - aggiornato il documento istruzioni: con nomi e path coerenti non serve mappare manualmente i 208 PNG nell'Inspector;
+  - prossimo step consigliato: gate visuale Unity con PNG reali minimi o set completo sotto `Assets/Resources/ArcGraph/NPC/...`.
 
 DOC SYNC:
 
