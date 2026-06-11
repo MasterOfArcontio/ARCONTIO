@@ -12602,6 +12602,121 @@ idle 4 frame, walk 9 frame, direzione e motion progress
 
 ---
 
+## Esito v0.38i.09 - ArcGraph NPC Direction Persistence
+
+La `v0.38i.09` rifinisce il passaggio tra animazione di camminata e animazione
+idle degli NPC modulari.
+
+### Problema individuato
+
+Il renderer NPC modulare sceglie la direzione della camminata usando il movimento
+visuale.
+
+Quando l'NPC e' in movimento:
+
+```text
+dx/dy del movimento
+-> north / south / east / west
+-> frame walk coerente
+```
+
+Quando pero' l'NPC non e' in movimento, prima di questo step il renderer non
+aveva un vettore da cui ricavare la direzione e tornava sempre a:
+
+```text
+south
+```
+
+Questo poteva produrre uno scatto visivo.
+
+Esempio:
+
+```text
+NPC cammina verso est
+-> usa walk east
+
+NPC si ferma
+-> prima tornava subito idle south
+```
+
+### Correzione
+
+Ogni handle NPC del pool mantiene ora:
+
+```text
+LastDirection
+```
+
+Quando l'NPC si muove, ArcGraph calcola la direzione e la salva:
+
+```text
+walk north -> LastDirection = north
+walk east  -> LastDirection = east
+walk west  -> LastDirection = west
+```
+
+Quando l'NPC non si muove, l'idle usa l'ultima direzione nota:
+
+```text
+idle -> usa LastDirection
+```
+
+Quindi:
+
+```text
+walk east
+-> idle east
+```
+
+invece di:
+
+```text
+walk east
+-> idle south
+```
+
+### Confini preservati
+
+La direzione persistente e' solo stato visuale locale del renderer.
+
+Non modifica:
+
+- posizione NPC;
+- movimento simulativo;
+- `World`;
+- snapshot actor;
+- Decision Layer;
+- Job Layer;
+- MapGrid;
+- catalogo NPC;
+- resolver sprite.
+
+### Stato dopo v0.38i.09
+
+Il renderer NPC modulare e' piu' coerente nel passaggio:
+
+```text
+walk -> idle
+```
+
+Resta da validare in Unity:
+
+- cambio frame idle 4 frame;
+- cambio frame walk 9 frame;
+- direzione corretta durante movimento;
+- idle nella stessa direzione dell'ultima camminata;
+- compatibilita' con sprite reali.
+
+Prossimo step consigliato:
+
+```text
+v0.38i.10 - terrain data-driven reale
+```
+
+oppure gate visuale Unity NPC se gli asset minimi sono pronti.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

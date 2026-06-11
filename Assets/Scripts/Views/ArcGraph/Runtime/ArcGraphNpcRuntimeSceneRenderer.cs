@@ -99,6 +99,7 @@ namespace Arcontio.View.ArcGraph
             public SpriteRenderer Renderer;
             public SpriteRenderer ShadowRenderer;
             public readonly Dictionary<string, SpriteRenderer> PartRenderers = new();
+            public string LastDirection = "south";
             public bool WasTouchedThisFrame;
         }
 
@@ -560,7 +561,7 @@ namespace Arcontio.View.ArcGraph
             if (catalog == null || catalog.PartCount <= 0)
                 return false;
 
-            string direction = ResolveDirection(entry, contract);
+            string direction = ResolveDirection(handle, entry, contract);
             string animation = entry.HasMotion ? "walk" : catalog.DefaultAnimationKey;
             bool appliedAnyPart = false;
 
@@ -1030,11 +1031,20 @@ namespace Arcontio.View.ArcGraph
         }
 
         private static string ResolveDirection(
+            ActorHandle handle,
             ArcGraphActorObjectSceneRenderEntry entry,
             ArcGraphNpcRuntimeSceneRendererContract contract)
         {
             if (!entry.HasMotion)
-                return "south";
+            {
+                // In assenza di movimento non abbiamo un vettore corrente da cui
+                // ricavare la direzione. Manteniamo quindi l'ultima direzione
+                // visuale nota dell'actor: cosi' un NPC che ha camminato verso
+                // nord resta in idle nord invece di scattare sempre a sud.
+                return handle != null && !string.IsNullOrWhiteSpace(handle.LastDirection)
+                    ? handle.LastDirection
+                    : "south";
+            }
 
             float tileSize = contract.TileWorldSize > 0f ? contract.TileWorldSize : 1f;
             float visualX = (entry.WorldX / tileSize) - 0.5f;
@@ -1042,10 +1052,16 @@ namespace Arcontio.View.ArcGraph
             float dx = visualX - entry.DiscreteCell.X;
             float dy = visualY - entry.DiscreteCell.Y;
 
+            string direction;
             if (Mathf.Abs(dx) >= Mathf.Abs(dy))
-                return dx >= 0f ? "east" : "west";
+                direction = dx >= 0f ? "east" : "west";
+            else
+                direction = dy >= 0f ? "north" : "south";
 
-            return dy >= 0f ? "north" : "south";
+            if (handle != null)
+                handle.LastDirection = direction;
+
+            return direction;
         }
 
         private Sprite ResolveSprite(

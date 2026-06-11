@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.08 - ArcGraph NPC Runtime Renderer Stabilization`
+`v0.38i.09 - ArcGraph NPC Direction Persistence`
 
 STATUS:
-RENDERER NPC STABILIZZATO SU PARTI MODULARI E DIAGNOSTICA / GATE VISUALE UNITY ANCORA DA ESEGUIRE CON PNG REALI
+DIREZIONE VISUALE NPC PERSISTENTE TRA WALK E IDLE / GATE VISUALE UNITY ANCORA DA ESEGUIRE CON PNG REALI
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -533,6 +533,15 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn isolato del renderer NPC riuscito con soli warning `SerializeField` attesi;
   - prossimo step consigliato: verifica animazione NPC fluida e direzione frame walk/idle.
+- micro-step `v0.38i.09` completato:
+  - `ArcGraphNpcRuntimeSceneRenderer.ActorHandle` mantiene ora `LastDirection`;
+  - quando l'actor e' in movimento, la direzione viene calcolata dal movimento visuale e salvata nell'handle;
+  - quando l'actor non e' in movimento, l'idle usa l'ultima direzione nota invece di tornare sempre a `south`;
+  - questo evita lo scatto visuale dopo una camminata verso north/east/west;
+  - la modifica resta view-side e non cambia la simulazione, il movimento, il World o gli snapshot;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn isolato del renderer NPC riuscito con soli warning `SerializeField` attesi;
+  - prossimo step consigliato: procedere al lato terrain data-driven reale o al gate visuale Unity degli NPC.
 
 DOC SYNC:
 
