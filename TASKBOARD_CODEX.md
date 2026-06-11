@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.04 - ArcGraph F12 View Switch + NPC Animation Frame Counts`
+`v0.38i.05 - ArcGraph NPC Visual Asset Contract Refinement`
 
 STATUS:
-SWITCH VISUALE F12 INTRODOTTO / IDLE 4 FRAME E WALK 9 FRAME CONFIGURATI / PROSSIMO STEP GATE VISUALE UNITY
+CONTRATTO NPC 32X48 E OMBRA RUNTIME INTRODOTTI / PROSSIMO STEP RESOLVER SPRITE PRATICO O GATE VISUALE UNITY
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -493,6 +493,15 @@ Regola corrente:
   - controllo JSON PowerShell riuscito;
   - `dotnet build --no-restore` non eseguibile per assenza di `Temp/obj/Assembly-CSharp/project.assets.json`; restore non lanciato per non scrivere in `Temp`;
   - prossimo step: gate visuale Unity dello switch F12 e assegnazione sprite/resolver.
+- micro-step `v0.38i.05` completato:
+  - il catalogo NPC dichiara ora `frameWidthPixels = 32` e `frameHeightPixels = 48`;
+  - resta valido `pixelsPerUnit = 32`, quindi un NPC `32x48` occupa 1 cella in larghezza e 1.5 celle in altezza;
+  - confermata la scelta semplice: `body`, `head`, `legs`, `feet` sono PNG `32x48` sovrapposti nello stesso canvas trasparente;
+  - aggiunta ombra NPC come renderer separato, non come parte anatomica del catalogo;
+  - l'ombra puo' essere risolta tramite sprite key `ArcGraph/NPC/common/shadow/soft_ellipse_32x16` oppure generata come fallback ellittico;
+  - l'ombra segue il root NPC, usa offset locale configurabile, tint configurabile e sorting sotto le parti;
+  - chiarito nel documento istruzioni che frame animazione e durata movimento restano separati: i tick simulativi non devono adeguarsi forzatamente al numero frame walk;
+  - prossimo step possibile: resolver sprite pratico per evitare mapping manuale esteso, oppure gate visuale Unity con set asset minimo.
 
 DOC SYNC:
 

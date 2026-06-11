@@ -11841,8 +11841,11 @@ Per il visuale iniziale `human_default` servono 208 sprite PNG.
 Dimensione consigliata:
 
 ```text
-32 x 32 px
+32 x 48 px
 ```
+
+Nota aggiornata in `v0.38i.05`: il terreno resta `32x32`, mentre i frame NPC
+usano canvas `32x48`.
 
 Import Unity consigliato:
 
@@ -12018,6 +12021,193 @@ Restano da validare in Unity:
 - comportamento F12 in Play Mode;
 - assegnazione sprite reali o resolver;
 - resa visiva del movimento NPC.
+
+---
+
+## Esito v0.38i.05 - ArcGraph NPC Visual Asset Contract Refinement
+
+La `v0.38i.05` assesta il contratto visuale degli NPC prima del gate con sprite
+reali.
+
+### Obiettivo dello step
+
+Chiarire e implementare tre punti emersi dopo la prima definizione del catalogo
+NPC:
+
+- il terreno resta basato su tile `32x32`;
+- l'NPC usa frame `32x48`;
+- gli NPC devono avere un'ombra visuale separata;
+- il numero di frame dell'animazione non deve imporre la durata simulativa del
+  movimento.
+
+### Dimensione terreno e NPC
+
+Il contratto corretto diventa:
+
+```text
+tile terreno = 32x32 px
+frame NPC = 32x48 px
+pixelsPerUnit = 32
+```
+
+Quindi, in unita' mondo Unity:
+
+```text
+NPC largo = 1 cella
+NPC alto = 1.5 celle
+```
+
+Il catalogo NPC dichiara ora:
+
+```json
+"frameWidthPixels": 32,
+"frameHeightPixels": 48
+```
+
+Questi valori non cambiano il terreno. Descrivono solo il canvas previsto per le
+parti visuali NPC.
+
+### Parti NPC
+
+Per il primo contratto stabile, ogni parte usa lo stesso canvas:
+
+```text
+body = PNG 32x48
+head = PNG 32x48
+legs = PNG 32x48
+feet = PNG 32x48
+```
+
+Ogni PNG contiene solo la propria parte visibile e lascia il resto trasparente.
+
+Esempio:
+
+```text
+body/south_idle_00.png -> corpo nella posizione corretta dentro canvas 32x48
+head/south_idle_00.png -> testa nella posizione corretta dentro canvas 32x48
+legs/south_idle_00.png -> gambe nella posizione corretta dentro canvas 32x48
+feet/south_idle_00.png -> piedi nella posizione corretta dentro canvas 32x48
+```
+
+Questa scelta evita per ora offset per parte/frame.
+
+Gli offset potranno essere aggiunti in futuro se si decidera' di usare sprite
+ritagliati piccoli invece di canvas comuni.
+
+### Ombra NPC
+
+Il renderer NPC ora supporta una ombra visuale separata.
+
+La gerarchia logica diventa:
+
+```text
+NPC root
+├─ shadow renderer
+├─ body renderer
+├─ head renderer
+├─ legs renderer
+└─ feet renderer
+```
+
+L'ombra:
+
+- segue il root NPC;
+- usa offset locale configurabile;
+- usa scala locale configurabile;
+- usa tint/alpha configurabile;
+- viene disegnata con sorting sotto le parti NPC.
+
+Sprite key prevista per una ombra reale:
+
+```text
+ArcGraph/NPC/common/shadow/soft_ellipse_32x16
+```
+
+Path asset consigliata:
+
+```text
+Assets/Resources/ArcGraph/NPC/common/shadow/soft_ellipse_32x16.png
+```
+
+Dimensione consigliata:
+
+```text
+32x16 px
+```
+
+Se la sprite non viene risolta dal resolver, il renderer puo' generare una
+ellisse fallback semitrasparente una sola volta e riusarla per tutti gli NPC.
+
+### Frame animazione e tick movimento
+
+Resta confermata la separazione:
+
+```text
+tick simulativo = durata reale del movimento
+frame animazione = rappresentazione visuale del movimento
+```
+
+Quindi una animazione `walk` da 8 o 9 frame non obbliga il movimento a durare 8
+o 9 tick.
+
+Esempio:
+
+```text
+walk = 8 frame
+movimento = 4 tick
+-> alcuni frame possono essere saltati
+
+walk = 8 frame
+movimento = 16 tick
+-> alcuni frame possono restare visibili per piu' tick
+```
+
+ArcGraph usa:
+
+```text
+MotionProgress01
+```
+
+per distribuire i frame lungo il movimento effettivo.
+
+Questo preserva il principio:
+
+```text
+la simulazione decide il tempo
+la grafica si adatta al tempo simulativo
+```
+
+### Confini preservati
+
+Lo step:
+
+- non modifica World;
+- non modifica movimento simulativo;
+- non modifica Job Layer;
+- non modifica Decision Layer;
+- non salva scene;
+- non salva prefab;
+- non rimuove MapGrid;
+- non introduce asset load nel core ArcGraph.
+
+### Stato dopo v0.38i.05
+
+ArcGraph NPC possiede ora:
+
+- catalogo data-driven con frame NPC `32x48`;
+- parti NPC modulari su canvas comune;
+- walk frame agganciati a `MotionProgress01`;
+- idle frame agganciati a timer visuale leggero;
+- ombra NPC separata, configurabile e con fallback generato.
+
+Prossimo step consigliato:
+
+```text
+v0.38i.06 - ArcGraph NPC Sprite Resolver Practical Wiring
+```
+
+Motivo: con 208 PNG per un solo set visuale, il mapping manuale in Inspector non
+e' praticabile come soluzione di lavoro ordinaria.
 
 ---
 

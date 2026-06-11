@@ -123,6 +123,8 @@ namespace Arcontio.View.ArcGraph
         public string DefaultVisualKey { get; }
         public string DefaultAnimationKey { get; }
         public int PixelsPerUnit { get; }
+        public int FrameWidthPixels { get; }
+        public int FrameHeightPixels { get; }
         public IReadOnlyList<string> Parts => _parts;
         public IReadOnlyList<ArcGraphNpcVisualFrame> Frames => _frames;
         public int PartCount => _parts.Length;
@@ -140,12 +142,16 @@ namespace Arcontio.View.ArcGraph
             string defaultVisualKey,
             string defaultAnimationKey,
             int pixelsPerUnit,
+            int frameWidthPixels,
+            int frameHeightPixels,
             string[] parts,
             ArcGraphNpcVisualFrame[] frames)
         {
             DefaultVisualKey = ArcGraphNpcVisualFrame.NormalizeKey(defaultVisualKey, "human_default");
             DefaultAnimationKey = ArcGraphNpcVisualFrame.NormalizeKey(defaultAnimationKey, "idle");
             PixelsPerUnit = pixelsPerUnit > 0 ? pixelsPerUnit : 32;
+            FrameWidthPixels = frameWidthPixels > 0 ? frameWidthPixels : 32;
+            FrameHeightPixels = frameHeightPixels > 0 ? frameHeightPixels : 48;
             _parts = NormalizeParts(parts);
             _frames = frames != null ? CopyFrames(frames) : new ArcGraphNpcVisualFrame[0];
             BuildFrameIndex();

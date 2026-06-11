@@ -42,6 +42,12 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool allowGeneratedFallbackSprites = true;
         [SerializeField] private bool disableMissingActorsAfterRender = true;
         [SerializeField] private int idleFrameStep = 12;
+        [SerializeField] private bool renderActorShadow = true;
+        [SerializeField] private string actorShadowSpriteKey = "ArcGraph/NPC/common/shadow/soft_ellipse_32x16";
+        [SerializeField] private Vector3 actorShadowLocalOffset = new Vector3(0f, -0.6f, 0f);
+        [SerializeField] private Vector2 actorShadowLocalScale = Vector2.one;
+        [SerializeField] private Color actorShadowTint = new Color(0f, 0f, 0f, 0.35f);
+        [SerializeField] private int actorShadowSortingOffset = -2;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float actorZOffset = -0.02f;
@@ -53,6 +59,7 @@ namespace Arcontio.View.ArcGraph
         private readonly ArcGraphActorObjectSceneRenderPlanBuilder _planBuilder = new();
         private Transform _root;
         private Sprite _generatedFallbackSprite;
+        private Sprite _generatedShadowSprite;
         private ArcGraphNpcVisualCatalog _npcVisualCatalog;
         private string _npcVisualCatalogSourceText;
         private ArcGraphNpcRuntimeSceneRendererDiagnostics _lastDiagnostics;
@@ -90,6 +97,7 @@ namespace Arcontio.View.ArcGraph
             public int ActorId;
             public GameObject GameObject;
             public SpriteRenderer Renderer;
+            public SpriteRenderer ShadowRenderer;
             public readonly Dictionary<string, SpriteRenderer> PartRenderers = new();
             public bool WasTouchedThisFrame;
         }
@@ -320,6 +328,14 @@ namespace Arcontio.View.ArcGraph
                 DestroyUnityObject(texture);
                 _generatedFallbackSprite = null;
             }
+
+            if (_generatedShadowSprite != null)
+            {
+                Texture2D texture = _generatedShadowSprite.texture;
+                DestroyUnityObject(_generatedShadowSprite);
+                DestroyUnityObject(texture);
+                _generatedShadowSprite = null;
+            }
         }
 
         private ArcGraphNpcRuntimeSceneRendererContract CreateContract()
@@ -407,7 +423,7 @@ namespace Arcontio.View.ArcGraph
                         continue;
                     }
 
-                    ApplyActorEntry(handle, entry, sprite, contract);
+                    ApplyActorEntry(handle, entry, sprite, contract, spriteResolver);
 
                     if (usedGeneratedFallback)
                         generatedFallbacks++;
@@ -479,7 +495,8 @@ namespace Arcontio.View.ArcGraph
             ActorHandle handle,
             ArcGraphActorObjectSceneRenderEntry entry,
             Sprite sprite,
-            ArcGraphNpcRuntimeSceneRendererContract contract)
+            ArcGraphNpcRuntimeSceneRendererContract contract,
+            IArcGraphSpriteResolver spriteResolver)
         {
             // Le coordinate mondo sono gia' state calcolate dal plan builder. Qui
             // aggiungiamo solo l'offset locale del renderer per poter sovrapporre
@@ -493,6 +510,7 @@ namespace Arcontio.View.ArcGraph
             handle.Renderer.sortingOrder = entry.SortingOrder;
             handle.Renderer.enabled = true;
             SetPartRenderersEnabled(handle, false);
+            ApplyActorShadow(handle, entry, contract, spriteResolver);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
         }
@@ -587,6 +605,7 @@ namespace Arcontio.View.ArcGraph
             if (!appliedAnyPart)
                 return false;
 
+            ApplyActorShadow(handle, entry, contract, spriteResolver);
             handle.Renderer.enabled = false;
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
@@ -668,6 +687,83 @@ namespace Arcontio.View.ArcGraph
             partRenderer.enabled = true;
         }
 
+        private void ApplyActorShadow(
+            ActorHandle handle,
+            ArcGraphActorObjectSceneRenderEntry entry,
+            ArcGraphNpcRuntimeSceneRendererContract contract,
+            IArcGraphSpriteResolver spriteResolver)
+        {
+            if (!renderActorShadow)
+            {
+                if (handle.ShadowRenderer != null)
+                    handle.ShadowRenderer.enabled = false;
+
+                return;
+            }
+
+            Sprite shadowSprite = ResolveActorShadowSprite(
+                entry,
+                spriteResolver);
+            if (shadowSprite == null)
+            {
+                if (handle.ShadowRenderer != null)
+                    handle.ShadowRenderer.enabled = false;
+
+                return;
+            }
+
+            SpriteRenderer shadowRenderer = GetOrCreateShadowRenderer(handle);
+
+            // L'ombra appartiene alla resa visuale dell'attore, non al catalogo
+            // delle parti anatomiche. Per questo usa un renderer separato che
+            // segue il root dell'NPC e resta sotto body/head/legs/feet.
+            shadowRenderer.transform.localPosition = actorShadowLocalOffset;
+            shadowRenderer.transform.localScale = new Vector3(
+                actorShadowLocalScale.x,
+                actorShadowLocalScale.y,
+                1f);
+            shadowRenderer.sprite = shadowSprite;
+            shadowRenderer.color = actorShadowTint;
+            shadowRenderer.sortingOrder = entry.SortingOrder + actorShadowSortingOffset;
+            shadowRenderer.enabled = true;
+        }
+
+        private Sprite ResolveActorShadowSprite(
+            ArcGraphActorObjectSceneRenderEntry entry,
+            IArcGraphSpriteResolver spriteResolver)
+        {
+            if (spriteResolver != null && !string.IsNullOrWhiteSpace(actorShadowSpriteKey))
+            {
+                var request = new ArcGraphSpriteResolveRequest(
+                    ArcGraphRenderItemKind.Actor,
+                    entry.EntityId,
+                    actorShadowSpriteKey,
+                    "shadow",
+                    usesSimplifiedRepresentation: false);
+
+                if (spriteResolver.TryResolveSprite(request, out Sprite resolved)
+                    && resolved != null)
+                {
+                    return resolved;
+                }
+            }
+
+            return allowGeneratedFallbackSprites
+                ? GetOrCreateGeneratedShadowSprite()
+                : null;
+        }
+
+        private SpriteRenderer GetOrCreateShadowRenderer(ActorHandle handle)
+        {
+            if (handle.ShadowRenderer != null)
+                return handle.ShadowRenderer;
+
+            var go = new GameObject("ArcGraphNpcShadow_" + handle.ActorId);
+            go.transform.SetParent(handle.GameObject.transform, false);
+            handle.ShadowRenderer = go.AddComponent<SpriteRenderer>();
+            return handle.ShadowRenderer;
+        }
+
         private void SetPartRenderersEnabled(
             ActorHandle handle,
             bool enabled)
@@ -740,6 +836,46 @@ namespace Arcontio.View.ArcGraph
                 pixelsPerUnit: 1f);
             _generatedFallbackSprite.name = "ArcGraphNpcGeneratedFallbackSprite";
             return _generatedFallbackSprite;
+        }
+
+        private Sprite GetOrCreateGeneratedShadowSprite()
+        {
+            if (_generatedShadowSprite != null)
+                return _generatedShadowSprite;
+
+            const int width = 32;
+            const int height = 16;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, mipChain: false)
+            {
+                name = "ArcGraphNpcGeneratedShadowTexture",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            // Ellisse morbida a bassissimo costo: viene generata una volta sola e
+            // poi riusata da tutti gli NPC del renderer. Non e' simulazione di luce,
+            // e' solo un placeholder visivo coerente con la pipeline ArcGraph.
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float nx = ((x + 0.5f) / width * 2f) - 1f;
+                    float ny = ((y + 0.5f) / height * 2f) - 1f;
+                    float distance = (nx * nx) + (ny * ny);
+                    float alpha = Mathf.Clamp01(1f - distance);
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+
+            _generatedShadowSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, width, height),
+                new Vector2(0.5f, 0.5f),
+                pixelsPerUnit: 32f);
+            _generatedShadowSprite.name = "ArcGraphNpcGeneratedShadowSprite";
+            return _generatedShadowSprite;
         }
 
         private ArcGraphNpcRuntimeSceneRendererDiagnostics StoreAndLogDiagnostics(

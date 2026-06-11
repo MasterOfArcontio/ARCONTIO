@@ -2,6 +2,8 @@
   "defaultVisualKey": "human_default",
   "defaultAnimationKey": "idle",
   "pixelsPerUnit": 32,
+  "frameWidthPixels": 32,
+  "frameHeightPixels": 48,
   "parts": [
     "body",
     "head",

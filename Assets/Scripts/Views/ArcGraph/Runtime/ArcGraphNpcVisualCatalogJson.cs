@@ -91,6 +91,8 @@ namespace Arcontio.View.ArcGraph
                 "human_default",
                 "idle",
                 32,
+                32,
+                48,
                 new[] { "body", "head", "legs", "feet" },
                 new[]
                 {
@@ -128,6 +130,8 @@ namespace Arcontio.View.ArcGraph
         public string defaultVisualKey = "human_default";
         public string defaultAnimationKey = "idle";
         public int pixelsPerUnit = 32;
+        public int frameWidthPixels = 32;
+        public int frameHeightPixels = 48;
         public string[] parts;
         public ArcGraphNpcVisualFrameDto[] frames;
         public ArcGraphNpcVisualFramePatternDto[] framePatterns;
@@ -146,6 +150,8 @@ namespace Arcontio.View.ArcGraph
                 defaultVisualKey,
                 defaultAnimationKey,
                 pixelsPerUnit,
+                frameWidthPixels,
+                frameHeightPixels,
                 parts,
                 BuildFrames());
         }
