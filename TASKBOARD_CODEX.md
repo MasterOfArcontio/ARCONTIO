@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.13 - ArcGraph Terrain Tile Roadmap`
+`v0.38i.14 - ArcGraph Terrain Visible Chunk Filter`
 
 STATUS:
-ROADMAP TILE TERRAIN DEFINITA / IMPLEMENTAZIONE TILE AVANZATI NON ANCORA AVVIATA
+FILTRO CHUNK VISIBILI TERRAIN AGGIUNTO / CULLING VIEWPORT SPENTO DI DEFAULT
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -589,6 +589,22 @@ Regola corrente:
   - `v0.38i.20`: gate visuale terrain completo con tile, varianti, animazioni e transizioni;
   - nessuna modifica implementativa a renderer, mesh, World, MapGrid, scene o prefab in questo micro-step;
   - prossimo step operativo consigliato: `v0.38i.14 - ArcGraph Terrain Visible Chunk Filter`.
+- micro-step `v0.38i.14` completato:
+  - introdotto `ArcGraphTerrainVisibleChunkFilter` come filtro passivo dei chunk terrain visibili;
+  - introdotto `ArcGraphTerrainVisibleChunkFilterHarness` per smoke test data-only del filtro viewport/Z;
+  - `ArcGraphTerrainChunkMeshBuilder` possiede ora un overload che costruisce mesh data da lista esplicita di chunk gia' filtrati;
+  - `ArcGraphTerrainRuntimeSceneRenderer` puo' ricevere un `ArcGraphViewCellRect` e filtrare i dirty chunks contro il viewport XY;
+  - il renderer puo' disattivare chunk gia' presenti nel pool quando escono dal viewport, senza distruggere GameObject o mesh;
+  - il culling viewport resta spento di default per compatibilita' con gate visuali e test esistenti;
+  - se alcuni dirty chunks vengono scartati dal viewport, il dirty state non viene pulito, per evitare perdita di aggiornamenti quando quei chunk torneranno visibili;
+  - estesa la diagnostica terrain runtime con viewport attivo, rettangolo visibile, chunk visibili, dirty chunk scartati e chunk disattivati fuori viewport;
+  - nessun collegamento ancora a varianti, animazioni, transition resolver o atlas strategy;
+  - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
+  - `git diff --check` superato;
+  - ricerca statica sulle dipendenze vietate superata;
+  - build completa Unity/C# non eseguita per mancanza nota di `Temp/obj/Assembly-CSharp/project.assets.json`;
+  - controllo Roslyn isolato dei file terrain interessati riuscito con soli warning attesi da controllo parziale;
+  - prossimo step operativo consigliato: `v0.38i.15 - Collegamento Terrain Visual Resolver al Mesh Builder`.
 
 DOC SYNC:
 

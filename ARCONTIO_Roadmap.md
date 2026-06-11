@@ -13690,6 +13690,182 @@ prestazioni
 
 ---
 
+## Esito v0.38i.14 - ArcGraph Terrain Visible Chunk Filter
+
+La `v0.38i.14` introduce il primo filtro viewport reale nel percorso terrain
+runtime di ArcGraph.
+
+L'obiettivo non e' ancora rendere il terreno piu' ricco.
+
+L'obiettivo e':
+
+```text
+prima decidere quali chunk vale la pena renderizzare
+poi arricchire cosa viene renderizzato
+```
+
+---
+
+### Cosa e' stato aggiunto
+
+Sono stati introdotti:
+
+- `ArcGraphTerrainVisibleChunkFilter`;
+- `ArcGraphTerrainVisibleChunkFilterResult`;
+- `ArcGraphTerrainVisibleChunkFilterHarness`;
+- overload di `ArcGraphTerrainChunkMeshBuilder.BuildChunks(...)` da lista esplicita di chunk;
+- campi viewport nel `ArcGraphTerrainRuntimeSceneRenderer`;
+- diagnostica viewport nel `ArcGraphTerrainRuntimeSceneRendererDiagnostics`.
+
+Il filtro riceve:
+
+```text
+dirty chunks
+chunk size
+visible Z level
+ArcGraphViewCellRect
+```
+
+e produce:
+
+```text
+chunk ammessi
+chunk ricevuti
+chunk visibili
+chunk scartati
+reason diagnostica
+```
+
+---
+
+### Comportamento runtime
+
+Il renderer terrain runtime ora puo':
+
+- conservare un rettangolo celle visibile;
+- filtrare i dirty chunks contro quel rettangolo;
+- costruire mesh solo per i chunk ammessi;
+- disattivare chunk del pool che sono usciti dal viewport;
+- lasciare spento il culling di default per non rompere i gate esistenti.
+
+Il flusso diventa:
+
+```text
+ArcGraphRenderState.Dirty.DirtyChunks
+-> ArcGraphTerrainVisibleChunkFilter
+-> BuildChunks(lista filtrata)
+-> ApplyChunks
+-> pool chunk runtime
+```
+
+---
+
+### Regola importante sul dirty state
+
+Se il viewport scarta alcuni dirty chunks, il dirty state non viene pulito.
+
+Motivo:
+
+```text
+un chunk fuori viewport puo' essere sporco ma non visibile ora
+se pulisco il dirty state, quando torno su quel chunk perdo l'aggiornamento
+```
+
+Quindi:
+
+```text
+dirty chunks tutti visibili/applicati
+-> dirty pulibile
+
+dirty chunks parzialmente scartati dal viewport
+-> dirty conservato
+```
+
+Questa scelta e' conservativa.
+
+Evita bug visivi nascosti durante pan/zoom, anche se in futuro potra' essere
+raffinata con dirty state parziale per chunk.
+
+---
+
+### Diagnostica aggiunta
+
+Il renderer terrain ora puo' spiegare:
+
+```text
+viewportCulling=...
+visibleRect=minX,minY->maxX,maxY
+visibleChunks=...
+culledDirtyChunks=...
+disabledOutsideViewport=...
+```
+
+Questi dati si aggiungono alla diagnostica gia' presente:
+
+```text
+dirtyChunks
+built
+nonEmpty
+applied
+created
+reused
+disabled
+active
+catalogUv
+legacyConfigUv
+missingUvTiles
+firstMissingUvTileId
+```
+
+---
+
+### Cosa NON cambia
+
+Questo step non collega ancora:
+
+- `ArcGraphTerrainVisualResolver`;
+- varianti tile;
+- animazioni tile;
+- transizioni/autotile;
+- atlas tematici;
+- nuova conformazione mappa ArcGraph.
+
+Non modifica:
+
+- `World`;
+- `Decision Layer`;
+- `Job Layer`;
+- `MapGrid`;
+- scene;
+- prefab.
+
+---
+
+### Stato dopo v0.38i.14
+
+ArcGraph terrain ora ha una base piu' sana per mappe grandi.
+
+Con mappe future da 250x250, il percorso non deve piu' ragionare solo in termini
+di:
+
+```text
+tutta la mappa
+```
+
+ma puo' ragionare in termini di:
+
+```text
+chunk dirty visibili
+```
+
+Il prossimo passo logico resta:
+
+```text
+v0.38i.15 - Collegamento Terrain Visual Resolver al Mesh Builder
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

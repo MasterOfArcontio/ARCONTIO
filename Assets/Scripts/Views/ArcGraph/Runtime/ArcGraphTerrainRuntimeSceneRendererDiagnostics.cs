@@ -53,6 +53,14 @@ namespace Arcontio.View.ArcGraph
         public readonly int ReusedChunkObjectCount;
         public readonly int DisabledChunkObjectCount;
         public readonly int ActiveChunkObjectCount;
+        public readonly bool ViewportCullingEnabled;
+        public readonly int VisibleRectMinX;
+        public readonly int VisibleRectMinY;
+        public readonly int VisibleRectMaxXExclusive;
+        public readonly int VisibleRectMaxYExclusive;
+        public readonly int VisibleChunkCount;
+        public readonly int CulledDirtyChunkCount;
+        public readonly int DisabledOutsideViewportChunkCount;
         public readonly bool UsedFallbackUv;
         public readonly int MissingUvTileCount;
         public readonly int FirstMissingUvTileId;
@@ -91,6 +99,14 @@ namespace Arcontio.View.ArcGraph
             int reusedChunkObjectCount,
             int disabledChunkObjectCount,
             int activeChunkObjectCount,
+            bool viewportCullingEnabled,
+            int visibleRectMinX,
+            int visibleRectMinY,
+            int visibleRectMaxXExclusive,
+            int visibleRectMaxYExclusive,
+            int visibleChunkCount,
+            int culledDirtyChunkCount,
+            int disabledOutsideViewportChunkCount,
             bool usedFallbackUv,
             int missingUvTileCount,
             int firstMissingUvTileId,
@@ -120,6 +136,14 @@ namespace Arcontio.View.ArcGraph
             ReusedChunkObjectCount = NormalizeCount(reusedChunkObjectCount);
             DisabledChunkObjectCount = NormalizeCount(disabledChunkObjectCount);
             ActiveChunkObjectCount = NormalizeCount(activeChunkObjectCount);
+            ViewportCullingEnabled = viewportCullingEnabled;
+            VisibleRectMinX = visibleRectMinX;
+            VisibleRectMinY = visibleRectMinY;
+            VisibleRectMaxXExclusive = visibleRectMaxXExclusive;
+            VisibleRectMaxYExclusive = visibleRectMaxYExclusive;
+            VisibleChunkCount = NormalizeCount(visibleChunkCount);
+            CulledDirtyChunkCount = NormalizeCount(culledDirtyChunkCount);
+            DisabledOutsideViewportChunkCount = NormalizeCount(disabledOutsideViewportChunkCount);
             UsedFallbackUv = usedFallbackUv;
             MissingUvTileCount = NormalizeCount(missingUvTileCount);
             FirstMissingUvTileId = firstMissingUvTileId;

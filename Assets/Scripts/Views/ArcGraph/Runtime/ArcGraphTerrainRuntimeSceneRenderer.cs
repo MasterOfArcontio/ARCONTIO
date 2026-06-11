@@ -40,6 +40,11 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool rendererEnabled;
         [SerializeField] private bool renderOnStart;
         [SerializeField] private bool clearDirtyAfterRender = true;
+        [SerializeField] private bool useViewportCulling;
+        [SerializeField] private int viewportMinX;
+        [SerializeField] private int viewportMinY;
+        [SerializeField] private int viewportMaxXExclusive;
+        [SerializeField] private int viewportMaxYExclusive;
         [SerializeField] private bool logDiagnostics = true;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float terrainZOffset = -0.05f;
@@ -58,6 +63,9 @@ namespace Arcontio.View.ArcGraph
         private int _uvTerrainCatalogEntryCount;
         private int _uvMissingTileCount;
         private int _uvFirstMissingTileId;
+        private int _lastVisibleChunkCount;
+        private int _lastCulledDirtyChunkCount;
+        private int _lastDisabledOutsideViewportChunkCount;
 
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
         public bool RendererEnabled => rendererEnabled;
@@ -174,6 +182,66 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetViewportCullingEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita il filtro viewport per i chunk terrain.
+        /// </para>
+        ///
+        /// <para><b>Gate esplicito</b></para>
+        /// <para>
+        /// Il culling resta disattivabile per mantenere compatibili i gate visuali
+        /// che vogliono renderizzare tutta la mappa. Quando e' attivo, il renderer
+        /// costruisce solo chunk che intersecano il rettangolo celle visibile.
+        /// </para>
+        /// </summary>
+        public void SetViewportCullingEnabled(bool enabled)
+        {
+            useViewportCulling = enabled;
+        }
+
+        // =============================================================================
+        // SetVisibleCellRect
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Imposta il rettangolo celle visibile usato dal filtro viewport.
+        /// </para>
+        ///
+        /// <para><b>Viewport ricevuto, non calcolato</b></para>
+        /// <para>
+        /// Il renderer non legge camera o input. Riceve una finestra celle gia'
+        /// risolta da moduli view-side e la conserva come parametro scene-side.
+        /// </para>
+        /// </summary>
+        public void SetVisibleCellRect(ArcGraphViewCellRect rect)
+        {
+            viewportMinX = rect.MinX;
+            viewportMinY = rect.MinY;
+            viewportMaxXExclusive = rect.MaxXExclusive;
+            viewportMaxYExclusive = rect.MaxYExclusive;
+            useViewportCulling = !rect.IsEmpty;
+        }
+
+        // =============================================================================
+        // ClearVisibleCellRect
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disabilita il filtro viewport e svuota il rettangolo celle salvato.
+        /// </para>
+        /// </summary>
+        public void ClearVisibleCellRect()
+        {
+            viewportMinX = 0;
+            viewportMinY = 0;
+            viewportMaxXExclusive = 0;
+            viewportMaxYExclusive = 0;
+            useViewportCulling = false;
+        }
+
+        // =============================================================================
         // RenderFromMapGridRuntimeContextMenu
         // =============================================================================
         /// <summary>
@@ -277,13 +345,28 @@ namespace Arcontio.View.ArcGraph
 
             int dirtyChunkCount = runtime.RenderState.Dirty.DirtyChunks.Count;
             if (dirtyChunkCount <= 0)
-                return StoreAndLogDiagnostics(context, runtime, terrainLayer, contract, false, false, 0, 0, 0, 0, 0, 0, 0, false, "NoDirtyTerrainChunks");
+            {
+                _lastDisabledOutsideViewportChunkCount = DisableChunksOutsideViewport(runtime.RenderState);
+                return StoreAndLogDiagnostics(context, runtime, terrainLayer, contract, false, false, 0, 0, 0, 0, 0, 0, _lastDisabledOutsideViewportChunkCount, false, "NoDirtyTerrainChunks");
+            }
 
-            List<ArcGraphTerrainChunkMeshData> chunks = BuildTerrainChunks(context, runtime.RenderState, terrainLayer, contract);
+            ArcGraphTerrainVisibleChunkFilterResult filterResult = FilterDirtyChunks(runtime.RenderState);
+            _lastVisibleChunkCount = filterResult.VisibleChunkCount;
+            _lastCulledDirtyChunkCount = filterResult.CulledChunkCount;
+            _lastDisabledOutsideViewportChunkCount = DisableChunksOutsideViewport(runtime.RenderState);
+
+            List<ArcGraphTerrainChunkMeshData> chunks = BuildTerrainChunks(
+                context,
+                runtime.RenderState,
+                terrainLayer,
+                contract,
+                filterResult);
+
             ApplyChunks(chunks, contract, out int applied, out int created, out int reused, out int disabled, out bool usedFallbackUv);
+            disabled += _lastDisabledOutsideViewportChunkCount;
 
             bool didClearDirty = false;
-            if (contract.ClearDirtyAfterRender)
+            if (contract.ClearDirtyAfterRender && _lastCulledDirtyChunkCount <= 0)
             {
                 runtime.RenderState.ClearDirty();
                 didClearDirty = true;
@@ -378,14 +461,111 @@ namespace Arcontio.View.ArcGraph
             ArcGraphRuntimeContext context,
             ArcGraphRenderState renderState,
             ArcGraphTerrainLayer terrainLayer,
-            ArcGraphTerrainRuntimeSceneRendererContract contract)
+            ArcGraphTerrainRuntimeSceneRendererContract contract,
+            ArcGraphTerrainVisibleChunkFilterResult filterResult)
         {
             var builder = new ArcGraphTerrainChunkMeshBuilder();
-            return builder.BuildDirtyChunks(
+            return builder.BuildChunks(
                 terrainLayer,
                 CreateUvMap(context?.Config, contract.TerrainMaterial),
-                renderState,
+                filterResult?.Chunks,
+                renderState != null ? renderState.ChunkSizeCells : 16,
+                renderState != null ? renderState.TileSizeWorld : 1f,
                 ArcGraphTerrainVisualPolicy.CreateLegacyDefault());
+        }
+
+        // =============================================================================
+        // FilterDirtyChunks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica il filtro viewport ai chunk terrain dirty del frame corrente.
+        /// </para>
+        ///
+        /// <para><b>Filtro grafico passivo</b></para>
+        /// <para>
+        /// Il metodo non cancella dirty state, non modifica layer e non tocca la
+        /// scena. Produce solo una lista di chunk ammessi alla costruzione mesh,
+        /// lasciando a <c>RenderFromRuntime</c> la scelta se consumare o conservare
+        /// il dirty complessivo.
+        /// </para>
+        /// </summary>
+        private ArcGraphTerrainVisibleChunkFilterResult FilterDirtyChunks(ArcGraphRenderState renderState)
+        {
+            var filter = new ArcGraphTerrainVisibleChunkFilter();
+            return filter.Filter(
+                renderState != null ? renderState.Dirty.DirtyChunks : null,
+                renderState != null ? renderState.ChunkSizeCells : 16,
+                renderState != null ? renderState.VisibleZLevel : ArcGraphZLevelPolicy.DefaultVisibleZLevel,
+                useViewportCulling,
+                CreateVisibleCellRect());
+        }
+
+        // =============================================================================
+        // DisableChunksOutsideViewport
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disattiva i chunk gia' presenti nel pool che non appartengono al viewport.
+        /// </para>
+        ///
+        /// <para><b>Pool conservato, scena alleggerita</b></para>
+        /// <para>
+        /// I chunk fuori finestra vengono solo spenti. Mesh e GameObject restano nel
+        /// pool locale per poter essere riattivati quando il viewport torna su quella
+        /// zona. Questo evita allocazioni ripetute durante pan/zoom e mantiene la
+        /// responsabilita' confinata al renderer.
+        /// </para>
+        /// </summary>
+        private int DisableChunksOutsideViewport(ArcGraphRenderState renderState)
+        {
+            if (!useViewportCulling || renderState == null)
+                return 0;
+
+            ArcGraphViewCellRect rect = CreateVisibleCellRect();
+            if (rect.IsEmpty)
+                return 0;
+
+            int disabled = 0;
+            foreach (var pair in _chunkPool)
+            {
+                ArcGraphChunkCoord chunk = pair.Key;
+                ChunkHandle handle = pair.Value;
+                if (handle == null || handle.GameObject == null || !handle.GameObject.activeSelf)
+                    continue;
+
+                bool outsideZ = chunk.Z != renderState.VisibleZLevel;
+                bool outsideRect = !ArcGraphTerrainVisibleChunkFilter.ChunkIntersectsRect(
+                    chunk,
+                    renderState.ChunkSizeCells,
+                    rect);
+
+                if (!outsideZ && !outsideRect)
+                    continue;
+
+                handle.GameObject.SetActive(false);
+                handle.WasTouchedThisFrame = false;
+                disabled++;
+            }
+
+            return disabled;
+        }
+
+        // =============================================================================
+        // CreateVisibleCellRect
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce il rettangolo celle visibile dai campi serializzati.
+        /// </para>
+        /// </summary>
+        private ArcGraphViewCellRect CreateVisibleCellRect()
+        {
+            return new ArcGraphViewCellRect(
+                viewportMinX,
+                viewportMinY,
+                viewportMaxXExclusive,
+                viewportMaxYExclusive);
         }
 
         private void ApplyChunks(
@@ -572,6 +752,14 @@ namespace Arcontio.View.ArcGraph
                 reusedChunkObjectCount,
                 disabledChunkObjectCount,
                 CountActiveChunkObjects(),
+                useViewportCulling,
+                viewportMinX,
+                viewportMinY,
+                viewportMaxXExclusive,
+                viewportMaxYExclusive,
+                _lastVisibleChunkCount,
+                _lastCulledDirtyChunkCount,
+                _lastDisabledOutsideViewportChunkCount,
                 usedFallbackUv,
                 _uvMissingTileCount,
                 _uvFirstMissingTileId,
@@ -609,6 +797,14 @@ namespace Arcontio.View.ArcGraph
                 ", reused=" + _lastDiagnostics.ReusedChunkObjectCount +
                 ", disabled=" + _lastDiagnostics.DisabledChunkObjectCount +
                 ", active=" + _lastDiagnostics.ActiveChunkObjectCount +
+                ", viewportCulling=" + _lastDiagnostics.ViewportCullingEnabled +
+                ", visibleRect=" + _lastDiagnostics.VisibleRectMinX + "," +
+                _lastDiagnostics.VisibleRectMinY + "->" +
+                _lastDiagnostics.VisibleRectMaxXExclusive + "," +
+                _lastDiagnostics.VisibleRectMaxYExclusive +
+                ", visibleChunks=" + _lastDiagnostics.VisibleChunkCount +
+                ", culledDirtyChunks=" + _lastDiagnostics.CulledDirtyChunkCount +
+                ", disabledOutsideViewport=" + _lastDiagnostics.DisabledOutsideViewportChunkCount +
                 ", fallbackUv=" + _lastDiagnostics.UsedFallbackUv +
                 ", missingUvTiles=" + _lastDiagnostics.MissingUvTileCount +
                 ", firstMissingUvTileId=" + _lastDiagnostics.FirstMissingUvTileId +
@@ -739,6 +935,9 @@ namespace Arcontio.View.ArcGraph
             _uvTerrainCatalogEntryCount = 0;
             _uvMissingTileCount = 0;
             _uvFirstMissingTileId = -1;
+            _lastVisibleChunkCount = 0;
+            _lastCulledDirtyChunkCount = 0;
+            _lastDisabledOutsideViewportChunkCount = 0;
         }
 
         private ArcGraphTerrainCatalog GetOrParseTerrainCatalog()

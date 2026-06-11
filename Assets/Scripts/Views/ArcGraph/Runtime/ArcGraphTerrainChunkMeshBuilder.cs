@@ -81,6 +81,49 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // BuildChunks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce mesh data terrain per una lista esplicita di chunk.
+        /// </para>
+        ///
+        /// <para><b>Filtro viewport esterno</b></para>
+        /// <para>
+        /// Questo overload permette al renderer di filtrare prima i chunk sporchi
+        /// secondo viewport, Z level o altre policy future, senza duplicare la
+        /// costruzione mesh. Il builder resta passivo: riceve chunk gia' scelti e
+        /// costruisce solo i dati mesh corrispondenti.
+        /// </para>
+        /// </summary>
+        public List<ArcGraphTerrainChunkMeshData> BuildChunks(
+            ArcGraphTerrainLayer terrainLayer,
+            ArcGraphTerrainTileUvMap uvMap,
+            IEnumerable<ArcGraphChunkCoord> chunks,
+            int chunkSizeCells,
+            float tileWorld,
+            ArcGraphTerrainVisualPolicy visualPolicy)
+        {
+            var results = new List<ArcGraphTerrainChunkMeshData>();
+
+            if (chunks == null)
+                return results;
+
+            foreach (ArcGraphChunkCoord chunk in chunks)
+            {
+                results.Add(BuildChunk(
+                    terrainLayer,
+                    uvMap,
+                    chunk,
+                    chunkSizeCells,
+                    tileWorld,
+                    visualPolicy));
+            }
+
+            return results;
+        }
+
+        // =============================================================================
         // BuildChunk
         // =============================================================================
         /// <summary>
