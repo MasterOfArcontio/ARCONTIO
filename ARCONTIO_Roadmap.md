@@ -14457,6 +14457,157 @@ v0.38i.19 - Animated Terrain Tiles
 
 ---
 
+## Esito v0.38i.19 - Animated Terrain Tiles
+
+La `v0.38i.19` rende operativa la prima animazione dei tile terrain dentro
+ArcGraph.
+
+Lo step parte dalla struttura introdotta in `v0.38i.18`:
+
+```text
+RuntimeTerrainMap
+├─ celle statiche con StaticTileId gia' risolto
+└─ celle animate con HasAnimatedVisual = true
+```
+
+e aggiunge il pezzo mancante:
+
+```text
+tempo visuale ArcGraph
+↓
+refresh selettivo dei chunk animati
+↓
+resolver frame-based
+↓
+mesh aggiornata solo dove serve
+```
+
+---
+
+### Cosa e' stato aggiunto
+
+Sono stati introdotti:
+
+- `ArcGraphTerrainAnimationClock`;
+- `ArcGraphTerrainAnimationClockStep`;
+- `ArcGraphTerrainAnimationClockHarness`;
+- diagnostica animation-side dentro `ArcGraphTerrainRuntimeSceneRendererDiagnostics`;
+- refresh selettivo dei chunk terrain animati dentro `ArcGraphTerrainRuntimeSceneRenderer`.
+
+Il clock e' solo grafico.
+
+Non e' un tick simulativo.
+
+Non modifica il World.
+
+Non modifica MapGrid.
+
+Non decide eventi.
+
+Serve solo a far avanzare frame visuali come:
+
+```text
+water frame 30
+water frame 31
+water frame 32
+water frame 33
+```
+
+---
+
+### Come funziona ora l'animazione terrain
+
+Il renderer conserva un indice dei chunk che contengono almeno una cella animata:
+
+```text
+_animatedTerrainChunks
+```
+
+Questo indice viene ricostruito quando viene ricostruita la runtime terrain map.
+
+Poi, durante il runtime:
+
+```text
+ArcGraphTerrainAnimationClock
+↓
+se passa l'intervallo configurato
+↓
+marca dirty solo i chunk animati visibili
+↓
+il mesh builder ricostruisce quei chunk
+↓
+il resolver sceglie il frame corrente usando VisualTimeSeconds
+```
+
+Questa soluzione evita di ridisegnare tutta la mappa a ogni frame.
+
+---
+
+### Parametri introdotti nel renderer
+
+Nel renderer terrain sono presenti due parametri:
+
+```text
+animateTerrainTiles = true
+terrainAnimationRefreshSeconds = 0.25
+```
+
+`animateTerrainTiles` abilita/disabilita il sistema.
+
+`terrainAnimationRefreshSeconds` indica ogni quanto ArcGraph deve provare a
+ridisegnare i chunk animati.
+
+Il valore `0.25` significa:
+
+```text
+circa 4 frame visuali al secondo
+```
+
+per i tile animati.
+
+---
+
+### Diagnostica aggiunta
+
+La diagnostica del renderer ora espone:
+
+```text
+TerrainAnimationEnabled
+TerrainAnimationVisualTimeSeconds
+TerrainAnimationRefreshSeconds
+AnimatedTerrainChunkCount
+TerrainAnimationRefreshQueued
+```
+
+Questo permette di capire da Console:
+
+- se l'animazione terrain e' attiva;
+- quanto tempo visuale sta usando il renderer;
+- quanti chunk animati sono stati rilevati;
+- se nello specifico frame e' stato accodato un refresh.
+
+---
+
+### Cosa resta fuori
+
+Restano fuori:
+
+- transizioni/autotile basate sul vicinato reale;
+- animazioni differenziate per LOD/zoom;
+- gestione separata di acqua come layer liquido autonomo;
+- animazioni erba/vegetazione nel layer vegetazione;
+- invalidazione fine per singola cella animata;
+- editor tooling per preview catalogo;
+- test visuale completo in Unity.
+
+Il prossimo step logico diventa:
+
+```text
+v0.38i.20 - Terrain Transitions / Autotile Semplice
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

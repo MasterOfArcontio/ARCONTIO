@@ -79,6 +79,11 @@ namespace Arcontio.View.ArcGraph
         public readonly int TerrainVisualCoverageCoveredTileCount;
         public readonly int TerrainVisualCoverageMissingTileCount;
         public readonly int TerrainVisualCoverageFirstMissingTileId;
+        public readonly bool TerrainAnimationEnabled;
+        public readonly float TerrainAnimationVisualTimeSeconds;
+        public readonly float TerrainAnimationRefreshSeconds;
+        public readonly int AnimatedTerrainChunkCount;
+        public readonly bool TerrainAnimationRefreshQueued;
         public readonly bool UsedFallbackUv;
         public readonly int MissingUvTileCount;
         public readonly int FirstMissingUvTileId;
@@ -141,6 +146,11 @@ namespace Arcontio.View.ArcGraph
             int terrainVisualCoverageCoveredTileCount,
             int terrainVisualCoverageMissingTileCount,
             int terrainVisualCoverageFirstMissingTileId,
+            bool terrainAnimationEnabled,
+            float terrainAnimationVisualTimeSeconds,
+            float terrainAnimationRefreshSeconds,
+            int animatedTerrainChunkCount,
+            bool terrainAnimationRefreshQueued,
             bool usedFallbackUv,
             int missingUvTileCount,
             int firstMissingUvTileId,
@@ -194,6 +204,11 @@ namespace Arcontio.View.ArcGraph
             TerrainVisualCoverageCoveredTileCount = NormalizeCount(terrainVisualCoverageCoveredTileCount);
             TerrainVisualCoverageMissingTileCount = NormalizeCount(terrainVisualCoverageMissingTileCount);
             TerrainVisualCoverageFirstMissingTileId = terrainVisualCoverageFirstMissingTileId;
+            TerrainAnimationEnabled = terrainAnimationEnabled;
+            TerrainAnimationVisualTimeSeconds = NormalizeSeconds(terrainAnimationVisualTimeSeconds);
+            TerrainAnimationRefreshSeconds = NormalizeSeconds(terrainAnimationRefreshSeconds);
+            AnimatedTerrainChunkCount = NormalizeCount(animatedTerrainChunkCount);
+            TerrainAnimationRefreshQueued = terrainAnimationRefreshQueued;
             UsedFallbackUv = usedFallbackUv;
             MissingUvTileCount = NormalizeCount(missingUvTileCount);
             FirstMissingUvTileId = firstMissingUvTileId;
@@ -203,6 +218,11 @@ namespace Arcontio.View.ArcGraph
         private static int NormalizeCount(int value)
         {
             return value < 0 ? 0 : value;
+        }
+
+        private static float NormalizeSeconds(float value)
+        {
+            return value < 0f ? 0f : value;
         }
     }
 }

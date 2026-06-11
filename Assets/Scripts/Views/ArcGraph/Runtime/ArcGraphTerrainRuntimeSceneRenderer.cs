@@ -41,6 +41,8 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool rendererEnabled;
         [SerializeField] private bool renderOnStart;
         [SerializeField] private bool clearDirtyAfterRender = true;
+        [SerializeField] private bool animateTerrainTiles = true;
+        [SerializeField] private float terrainAnimationRefreshSeconds = 0.25f;
         [SerializeField] private bool useViewportCulling;
         [SerializeField] private int viewportMinX;
         [SerializeField] private int viewportMinY;
@@ -53,6 +55,8 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private string runtimeRootName = "ArcGraphTerrainRuntimeRoot";
 
         private readonly Dictionary<ArcGraphChunkCoord, ChunkHandle> _chunkPool = new();
+        private readonly HashSet<ArcGraphChunkCoord> _animatedTerrainChunks = new();
+        private readonly ArcGraphTerrainAnimationClock _terrainAnimationClock = new();
         private Transform _root;
         private ArcGraphTerrainCatalog _terrainCatalog;
         private string _terrainCatalogSourceText;
@@ -85,6 +89,9 @@ namespace Arcontio.View.ArcGraph
         private int _coverageCoveredTileCount;
         private int _coverageMissingTileCount;
         private int _coverageFirstMissingTileId;
+        private int _lastAnimatedTerrainChunkCount;
+        private bool _lastTerrainAnimationRefreshQueued;
+        private float _lastTerrainAnimationVisualTimeSeconds;
 
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
         public bool RendererEnabled => rendererEnabled;
@@ -377,6 +384,8 @@ namespace Arcontio.View.ArcGraph
                 return StoreAndLogDiagnostics(context, runtime, null, contract, false, false, runtime.RenderState.Dirty.DirtyChunks.Count, 0, 0, 0, 0, 0, 0, false, "TerrainLayerMissing");
             }
 
+            QueueAnimatedTerrainChunksIfDue(runtime.RenderState);
+
             int dirtyChunkCount = runtime.RenderState.Dirty.DirtyChunks.Count;
             if (dirtyChunkCount <= 0)
             {
@@ -504,6 +513,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphRuntimeTerrainMap runtimeTerrainMap = terrainLayer != null
                 ? terrainLayer.RebuildRuntimeTerrainMap(visualPolicy, visualBuildOptions)
                 : null;
+            RefreshAnimatedTerrainChunks(runtimeTerrainMap, renderState);
 
             return builder.BuildChunks(
                 terrainLayer,
@@ -548,6 +558,124 @@ namespace Arcontio.View.ArcGraph
                 renderState != null ? renderState.VisibleZLevel : ArcGraphZLevelPolicy.DefaultVisibleZLevel,
                 useViewportCulling,
                 CreateVisibleCellRect());
+        }
+
+        // =============================================================================
+        // QueueAnimatedTerrainChunksIfDue
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca dirty i chunk terrain animati quando il clock visuale richiede un
+        /// cambio frame.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: animazione a chunk, non scansione completa</b></para>
+        /// <para>
+        /// Il metodo non rilegge tutta la mappa e non decide quali celle siano
+        /// acqua, erba o altro. Usa solo l'elenco dei chunk animati gia' prodotto
+        /// durante l'ultimo rebuild della runtime terrain map. In questo modo il
+        /// costo per frame resta proporzionale ai chunk animati noti, non al numero
+        /// totale di celle.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Clock</b>: avanza tempo visuale con delta Unity.</item>
+        ///   <item><b>Filtro Z</b>: marca solo chunk del livello visibile.</item>
+        ///   <item><b>Filtro viewport</b>: evita chunk animati fuori finestra quando il culling e' attivo.</item>
+        ///   <item><b>Dirty chunks</b>: accoda solo coordinate chunk, non celle singole.</item>
+        /// </list>
+        /// </summary>
+        private void QueueAnimatedTerrainChunksIfDue(ArcGraphRenderState renderState)
+        {
+            _lastTerrainAnimationRefreshQueued = false;
+            _lastAnimatedTerrainChunkCount = _animatedTerrainChunks.Count;
+            _lastTerrainAnimationVisualTimeSeconds = _terrainAnimationClock.VisualTimeSeconds;
+
+            if (!animateTerrainTiles || renderState == null)
+                return;
+
+            float deltaSeconds = Time.unscaledDeltaTime > 0f
+                ? Time.unscaledDeltaTime
+                : Time.deltaTime;
+
+            ArcGraphTerrainAnimationClockStep step = _terrainAnimationClock.Advance(
+                deltaSeconds,
+                terrainAnimationRefreshSeconds);
+            _lastTerrainAnimationVisualTimeSeconds = step.VisualTimeSeconds;
+
+            if (!step.RefreshDue || _animatedTerrainChunks.Count <= 0)
+                return;
+
+            int queued = 0;
+            ArcGraphViewCellRect visibleRect = CreateVisibleCellRect();
+            foreach (ArcGraphChunkCoord chunk in _animatedTerrainChunks)
+            {
+                if (chunk.Z != renderState.VisibleZLevel)
+                    continue;
+
+                if (useViewportCulling
+                    && !visibleRect.IsEmpty
+                    && !ArcGraphTerrainVisibleChunkFilter.ChunkIntersectsRect(
+                        chunk,
+                        renderState.ChunkSizeCells,
+                        visibleRect))
+                {
+                    continue;
+                }
+
+                renderState.Dirty.MarkChunkDirty(chunk);
+                queued++;
+            }
+
+            _lastTerrainAnimationRefreshQueued = queued > 0;
+        }
+
+        // =============================================================================
+        // RefreshAnimatedTerrainChunks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce l'indice dei chunk che contengono celle terrain animate.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: indicizzazione dopo il dato runtime</b></para>
+        /// <para>
+        /// L'indice nasce dalla <c>ArcGraphRuntimeTerrainMap</c>, non dal catalogo
+        /// grezzo e non da MapGrid. Questo significa che un chunk viene considerato
+        /// animato solo se almeno una cella runtime e' stata effettivamente marcata
+        /// come <c>HasAnimatedVisual</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Clear</b>: elimina l'indice precedente.</item>
+        ///   <item><b>Scan runtime map</b>: controlla solo la cache visuale delle celle.</item>
+        ///   <item><b>ResolveChunkCoord</b>: usa il render state per rispettare la dimensione chunk corrente.</item>
+        /// </list>
+        /// </summary>
+        private void RefreshAnimatedTerrainChunks(
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            ArcGraphRenderState renderState)
+        {
+            _animatedTerrainChunks.Clear();
+
+            if (runtimeTerrainMap == null || renderState == null)
+            {
+                _lastAnimatedTerrainChunkCount = 0;
+                return;
+            }
+
+            for (int i = 0; i < runtimeTerrainMap.Cells.Count; i++)
+            {
+                ArcGraphRuntimeTerrainCell cell = runtimeTerrainMap.Cells[i];
+                if (!cell.VisualCache.HasAnimatedVisual)
+                    continue;
+
+                _animatedTerrainChunks.Add(renderState.ResolveChunkCoord(cell.Cell));
+            }
+
+            _lastAnimatedTerrainChunkCount = _animatedTerrainChunks.Count;
         }
 
         // =============================================================================
@@ -832,6 +960,11 @@ namespace Arcontio.View.ArcGraph
                 _coverageCoveredTileCount,
                 _coverageMissingTileCount,
                 _coverageFirstMissingTileId,
+                animateTerrainTiles,
+                _lastTerrainAnimationVisualTimeSeconds,
+                terrainAnimationRefreshSeconds,
+                _lastAnimatedTerrainChunkCount,
+                _lastTerrainAnimationRefreshQueued,
                 usedFallbackUv,
                 _uvMissingTileCount,
                 _uvFirstMissingTileId,
@@ -893,6 +1026,11 @@ namespace Arcontio.View.ArcGraph
                 ", coverageCovered=" + _lastDiagnostics.TerrainVisualCoverageCoveredTileCount +
                 ", coverageMissing=" + _lastDiagnostics.TerrainVisualCoverageMissingTileCount +
                 ", coverageFirstMissing=" + _lastDiagnostics.TerrainVisualCoverageFirstMissingTileId +
+                ", terrainAnimationEnabled=" + _lastDiagnostics.TerrainAnimationEnabled +
+                ", terrainAnimationTime=" + _lastDiagnostics.TerrainAnimationVisualTimeSeconds +
+                ", terrainAnimationRefreshSeconds=" + _lastDiagnostics.TerrainAnimationRefreshSeconds +
+                ", animatedTerrainChunks=" + _lastDiagnostics.AnimatedTerrainChunkCount +
+                ", terrainAnimationRefreshQueued=" + _lastDiagnostics.TerrainAnimationRefreshQueued +
                 ", fallbackUv=" + _lastDiagnostics.UsedFallbackUv +
                 ", missingUvTiles=" + _lastDiagnostics.MissingUvTileCount +
                 ", firstMissingUvTileId=" + _lastDiagnostics.FirstMissingUvTileId +
@@ -1042,6 +1180,9 @@ namespace Arcontio.View.ArcGraph
             _coverageCoveredTileCount = 0;
             _coverageMissingTileCount = 0;
             _coverageFirstMissingTileId = -1;
+            _lastAnimatedTerrainChunkCount = _animatedTerrainChunks.Count;
+            _lastTerrainAnimationRefreshQueued = false;
+            _lastTerrainAnimationVisualTimeSeconds = _terrainAnimationClock.VisualTimeSeconds;
         }
 
         private ArcGraphTerrainVisualBuildOptions CreateVisualBuildOptions()
@@ -1054,7 +1195,7 @@ namespace Arcontio.View.ArcGraph
 
             return ArcGraphTerrainVisualBuildOptions.CreateWithCatalog(
                 catalog,
-                visualTimeSeconds: 0f);
+                _terrainAnimationClock.VisualTimeSeconds);
         }
 
         private void UpdateVisualCoverageDiagnostics(ArcGraphTerrainVisualCatalog visualCatalog)

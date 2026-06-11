@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.18 - Runtime Terrain Map e Cache Visuale Statica`
+`v0.38i.19 - Animated Terrain Tiles`
 
 STATUS:
-MAPPA TERRAIN RUNTIME SEMANTICA AGGIUNTA / CACHE VISUALE STATICA PRE-RISOLTA
+ANIMAZIONE TILE TERRAIN ATTIVA CON REFRESH CHUNK SELETTIVO
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -579,14 +579,15 @@ Regola corrente:
   - definita roadmap operativa tile terrain per le richieste progettuali dell'operatore;
   - la roadmap copre varianti tile, strategia atlas, rendering solo chunk visibili, tile animati e transizioni/autotile;
   - confermata priorita' tecnica: prima filtro viewport XY/chunk visibili, poi collegamento del resolver visuale al mesh builder;
-  - definita sequenza consigliata `v0.38i.14`-`v0.38i.20`;
+  - definita sequenza consigliata `v0.38i.14`-`v0.38i.21`;
   - `v0.38i.14`: visible chunk filter e culling chunk fuori viewport;
   - `v0.38i.15`: collegamento `ArcGraphTerrainVisualResolver` al mesh builder con fallback legacy;
   - `v0.38i.16`: consolidamento atlas e diagnostica coverage tile/atlas;
   - `v0.38i.17`: varianti tile pesate da catalogo collegate al rendering;
-  - `v0.38i.18`: animazioni tile visibili, separate dal tick simulativo;
-  - `v0.38i.19`: transizioni cardinali/autotile semplice tra terrain type;
-  - `v0.38i.20`: gate visuale terrain completo con tile, varianti, animazioni e transizioni;
+  - `v0.38i.18`: runtime terrain map semantica con cache visuale statica;
+  - `v0.38i.19`: animazioni tile visibili, separate dal tick simulativo;
+  - `v0.38i.20`: transizioni cardinali/autotile semplice tra terrain type;
+  - `v0.38i.21`: gate visuale terrain completo con tile, varianti, animazioni e transizioni;
   - nessuna modifica implementativa a renderer, mesh, World, MapGrid, scene o prefab in questo micro-step;
   - prossimo step operativo consigliato: `v0.38i.14 - ArcGraph Terrain Visible Chunk Filter`.
 - micro-step `v0.38i.14` completato:
@@ -665,6 +666,17 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn mirato del perimetro terrain/runtime ArcGraph riuscito senza errori reali, con warning attesi da assembly Unity locale non riallineato;
   - prossimo step operativo consigliato: `v0.38i.19 - Animated Terrain Tiles`.
+- micro-step `v0.38i.19` completato:
+  - introdotto `ArcGraphTerrainAnimationClock` come clock grafico data-only separato dal tick simulativo;
+  - introdotto `ArcGraphTerrainAnimationClockHarness` per smoke test su refresh temporizzato e avanzamento frame acqua;
+  - `ArcGraphTerrainRuntimeSceneRenderer` ora accumula tempo visuale e lo passa al resolver terrain;
+  - il renderer conserva un indice dei chunk che contengono celle con `HasAnimatedVisual`;
+  - quando scatta l'intervallo di refresh, il renderer marca dirty solo i chunk animati compatibili con Z visibile e viewport corrente;
+  - i tile statici continuano a usare la cache visuale stabile introdotta in `v0.38i.18`;
+  - i tile animati, come acqua, vengono risolti frame per frame dal catalogo visuale tramite `VisualTimeSeconds`;
+  - diagnostica estesa con stato animazione terrain, tempo visuale, intervallo refresh, chunk animati tracciati e refresh accodato;
+  - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
+  - prossimo step operativo consigliato: `v0.38i.20 - Terrain Transitions / Autotile Semplice`.
 
 DOC SYNC:
 
