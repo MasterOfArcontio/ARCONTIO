@@ -14269,7 +14269,190 @@ Restano fuori:
 Il prossimo step logico e':
 
 ```text
-v0.38i.18 - Animated Terrain Tiles
+v0.38i.18 - Runtime Terrain Map e Cache Visuale Statica
+```
+
+---
+
+## Esito v0.38i.18 - Runtime Terrain Map e Cache Visuale Statica
+
+La `v0.38i.18` introduce la struttura runtime che mancava tra:
+
+```text
+mappa letta / snapshot terrain
+```
+
+e:
+
+```text
+mesh finale disegnata da ArcGraph
+```
+
+La decisione progettuale applicata e':
+
+```text
+la mappa runtime non deve essere una mappa di sprite
+deve essere una mappa semantica con una cache grafica stabile
+```
+
+---
+
+### Cosa e' stato aggiunto
+
+Sono stati introdotti:
+
+- `ArcGraphTerrainTypeMapper`;
+- `ArcGraphTerrainVisualCache`;
+- `ArcGraphRuntimeTerrainCell`;
+- `ArcGraphRuntimeTerrainMap`;
+- `ArcGraphRuntimeTerrainMapBuilder`;
+- `ArcGraphRuntimeTerrainMapHarness`.
+
+Il mapper provvisorio traduce i tile legacy in terrain id:
+
+```text
+tile 30-33 -> water
+tile 10/11 -> stone_floor
+altri tile -> grass
+```
+
+Questa traduzione e' temporanea e dichiarata.
+
+In futuro sara' sostituita da una mappa ArcGraph letta direttamente da file con
+terrain id gia' espliciti.
+
+---
+
+### Nuova struttura della cella runtime
+
+Una cella runtime terrain ora puo' essere letta concettualmente cosi':
+
+```text
+ArcGraphRuntimeTerrainCell
+├─ Cell
+├─ TerrainId
+├─ SourceTileId
+├─ IsBlocked
+├─ MovementCost
+└─ VisualCache
+   ├─ StaticTileId
+   ├─ HasStaticTile
+   ├─ HasAnimatedVisual
+   ├─ UsedVisualResolver
+   ├─ UsedVariant
+   └─ UsedFallback
+```
+
+Questo separa:
+
+```text
+cosa e' la cella
+```
+
+da:
+
+```text
+come viene disegnata
+```
+
+Esempio:
+
+```text
+TerrainId = grass
+StaticTileId = 2
+```
+
+significa:
+
+```text
+la cella e' prato
+ArcGraph la disegna con la variante prato 2
+```
+
+Il tile statico non diventa la verita' della mappa.
+
+---
+
+### Rapporto con le varianti statiche
+
+Prima di questo step, il mesh builder poteva risolvere la variante durante la
+costruzione del chunk.
+
+Ora il flusso corretto diventa:
+
+```text
+snapshot terrain
+↓
+ArcGraphRuntimeTerrainMapBuilder
+↓
+RuntimeTerrainMap con cache statica
+↓
+ArcGraphTerrainChunkMeshBuilder
+↓
+mesh
+```
+
+Quindi per i tile statici:
+
+```text
+la variante viene scelta una volta nella runtime map
+il builder legge StaticTileId
+```
+
+Questo riduce lavoro inutile e rende piu' chiaro dove viene prodotta la varieta'
+grafica.
+
+---
+
+### Rapporto con acqua e tile animati
+
+Le celle animate non vengono congelate come tile finale statico.
+
+Esempio:
+
+```text
+TerrainId = water
+HasAnimatedVisual = true
+HasStaticTile = false
+```
+
+significa:
+
+```text
+la cella resta acqua a livello semantico
+il frame grafico verra' scelto dal sistema animazione visuale
+```
+
+Questo prepara il prossimo step senza confondere:
+
+```text
+cache statica
+```
+
+con:
+
+```text
+frame animato nel tempo
+```
+
+---
+
+### Cosa resta fuori
+
+Restano fuori:
+
+- loader mappa ArcGraph definitivo da file;
+- salvataggio file con terrain id nativi;
+- transizioni/autotile basate sul vicinato reale;
+- aggiornamento temporale dei frame animati;
+- invalidazione selettiva della cache quando cambia una cella o un vicino;
+- sistema movement cost definitivo per tipo terreno;
+- sostituzione completa di `MapGridData`.
+
+Il prossimo step logico diventa:
+
+```text
+v0.38i.19 - Animated Terrain Tiles
 ```
 
 ---

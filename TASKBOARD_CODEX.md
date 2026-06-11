@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.17 - Tile Variants Runtime`
+`v0.38i.18 - Runtime Terrain Map e Cache Visuale Statica`
 
 STATUS:
-VARIANTI TILE TERRAIN DETERMINISTICHE VERIFICATE / NESSUN RANDOM PER FRAME INTRODOTTO
+MAPPA TERRAIN RUNTIME SEMANTICA AGGIUNTA / CACHE VISUALE STATICA PRE-RISOLTA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -649,7 +649,22 @@ Regola corrente:
   - `git diff --check` superato;
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn isolato dei file terrain visuali riuscito con soli warning attesi da controllo parziale;
-  - prossimo step operativo consigliato: `v0.38i.18 - Animated Terrain Tiles`.
+  - prossimo step operativo consigliato: `v0.38i.18 - Runtime Terrain Map e Cache Visuale Statica`.
+- micro-step `v0.38i.18` completato:
+  - introdotto `ArcGraphTerrainTypeMapper` come ponte dichiarato da tile id legacy a terrain id semantico provvisorio;
+  - introdotto `ArcGraphRuntimeTerrainMap` con celle runtime semantiche e cache visuale separata;
+  - introdotto `ArcGraphRuntimeTerrainMapBuilder` per pre-risolvere i tile statici da snapshot terrain e catalogo visuale;
+  - introdotto `ArcGraphRuntimeTerrainMapHarness` per smoke test data-only su varianti statiche e acqua animata differita;
+  - `ArcGraphTerrainLayer` ora puo' ricostruire e conservare una runtime terrain map derivata dagli snapshot;
+  - `ArcGraphTerrainChunkMeshBuilder` usa la runtime map quando disponibile, leggendo `StaticTileId` gia' cacheizzato invece di ricalcolare varianti statiche per ogni quad;
+  - `ArcGraphTerrainRuntimeSceneRenderer` ricostruisce la runtime terrain map prima di costruire i chunk terrain;
+  - le celle animate, come acqua, vengono marcate come `HasAnimatedVisual` e non congelate come tile statico definitivo;
+  - la mappa definitiva ArcGraph da file non e' ancora implementata: il ponte parte ancora dagli snapshot derivati da `MapGridData`;
+  - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
+  - `git diff --check` superato;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn mirato del perimetro terrain/runtime ArcGraph riuscito senza errori reali, con warning attesi da assembly Unity locale non riallineato;
+  - prossimo step operativo consigliato: `v0.38i.19 - Animated Terrain Tiles`.
 
 DOC SYNC:
 

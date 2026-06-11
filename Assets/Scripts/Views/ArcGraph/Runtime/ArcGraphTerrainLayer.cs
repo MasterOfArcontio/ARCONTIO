@@ -30,9 +30,11 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphTerrainLayer : ArcGraphLayerBase
     {
         private readonly Dictionary<ArcGraphCellCoord, ArcGraphTerrainCellSnapshot> _cells = new();
+        private ArcGraphRuntimeTerrainMap _runtimeTerrainMap;
 
         public override ArcGraphLayerId LayerId => ArcGraphLayerId.Terrain;
         public int CellCount => _cells.Count;
+        public ArcGraphRuntimeTerrainMap RuntimeTerrainMap => _runtimeTerrainMap;
 
         // =============================================================================
         // ReplaceSnapshots
@@ -61,6 +63,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphRenderState renderState = null)
         {
             _cells.Clear();
+            _runtimeTerrainMap = null;
 
             if (snapshots == null)
                 return;
@@ -98,6 +101,43 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // RebuildRuntimeTerrainMap
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce la mappa runtime semantica del terreno a partire dagli snapshot.
+        /// </para>
+        ///
+        /// <para><b>Cache visuale esplicita</b></para>
+        /// <para>
+        /// Gli snapshot restano il ponte compatibile col runtime attuale, ma la
+        /// runtime map separa il significato della cella dalla cache grafica.
+        /// Questo metodo e' il punto in cui le varianti statiche vengono congelate
+        /// in modo deterministico per coordinate, mentre le celle animate vengono
+        /// marcate per risoluzione visuale successiva.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>visualPolicy</b>: fallback legacy per tile non coperti dal catalogo.</item>
+        ///   <item><b>visualBuildOptions</b>: catalogo visuale opzionale e tempo visuale.</item>
+        ///   <item><b>_runtimeTerrainMap</b>: cache semantica aggiornata.</item>
+        /// </list>
+        /// </summary>
+        public ArcGraphRuntimeTerrainMap RebuildRuntimeTerrainMap(
+            ArcGraphTerrainVisualPolicy visualPolicy,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions)
+        {
+            var builder = new ArcGraphRuntimeTerrainMapBuilder();
+            _runtimeTerrainMap = builder.Build(
+                _cells.Values,
+                visualPolicy,
+                visualBuildOptions);
+
+            return _runtimeTerrainMap;
+        }
+
+        // =============================================================================
         // ClearSnapshots
         // =============================================================================
         /// <summary>
@@ -120,6 +160,7 @@ namespace Arcontio.View.ArcGraph
         public void ClearSnapshots()
         {
             _cells.Clear();
+            _runtimeTerrainMap = null;
         }
 
         public override void Dispose()

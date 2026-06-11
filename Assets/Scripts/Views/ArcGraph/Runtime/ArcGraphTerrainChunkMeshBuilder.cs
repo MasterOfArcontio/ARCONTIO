@@ -129,7 +129,10 @@ namespace Arcontio.View.ArcGraph
             if (renderState == null)
                 return results;
 
-            var chunks = new List<ArcGraphChunkCoord>(renderState.Dirty.DirtyChunks);
+            var chunks = new List<ArcGraphChunkCoord>();
+            foreach (ArcGraphChunkCoord dirtyChunk in renderState.Dirty.DirtyChunks)
+                chunks.Add(dirtyChunk);
+
             chunks.Sort(CompareChunks);
 
             for (int i = 0; i < chunks.Count; i++)
@@ -211,6 +214,54 @@ namespace Arcontio.View.ArcGraph
             {
                 results.Add(BuildChunk(
                     terrainLayer,
+                    null,
+                    uvMap,
+                    chunk,
+                    chunkSizeCells,
+                    tileWorld,
+                    visualPolicy,
+                    visualBuildOptions));
+            }
+
+            return results;
+        }
+
+        // =============================================================================
+        // BuildChunks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce mesh data terrain usando una runtime map semantica/cache se disponibile.
+        /// </para>
+        ///
+        /// <para><b>Cache statica prima del resolver</b></para>
+        /// <para>
+        /// Quando <c>runtimeTerrainMap</c> contiene la cella richiesta, il builder
+        /// legge il tile statico gia' risolto invece di ricalcolare varianti. Questo
+        /// mantiene il rendering leggero e rende esplicito che la varieta' visuale
+        /// dei tile statici viene prodotta nel passaggio di preparazione dati.
+        /// </para>
+        /// </summary>
+        public List<ArcGraphTerrainChunkMeshData> BuildChunks(
+            ArcGraphTerrainLayer terrainLayer,
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            ArcGraphTerrainTileUvMap uvMap,
+            IEnumerable<ArcGraphChunkCoord> chunks,
+            int chunkSizeCells,
+            float tileWorld,
+            ArcGraphTerrainVisualPolicy visualPolicy,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions)
+        {
+            var results = new List<ArcGraphTerrainChunkMeshData>();
+
+            if (chunks == null)
+                return results;
+
+            foreach (ArcGraphChunkCoord chunk in chunks)
+            {
+                results.Add(BuildChunk(
+                    terrainLayer,
+                    runtimeTerrainMap,
                     uvMap,
                     chunk,
                     chunkSizeCells,
@@ -272,6 +323,35 @@ namespace Arcontio.View.ArcGraph
             ArcGraphTerrainVisualPolicy visualPolicy,
             ArcGraphTerrainVisualBuildOptions visualBuildOptions)
         {
+            return BuildChunk(
+                terrainLayer,
+                null,
+                uvMap,
+                chunk,
+                chunkSizeCells,
+                tileWorld,
+                visualPolicy,
+                visualBuildOptions);
+        }
+
+        // =============================================================================
+        // BuildChunk
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un chunk usando runtime terrain map quando disponibile.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainChunkMeshData BuildChunk(
+            ArcGraphTerrainLayer terrainLayer,
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            ArcGraphTerrainTileUvMap uvMap,
+            ArcGraphChunkCoord chunk,
+            int chunkSizeCells,
+            float tileWorld,
+            ArcGraphTerrainVisualPolicy visualPolicy,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions)
+        {
             if (terrainLayer == null)
                 return ArcGraphTerrainChunkMeshData.Empty(chunk, "TerrainLayerMissing");
 
@@ -309,15 +389,25 @@ namespace Arcontio.View.ArcGraph
                 for (int x = startX; x < endX; x++)
                 {
                     var cell = new ArcGraphCellCoord(x, y, chunk.Z);
-                    if (!terrainLayer.TryGetCell(cell, out var snapshot))
+                    ArcGraphRuntimeTerrainCell runtimeCell = default;
+                    bool hasRuntimeCell = runtimeTerrainMap != null
+                                          && runtimeTerrainMap.TryGetCell(cell, out runtimeCell);
+                    bool hasSnapshot = terrainLayer.TryGetCell(cell, out var snapshot);
+
+                    if (!hasRuntimeCell && !hasSnapshot)
                         continue;
 
-                    ResolvedTerrainTile resolvedTile = ResolveTerrainTile(
-                        terrainLayer,
-                        snapshot,
-                        visualPolicy,
-                        visualBuildOptions,
-                        visualResolver);
+                    ResolvedTerrainTile resolvedTile = hasRuntimeCell
+                        ? ResolveTerrainTile(
+                            runtimeCell,
+                            visualBuildOptions,
+                            visualResolver)
+                        : ResolveTerrainTile(
+                            terrainLayer,
+                            snapshot,
+                            visualPolicy,
+                            visualBuildOptions,
+                            visualResolver);
 
                     int tileId = resolvedTile.TileId;
                     if (resolvedTile.UsedVisualResolver)
@@ -450,6 +540,61 @@ namespace Arcontio.View.ArcGraph
         }
 
         private static ResolvedTerrainTile ResolveTerrainTile(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            ArcGraphTerrainVisualResolver visualResolver)
+        {
+            ArcGraphTerrainVisualCache cache = runtimeCell.VisualCache;
+
+            if (cache.HasAnimatedVisual
+                && visualBuildOptions.UseVisualResolver
+                && visualBuildOptions.VisualCatalog != null
+                && visualResolver != null)
+            {
+                var input = new ArcGraphTerrainVisualResolveInput(
+                    runtimeCell.Cell,
+                    runtimeCell.TerrainId,
+                    neighborTerrainId: null,
+                    neighborMask: null,
+                    visualBuildOptions.VisualTimeSeconds);
+
+                ArcGraphTerrainVisualResolveResult result = visualResolver.Resolve(
+                    visualBuildOptions.VisualCatalog,
+                    input);
+
+                return new ResolvedTerrainTile(
+                    result.TileId,
+                    usedVisualResolver: true,
+                    usedLegacy: false,
+                    usedVariant: false,
+                    usedAnimation: result.UsedAnimation,
+                    usedTransition: result.UsedTransition,
+                    usedVisualFallback: false);
+            }
+
+            if (cache.HasStaticTile)
+            {
+                return new ResolvedTerrainTile(
+                    cache.StaticTileId,
+                    cache.UsedVisualResolver,
+                    usedLegacy: !cache.UsedVisualResolver,
+                    cache.UsedVariant,
+                    usedAnimation: false,
+                    usedTransition: false,
+                    cache.UsedFallback);
+            }
+
+            return new ResolvedTerrainTile(
+                runtimeCell.SourceTileId,
+                usedVisualResolver: false,
+                usedLegacy: true,
+                usedVariant: false,
+                usedAnimation: false,
+                usedTransition: false,
+                usedVisualFallback: true);
+        }
+
+        private static ResolvedTerrainTile ResolveTerrainTile(
             ArcGraphTerrainLayer terrainLayer,
             ArcGraphTerrainCellSnapshot snapshot,
             ArcGraphTerrainVisualPolicy policy,
@@ -467,7 +612,7 @@ namespace Arcontio.View.ArcGraph
             if (snapshot.IsBlocked)
                 return new ResolvedTerrainTile(legacyTileId, false, true, false, false, false, false);
 
-            string terrainId = ResolveTemporaryTerrainId(snapshot);
+            string terrainId = ArcGraphTerrainTypeMapper.ResolveTemporaryTerrainId(snapshot);
             if (string.IsNullOrWhiteSpace(terrainId)
                 || visualBuildOptions.VisualCatalog == null
                 || visualResolver == null
@@ -495,17 +640,6 @@ namespace Arcontio.View.ArcGraph
                 usedAnimation: result.UsedAnimation,
                 usedTransition: result.UsedTransition,
                 usedVisualFallback: false);
-        }
-
-        private static string ResolveTemporaryTerrainId(ArcGraphTerrainCellSnapshot snapshot)
-        {
-            if (snapshot.TileId >= 30 && snapshot.TileId <= 33)
-                return "water";
-
-            if (snapshot.TileId == 10 || snapshot.TileId == 11)
-                return "stone_floor";
-
-            return "grass";
         }
 
         private static int Hash2D(int x, int y)

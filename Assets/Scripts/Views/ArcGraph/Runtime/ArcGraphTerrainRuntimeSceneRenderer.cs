@@ -499,14 +499,21 @@ namespace Arcontio.View.ArcGraph
             ArcGraphTerrainVisibleChunkFilterResult filterResult)
         {
             var builder = new ArcGraphTerrainChunkMeshBuilder();
+            ArcGraphTerrainVisualPolicy visualPolicy = ArcGraphTerrainVisualPolicy.CreateLegacyDefault();
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions = CreateVisualBuildOptions();
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap = terrainLayer != null
+                ? terrainLayer.RebuildRuntimeTerrainMap(visualPolicy, visualBuildOptions)
+                : null;
+
             return builder.BuildChunks(
                 terrainLayer,
+                runtimeTerrainMap,
                 CreateUvMap(context?.Config, contract.TerrainMaterial),
                 filterResult?.Chunks,
                 renderState != null ? renderState.ChunkSizeCells : 16,
                 renderState != null ? renderState.TileSizeWorld : 1f,
-                ArcGraphTerrainVisualPolicy.CreateLegacyDefault(),
-                CreateVisualBuildOptions());
+                visualPolicy,
+                visualBuildOptions);
         }
 
         // =============================================================================
@@ -528,8 +535,15 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainVisibleChunkFilterResult FilterDirtyChunks(ArcGraphRenderState renderState)
         {
             var filter = new ArcGraphTerrainVisibleChunkFilter();
+            var dirtyChunks = new List<ArcGraphChunkCoord>();
+            if (renderState != null)
+            {
+                foreach (ArcGraphChunkCoord dirtyChunk in renderState.Dirty.DirtyChunks)
+                    dirtyChunks.Add(dirtyChunk);
+            }
+
             return filter.Filter(
-                renderState != null ? renderState.Dirty.DirtyChunks : null,
+                dirtyChunks,
                 renderState != null ? renderState.ChunkSizeCells : 16,
                 renderState != null ? renderState.VisibleZLevel : ArcGraphZLevelPolicy.DefaultVisibleZLevel,
                 useViewportCulling,
