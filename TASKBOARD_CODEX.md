@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.10 - ArcGraph Terrain UV Source Diagnostics`
+`v0.38i.11 - ArcGraph Terrain Missing UV Diagnostics`
 
 STATUS:
-DIAGNOSTICA SORGENTE UV TERRAIN AGGIUNTA / CONFORMAZIONE MAPPA ANCORA DA ADAPTER MAPGRID TEMPORANEO
+DIAGNOSTICA TILE UV MANCANTI AGGIUNTA / GATE VISUALE TERRAIN+NPC ANCORA DA ESEGUIRE
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -552,6 +552,16 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn isolato del renderer terrain riuscito con solo warning `SerializeField` atteso;
   - prossimo step consigliato: rifinitura visuale terrain o preparazione gate visuale unico terrain+NPC.
+- micro-step `v0.38i.11` completato:
+  - estesa `ArcGraphTerrainChunkMeshDiagnostics` con `MissingUvTileCount` e `FirstMissingUvTileId`;
+  - estesa `ArcGraphTerrainRuntimeSceneRendererDiagnostics` con conteggio aggregato dei tile terrain senza UV;
+  - il mesh builder terrain conta quante celle cadono su UV fallback;
+  - il renderer runtime terrain conserva il primo `tileId` mancante, cosi' il catalogo JSON puo' essere corretto senza dover ispezionare tutta la mappa;
+  - il log `ArcGraphTerrainRuntimeSceneRenderer` stampa ora `missingUvTiles` e `firstMissingUvTileId`;
+  - la modifica e' solo diagnostica: non cambia mesh, materiale, atlas, conformazione mappa, World, Decision Layer, Job Layer, scene o prefab;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn isolato terrain riuscito con warning attesi da controllo parziale e campi `SerializeField`;
+  - prossimo step consigliato: gate visuale Unity terrain+NPC oppure rifinitura resolver/asset se il gate segnala sprite o UV mancanti.
 
 DOC SYNC:
 

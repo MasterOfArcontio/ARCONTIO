@@ -12849,6 +12849,123 @@ materiale, fallback UV, diagnostica tile mancanti e gate terrain/NPC
 
 ---
 
+## Esito v0.38i.11 - ArcGraph Terrain Missing UV Diagnostics
+
+La `v0.38i.11` raffina la diagnostica terrain data-driven: non basta sapere che
+il renderer e' caduto su UV fallback, serve sapere anche quante celle sono cadute
+in fallback e quale tile id manca per primo.
+
+### Contesto
+
+Dopo la `v0.38i.10`, il renderer terrain distingue gia':
+
+```text
+UV da catalogo ArcGraph
+```
+
+da:
+
+```text
+UV da fallback legacy MapGridConfig
+```
+
+Pero' il campo `UsedFallbackUv` era solo booleano.
+
+Questo significava:
+
+```text
+fallbackUv=True
+```
+
+ma non diceva:
+
+- se il problema riguardava una sola cella o molte celle;
+- quale `tileId` non era coperto dal catalogo;
+- se il catalogo era quasi completo oppure molto incompleto.
+
+### Correzione
+
+La diagnostica del singolo chunk terrain ora espone:
+
+- `MissingUvTileCount`;
+- `FirstMissingUvTileId`.
+
+La diagnostica del renderer runtime terrain aggrega questi dati e li rende
+visibili nel log generale.
+
+Esempio di output atteso:
+
+```text
+fallbackUv=True
+missingUvTiles=42
+firstMissingUvTileId=7
+```
+
+Interpretazione:
+
+```text
+ArcGraph ha trovato 42 celle che usano tile id senza UV nel catalogo.
+Il primo id mancante e' 7.
+Prima correzione consigliata: aggiungere o correggere il tile id 7 nel catalogo terrain JSON.
+```
+
+### File tecnici coinvolti
+
+- `ArcGraphTerrainChunkMeshDiagnostics`;
+- `ArcGraphTerrainChunkMeshBuilder`;
+- `ArcGraphTerrainChunkMeshData`;
+- `ArcGraphTerrainRuntimeSceneRendererDiagnostics`;
+- `ArcGraphTerrainRuntimeSceneRenderer`.
+
+### Confini preservati
+
+Lo step:
+
+- non cambia la mesh generata;
+- non cambia il materiale terrain;
+- non cambia l'atlas;
+- non cambia il catalogo terrain JSON;
+- non cambia `MapGridData`;
+- non cambia la conformazione della mappa;
+- non modifica `World`;
+- non modifica Decision Layer;
+- non modifica Job Layer;
+- non salva scene;
+- non salva prefab;
+- non rimuove fallback legacy.
+
+### Stato dopo v0.38i.11
+
+Il terreno ArcGraph e' piu' diagnosticabile prima del gate visuale.
+
+Ora, se il terrain viene renderizzato con tile fallback, il log non si limita a
+dire:
+
+```text
+qualcosa manca
+```
+
+ma indica:
+
+```text
+quante celle mancano
+quale tile id correggere per primo
+```
+
+Prossimo step consigliato:
+
+```text
+gate visuale Unity terrain+NPC
+```
+
+oppure, se il gate segnala asset mancanti:
+
+```text
+rifinitura resolver / cataloghi / asset path
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

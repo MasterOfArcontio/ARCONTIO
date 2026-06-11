@@ -91,6 +91,8 @@ namespace Arcontio.View.ArcGraph
                     0,
                     0,
                     false,
+                    0,
+                    -1,
                     reason));
         }
     }

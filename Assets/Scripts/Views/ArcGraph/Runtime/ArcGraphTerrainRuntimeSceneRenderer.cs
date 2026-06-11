@@ -56,6 +56,8 @@ namespace Arcontio.View.ArcGraph
         private bool _uvUsedCatalogMap;
         private bool _uvUsedLegacyConfigMap;
         private int _uvTerrainCatalogEntryCount;
+        private int _uvMissingTileCount;
+        private int _uvFirstMissingTileId;
 
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
         public bool RendererEnabled => rendererEnabled;
@@ -423,6 +425,13 @@ namespace Arcontio.View.ArcGraph
 
                 applied++;
                 usedFallbackUv |= chunk.Diagnostics.UsedFallbackUv;
+                _uvMissingTileCount += chunk.Diagnostics.MissingUvTileCount;
+
+                // Il primo id mancante viene conservato come indizio rapido:
+                // se il catalogo terrain non contiene un tile, in Console si
+                // vede subito quale id va corretto prima di guardare tutti i dati.
+                if (_uvFirstMissingTileId < 0 && chunk.Diagnostics.FirstMissingUvTileId >= 0)
+                    _uvFirstMissingTileId = chunk.Diagnostics.FirstMissingUvTileId;
 
                 if (wasCreated)
                     created++;
@@ -564,6 +573,8 @@ namespace Arcontio.View.ArcGraph
                 disabledChunkObjectCount,
                 CountActiveChunkObjects(),
                 usedFallbackUv,
+                _uvMissingTileCount,
+                _uvFirstMissingTileId,
                 reason);
 
             LogLastDiagnostics();
@@ -599,6 +610,8 @@ namespace Arcontio.View.ArcGraph
                 ", disabled=" + _lastDiagnostics.DisabledChunkObjectCount +
                 ", active=" + _lastDiagnostics.ActiveChunkObjectCount +
                 ", fallbackUv=" + _lastDiagnostics.UsedFallbackUv +
+                ", missingUvTiles=" + _lastDiagnostics.MissingUvTileCount +
+                ", firstMissingUvTileId=" + _lastDiagnostics.FirstMissingUvTileId +
                 ", dirtyCleared=" + _lastDiagnostics.DidClearDirty);
         }
 
@@ -724,6 +737,8 @@ namespace Arcontio.View.ArcGraph
             _uvUsedCatalogMap = false;
             _uvUsedLegacyConfigMap = false;
             _uvTerrainCatalogEntryCount = 0;
+            _uvMissingTileCount = 0;
+            _uvFirstMissingTileId = -1;
         }
 
         private ArcGraphTerrainCatalog GetOrParseTerrainCatalog()

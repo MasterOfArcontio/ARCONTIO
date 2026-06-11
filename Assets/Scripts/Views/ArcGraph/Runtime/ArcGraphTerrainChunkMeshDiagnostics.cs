@@ -22,6 +22,8 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>VertexCount</b>: vertici prodotti.</item>
     ///   <item><b>TriangleIndexCount</b>: indici triangolo prodotti.</item>
     ///   <item><b>UsedFallbackUv</b>: true se almeno un tile non aveva UV registrate.</item>
+    ///   <item><b>MissingUvTileCount</b>: quante celle sono cadute su UV fallback.</item>
+    ///   <item><b>FirstMissingUvTileId</b>: primo tile id senza UV, utile per correggere catalogo.</item>
     ///   <item><b>Reason</b>: esito leggibile.</item>
     /// </list>
     /// </summary>
@@ -32,6 +34,8 @@ namespace Arcontio.View.ArcGraph
         public readonly int VertexCount;
         public readonly int TriangleIndexCount;
         public readonly bool UsedFallbackUv;
+        public readonly int MissingUvTileCount;
+        public readonly int FirstMissingUvTileId;
         public readonly string Reason;
 
         public bool IsEmpty => CellCount <= 0;
@@ -56,6 +60,8 @@ namespace Arcontio.View.ArcGraph
             int vertexCount,
             int triangleIndexCount,
             bool usedFallbackUv,
+            int missingUvTileCount,
+            int firstMissingUvTileId,
             string reason)
         {
             Chunk = chunk;
@@ -63,6 +69,8 @@ namespace Arcontio.View.ArcGraph
             VertexCount = vertexCount;
             TriangleIndexCount = triangleIndexCount;
             UsedFallbackUv = usedFallbackUv;
+            MissingUvTileCount = missingUvTileCount < 0 ? 0 : missingUvTileCount;
+            FirstMissingUvTileId = firstMissingUvTileId;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
         }
     }

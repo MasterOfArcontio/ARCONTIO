@@ -122,6 +122,8 @@ namespace Arcontio.View.ArcGraph
             var triangles = new List<int>(safeChunkSize * safeChunkSize * 6);
 
             bool usedFallbackUv = false;
+            int missingUvTileCount = 0;
+            int firstMissingUvTileId = -1;
             int cellCount = 0;
 
             for (int y = startY; y < endY; y++)
@@ -135,7 +137,12 @@ namespace Arcontio.View.ArcGraph
                     int tileId = ResolveVisualTileId(terrainLayer, snapshot, visualPolicy);
                     bool foundUv = uvMap.TryGetUvQuad(tileId, out var uv0, out var uv1, out var uv2, out var uv3);
                     if (!foundUv)
+                    {
                         usedFallbackUv = true;
+                        missingUvTileCount++;
+                        if (firstMissingUvTileId < 0)
+                            firstMissingUvTileId = tileId;
+                    }
 
                     AddQuad(
                         vertices,
@@ -160,6 +167,8 @@ namespace Arcontio.View.ArcGraph
                 vertices.Count,
                 triangles.Count,
                 usedFallbackUv,
+                missingUvTileCount,
+                firstMissingUvTileId,
                 reason);
 
             return new ArcGraphTerrainChunkMeshData(

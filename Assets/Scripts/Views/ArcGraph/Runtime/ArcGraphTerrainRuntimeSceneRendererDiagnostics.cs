@@ -54,6 +54,8 @@ namespace Arcontio.View.ArcGraph
         public readonly int DisabledChunkObjectCount;
         public readonly int ActiveChunkObjectCount;
         public readonly bool UsedFallbackUv;
+        public readonly int MissingUvTileCount;
+        public readonly int FirstMissingUvTileId;
         public readonly string Reason;
 
         // =============================================================================
@@ -90,6 +92,8 @@ namespace Arcontio.View.ArcGraph
             int disabledChunkObjectCount,
             int activeChunkObjectCount,
             bool usedFallbackUv,
+            int missingUvTileCount,
+            int firstMissingUvTileId,
             string reason)
         {
             RendererEnabled = rendererEnabled;
@@ -117,6 +121,8 @@ namespace Arcontio.View.ArcGraph
             DisabledChunkObjectCount = NormalizeCount(disabledChunkObjectCount);
             ActiveChunkObjectCount = NormalizeCount(activeChunkObjectCount);
             UsedFallbackUv = usedFallbackUv;
+            MissingUvTileCount = NormalizeCount(missingUvTileCount);
+            FirstMissingUvTileId = firstMissingUvTileId;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
         }
 
