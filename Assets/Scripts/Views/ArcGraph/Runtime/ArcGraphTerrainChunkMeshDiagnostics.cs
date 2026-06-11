@@ -24,6 +24,12 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>UsedFallbackUv</b>: true se almeno un tile non aveva UV registrate.</item>
     ///   <item><b>MissingUvTileCount</b>: quante celle sono cadute su UV fallback.</item>
     ///   <item><b>FirstMissingUvTileId</b>: primo tile id senza UV, utile per correggere catalogo.</item>
+    ///   <item><b>VisualResolverTileCount</b>: celle risolte dal catalogo visuale.</item>
+    ///   <item><b>LegacyVisualTileCount</b>: celle rimaste sulla policy legacy.</item>
+    ///   <item><b>VisualVariantTileCount</b>: celle risolte come variante deterministica.</item>
+    ///   <item><b>VisualAnimationTileCount</b>: celle risolte come frame animato.</item>
+    ///   <item><b>VisualTransitionTileCount</b>: celle risolte come transizione.</item>
+    ///   <item><b>VisualResolverFallbackCount</b>: celle tornate al legacy dopo fallimento catalogo.</item>
     ///   <item><b>Reason</b>: esito leggibile.</item>
     /// </list>
     /// </summary>
@@ -36,6 +42,12 @@ namespace Arcontio.View.ArcGraph
         public readonly bool UsedFallbackUv;
         public readonly int MissingUvTileCount;
         public readonly int FirstMissingUvTileId;
+        public readonly int VisualResolverTileCount;
+        public readonly int LegacyVisualTileCount;
+        public readonly int VisualVariantTileCount;
+        public readonly int VisualAnimationTileCount;
+        public readonly int VisualTransitionTileCount;
+        public readonly int VisualResolverFallbackCount;
         public readonly string Reason;
 
         public bool IsEmpty => CellCount <= 0;
@@ -62,6 +74,12 @@ namespace Arcontio.View.ArcGraph
             bool usedFallbackUv,
             int missingUvTileCount,
             int firstMissingUvTileId,
+            int visualResolverTileCount,
+            int legacyVisualTileCount,
+            int visualVariantTileCount,
+            int visualAnimationTileCount,
+            int visualTransitionTileCount,
+            int visualResolverFallbackCount,
             string reason)
         {
             Chunk = chunk;
@@ -71,6 +89,12 @@ namespace Arcontio.View.ArcGraph
             UsedFallbackUv = usedFallbackUv;
             MissingUvTileCount = missingUvTileCount < 0 ? 0 : missingUvTileCount;
             FirstMissingUvTileId = firstMissingUvTileId;
+            VisualResolverTileCount = visualResolverTileCount < 0 ? 0 : visualResolverTileCount;
+            LegacyVisualTileCount = legacyVisualTileCount < 0 ? 0 : legacyVisualTileCount;
+            VisualVariantTileCount = visualVariantTileCount < 0 ? 0 : visualVariantTileCount;
+            VisualAnimationTileCount = visualAnimationTileCount < 0 ? 0 : visualAnimationTileCount;
+            VisualTransitionTileCount = visualTransitionTileCount < 0 ? 0 : visualTransitionTileCount;
+            VisualResolverFallbackCount = visualResolverFallbackCount < 0 ? 0 : visualResolverFallbackCount;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
         }
     }

@@ -22,6 +22,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Gate</b>: renderer abilitato, contratto valido, runtime valido.</item>
     ///   <item><b>Input</b>: presenza context, config, map, runtime e terrain layer.</item>
     ///   <item><b>Catalogo</b>: presenza/parse del catalogo terrain e sorgente UV usata.</item>
+    ///   <item><b>Catalogo visuale</b>: uso del resolver terrain, varianti, animazioni e fallback legacy.</item>
     ///   <item><b>Chunk</b>: chunk dirty richiesti, costruiti, non vuoti e applicati.</item>
     ///   <item><b>Pool</b>: oggetti creati, riusati, disattivati e attivi.</item>
     ///   <item><b>Reason</b>: esito sintetico del frame.</item>
@@ -61,6 +62,16 @@ namespace Arcontio.View.ArcGraph
         public readonly int VisibleChunkCount;
         public readonly int CulledDirtyChunkCount;
         public readonly int DisabledOutsideViewportChunkCount;
+        public readonly bool HasTerrainVisualCatalogJson;
+        public readonly bool TerrainVisualCatalogParsed;
+        public readonly bool UsedTerrainVisualResolver;
+        public readonly int TerrainVisualCatalogDefinitionCount;
+        public readonly int VisualResolverTileCount;
+        public readonly int LegacyVisualTileCount;
+        public readonly int VisualVariantTileCount;
+        public readonly int VisualAnimationTileCount;
+        public readonly int VisualTransitionTileCount;
+        public readonly int VisualResolverFallbackCount;
         public readonly bool UsedFallbackUv;
         public readonly int MissingUvTileCount;
         public readonly int FirstMissingUvTileId;
@@ -107,6 +118,16 @@ namespace Arcontio.View.ArcGraph
             int visibleChunkCount,
             int culledDirtyChunkCount,
             int disabledOutsideViewportChunkCount,
+            bool hasTerrainVisualCatalogJson,
+            bool terrainVisualCatalogParsed,
+            bool usedTerrainVisualResolver,
+            int terrainVisualCatalogDefinitionCount,
+            int visualResolverTileCount,
+            int legacyVisualTileCount,
+            int visualVariantTileCount,
+            int visualAnimationTileCount,
+            int visualTransitionTileCount,
+            int visualResolverFallbackCount,
             bool usedFallbackUv,
             int missingUvTileCount,
             int firstMissingUvTileId,
@@ -144,6 +165,16 @@ namespace Arcontio.View.ArcGraph
             VisibleChunkCount = NormalizeCount(visibleChunkCount);
             CulledDirtyChunkCount = NormalizeCount(culledDirtyChunkCount);
             DisabledOutsideViewportChunkCount = NormalizeCount(disabledOutsideViewportChunkCount);
+            HasTerrainVisualCatalogJson = hasTerrainVisualCatalogJson;
+            TerrainVisualCatalogParsed = terrainVisualCatalogParsed;
+            UsedTerrainVisualResolver = usedTerrainVisualResolver;
+            TerrainVisualCatalogDefinitionCount = NormalizeCount(terrainVisualCatalogDefinitionCount);
+            VisualResolverTileCount = NormalizeCount(visualResolverTileCount);
+            LegacyVisualTileCount = NormalizeCount(legacyVisualTileCount);
+            VisualVariantTileCount = NormalizeCount(visualVariantTileCount);
+            VisualAnimationTileCount = NormalizeCount(visualAnimationTileCount);
+            VisualTransitionTileCount = NormalizeCount(visualTransitionTileCount);
+            VisualResolverFallbackCount = NormalizeCount(visualResolverFallbackCount);
             UsedFallbackUv = usedFallbackUv;
             MissingUvTileCount = NormalizeCount(missingUvTileCount);
             FirstMissingUvTileId = firstMissingUvTileId;

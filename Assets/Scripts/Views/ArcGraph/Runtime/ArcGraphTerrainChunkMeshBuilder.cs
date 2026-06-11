@@ -25,11 +25,56 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>BuildChunk</b>: costruisce mesh data per un chunk esplicito.</item>
     ///   <item><b>ResolveVisualTileId</b>: replica la policy visuale legacy.</item>
+    ///   <item><b>ResolveTerrainTile</b>: usa resolver visuale opzionale con fallback legacy.</item>
     ///   <item><b>Hash2D</b>: variante floor deterministica.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphTerrainChunkMeshBuilder
     {
+        // =============================================================================
+        // ResolvedTerrainTile
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esito locale della scelta tile per una cella terrain.
+        /// </para>
+        ///
+        /// <para><b>Diagnostica senza allocazioni pubbliche</b></para>
+        /// <para>
+        /// Questa struttura resta privata al builder. Serve solo ad accumulare
+        /// contatori leggibili nel chunk senza esporre un nuovo contratto pubblico
+        /// per ogni cella.
+        /// </para>
+        /// </summary>
+        private readonly struct ResolvedTerrainTile
+        {
+            public readonly int TileId;
+            public readonly bool UsedVisualResolver;
+            public readonly bool UsedLegacy;
+            public readonly bool UsedVariant;
+            public readonly bool UsedAnimation;
+            public readonly bool UsedTransition;
+            public readonly bool UsedVisualFallback;
+
+            public ResolvedTerrainTile(
+                int tileId,
+                bool usedVisualResolver,
+                bool usedLegacy,
+                bool usedVariant,
+                bool usedAnimation,
+                bool usedTransition,
+                bool usedVisualFallback)
+            {
+                TileId = tileId;
+                UsedVisualResolver = usedVisualResolver;
+                UsedLegacy = usedLegacy;
+                UsedVariant = usedVariant;
+                UsedAnimation = usedAnimation;
+                UsedTransition = usedTransition;
+                UsedVisualFallback = usedVisualFallback;
+            }
+        }
+
         // =============================================================================
         // BuildDirtyChunks
         // =============================================================================
@@ -54,6 +99,31 @@ namespace Arcontio.View.ArcGraph
             ArcGraphTerrainVisualPolicy visualPolicy,
             bool onlyVisibleZLevel = true)
         {
+            return BuildDirtyChunks(
+                terrainLayer,
+                uvMap,
+                renderState,
+                visualPolicy,
+                ArcGraphTerrainVisualBuildOptions.CreateLegacyOnly(),
+                onlyVisibleZLevel);
+        }
+
+        // =============================================================================
+        // BuildDirtyChunks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce i chunk sporchi usando opzionalmente il catalogo visuale.
+        /// </para>
+        /// </summary>
+        public List<ArcGraphTerrainChunkMeshData> BuildDirtyChunks(
+            ArcGraphTerrainLayer terrainLayer,
+            ArcGraphTerrainTileUvMap uvMap,
+            ArcGraphRenderState renderState,
+            ArcGraphTerrainVisualPolicy visualPolicy,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            bool onlyVisibleZLevel = true)
+        {
             var results = new List<ArcGraphTerrainChunkMeshData>();
 
             if (renderState == null)
@@ -74,7 +144,8 @@ namespace Arcontio.View.ArcGraph
                     chunk,
                     renderState.ChunkSizeCells,
                     renderState.TileSizeWorld,
-                    visualPolicy));
+                    visualPolicy,
+                    visualBuildOptions));
             }
 
             return results;
@@ -104,6 +175,33 @@ namespace Arcontio.View.ArcGraph
             float tileWorld,
             ArcGraphTerrainVisualPolicy visualPolicy)
         {
+            return BuildChunks(
+                terrainLayer,
+                uvMap,
+                chunks,
+                chunkSizeCells,
+                tileWorld,
+                visualPolicy,
+                ArcGraphTerrainVisualBuildOptions.CreateLegacyOnly());
+        }
+
+        // =============================================================================
+        // BuildChunks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce mesh data terrain per chunk filtrati usando catalogo opzionale.
+        /// </para>
+        /// </summary>
+        public List<ArcGraphTerrainChunkMeshData> BuildChunks(
+            ArcGraphTerrainLayer terrainLayer,
+            ArcGraphTerrainTileUvMap uvMap,
+            IEnumerable<ArcGraphChunkCoord> chunks,
+            int chunkSizeCells,
+            float tileWorld,
+            ArcGraphTerrainVisualPolicy visualPolicy,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions)
+        {
             var results = new List<ArcGraphTerrainChunkMeshData>();
 
             if (chunks == null)
@@ -117,7 +215,8 @@ namespace Arcontio.View.ArcGraph
                     chunk,
                     chunkSizeCells,
                     tileWorld,
-                    visualPolicy));
+                    visualPolicy,
+                    visualBuildOptions));
             }
 
             return results;
@@ -146,6 +245,33 @@ namespace Arcontio.View.ArcGraph
             float tileWorld,
             ArcGraphTerrainVisualPolicy visualPolicy)
         {
+            return BuildChunk(
+                terrainLayer,
+                uvMap,
+                chunk,
+                chunkSizeCells,
+                tileWorld,
+                visualPolicy,
+                ArcGraphTerrainVisualBuildOptions.CreateLegacyOnly());
+        }
+
+        // =============================================================================
+        // BuildChunk
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un chunk usando resolver visuale opzionale e fallback legacy.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainChunkMeshData BuildChunk(
+            ArcGraphTerrainLayer terrainLayer,
+            ArcGraphTerrainTileUvMap uvMap,
+            ArcGraphChunkCoord chunk,
+            int chunkSizeCells,
+            float tileWorld,
+            ArcGraphTerrainVisualPolicy visualPolicy,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions)
+        {
             if (terrainLayer == null)
                 return ArcGraphTerrainChunkMeshData.Empty(chunk, "TerrainLayerMissing");
 
@@ -168,6 +294,15 @@ namespace Arcontio.View.ArcGraph
             int missingUvTileCount = 0;
             int firstMissingUvTileId = -1;
             int cellCount = 0;
+            int visualResolverTileCount = 0;
+            int legacyVisualTileCount = 0;
+            int visualVariantTileCount = 0;
+            int visualAnimationTileCount = 0;
+            int visualTransitionTileCount = 0;
+            int visualResolverFallbackCount = 0;
+            ArcGraphTerrainVisualResolver visualResolver = visualBuildOptions.UseVisualResolver
+                ? new ArcGraphTerrainVisualResolver()
+                : null;
 
             for (int y = startY; y < endY; y++)
             {
@@ -177,7 +312,32 @@ namespace Arcontio.View.ArcGraph
                     if (!terrainLayer.TryGetCell(cell, out var snapshot))
                         continue;
 
-                    int tileId = ResolveVisualTileId(terrainLayer, snapshot, visualPolicy);
+                    ResolvedTerrainTile resolvedTile = ResolveTerrainTile(
+                        terrainLayer,
+                        snapshot,
+                        visualPolicy,
+                        visualBuildOptions,
+                        visualResolver);
+
+                    int tileId = resolvedTile.TileId;
+                    if (resolvedTile.UsedVisualResolver)
+                        visualResolverTileCount++;
+
+                    if (resolvedTile.UsedLegacy)
+                        legacyVisualTileCount++;
+
+                    if (resolvedTile.UsedVariant)
+                        visualVariantTileCount++;
+
+                    if (resolvedTile.UsedAnimation)
+                        visualAnimationTileCount++;
+
+                    if (resolvedTile.UsedTransition)
+                        visualTransitionTileCount++;
+
+                    if (resolvedTile.UsedVisualFallback)
+                        visualResolverFallbackCount++;
+
                     bool foundUv = uvMap.TryGetUvQuad(tileId, out var uv0, out var uv1, out var uv2, out var uv3);
                     if (!foundUv)
                     {
@@ -212,6 +372,12 @@ namespace Arcontio.View.ArcGraph
                 usedFallbackUv,
                 missingUvTileCount,
                 firstMissingUvTileId,
+                visualResolverTileCount,
+                legacyVisualTileCount,
+                visualVariantTileCount,
+                visualAnimationTileCount,
+                visualTransitionTileCount,
+                visualResolverFallbackCount,
                 reason);
 
             return new ArcGraphTerrainChunkMeshData(
@@ -281,6 +447,65 @@ namespace Arcontio.View.ArcGraph
             int hash = Hash2D(snapshot.Cell.X, snapshot.Cell.Y);
             int variant = Mathf.Abs(hash) % policy.FloorVariantCount;
             return policy.FloorBaseTileId + variant;
+        }
+
+        private static ResolvedTerrainTile ResolveTerrainTile(
+            ArcGraphTerrainLayer terrainLayer,
+            ArcGraphTerrainCellSnapshot snapshot,
+            ArcGraphTerrainVisualPolicy policy,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            ArcGraphTerrainVisualResolver visualResolver)
+        {
+            int legacyTileId = ResolveVisualTileId(terrainLayer, snapshot, policy);
+
+            if (!visualBuildOptions.UseVisualResolver)
+                return new ResolvedTerrainTile(legacyTileId, false, true, false, false, false, false);
+
+            // Le celle bloccate rappresentano ancora muri/strutture legacy. In
+            // questo checkpoint non le trasformiamo in terrain type, per non
+            // confondere pavimento e oggetti verticali.
+            if (snapshot.IsBlocked)
+                return new ResolvedTerrainTile(legacyTileId, false, true, false, false, false, false);
+
+            string terrainId = ResolveTemporaryTerrainId(snapshot);
+            if (string.IsNullOrWhiteSpace(terrainId)
+                || visualBuildOptions.VisualCatalog == null
+                || visualResolver == null
+                || !visualBuildOptions.VisualCatalog.TryGetDefinition(terrainId, out _))
+            {
+                return new ResolvedTerrainTile(legacyTileId, false, true, false, false, false, true);
+            }
+
+            var input = new ArcGraphTerrainVisualResolveInput(
+                snapshot.Cell,
+                terrainId,
+                neighborTerrainId: null,
+                neighborMask: null,
+                visualBuildOptions.VisualTimeSeconds);
+
+            ArcGraphTerrainVisualResolveResult result = visualResolver.Resolve(
+                visualBuildOptions.VisualCatalog,
+                input);
+
+            return new ResolvedTerrainTile(
+                result.TileId,
+                usedVisualResolver: true,
+                usedLegacy: false,
+                usedVariant: result.UsedVariant,
+                usedAnimation: result.UsedAnimation,
+                usedTransition: result.UsedTransition,
+                usedVisualFallback: false);
+        }
+
+        private static string ResolveTemporaryTerrainId(ArcGraphTerrainCellSnapshot snapshot)
+        {
+            if (snapshot.TileId >= 30 && snapshot.TileId <= 33)
+                return "water";
+
+            if (snapshot.TileId == 10 || snapshot.TileId == 11)
+                return "stone_floor";
+
+            return "grass";
         }
 
         private static int Hash2D(int x, int y)

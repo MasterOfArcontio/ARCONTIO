@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.14 - ArcGraph Terrain Visible Chunk Filter`
+`v0.38i.15 - Collegamento Terrain Visual Resolver al Mesh Builder`
 
 STATUS:
-FILTRO CHUNK VISIBILI TERRAIN AGGIUNTO / CULLING VIEWPORT SPENTO DI DEFAULT
+RESOLVER VISUALE TERRAIN COLLEGATO AL MESH BUILDER / FALLBACK LEGACY CONSERVATO
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -605,6 +605,24 @@ Regola corrente:
   - build completa Unity/C# non eseguita per mancanza nota di `Temp/obj/Assembly-CSharp/project.assets.json`;
   - controllo Roslyn isolato dei file terrain interessati riuscito con soli warning attesi da controllo parziale;
   - prossimo step operativo consigliato: `v0.38i.15 - Collegamento Terrain Visual Resolver al Mesh Builder`.
+- micro-step `v0.38i.15` completato:
+  - introdotto `ArcGraphTerrainVisualBuildOptions` come opzione passiva per abilitare o disabilitare il resolver visuale nel mesh builder;
+  - `ArcGraphTerrainChunkMeshBuilder` mantiene le firme legacy e aggiunge overload con opzioni visuali;
+  - quando il catalogo visuale e' valido, il builder puo' risolvere il tile finale tramite `ArcGraphTerrainVisualResolver`;
+  - se il catalogo manca, non e' valido o non copre il terrain provvisorio, il builder torna alla policy legacy gia' validata;
+  - il mapping provvisorio resta semplice: celle bloccate restano legacy, tile acqua 30-33 diventano `water`, tile 10/11 diventano `stone_floor`, gli altri non bloccati diventano `grass`;
+  - le celle bloccate non vengono trasformate in terrain type per non confondere pavimento e strutture verticali;
+  - il resolver viene istanziato una volta per chunk, non una volta per cella;
+  - estesa `ArcGraphTerrainChunkMeshDiagnostics` con contatori resolver, legacy, varianti, animazioni, transizioni e fallback resolver;
+  - `ArcGraphTerrainRuntimeSceneRenderer` puo' ricevere un `terrainVisualCatalogJson` separato dal catalogo UV;
+  - il renderer parsa e cache-a il catalogo visuale solo quando cambia il testo sorgente;
+  - estesa `ArcGraphTerrainRuntimeSceneRendererDiagnostics` con diagnostica del catalogo visuale e dei tile risolti;
+  - lo step non implementa ancora autotile/transizioni basate sul vicinato e non aggiorna ancora frame animati nel tempo;
+  - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
+  - `git diff --check` superato;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn isolato dei file terrain interessati riuscito con soli warning attesi da controllo parziale;
+  - prossimo step operativo consigliato: `v0.38i.16 - Terrain Atlas Strategy e Coverage Diagnostics`.
 
 DOC SYNC:
 

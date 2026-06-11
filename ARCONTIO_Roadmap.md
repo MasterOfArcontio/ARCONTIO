@@ -13866,6 +13866,166 @@ v0.38i.15 - Collegamento Terrain Visual Resolver al Mesh Builder
 
 ---
 
+## Esito v0.38i.15 - Collegamento Terrain Visual Resolver al Mesh Builder
+
+La `v0.38i.15` collega il catalogo visuale terrain al percorso di costruzione
+mesh, mantenendo pero' il fallback legacy come comportamento sicuro.
+
+Il principio dello step e':
+
+```text
+se il catalogo visuale e' disponibile, usalo
+se non e' disponibile, continua come prima
+```
+
+Questo evita che ArcGraph diventi fragile mentre il nuovo sistema tile e' ancora
+in costruzione.
+
+---
+
+### Cosa e' stato aggiunto
+
+E' stato introdotto:
+
+- `ArcGraphTerrainVisualBuildOptions`;
+- overload del mesh builder con opzioni visuali;
+- parsing/cache del `terrainVisualCatalogJson` dentro il terrain runtime renderer;
+- contatori diagnostici per resolver visuale, legacy, varianti, animazioni,
+  transizioni e fallback resolver.
+
+Il nuovo flusso puo' diventare:
+
+```text
+ArcGraphTerrainCellSnapshot
+-> terrain id provvisorio
+-> ArcGraphTerrainVisualCatalog
+-> ArcGraphTerrainVisualResolver
+-> tile id finale
+-> ArcGraphTerrainTileUvMap
+-> mesh chunk
+```
+
+Se questo flusso non e' possibile, resta:
+
+```text
+ArcGraphTerrainCellSnapshot
+-> ArcGraphTerrainVisualPolicy legacy
+-> tile id finale
+-> ArcGraphTerrainTileUvMap
+-> mesh chunk
+```
+
+---
+
+### Mapping provvisorio tile legacy -> terrain id
+
+La mappa definitiva ArcGraph non possiede ancora un vero campo `terrainType`.
+
+Per questo lo step usa una compatibilita' provvisoria:
+
+```text
+tileId 30-33 -> water
+tileId 10/11 -> stone_floor
+altri tile non bloccati -> grass
+celle bloccate -> legacy
+```
+
+Le celle bloccate restano volutamente nel percorso legacy.
+
+Motivo:
+
+```text
+blocked oggi rappresenta spesso muri/strutture
+terrain visuale deve restare pavimento/suolo/liquido base
+```
+
+Questo evita di confondere il terrain layer con lo structure/object layer futuro.
+
+---
+
+### Prestazioni
+
+Il resolver visuale viene creato una volta per chunk, non una volta per cella.
+
+Il catalogo visuale JSON viene parsato solo quando cambia il testo sorgente.
+
+Quindi il percorso resta leggero:
+
+```text
+parse catalogo -> cache
+chunk build -> resolver riusato nel chunk
+cella -> scelta tile locale
+```
+
+---
+
+### Diagnostica aggiunta
+
+La diagnostica chunk ora puo' dire:
+
+```text
+VisualResolverTileCount
+LegacyVisualTileCount
+VisualVariantTileCount
+VisualAnimationTileCount
+VisualTransitionTileCount
+VisualResolverFallbackCount
+```
+
+La diagnostica del renderer ora puo' dire:
+
+```text
+visualCatalogJson=...
+visualCatalogParsed=...
+visualDefinitions=...
+visualResolver=...
+visualResolverTiles=...
+legacyVisualTiles=...
+visualVariants=...
+visualAnimations=...
+visualTransitions=...
+visualResolverFallbacks=...
+```
+
+Questo serve per il gate visuale: non basta vedere il terreno a video, bisogna
+sapere se il terreno sta arrivando davvero dal nuovo catalogo visuale.
+
+---
+
+### Cosa resta fuori
+
+Questo step non implementa ancora:
+
+- transizioni/autotile basate sul vicinato reale;
+- aggiornamento temporale dei frame animati;
+- strategia atlas tematica;
+- coverage diagnostica tra visual catalog e UV catalog;
+- nuova mappa ArcGraph con `terrainType` nativo.
+
+Questi punti restano nei passaggi successivi:
+
+```text
+v0.38i.16 - Atlas Strategy + Coverage
+v0.38i.17 - Variants Runtime
+v0.38i.18 - Animated Tiles
+v0.38i.19 - Terrain Transitions
+```
+
+---
+
+### Stato dopo v0.38i.15
+
+ArcGraph terrain puo' ora iniziare a usare un catalogo visuale data-driven nel
+percorso mesh, ma senza perdere compatibilita' con la resa precedente.
+
+Il prossimo passo logico diventa:
+
+```text
+v0.38i.16 - Terrain Atlas Strategy e Coverage Diagnostics
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

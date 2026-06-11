@@ -37,6 +37,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private ArcGraphTerrainRuntimeMapGridAdapter runtimeMapAdapter;
         [SerializeField] private Material terrainMaterial;
         [SerializeField] private TextAsset terrainCatalogJson;
+        [SerializeField] private TextAsset terrainVisualCatalogJson;
         [SerializeField] private bool rendererEnabled;
         [SerializeField] private bool renderOnStart;
         [SerializeField] private bool clearDirtyAfterRender = true;
@@ -55,6 +56,8 @@ namespace Arcontio.View.ArcGraph
         private Transform _root;
         private ArcGraphTerrainCatalog _terrainCatalog;
         private string _terrainCatalogSourceText;
+        private ArcGraphTerrainVisualCatalog _terrainVisualCatalog;
+        private string _terrainVisualCatalogSourceText;
         private ArcGraphTerrainRuntimeSceneRendererDiagnostics _lastDiagnostics;
         private bool _uvHasTerrainCatalogJson;
         private bool _uvTerrainCatalogParsed;
@@ -66,6 +69,16 @@ namespace Arcontio.View.ArcGraph
         private int _lastVisibleChunkCount;
         private int _lastCulledDirtyChunkCount;
         private int _lastDisabledOutsideViewportChunkCount;
+        private bool _visualHasTerrainVisualCatalogJson;
+        private bool _visualTerrainVisualCatalogParsed;
+        private bool _visualUsedResolver;
+        private int _visualTerrainVisualCatalogDefinitionCount;
+        private int _visualResolverTileCount;
+        private int _visualLegacyTileCount;
+        private int _visualVariantTileCount;
+        private int _visualAnimationTileCount;
+        private int _visualTransitionTileCount;
+        private int _visualResolverFallbackCount;
 
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
         public bool RendererEnabled => rendererEnabled;
@@ -179,6 +192,21 @@ namespace Arcontio.View.ArcGraph
             terrainCatalogJson = catalogJson;
             _terrainCatalog = null;
             _terrainCatalogSourceText = null;
+        }
+
+        // =============================================================================
+        // SetTerrainVisualCatalogJson
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il JSON del catalogo visuale terrain usato dal resolver.
+        /// </para>
+        /// </summary>
+        public void SetTerrainVisualCatalogJson(TextAsset catalogJson)
+        {
+            terrainVisualCatalogJson = catalogJson;
+            _terrainVisualCatalog = null;
+            _terrainVisualCatalogSourceText = null;
         }
 
         // =============================================================================
@@ -471,7 +499,8 @@ namespace Arcontio.View.ArcGraph
                 filterResult?.Chunks,
                 renderState != null ? renderState.ChunkSizeCells : 16,
                 renderState != null ? renderState.TileSizeWorld : 1f,
-                ArcGraphTerrainVisualPolicy.CreateLegacyDefault());
+                ArcGraphTerrainVisualPolicy.CreateLegacyDefault(),
+                CreateVisualBuildOptions());
         }
 
         // =============================================================================
@@ -606,6 +635,13 @@ namespace Arcontio.View.ArcGraph
                 applied++;
                 usedFallbackUv |= chunk.Diagnostics.UsedFallbackUv;
                 _uvMissingTileCount += chunk.Diagnostics.MissingUvTileCount;
+                _visualResolverTileCount += chunk.Diagnostics.VisualResolverTileCount;
+                _visualLegacyTileCount += chunk.Diagnostics.LegacyVisualTileCount;
+                _visualVariantTileCount += chunk.Diagnostics.VisualVariantTileCount;
+                _visualAnimationTileCount += chunk.Diagnostics.VisualAnimationTileCount;
+                _visualTransitionTileCount += chunk.Diagnostics.VisualTransitionTileCount;
+                _visualResolverFallbackCount += chunk.Diagnostics.VisualResolverFallbackCount;
+                _visualUsedResolver |= chunk.Diagnostics.VisualResolverTileCount > 0;
 
                 // Il primo id mancante viene conservato come indizio rapido:
                 // se il catalogo terrain non contiene un tile, in Console si
@@ -760,6 +796,16 @@ namespace Arcontio.View.ArcGraph
                 _lastVisibleChunkCount,
                 _lastCulledDirtyChunkCount,
                 _lastDisabledOutsideViewportChunkCount,
+                _visualHasTerrainVisualCatalogJson,
+                _visualTerrainVisualCatalogParsed,
+                _visualUsedResolver,
+                _visualTerrainVisualCatalogDefinitionCount,
+                _visualResolverTileCount,
+                _visualLegacyTileCount,
+                _visualVariantTileCount,
+                _visualAnimationTileCount,
+                _visualTransitionTileCount,
+                _visualResolverFallbackCount,
                 usedFallbackUv,
                 _uvMissingTileCount,
                 _uvFirstMissingTileId,
@@ -805,6 +851,16 @@ namespace Arcontio.View.ArcGraph
                 ", visibleChunks=" + _lastDiagnostics.VisibleChunkCount +
                 ", culledDirtyChunks=" + _lastDiagnostics.CulledDirtyChunkCount +
                 ", disabledOutsideViewport=" + _lastDiagnostics.DisabledOutsideViewportChunkCount +
+                ", visualCatalogJson=" + _lastDiagnostics.HasTerrainVisualCatalogJson +
+                ", visualCatalogParsed=" + _lastDiagnostics.TerrainVisualCatalogParsed +
+                ", visualDefinitions=" + _lastDiagnostics.TerrainVisualCatalogDefinitionCount +
+                ", visualResolver=" + _lastDiagnostics.UsedTerrainVisualResolver +
+                ", visualResolverTiles=" + _lastDiagnostics.VisualResolverTileCount +
+                ", legacyVisualTiles=" + _lastDiagnostics.LegacyVisualTileCount +
+                ", visualVariants=" + _lastDiagnostics.VisualVariantTileCount +
+                ", visualAnimations=" + _lastDiagnostics.VisualAnimationTileCount +
+                ", visualTransitions=" + _lastDiagnostics.VisualTransitionTileCount +
+                ", visualResolverFallbacks=" + _lastDiagnostics.VisualResolverFallbackCount +
                 ", fallbackUv=" + _lastDiagnostics.UsedFallbackUv +
                 ", missingUvTiles=" + _lastDiagnostics.MissingUvTileCount +
                 ", firstMissingUvTileId=" + _lastDiagnostics.FirstMissingUvTileId +
@@ -938,6 +994,27 @@ namespace Arcontio.View.ArcGraph
             _lastVisibleChunkCount = 0;
             _lastCulledDirtyChunkCount = 0;
             _lastDisabledOutsideViewportChunkCount = 0;
+            _visualHasTerrainVisualCatalogJson = false;
+            _visualTerrainVisualCatalogParsed = false;
+            _visualUsedResolver = false;
+            _visualTerrainVisualCatalogDefinitionCount = 0;
+            _visualResolverTileCount = 0;
+            _visualLegacyTileCount = 0;
+            _visualVariantTileCount = 0;
+            _visualAnimationTileCount = 0;
+            _visualTransitionTileCount = 0;
+            _visualResolverFallbackCount = 0;
+        }
+
+        private ArcGraphTerrainVisualBuildOptions CreateVisualBuildOptions()
+        {
+            ArcGraphTerrainVisualCatalog catalog = GetOrParseTerrainVisualCatalog();
+            if (catalog == null || catalog.DefinitionCount <= 0)
+                return ArcGraphTerrainVisualBuildOptions.CreateLegacyOnly();
+
+            return ArcGraphTerrainVisualBuildOptions.CreateWithCatalog(
+                catalog,
+                visualTimeSeconds: 0f);
         }
 
         private ArcGraphTerrainCatalog GetOrParseTerrainCatalog()
@@ -960,6 +1037,40 @@ namespace Arcontio.View.ArcGraph
 
             _terrainCatalogSourceText = json;
             return _terrainCatalog;
+        }
+
+        private ArcGraphTerrainVisualCatalog GetOrParseTerrainVisualCatalog()
+        {
+            _visualHasTerrainVisualCatalogJson = terrainVisualCatalogJson != null;
+
+            string json = terrainVisualCatalogJson != null
+                ? terrainVisualCatalogJson.text
+                : null;
+
+            if (string.IsNullOrWhiteSpace(json))
+                return null;
+
+            // Anche il catalogo visuale viene parsato solo quando cambia il testo.
+            // In questo modo il renderer puo' usarlo per molti frame senza pagare
+            // continuamente il costo di conversione JSON -> strutture runtime.
+            if (_terrainVisualCatalog != null && _terrainVisualCatalogSourceText == json)
+            {
+                _visualTerrainVisualCatalogParsed = true;
+                _visualTerrainVisualCatalogDefinitionCount = _terrainVisualCatalog.DefinitionCount;
+                return _terrainVisualCatalog;
+            }
+
+            if (!ArcGraphTerrainVisualCatalogJson.TryParse(json, out _terrainVisualCatalog))
+            {
+                _terrainVisualCatalog = null;
+                _terrainVisualCatalogSourceText = null;
+                return null;
+            }
+
+            _terrainVisualCatalogSourceText = json;
+            _visualTerrainVisualCatalogParsed = true;
+            _visualTerrainVisualCatalogDefinitionCount = _terrainVisualCatalog.DefinitionCount;
+            return _terrainVisualCatalog;
         }
 
         private static void DestroyUnityObject(Object unityObject)
