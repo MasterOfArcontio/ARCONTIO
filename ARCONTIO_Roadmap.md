@@ -12717,6 +12717,138 @@ oppure gate visuale Unity NPC se gli asset minimi sono pronti.
 
 ---
 
+## Esito v0.38i.10 - ArcGraph Terrain UV Source Diagnostics
+
+La `v0.38i.10` rende verificabile quale sorgente UV sta usando il renderer terrain
+runtime di ArcGraph.
+
+### Contesto
+
+Il terreno ArcGraph ha gia' un catalogo visuale:
+
+```text
+Assets/Resources/ArcGraph/Config/ArcGraphTerrainCatalog.json
+```
+
+Questo catalogo descrive:
+
+- atlas terrain;
+- dimensione tile;
+- tile id;
+- coordinate UV nell'atlas.
+
+La conformazione della mappa, invece, non e' ancora stata migrata a un modello
+mappa ArcGraph definitivo.
+
+Per ora resta valida questa separazione:
+
+```text
+MapGridData / adapter temporaneo
+-> dice quale tile id sta in ogni cella
+
+ArcGraphTerrainCatalog
+-> dice dove quel tile id sta nell'atlas
+```
+
+### Problema
+
+Prima di questo step, dal log non era immediatamente chiaro se il renderer stesse
+usando:
+
+```text
+catalogo ArcGraph
+```
+
+oppure:
+
+```text
+fallback legacy MapGridConfig
+```
+
+Questo rendeva il gate terrain meno leggibile.
+
+### Correzione
+
+La diagnostica terrain ora espone:
+
+- `HasTerrainCatalogJson`;
+- `TerrainCatalogParsed`;
+- `TerrainCatalogEntryCount`;
+- `UsedCatalogUvMap`;
+- `UsedLegacyConfigUvMap`;
+
+Nel log del renderer compaiono ora campi come:
+
+```text
+catalogJson=True
+catalogParsed=True
+catalogEntries=2
+catalogUv=True
+legacyConfigUv=False
+```
+
+Oppure, in fallback:
+
+```text
+catalogJson=False
+catalogParsed=False
+catalogEntries=0
+catalogUv=False
+legacyConfigUv=True
+```
+
+### Menu diagnostico
+
+Aggiunto context menu:
+
+```text
+ArcGraph/Log Last Terrain Runtime Diagnostics
+```
+
+Serve a ristampare l'ultimo stato terrain senza ricostruire i chunk.
+
+### Confini preservati
+
+Lo step:
+
+- non introduce una nuova mappa ArcGraph;
+- non cambia la conformazione delle celle;
+- non modifica `MapGridData`;
+- non modifica `World`;
+- non modifica Decision Layer;
+- non modifica Job Layer;
+- non salva scene;
+- non salva prefab;
+- non carica asset nel renderer;
+- non rimuove fallback legacy.
+
+### Stato dopo v0.38i.10
+
+Il terreno ArcGraph e' piu' verificabile.
+
+Non siamo ancora al modello mappa definitivo, ma possiamo distinguere chiaramente:
+
+```text
+tile id da adapter MapGrid temporaneo
+UV da catalogo ArcGraph
+```
+
+oppure:
+
+```text
+tile id da adapter MapGrid temporaneo
+UV da fallback MapGridConfig
+```
+
+Prossimo step consigliato:
+
+```text
+v0.38i.11 - rifinitura visuale terrain:
+materiale, fallback UV, diagnostica tile mancanti e gate terrain/NPC
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

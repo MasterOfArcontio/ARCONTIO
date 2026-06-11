@@ -21,6 +21,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Gate</b>: renderer abilitato, contratto valido, runtime valido.</item>
     ///   <item><b>Input</b>: presenza context, config, map, runtime e terrain layer.</item>
+    ///   <item><b>Catalogo</b>: presenza/parse del catalogo terrain e sorgente UV usata.</item>
     ///   <item><b>Chunk</b>: chunk dirty richiesti, costruiti, non vuoti e applicati.</item>
     ///   <item><b>Pool</b>: oggetti creati, riusati, disattivati e attivi.</item>
     ///   <item><b>Reason</b>: esito sintetico del frame.</item>
@@ -37,6 +38,11 @@ namespace Arcontio.View.ArcGraph
         public readonly bool HasRuntime;
         public readonly bool HasRenderState;
         public readonly bool HasTerrainLayer;
+        public readonly bool HasTerrainCatalogJson;
+        public readonly bool TerrainCatalogParsed;
+        public readonly bool UsedCatalogUvMap;
+        public readonly bool UsedLegacyConfigUvMap;
+        public readonly int TerrainCatalogEntryCount;
         public readonly bool DidBuildChunks;
         public readonly bool DidClearDirty;
         public readonly int DirtyChunkCountBeforeBuild;
@@ -68,6 +74,11 @@ namespace Arcontio.View.ArcGraph
             bool hasRuntime,
             bool hasRenderState,
             bool hasTerrainLayer,
+            bool hasTerrainCatalogJson,
+            bool terrainCatalogParsed,
+            bool usedCatalogUvMap,
+            bool usedLegacyConfigUvMap,
+            int terrainCatalogEntryCount,
             bool didBuildChunks,
             bool didClearDirty,
             int dirtyChunkCountBeforeBuild,
@@ -90,6 +101,11 @@ namespace Arcontio.View.ArcGraph
             HasRuntime = hasRuntime;
             HasRenderState = hasRenderState;
             HasTerrainLayer = hasTerrainLayer;
+            HasTerrainCatalogJson = hasTerrainCatalogJson;
+            TerrainCatalogParsed = terrainCatalogParsed;
+            UsedCatalogUvMap = usedCatalogUvMap;
+            UsedLegacyConfigUvMap = usedLegacyConfigUvMap;
+            TerrainCatalogEntryCount = NormalizeCount(terrainCatalogEntryCount);
             DidBuildChunks = didBuildChunks;
             DidClearDirty = didClearDirty;
             DirtyChunkCountBeforeBuild = NormalizeCount(dirtyChunkCountBeforeBuild);

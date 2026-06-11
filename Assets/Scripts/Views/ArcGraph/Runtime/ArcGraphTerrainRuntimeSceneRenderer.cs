@@ -51,6 +51,11 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainCatalog _terrainCatalog;
         private string _terrainCatalogSourceText;
         private ArcGraphTerrainRuntimeSceneRendererDiagnostics _lastDiagnostics;
+        private bool _uvHasTerrainCatalogJson;
+        private bool _uvTerrainCatalogParsed;
+        private bool _uvUsedCatalogMap;
+        private bool _uvUsedLegacyConfigMap;
+        private int _uvTerrainCatalogEntryCount;
 
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
         public bool RendererEnabled => rendererEnabled;
@@ -248,6 +253,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphBootstrapRuntime runtime)
         {
             ArcGraphTerrainRuntimeSceneRendererContract contract = CreateContract();
+            ResetUvSourceDiagnostics();
 
             if (!rendererEnabled)
                 return StoreAndLogDiagnostics(context, runtime, null, contract, false, false, 0, 0, 0, 0, 0, 0, 0, false, "RendererDisabled");
@@ -332,6 +338,27 @@ namespace Arcontio.View.ArcGraph
                 DestroyUnityObject(_root.gameObject);
                 _root = null;
             }
+        }
+
+        // =============================================================================
+        // LogLastDiagnosticsFromContextMenu
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ristampa in Console l'ultima diagnostica prodotta dal renderer terrain.
+        /// </para>
+        ///
+        /// <para><b>Supporto gate visuale</b></para>
+        /// <para>
+        /// Durante il confronto MapGrid/ArcGraph puo' essere utile verificare di
+        /// nuovo se il renderer sta usando catalogo ArcGraph o fallback legacy,
+        /// senza ricostruire i chunk e senza modificare scena o simulazione.
+        /// </para>
+        /// </summary>
+        [ContextMenu("ArcGraph/Log Last Terrain Runtime Diagnostics")]
+        public void LogLastDiagnosticsFromContextMenu()
+        {
+            LogLastDiagnostics();
         }
 
         private ArcGraphTerrainRuntimeSceneRendererContract CreateContract()
@@ -521,6 +548,11 @@ namespace Arcontio.View.ArcGraph
                 runtime != null,
                 runtime != null && runtime.RenderState != null,
                 terrainLayer != null,
+                _uvHasTerrainCatalogJson,
+                _uvTerrainCatalogParsed,
+                _uvUsedCatalogMap,
+                _uvUsedLegacyConfigMap,
+                _uvTerrainCatalogEntryCount,
                 didBuildChunks,
                 didClearDirty,
                 dirtyChunkCountBeforeBuild,
@@ -553,6 +585,11 @@ namespace Arcontio.View.ArcGraph
                 ", runtime=" + _lastDiagnostics.HasRuntime +
                 ", renderState=" + _lastDiagnostics.HasRenderState +
                 ", terrainLayer=" + _lastDiagnostics.HasTerrainLayer +
+                ", catalogJson=" + _lastDiagnostics.HasTerrainCatalogJson +
+                ", catalogParsed=" + _lastDiagnostics.TerrainCatalogParsed +
+                ", catalogEntries=" + _lastDiagnostics.TerrainCatalogEntryCount +
+                ", catalogUv=" + _lastDiagnostics.UsedCatalogUvMap +
+                ", legacyConfigUv=" + _lastDiagnostics.UsedLegacyConfigUvMap +
                 ", dirtyChunks=" + _lastDiagnostics.DirtyChunkCountBeforeBuild +
                 ", built=" + _lastDiagnostics.BuiltChunkCount +
                 ", nonEmpty=" + _lastDiagnostics.NonEmptyChunkCount +
@@ -619,6 +656,8 @@ namespace Arcontio.View.ArcGraph
             if (config?.tileDefs == null)
                 return uvMap;
 
+            _uvUsedLegacyConfigMap = true;
+
             for (int i = 0; i < config.tileDefs.Length; i++)
             {
                 MapGridConfig.TileDef definition = config.tileDefs[i];
@@ -660,6 +699,7 @@ namespace Arcontio.View.ArcGraph
             out ArcGraphTerrainTileUvMap uvMap)
         {
             uvMap = null;
+            _uvHasTerrainCatalogJson = terrainCatalogJson != null;
 
             if (terrainCatalogJson == null)
                 return false;
@@ -668,9 +708,22 @@ namespace Arcontio.View.ArcGraph
             if (catalog == null || catalog.EntryCount <= 0)
                 return false;
 
+            _uvTerrainCatalogParsed = true;
+            _uvTerrainCatalogEntryCount = catalog.EntryCount;
+            _uvUsedCatalogMap = true;
+
             Texture texture = material != null ? material.mainTexture : null;
             uvMap = catalog.BuildUvMap(texture);
             return uvMap != null;
+        }
+
+        private void ResetUvSourceDiagnostics()
+        {
+            _uvHasTerrainCatalogJson = false;
+            _uvTerrainCatalogParsed = false;
+            _uvUsedCatalogMap = false;
+            _uvUsedLegacyConfigMap = false;
+            _uvTerrainCatalogEntryCount = 0;
         }
 
         private ArcGraphTerrainCatalog GetOrParseTerrainCatalog()

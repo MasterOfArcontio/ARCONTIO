@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.09 - ArcGraph NPC Direction Persistence`
+`v0.38i.10 - ArcGraph Terrain UV Source Diagnostics`
 
 STATUS:
-DIREZIONE VISUALE NPC PERSISTENTE TRA WALK E IDLE / GATE VISUALE UNITY ANCORA DA ESEGUIRE CON PNG REALI
+DIAGNOSTICA SORGENTE UV TERRAIN AGGIUNTA / CONFORMAZIONE MAPPA ANCORA DA ADAPTER MAPGRID TEMPORANEO
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -542,6 +542,16 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn isolato del renderer NPC riuscito con soli warning `SerializeField` attesi;
   - prossimo step consigliato: procedere al lato terrain data-driven reale o al gate visuale Unity degli NPC.
+- micro-step `v0.38i.10` completato:
+  - estesa `ArcGraphTerrainRuntimeSceneRendererDiagnostics` con dati sulla sorgente UV;
+  - il renderer terrain segnala ora presenza del catalogo JSON, parse riuscito, numero entry catalogo, uso catalogo ArcGraph e uso fallback legacy `MapGridConfig`;
+  - aggiunto context menu `ArcGraph/Log Last Terrain Runtime Diagnostics`;
+  - la diagnostica distingue `catalogUv` da `legacyConfigUv`, rendendo verificabile se il terreno sta usando il catalogo ArcGraph;
+  - la conformazione della mappa resta intenzionalmente da `MapGridData`/adapter temporaneo: questo step non introduce una nuova sorgente mappa;
+  - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn isolato del renderer terrain riuscito con solo warning `SerializeField` atteso;
+  - prossimo step consigliato: rifinitura visuale terrain o preparazione gate visuale unico terrain+NPC.
 
 DOC SYNC:
 
