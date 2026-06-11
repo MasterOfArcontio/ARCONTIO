@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.19 - Animated Terrain Tiles`
+`v0.38i.20 - Terrain Transitions / Autotile Semplice`
 
 STATUS:
-ANIMAZIONE TILE TERRAIN ATTIVA CON REFRESH CHUNK SELETTIVO
+TRANSIZIONI TERRAIN CARDINALI ATTIVE DA RUNTIME TERRAIN MAP
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -677,6 +677,15 @@ Regola corrente:
   - diagnostica estesa con stato animazione terrain, tempo visuale, intervallo refresh, chunk animati tracciati e refresh accodato;
   - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
   - prossimo step operativo consigliato: `v0.38i.20 - Terrain Transitions / Autotile Semplice`.
+- micro-step `v0.38i.20` completato:
+  - `ArcGraphTerrainChunkMeshBuilder` ora prova una transizione terrain prima di usare animazione, cache statica o fallback legacy;
+  - la transizione legge solo i vicini cardinali `N/E/S/W` dalla `ArcGraphRuntimeTerrainMap`;
+  - i vicini dello stesso terrain id vengono aggregati in maschere come `E`, `NE`, `SW`;
+  - il resolver visuale accetta la transizione solo se il catalogo contiene una regola compatibile;
+  - le varianti statiche restano stabili, ma vengono superate da un bordo terrain quando il catalogo lo richiede;
+  - introdotto `ArcGraphTerrainTransitionHarness` per smoke test data-only su prato confinante con pietra;
+  - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
+  - prossimo step operativo consigliato: `v0.38i.21 - Terrain Visual Gate Finale`.
 
 DOC SYNC:
 

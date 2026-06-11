@@ -14608,6 +14608,135 @@ v0.38i.20 - Terrain Transitions / Autotile Semplice
 
 ---
 
+## Esito v0.38i.20 - Terrain Transitions / Autotile Semplice
+
+La `v0.38i.20` collega al rendering terrain il primo sistema di transizioni
+cardinali tra tipi di terreno.
+
+Lo step risolve il problema rimasto dopo `v0.38i.18` e `v0.38i.19`:
+
+```text
+la cella aveva gia' un terrain id
+la cella aveva gia' una cache statica o animata
+ma il renderer non guardava ancora i vicini reali
+```
+
+Ora il mesh builder puo' usare la `RuntimeTerrainMap` per capire se una cella
+confina con un altro tipo di terreno.
+
+---
+
+### Cosa e' stato aggiunto
+
+Sono stati aggiunti:
+
+- risoluzione delle transizioni dentro `ArcGraphTerrainChunkMeshBuilder`;
+- lettura locale dei vicini cardinali `N/E/S/W` dalla `ArcGraphRuntimeTerrainMap`;
+- costruzione di maschere come `E`, `N`, `NE`, `SW`;
+- uso del resolver visuale prima della cache statica quando esiste una transizione valida;
+- `ArcGraphTerrainTransitionHarness` come smoke test data-only.
+
+---
+
+### Flusso logico
+
+Il nuovo flusso per una cella terrain e':
+
+```text
+RuntimeTerrainCell
+↓
+leggi vicini cardinali nella RuntimeTerrainMap
+↓
+costruisci maschera per terrain confinante
+↓
+prova regola di transizione dal VisualCatalog
+↓
+se esiste: usa tile transizione
+↓
+se non esiste: usa animazione/cache statica/fallback legacy
+```
+
+Esempio:
+
+```text
+cella corrente: grass
+vicino est: stone_floor
+maschera: E
+regola catalogo: grass -> stone_floor, E = tile 20
+risultato: tile 20
+```
+
+---
+
+### Priorita' visuale aggiornata
+
+La priorita' attuale diventa:
+
+```text
+1. transizione terrain da vicinato runtime
+2. animazione terrain
+3. cache statica pre-risolta
+4. fallback tile sorgente / legacy
+```
+
+Questa scelta permette ai bordi di vincere sulle varianti statiche.
+
+Una cella resta semanticamente:
+
+```text
+grass
+```
+
+ma puo' essere disegnata come:
+
+```text
+grass_edge_east
+```
+
+se il catalogo lo richiede.
+
+---
+
+### Vincoli rispettati
+
+La patch non introduce:
+
+- lettura diretta del World;
+- lettura diretta di MapGridData nel builder;
+- comandi verso la simulazione;
+- oggetti scena;
+- caricamento asset;
+- planner grafico generale.
+
+La transizione e' locale e limitata ai quattro vicini cardinali.
+
+---
+
+### Cosa resta fuori
+
+Restano fuori:
+
+- regole diagonali complesse stile Wang tile completo;
+- transizioni tra piu' di due terrain type con priorita' configurabile;
+- fallback parziale quando esiste una maschera combinata non dichiarata;
+- editor di preview del catalogo;
+- test visuale Unity completo;
+- separazione definitiva del layer acqua come liquid layer autonomo.
+
+Il prossimo step logico diventa:
+
+```text
+v0.38i.21 - Terrain Visual Gate Finale
+```
+
+Obiettivo:
+
+```text
+verificare in un unico gate terrain tile base, varianti, animazioni e transizioni
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

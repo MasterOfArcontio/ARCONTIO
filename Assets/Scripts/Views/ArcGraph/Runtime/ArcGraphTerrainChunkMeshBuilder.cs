@@ -400,6 +400,7 @@ namespace Arcontio.View.ArcGraph
                     ResolvedTerrainTile resolvedTile = hasRuntimeCell
                         ? ResolveTerrainTile(
                             runtimeCell,
+                            runtimeTerrainMap,
                             visualBuildOptions,
                             visualResolver)
                         : ResolveTerrainTile(
@@ -541,10 +542,21 @@ namespace Arcontio.View.ArcGraph
 
         private static ResolvedTerrainTile ResolveTerrainTile(
             ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
             ArcGraphTerrainVisualBuildOptions visualBuildOptions,
             ArcGraphTerrainVisualResolver visualResolver)
         {
             ArcGraphTerrainVisualCache cache = runtimeCell.VisualCache;
+
+            if (TryResolveRuntimeTransition(
+                runtimeCell,
+                runtimeTerrainMap,
+                visualBuildOptions,
+                visualResolver,
+                out ResolvedTerrainTile transitionTile))
+            {
+                return transitionTile;
+            }
 
             if (cache.HasAnimatedVisual
                 && visualBuildOptions.UseVisualResolver
@@ -592,6 +604,306 @@ namespace Arcontio.View.ArcGraph
                 usedAnimation: false,
                 usedTransition: false,
                 usedVisualFallback: true);
+        }
+
+        // =============================================================================
+        // TryResolveRuntimeTransition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova a risolvere una transizione terrain leggendo i vicini della runtime map.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: autotile locale, non sistema onnisciente</b></para>
+        /// <para>
+        /// Il metodo non legge il World e non interroga MapGrid. Usa solo la
+        /// <c>ArcGraphRuntimeTerrainMap</c> gia' derivata dal layer terrain e
+        /// costruisce una maschera cardinale sintetica per i terreni confinanti.
+        /// Se il catalogo visuale non contiene una regola compatibile, il chiamante
+        /// torna al percorso normale: animazione, cache statica o fallback legacy.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>N/E/S/W</b>: controlla solo i quattro vicini cardinali.</item>
+        ///   <item><b>Gruppi terrain</b>: unisce direzioni dello stesso terrain id in una maschera.</item>
+        ///   <item><b>Resolver</b>: accetta solo risultati marcati come transizione.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryResolveRuntimeTransition(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            ArcGraphTerrainVisualResolver visualResolver,
+            out ResolvedTerrainTile resolvedTile)
+        {
+            resolvedTile = default;
+
+            if (runtimeCell.IsBlocked
+                || runtimeTerrainMap == null
+                || !visualBuildOptions.UseVisualResolver
+                || visualBuildOptions.VisualCatalog == null
+                || visualResolver == null)
+            {
+                return false;
+            }
+
+            string terrainId = runtimeCell.TerrainId;
+            if (string.IsNullOrWhiteSpace(terrainId)
+                || !visualBuildOptions.VisualCatalog.TryGetDefinition(terrainId, out _))
+            {
+                return false;
+            }
+
+            string neighborId0 = null;
+            string neighborId1 = null;
+            string neighborId2 = null;
+            string neighborId3 = null;
+            string mask0 = string.Empty;
+            string mask1 = string.Empty;
+            string mask2 = string.Empty;
+            string mask3 = string.Empty;
+            int neighborGroupCount = 0;
+
+            AddNeighborMask(
+                runtimeTerrainMap,
+                runtimeCell,
+                0,
+                1,
+                "N",
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+            AddNeighborMask(
+                runtimeTerrainMap,
+                runtimeCell,
+                1,
+                0,
+                "E",
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+            AddNeighborMask(
+                runtimeTerrainMap,
+                runtimeCell,
+                0,
+                -1,
+                "S",
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+            AddNeighborMask(
+                runtimeTerrainMap,
+                runtimeCell,
+                -1,
+                0,
+                "W",
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+
+            return TryResolveTransitionGroup(
+                       runtimeCell,
+                       visualBuildOptions,
+                       visualResolver,
+                       neighborId0,
+                       mask0,
+                       out resolvedTile)
+                   || TryResolveTransitionGroup(
+                       runtimeCell,
+                       visualBuildOptions,
+                       visualResolver,
+                       neighborId1,
+                       mask1,
+                       out resolvedTile)
+                   || TryResolveTransitionGroup(
+                       runtimeCell,
+                       visualBuildOptions,
+                       visualResolver,
+                       neighborId2,
+                       mask2,
+                       out resolvedTile)
+                   || TryResolveTransitionGroup(
+                       runtimeCell,
+                       visualBuildOptions,
+                       visualResolver,
+                       neighborId3,
+                       mask3,
+                       out resolvedTile);
+        }
+
+        private static void AddNeighborMask(
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            int dx,
+            int dy,
+            string direction,
+            ref string neighborId0,
+            ref string neighborId1,
+            ref string neighborId2,
+            ref string neighborId3,
+            ref string mask0,
+            ref string mask1,
+            ref string mask2,
+            ref string mask3,
+            ref int neighborGroupCount)
+        {
+            var neighborCoord = new ArcGraphCellCoord(
+                runtimeCell.Cell.X + dx,
+                runtimeCell.Cell.Y + dy,
+                runtimeCell.Cell.Z);
+
+            if (!runtimeTerrainMap.TryGetCell(neighborCoord, out ArcGraphRuntimeTerrainCell neighborCell))
+                return;
+
+            if (neighborCell.IsBlocked)
+                return;
+
+            string neighborTerrainId = neighborCell.TerrainId;
+            if (string.IsNullOrWhiteSpace(neighborTerrainId)
+                || neighborTerrainId == runtimeCell.TerrainId)
+            {
+                return;
+            }
+
+            AddDirectionToGroup(
+                neighborTerrainId,
+                direction,
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+        }
+
+        private static void AddDirectionToGroup(
+            string neighborTerrainId,
+            string direction,
+            ref string neighborId0,
+            ref string neighborId1,
+            ref string neighborId2,
+            ref string neighborId3,
+            ref string mask0,
+            ref string mask1,
+            ref string mask2,
+            ref string mask3,
+            ref int neighborGroupCount)
+        {
+            if (neighborTerrainId == neighborId0)
+            {
+                mask0 += direction;
+                return;
+            }
+
+            if (neighborTerrainId == neighborId1)
+            {
+                mask1 += direction;
+                return;
+            }
+
+            if (neighborTerrainId == neighborId2)
+            {
+                mask2 += direction;
+                return;
+            }
+
+            if (neighborTerrainId == neighborId3)
+            {
+                mask3 += direction;
+                return;
+            }
+
+            if (neighborGroupCount == 0)
+            {
+                neighborId0 = neighborTerrainId;
+                mask0 = direction;
+            }
+            else if (neighborGroupCount == 1)
+            {
+                neighborId1 = neighborTerrainId;
+                mask1 = direction;
+            }
+            else if (neighborGroupCount == 2)
+            {
+                neighborId2 = neighborTerrainId;
+                mask2 = direction;
+            }
+            else if (neighborGroupCount == 3)
+            {
+                neighborId3 = neighborTerrainId;
+                mask3 = direction;
+            }
+
+            neighborGroupCount++;
+        }
+
+        private static bool TryResolveTransitionGroup(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            ArcGraphTerrainVisualResolver visualResolver,
+            string neighborTerrainId,
+            string neighborMask,
+            out ResolvedTerrainTile resolvedTile)
+        {
+            resolvedTile = default;
+
+            if (string.IsNullOrWhiteSpace(neighborTerrainId)
+                || string.IsNullOrWhiteSpace(neighborMask))
+            {
+                return false;
+            }
+
+            var input = new ArcGraphTerrainVisualResolveInput(
+                runtimeCell.Cell,
+                runtimeCell.TerrainId,
+                neighborTerrainId,
+                neighborMask,
+                visualBuildOptions.VisualTimeSeconds);
+
+            ArcGraphTerrainVisualResolveResult result = visualResolver.Resolve(
+                visualBuildOptions.VisualCatalog,
+                input);
+
+            if (!result.UsedTransition)
+                return false;
+
+            resolvedTile = new ResolvedTerrainTile(
+                result.TileId,
+                usedVisualResolver: true,
+                usedLegacy: false,
+                usedVariant: false,
+                usedAnimation: false,
+                usedTransition: true,
+                usedVisualFallback: false);
+            return true;
         }
 
         private static ResolvedTerrainTile ResolveTerrainTile(
