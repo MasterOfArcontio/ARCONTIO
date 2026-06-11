@@ -1,0 +1,85 @@
+{
+  "terrains": [
+    {
+      "terrainId": "grass",
+      "defaultTileId": 0,
+      "variants": [
+        {
+          "tileId": 0,
+          "weight": 70
+        },
+        {
+          "tileId": 1,
+          "weight": 20
+        },
+        {
+          "tileId": 2,
+          "weight": 10
+        }
+      ]
+    },
+    {
+      "terrainId": "stone_floor",
+      "defaultTileId": 10,
+      "variants": [
+        {
+          "tileId": 10,
+          "weight": 1
+        }
+      ]
+    },
+    {
+      "terrainId": "water",
+      "defaultTileId": 30,
+      "animation": {
+        "frameTileIds": [
+          30,
+          31,
+          32,
+          33
+        ],
+        "frameSeconds": 0.25
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "fromTerrainId": "grass",
+      "toTerrainId": "stone_floor",
+      "rules": [
+        {
+          "mask": "N",
+          "tileId": 21
+        },
+        {
+          "mask": "E",
+          "tileId": 20
+        },
+        {
+          "mask": "S",
+          "tileId": 23
+        },
+        {
+          "mask": "W",
+          "tileId": 22
+        },
+        {
+          "mask": "NE",
+          "tileId": 24
+        },
+        {
+          "mask": "SE",
+          "tileId": 25
+        },
+        {
+          "mask": "SW",
+          "tileId": 26
+        },
+        {
+          "mask": "NW",
+          "tileId": 27
+        }
+      ]
+    }
+  ]
+}

@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.11 - ArcGraph Terrain Missing UV Diagnostics`
+`v0.38i.12 - ArcGraph Terrain Visual Catalog v1`
 
 STATUS:
-DIAGNOSTICA TILE UV MANCANTI AGGIUNTA / GATE VISUALE TERRAIN+NPC ANCORA DA ESEGUIRE
+CATALOGO VISUALE TERRAIN V1 AGGIUNTO / NON ANCORA COLLEGATO AL RENDERER PRODUTTIVO
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -562,6 +562,19 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn isolato terrain riuscito con warning attesi da controllo parziale e campi `SerializeField`;
   - prossimo step consigliato: gate visuale Unity terrain+NPC oppure rifinitura resolver/asset se il gate segnala sprite o UV mancanti.
+- micro-step `v0.38i.12` completato:
+  - introdotto `ArcGraphTerrainVisualCatalog` come catalogo visuale terrain data-driven;
+  - introdotti terrain type con `defaultTileId`, varianti pesate, animazioni opzionali e transition set;
+  - introdotto `ArcGraphTerrainVisualCatalogJson` per convertire JSON authoring in strutture runtime normalizzate;
+  - aggiunto `Assets/Resources/ArcGraph/Config/ArcGraphTerrainVisualCatalog.json` come esempio v1 con `grass`, `stone_floor`, `water`, varianti prato, acqua animata e bordi grass->stone;
+  - introdotto `ArcGraphTerrainVisualResolver`, che risolve tile finale con priorita': transizione, animazione, variante deterministica, fallback;
+  - introdotto `ArcGraphTerrainVisualCatalogHarness` per smoke test data-only su parse, variante stabile, transizione e animazione;
+  - la scelta variante usa hash stabile su coordinate e terrain id, senza random runtime e senza `string.GetHashCode`;
+  - nessun aggancio al renderer terrain produttivo, nessuna mesh, nessun asset load, nessun `Resources.Load`, nessuna scena o prefab modificati;
+  - ricerca statica sulle dipendenze vietate superata, con unica occorrenza in commento descrittivo;
+  - controllo JSON PowerShell riuscito: 3 terrain type, 1 transition set;
+  - controllo Roslyn isolato riuscito con soli warning attesi da controllo parziale;
+  - prossimo step consigliato: collegare il resolver visuale al mesh builder terrain dietro gate/fallback legacy, oppure completare prima il filtro viewport chunk visibili.
 
 DOC SYNC:
 

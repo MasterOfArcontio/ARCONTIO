@@ -12966,6 +12966,243 @@ rifinitura resolver / cataloghi / asset path
 
 ---
 
+## Esito v0.38i.12 - ArcGraph Terrain Visual Catalog v1
+
+La `v0.38i.12` introduce il primo catalogo visuale terrain data-driven di
+ArcGraph.
+
+Questo step non cambia ancora il renderer terrain produttivo. Serve a definire
+la struttura dati che useremo per gestire:
+
+- tile default;
+- varianti visuali pesate;
+- animazioni tile;
+- transizioni di bordo tra tipi terreno;
+- scelta deterministica della variante per cella.
+
+### Problema progettuale
+
+Il modello precedente ragionava soprattutto cosi':
+
+```text
+cella
+-> tileId
+-> UV atlas
+```
+
+Questo e' sufficiente per disegnare una mappa minima, ma diventa fragile appena
+vogliamo introdurre varieta' visuale.
+
+Esempio:
+
+```text
+grass
+-> prato base
+-> prato con fiori
+-> prato con erba piu' scura
+-> prato vicino a piastrelle
+```
+
+Se la mappa deve salvare direttamente ogni singola variante, allora la mappa
+diventa troppo grafica e perde significato simulativo.
+
+La direzione corretta e':
+
+```text
+cella
+-> terrainType = grass
+-> resolver visuale
+-> tileId finale
+-> UV atlas
+```
+
+### Nuovo catalogo
+
+Aggiunto:
+
+```text
+Assets/Resources/ArcGraph/Config/ArcGraphTerrainVisualCatalog.json
+```
+
+Il file di esempio contiene:
+
+- `grass`;
+- `stone_floor`;
+- `water`;
+- varianti pesate per `grass`;
+- animazione frame-based per `water`;
+- transizioni cardinali da `grass` a `stone_floor`.
+
+Esempio concettuale:
+
+```json
+{
+  "terrainId": "grass",
+  "defaultTileId": 0,
+  "variants": [
+    { "tileId": 0, "weight": 70 },
+    { "tileId": 1, "weight": 20 },
+    { "tileId": 2, "weight": 10 }
+  ]
+}
+```
+
+### Resolver visuale
+
+Introdotto:
+
+```text
+ArcGraphTerrainVisualResolver
+```
+
+Il resolver applica questa priorita':
+
+```text
+1. transizione di bordo
+2. animazione tile
+3. variante deterministica
+4. fallback
+```
+
+Esempio:
+
+```text
+cella grass
+vicino est stone_floor
+mask E
+-> usa tile transizione grass_to_stone_east
+```
+
+Altro esempio:
+
+```text
+cella grass senza bordo
+coordinate 12,9
+-> sceglie una variante prato in modo stabile
+```
+
+La variante non viene scelta con random runtime.
+
+Viene scelta con hash stabile da:
+
+```text
+x
+y
+z
+terrainId
+```
+
+Quindi:
+
+```text
+la stessa cella produce sempre la stessa variante
+```
+
+senza flickering e senza dipendere dalla sessione.
+
+### Animazioni
+
+Il catalogo supporta animazioni passivamente:
+
+```json
+{
+  "terrainId": "water",
+  "defaultTileId": 30,
+  "animation": {
+    "frameTileIds": [30, 31, 32, 33],
+    "frameSeconds": 0.25
+  }
+}
+```
+
+Questo non anima ancora la scena.
+
+Definisce solo il contratto:
+
+```text
+tempo visuale
+-> frame index
+-> tile id animato
+```
+
+Il tick simulativo resta separato dal tempo visuale.
+
+### Transizioni
+
+Il catalogo supporta maschere cardinali semplici:
+
+```text
+N
+E
+S
+W
+NE
+SE
+SW
+NW
+```
+
+Questo e' sufficiente per il primo sistema di bordi tra prato e pavimenti.
+
+Non e' ancora un sistema Wang tiles completo, ma lascia aperta la strada a un
+autotile piu' ricco senza cambiare il modello mappa.
+
+### File tecnici introdotti
+
+- `ArcGraphTerrainVisualCatalog`;
+- `ArcGraphTerrainVisualCatalogJson`;
+- `ArcGraphTerrainVisualResolver`;
+- `ArcGraphTerrainVisualCatalogHarness`;
+- `ArcGraphTerrainVisualCatalog.json`.
+
+### Confini preservati
+
+Lo step:
+
+- non collega ancora il resolver al mesh builder;
+- non cambia `ArcGraphTerrainChunkMeshBuilder`;
+- non cambia `ArcGraphTerrainRuntimeSceneRenderer`;
+- non cambia `MapGridData`;
+- non cambia `World`;
+- non modifica Decision Layer;
+- non modifica Job Layer;
+- non salva scene;
+- non salva prefab;
+- non carica asset;
+- non usa `Resources.Load`;
+- non crea GameObject, mesh o materiali.
+
+### Stato dopo v0.38i.12
+
+ArcGraph ora possiede un contratto dati per rappresentare il terreno in modo piu'
+ricco del semplice tile id.
+
+La catena futura diventa:
+
+```text
+terrain snapshot
+-> terrain type / tile legacy temporaneo
+-> visual catalog
+-> visual resolver
+-> tile id finale
+-> UV map
+-> mesh chunk
+```
+
+Prossimo step consigliato:
+
+```text
+collegare il resolver visuale al mesh builder terrain dietro fallback legacy
+```
+
+oppure, prima del collegamento:
+
+```text
+implementare filtro viewport XY per renderizzare solo i chunk visibili
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
