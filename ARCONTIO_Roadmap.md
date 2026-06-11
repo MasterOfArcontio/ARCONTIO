@@ -13203,6 +13203,493 @@ implementare filtro viewport XY per renderizzare solo i chunk visibili
 
 ---
 
+## Roadmap operativa v0.38i.13 - ArcGraph Terrain Tile Roadmap
+
+La `v0.38i.13` definisce la roadmap operativa per completare la gestione tile
+terrain di ArcGraph sulla base dei cinque punti progettuali aperti:
+
+1. tile default con varianti;
+2. scelta atlas / piu' atlas / sprite separati;
+3. rendering solo della porzione visibile;
+4. tile animati;
+5. tile di confine e transizioni tra aree.
+
+Questa roadmap non implementa ancora codice nuovo.
+
+Serve a ordinare il lavoro in modo che il terreno non diventi pesante o fragile
+prima ancora di avere un renderer viewport-aware.
+
+### Principio guida
+
+La priorita' tecnica e':
+
+```text
+prima ridurre cosa renderizziamo
+poi aumentare la ricchezza di cosa renderizziamo
+```
+
+Per questo il primo step non deve essere animare acqua o collegare tutte le
+varianti.
+
+Il primo step deve essere:
+
+```text
+renderizzare / aggiornare solo chunk visibili
+```
+
+Altrimenti varianti, transizioni e animazioni rischiano di aumentare il costo di
+una pipeline che non filtra ancora bene la porzione visibile.
+
+---
+
+### v0.38i.14 - ArcGraph Terrain Visible Chunk Filter
+
+**Obiettivo**
+
+Introdurre il filtro viewport XY per il renderer terrain runtime.
+
+Oggi ArcGraph possiede:
+
+```text
+DirtyChunks
+chunk mesh
+pool chunk
+filtro Z level
+```
+
+ma non possiede ancora in modo completo:
+
+```text
+VisibleChunkSet XY
+```
+
+Questo step deve fare in modo che il renderer terrain lavori solo sui chunk che
+intersecano il rettangolo visibile della camera/vista.
+
+**Output atteso**
+
+- calcolo dei chunk visibili da `ArcGraphViewCellRect`;
+- filtro dei dirty chunks fuori viewport;
+- disattivazione o mantenimento spento dei chunk non visibili;
+- diagnostica:
+  - dirty chunks totali;
+  - chunk visibili;
+  - chunk scartati per viewport;
+  - chunk applicati;
+  - chunk disattivati.
+
+**Vincoli**
+
+- non cambiare ancora il resolver tile;
+- non introdurre animazioni;
+- non salvare scene;
+- non modificare MapGrid;
+- non leggere direttamente camera o input dentro il mesh builder.
+
+**Criterio di completamento**
+
+Il renderer deve poter dire:
+
+```text
+questa mappa ha molti chunk
+ma in questo frame ne considero solo N visibili
+```
+
+---
+
+### v0.38i.15 - Collegamento Terrain Visual Resolver al Mesh Builder
+
+**Obiettivo**
+
+Collegare `ArcGraphTerrainVisualResolver` alla costruzione mesh terrain.
+
+La catena futura diventa:
+
+```text
+ArcGraphTerrainCellSnapshot
+-> terrain type / tile legacy temporaneo
+-> ArcGraphTerrainVisualCatalog
+-> ArcGraphTerrainVisualResolver
+-> tileId finale
+-> ArcGraphTerrainTileUvMap
+-> mesh chunk
+```
+
+**Nota importante**
+
+La mappa definitiva non possiede ancora un vero `terrainType`.
+
+Per questa fase serve una compatibilita' temporanea:
+
+```text
+tileId legacy
+-> terrainId provvisorio
+```
+
+Esempio:
+
+```text
+tileId 0 -> grass
+tileId 1 -> grass
+blocked -> wall / stone_floor provvisorio
+```
+
+**Output atteso**
+
+- contratto per passare il catalogo visuale al builder;
+- fallback legacy se il catalogo visuale manca;
+- diagnostica:
+  - tile risolti da resolver;
+  - tile risolti da policy legacy;
+  - transition usate;
+  - animation usate;
+  - variant usate;
+  - fallback usati.
+
+**Criterio di completamento**
+
+La resa visiva deve poter usare il catalogo:
+
+```text
+grass -> varianti deterministiche
+```
+
+senza rompere il rendering precedente.
+
+---
+
+### v0.38i.16 - Terrain Atlas Strategy e Coverage Diagnostics
+
+**Obiettivo**
+
+Consolidare la scelta atlas.
+
+Decisione consigliata:
+
+```text
+piu' atlas tematici
+```
+
+Non:
+
+```text
+un atlas unico infinito
+```
+
+e non:
+
+```text
+un PNG separato per ogni tile come strategia finale terrain
+```
+
+**Strategia consigliata**
+
+```text
+Terrain Base Atlas
+-> erba, terra, pietra, sabbia, pavimenti
+
+Terrain Transition Atlas
+-> bordi, angoli, raccordi
+
+Water Atlas
+-> acqua animata, rive, schiuma
+
+Structure/Object Atlas
+-> muri alti, porte, strutture
+```
+
+**Output atteso**
+
+- estensione cataloghi per distinguere `atlasId`;
+- diagnostica coverage:
+  - tile dichiarati dal visual catalog;
+  - tile presenti nell'UV catalog;
+  - tile mancanti;
+  - atlas mancanti;
+  - primo tile mancante.
+
+**Criterio di completamento**
+
+Prima del gate visuale, ArcGraph deve poter dire:
+
+```text
+tutti i tile richiesti dal visual catalog sono coperti da UV
+```
+
+oppure:
+
+```text
+manca il tile X nell'atlas Y
+```
+
+---
+
+### v0.38i.17 - Tile Variants Runtime
+
+**Obiettivo**
+
+Rendere operative le varianti tile dichiarate nel visual catalog.
+
+Esempio:
+
+```text
+grass
+-> grass_base 70%
+-> grass_flowers_01 20%
+-> grass_flowers_02 10%
+```
+
+**Regola fondamentale**
+
+La variante deve essere:
+
+```text
+deterministica per cella
+```
+
+Non:
+
+```text
+random ogni frame
+```
+
+Esempio:
+
+```text
+cella 10,20 grass -> grass_flowers_01 sempre
+cella 11,20 grass -> grass_base sempre
+```
+
+**Output atteso**
+
+- varianti risolte dal catalogo;
+- peso rispettato in modo stabile;
+- diagnostica conteggio varianti per chunk;
+- nessun flickering.
+
+**Criterio di completamento**
+
+La stessa mappa deve produrre sempre la stessa distribuzione visuale di varianti
+a parita' di coordinate e catalogo.
+
+---
+
+### v0.38i.18 - Animated Terrain Tiles
+
+**Obiettivo**
+
+Supportare tile animati, soprattutto acqua.
+
+Il catalogo gia' ammette:
+
+```json
+{
+  "terrainId": "water",
+  "animation": {
+    "frameTileIds": [30, 31, 32, 33],
+    "frameSeconds": 0.25
+  }
+}
+```
+
+Lo step deve trasformare questo contratto in aggiornamento visuale.
+
+**Regola fondamentale**
+
+Il tempo visuale deve restare separato dal tick simulativo:
+
+```text
+tick simulazione
+!=
+frame animazione tile
+```
+
+**Output atteso**
+
+- aggiornamento solo dei chunk visibili con tile animati;
+- dirty visuale dedicato o refresh controllato;
+- nessun aggiornamento di tile animati fuori viewport;
+- diagnostica:
+  - chunk animati visibili;
+  - tile animati aggiornati;
+  - frame corrente;
+  - tempo visuale usato.
+
+**Criterio di completamento**
+
+L'acqua puo' animarsi senza obbligare tutta la mappa a ricostruirsi a ogni frame.
+
+---
+
+### v0.38i.19 - Terrain Transitions / Autotile Semplice
+
+**Obiettivo**
+
+Rendere operative le transizioni di bordo tra terrain type.
+
+Esempio:
+
+```text
+grass vicino a stone_floor
+-> bordo grass/stone
+```
+
+Il primo modello resta semplice:
+
+```text
+maschere cardinali N/E/S/W
+combinazioni NE/SE/SW/NW
+```
+
+Non si implementa subito un Wang tile system completo.
+
+**Output atteso**
+
+- lettura dei vicini cardinali;
+- costruzione maschera;
+- risoluzione transition set;
+- fallback se manca una regola;
+- diagnostica:
+  - transizioni risolte;
+  - transizioni mancanti;
+  - prima maschera mancante;
+  - terrain pair mancante.
+
+**Criterio di completamento**
+
+Una zona prato accanto a una zona pavimento deve poter mostrare un bordo grafico
+coerente, senza cambiare il dato simulativo della cella.
+
+---
+
+### v0.38i.20 - Terrain Tile Visual Gate
+
+**Obiettivo**
+
+Validare in Unity la pipeline terrain completa.
+
+Il gate deve verificare:
+
+- chunk visibili;
+- varianti prato;
+- atlas coverage;
+- acqua animata;
+- transizioni prato/pavimento;
+- fallback UV leggibili;
+- assenza di flickering;
+- assenza di ricostruzione inutile su tutta la mappa;
+- compatibilita' con F12 MapGrid/ArcGraph.
+
+**Output atteso in Console**
+
+Esempio:
+
+```text
+visibleChunks=...
+culledChunks=...
+resolverTiles=...
+variantTiles=...
+transitionTiles=...
+animatedTiles=...
+missingUvTiles=0
+```
+
+**Criterio di completamento**
+
+Il terreno ArcGraph puo' essere considerato candidato minimo stabile per:
+
+```text
+tile base
+varianti
+animazioni
+transizioni
+viewport-aware rendering
+```
+
+Non significa ancora pensionare MapGrid.
+
+Significa solo che il terreno ArcGraph e' abbastanza maturo per il confronto
+visuale serio.
+
+---
+
+### Rischi principali
+
+**Rischio 1: troppa ricchezza prima del culling**
+
+Se colleghiamo subito animazioni e transizioni senza filtro viewport, rischiamo
+di aggiornare troppa mappa.
+
+Mitigazione:
+
+```text
+v0.38i.14 prima di tutto
+```
+
+**Rischio 2: confondere terrain con object/structure**
+
+Muri alti, alberi grandi e oggetti che possono coprire NPC non devono stare nel
+terrain base.
+
+Devono stare in layer structure/object.
+
+Mitigazione:
+
+```text
+terrain = pavimento/suolo/liquidi base
+object/structure = elementi verticali o interattivi
+```
+
+**Rischio 3: transizioni troppo sofisticate troppo presto**
+
+Un Wang tile system completo puo' diventare un mini-editor dentro ArcGraph.
+
+Mitigazione:
+
+```text
+prima maschere cardinali semplici
+poi eventuale estensione
+```
+
+**Rischio 4: atlas troppo grande o troppo frammentato**
+
+Un solo atlas gigante e' difficile da gestire.
+Troppi atlas piccoli rompono batching e materiali.
+
+Mitigazione:
+
+```text
+atlas tematici
+```
+
+---
+
+### Ordine operativo raccomandato
+
+```text
+v0.38i.14 - Visible Chunk Filter
+v0.38i.15 - Resolver -> Mesh Builder
+v0.38i.16 - Atlas Strategy + Coverage
+v0.38i.17 - Variants Runtime
+v0.38i.18 - Animated Tiles
+v0.38i.19 - Terrain Transitions
+v0.38i.20 - Visual Gate
+```
+
+Questo ordine conserva una progressione sana:
+
+```text
+prestazioni
+-> aggancio dati
+-> asset coverage
+-> varieta'
+-> movimento visuale
+-> bordi
+-> gate
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

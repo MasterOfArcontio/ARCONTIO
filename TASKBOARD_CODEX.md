@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.12 - ArcGraph Terrain Visual Catalog v1`
+`v0.38i.13 - ArcGraph Terrain Tile Roadmap`
 
 STATUS:
-CATALOGO VISUALE TERRAIN V1 AGGIUNTO / NON ANCORA COLLEGATO AL RENDERER PRODUTTIVO
+ROADMAP TILE TERRAIN DEFINITA / IMPLEMENTAZIONE TILE AVANZATI NON ANCORA AVVIATA
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -575,6 +575,20 @@ Regola corrente:
   - controllo JSON PowerShell riuscito: 3 terrain type, 1 transition set;
   - controllo Roslyn isolato riuscito con soli warning attesi da controllo parziale;
   - prossimo step consigliato: collegare il resolver visuale al mesh builder terrain dietro gate/fallback legacy, oppure completare prima il filtro viewport chunk visibili.
+- micro-step `v0.38i.13` completato:
+  - definita roadmap operativa tile terrain per le richieste progettuali dell'operatore;
+  - la roadmap copre varianti tile, strategia atlas, rendering solo chunk visibili, tile animati e transizioni/autotile;
+  - confermata priorita' tecnica: prima filtro viewport XY/chunk visibili, poi collegamento del resolver visuale al mesh builder;
+  - definita sequenza consigliata `v0.38i.14`-`v0.38i.20`;
+  - `v0.38i.14`: visible chunk filter e culling chunk fuori viewport;
+  - `v0.38i.15`: collegamento `ArcGraphTerrainVisualResolver` al mesh builder con fallback legacy;
+  - `v0.38i.16`: consolidamento atlas e diagnostica coverage tile/atlas;
+  - `v0.38i.17`: varianti tile pesate da catalogo collegate al rendering;
+  - `v0.38i.18`: animazioni tile visibili, separate dal tick simulativo;
+  - `v0.38i.19`: transizioni cardinali/autotile semplice tra terrain type;
+  - `v0.38i.20`: gate visuale terrain completo con tile, varianti, animazioni e transizioni;
+  - nessuna modifica implementativa a renderer, mesh, World, MapGrid, scene o prefab in questo micro-step;
+  - prossimo step operativo consigliato: `v0.38i.14 - ArcGraph Terrain Visible Chunk Filter`.
 
 DOC SYNC:
 
