@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.15 - Collegamento Terrain Visual Resolver al Mesh Builder`
+`v0.38i.16 - Terrain Atlas Strategy e Coverage Diagnostics`
 
 STATUS:
-RESOLVER VISUALE TERRAIN COLLEGATO AL MESH BUILDER / FALLBACK LEGACY CONSERVATO
+DIAGNOSTICA COVERAGE VISUAL CATALOG -> UV CATALOG AGGIUNTA / MULTI-ATLAS UNITY NON ANCORA OPERATIVO
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -623,6 +623,20 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn isolato dei file terrain interessati riuscito con soli warning attesi da controllo parziale;
   - prossimo step operativo consigliato: `v0.38i.16 - Terrain Atlas Strategy e Coverage Diagnostics`.
+- micro-step `v0.38i.16` completato:
+  - introdotto `ArcGraphTerrainVisualCoverageDiagnostics`;
+  - introdotto `ArcGraphTerrainVisualCoverageAnalyzer`;
+  - introdotto `ArcGraphTerrainVisualCoverageHarness`;
+  - l'analizzatore confronta i tile richiesti dal visual catalog con i tile presenti nel catalogo UV/atlas;
+  - la coverage raccoglie default tile, varianti, frame animati e transition rules;
+  - il controllo resta data-only: non crea mesh, non legge texture, non carica asset e non modifica scena;
+  - `ArcGraphTerrainRuntimeSceneRenderer` aggrega ora coverage checked, coverage complete, required tiles, covered tiles, missing tiles e primo tile mancante;
+  - questo step non introduce ancora multi-material, multi-atlas Unity o batching multi-atlas operativo;
+  - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
+  - `git diff --check` superato;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn isolato dei file terrain interessati riuscito con soli warning attesi da controllo parziale;
+  - prossimo step operativo consigliato: `v0.38i.17 - Tile Variants Runtime`.
 
 DOC SYNC:
 

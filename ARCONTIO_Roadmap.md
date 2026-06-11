@@ -14026,6 +14026,135 @@ v0.38i.16 - Terrain Atlas Strategy e Coverage Diagnostics
 
 ---
 
+## Esito v0.38i.16 - Terrain Atlas Strategy e Coverage Diagnostics
+
+La `v0.38i.16` introduce il controllo passivo di coverage tra:
+
+```text
+ArcGraphTerrainVisualCatalog
+-> tile richiesti
+
+ArcGraphTerrainCatalog
+-> tile coperti da UV/atlas
+```
+
+Questo step non rende ancora operativo il multi-atlas Unity.
+
+Serve invece a sapere, prima del gate visuale, se il catalogo visuale chiede tile
+che il catalogo UV non conosce.
+
+---
+
+### Cosa e' stato aggiunto
+
+Sono stati introdotti:
+
+- `ArcGraphTerrainVisualCoverageDiagnostics`;
+- `ArcGraphTerrainVisualCoverageAnalyzer`;
+- `ArcGraphTerrainVisualCoverageHarness`.
+
+L'analizzatore raccoglie dal visual catalog:
+
+- default tile;
+- varianti;
+- frame animati;
+- tile delle transition rules.
+
+Poi confronta questi tile con gli id presenti nel catalogo UV.
+
+---
+
+### Output diagnostico
+
+La diagnostica produce:
+
+```text
+HasVisualCatalog
+HasUvCatalog
+IsFullyCovered
+RequiredTileCount
+CoveredTileCount
+MissingTileCount
+FirstMissingTileId
+Reason
+```
+
+Il renderer terrain runtime espone ora anche:
+
+```text
+coverageChecked
+coverageComplete
+coverageRequired
+coverageCovered
+coverageMissing
+coverageFirstMissing
+```
+
+Questo significa che il gate visuale potra' distinguere:
+
+```text
+il tile non si vede per problema di sprite/materiale
+```
+
+da:
+
+```text
+il tile non e' proprio dichiarato nel catalogo UV
+```
+
+---
+
+### Rapporto con atlas tematici
+
+La decisione progettuale resta:
+
+```text
+atlas tematici
+```
+
+Esempio futuro:
+
+```text
+terrain_base
+terrain_transition
+water
+structure_object
+```
+
+La `v0.38i.16` non implementa ancora un renderer multi-materiale per questi
+atlas.
+
+Implementa pero' il controllo minimo necessario:
+
+```text
+il visual catalog chiede tile X
+il catalogo UV deve coprire tile X
+```
+
+Il passaggio a piu' atlas fisici richiedera' una fase successiva sul renderer,
+perche' ogni atlas/materiale puo' implicare mesh separate o submesh.
+
+---
+
+### Cosa resta fuori
+
+Restano fuori:
+
+- multi-atlas Unity operativo;
+- scelta automatica del materiale in base ad atlas id;
+- batching multi-material;
+- submesh per atlas;
+- transizioni basate sul vicinato reale;
+- animazioni tile aggiornate nel tempo.
+
+Il prossimo step logico e':
+
+```text
+v0.38i.17 - Tile Variants Runtime
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

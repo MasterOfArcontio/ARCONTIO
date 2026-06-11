@@ -79,6 +79,12 @@ namespace Arcontio.View.ArcGraph
         private int _visualAnimationTileCount;
         private int _visualTransitionTileCount;
         private int _visualResolverFallbackCount;
+        private bool _coverageChecked;
+        private bool _coverageComplete;
+        private int _coverageRequiredTileCount;
+        private int _coverageCoveredTileCount;
+        private int _coverageMissingTileCount;
+        private int _coverageFirstMissingTileId;
 
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
         public bool RendererEnabled => rendererEnabled;
@@ -806,6 +812,12 @@ namespace Arcontio.View.ArcGraph
                 _visualAnimationTileCount,
                 _visualTransitionTileCount,
                 _visualResolverFallbackCount,
+                _coverageChecked,
+                _coverageComplete,
+                _coverageRequiredTileCount,
+                _coverageCoveredTileCount,
+                _coverageMissingTileCount,
+                _coverageFirstMissingTileId,
                 usedFallbackUv,
                 _uvMissingTileCount,
                 _uvFirstMissingTileId,
@@ -861,6 +873,12 @@ namespace Arcontio.View.ArcGraph
                 ", visualAnimations=" + _lastDiagnostics.VisualAnimationTileCount +
                 ", visualTransitions=" + _lastDiagnostics.VisualTransitionTileCount +
                 ", visualResolverFallbacks=" + _lastDiagnostics.VisualResolverFallbackCount +
+                ", coverageChecked=" + _lastDiagnostics.TerrainVisualCoverageChecked +
+                ", coverageComplete=" + _lastDiagnostics.TerrainVisualCoverageComplete +
+                ", coverageRequired=" + _lastDiagnostics.TerrainVisualCoverageRequiredTileCount +
+                ", coverageCovered=" + _lastDiagnostics.TerrainVisualCoverageCoveredTileCount +
+                ", coverageMissing=" + _lastDiagnostics.TerrainVisualCoverageMissingTileCount +
+                ", coverageFirstMissing=" + _lastDiagnostics.TerrainVisualCoverageFirstMissingTileId +
                 ", fallbackUv=" + _lastDiagnostics.UsedFallbackUv +
                 ", missingUvTiles=" + _lastDiagnostics.MissingUvTileCount +
                 ", firstMissingUvTileId=" + _lastDiagnostics.FirstMissingUvTileId +
@@ -1004,6 +1022,12 @@ namespace Arcontio.View.ArcGraph
             _visualAnimationTileCount = 0;
             _visualTransitionTileCount = 0;
             _visualResolverFallbackCount = 0;
+            _coverageChecked = false;
+            _coverageComplete = false;
+            _coverageRequiredTileCount = 0;
+            _coverageCoveredTileCount = 0;
+            _coverageMissingTileCount = 0;
+            _coverageFirstMissingTileId = -1;
         }
 
         private ArcGraphTerrainVisualBuildOptions CreateVisualBuildOptions()
@@ -1012,9 +1036,26 @@ namespace Arcontio.View.ArcGraph
             if (catalog == null || catalog.DefinitionCount <= 0)
                 return ArcGraphTerrainVisualBuildOptions.CreateLegacyOnly();
 
+            UpdateVisualCoverageDiagnostics(catalog);
+
             return ArcGraphTerrainVisualBuildOptions.CreateWithCatalog(
                 catalog,
                 visualTimeSeconds: 0f);
+        }
+
+        private void UpdateVisualCoverageDiagnostics(ArcGraphTerrainVisualCatalog visualCatalog)
+        {
+            var analyzer = new ArcGraphTerrainVisualCoverageAnalyzer();
+            ArcGraphTerrainVisualCoverageDiagnostics coverage = analyzer.Analyze(
+                visualCatalog,
+                _terrainCatalog);
+
+            _coverageChecked = coverage.HasVisualCatalog;
+            _coverageComplete = coverage.IsFullyCovered;
+            _coverageRequiredTileCount = coverage.RequiredTileCount;
+            _coverageCoveredTileCount = coverage.CoveredTileCount;
+            _coverageMissingTileCount = coverage.MissingTileCount;
+            _coverageFirstMissingTileId = coverage.FirstMissingTileId;
         }
 
         private ArcGraphTerrainCatalog GetOrParseTerrainCatalog()

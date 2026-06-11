@@ -23,6 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Input</b>: presenza context, config, map, runtime e terrain layer.</item>
     ///   <item><b>Catalogo</b>: presenza/parse del catalogo terrain e sorgente UV usata.</item>
     ///   <item><b>Catalogo visuale</b>: uso del resolver terrain, varianti, animazioni e fallback legacy.</item>
+    ///   <item><b>Coverage</b>: coerenza tra tile richiesti dal visual catalog e tile presenti nel catalogo UV.</item>
     ///   <item><b>Chunk</b>: chunk dirty richiesti, costruiti, non vuoti e applicati.</item>
     ///   <item><b>Pool</b>: oggetti creati, riusati, disattivati e attivi.</item>
     ///   <item><b>Reason</b>: esito sintetico del frame.</item>
@@ -72,6 +73,12 @@ namespace Arcontio.View.ArcGraph
         public readonly int VisualAnimationTileCount;
         public readonly int VisualTransitionTileCount;
         public readonly int VisualResolverFallbackCount;
+        public readonly bool TerrainVisualCoverageChecked;
+        public readonly bool TerrainVisualCoverageComplete;
+        public readonly int TerrainVisualCoverageRequiredTileCount;
+        public readonly int TerrainVisualCoverageCoveredTileCount;
+        public readonly int TerrainVisualCoverageMissingTileCount;
+        public readonly int TerrainVisualCoverageFirstMissingTileId;
         public readonly bool UsedFallbackUv;
         public readonly int MissingUvTileCount;
         public readonly int FirstMissingUvTileId;
@@ -128,6 +135,12 @@ namespace Arcontio.View.ArcGraph
             int visualAnimationTileCount,
             int visualTransitionTileCount,
             int visualResolverFallbackCount,
+            bool terrainVisualCoverageChecked,
+            bool terrainVisualCoverageComplete,
+            int terrainVisualCoverageRequiredTileCount,
+            int terrainVisualCoverageCoveredTileCount,
+            int terrainVisualCoverageMissingTileCount,
+            int terrainVisualCoverageFirstMissingTileId,
             bool usedFallbackUv,
             int missingUvTileCount,
             int firstMissingUvTileId,
@@ -175,6 +188,12 @@ namespace Arcontio.View.ArcGraph
             VisualAnimationTileCount = NormalizeCount(visualAnimationTileCount);
             VisualTransitionTileCount = NormalizeCount(visualTransitionTileCount);
             VisualResolverFallbackCount = NormalizeCount(visualResolverFallbackCount);
+            TerrainVisualCoverageChecked = terrainVisualCoverageChecked;
+            TerrainVisualCoverageComplete = terrainVisualCoverageComplete;
+            TerrainVisualCoverageRequiredTileCount = NormalizeCount(terrainVisualCoverageRequiredTileCount);
+            TerrainVisualCoverageCoveredTileCount = NormalizeCount(terrainVisualCoverageCoveredTileCount);
+            TerrainVisualCoverageMissingTileCount = NormalizeCount(terrainVisualCoverageMissingTileCount);
+            TerrainVisualCoverageFirstMissingTileId = terrainVisualCoverageFirstMissingTileId;
             UsedFallbackUv = usedFallbackUv;
             MissingUvTileCount = NormalizeCount(missingUvTileCount);
             FirstMissingUvTileId = firstMissingUvTileId;
