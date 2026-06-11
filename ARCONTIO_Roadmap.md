@@ -14155,6 +14155,125 @@ v0.38i.17 - Tile Variants Runtime
 
 ---
 
+## Esito v0.38i.17 - Tile Variants Runtime
+
+La `v0.38i.17` consolida il comportamento delle varianti tile del terreno.
+
+Il punto progettuale e' semplice:
+
+```text
+una cella prato puo' usare tile prato diversi
+ma la stessa cella deve mantenere sempre lo stesso tile
+```
+
+Questo evita il problema peggiore delle varianti grafiche, cioe' il flickering:
+se a ogni frame una cella scegliesse casualmente un tile diverso, il terreno
+sembrerebbe tremare.
+
+---
+
+### Cosa e' stato aggiunto
+
+Sono stati introdotti:
+
+- `ArcGraphTerrainVariantDiagnostics`;
+- `ArcGraphTerrainVariantAnalyzer`;
+- `ArcGraphTerrainVariantHarness`.
+
+L'analizzatore lavora su:
+
+- `ArcGraphTerrainVisualCatalog`;
+- terrain id, per esempio `grass`;
+- dimensione del campione, per esempio `16x16`;
+- livello Z;
+- tempo visuale opzionale.
+
+Per ogni cella del campione risolve il tile due volte.
+
+Se la stessa cella produce due tile diversi, la diagnostica segnala instabilita'.
+
+Se invece tutte le celle sono stabili e nel campione appaiono piu' tile diversi,
+il catalogo sta producendo varieta' visuale corretta.
+
+---
+
+### Output diagnostico
+
+La diagnostica produce:
+
+```text
+HasCatalog
+HasTerrainDefinition
+IsStable
+HasVariation
+SampleCount
+StableSampleCount
+ChangedSampleCount
+DistinctTileCount
+FirstTileId
+FirstChangedCellX/Y/Z
+Reason
+```
+
+Esempio interpretativo:
+
+```text
+IsStable = true
+HasVariation = true
+SampleCount = 256
+ChangedSampleCount = 0
+DistinctTileCount = 3
+Reason = StableVariantDistribution
+```
+
+significa:
+
+```text
+ho controllato 256 celle
+nessuna cella cambia tile tra due risoluzioni consecutive
+il campione usa 3 tile diversi
+```
+
+Questo e' il comportamento desiderato per prato, terra, pavimento o altri tile
+statici con varianti.
+
+---
+
+### Rapporto con il rendering
+
+Il mesh builder era gia' stato collegato al `ArcGraphTerrainVisualResolver` in
+`v0.38i.15`.
+
+La `v0.38i.17` non cambia quindi la mesh in modo nuovo.
+
+Serve invece a rendere verificabile il contratto:
+
+```text
+le varianti che arrivano al rendering sono stabili per coordinate
+```
+
+La scelta resta deterministica e non usa random per-frame.
+
+---
+
+### Cosa resta fuori
+
+Restano fuori:
+
+- animazione tile nel tempo;
+- refresh dei chunk quando cambia il frame visuale di acqua o altri terreni animati;
+- transizioni/autotile basate sul vicinato reale;
+- multi-atlas Unity operativo;
+- gate visuale completo terrain.
+
+Il prossimo step logico e':
+
+```text
+v0.38i.18 - Animated Terrain Tiles
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

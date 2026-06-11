@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.16 - Terrain Atlas Strategy e Coverage Diagnostics`
+`v0.38i.17 - Tile Variants Runtime`
 
 STATUS:
-DIAGNOSTICA COVERAGE VISUAL CATALOG -> UV CATALOG AGGIUNTA / MULTI-ATLAS UNITY NON ANCORA OPERATIVO
+VARIANTI TILE TERRAIN DETERMINISTICHE VERIFICATE / NESSUN RANDOM PER FRAME INTRODOTTO
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -637,6 +637,19 @@ Regola corrente:
   - ricerca statica sulle dipendenze vietate superata;
   - controllo Roslyn isolato dei file terrain interessati riuscito con soli warning attesi da controllo parziale;
   - prossimo step operativo consigliato: `v0.38i.17 - Tile Variants Runtime`.
+- micro-step `v0.38i.17` completato:
+  - introdotto `ArcGraphTerrainVariantDiagnostics`;
+  - introdotto `ArcGraphTerrainVariantAnalyzer`;
+  - introdotto `ArcGraphTerrainVariantHarness`;
+  - l'analizzatore controlla una finestra rettangolare di celle per verificare che la stessa cella risolva sempre lo stesso tile visuale;
+  - il controllo misura anche quanti tile distinti vengono incontrati, cosi' il catalogo puo' produrre varieta' visiva senza flickering;
+  - lo smoke test usa un prato con tre varianti pesate e verifica stabilita', sample count e distribuzione minima;
+  - il controllo resta data-only: non crea mesh, non legge texture, non carica asset e non modifica scena;
+  - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
+  - `git diff --check` superato;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn isolato dei file terrain visuali riuscito con soli warning attesi da controllo parziale;
+  - prossimo step operativo consigliato: `v0.38i.18 - Animated Terrain Tiles`.
 
 DOC SYNC:
 
