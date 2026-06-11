@@ -12355,6 +12355,129 @@ Il test consigliato e':
 
 ---
 
+## Esito v0.38i.07 - ArcGraph NPC Sprite Resource Probe
+
+La `v0.38i.07` aggiunge un probe tecnico per verificare le sprite NPC prima del
+gate visuale Unity.
+
+### Perche' serve
+
+Dopo la `v0.38i.06`, il resolver puo' caricare sprite da `Assets/Resources`.
+Resta pero' un problema pratico:
+
+```text
+se l'NPC non appare, il problema e' nel renderer, nel catalogo, nei path PNG o negli import settings?
+```
+
+Per evitare un gate visuale cieco, e' stato aggiunto un componente separato:
+
+```text
+ArcGraphNpcSpriteResourceProbe
+```
+
+Questo componente non disegna nulla. Serve solo a rispondere alla domanda:
+
+```text
+le sprite key dichiarate dal catalogo NPC sono risolvibili dal resolver?
+```
+
+### Funzionamento
+
+Il probe riceve da Inspector:
+
+- `Npc Visual Catalog Json`;
+- un componente `Sprite Resolver Behaviour`.
+
+Poi, tramite menu contestuale:
+
+```text
+ArcGraph/Probe NPC Sprite Resources
+```
+
+esegue questo controllo:
+
+```text
+catalogo NPC
+-> frame espansi
+-> sprite key dichiarate
+-> resolver sprite
+-> conteggio sprite risolte/mancanti
+```
+
+### Diagnostica
+
+La diagnostica prodotta contiene:
+
+- presenza catalogo JSON;
+- parse catalogo riuscito o fallito;
+- presenza resolver;
+- numero frame del catalogo;
+- numero sprite key controllate;
+- numero sprite key vuote;
+- numero sprite risolte;
+- numero sprite mancanti;
+- prima sprite key mancante;
+- ragione sintetica.
+
+Esempio di esito positivo atteso con set completo:
+
+```text
+reason=NpcSpriteResourcesReady
+catalogFrames=208
+checkedSpriteKeys=208
+resolvedSprites=208
+missingSprites=0
+```
+
+Esempio di esito utile con asset mancanti:
+
+```text
+reason=NpcSpriteResourcesIncomplete
+catalogFrames=208
+checkedSpriteKeys=208
+resolvedSprites=64
+missingSprites=144
+firstMissing='ArcGraph/NPC/human_default/head/north_walk_03'
+```
+
+### Confini architetturali
+
+Lo step:
+
+- non crea `GameObject`;
+- non crea `SpriteRenderer`;
+- non disegna;
+- non legge `World`;
+- non legge `MapGridWorldView`;
+- non usa `FindObjectOfType`;
+- non invia comandi;
+- non usa `Resources.Load` direttamente;
+- non modifica la simulazione.
+
+Il caricamento asset resta nel resolver scene-side introdotto in `v0.38i.06`.
+
+### Stato dopo v0.38i.07
+
+ArcGraph possiede ora un controllo tecnico oggettivo prima del gate visuale NPC.
+
+Questo non significa che il gate visuale sia superato.
+
+Significa invece:
+
+```text
+prima controlliamo path e risoluzione sprite
+poi testiamo resa visiva, sorting, ombra e movimento
+```
+
+Prossimo step consigliato:
+
+```text
+v0.38i.08 - stabilizzazione renderer NPC:
+fallback, missing sprites, sorting parti, ombra e diagnostica
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

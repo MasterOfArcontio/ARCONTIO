@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.06 - ArcGraph NPC Sprite Resolver Practical Wiring`
+`v0.38i.07 - ArcGraph NPC Sprite Resource Probe`
 
 STATUS:
-RESOLVER SPRITE NPC COLLEGATO A RESOURCES CON CACHE / PROSSIMO STEP GATE VISUALE UNITY O RIFINITURA TERRENO/NPC MINIMA
+PROBE RISORSE SPRITE NPC AGGIUNTO / GATE VISUALE UNITY ANCORA DA ESEGUIRE CON PNG REALI
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -512,6 +512,17 @@ Regola corrente:
   - il caricamento asset resta confinato al resolver scene-side: builder, cataloghi, snapshot e queue ArcGraph continuano a produrre solo dati passivi;
   - aggiornato il documento istruzioni: con nomi e path coerenti non serve mappare manualmente i 208 PNG nell'Inspector;
   - prossimo step consigliato: gate visuale Unity con PNG reali minimi o set completo sotto `Assets/Resources/ArcGraph/NPC/...`.
+- micro-step `v0.38i.07` completato:
+  - introdotto `ArcGraphNpcSpriteResourceProbeDiagnostics`;
+  - introdotto `ArcGraphNpcSpriteResourceProbe`;
+  - il probe legge un `TextAsset` catalogo NPC assegnato da Inspector;
+  - il probe usa un componente che implementa `IArcGraphSpriteResolver`;
+  - context menu aggiunto: `ArcGraph/Probe NPC Sprite Resources`;
+  - il probe conta frame dichiarati, sprite key controllate, sprite key vuote, sprite risolte e sprite mancanti;
+  - il probe stampa la prima sprite key mancante, utile per correggere path o nome PNG;
+  - non crea GameObject, non disegna, non legge World, non usa `Resources.Load` direttamente e non modifica ArcGraph;
+  - il gate visuale non viene dichiarato superato: lo step prepara solo una verifica tecnica oggettiva prima del test Unity con asset reali;
+  - prossimo step consigliato: stabilizzazione del renderer NPC su fallback, sorting e diagnostica dopo probe/gate.
 
 DOC SYNC:
 
