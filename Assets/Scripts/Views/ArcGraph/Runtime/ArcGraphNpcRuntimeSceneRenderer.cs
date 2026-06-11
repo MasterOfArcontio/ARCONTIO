@@ -338,6 +338,27 @@ namespace Arcontio.View.ArcGraph
             }
         }
 
+        // =============================================================================
+        // LogLastDiagnosticsFromContextMenu
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ristampa in Console l'ultima diagnostica prodotta dal renderer NPC.
+        /// </para>
+        ///
+        /// <para><b>Supporto gate visuale</b></para>
+        /// <para>
+        /// Durante i test Unity puo' essere utile leggere di nuovo l'ultimo stato
+        /// senza rieseguire il render: questo menu non modifica scena, pool o
+        /// simulazione, ma richiama soltanto il log diagnostico gia' salvato.
+        /// </para>
+        /// </summary>
+        [ContextMenu("ArcGraph/Log Last NPC Runtime Diagnostics")]
+        public void LogLastDiagnosticsFromContextMenu()
+        {
+            LogLastDiagnostics();
+        }
+
         private ArcGraphNpcRuntimeSceneRendererContract CreateContract()
         {
             return new ArcGraphNpcRuntimeSceneRendererContract(
@@ -542,6 +563,13 @@ namespace Arcontio.View.ArcGraph
             string direction = ResolveDirection(entry, contract);
             string animation = entry.HasMotion ? "walk" : catalog.DefaultAnimationKey;
             bool appliedAnyPart = false;
+
+            // Prima di applicare il frame modulare corrente spegniamo tutte le
+            // parti gia' presenti nel pool. Questo evita residui visivi: se, per
+            // esempio, nel frame precedente esisteva la testa e nel frame corrente
+            // la sprite head manca o il catalogo non la risolve, la vecchia testa
+            // non deve restare disegnata per errore.
+            SetPartRenderersEnabled(handle, false);
 
             for (int i = 0; i < catalog.Parts.Count; i++)
             {

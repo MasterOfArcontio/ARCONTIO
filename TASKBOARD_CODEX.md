@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.07 - ArcGraph NPC Sprite Resource Probe`
+`v0.38i.08 - ArcGraph NPC Runtime Renderer Stabilization`
 
 STATUS:
-PROBE RISORSE SPRITE NPC AGGIUNTO / GATE VISUALE UNITY ANCORA DA ESEGUIRE CON PNG REALI
+RENDERER NPC STABILIZZATO SU PARTI MODULARI E DIAGNOSTICA / GATE VISUALE UNITY ANCORA DA ESEGUIRE CON PNG REALI
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -523,6 +523,16 @@ Regola corrente:
   - non crea GameObject, non disegna, non legge World, non usa `Resources.Load` direttamente e non modifica ArcGraph;
   - il gate visuale non viene dichiarato superato: lo step prepara solo una verifica tecnica oggettiva prima del test Unity con asset reali;
   - prossimo step consigliato: stabilizzazione del renderer NPC su fallback, sorting e diagnostica dopo probe/gate.
+- micro-step `v0.38i.08` completato:
+  - stabilizzato `ArcGraphNpcRuntimeSceneRenderer` nel percorso layered actor;
+  - prima di applicare un frame modulare, il renderer spegne tutte le parti gia' presenti nel pool dell'NPC;
+  - questa correzione evita residui visivi quando una parte esisteva nel frame precedente ma manca o non si risolve nel frame corrente;
+  - aggiunto context menu `ArcGraph/Log Last NPC Runtime Diagnostics`;
+  - il menu ristampa l'ultima diagnostica senza rieseguire render, senza modificare scena, pool o simulazione;
+  - nessuna modifica a World, Decision Layer, Job Layer, movimento o MapGrid;
+  - ricerca statica sulle dipendenze vietate superata;
+  - controllo Roslyn isolato del renderer NPC riuscito con soli warning `SerializeField` attesi;
+  - prossimo step consigliato: verifica animazione NPC fluida e direzione frame walk/idle.
 
 DOC SYNC:
 

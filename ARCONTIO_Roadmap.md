@@ -12478,6 +12478,130 @@ fallback, missing sprites, sorting parti, ombra e diagnostica
 
 ---
 
+## Esito v0.38i.08 - ArcGraph NPC Runtime Renderer Stabilization
+
+La `v0.38i.08` stabilizza un comportamento pratico del renderer NPC modulare
+prima del gate visuale con sprite reali.
+
+### Problema individuato
+
+Il renderer NPC mantiene un pool di `SpriteRenderer` per ogni actor.
+
+Nel percorso modulare, ogni NPC puo' avere parti separate:
+
+```text
+body
+head
+legs
+feet
+shadow
+```
+
+Se in un frame precedente una parte era stata disegnata, ma nel frame corrente
+quella stessa parte non viene risolta dal catalogo o dal resolver, esiste un
+rischio visivo:
+
+```text
+la vecchia parte resta accesa
+```
+
+Esempio:
+
+```text
+frame 1:
+body ok
+head ok
+legs ok
+feet ok
+
+frame 2:
+body ok
+head mancante
+legs ok
+feet ok
+
+rischio precedente:
+head del frame 1 resta visibile
+```
+
+### Correzione
+
+Nel percorso `TryApplyLayeredActorEntry`, prima di applicare il frame modulare
+corrente, il renderer ora spegne tutte le parti gia' presenti nel pool
+dell'actor.
+
+Poi riaccende solo le parti realmente risolte nel frame corrente.
+
+Il comportamento diventa:
+
+```text
+inizio render actor modulare
+-> spegni tutte le parti vecchie
+-> risolvi frame corrente
+-> accendi solo body/head/legs/feet disponibili
+```
+
+Questo evita residui visuali durante:
+
+- asset mancanti;
+- frame mancanti nel catalogo;
+- fallback parziali;
+- cambio direzione;
+- cambio animazione;
+- test con set PNG incompleto.
+
+### Supporto diagnostico
+
+Aggiunto menu contestuale:
+
+```text
+ArcGraph/Log Last NPC Runtime Diagnostics
+```
+
+Serve a ristampare l'ultima diagnostica del renderer NPC senza rieseguire il
+render.
+
+Questo e' utile durante il gate Unity quando si vuole rileggere in Console:
+
+- actor renderizzati;
+- actor layered;
+- parti create;
+- parti riusate;
+- sprite mancanti;
+- fallback generati;
+- frame catalogo mancanti.
+
+### Confini preservati
+
+Lo step:
+
+- non modifica `World`;
+- non modifica Decision Layer;
+- non modifica Job Layer;
+- non modifica movimento;
+- non modifica MapGrid;
+- non salva scene;
+- non salva prefab;
+- non introduce asset load nel renderer;
+- non cambia il resolver;
+- non cambia il catalogo NPC.
+
+### Stato dopo v0.38i.08
+
+Il renderer NPC modulare e' piu' robusto in presenza di asset incompleti.
+
+Il gate visuale resta da eseguire, ma ora un set sprite incompleto non dovrebbe
+lasciare residui di parti vecchie accese tra frame successivi.
+
+Prossimo step consigliato:
+
+```text
+v0.38i.09 - verifica e rifinitura animazione NPC:
+idle 4 frame, walk 9 frame, direzione e motion progress
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
