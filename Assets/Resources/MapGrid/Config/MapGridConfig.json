@@ -23,6 +23,13 @@
     }
   ],
 
+  "nonWalkableTerrainTileIds": [
+    30,
+    31,
+    32,
+    33
+  ],
+
   "layoutResourcePath": "MapGrid/Layouts/Layout_ArcGraph_TerrainVisualTest",
 
   "camera": {

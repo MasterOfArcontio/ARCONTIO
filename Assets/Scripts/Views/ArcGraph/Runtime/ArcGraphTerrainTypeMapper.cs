@@ -51,6 +51,9 @@ namespace Arcontio.View.ArcGraph
             if (sourceTileId >= 30 && sourceTileId <= 33)
                 return "water";
 
+            if (sourceTileId >= 40 && sourceTileId <= 42)
+                return "tile_floor";
+
             if (sourceTileId >= 10 && sourceTileId <= 12)
                 return "stone_floor";
 

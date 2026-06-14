@@ -38,6 +38,11 @@ namespace Arcontio.View.MapGrid
         // Definizioni tile: associano tileId -> coordinate (uvX,uvY) nell'atlas a griglia.
         public TileDef[] tileDefs;
 
+        // Tile di terreno che non possono essere attraversati dagli attori.
+        // Esempio attuale: acqua. Non va confuso con gli occluder/muri, perche'
+        // quelli restano ostacoli fisici espliciti e possono avere regole visuali diverse.
+        public int[] nonWalkableTerrainTileIds;
+
         // Path in Resources del layout (dove sono tile, ostacoli, risorse).
         public string layoutResourcePath;
 

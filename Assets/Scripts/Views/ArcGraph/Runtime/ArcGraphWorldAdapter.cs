@@ -120,7 +120,7 @@ namespace Arcontio.View.ArcGraph
                     target.Add(new ArcGraphTerrainCellSnapshot(
                         cell,
                         map.GetTerrain(x, y),
-                        map.IsBlocked(x, y)));
+                        map.IsMovementBlocked(x, y)));
                 }
             }
         }

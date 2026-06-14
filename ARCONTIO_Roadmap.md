@@ -10,42 +10,56 @@
 
 | Versione | Focus principale | Periodo stimato | Stato |
 |----------|-----------------|-----------------|-------|
-| v0.01 | Sistemi base: perception, memory, token | Completata | - |
-| v0.02 | Sistemi base 2 | Completata | - |
-| v0.03 | Pathfinding landmark + ComplexEdge + failure ladder | Aprile 2026 | Completata |
-| v0.04 | NpcDnaProfile · NpcProfile · Needs System · BeliefStore | Aprile 2026 | Completata con residui parziali documentati |
-| v0.05 | Decision Layer baseline / NeedsDecision bridge | Aprile 2026 | Parziale legacy |
-| v0.05.5 | EL-MBQD Runtime UI Registry + pannello laterale | Aprile 2026 | Completata |
-| v0.06 | Job System + Step System | Aprile 2026 | Completata ma da reintegrare |
-| v0.07 | Explainability Layer v0.06: Job / Phase / Step / Command | Posticipata |
-| v0.08 | Repository Stabilization + Constitutional Documentation Bootstrap | Aprile 2026 | IN CORSO |
-| v0.09 | Simulation Backbone Hardening & Constitutional Alignment | Maggio 2026 | Completata |
-| v0.10 | World Persistence Closure & Save/Load Completion | Maggio 2026 | Completata |
-| v0.11A | Job Backbone Reintegration | Maggio 2026 | Completata |
-| v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | Completata |
-| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio 2026 | Completata fino a v0.11c.06 |
-| v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | Completata |
-| v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | Completata |
-| v0.13 | Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule | Giugno 2026 | Completata |
-| v0.14 | Job Recovery Runtime e fallback degli incarichi | Giugno 2026 | Completata |
-| v0.15 | Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime | Giugno-Luglio 2026 | Completata |
-| v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | Completata |
-| v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | Pending |
-| v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | In corso |
-| v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | Completata fino a v0.20q |
-| v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | In corso |
-| v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | Completata come foundation |
-| v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | Completata |
-| v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | Completata |
-| v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | Completata nel perimetro sicuro |
-| v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | Completata nel perimetro passivo |
-| v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | Completata nel perimetro bridge read-only |
-| v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | Aperta in audit preparatorio |
-| v0.37 | ArcGraph Debug/Overlay Migration | Settembre 2026 | Pending |
-| v0.38 | ArcGraph Legacy Absorption / Retirement | Settembre 2026 | Pending |
-| v0.170 | Conseguenze Sociali Emergenti | Luglio-Agosto 2026 | Pending |
-| v0.180 | Observer Layer Pubblico ed Explainability Esterna | Agosto 2026 | Pending |
-| v1.00 | Prima demo giocabile pubblica | TBD | Target |
+| v0.01 | Sistemi base: perception, memory, token | Completata | ✅ Completata |
+| v0.02 | Sistemi base 2 | Completata | ✅ Completata |
+| v0.03 | Pathfinding landmark + ComplexEdge + failure ladder | Aprile 2026 | ✅ Completata |
+| v0.04 | NpcDnaProfile · NpcProfile · Needs System · BeliefStore | Aprile 2026 | ✅ Completata con residui parziali documentati |
+| v0.05 | Decision Layer baseline / NeedsDecision bridge | Aprile 2026 | ⚠️ Parziale legacy |
+| v0.05.5 | EL-MBQD Runtime UI Registry + pannello laterale | Aprile 2026 | ✅ Completata |
+| v0.06 | Job System + Step System | Aprile 2026 | ✅ Completata ma da reintegrare |
+| v0.07 | Explainability Layer v0.06: Job / Phase / Step / Command | Posticipata | 🧊 Posticipata |
+| v0.08 | Repository Stabilization + Constitutional Documentation Bootstrap | Aprile 2026 | ✅ Completata |
+| v0.09 | Simulation Backbone Hardening & Constitutional Alignment | Maggio 2026 | ✅ Completata |
+| v0.10 | World Persistence Closure & Save/Load Completion | Maggio 2026 | ✅ Completata |
+| v0.11A | Job Backbone Reintegration | Maggio 2026 | ✅ Completata |
+| v0.11B | Decision Architecture (MBQD) Foundation | Maggio 2026 | ✅ Completata |
+| v0.11C | Decision Orchestrator & Temporal Runtime Foundation | Maggio 2026 | ✅ Completata fino a v0.11c.06 |
+| v0.11D | Runtime Infrastructure & Dormant Systems Forensic Reintegration | Maggio-Giugno 2026 | ✅ Completata |
+| v0.12 | Pulizia Logging, Explainability e Diagnostica Runtime | Giugno 2026 | ✅ Completata |
+| v0.13 | Chiusura MBQD/Incarichi e pensionamento NeedsDecisionRule | Giugno 2026 | ✅ Completata |
+| v0.14 | Job Recovery Runtime e fallback degli incarichi | Giugno 2026 | ✅ Completata |
+| v0.15 | Chiusura Movimento Multi-Tick e pensionamento MoveIntent runtime | Giugno-Luglio 2026 | ✅ Completata |
+| v0.16 | Cognizione Soggettiva Avanzata | Luglio 2026 | ✅ Completata |
+| v0.17 | Osservatorio costi runtime e profilazione per NPC | Luglio 2026 | ⏳ Pending |
+| v0.18 | Ottimizzazione forte runtime percezione / belief / query | Luglio 2026 | 🔄 In corso |
+| v0.20 | Rifondazione percettiva strutturale e scheduling percettivo | Luglio 2026 | ✅ Completata fino a v0.20q |
+| v0.21 | Stabilizzazione post-rifondazione percettiva | Luglio 2026 | 🔄 In corso |
+| v0.30 | ArcGraph Foundation e sostituzione progressiva rendering provvisorio | Agosto 2026 | ✅ Completata come foundation |
+| v0.31 | ArcGraph Bootstrap controllato | Agosto 2026 | ✅ Completata |
+| v0.32 | ArcGraph Terrain Renderer | Agosto 2026 | ✅ Completata |
+| v0.33 | ArcGraph Modalita' comparativa controllata | Agosto 2026 | ✅ Completata nel perimetro sicuro |
+| v0.34 | ArcGraph Actor/Object Renderer | Agosto 2026 | ✅ Completata nel perimetro passivo |
+| v0.35 | ArcGraph Actor Motion Runtime Bridge | Agosto 2026 | ✅ Completata nel perimetro bridge read-only |
+| v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | ✅ Completata come contratti visuali preparatori |
+| v0.37 | ArcGraph Debug/Overlay Migration | Settembre 2026 | ✅ Completata come migrazione debug minima |
+| v0.38 | ArcGraph Legacy Absorption / Retirement | Settembre 2026 | 🔄 In corso |
+| v0.39 | Environment Foundation Data-Only | Post-v0.38 | ⏳ Pending |
+| v0.40 | Calendar, Time, Season | Post-v0.39 | ⏳ Pending |
+| v0.41 | Global Climate & Weather | Post-v0.40 | ⏳ Pending |
+| v0.42 | Environment Area Registry | Post-v0.41 | ⏳ Pending |
+| v0.43 | Fertility Areas | Post-v0.42 | ⏳ Pending |
+| v0.44 | Water Areas / Water Map | Post-v0.43 | ⏳ Pending |
+| v0.45 | Vegetation Areas & SeedBank | Post-v0.44 | ⏳ Pending |
+| v0.46 | Plant Catalog | Post-v0.45 | ⏳ Pending |
+| v0.47 | PlantInstance Lifecycle | Post-v0.46 | ⏳ Pending |
+| v0.48 | Natural Growth Loop | Post-v0.47 | ⏳ Pending |
+| v0.49 | Agriculture Foundation | Post-v0.48 | ⏳ Pending |
+| v0.50 | Environment Read-Only Snapshots | Post-v0.49 | ⏳ Pending |
+| v0.51 | Save/Load Environment | Post-v0.50 | ⏳ Pending |
+| v0.52 | ArcGraph Environment Adapter | Post-v0.51 | ⏳ Pending |
+| v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ Pending |
+| v0.180 | Observer Layer Pubblico ed Explainability Esterna | Dopo observer prerequisites | ⏳ Pending |
+| v1.00 | Prima demo giocabile pubblica | TBD | 🎯 Target |
 
 ---
 
@@ -7174,6 +7188,42 @@ La chiusura di questa fase richiedera':
 | v0.38g.05 | Wrapper scena minimo per alimentare il coordinator runtime ArcGraph | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da mancanza percorso produttivo stabile |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
+| v0.38j.01 | Metadati traversabilita' terrain: acqua non camminabile e pavimento a piastrella configurabile | In corso |
+| v0.38j.02 | Metadati muri: struttura 32x83, footprint 1x1, blocco movimento e blocco visione | Pending |
+| v0.38j.03 | Resolver muri cardinali: scelta sprite in base ai vicini N/E/S/W | Pending |
+| v0.38j.04 | Renderer oggetti/muri ArcGraph con altezza sprite e ordinamento dietro/davanti NPC | Pending |
+| v0.38j.05 | Composizione pavimenti a mini-tile 16x16 per giunzioni interno/esterno sotto muri sottili | Pending |
+
+## Roadmap operativa v0.38j - Terreno, muri e blocchi fisici
+
+Questa micro-roadmap completa la parte minima di ArcGraph necessaria a trattare
+terreno, acqua, pavimenti e muri come elementi grafici e semi-fisici coerenti.
+
+1. `v0.38j.01` - Traversabilita' terrain.
+   L'acqua deve essere visibile come terrain ma non attraversabile. Il blocco
+   terrain non deve essere confuso con i muri legacy, altrimenti il vecchio
+   renderer MapGrid trasformerebbe l'acqua in ostacolo visuale.
+
+2. `v0.38j.02` - Metadati muri.
+   Il muro occupa formalmente una cella 32x32, ma lo sprite e' alto 83 pixel.
+   La base resta nella cella, mentre la parte superiore sale sopra. Il muro
+   blocca movimento e visione, ma non diventa terrain.
+
+3. `v0.38j.03` - Resolver muri cardinali.
+   Il renderer deve scegliere la variante corretta del muro osservando i vicini
+   cardinali. Esempi: linea orizzontale, linea verticale, angolo a L, T,
+   incrocio a croce.
+
+4. `v0.38j.04` - Rendering muri/oggetti alti.
+   ArcGraph deve disegnare oggetti piu' alti di una cella con pivot coerente,
+   sorting leggibile e base ancorata alla griglia. La semi-trasparenza quando
+   un NPC passa dietro resta una fase successiva se richiede regole occlusive
+   dedicate.
+
+5. `v0.38j.05` - Mini-tile pavimento.
+   I muri sottili lasciano vedere porzioni di pavimento ai lati. Quando interno
+   ed esterno hanno pavimenti diversi, alcuni casi richiederanno composizione
+   16x16 o overlay dedicati.
 
 ## Esito v0.38a - ArcGraph Legacy Absorption Audit
 
@@ -15152,10 +15202,572 @@ ArcGraph minimo stabile, pronto per ricevere moduli visuali futuri uno alla volt
 
 ---
 
+## Roadmap v0.39-v0.52 - Biosfera / Environment Foundation
+
+La roadmap BIOSFERA nasce dalla pagina Notion `BIOSFERA` e dal rapido audit di
+compatibilita' con ArcGraph.
+
+Obiettivo generale:
+
+```text
+introdurre una biosfera sistemica, stratificata e compatibile con la futura vista
+ArcGraph, senza trasformare oggetti, rendering o MapGrid in source of truth
+ambientale
+```
+
+Principio architetturale:
+
+```text
+Core Environment possiede dati e regole ambientali.
+ArcGraph ricevera' in futuro snapshot visuali derivati.
+ArcGraph non deve possedere clima, crescita, acqua, fertilita' o seed bank.
+```
+
+Regole iniziali:
+
+- non introdurre rendering dentro `Assets/Scripts/Core/Environment`;
+- non creare ponte diretto con ArcGraph prima di `v0.52`;
+- non modificare `World.cs` o `SimulationHost` nella foundation data-only;
+- non usare `WorldObjectInstance` come contenitore universale della biosfera;
+- distinguere sempre proprieta' di cella, area ambientale, oggetto naturale, pianta importante e actor;
+- usare coordinate compatibili con `x/y/z`, anche se il primo runtime opera solo su `z = 0`;
+- produrre snapshot read-only Core-side, non snapshot ArcGraph-side;
+- mantenere update rari e cadenzati: orario/giornaliero/stagionale, non frame-based.
+
+Problemi progettuali da chiudere prima del runtime produttivo:
+
+| Nodo | Rischio | Decisione provvisoria |
+|---|---|---|
+| Scala tempo reale/simulato | La pagina BIOSFERA conteneva durate non coerenti tra loro | Decisione: `24 ore simulate = 20 minuti reali`; valori futuri in file di configurazione |
+| Cella come contenitore unico | Saturazione del vincolo `1 oggetto per cella` | Cella come coordinata + layer sovrapposti |
+| Aree sovrapposte | Un solo `AreaId` non basta | Registry per layer: fertility/water/vegetation/room/territory |
+| Vegetazione diffusa | Troppe entita' se ogni filo d'erba diventa oggetto | `VegetationArea` + seedBank astratta |
+| Piante importanti | Ambiguita' tra oggetto e pianta viva | `PlantInstance` ambientale, con output risorse futuro |
+| Acqua | Rischio fluidodinamica precoce | Profondita' discreta e aree stabili, niente simulazione continua |
+| Z-level | Rischio esplosione scope | Contratti `x/y/z` subito, uso produttivo multilivello rinviato |
+| ArcGraph | Rischio coupling Core -> View | Adapter differito a `v0.52` |
+
+Schema concettuale canonico:
+
+```text
+Mappa = griglia stabile
+Cella = coordinate + layer
+Oggetti = solo uno dei layer
+Piante = layer separato
+NPC/animali = actor layer
+Acqua = liquid layer
+Altitudine = terrain/elevation layer
+Ecosistema = aree chiuse sovrapposte
+Rendering = consumer separato che legge snapshot derivati
+```
+
+---
+
+### v0.39 - Environment Foundation Data-Only
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+creare il vocabolario dati minimo della biosfera senza attivare sistemi runtime
+```
+
+Perimetro:
+
+- nuovi file solo sotto `Assets/Scripts/Core/Environment`;
+- contratti value-only e DTO passivi;
+- nessun riferimento a `Arcontio.View.ArcGraph`;
+- nessun riferimento operativo a MapGrid;
+- nessun renderer;
+- nessun `MonoBehaviour`;
+- nessuna modifica a scene, prefab o `.meta`.
+
+Contratti previsti:
+
+| Blocco | Strutture candidate | Stato |
+|---|---|---|
+| Coordinate | `EnvironmentCellCoord`, `EnvironmentChunkCoord` | ⏳ Pending |
+| Aree | `EnvironmentAreaId`, `EnvironmentAreaKind`, `EnvironmentAreaBounds`, `EnvironmentAreaDefinition` | ⏳ Pending |
+| Calendario | `EnvironmentCalendarState`, `EnvironmentDate`, `EnvironmentTimeOfDay` | ⏳ Pending |
+| Stagioni | `EnvironmentSeasonKind`, `EnvironmentSeasonProfile` | ⏳ Pending |
+| Clima | `EnvironmentGlobalClimateState`, `EnvironmentWeatherKind` | ⏳ Pending |
+| Fertilita' | `EnvironmentFertilityAreaState` | ⏳ Pending |
+| Acqua | `EnvironmentWaterAreaState`, `EnvironmentWaterDepthLevel` | ⏳ Pending |
+| Vegetazione | `EnvironmentVegetationAreaState`, `EnvironmentSeedBankEntry` | ⏳ Pending |
+| Snapshot | `EnvironmentSnapshot`, `EnvironmentAreaSnapshot`, snapshot per dominio | ⏳ Pending |
+
+Definition of Done:
+
+- contratti compilabili e commentati;
+- nessun codice eseguito automaticamente;
+- nessun coupling con ArcGraph/MapGrid;
+- nessuna modifica a `World.cs` o `SimulationHost`;
+- snapshot Core-side pronti per consumer futuri.
+
+---
+
+### v0.40 - Calendar, Time, Season
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+definire il tempo ambientale canonico e derivare ora, giorno, mese, anno e stagione
+```
+
+Decisione obbligatoria iniziale:
+
+- usare come baseline `24 ore simulate = 20 minuti reali`;
+- derivare da questa scala la durata dell'ora simulata: `1 ora simulata = 50 secondi reali`;
+- dichiarare tutti questi valori come configurabili, non hardcoded;
+- collocare giorni per mese, mesi per anno, durata giorno, stagioni e profili luce in file di configurazione dedicati.
+
+Componenti previsti:
+
+| Componente | Funzione | Stato |
+|---|---|---|
+| Calendar resolver | converte tick ambientali in data/ora | ⏳ Pending |
+| Season resolver | ricava stagione da giorno/mese | ⏳ Pending |
+| Daylight resolver | calcola ore luce e intensita' luce | ⏳ Pending |
+| Config data | giorni per mese, mesi per anno, stagioni | ⏳ Pending |
+
+Valori baseline da configurare:
+
+| Parametro | Valore baseline | Stato |
+|---|---|---|
+| ore per giorno | 24 | ⏳ Pending |
+| durata giorno simulato | 20 minuti reali | ⏳ Pending |
+| durata ora simulata | 50 secondi reali | ⏳ Pending |
+| giorni per mese | 25 | ⏳ Pending |
+| mesi per anno | 12 | ⏳ Pending |
+| giorni per anno | 300 | ⏳ Pending |
+| stagione primavera | 12 ore luce / 12 buio | ⏳ Pending |
+| stagione estate | 16 ore luce / 8 buio | ⏳ Pending |
+| stagione autunno | 12 ore luce / 12 buio | ⏳ Pending |
+| stagione inverno | 8 ore luce / 16 buio | ⏳ Pending |
+
+Vincoli:
+
+- il calendario non deve modificare NPC, World o Jobs;
+- il giorno/notte produce solo dati ambientali;
+- l'eventuale impatto su visione, memoria o decisione resta fuori da questa fase.
+
+---
+
+### v0.41 - Global Climate & Weather
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+creare clima e meteo globale leggeri, derivati da stagione e calendario
+```
+
+Strutture previste:
+
+- `EnvironmentSeasonClimateProfile`;
+- `EnvironmentWeatherState`;
+- `EnvironmentWeatherKind`;
+- `EnvironmentDailyWeatherPlan`;
+- `EnvironmentGlobalClimateState`.
+
+Regole previste:
+
+| Regola | Descrizione | Stato |
+|---|---|---|
+| Generazione giornaliera | meteo principale scelto a inizio giorno | ⏳ Pending |
+| Variazione oraria | piccole oscillazioni temperatura/umidita' | ⏳ Pending |
+| Persistenza | parte del meteo precedente influenza il successivo | ⏳ Pending |
+| Stagionalita' | primavera/estate/autunno/inverno pesano eventi diversi | ⏳ Pending |
+| Aridita' | caldo e vento aumentano aridita', pioggia/neve la riducono | ⏳ Pending |
+
+Fuori scope:
+
+- rendering pioggia/neve;
+- effetti su pathfinding;
+- modifiche dirette a bisogni NPC;
+- eventi estremi produttivi.
+
+---
+
+### v0.42 - Environment Area Registry
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+introdurre il registro delle aree ambientali sovrapposte
+```
+
+Concetto:
+
+```text
+una cella puo' appartenere contemporaneamente a un'area fertile, umida,
+vegetata, coperta, interna, territoriale o di caccia
+```
+
+Componenti previsti:
+
+| Componente | Funzione | Stato |
+|---|---|---|
+| Area registry | elenco aree e lookup per id | ⏳ Pending |
+| Area layer index | separa fertility/water/vegetation/room/territory | ⏳ Pending |
+| Cell membership | appartenenza cella -> area per layer | ⏳ Pending |
+| Bounds/mask | bounding box e futura maschera celle | ⏳ Pending |
+| Chunk mask | elenco aree presenti per chunk | ⏳ Pending |
+
+Vincoli:
+
+- nessuna scansione totale calda a ogni tick;
+- no `AreaIdGrid` unico per tutti i layer;
+- no dipendenza da MapGridData;
+- no rendering.
+
+---
+
+### v0.43 - Fertility Areas
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+modellare la fertilita' come proprieta' di area, non come oggetto o umidita' fine-grained
+```
+
+Strutture previste:
+
+- `EnvironmentFertilityAreaState`;
+- `EnvironmentSoilKind`;
+- `EnvironmentFertilitySnapshot`.
+
+Dati minimi:
+
+| Campo | Significato | Stato |
+|---|---|---|
+| `BaseFertility01` | fertilita' naturale dell'area | ⏳ Pending |
+| `CurrentFertility01` | fertilita' runtime modificabile lentamente | ⏳ Pending |
+| `SoilKind` | tipo terreno/suolo astratto | ⏳ Pending |
+| `GrowthModifier01` | modificatore crescita piante | ⏳ Pending |
+| `Exhaustion01` | esaurimento da uso agricolo futuro | ⏳ Pending |
+| `Recovery01` | ripristino naturale lento | ⏳ Pending |
+
+Fuori scope:
+
+- umidita' per cella;
+- chimica del suolo;
+- erosione;
+- agricoltura produttiva.
+
+---
+
+### v0.44 - Water Areas / Water Map
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+modellare acqua stabile e profondita' discreta come layer ambientale
+```
+
+Strutture previste:
+
+- `EnvironmentWaterAreaState`;
+- `EnvironmentWaterKind`;
+- `EnvironmentWaterDepthLevel`;
+- `EnvironmentWaterCellSnapshot`.
+
+Profondita' iniziale:
+
+| Livello | Significato | Stato |
+|---|---|---|
+| 0 | nessuna acqua | ⏳ Pending |
+| 1 | pozzanghera / basso | ⏳ Pending |
+| 2 | guado / medio | ⏳ Pending |
+| 3 | profondo | ⏳ Pending |
+| 4 | molto profondo / pericolo | ⏳ Pending |
+
+Vincoli:
+
+- niente fluidodinamica continua;
+- niente propagazione pressione;
+- niente pathfinding acquatico;
+- niente renderer acqua;
+- valori leggibili da snapshot futuri.
+
+---
+
+### v0.45 - Vegetation Areas & SeedBank
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+gestire vegetazione diffusa come area astratta con seedBank, non come migliaia di oggetti
+```
+
+Strutture previste:
+
+- `EnvironmentVegetationAreaState`;
+- `EnvironmentVegetationKind`;
+- `EnvironmentSeedBankEntry`;
+- `EnvironmentVegetationDensitySnapshot`.
+
+Dati minimi:
+
+| Campo | Significato | Stato |
+|---|---|---|
+| `Density01` | densita' vegetazione diffusa | ⏳ Pending |
+| `SpeciesKeys` | specie/categorie possibili | ⏳ Pending |
+| `SeedBank` | pressione semi astratta per specie | ⏳ Pending |
+| `FertilityInfluence01` | influenza fertilita' | ⏳ Pending |
+| `ClimateInfluence01` | influenza clima globale | ⏳ Pending |
+| `GrowthPotential01` | capacita' di crescita corrente | ⏳ Pending |
+
+Regola chiave:
+
+```text
+seed naturali diffusi = valore dell'area
+semi agricoli posseduti dagli NPC = risorsa concreta futura
+```
+
+---
+
+### v0.46 - Plant Catalog
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+definire un catalogo data-driven delle specie vegetali importanti
+```
+
+Campi previsti per specie:
+
+- `SpeciesKey`;
+- categoria: erba, arbusto, albero, coltura, medicinale;
+- stadi crescita;
+- giorni richiesti per stadio;
+- stagioni favorevoli;
+- temperatura ideale;
+- umidita' ideale;
+- fertilita' minima;
+- risorse prodotte;
+- comportamento stagionale: annuale, decidua, sempreverde.
+
+Fuori scope:
+
+- loader produttivo se non necessario al primo pass;
+- sprite reali;
+- rendering stadi;
+- job agricoli.
+
+---
+
+### v0.47 - PlantInstance Lifecycle
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+introdurre piante importanti come entita' ambientali concrete
+```
+
+Strutture previste:
+
+- `EnvironmentPlantInstance`;
+- `EnvironmentPlantGrowthStage`;
+- `EnvironmentPlantHealthState`;
+- `EnvironmentPlantSnapshot`.
+
+Dati minimi:
+
+| Campo | Significato | Stato |
+|---|---|---|
+| `PlantId` | identita' runtime/persistibile futura | ⏳ Pending |
+| `SpeciesKey` | specie dal catalogo | ⏳ Pending |
+| `Cell` | coordinata x/y/z | ⏳ Pending |
+| `AgeDays` | eta' in giorni ambientali | ⏳ Pending |
+| `GrowthStage` | germoglio/giovane/adulta/secca/morta | ⏳ Pending |
+| `Health01` | salute normalizzata | ⏳ Pending |
+| `Maturity01` | maturita' produttiva | ⏳ Pending |
+
+Regola:
+
+```text
+erba diffusa = area
+albero / arbusto raccoglibile / coltura = PlantInstance
+```
+
+---
+
+### v0.48 - Natural Growth Loop
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+chiudere il primo ciclo naturale area -> seedBank -> PlantInstance -> crescita -> morte
+```
+
+Pipeline prevista:
+
+```text
+VegetationArea
+-> legge clima globale, luce, stagione, fertilita', acqua vicina
+-> calcola GrowthScore giornaliero
+-> aggiorna seedBank
+-> genera alcune PlantInstance se ci sono celle adatte
+-> aggiorna crescita/salute piante
+-> gestisce morte/secchezza/decomposizione leggera
+```
+
+Vincoli:
+
+- update giornaliero, non per tick;
+- limiti massimi per area;
+- nessuna scansione completa continua;
+- nessun impatto diretto su NPC;
+- nessun rendering.
+
+---
+
+### v0.49 - Agriculture Foundation
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+separare coltivazione intenzionale dalla vegetazione naturale
+```
+
+Blocchi previsti:
+
+| Blocco | Funzione | Stato |
+|---|---|---|
+| Crop plant | coltura come PlantInstance controllata | ⏳ Pending |
+| Cultivated area | area coltivabile o campo | ⏳ Pending |
+| Seed resource boundary | semi agricoli come risorsa concreta futura | ⏳ Pending |
+| Harvest output | produzione raccolto come dato, non ancora job | ⏳ Pending |
+| Job hooks futuri | punti di integrazione semina/raccolta | ⏳ Pending |
+
+Fuori scope:
+
+- implementazione Job semina/raccolta;
+- economia agricola;
+- magazzini agricoli;
+- UI agricola.
+
+---
+
+### v0.50 - Environment Read-Only Snapshots
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+stabilizzare il modello di osservazione read-only della biosfera
+```
+
+Snapshot previsti:
+
+- `EnvironmentCalendarSnapshot`;
+- `EnvironmentClimateSnapshot`;
+- `EnvironmentWeatherSnapshot`;
+- `EnvironmentFertilitySnapshot`;
+- `EnvironmentWaterSnapshot`;
+- `EnvironmentVegetationSnapshot`;
+- `EnvironmentPlantSnapshot`;
+- `EnvironmentAreaSnapshot`;
+- `EnvironmentFullSnapshot`.
+
+Vincoli:
+
+- snapshot Core-side;
+- nessun tipo ArcGraph;
+- nessun riferimento mutabile a registry interni;
+- adatti a UI/debug/save/load/adapter futuri;
+- compatibili con `x/y/z`.
+
+---
+
+### v0.51 - Save/Load Environment
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+rendere persistibile lo stato ambientale realmente necessario
+```
+
+Dati candidati:
+
+| Dato | Persistenza | Stato |
+|---|---|---|
+| calendario | persistente | ⏳ Pending |
+| clima/meteo corrente | persistente o ricostruibile dichiarato | ⏳ Pending |
+| area registry | persistente | ⏳ Pending |
+| fertility areas | persistente | ⏳ Pending |
+| water areas | persistente | ⏳ Pending |
+| vegetation areas | persistente | ⏳ Pending |
+| seedBank | persistente | ⏳ Pending |
+| PlantInstance | persistente | ⏳ Pending |
+| snapshot visuali | non persistenti | ⏳ Pending |
+
+Vincoli:
+
+- distinguere stato persistente, volatile e ricostruibile;
+- non salvare dati puramente visuali;
+- non rendere ArcGraph parte del save.
+
+---
+
+### v0.52 - ArcGraph Environment Adapter
+
+**Stato:** ⏳ Pending
+
+Obiettivo:
+
+```text
+collegare la biosfera Core ad ArcGraph solo tramite adapter read-only
+```
+
+Conversioni future:
+
+| Core Environment | ArcGraph visuale | Stato |
+|---|---|---|
+| water snapshot | `ArcGraphWaterVisualSnapshot` | ⏳ Pending |
+| vegetation snapshot | `ArcGraphVegetationVisualSnapshot` | ⏳ Pending |
+| weather snapshot | `ArcGraphWeatherVisualSnapshot` | ⏳ Pending |
+| light/day-night snapshot | `ArcGraphLightVisualSnapshot` | ⏳ Pending |
+| effects ambientali futuri | `ArcGraphEffectVisualSnapshot` | ⏳ Pending |
+
+Vincoli:
+
+- adapter fuori dal Core Environment;
+- ArcGraph resta consumer;
+- nessuna simulazione dentro ArcGraph;
+- nessuna dipendenza inversa Core -> View;
+- nessuna attivazione automatica senza gate dedicato.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
-FUTURA / PENDING
+⏳ FUTURA / PENDING
 
 ## Obiettivo
 
@@ -15177,7 +15789,7 @@ Introdurre conseguenze sociali emergenti sopra world events, memoria soggettiva 
 #### v0.180 - Observer Layer Pubblico ed Explainability Esterna
 
 ## Stato
-FUTURA / PENDING
+⏳ FUTURA / PENDING
 
 ## Obiettivo
 

@@ -101,6 +101,24 @@
       "uvY": 2
     },
     {
+      "id": 40,
+      "name": "tile_floor_variant_0",
+      "uvX": 0,
+      "uvY": 3
+    },
+    {
+      "id": 41,
+      "name": "tile_floor_variant_1",
+      "uvX": 1,
+      "uvY": 3
+    },
+    {
+      "id": 42,
+      "name": "tile_floor_variant_2",
+      "uvX": 2,
+      "uvY": 3
+    },
+    {
       "id": 200,
       "name": "grass_dual_grid_0001",
       "uvX": 0,

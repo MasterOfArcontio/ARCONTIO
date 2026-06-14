@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38j - NPC Animation Gate / Object Visual Bridge preparatorio`
+`v0.38j - ArcGraph terrain/object physical metadata: acqua, pavimenti, muri`
 
 STATUS:
 TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; TEST VISUALI AVANZATI CONGELATI, PROSECUZIONE SU IMPLEMENTAZIONE/DIAGNOSTICA NON VISUALE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
+`ai-task/v0.38j-04-terrain-traversability-metadata`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -93,6 +93,16 @@ v0.38m    -> UI Archetype Foundation: prefab/controller riutilizzabili per pulsa
 v0.38n    -> Debug/UI Migration Cleanup: debug utili senza copiare MapGridWorldView
 v0.38o    -> MapGrid Dependency Audit Finale: dipendenze residue prima del pensionamento
 v0.38p    -> ArcGraph Minimum Stable Closure: vista minima stabile e documentata
+```
+
+MICRO-ROADMAP OPERATIVA v0.38j:
+
+```text
+v0.38j.01 -> Traversabilita' terrain: acqua non camminabile, tile_floor registrato e separazione blocco terrain/blocco muro
+v0.38j.02 -> Metadati muri: sprite 32x83, footprint 1x1, blocco movimento e visione
+v0.38j.03 -> Resolver muri cardinali: variante muro da vicini N/E/S/W
+v0.38j.04 -> Rendering muri/oggetti alti: pivot, sorting, altezza sprite e base cella
+v0.38j.05 -> Mini-tile pavimento 16x16: giunzioni interno/esterno sotto muri sottili
 ```
 
 Regola corrente:

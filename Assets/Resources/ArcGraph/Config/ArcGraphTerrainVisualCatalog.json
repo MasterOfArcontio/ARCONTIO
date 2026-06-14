@@ -65,6 +65,26 @@
       "details": []
     },
     {
+      "terrainId": "tile_floor",
+      "defaultTileId": 40,
+      "detailChancePermille": 0,
+      "variants": [
+        {
+          "tileId": 40,
+          "weight": 1
+        },
+        {
+          "tileId": 41,
+          "weight": 1
+        },
+        {
+          "tileId": 42,
+          "weight": 1
+        }
+      ],
+      "details": []
+    },
+    {
       "terrainId": "water",
       "defaultTileId": 30,
       "detailChancePermille": 0,

@@ -182,7 +182,7 @@ namespace Arcontio.View.MapGrid
 
             for (int y = 0; y < _map.Height; y++)
                 for (int x = 0; x < _map.Width; x++)
-                    _map.SetTerrain(x, y, fill);
+                    ApplyTerrainTileToMap(x, y, fill);
 
             // Patch rettangolari (es. aree rocciose)
             if (layout?.terrain?.patches != null)
@@ -193,7 +193,7 @@ namespace Arcontio.View.MapGrid
                         for (int xx = p.x; xx < p.x + p.w; xx++)
                         {
                             if (_map.InBounds(xx, yy))
-                                _map.SetTerrain(xx, yy, p.tileId);
+                                ApplyTerrainTileToMap(xx, yy, p.tileId);
                         }
                 }
             }
@@ -210,6 +210,56 @@ namespace Arcontio.View.MapGrid
 
             // Resources: per ora non le disegniamo in questo pacchetto base,
             // ma le abbiamo nel layout per evoluzione futura.
+        }
+
+        // =============================================================================
+        // ApplyTerrainTileToMap
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scrive su <c>MapGridData</c> il tile terrain e il suo flag di attraversabilita'.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dato terrain dichiarativo</b></para>
+        /// <para>
+        /// Il layout resta la fonte delle celle, mentre <c>MapGridConfig</c> decide quali
+        /// tile sono attraversabili. In questo modo acqua e futuri terreni pericolosi
+        /// possono bloccare il movimento senza essere confusi con muri, occluder o
+        /// oggetti solidi disegnati dal vecchio renderer MapGrid.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>SetTerrain</b>: mantiene il tile id visuale/source.</item>
+        ///   <item><b>SetTerrainTraversalBlocked</b>: salva il blocco di movimento terrain-side.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyTerrainTileToMap(int x, int y, int tileId)
+        {
+            _map.SetTerrain(x, y, tileId);
+            _map.SetTerrainTraversalBlocked(x, y, IsTerrainTraversalBlockedByConfig(tileId));
+        }
+
+        // =============================================================================
+        // IsTerrainTraversalBlockedByConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se un tile terrain e' dichiarato non camminabile nella configurazione.
+        /// </para>
+        /// </summary>
+        private bool IsTerrainTraversalBlockedByConfig(int tileId)
+        {
+            if (_cfg?.nonWalkableTerrainTileIds == null)
+                return false;
+
+            for (int i = 0; i < _cfg.nonWalkableTerrainTileIds.Length; i++)
+            {
+                if (_cfg.nonWalkableTerrainTileIds[i] == tileId)
+                    return true;
+            }
+
+            return false;
         }
 
         private void BuildTerrainChunks()
