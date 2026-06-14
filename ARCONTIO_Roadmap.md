@@ -14922,6 +14922,18 @@ Ponte preparatorio collegato:
 - ArcGraph deve leggere questi dati come snapshot/passaggio read-only, non come
   autorita' simulativa.
 
+Micro-step completato:
+
+- `ArcGraphObjectVisualSnapshot` trasporta ora footprint XY, dimensione sprite,
+  offset visuale e flag grafici futuri;
+- `ArcGraphObjectRenderItem` conserva gli stessi metadati per i renderer futuri;
+- `ArcGraphObjectRenderQueueBuilder` propaga i dati senza interpretare regole
+  simulativo/logiche;
+- `ArcGraphWorldAdapter` legge `ObjectDef.Visual` una sola volta per oggetto e
+  copia i metadati nello snapshot;
+- non e' stato introdotto alcun renderer produttivo per alberi, mobili grandi o
+  vegetazione.
+
 ---
 
 ### v0.38k - ArcGraph Runtime Switch Stabilization

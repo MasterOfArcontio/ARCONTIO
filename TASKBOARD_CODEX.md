@@ -730,6 +730,13 @@ Regola corrente:
   - aggiunti dati di footprint XY e sezione visuale oggetto;
   - ArcGraph puo' risolvere il path sprite oggetto da `ObjectDef`, senza introdurre un catalogo visuale parallelo;
   - prossimo step tecnico consigliato: propagare i metadati visuali oggetto negli snapshot/render item ArcGraph, senza ancora introdurre alberi/vegetazione produttiva.
+- micro-step `v0.38j.02 - Object Visual Metadata Snapshots` completato:
+  - `ArcGraphObjectVisualSnapshot` contiene ora footprint XY, dimensione sprite, offset visuale, `FadeWhenActorBehind` e `UseShadow`;
+  - `ArcGraphObjectRenderItem` conserva gli stessi dati fino alla render queue;
+  - `ArcGraphObjectRenderQueueBuilder` propaga i metadati senza creare renderer, asset load o GameObject;
+  - `ArcGraphWorldAdapter` legge `ObjectDef.Visual` e normalizza i valori mancanti;
+  - il rendering effettivo di oggetti grandi, alberi e trasparenza dietro NPC resta uno step futuro;
+  - verifica `dotnet build Assembly-CSharp.csproj --no-restore` non eseguibile: manca `Temp/obj/Assembly-CSharp/project.assets.json`; non eseguito restore per non scrivere in `Temp/Obj`.
 - micro-step preparatorio `v0.38i.21` avviato:
   - `ArcGraphTerrainCatalog.json` ora registra tutti i tile richiesti da `ArcGraphTerrainVisualCatalog.json`;
   - atlas dichiarato come `512x512` con tile `32x32`, coerente con `TerrainAtlas.png` attuale;

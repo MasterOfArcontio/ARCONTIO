@@ -177,14 +177,28 @@ namespace Arcontio.View.ArcGraph
                 if (world.FoodStocks.TryGetValue(pair.Key, out var stock))
                     stockUnits = stock.Units;
 
+                // La definizione oggetto viene letta una sola volta per evitare una
+                // seconda lookup nella risoluzione sprite e per copiare in blocco i
+                // metadati visuali verso lo snapshot ArcGraph.
+                world.TryGetObjectDef(instance.DefId, out var def);
+                ObjectVisualDef visual = def?.Visual;
+
                 target.Add(new ArcGraphObjectVisualSnapshot(
                     pair.Key,
                     instance.DefId,
                     ArcGraphZLevelPolicy.CreateRuntimeCell(instance.CellX, instance.CellY),
-                    ResolveObjectSpriteKey(world, instance),
+                    ResolveObjectSpriteKey(instance, def),
                     instance.IsHeld,
                     instance.HolderNpcId,
-                    stockUnits));
+                    stockUnits,
+                    ResolvePositive(def?.FootprintWidth ?? 0, 1),
+                    ResolvePositive(def?.FootprintHeight ?? 0, 1),
+                    ResolveNonNegative(visual?.WidthPixels ?? 0),
+                    ResolveNonNegative(visual?.HeightPixels ?? 0),
+                    visual?.OffsetX ?? 0,
+                    visual?.OffsetY ?? 0,
+                    visual?.FadeWhenActorBehind ?? false,
+                    visual?.UseShadow ?? false));
             }
         }
 
@@ -299,6 +313,46 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // ResolvePositive
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza un valore intero che deve essere almeno positivo.
+        /// </para>
+        ///
+        /// <para><b>Normalizzazione data-only</b></para>
+        /// <para>
+        /// I cataloghi possono essere incompleti durante la migrazione. Questa helper
+        /// evita che uno zero o un valore negativo generi oggetti con ingombro nullo
+        /// nella pipeline visuale.
+        /// </para>
+        /// </summary>
+        private static int ResolvePositive(int value, int fallback)
+        {
+            return value > 0 ? value : fallback;
+        }
+
+        // =============================================================================
+        // ResolveNonNegative
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza un valore visuale che puo' essere zero ma non negativo.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' cataloghi incompleti</b></para>
+        /// <para>
+        /// Le dimensioni sprite possono mancare nei primi oggetti migrati. In quel
+        /// caso <c>0</c> significa "non dichiarato"; valori negativi vengono riportati
+        /// allo stesso stato neutro.
+        /// </para>
+        /// </summary>
+        private static int ResolveNonNegative(int value)
+        {
+            return value < 0 ? 0 : value;
+        }
+
+        // =============================================================================
         // ResolveObjectSpriteKey
         // =============================================================================
         /// <summary>
@@ -319,18 +373,16 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>world</b>: necessario solo per leggere la definizione oggetto.</item>
         ///   <item><b>instance</b>: istanza da cui prendere il defId.</item>
+        ///   <item><b>def</b>: definizione gia' risolta dal chiamante.</item>
         /// </list>
         /// </summary>
-        private string ResolveObjectSpriteKey(World world, WorldObjectInstance instance)
+        private string ResolveObjectSpriteKey(WorldObjectInstance instance, ObjectDef def)
         {
             if (instance == null || string.IsNullOrWhiteSpace(instance.DefId))
                 return string.Empty;
 
-            if (world != null
-                && world.TryGetObjectDef(instance.DefId, out var def)
-                && def != null)
+            if (def != null)
             {
                 string visualSpritePath = def.ResolveArcGraphSpritePath();
                 if (!string.IsNullOrWhiteSpace(visualSpritePath))
