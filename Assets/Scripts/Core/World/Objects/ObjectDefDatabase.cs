@@ -35,7 +35,10 @@ namespace Arcontio.Core
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>SpritePath</b>: path Resources preferito da ArcGraph per il PNG dell'oggetto.</item>
+    ///   <item><b>VisualKind</b>: categoria visuale, per esempio <c>wall</c>, utile ai resolver futuri.</item>
+    ///   <item><b>ResolverKey</b>: chiave opzionale per scegliere una famiglia di varianti visuali.</item>
     ///   <item><b>WidthPixels/HeightPixels</b>: dimensione nominale dello sprite, utile per authoring e probe.</item>
+    ///   <item><b>BaseWidthPixels/BaseHeightPixels</b>: dimensione della base logica appoggiata alla cella.</item>
     ///   <item><b>Pivot</b>: convenzione visuale del punto di ancoraggio, per ora testuale.</item>
     ///   <item><b>OffsetX/OffsetY</b>: correzione visuale in pixel, senza effetto sulla cella logica.</item>
     ///   <item><b>FadeWhenActorBehind</b>: abilita futura trasparenza quando un NPC passa dietro.</item>
@@ -46,8 +49,12 @@ namespace Arcontio.Core
     public sealed class ObjectVisualDef
     {
         public string SpritePath;
+        public string VisualKind;
+        public string ResolverKey;
         public int WidthPixels;
         public int HeightPixels;
+        public int BaseWidthPixels;
+        public int BaseHeightPixels;
         public string Pivot;
         public int OffsetX;
         public int OffsetY;

@@ -24,7 +24,10 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>ObjectMode</b>: LOD oggetto risolto.</item>
     ///   <item><b>IsHeld/HolderActorId</b>: stato trasporto copiato.</item>
     ///   <item><b>FootprintWidth/FootprintHeight</b>: ingombro logico XY per renderer futuri.</item>
+    ///   <item><b>VisualKind/VisualResolverKey</b>: classificazione visuale passiva per resolver futuri.</item>
     ///   <item><b>VisualWidthPixels/VisualHeightPixels</b>: dimensione nominale sprite.</item>
+    ///   <item><b>VisualBaseWidthPixels/VisualBaseHeightPixels</b>: base grafica/logica appoggiata alla cella.</item>
+    ///   <item><b>VisualPivot</b>: convenzione testuale del pivot sprite.</item>
     ///   <item><b>VisualOffsetX/VisualOffsetY</b>: offset grafico copiato.</item>
     ///   <item><b>FadeWhenActorBehind/UseShadow</b>: flag visuali non simulativi.</item>
     ///   <item><b>SortKey</b>: ordinamento deterministico.</item>
@@ -45,8 +48,13 @@ namespace Arcontio.View.ArcGraph
         public readonly bool HasFoodStock;
         public readonly int FootprintWidth;
         public readonly int FootprintHeight;
+        public readonly string VisualKind;
+        public readonly string VisualResolverKey;
         public readonly int VisualWidthPixels;
         public readonly int VisualHeightPixels;
+        public readonly int VisualBaseWidthPixels;
+        public readonly int VisualBaseHeightPixels;
+        public readonly string VisualPivot;
         public readonly int VisualOffsetX;
         public readonly int VisualOffsetY;
         public readonly bool FadeWhenActorBehind;
@@ -97,8 +105,13 @@ namespace Arcontio.View.ArcGraph
                 foodStockUnits,
                 1,
                 1,
+                string.Empty,
+                string.Empty,
                 0,
                 0,
+                0,
+                0,
+                string.Empty,
                 0,
                 0,
                 false,
@@ -148,6 +161,72 @@ namespace Arcontio.View.ArcGraph
             bool isVisible,
             string hiddenReason,
             ArcGraphRenderSortKey sortKey)
+            : this(
+                objectId,
+                defId,
+                cell,
+                spriteKey,
+                objectMode,
+                usesSimplifiedRepresentation,
+                showMinorItems,
+                isHeld,
+                holderActorId,
+                foodStockUnits,
+                footprintWidth,
+                footprintHeight,
+                string.Empty,
+                string.Empty,
+                visualWidthPixels,
+                visualHeightPixels,
+                0,
+                0,
+                string.Empty,
+                visualOffsetX,
+                visualOffsetY,
+                fadeWhenActorBehind,
+                useShadow,
+                isVisible,
+                hiddenReason,
+                sortKey)
+        {
+        }
+
+        // =============================================================================
+        // ArcGraphObjectRenderItem
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un item oggetto renderizzabile includendo classificazione
+        /// visuale, base sprite e pivot.
+        /// </para>
+        /// </summary>
+        public ArcGraphObjectRenderItem(
+            int objectId,
+            string defId,
+            ArcGraphCellCoord cell,
+            string spriteKey,
+            ArcGraphObjectLodMode objectMode,
+            bool usesSimplifiedRepresentation,
+            bool showMinorItems,
+            bool isHeld,
+            int holderActorId,
+            int foodStockUnits,
+            int footprintWidth,
+            int footprintHeight,
+            string visualKind,
+            string visualResolverKey,
+            int visualWidthPixels,
+            int visualHeightPixels,
+            int visualBaseWidthPixels,
+            int visualBaseHeightPixels,
+            string visualPivot,
+            int visualOffsetX,
+            int visualOffsetY,
+            bool fadeWhenActorBehind,
+            bool useShadow,
+            bool isVisible,
+            string hiddenReason,
+            ArcGraphRenderSortKey sortKey)
         {
             ObjectId = objectId;
             DefId = defId ?? string.Empty;
@@ -162,8 +241,13 @@ namespace Arcontio.View.ArcGraph
             HasFoodStock = foodStockUnits >= 0;
             FootprintWidth = footprintWidth <= 0 ? 1 : footprintWidth;
             FootprintHeight = footprintHeight <= 0 ? 1 : footprintHeight;
+            VisualKind = visualKind ?? string.Empty;
+            VisualResolverKey = visualResolverKey ?? string.Empty;
             VisualWidthPixels = visualWidthPixels < 0 ? 0 : visualWidthPixels;
             VisualHeightPixels = visualHeightPixels < 0 ? 0 : visualHeightPixels;
+            VisualBaseWidthPixels = visualBaseWidthPixels < 0 ? 0 : visualBaseWidthPixels;
+            VisualBaseHeightPixels = visualBaseHeightPixels < 0 ? 0 : visualBaseHeightPixels;
+            VisualPivot = visualPivot ?? string.Empty;
             VisualOffsetX = visualOffsetX;
             VisualOffsetY = visualOffsetY;
             FadeWhenActorBehind = fadeWhenActorBehind;

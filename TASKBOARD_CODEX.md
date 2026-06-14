@@ -98,9 +98,9 @@ v0.38p    -> ArcGraph Minimum Stable Closure: vista minima stabile e documentata
 MICRO-ROADMAP OPERATIVA v0.38j:
 
 ```text
-v0.38j.01 -> Traversabilita' terrain: acqua non camminabile, tile_floor registrato e separazione blocco terrain/blocco muro
-v0.38j.02 -> Metadati muri: sprite 32x83, footprint 1x1, blocco movimento e visione
-v0.38j.03 -> Resolver muri cardinali: variante muro da vicini N/E/S/W
+v0.38j.01 -> COMPLETATO - Traversabilita' terrain: acqua non camminabile, tile_floor registrato e separazione blocco terrain/blocco muro
+v0.38j.02 -> COMPLETATO - Metadati muri: sprite 32x83, footprint 1x1, blocco movimento e visione
+v0.38j.03 -> PROSSIMO - Resolver muri cardinali: variante muro da vicini N/E/S/W
 v0.38j.04 -> Rendering muri/oggetti alti: pivot, sorting, altezza sprite e base cella
 v0.38j.05 -> Mini-tile pavimento 16x16: giunzioni interno/esterno sotto muri sottili
 ```
@@ -740,11 +740,14 @@ Regola corrente:
   - aggiunti dati di footprint XY e sezione visuale oggetto;
   - ArcGraph puo' risolvere il path sprite oggetto da `ObjectDef`, senza introdurre un catalogo visuale parallelo;
   - prossimo step tecnico consigliato: propagare i metadati visuali oggetto negli snapshot/render item ArcGraph, senza ancora introdurre alberi/vegetazione produttiva.
-- micro-step `v0.38j.02 - Object Visual Metadata Snapshots` completato:
-  - `ArcGraphObjectVisualSnapshot` contiene ora footprint XY, dimensione sprite, offset visuale, `FadeWhenActorBehind` e `UseShadow`;
+- micro-step `v0.38j.02 - Metadati muri e Object Visual Metadata Snapshots` completato:
+  - `object_defs.json` dichiara il muro come oggetto con sprite alto 83 pixel, base 32x32, footprint 1x1, blocco movimento e blocco visione;
+  - la sezione visuale oggetto espone ora `VisualKind`, `ResolverKey`, dimensione sprite, dimensione base, pivot, offset, `FadeWhenActorBehind` e `UseShadow`;
+  - `ArcGraphObjectVisualSnapshot` conserva footprint XY e metadati visuali completi;
   - `ArcGraphObjectRenderItem` conserva gli stessi dati fino alla render queue;
   - `ArcGraphObjectRenderQueueBuilder` propaga i metadati senza creare renderer, asset load o GameObject;
   - `ArcGraphWorldAdapter` legge `ObjectDef.Visual` e normalizza i valori mancanti;
+  - il prossimo step tecnico e' `v0.38j.03`, cioe' resolver cardinali dei muri N/E/S/W;
   - il rendering effettivo di oggetti grandi, alberi e trasparenza dietro NPC resta uno step futuro;
   - verifica `dotnet build Assembly-CSharp.csproj --no-restore` non eseguibile: manca `Temp/obj/Assembly-CSharp/project.assets.json`; non eseguito restore per non scrivere in `Temp/Obj`.
 - micro-step preparatorio `v0.38i.21` avviato:

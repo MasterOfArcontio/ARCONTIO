@@ -212,12 +212,16 @@
       "IsInteractable": false,
       "Visual": {
         "SpritePath": "MapGrid/Sprites/Objects/wall_stone",
+        "VisualKind": "wall",
+        "ResolverKey": "wall_stone_cardinal",
         "WidthPixels": 32,
-        "HeightPixels": 32,
+        "HeightPixels": 83,
+        "BaseWidthPixels": 32,
+        "BaseHeightPixels": 32,
         "Pivot": "bottom_center",
         "OffsetX": 0,
         "OffsetY": 0,
-        "FadeWhenActorBehind": false,
+        "FadeWhenActorBehind": true,
         "UseShadow": false
       },
       "BlocksVision": true,

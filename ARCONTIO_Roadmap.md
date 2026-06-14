@@ -7188,8 +7188,8 @@ La chiusura di questa fase richiedera':
 | v0.38g.05 | Wrapper scena minimo per alimentare il coordinator runtime ArcGraph | Pending |
 | v0.38g | Pensionamento controllato componenti MapGrid assorbiti | Bloccato da mancanza percorso produttivo stabile |
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
-| v0.38j.01 | Metadati traversabilita' terrain: acqua non camminabile e pavimento a piastrella configurabile | In corso |
-| v0.38j.02 | Metadati muri: struttura 32x83, footprint 1x1, blocco movimento e blocco visione | Pending |
+| v0.38j.01 | Metadati traversabilita' terrain: acqua non camminabile e pavimento a piastrella configurabile | Completato |
+| v0.38j.02 | Metadati muri: struttura 32x83, footprint 1x1, blocco movimento e blocco visione | Completato |
 | v0.38j.03 | Resolver muri cardinali: scelta sprite in base ai vicini N/E/S/W | Pending |
 | v0.38j.04 | Renderer oggetti/muri ArcGraph con altezza sprite e ordinamento dietro/davanti NPC | Pending |
 | v0.38j.05 | Composizione pavimenti a mini-tile 16x16 per giunzioni interno/esterno sotto muri sottili | Pending |
@@ -7224,6 +7224,35 @@ terreno, acqua, pavimenti e muri come elementi grafici e semi-fisici coerenti.
    I muri sottili lasciano vedere porzioni di pavimento ai lati. Quando interno
    ed esterno hanno pavimenti diversi, alcuni casi richiederanno composizione
    16x16 o overlay dedicati.
+
+## Esito v0.38j.02 - Metadati muri e ponte visuale oggetti
+
+La `v0.38j.02` ha completato il passaggio preparatorio necessario per trattare
+i muri come oggetti alti e non come semplici tile terrain.
+
+Decisioni consolidate:
+
+- il muro resta un oggetto, non un tile di terreno;
+- il footprint logico del muro resta 1x1 cella;
+- la base visuale dichiarata e' 32x32 pixel;
+- lo sprite muro dichiarato e' alto 83 pixel;
+- il muro blocca movimento e visione tramite `object_defs.json`;
+- la sezione visuale dell'oggetto puo' ora esporre `VisualKind`,
+  `ResolverKey`, dimensione sprite, dimensione base e pivot;
+- ArcGraph propaga questi dati da `ObjectDef` fino a snapshot e render item,
+  senza creare ancora un renderer oggetti/muri definitivo;
+- la trasparenza dei muri quando un NPC passa dietro resta demandata alla fase
+  di rendering oggetti alti.
+
+Prossimo step:
+
+```text
+v0.38j.03 - Resolver muri cardinali
+```
+
+Il resolver dovra' scegliere quale variante del muro usare in base ai vicini
+cardinali N/E/S/W, senza leggere dati globali in modo onnisciente e senza
+trasformare il muro in terrain.
 
 ## Esito v0.38a - ArcGraph Legacy Absorption Audit
 

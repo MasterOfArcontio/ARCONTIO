@@ -28,7 +28,10 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>HolderActorId</b>: NPC che trasporta l'oggetto, se noto.</item>
     ///   <item><b>FoodStockUnits</b>: quantita' stock osservabile per label/debug visuale.</item>
     ///   <item><b>FootprintWidth/FootprintHeight</b>: ingombro logico XY copiato dal catalogo oggetti.</item>
+    ///   <item><b>VisualKind/VisualResolverKey</b>: classificazione visuale passiva per resolver futuri.</item>
     ///   <item><b>VisualWidthPixels/VisualHeightPixels</b>: dimensione nominale sprite letta dalla sezione visuale.</item>
+    ///   <item><b>VisualBaseWidthPixels/VisualBaseHeightPixels</b>: base logica dello sprite appoggiata alla cella.</item>
+    ///   <item><b>VisualPivot</b>: convenzione testuale del punto di ancoraggio, per esempio <c>bottom_center</c>.</item>
     ///   <item><b>VisualOffsetX/VisualOffsetY</b>: offset grafico futuro, senza effetto sulla cella logica.</item>
     ///   <item><b>FadeWhenActorBehind/UseShadow</b>: flag visuali futuri copiati in sola lettura.</item>
     /// </list>
@@ -44,8 +47,13 @@ namespace Arcontio.View.ArcGraph
         public readonly int FoodStockUnits;
         public readonly int FootprintWidth;
         public readonly int FootprintHeight;
+        public readonly string VisualKind;
+        public readonly string VisualResolverKey;
         public readonly int VisualWidthPixels;
         public readonly int VisualHeightPixels;
+        public readonly int VisualBaseWidthPixels;
+        public readonly int VisualBaseHeightPixels;
+        public readonly string VisualPivot;
         public readonly int VisualOffsetX;
         public readonly int VisualOffsetY;
         public readonly bool FadeWhenActorBehind;
@@ -95,8 +103,13 @@ namespace Arcontio.View.ArcGraph
                 foodStockUnits,
                 1,
                 1,
+                string.Empty,
+                string.Empty,
                 0,
                 0,
+                0,
+                0,
+                string.Empty,
                 0,
                 0,
                 false,
@@ -124,7 +137,10 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>footprintWidth/footprintHeight</b>: normalizzati almeno a <c>1</c>.</item>
+        ///   <item><b>visualKind/visualResolverKey</b>: stringhe normalizzate, vuote se non dichiarate.</item>
         ///   <item><b>visualWidthPixels/visualHeightPixels</b>: <c>0</c> se non dichiarati.</item>
+        ///   <item><b>visualBaseWidthPixels/visualBaseHeightPixels</b>: base grafica/logica dello sprite.</item>
+        ///   <item><b>visualPivot</b>: pivot testuale copiato dalla definizione oggetto.</item>
         ///   <item><b>visualOffsetX/visualOffsetY</b>: offset in pixel copiato senza applicazione runtime.</item>
         ///   <item><b>fadeWhenActorBehind/useShadow</b>: flag grafici futuri non ancora consumati dal renderer.</item>
         /// </list>
@@ -145,6 +161,60 @@ namespace Arcontio.View.ArcGraph
             int visualOffsetY,
             bool fadeWhenActorBehind,
             bool useShadow)
+            : this(
+                objectId,
+                defId,
+                cell,
+                spriteKey,
+                isHeld,
+                holderActorId,
+                foodStockUnits,
+                footprintWidth,
+                footprintHeight,
+                string.Empty,
+                string.Empty,
+                visualWidthPixels,
+                visualHeightPixels,
+                0,
+                0,
+                string.Empty,
+                visualOffsetX,
+                visualOffsetY,
+                fadeWhenActorBehind,
+                useShadow)
+        {
+        }
+
+        // =============================================================================
+        // ArcGraphObjectVisualSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una proiezione visuale completa includendo anche metadati
+        /// di classificazione, base sprite e pivot.
+        /// </para>
+        /// </summary>
+        public ArcGraphObjectVisualSnapshot(
+            int objectId,
+            string defId,
+            ArcGraphCellCoord cell,
+            string spriteKey,
+            bool isHeld,
+            int holderActorId,
+            int foodStockUnits,
+            int footprintWidth,
+            int footprintHeight,
+            string visualKind,
+            string visualResolverKey,
+            int visualWidthPixels,
+            int visualHeightPixels,
+            int visualBaseWidthPixels,
+            int visualBaseHeightPixels,
+            string visualPivot,
+            int visualOffsetX,
+            int visualOffsetY,
+            bool fadeWhenActorBehind,
+            bool useShadow)
         {
             ObjectId = objectId;
             DefId = defId ?? string.Empty;
@@ -155,8 +225,13 @@ namespace Arcontio.View.ArcGraph
             FoodStockUnits = foodStockUnits;
             FootprintWidth = footprintWidth <= 0 ? 1 : footprintWidth;
             FootprintHeight = footprintHeight <= 0 ? 1 : footprintHeight;
+            VisualKind = visualKind ?? string.Empty;
+            VisualResolverKey = visualResolverKey ?? string.Empty;
             VisualWidthPixels = visualWidthPixels < 0 ? 0 : visualWidthPixels;
             VisualHeightPixels = visualHeightPixels < 0 ? 0 : visualHeightPixels;
+            VisualBaseWidthPixels = visualBaseWidthPixels < 0 ? 0 : visualBaseWidthPixels;
+            VisualBaseHeightPixels = visualBaseHeightPixels < 0 ? 0 : visualBaseHeightPixels;
+            VisualPivot = visualPivot ?? string.Empty;
             VisualOffsetX = visualOffsetX;
             VisualOffsetY = visualOffsetY;
             FadeWhenActorBehind = fadeWhenActorBehind;
