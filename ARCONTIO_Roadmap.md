@@ -7191,7 +7191,7 @@ La chiusura di questa fase richiedera':
 | v0.38j.01 | Metadati traversabilita' terrain: acqua non camminabile e pavimento a piastrella configurabile | Completato |
 | v0.38j.02 | Metadati muri: struttura 32x83, footprint 1x1, blocco movimento e blocco visione | Completato |
 | v0.38j.03 | Resolver muri cardinali: scelta sprite in base ai vicini N/E/S/W | Completato data-only |
-| v0.38j.04 | Renderer oggetti/muri ArcGraph con altezza sprite e ordinamento dietro/davanti NPC | Pending |
+| v0.38j.04 | Renderer oggetti/muri ArcGraph con altezza sprite e ordinamento dietro/davanti NPC | Completato data-only |
 | v0.38j.05 | Composizione pavimenti a mini-tile 16x16 per giunzioni interno/esterno sotto muri sottili | Pending |
 
 ## Roadmap operativa v0.38j - Terreno, muri e blocchi fisici
@@ -7292,6 +7292,57 @@ v0.38j.04 - Rendering muri/oggetti alti
 
 Il renderer dovra' usare le sprite key gia' risolte e gestire pivot, altezza
 83px, sorting e base cella.
+
+## Esito v0.38j.04 - Rendering muri e oggetti alti
+
+La `v0.38j.04` ha completato il primo passaggio tecnico per permettere ad
+ArcGraph di rappresentare correttamente oggetti piu' alti della cella base,
+come i muri 32x83.
+
+Comportamento introdotto:
+
+- `ArcGraphActorObjectSceneRenderEntry` conserva ora anche i metadati visuali
+  oggetto: dimensione sprite, dimensione base, pivot, offset e flag visuali;
+- il piano scena actor/object propaga questi dati dalla render queue fino alla
+  entry consumabile dal renderer;
+- gli oggetti normali restano centrati nella footprint logica;
+- gli oggetti con pivot basso, per esempio `bottom_center`, vengono ancorati al
+  bordo basso della cella invece che al centro;
+- un muro 32x83 con base 32x32 cresce quindi verso l'alto senza slittare di
+  mezza cella;
+- gli offset visuali in pixel vengono convertiti in world units usando la base
+  dichiarata dell'oggetto;
+- il probe actor/object non applica piu' la scala placeholder agli oggetti che
+  dichiarano metadati visuali reali, cosi' un muro alto resta leggibile alla
+  scala prevista.
+
+QA eseguita:
+
+- `git diff --check` mirato sui file modificati: pulito;
+- compilazione Roslyn data-only del sottoinsieme ArcGraph actor/object, render
+  queue, wall resolver e harness: `exit=0`, `warning_count=0`;
+- il check completo di tutto `ArcGraph/Runtime` non e' stato usato come
+  criterio perche' l'`Assembly-CSharp.dll` locale risulta non aggiornato rispetto
+  agli ultimi commit e genera falsi errori su tipi gia' presenti nel sorgente.
+
+Confini preservati:
+
+- nessun nuovo renderer produttivo oggetti;
+- nessun asset load;
+- nessuna scena o prefab modificati;
+- nessuna lettura diretta di `World`;
+- nessuna implementazione della trasparenza NPC dietro muro;
+- nessuna modifica a MapGrid.
+
+Prossimo step:
+
+```text
+v0.38j.05 - Mini-tile pavimento 16x16
+```
+
+Lo step successivo dovra' affrontare il problema dei muri sottili che lasciano
+vedere porzioni di pavimento ai lati, specialmente quando pavimento interno ed
+esterno sono diversi.
 
 ## Esito v0.38a - ArcGraph Legacy Absorption Audit
 

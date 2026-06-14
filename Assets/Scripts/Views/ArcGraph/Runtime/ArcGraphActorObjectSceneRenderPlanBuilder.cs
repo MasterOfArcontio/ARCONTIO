@@ -194,11 +194,9 @@ namespace Arcontio.View.ArcGraph
             if (!item.IsVisible)
                 return false;
 
-            // Gli oggetti non hanno interpolazione: vengono centrati nella cella
-            // discreta gia' decisa dalla snapshot object.
             float tileSize = contract.TileWorldSize;
-            float worldX = (item.Cell.X + 0.5f) * tileSize;
-            float worldY = (item.Cell.Y + 0.5f) * tileSize;
+            float worldX = ResolveObjectWorldX(item, tileSize);
+            float worldY = ResolveObjectWorldY(item, tileSize);
             float worldZ = item.Cell.Z * tileSize;
 
             var spriteRequest = new ArcGraphSpriteResolveRequest(
@@ -218,8 +216,84 @@ namespace Arcontio.View.ArcGraph
                 worldZ,
                 ResolveSortingOrder(contract, queueIndex),
                 hasMotion: false,
-                motionProgress01: 0f);
+                motionProgress01: 0f,
+                item.VisualWidthPixels,
+                item.VisualHeightPixels,
+                item.VisualBaseWidthPixels,
+                item.VisualBaseHeightPixels,
+                item.VisualPivot,
+                item.VisualOffsetX,
+                item.VisualOffsetY,
+                item.FadeWhenActorBehind,
+                item.UseShadow);
             return true;
+        }
+
+        private static float ResolveObjectWorldX(
+            ArcGraphObjectRenderItem item,
+            float tileSize)
+        {
+            // L'asse X resta centrato sulla footprint logica. Per un oggetto 1x1
+            // coincide con la vecchia convenzione: x + 0.5 cella.
+            float anchor = (item.Cell.X + (item.FootprintWidth * 0.5f)) * tileSize;
+
+            if (IsPivot(item.VisualPivot, "bottom_left"))
+                anchor = item.Cell.X * tileSize;
+            else if (IsPivot(item.VisualPivot, "bottom_right"))
+                anchor = (item.Cell.X + item.FootprintWidth) * tileSize;
+
+            return anchor + ConvertPixelOffsetToWorld(
+                item.VisualOffsetX,
+                item.VisualBaseWidthPixels,
+                tileSize);
+        }
+
+        private static float ResolveObjectWorldY(
+            ArcGraphObjectRenderItem item,
+            float tileSize)
+        {
+            // Gli oggetti normali restano centrati nella footprint. Gli oggetti con
+            // pivot basso, come i muri 32x83, vengono invece ancorati al bordo basso
+            // della cella base: lo sprite cresce verso l'alto senza slittare di mezza
+            // cella.
+            float anchor = (item.Cell.Y + (item.FootprintHeight * 0.5f)) * tileSize;
+            if (IsBottomPivot(item.VisualPivot))
+                anchor = item.Cell.Y * tileSize;
+
+            return anchor + ConvertPixelOffsetToWorld(
+                item.VisualOffsetY,
+                item.VisualBaseHeightPixels,
+                tileSize);
+        }
+
+        private static bool IsBottomPivot(
+            string pivot)
+        {
+            return IsPivot(pivot, "bottom_center")
+                   || IsPivot(pivot, "bottom_left")
+                   || IsPivot(pivot, "bottom_right");
+        }
+
+        private static bool IsPivot(
+            string pivot,
+            string expected)
+        {
+            return string.Equals(
+                pivot ?? string.Empty,
+                expected ?? string.Empty,
+                System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static float ConvertPixelOffsetToWorld(
+            int offsetPixels,
+            int basePixels,
+            float tileSize)
+        {
+            if (offsetPixels == 0)
+                return 0f;
+
+            int safeBasePixels = basePixels > 0 ? basePixels : 32;
+            return offsetPixels * (tileSize / safeBasePixels);
         }
 
         private static int ResolveSortingOrder(

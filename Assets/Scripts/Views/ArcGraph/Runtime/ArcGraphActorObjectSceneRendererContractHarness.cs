@@ -25,6 +25,8 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>PlannedEntryCount</b>: entry scene-side prodotte.</item>
     ///   <item><b>ObjectBeforeActor</b>: verifica ordine su stessa cella.</item>
     ///   <item><b>ActorUsesInterpolatedPose</b>: verifica posizione actor frazionaria.</item>
+    ///   <item><b>ObjectCarriesVisualMetadata</b>: verifica propagazione dati visuali oggetto.</item>
+    ///   <item><b>TallObjectUsesBottomPivot</b>: verifica ancoraggio basso di oggetti alti.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphActorObjectSceneRendererContractHarnessResult
@@ -36,6 +38,8 @@ namespace Arcontio.View.ArcGraph
         public readonly int ObjectEntryCount;
         public readonly bool ObjectBeforeActor;
         public readonly bool ActorUsesInterpolatedPose;
+        public readonly bool ObjectCarriesVisualMetadata;
+        public readonly bool TallObjectUsesBottomPivot;
         public readonly bool ContractSafe;
 
         public ArcGraphActorObjectSceneRendererContractHarnessResult(
@@ -46,6 +50,8 @@ namespace Arcontio.View.ArcGraph
             int objectEntryCount,
             bool objectBeforeActor,
             bool actorUsesInterpolatedPose,
+            bool objectCarriesVisualMetadata,
+            bool tallObjectUsesBottomPivot,
             bool contractSafe)
         {
             Passed = passed;
@@ -55,6 +61,8 @@ namespace Arcontio.View.ArcGraph
             ObjectEntryCount = objectEntryCount;
             ObjectBeforeActor = objectBeforeActor;
             ActorUsesInterpolatedPose = actorUsesInterpolatedPose;
+            ObjectCarriesVisualMetadata = objectCarriesVisualMetadata;
+            TallObjectUsesBottomPivot = tallObjectUsesBottomPivot;
             ContractSafe = contractSafe;
         }
     }
@@ -148,7 +156,9 @@ namespace Arcontio.View.ArcGraph
                           && diagnostics.ActorEntryCount == 1
                           && diagnostics.ObjectEntryCount == 1
                           && objectBeforeActor
-                          && actorInterpolated;
+                          && actorInterpolated
+                          && ObjectCarriesVisualMetadata(plan)
+                          && TallObjectUsesBottomPivot(plan);
 
             return new ArcGraphActorObjectSceneRendererContractHarnessResult(
                 passed,
@@ -158,6 +168,8 @@ namespace Arcontio.View.ArcGraph
                 diagnostics.ObjectEntryCount,
                 objectBeforeActor,
                 actorInterpolated,
+                ObjectCarriesVisualMetadata(plan),
+                TallObjectUsesBottomPivot(plan),
                 diagnostics.ContractSafe);
         }
 
@@ -181,12 +193,55 @@ namespace Arcontio.View.ArcGraph
         {
             yield return new ArcGraphObjectVisualSnapshot(
                 10,
-                "crate",
+                "tall_crate",
                 new ArcGraphCellCoord(1, 1, 0),
                 "MapGrid/Sprites/Objects/crate",
                 isHeld: false,
                 holderActorId: 0,
-                foodStockUnits: -1);
+                foodStockUnits: -1,
+                footprintWidth: 1,
+                footprintHeight: 1,
+                visualKind: string.Empty,
+                visualResolverKey: string.Empty,
+                visualWidthPixels: 32,
+                visualHeightPixels: 83,
+                visualBaseWidthPixels: 32,
+                visualBaseHeightPixels: 32,
+                visualPivot: "bottom_center",
+                visualOffsetX: 0,
+                visualOffsetY: 0,
+                fadeWhenActorBehind: true,
+                useShadow: false);
+        }
+
+        private static bool ObjectCarriesVisualMetadata(
+            ArcGraphActorObjectSceneRenderPlan plan)
+        {
+            if (plan == null || plan.Entries.Count <= 0)
+                return false;
+
+            ArcGraphActorObjectSceneRenderEntry entry = plan.Entries[0];
+            return entry.Kind == ArcGraphRenderItemKind.Object
+                   && entry.HasObjectVisualMetadata
+                   && entry.IsTallObjectVisual
+                   && entry.VisualWidthPixels == 32
+                   && entry.VisualHeightPixels == 83
+                   && entry.VisualBaseWidthPixels == 32
+                   && entry.VisualBaseHeightPixels == 32
+                   && entry.VisualPivot == "bottom_center"
+                   && entry.FadeWhenActorBehind;
+        }
+
+        private static bool TallObjectUsesBottomPivot(
+            ArcGraphActorObjectSceneRenderPlan plan)
+        {
+            if (plan == null || plan.Entries.Count <= 0)
+                return false;
+
+            ArcGraphActorObjectSceneRenderEntry entry = plan.Entries[0];
+            return entry.Kind == ArcGraphRenderItemKind.Object
+                   && Approximately(entry.WorldX, 1.5f)
+                   && Approximately(entry.WorldY, 1.0f);
         }
 
         private static bool Approximately(float left, float right)

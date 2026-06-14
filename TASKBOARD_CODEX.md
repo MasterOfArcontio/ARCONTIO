@@ -34,7 +34,7 @@ STATUS:
 TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; TEST VISUALI AVANZATI CONGELATI, PROSECUZIONE SU IMPLEMENTAZIONE/DIAGNOSTICA NON VISUALE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38j-04-terrain-traversability-metadata`
+`ai-task/v0.38j-04-wall-object-height-rendering`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -101,8 +101,8 @@ MICRO-ROADMAP OPERATIVA v0.38j:
 v0.38j.01 -> COMPLETATO - Traversabilita' terrain: acqua non camminabile, tile_floor registrato e separazione blocco terrain/blocco muro
 v0.38j.02 -> COMPLETATO - Metadati muri: sprite 32x83, footprint 1x1, blocco movimento e visione
 v0.38j.03 -> COMPLETATO - Resolver muri cardinali: variante muro da vicini N/E/S/W
-v0.38j.04 -> PROSSIMO - Rendering muri/oggetti alti: pivot, sorting, altezza sprite e base cella
-v0.38j.05 -> Mini-tile pavimento 16x16: giunzioni interno/esterno sotto muri sottili
+v0.38j.04 -> COMPLETATO DATA-ONLY - Rendering muri/oggetti alti: pivot, altezza sprite e base cella
+v0.38j.05 -> PROSSIMO - Mini-tile pavimento 16x16: giunzioni interno/esterno sotto muri sottili
 ```
 
 Regola corrente:
@@ -761,6 +761,16 @@ Regola corrente:
   - aggiunto `ArcGraphWallCardinalResolverHarness` per smoke test data-only verticale/orizzontale;
   - nessun renderer Unity, nessun asset load, nessun GameObject, nessuna scena/prefab modificati;
   - prossimo step tecnico: `v0.38j.04 - Rendering muri/oggetti alti`.
+- micro-step `v0.38j.04 - Rendering muri e oggetti alti` completato:
+  - `ArcGraphActorObjectSceneRenderEntry` conserva dimensione sprite, base, pivot, offset e flag visuali degli oggetti;
+  - `ArcGraphActorObjectSceneRenderPlanBuilder` ancora gli oggetti con pivot basso al bordo basso della cella, invece che al centro;
+  - un muro 32x83 con base 32x32 puo' quindi crescere verso l'alto mantenendo la base sulla griglia;
+  - gli offset visuali in pixel vengono convertiti in world units usando la base dichiarata;
+  - `ArcGraphActorObjectSceneProbeRenderer` non riduce piu' con scala placeholder gli oggetti che dichiarano metadati visuali reali;
+  - lo harness actor/object verifica propagazione metadati visuali e ancoraggio `bottom_center`;
+  - verifica data-only Roslyn del sottoinsieme actor/object/wall: `exit=0`, `warning_count=0`;
+  - nessun renderer oggetti produttivo definitivo, nessuna scena/prefab, nessun asset load e nessuna trasparenza NPC dietro muro introdotti;
+  - prossimo step tecnico: `v0.38j.05 - Mini-tile pavimento 16x16`.
 - micro-step preparatorio `v0.38i.21` avviato:
   - `ArcGraphTerrainCatalog.json` ora registra tutti i tile richiesti da `ArcGraphTerrainVisualCatalog.json`;
   - atlas dichiarato come `512x512` con tile `32x32`, coerente con `TerrainAtlas.png` attuale;

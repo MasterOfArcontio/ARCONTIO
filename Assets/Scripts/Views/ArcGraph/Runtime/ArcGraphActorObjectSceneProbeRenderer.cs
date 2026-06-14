@@ -347,7 +347,7 @@ namespace Arcontio.View.ArcGraph
             var go = new GameObject(CreateSceneObjectName(entry));
             go.transform.SetParent(_root, false);
             go.transform.position = ResolveWorldPosition(entry);
-            go.transform.localScale = Vector3.one * ResolveScale(entry.Kind);
+            go.transform.localScale = Vector3.one * ResolveScale(entry);
 
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = sprite;
@@ -471,13 +471,22 @@ namespace Arcontio.View.ArcGraph
                 entry.WorldZ + probeZOffset);
         }
 
-        private float ResolveScale(ArcGraphRenderItemKind kind)
+        private float ResolveScale(
+            ArcGraphActorObjectSceneRenderEntry entry)
         {
-            if (kind == ArcGraphRenderItemKind.Actor)
+            if (entry.Kind == ArcGraphRenderItemKind.Actor)
                 return actorScale > 0f ? actorScale : 1f;
 
-            if (kind == ArcGraphRenderItemKind.Object)
+            if (entry.Kind == ArcGraphRenderItemKind.Object)
+            {
+                // Se l'oggetto dichiara dimensioni visuali reali, il probe non deve
+                // ridurlo con la scala placeholder: un muro 32x83 deve restare
+                // leggibile con la sua altezza effettiva.
+                if (entry.HasObjectVisualMetadata)
+                    return 1f;
+
                 return objectScale > 0f ? objectScale : 1f;
+            }
 
             return 1f;
         }

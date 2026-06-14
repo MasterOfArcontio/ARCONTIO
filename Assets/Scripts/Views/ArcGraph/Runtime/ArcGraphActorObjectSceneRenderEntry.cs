@@ -23,6 +23,11 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>WorldX/Y/Z</b>: posizione visuale gia' scalata.</item>
     ///   <item><b>SortingOrder</b>: ordine SpriteRenderer futuro.</item>
     ///   <item><b>HasMotion/MotionProgress01</b>: stato movimento actor copiato.</item>
+    ///   <item><b>VisualWidth/Height</b>: dimensione sprite oggetto, se disponibile.</item>
+    ///   <item><b>VisualBaseWidth/Height</b>: base dello sprite appoggiata alla cella.</item>
+    ///   <item><b>VisualPivot</b>: convenzione di ancoraggio, per esempio <c>bottom_center</c>.</item>
+    ///   <item><b>VisualOffset</b>: offset grafico in pixel gia' copiato dal catalogo.</item>
+    ///   <item><b>FadeWhenActorBehind/UseShadow</b>: flag visuali futuri non simulativi.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphActorObjectSceneRenderEntry
@@ -37,6 +42,29 @@ namespace Arcontio.View.ArcGraph
         public readonly int SortingOrder;
         public readonly bool HasMotion;
         public readonly float MotionProgress01;
+        public readonly int VisualWidthPixels;
+        public readonly int VisualHeightPixels;
+        public readonly int VisualBaseWidthPixels;
+        public readonly int VisualBaseHeightPixels;
+        public readonly string VisualPivot;
+        public readonly int VisualOffsetX;
+        public readonly int VisualOffsetY;
+        public readonly bool FadeWhenActorBehind;
+        public readonly bool UseShadow;
+
+        public bool HasObjectVisualMetadata =>
+            Kind == ArcGraphRenderItemKind.Object
+            && (VisualWidthPixels > 0
+                || VisualHeightPixels > 0
+                || VisualBaseWidthPixels > 0
+                || VisualBaseHeightPixels > 0
+                || !string.IsNullOrWhiteSpace(VisualPivot));
+
+        public bool IsTallObjectVisual =>
+            Kind == ArcGraphRenderItemKind.Object
+            && VisualHeightPixels > 0
+            && VisualBaseHeightPixels > 0
+            && VisualHeightPixels > VisualBaseHeightPixels;
 
         // =============================================================================
         // ArcGraphActorObjectSceneRenderEntry
@@ -57,6 +85,66 @@ namespace Arcontio.View.ArcGraph
             int sortingOrder,
             bool hasMotion,
             float motionProgress01)
+            : this(
+                kind,
+                entityId,
+                discreteCell,
+                spriteRequest,
+                worldX,
+                worldY,
+                worldZ,
+                sortingOrder,
+                hasMotion,
+                motionProgress01,
+                0,
+                0,
+                0,
+                0,
+                string.Empty,
+                0,
+                0,
+                false,
+                false)
+        {
+        }
+
+        // =============================================================================
+        // ArcGraphActorObjectSceneRenderEntry
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una entry scena actor/object immutabile includendo anche i
+        /// metadati visuali oggetto.
+        /// </para>
+        ///
+        /// <para><b>Oggetti alti senza nuova authority</b></para>
+        /// <para>
+        /// I metadati permettono al renderer scena di sapere che un oggetto occupa
+        /// graficamente piu' pixel della cella base, come un muro 32x83 appoggiato
+        /// a una base 32x32. Restano dati visuali: non modificano collisioni,
+        /// passabilita', occlusione o stato del mondo.
+        /// </para>
+        /// </summary>
+        public ArcGraphActorObjectSceneRenderEntry(
+            ArcGraphRenderItemKind kind,
+            int entityId,
+            ArcGraphCellCoord discreteCell,
+            ArcGraphSpriteResolveRequest spriteRequest,
+            float worldX,
+            float worldY,
+            float worldZ,
+            int sortingOrder,
+            bool hasMotion,
+            float motionProgress01,
+            int visualWidthPixels,
+            int visualHeightPixels,
+            int visualBaseWidthPixels,
+            int visualBaseHeightPixels,
+            string visualPivot,
+            int visualOffsetX,
+            int visualOffsetY,
+            bool fadeWhenActorBehind,
+            bool useShadow)
         {
             Kind = kind;
             EntityId = entityId;
@@ -68,6 +156,15 @@ namespace Arcontio.View.ArcGraph
             SortingOrder = sortingOrder;
             HasMotion = hasMotion;
             MotionProgress01 = Clamp01(motionProgress01);
+            VisualWidthPixels = visualWidthPixels < 0 ? 0 : visualWidthPixels;
+            VisualHeightPixels = visualHeightPixels < 0 ? 0 : visualHeightPixels;
+            VisualBaseWidthPixels = visualBaseWidthPixels < 0 ? 0 : visualBaseWidthPixels;
+            VisualBaseHeightPixels = visualBaseHeightPixels < 0 ? 0 : visualBaseHeightPixels;
+            VisualPivot = visualPivot ?? string.Empty;
+            VisualOffsetX = visualOffsetX;
+            VisualOffsetY = visualOffsetY;
+            FadeWhenActorBehind = fadeWhenActorBehind;
+            UseShadow = useShadow;
         }
 
         private static float Clamp01(float value)
