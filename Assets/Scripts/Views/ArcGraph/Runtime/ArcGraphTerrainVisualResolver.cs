@@ -157,14 +157,18 @@ namespace Arcontio.View.ArcGraph
             if (!string.IsNullOrWhiteSpace(input.NeighborTerrainId)
                 && !string.IsNullOrWhiteSpace(input.NeighborMask)
                 && catalog.TryGetTransitionSet(input.TerrainId, input.NeighborTerrainId, out var transitionSet)
-                && transitionSet.TryResolveTileId(input.NeighborMask, out int transitionTileId))
+                && transitionSet.TryResolveTileId(
+                    input.NeighborMask,
+                    input.VisualTimeSeconds,
+                    out int transitionTileId,
+                    out bool usedAnimatedTransition))
             {
                 return new ArcGraphTerrainVisualResolveResult(
                     transitionTileId,
                     usedTransition: true,
-                    usedAnimation: false,
+                    usedAnimation: usedAnimatedTransition,
                     usedVariant: false,
-                    reason: "TransitionRule");
+                    reason: usedAnimatedTransition ? "AnimatedTransitionRule" : "TransitionRule");
             }
 
             if (definition.HasAnimation)
@@ -204,11 +208,31 @@ namespace Arcontio.View.ArcGraph
         {
             unchecked
             {
-                int hash = 17;
-                hash = (hash * 31) + cell.X;
-                hash = (hash * 31) + cell.Y;
-                hash = (hash * 31) + cell.Z;
-                hash = (hash * 31) + StableStringHash(terrainId);
+                uint hash = 2166136261u;
+                hash = Mix(hash, (uint)cell.X);
+                hash = Mix(hash, (uint)cell.Y);
+                hash = Mix(hash, (uint)cell.Z);
+                hash = Mix(hash, (uint)StableStringHash(terrainId));
+
+                // Una griglia regolare tende a mostrare pattern se il seed resta
+                // quasi lineare e poi viene ridotto con modulo piccolo, ad esempio
+                // nove varianti di prato. Questo finalizer spezza le correlazioni
+                // tra celle vicine mantenendo pero' il risultato deterministico.
+                hash ^= hash >> 16;
+                hash *= 2246822519u;
+                hash ^= hash >> 13;
+                hash *= 3266489917u;
+                hash ^= hash >> 16;
+
+                return (int)hash;
+            }
+        }
+
+        private static uint Mix(uint hash, uint value)
+        {
+            unchecked
+            {
+                hash ^= value + 0x9E3779B9u + (hash << 6) + (hash >> 2);
                 return hash;
             }
         }

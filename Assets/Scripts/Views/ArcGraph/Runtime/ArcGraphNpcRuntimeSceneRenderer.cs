@@ -44,7 +44,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private int idleFrameStep = 12;
         [SerializeField] private bool renderActorShadow = true;
         [SerializeField] private string actorShadowSpriteKey = "ArcGraph/NPC/common/shadow/soft_ellipse_32x16";
-        [SerializeField] private Vector3 actorShadowLocalOffset = new Vector3(0f, -0.6f, 0f);
+        [SerializeField] private Vector3 actorShadowLocalOffset = new Vector3(0f, -0.1f, 0f);
         [SerializeField] private Vector2 actorShadowLocalScale = Vector2.one;
         [SerializeField] private Color actorShadowTint = new Color(0f, 0f, 0f, 0.35f);
         [SerializeField] private int actorShadowSortingOffset = -2;
@@ -52,6 +52,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float actorZOffset = -0.02f;
         [SerializeField] private float actorScale = 1f;
+        [SerializeField] private Vector3 layeredActorSpriteLocalOffset = new Vector3(0f, -0.25f, 0f);
         [SerializeField] private string runtimeRootName = "ArcGraphNpcRuntimeRoot";
 
         private readonly Dictionary<int, ActorHandle> _actorPool = new();
@@ -177,6 +178,49 @@ namespace Arcontio.View.ArcGraph
             npcVisualCatalogJson = catalogJson;
             _npcVisualCatalog = null;
             _npcVisualCatalogSourceText = null;
+        }
+
+        // =============================================================================
+        // SetUseLayeredActorCatalog
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita la composizione NPC a layer letta dal catalogo
+        /// visuale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: configurazione esplicita del renderer</b></para>
+        /// <para>
+        /// L'installer di scena puo' attivare il path modulare degli NPC senza
+        /// accedere ai campi privati del componente. Il renderer resta comunque
+        /// consumer della queue ArcGraph: questa opzione decide solo come tradurre
+        /// una entry actor in sprite Unity.
+        /// </para>
+        /// </summary>
+        public void SetUseLayeredActorCatalog(bool enabled)
+        {
+            useLayeredActorCatalog = enabled;
+        }
+
+        // =============================================================================
+        // SetRenderActorShadow
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita la resa dell'ombra locale degli NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: fallback visuale controllabile</b></para>
+        /// <para>
+        /// L'ombra generata e' utile come placeholder, ma durante il gate sugli
+        /// sprite reali puo' confondere la lettura dell'asset. Esporre questo setter
+        /// consente all'installer o a futuri pannelli debug di spegnerla senza
+        /// modificare la logica di rendering degli attori.
+        /// </para>
+        /// </summary>
+        public void SetRenderActorShadow(bool enabled)
+        {
+            renderActorShadow = enabled;
         }
 
         // =============================================================================
@@ -608,7 +652,11 @@ namespace Arcontio.View.ArcGraph
                     visualFrame.PartKey,
                     usesSimplifiedRepresentation: false);
 
-                Sprite sprite = ResolveSprite(request, spriteResolver, out bool usedGeneratedFallback);
+                Sprite sprite = ResolveSprite(
+                    request,
+                    spriteResolver,
+                    allowFallbackForThisRequest: false,
+                    out bool usedGeneratedFallback);
                 if (sprite == null)
                 {
                     missingSprites++;
@@ -709,7 +757,7 @@ namespace Arcontio.View.ArcGraph
                 entry.WorldZ + contract.ZOffset);
             handle.GameObject.transform.localScale = Vector3.one * contract.ActorScale;
 
-            partRenderer.transform.localPosition = Vector3.zero;
+            partRenderer.transform.localPosition = layeredActorSpriteLocalOffset;
             partRenderer.transform.localScale = Vector3.one;
             partRenderer.sprite = sprite;
             partRenderer.sortingOrder = entry.SortingOrder + visualFrame.SortingOffset;
@@ -1069,6 +1117,19 @@ namespace Arcontio.View.ArcGraph
             IArcGraphSpriteResolver spriteResolver,
             out bool usedGeneratedFallback)
         {
+            return ResolveSprite(
+                request,
+                spriteResolver,
+                allowFallbackForThisRequest: true,
+                out usedGeneratedFallback);
+        }
+
+        private Sprite ResolveSprite(
+            ArcGraphSpriteResolveRequest request,
+            IArcGraphSpriteResolver spriteResolver,
+            bool allowFallbackForThisRequest,
+            out bool usedGeneratedFallback)
+        {
             usedGeneratedFallback = false;
 
             if (spriteResolver != null
@@ -1078,7 +1139,12 @@ namespace Arcontio.View.ArcGraph
                 return resolved;
             }
 
-            if (!allowGeneratedFallbackSprites)
+            // Le parti modulari dell'NPC non devono produrre quadrati magenta
+            // giganti se manca un singolo PNG: meglio saltare la parte, loggare
+            // missingSprites e lasciare visibile il resto del corpo. Il fallback
+            // resta invece disponibile per il path non modulare, dove senza sprite
+            // l'intero actor sparirebbe e il gate visuale sarebbe meno leggibile.
+            if (!allowFallbackForThisRequest || !allowGeneratedFallbackSprites)
                 return null;
 
             usedGeneratedFallback = true;

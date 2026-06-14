@@ -3,7 +3,7 @@
   "worldHeight": 64,
   "tick": {
     "ticksPerSecond": 25,
-    "baseWalkCellDurationTicks": 4,
+    "baseWalkCellDurationTicks": 8,
     "enableJobRunningActionTraversal": true
   },
   "Language": "it",
@@ -150,7 +150,7 @@
     "blacklist_penalty_stage2": 0.35
   },
   "decision": {
-    "decisionEveryTicks": 25,
+    "decisionEveryTicks": 50,
     "selectionMode": "DeterministicTop1",
     "topN": 1,
     "noise01": 0.0,

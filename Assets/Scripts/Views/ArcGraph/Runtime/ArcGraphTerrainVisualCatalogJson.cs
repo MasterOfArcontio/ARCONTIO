@@ -121,6 +121,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>terrains</b>: definizioni terrain type -> varianti/animazioni.</item>
     ///   <item><b>transitions</b>: regole opzionali per bordi tra terrain type.</item>
+    ///   <item><b>dualGridOverlays</b>: overlay 2x2 per terreni superiori.</item>
     /// </list>
     /// </summary>
     [Serializable]
@@ -128,6 +129,7 @@ namespace Arcontio.View.ArcGraph
     {
         public ArcGraphTerrainVisualDefinitionDto[] terrains;
         public ArcGraphTerrainVisualTransitionSetDto[] transitions;
+        public ArcGraphTerrainVisualDualGridOverlayDto[] dualGridOverlays;
 
         // =============================================================================
         // ToRuntimeCatalog
@@ -141,7 +143,8 @@ namespace Arcontio.View.ArcGraph
         {
             return new ArcGraphTerrainVisualCatalog(
                 BuildDefinitions(),
-                BuildTransitionSets());
+                BuildTransitionSets(),
+                BuildDualGridOverlays());
         }
 
         private ArcGraphTerrainVisualDefinition[] BuildDefinitions()
@@ -191,6 +194,25 @@ namespace Arcontio.View.ArcGraph
 
             return result;
         }
+
+        private ArcGraphTerrainVisualDualGridOverlay[] BuildDualGridOverlays()
+        {
+            if (dualGridOverlays == null || dualGridOverlays.Length == 0)
+                return Array.Empty<ArcGraphTerrainVisualDualGridOverlay>();
+
+            var result = new ArcGraphTerrainVisualDualGridOverlay[dualGridOverlays.Length];
+            for (int i = 0; i < dualGridOverlays.Length; i++)
+            {
+                result[i] = dualGridOverlays[i] != null
+                    ? dualGridOverlays[i].ToRuntimeOverlay()
+                    : new ArcGraphTerrainVisualDualGridOverlay(
+                        "unknown",
+                        0,
+                        Array.Empty<ArcGraphTerrainVisualDualGridRule>());
+            }
+
+            return result;
+        }
     }
 
     // =============================================================================
@@ -216,6 +238,8 @@ namespace Arcontio.View.ArcGraph
         public int defaultTileId;
         public ArcGraphTerrainVisualVariantDto[] variants;
         public ArcGraphTerrainVisualAnimationDto animation;
+        public int detailChancePermille = 0;
+        public ArcGraphTerrainVisualDetailDto[] details;
 
         // =============================================================================
         // ToRuntimeDefinition
@@ -233,7 +257,9 @@ namespace Arcontio.View.ArcGraph
                 BuildVariants(),
                 animation != null
                     ? animation.ToRuntimeAnimation()
-                    : new ArcGraphTerrainVisualAnimation(null, 0f));
+                    : new ArcGraphTerrainVisualAnimation(null, 0f),
+                BuildDetails(),
+                detailChancePermille);
         }
 
         private ArcGraphTerrainVisualVariant[] BuildVariants()
@@ -252,6 +278,22 @@ namespace Arcontio.View.ArcGraph
                 result[i] = variants[i] != null
                     ? variants[i].ToRuntimeVariant()
                     : new ArcGraphTerrainVisualVariant(defaultTileId, 1);
+            }
+
+            return result;
+        }
+
+        private ArcGraphTerrainVisualDetail[] BuildDetails()
+        {
+            if (details == null || details.Length == 0)
+                return Array.Empty<ArcGraphTerrainVisualDetail>();
+
+            var result = new ArcGraphTerrainVisualDetail[details.Length];
+            for (int i = 0; i < details.Length; i++)
+            {
+                result[i] = details[i] != null
+                    ? details[i].ToRuntimeDetail()
+                    : new ArcGraphTerrainVisualDetail(defaultTileId, 1);
             }
 
             return result;
@@ -283,6 +325,39 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphTerrainVisualVariant ToRuntimeVariant()
         {
             return new ArcGraphTerrainVisualVariant(tileId, weight);
+        }
+    }
+
+    // =============================================================================
+    // ArcGraphTerrainVisualDetailDto
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO di un dettaglio decorativo tile pesato.
+    /// </para>
+    ///
+    /// <para>
+    /// I dettagli sono overlay puramente visuali: non diventano oggetti, non
+    /// entrano nella navigazione e non modificano la simulazione.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class ArcGraphTerrainVisualDetailDto
+    {
+        public int tileId;
+        public int weight = 1;
+
+        // =============================================================================
+        // ToRuntimeDetail
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte il dettaglio JSON in dettaglio runtime normalizzato.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualDetail ToRuntimeDetail()
+        {
+            return new ArcGraphTerrainVisualDetail(tileId, weight);
         }
     }
 
@@ -375,6 +450,8 @@ namespace Arcontio.View.ArcGraph
     {
         public string mask;
         public int tileId;
+        public int[] frameTileIds;
+        public float frameSeconds = 0.25f;
 
         // =============================================================================
         // ToRuntimeRule
@@ -386,7 +463,90 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public ArcGraphTerrainVisualTransitionRule ToRuntimeRule()
         {
-            return new ArcGraphTerrainVisualTransitionRule(mask, tileId);
+            var animation = new ArcGraphTerrainVisualAnimation(frameTileIds, frameSeconds);
+            return new ArcGraphTerrainVisualTransitionRule(mask, tileId, animation);
+        }
+    }
+
+    // =============================================================================
+    // ArcGraphTerrainVisualDualGridOverlayDto
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO di un overlay dual-grid data-driven.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class ArcGraphTerrainVisualDualGridOverlayDto
+    {
+        public string overlayTerrainId;
+        public int priority = 0;
+        public ArcGraphTerrainVisualDualGridRuleDto[] rules;
+
+        // =============================================================================
+        // ToRuntimeOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte l'overlay JSON in overlay runtime normalizzato.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualDualGridOverlay ToRuntimeOverlay()
+        {
+            return new ArcGraphTerrainVisualDualGridOverlay(
+                overlayTerrainId,
+                priority,
+                BuildRules());
+        }
+
+        private ArcGraphTerrainVisualDualGridRule[] BuildRules()
+        {
+            if (rules == null || rules.Length == 0)
+                return Array.Empty<ArcGraphTerrainVisualDualGridRule>();
+
+            var result = new ArcGraphTerrainVisualDualGridRule[rules.Length];
+            for (int i = 0; i < rules.Length; i++)
+            {
+                result[i] = rules[i] != null
+                    ? rules[i].ToRuntimeRule()
+                    : new ArcGraphTerrainVisualDualGridRule(
+                        "0000",
+                        0,
+                        new ArcGraphTerrainVisualAnimation(null, 0f));
+            }
+
+            return result;
+        }
+    }
+
+    // =============================================================================
+    // ArcGraphTerrainVisualDualGridRuleDto
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO di una regola dual-grid maschera 2x2 -> tile id.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class ArcGraphTerrainVisualDualGridRuleDto
+    {
+        public string mask;
+        public int tileId;
+        public int[] frameTileIds;
+        public float frameSeconds = 0.25f;
+
+        // =============================================================================
+        // ToRuntimeRule
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte la regola dual-grid JSON in regola runtime normalizzata.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualDualGridRule ToRuntimeRule()
+        {
+            var animation = new ArcGraphTerrainVisualAnimation(frameTileIds, frameSeconds);
+            return new ArcGraphTerrainVisualDualGridRule(mask, tileId, animation);
         }
     }
 }

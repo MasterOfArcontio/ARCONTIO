@@ -76,6 +76,51 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // ResolvedDualGridOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esito locale della risoluzione dual-grid per un quad visuale.
+        /// </para>
+        ///
+        /// <para><b>Base + overlay</b></para>
+        /// <para>
+        /// La dual-grid del prato richiede due disegni: prima il terreno di fondo,
+        /// poi il tile prato trasparente calcolato sulla finestra 2x2. Questa
+        /// struttura tiene insieme i due tile senza trasformarli in nuovo stato
+        /// pubblico della mappa.
+        /// </para>
+        /// </summary>
+        private readonly struct ResolvedDualGridOverlay
+        {
+            public readonly int BaseTileId;
+            public readonly int OverlayTileId;
+            public readonly bool DrawBaseTile;
+            public readonly bool UsedBaseAnimation;
+            public readonly bool UsedOverlayAnimation;
+            public readonly bool UsedBaseVariant;
+            public readonly bool UsedBaseFallback;
+
+            public ResolvedDualGridOverlay(
+                int baseTileId,
+                int overlayTileId,
+                bool drawBaseTile,
+                bool usedBaseAnimation,
+                bool usedOverlayAnimation,
+                bool usedBaseVariant,
+                bool usedBaseFallback)
+            {
+                BaseTileId = baseTileId;
+                OverlayTileId = overlayTileId;
+                DrawBaseTile = drawBaseTile;
+                UsedBaseAnimation = usedBaseAnimation;
+                UsedOverlayAnimation = usedOverlayAnimation;
+                UsedBaseVariant = usedBaseVariant;
+                UsedBaseFallback = usedBaseFallback;
+            }
+        }
+
+        // =============================================================================
         // BuildDirtyChunks
         // =============================================================================
         /// <summary>
@@ -397,6 +442,63 @@ namespace Arcontio.View.ArcGraph
                     if (!hasRuntimeCell && !hasSnapshot)
                         continue;
 
+                    if (hasRuntimeCell
+                        && TryResolveRuntimeDualGridOverlay(
+                            runtimeCell,
+                            runtimeTerrainMap,
+                            visualBuildOptions,
+                            visualResolver,
+                            out ResolvedDualGridOverlay dualGridOverlay))
+                    {
+                        if (dualGridOverlay.DrawBaseTile)
+                        {
+                            AddTileQuad(
+                                vertices,
+                                uvs,
+                                triangles,
+                                uvMap,
+                                dualGridOverlay.BaseTileId,
+                                x,
+                                y,
+                                safeTileWorld,
+                                zOffset: 0f,
+                                ref usedFallbackUv,
+                                ref missingUvTileCount,
+                                ref firstMissingUvTileId);
+                        }
+
+                        AddTileQuad(
+                            vertices,
+                            uvs,
+                            triangles,
+                            uvMap,
+                            dualGridOverlay.OverlayTileId,
+                            x,
+                            y,
+                            safeTileWorld,
+                            zOffset: -0.0001f,
+                            ref usedFallbackUv,
+                            ref missingUvTileCount,
+                            ref firstMissingUvTileId);
+
+                        visualResolverTileCount++;
+                        visualTransitionTileCount++;
+                        if ((dualGridOverlay.DrawBaseTile && dualGridOverlay.UsedBaseAnimation)
+                            || dualGridOverlay.UsedOverlayAnimation)
+                        {
+                            visualAnimationTileCount++;
+                        }
+
+                        if (dualGridOverlay.DrawBaseTile && dualGridOverlay.UsedBaseVariant)
+                            visualVariantTileCount++;
+
+                        if (dualGridOverlay.DrawBaseTile && dualGridOverlay.UsedBaseFallback)
+                            visualResolverFallbackCount++;
+
+                        cellCount++;
+                        continue;
+                    }
+
                     ResolvedTerrainTile resolvedTile = hasRuntimeCell
                         ? ResolveTerrainTile(
                             runtimeCell,
@@ -429,26 +531,41 @@ namespace Arcontio.View.ArcGraph
                     if (resolvedTile.UsedVisualFallback)
                         visualResolverFallbackCount++;
 
-                    bool foundUv = uvMap.TryGetUvQuad(tileId, out var uv0, out var uv1, out var uv2, out var uv3);
-                    if (!foundUv)
-                    {
-                        usedFallbackUv = true;
-                        missingUvTileCount++;
-                        if (firstMissingUvTileId < 0)
-                            firstMissingUvTileId = tileId;
-                    }
-
-                    AddQuad(
+                    AddTileQuad(
                         vertices,
                         uvs,
                         triangles,
+                        uvMap,
+                        tileId,
                         x,
                         y,
                         safeTileWorld,
-                        uv0,
-                        uv1,
-                        uv2,
-                        uv3);
+                        zOffset: 0f,
+                        ref usedFallbackUv,
+                        ref missingUvTileCount,
+                        ref firstMissingUvTileId);
+
+                    if (hasRuntimeCell
+                        && !resolvedTile.UsedTransition
+                        && TryResolveRuntimeTerrainDetail(
+                            runtimeCell,
+                            visualBuildOptions,
+                            out int detailTileId))
+                    {
+                        AddTileQuad(
+                            vertices,
+                            uvs,
+                            triangles,
+                            uvMap,
+                            detailTileId,
+                            x,
+                            y,
+                            safeTileWorld,
+                            zOffset: -0.0002f,
+                            ref usedFallbackUv,
+                            ref missingUvTileCount,
+                            ref firstMissingUvTileId);
+                    }
 
                     cellCount++;
                 }
@@ -488,17 +605,18 @@ namespace Arcontio.View.ArcGraph
             Vector2 uv0,
             Vector2 uv1,
             Vector2 uv2,
-            Vector2 uv3)
+            Vector2 uv3,
+            float zOffset)
         {
             int v = vertices.Count;
 
             float wx = cellX * tileWorld;
             float wy = cellY * tileWorld;
 
-            vertices.Add(new Vector3(wx, wy, 0f));
-            vertices.Add(new Vector3(wx + tileWorld, wy, 0f));
-            vertices.Add(new Vector3(wx + tileWorld, wy + tileWorld, 0f));
-            vertices.Add(new Vector3(wx, wy + tileWorld, 0f));
+            vertices.Add(new Vector3(wx, wy, zOffset));
+            vertices.Add(new Vector3(wx + tileWorld, wy, zOffset));
+            vertices.Add(new Vector3(wx + tileWorld, wy + tileWorld, zOffset));
+            vertices.Add(new Vector3(wx, wy + tileWorld, zOffset));
 
             uvs.Add(uv0);
             uvs.Add(uv1);
@@ -512,6 +630,43 @@ namespace Arcontio.View.ArcGraph
             triangles.Add(v + 0);
             triangles.Add(v + 3);
             triangles.Add(v + 2);
+        }
+
+        private static void AddTileQuad(
+            List<Vector3> vertices,
+            List<Vector2> uvs,
+            List<int> triangles,
+            ArcGraphTerrainTileUvMap uvMap,
+            int tileId,
+            int cellX,
+            int cellY,
+            float tileWorld,
+            float zOffset,
+            ref bool usedFallbackUv,
+            ref int missingUvTileCount,
+            ref int firstMissingUvTileId)
+        {
+            bool foundUv = uvMap.TryGetUvQuad(tileId, out var uv0, out var uv1, out var uv2, out var uv3);
+            if (!foundUv)
+            {
+                usedFallbackUv = true;
+                missingUvTileCount++;
+                if (firstMissingUvTileId < 0)
+                    firstMissingUvTileId = tileId;
+            }
+
+            AddQuad(
+                vertices,
+                uvs,
+                triangles,
+                cellX,
+                cellY,
+                tileWorld,
+                uv0,
+                uv1,
+                uv2,
+                uv3,
+                zOffset);
         }
 
         private static int ResolveVisualTileId(
@@ -538,6 +693,51 @@ namespace Arcontio.View.ArcGraph
             int hash = Hash2D(snapshot.Cell.X, snapshot.Cell.Y);
             int variant = Mathf.Abs(hash) % policy.FloorVariantCount;
             return policy.FloorBaseTileId + variant;
+        }
+
+        // =============================================================================
+        // TryResolveRuntimeTerrainDetail
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova a risolvere un dettaglio decorativo per una cella terrain runtime.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: atmosfera senza nuovo oggetto simulativo</b></para>
+        /// <para>
+        /// Il dettaglio viene disegnato come overlay dello stesso mesh terrain. Non
+        /// crea GameObject, non modifica pathfinding, non blocca l'attore e non
+        /// diventa parte del layer oggetti. La scelta e' data-driven dal visual
+        /// catalog e deterministica per coordinata, quindi costa solo quando il
+        /// chunk viene costruito o ricostruito.
+        /// </para>
+        /// </summary>
+        private static bool TryResolveRuntimeTerrainDetail(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            out int detailTileId)
+        {
+            detailTileId = 0;
+
+            if (runtimeCell.IsBlocked
+                || !visualBuildOptions.UseVisualResolver
+                || visualBuildOptions.VisualCatalog == null)
+            {
+                return false;
+            }
+
+            if (!visualBuildOptions.VisualCatalog.TryGetDefinition(
+                    runtimeCell.TerrainId,
+                    out ArcGraphTerrainVisualDefinition definition))
+            {
+                return false;
+            }
+
+            if (!definition.HasDetails)
+                return false;
+
+            int seed = HashTerrainDetail(runtimeCell.Cell, runtimeCell.TerrainId);
+            return definition.TryResolveDetailTileId(seed, out detailTileId);
         }
 
         private static ResolvedTerrainTile ResolveTerrainTile(
@@ -607,6 +807,268 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // TryResolveRuntimeDualGridOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova a risolvere un overlay dual-grid sulla finestra 2x2 che parte
+        /// dalla cella corrente.
+        /// </para>
+        ///
+        /// <para><b>Convenzione maschera ARCONTIO</b></para>
+        /// <para>
+        /// Le quattro cifre sono lette nell'ordine definito dall'operatore:
+        /// alto sinistra, alto destra, basso sinistra, basso destra. Il valore
+        /// <c>1</c> indica il terrain type dell'overlay, oggi il prato. Il valore
+        /// <c>0</c> indica qualunque altro terreno sottostante.
+        /// </para>
+        /// </summary>
+        private static bool TryResolveRuntimeDualGridOverlay(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            ArcGraphTerrainVisualResolver visualResolver,
+            out ResolvedDualGridOverlay resolvedOverlay)
+        {
+            resolvedOverlay = default;
+
+            if (runtimeTerrainMap == null
+                || runtimeCell.IsBlocked
+                || !visualBuildOptions.UseVisualResolver
+                || visualBuildOptions.VisualCatalog == null
+                || visualResolver == null
+                || visualBuildOptions.VisualCatalog.DualGridOverlayCount == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < visualBuildOptions.VisualCatalog.DualGridOverlays.Count; i++)
+            {
+                ArcGraphTerrainVisualDualGridOverlay overlay = visualBuildOptions.VisualCatalog.DualGridOverlays[i];
+                if (overlay == null || overlay.RuleCount == 0)
+                    continue;
+
+                bool topLeftIsOverlay = IsDualGridOverlayTerrain(
+                    runtimeTerrainMap,
+                    runtimeCell.Cell.X,
+                    runtimeCell.Cell.Y + 1,
+                    runtimeCell.Cell.Z,
+                    overlay);
+                bool topRightIsOverlay = IsDualGridOverlayTerrain(
+                    runtimeTerrainMap,
+                    runtimeCell.Cell.X + 1,
+                    runtimeCell.Cell.Y + 1,
+                    runtimeCell.Cell.Z,
+                    overlay);
+                bool bottomLeftIsOverlay = IsDualGridOverlayTerrain(
+                    runtimeTerrainMap,
+                    runtimeCell.Cell.X,
+                    runtimeCell.Cell.Y,
+                    runtimeCell.Cell.Z,
+                    overlay);
+                bool bottomRightIsOverlay = IsDualGridOverlayTerrain(
+                    runtimeTerrainMap,
+                    runtimeCell.Cell.X + 1,
+                    runtimeCell.Cell.Y,
+                    runtimeCell.Cell.Z,
+                    overlay);
+
+                if (!topLeftIsOverlay
+                    && !topRightIsOverlay
+                    && !bottomLeftIsOverlay
+                    && !bottomRightIsOverlay)
+                {
+                    continue;
+                }
+
+                if (topLeftIsOverlay
+                    && topRightIsOverlay
+                    && bottomLeftIsOverlay
+                    && bottomRightIsOverlay)
+                {
+                    continue;
+                }
+
+                string mask = BuildDualGridMask(
+                    topLeftIsOverlay,
+                    topRightIsOverlay,
+                    bottomLeftIsOverlay,
+                    bottomRightIsOverlay);
+
+                if (!overlay.TryResolveTileId(
+                        mask,
+                        visualBuildOptions.VisualTimeSeconds,
+                        out int overlayTileId,
+                        out bool usedOverlayAnimation))
+                {
+                    continue;
+                }
+
+                ResolvedTerrainTile baseTile = ResolveDualGridBaseTile(
+                    runtimeCell,
+                    runtimeTerrainMap,
+                    overlay,
+                    visualBuildOptions,
+                    visualResolver);
+
+                resolvedOverlay = new ResolvedDualGridOverlay(
+                    baseTile.TileId,
+                    overlayTileId,
+                    drawBaseTile: true,
+                    baseTile.UsedAnimation,
+                    usedOverlayAnimation,
+                    baseTile.UsedVariant,
+                    baseTile.UsedVisualFallback);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsDualGridOverlayTerrain(
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            int x,
+            int y,
+            int z,
+            ArcGraphTerrainVisualDualGridOverlay overlay)
+        {
+            var coord = new ArcGraphCellCoord(x, y, z);
+            return runtimeTerrainMap.TryGetCell(coord, out ArcGraphRuntimeTerrainCell cell)
+                   && !cell.IsBlocked
+                   && overlay.IsOverlayTerrain(cell.TerrainId);
+        }
+
+        private static string BuildDualGridMask(
+            bool topLeftIsOverlay,
+            bool topRightIsOverlay,
+            bool bottomLeftIsOverlay,
+            bool bottomRightIsOverlay)
+        {
+            return (topLeftIsOverlay ? "1" : "0")
+                   + (topRightIsOverlay ? "1" : "0")
+                   + (bottomLeftIsOverlay ? "1" : "0")
+                   + (bottomRightIsOverlay ? "1" : "0");
+        }
+
+        private static ResolvedTerrainTile ResolveDualGridBaseTile(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            ArcGraphTerrainVisualDualGridOverlay overlay,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            ArcGraphTerrainVisualResolver visualResolver)
+        {
+            if (TryGetDualGridBaseCell(
+                    runtimeCell,
+                    runtimeTerrainMap,
+                    overlay,
+                    out ArcGraphRuntimeTerrainCell baseCell))
+            {
+                return ResolveTerrainTileWithoutTransitions(
+                    baseCell,
+                    visualBuildOptions,
+                    visualResolver);
+            }
+
+            return ResolveTerrainTileWithoutTransitions(
+                runtimeCell,
+                visualBuildOptions,
+                visualResolver);
+        }
+
+        private static bool TryGetDualGridBaseCell(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            ArcGraphTerrainVisualDualGridOverlay overlay,
+            out ArcGraphRuntimeTerrainCell baseCell)
+        {
+            if (TryGetNonOverlayCell(runtimeTerrainMap, runtimeCell.Cell.X, runtimeCell.Cell.Y, runtimeCell.Cell.Z, overlay, out baseCell))
+                return true;
+
+            if (TryGetNonOverlayCell(runtimeTerrainMap, runtimeCell.Cell.X + 1, runtimeCell.Cell.Y, runtimeCell.Cell.Z, overlay, out baseCell))
+                return true;
+
+            if (TryGetNonOverlayCell(runtimeTerrainMap, runtimeCell.Cell.X, runtimeCell.Cell.Y + 1, runtimeCell.Cell.Z, overlay, out baseCell))
+                return true;
+
+            return TryGetNonOverlayCell(runtimeTerrainMap, runtimeCell.Cell.X + 1, runtimeCell.Cell.Y + 1, runtimeCell.Cell.Z, overlay, out baseCell);
+        }
+
+        private static bool TryGetNonOverlayCell(
+            ArcGraphRuntimeTerrainMap runtimeTerrainMap,
+            int x,
+            int y,
+            int z,
+            ArcGraphTerrainVisualDualGridOverlay overlay,
+            out ArcGraphRuntimeTerrainCell baseCell)
+        {
+            var coord = new ArcGraphCellCoord(x, y, z);
+            if (runtimeTerrainMap.TryGetCell(coord, out baseCell)
+                && !baseCell.IsBlocked
+                && !overlay.IsOverlayTerrain(baseCell.TerrainId))
+            {
+                return true;
+            }
+
+            baseCell = default;
+            return false;
+        }
+
+        private static ResolvedTerrainTile ResolveTerrainTileWithoutTransitions(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            ArcGraphTerrainVisualResolver visualResolver)
+        {
+            ArcGraphTerrainVisualCache cache = runtimeCell.VisualCache;
+
+            if (cache.HasAnimatedVisual
+                && visualBuildOptions.UseVisualResolver
+                && visualBuildOptions.VisualCatalog != null
+                && visualResolver != null)
+            {
+                var input = new ArcGraphTerrainVisualResolveInput(
+                    runtimeCell.Cell,
+                    runtimeCell.TerrainId,
+                    neighborTerrainId: null,
+                    neighborMask: null,
+                    visualBuildOptions.VisualTimeSeconds);
+
+                ArcGraphTerrainVisualResolveResult result = visualResolver.Resolve(
+                    visualBuildOptions.VisualCatalog,
+                    input);
+
+                return new ResolvedTerrainTile(
+                    result.TileId,
+                    usedVisualResolver: true,
+                    usedLegacy: false,
+                    usedVariant: false,
+                    usedAnimation: result.UsedAnimation,
+                    usedTransition: false,
+                    usedVisualFallback: false);
+            }
+
+            if (cache.HasStaticTile)
+            {
+                return new ResolvedTerrainTile(
+                    cache.StaticTileId,
+                    cache.UsedVisualResolver,
+                    usedLegacy: !cache.UsedVisualResolver,
+                    cache.UsedVariant,
+                    usedAnimation: false,
+                    usedTransition: false,
+                    cache.UsedFallback);
+            }
+
+            return new ResolvedTerrainTile(
+                runtimeCell.SourceTileId,
+                usedVisualResolver: false,
+                usedLegacy: true,
+                usedVariant: false,
+                usedAnimation: false,
+                usedTransition: false,
+                usedVisualFallback: true);
+        }
+
+        // =============================================================================
         // TryResolveRuntimeTransition
         // =============================================================================
         /// <summary>
@@ -625,7 +1087,8 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>N/E/S/W</b>: controlla solo i quattro vicini cardinali.</item>
+        ///   <item><b>N/E/S/W</b>: controlla i quattro vicini cardinali.</item>
+        ///   <item><b>NE/SE/SW/NW</b>: controlla anche i quattro vicini diagonali per gli spigoli.</item>
         ///   <item><b>Gruppi terrain</b>: unisce direzioni dello stesso terrain id in una maschera.</item>
         ///   <item><b>Resolver</b>: accetta solo risultati marcati come transizione.</item>
         /// </list>
@@ -726,6 +1189,123 @@ namespace Arcontio.View.ArcGraph
                 ref mask3,
                 ref neighborGroupCount);
 
+            if (TryResolveTransitionGroups(
+                runtimeCell,
+                visualBuildOptions,
+                visualResolver,
+                neighborId0,
+                neighborId1,
+                neighborId2,
+                neighborId3,
+                mask0,
+                mask1,
+                mask2,
+                mask3,
+                out resolvedTile))
+            {
+                return true;
+            }
+
+            neighborId0 = null;
+            neighborId1 = null;
+            neighborId2 = null;
+            neighborId3 = null;
+            mask0 = string.Empty;
+            mask1 = string.Empty;
+            mask2 = string.Empty;
+            mask3 = string.Empty;
+            neighborGroupCount = 0;
+
+            AddNeighborMask(
+                runtimeTerrainMap,
+                runtimeCell,
+                1,
+                1,
+                "NE",
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+            AddNeighborMask(
+                runtimeTerrainMap,
+                runtimeCell,
+                1,
+                -1,
+                "SE",
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+            AddNeighborMask(
+                runtimeTerrainMap,
+                runtimeCell,
+                -1,
+                -1,
+                "SW",
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+            AddNeighborMask(
+                runtimeTerrainMap,
+                runtimeCell,
+                -1,
+                1,
+                "NW",
+                ref neighborId0,
+                ref neighborId1,
+                ref neighborId2,
+                ref neighborId3,
+                ref mask0,
+                ref mask1,
+                ref mask2,
+                ref mask3,
+                ref neighborGroupCount);
+
+            return TryResolveTransitionGroups(
+                runtimeCell,
+                visualBuildOptions,
+                visualResolver,
+                neighborId0,
+                neighborId1,
+                neighborId2,
+                neighborId3,
+                mask0,
+                mask1,
+                mask2,
+                mask3,
+                out resolvedTile);
+        }
+
+        private static bool TryResolveTransitionGroups(
+            ArcGraphRuntimeTerrainCell runtimeCell,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions,
+            ArcGraphTerrainVisualResolver visualResolver,
+            string neighborId0,
+            string neighborId1,
+            string neighborId2,
+            string neighborId3,
+            string mask0,
+            string mask1,
+            string mask2,
+            string mask3,
+            out ResolvedTerrainTile resolvedTile)
+        {
             return TryResolveTransitionGroup(
                        runtimeCell,
                        visualBuildOptions,
@@ -900,7 +1480,7 @@ namespace Arcontio.View.ArcGraph
                 usedVisualResolver: true,
                 usedLegacy: false,
                 usedVariant: false,
-                usedAnimation: false,
+                usedAnimation: result.UsedAnimation,
                 usedTransition: true,
                 usedVisualFallback: false);
             return true;
@@ -958,13 +1538,52 @@ namespace Arcontio.View.ArcGraph
         {
             unchecked
             {
-                int h = 17;
-                h = (h * 31) + x;
-                h = (h * 31) + y;
-                h ^= (h << 13);
-                h ^= (h >> 17);
-                h ^= (h << 5);
-                return h;
+                uint hash = 2166136261u;
+                hash ^= (uint)x + 0x9E3779B9u + (hash << 6) + (hash >> 2);
+                hash ^= (uint)y + 0x9E3779B9u + (hash << 6) + (hash >> 2);
+                hash ^= hash >> 16;
+                hash *= 2246822519u;
+                hash ^= hash >> 13;
+                hash *= 3266489917u;
+                hash ^= hash >> 16;
+                return (int)hash;
+            }
+        }
+
+        private static int HashTerrainDetail(ArcGraphCellCoord cell, string terrainId)
+        {
+            unchecked
+            {
+                uint hash = 2166136261u;
+                hash ^= (uint)cell.X + 0x9E3779B9u + (hash << 6) + (hash >> 2);
+                hash ^= (uint)cell.Y + 0x9E3779B9u + (hash << 6) + (hash >> 2);
+                hash ^= (uint)cell.Z + 0x9E3779B9u + (hash << 6) + (hash >> 2);
+                hash ^= (uint)StableStringHash(terrainId) + 0x9E3779B9u + (hash << 6) + (hash >> 2);
+                hash ^= 0xA511E9B3u;
+                hash ^= hash >> 16;
+                hash *= 2246822519u;
+                hash ^= hash >> 13;
+                hash *= 3266489917u;
+                hash ^= hash >> 16;
+                return (int)hash;
+            }
+        }
+
+        private static int StableStringHash(string value)
+        {
+            unchecked
+            {
+                uint hash = 2166136261u;
+                if (!string.IsNullOrEmpty(value))
+                {
+                    for (int i = 0; i < value.Length; i++)
+                    {
+                        hash ^= value[i];
+                        hash *= 16777619u;
+                    }
+                }
+
+                return (int)hash;
             }
         }
 

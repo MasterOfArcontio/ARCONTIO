@@ -23,7 +23,7 @@
     }
   ],
 
-  "layoutResourcePath": "MapGrid/Layouts/Layout_Default",
+  "layoutResourcePath": "MapGrid/Layouts/Layout_ArcGraph_TerrainVisualTest",
 
   "camera": {
     "startZoom": 18.0,

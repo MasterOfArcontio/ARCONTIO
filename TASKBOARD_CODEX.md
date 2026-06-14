@@ -28,10 +28,10 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38i.20 - Terrain Transitions / Autotile Semplice`
+`v0.38j - NPC Animation Gate / Object Visual Bridge preparatorio`
 
 STATUS:
-TRANSIZIONI TERRAIN CARDINALI ATTIVE DA RUNTIME TERRAIN MAP
+TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; TEST VISUALI AVANZATI CONGELATI, PROSECUZIONE SU IMPLEMENTAZIONE/DIAGNOSTICA NON VISUALE
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38i-arcgraph-data-driven-terrain-npc`
@@ -84,6 +84,15 @@ PROMPT OPERATIVO - ROADMAP RESIDUA ARCGRAPH:
 ```text
 v0.37    -> Debug/Overlay Migration: migrazione progressiva overlay diagnostici da MapGridWorldView
 v0.38    -> Legacy Absorption / Retirement: assorbimento e pensionamento controllato del rendering MapGrid legacy
+v0.38i.21 -> Terrain Visual Gate Finale: tile base, varianti, acqua animata e transizioni
+v0.38i.22 -> Terrain Visual Gate Fix: correzioni mirate emerse dal gate terrain
+v0.38j    -> NPC Animation Gate: idle, walk, direzioni, movimento multitick e layer finali
+v0.38k    -> Runtime Switch Stabilization: F12, root visuali, auto-installer e diagnostica
+v0.38l    -> Interaction Minimum Gate: hover, selezione e pointer HUD dentro ArcGraph
+v0.38m    -> UI Archetype Foundation: prefab/controller riutilizzabili per pulsanti, menu e pannelli
+v0.38n    -> Debug/UI Migration Cleanup: debug utili senza copiare MapGridWorldView
+v0.38o    -> MapGrid Dependency Audit Finale: dipendenze residue prima del pensionamento
+v0.38p    -> ArcGraph Minimum Stable Closure: vista minima stabile e documentata
 ```
 
 Regola corrente:
@@ -686,6 +695,66 @@ Regola corrente:
   - introdotto `ArcGraphTerrainTransitionHarness` per smoke test data-only su prato confinante con pietra;
   - nessuna modifica a World, Decision Layer, Job Layer, MapGrid, scene o prefab;
   - prossimo step operativo consigliato: `v0.38i.21 - Terrain Visual Gate Finale`.
+- gate visuale runtime NPC/F12 recuperato e superato:
+  - introdotto cablaggio runtime auto-installato per `Scene_MapGrid` come supporto di gate, senza salvataggio scena;
+  - `ArcGraphViewModeSwitcher` usa New Input System per evitare eccezione da `UnityEngine.Input`;
+  - `F12` alterna MapGrid/ArcGraph nel test operatore;
+  - renderer NPC modulare carica sprite reali da `Assets/Resources/ArcGraph/NPC/human_default`;
+  - fallback magenta non viene piu' usato per singole parti modulari mancanti;
+  - offset verticale NPC `32x48` corretto rispetto alla cella `32x32`;
+  - shadow automatica mantenuta e riallineata dopo test visuale;
+  - prossimo blocco prioritario resta `v0.38i.21 - Terrain Visual Gate Finale`.
+- roadmap residua v0.38 aggiornata:
+  - `v0.38i.21`: gate terrain completo su tile base, varianti, animazioni e transizioni;
+  - `v0.38i.22`: fix mirati post gate terrain;
+- `v0.38j`: gate animazioni NPC;
+- `v0.38k`: stabilizzazione switch runtime e cablaggio;
+- `v0.38l`: interaction minima;
+- `v0.38m`: fondazione archetipi UI riutilizzabili per pulsanti/menu/pannelli;
+- `v0.38n`: cleanup debug/UI;
+- `v0.38o`: audit dipendenze residue MapGrid;
+- `v0.38p`: closeout ArcGraph minimo stabile.
+- gate terrain `v0.38i.21` superato dall'operatore:
+  - prato, pietra, acqua animata e atlas dati risultano visibili;
+  - varianti prato/pietra funzionanti;
+  - distribuzione varianti corretta dopo riduzione del pattern ripetitivo;
+  - renderer terrain resta guidato da cataloghi dati.
+- fix terrain `v0.38i.22` completato:
+  - transizioni prato/roccia spostate su logica dual-grid;
+  - riga dual-grid dell'atlas con 14 maschere operative, esclusi `0000` e `1111`;
+  - ordine maschera: alto-sinistra, alto-destra, basso-sinistra, basso-destra;
+  - prato trattato come layer superiore rispetto al materiale sottostante;
+  - acqua/prato e acqua/pietra animati rimandati al futuro blocco acqua, non inclusi nella chiusura terrain minima.
+- ponte object visual avviato:
+  - scelta progettuale confermata: usare `object_defs.json` come catalogo unico simulazione + grafica;
+  - aggiunti dati di footprint XY e sezione visuale oggetto;
+  - ArcGraph puo' risolvere il path sprite oggetto da `ObjectDef`, senza introdurre un catalogo visuale parallelo;
+  - prossimo step tecnico consigliato: propagare i metadati visuali oggetto negli snapshot/render item ArcGraph, senza ancora introdurre alberi/vegetazione produttiva.
+- micro-step preparatorio `v0.38i.21` avviato:
+  - `ArcGraphTerrainCatalog.json` ora registra tutti i tile richiesti da `ArcGraphTerrainVisualCatalog.json`;
+  - atlas dichiarato come `512x512` con tile `32x32`, coerente con `TerrainAtlas.png` attuale;
+  - mapping registrato per grass base, 2 varianti grass, stone floor, 8 transizioni grass/stone e 4 frame acqua;
+  - verifica data-only PowerShell: `required=16`, `present=16`, `missing=` vuoto, `outOfBounds=` vuoto;
+  - il gate visuale terrain non e' ancora dichiarato superato: serve test Unity con atlas disegnato correttamente nelle coordinate dichiarate.
+- congelamento operativo test visuali registrato:
+  - l'operatore non puo' eseguire test Unity in questa fase;
+  - i gate visuali terrain e NPC animation restano congelati, non falliti;
+  - durante il congelamento e' ammesso procedere solo con implementazione non distruttiva, diagnostica data-only e preparazione tecnica;
+  - non dichiarare chiuso il gate terrain senza validazione visuale futura;
+  - non pensionare MapGrid finche' i gate visuali congelati non saranno recuperati.
+- micro-step preparatorio `v0.38j` avviato:
+  - estesa la diagnostica di `ArcGraphNpcSpriteResourceProbe`;
+  - il probe ora distingue parti, direzioni, animazioni e slot parte/direzione/animazione del catalogo NPC;
+  - il probe segnala il primo sprite mancante con parte, direzione e animazione;
+  - il probe segnala eventuali slot catalogo incompleti, per esempio `body/south/walk`;
+  - la summary diagnostica riporta range frame idle e walk, utile per controllare idle a 4 frame e walk a 8 frame;
+  - l'auto-installer runtime aggiunge anche `ArcGraphNpcSpriteResourceProbe` sul visual root ArcGraph e lo cabla con lo stesso catalogo/resolver del renderer NPC;
+  - nessun test visuale eseguito, nessuna scena/prefab modificata, nessuna mutazione World/MapGrid.
+- micro-step preparatorio `v0.38k` avviato:
+  - estesa la diagnostica di `ArcGraphViewModeSwitcher`;
+  - oltre ai root visuali assegnati, lo switcher ora registra quanti root MapGrid e ArcGraph risultano attivi dopo lo switch;
+  - questo prepara il recupero futuro del gate F12 senza richiedere test immediati;
+  - nessuna scena/prefab modificata, nessuna mutazione World/MapGrid.
 
 DOC SYNC:
 

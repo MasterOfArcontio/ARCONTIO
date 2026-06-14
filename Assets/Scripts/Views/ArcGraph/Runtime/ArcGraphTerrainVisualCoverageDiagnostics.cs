@@ -178,6 +178,9 @@ namespace Arcontio.View.ArcGraph
                 for (int v = 0; v < definition.Variants.Count; v++)
                     required.Add(definition.Variants[v].TileId);
 
+                for (int d = 0; d < definition.Details.Count; d++)
+                    required.Add(definition.Details[d].TileId);
+
                 if (definition.HasAnimation)
                 {
                     for (int f = 0; f < definition.Animation.FrameTileIds.Count; f++)
@@ -192,7 +195,35 @@ namespace Arcontio.View.ArcGraph
                     continue;
 
                 for (int r = 0; r < transitionSet.Rules.Count; r++)
-                    required.Add(transitionSet.Rules[r].TileId);
+                {
+                    ArcGraphTerrainVisualTransitionRule rule = transitionSet.Rules[r];
+                    required.Add(rule.TileId);
+
+                    if (rule.HasAnimation)
+                    {
+                        for (int f = 0; f < rule.Animation.FrameTileIds.Count; f++)
+                            required.Add(rule.Animation.FrameTileIds[f]);
+                    }
+                }
+            }
+
+            for (int i = 0; i < visualCatalog.DualGridOverlays.Count; i++)
+            {
+                ArcGraphTerrainVisualDualGridOverlay overlay = visualCatalog.DualGridOverlays[i];
+                if (overlay == null)
+                    continue;
+
+                for (int r = 0; r < overlay.Rules.Count; r++)
+                {
+                    ArcGraphTerrainVisualDualGridRule rule = overlay.Rules[r];
+                    required.Add(rule.TileId);
+
+                    if (rule.HasAnimation)
+                    {
+                        for (int f = 0; f < rule.Animation.FrameTileIds.Count; f++)
+                            required.Add(rule.Animation.FrameTileIds[f]);
+                    }
+                }
             }
 
             return required;

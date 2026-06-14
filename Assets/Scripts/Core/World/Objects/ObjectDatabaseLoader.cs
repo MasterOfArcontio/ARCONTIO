@@ -46,8 +46,14 @@ namespace Arcontio.Core
                 if (def == null) continue;
                 if (string.IsNullOrWhiteSpace(def.Id)) continue;
 
-                // Normalizza alcuni default utili
+                // Normalizza alcuni default utili. Il footprint nasce come dato
+                // autorevole di catalogo, ma il mondo attuale usa ancora una
+                // occupazione effettiva 1x1: il default mantiene compatibili le
+                // definizioni legacy che non dichiarano ancora dimensioni XY.
                 if (def.VisionCost <= 0f) def.VisionCost = 1f;
+                if (def.FootprintWidth <= 0) def.FootprintWidth = 1;
+                if (def.FootprintHeight <= 0) def.FootprintHeight = 1;
+                if (def.Visual == null) def.Visual = new ObjectVisualDef();
                 if (def.Properties == null) def.Properties = new System.Collections.Generic.List<ObjectPropertyKV>();
 
                 world.ObjectDefs[def.Id] = def;

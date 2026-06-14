@@ -3,34 +3,71 @@
     {
       "terrainId": "grass",
       "defaultTileId": 0,
+      "detailChancePermille": 0,
       "variants": [
         {
           "tileId": 0,
-          "weight": 70
+          "weight": 40
         },
         {
           "tileId": 1,
-          "weight": 20
+          "weight": 5
         },
         {
           "tileId": 2,
+          "weight": 15
+        },
+        {
+          "tileId": 3,
+          "weight": 15
+        },
+        {
+          "tileId": 4,
           "weight": 10
+        },
+        {
+          "tileId": 5,
+          "weight": 5
+        },
+        {
+          "tileId": 6,
+          "weight": 5
+        },
+        {
+          "tileId": 7,
+          "weight": 3
+        },
+        {
+          "tileId": 8,
+          "weight": 3
         }
-      ]
+      ],
+      "details": []
     },
     {
       "terrainId": "stone_floor",
       "defaultTileId": 10,
+      "detailChancePermille": 0,
       "variants": [
         {
           "tileId": 10,
           "weight": 1
+        },
+        {
+          "tileId": 11,
+          "weight": 1
+        },
+        {
+          "tileId": 12,
+          "weight": 1
         }
-      ]
+      ],
+      "details": []
     },
     {
       "terrainId": "water",
       "defaultTileId": 30,
+      "detailChancePermille": 0,
       "animation": {
         "frameTileIds": [
           30,
@@ -38,46 +75,72 @@
           32,
           33
         ],
-        "frameSeconds": 0.25
-      }
+        "frameSeconds": 0.75
+      },
+      "details": []
     }
   ],
-  "transitions": [
+  "transitions": [],
+  "dualGridOverlays": [
     {
-      "fromTerrainId": "grass",
-      "toTerrainId": "stone_floor",
+      "overlayTerrainId": "grass",
+      "priority": 100,
       "rules": [
         {
-          "mask": "N",
-          "tileId": 21
+          "mask": "0001",
+          "tileId": 200
         },
         {
-          "mask": "E",
-          "tileId": 20
+          "mask": "0010",
+          "tileId": 201
         },
         {
-          "mask": "S",
-          "tileId": 23
+          "mask": "0011",
+          "tileId": 202
         },
         {
-          "mask": "W",
-          "tileId": 22
+          "mask": "0100",
+          "tileId": 203
         },
         {
-          "mask": "NE",
-          "tileId": 24
+          "mask": "0101",
+          "tileId": 204
         },
         {
-          "mask": "SE",
-          "tileId": 25
+          "mask": "0110",
+          "tileId": 205
         },
         {
-          "mask": "SW",
-          "tileId": 26
+          "mask": "0111",
+          "tileId": 206
         },
         {
-          "mask": "NW",
-          "tileId": 27
+          "mask": "1000",
+          "tileId": 207
+        },
+        {
+          "mask": "1001",
+          "tileId": 208
+        },
+        {
+          "mask": "1010",
+          "tileId": 209
+        },
+        {
+          "mask": "1011",
+          "tileId": 210
+        },
+        {
+          "mask": "1100",
+          "tileId": 211
+        },
+        {
+          "mask": "1101",
+          "tileId": 212
+        },
+        {
+          "mask": "1110",
+          "tileId": 213
         }
       ]
     }

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -33,9 +34,10 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Diagnostica value-only</b></para>
     /// <para>
-    /// La struttura contiene solo valori copiati: modalita', contatori, presenza
-    /// dei componenti e ragione dell'ultimo esito. Non espone riferimenti Unity e
-    /// non consente di modificare scena o simulazione dall'esterno.
+    /// La struttura contiene solo valori copiati: modalita', contatori di root
+    /// assegnati/attivi, presenza dei componenti e ragione dell'ultimo esito. Non
+    /// espone riferimenti Unity e non consente di modificare scena o simulazione
+    /// dall'esterno.
     /// </para>
     /// </summary>
     public readonly struct ArcGraphViewModeSwitcherDiagnostics
@@ -45,6 +47,8 @@ namespace Arcontio.View.ArcGraph
         public readonly KeyCode ToggleKey;
         public readonly int MapGridVisualRootCount;
         public readonly int ArcGraphVisualRootCount;
+        public readonly int MapGridActiveRootCount;
+        public readonly int ArcGraphActiveRootCount;
         public readonly bool HasRuntimeWrapper;
         public readonly bool HasTerrainRenderer;
         public readonly bool HasNpcRenderer;
@@ -66,6 +70,8 @@ namespace Arcontio.View.ArcGraph
             KeyCode toggleKey,
             int mapGridVisualRootCount,
             int arcGraphVisualRootCount,
+            int mapGridActiveRootCount,
+            int arcGraphActiveRootCount,
             bool hasRuntimeWrapper,
             bool hasTerrainRenderer,
             bool hasNpcRenderer,
@@ -78,6 +84,8 @@ namespace Arcontio.View.ArcGraph
             ToggleKey = toggleKey;
             MapGridVisualRootCount = mapGridVisualRootCount < 0 ? 0 : mapGridVisualRootCount;
             ArcGraphVisualRootCount = arcGraphVisualRootCount < 0 ? 0 : arcGraphVisualRootCount;
+            MapGridActiveRootCount = mapGridActiveRootCount < 0 ? 0 : mapGridActiveRootCount;
+            ArcGraphActiveRootCount = arcGraphActiveRootCount < 0 ? 0 : arcGraphActiveRootCount;
             HasRuntimeWrapper = hasRuntimeWrapper;
             HasTerrainRenderer = hasTerrainRenderer;
             HasNpcRenderer = hasNpcRenderer;
@@ -136,6 +144,37 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphViewModeSwitcherDiagnostics LastDiagnostics => _lastDiagnostics;
 
         // =============================================================================
+        // ConfigureRuntimeWiring
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Configura da codice i riferimenti scena necessari allo switch MapGrid /
+        /// ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: cablaggio visuale esplicito</b></para>
+        /// <para>
+        /// Il metodo non cerca oggetti, non crea renderer e non deduce quali root
+        /// spegnere. Riceve tutto dall'installer o dall'Inspector e aggiorna solo
+        /// i riferimenti interni usati da <c>SetMode</c>. In questo modo lo switch
+        /// F12 resta un puro cambio di vista, non un secondo bootstrap simulativo.
+        /// </para>
+        /// </summary>
+        public void ConfigureRuntimeWiring(
+            GameObject[] mapGridRoots,
+            GameObject[] arcGraphRoots,
+            ArcGraphMinimalRuntimeSceneWrapper wrapper,
+            ArcGraphTerrainRuntimeSceneRenderer terrain,
+            ArcGraphNpcRuntimeSceneRenderer npc)
+        {
+            mapGridVisualRoots = mapGridRoots;
+            arcGraphVisualRoots = arcGraphRoots;
+            runtimeWrapper = wrapper;
+            terrainRenderer = terrain;
+            npcRenderer = npc;
+        }
+
+        // =============================================================================
         // Start
         // =============================================================================
         /// <summary>
@@ -170,10 +209,66 @@ namespace Arcontio.View.ArcGraph
             if (!switcherEnabled)
                 return;
 
-            if (!Input.GetKeyDown(toggleKey))
+            if (!WasToggleKeyPressedThisFrame())
                 return;
 
             ToggleMode();
+        }
+
+        // =============================================================================
+        // WasToggleKeyPressedThisFrame
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se il tasto di toggle e' stato premuto usando il New Input
+        /// System.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: input view-side compatibile col progetto</b></para>
+        /// <para>
+        /// ARCONTIO usa il package Input System come backend attivo. Per questo lo
+        /// switcher non puo' interrogare <c>UnityEngine.Input.GetKeyDown</c>, che
+        /// genera eccezione quando il vecchio input manager e' disabilitato. Il
+        /// metodo mantiene il contratto semplice del componente: ascolta solo il
+        /// tasto configurato, senza introdurre action asset, comandi simulativi o
+        /// dipendenze dal decision layer.
+        /// </para>
+        /// </summary>
+        private bool WasToggleKeyPressedThisFrame()
+        {
+            Keyboard keyboard = Keyboard.current;
+            if (keyboard == null)
+                return false;
+
+            switch (toggleKey)
+            {
+                case KeyCode.F1:
+                    return keyboard.f1Key.wasPressedThisFrame;
+                case KeyCode.F2:
+                    return keyboard.f2Key.wasPressedThisFrame;
+                case KeyCode.F3:
+                    return keyboard.f3Key.wasPressedThisFrame;
+                case KeyCode.F4:
+                    return keyboard.f4Key.wasPressedThisFrame;
+                case KeyCode.F5:
+                    return keyboard.f5Key.wasPressedThisFrame;
+                case KeyCode.F6:
+                    return keyboard.f6Key.wasPressedThisFrame;
+                case KeyCode.F7:
+                    return keyboard.f7Key.wasPressedThisFrame;
+                case KeyCode.F8:
+                    return keyboard.f8Key.wasPressedThisFrame;
+                case KeyCode.F9:
+                    return keyboard.f9Key.wasPressedThisFrame;
+                case KeyCode.F10:
+                    return keyboard.f10Key.wasPressedThisFrame;
+                case KeyCode.F11:
+                    return keyboard.f11Key.wasPressedThisFrame;
+                case KeyCode.F12:
+                    return keyboard.f12Key.wasPressedThisFrame;
+                default:
+                    return false;
+            }
         }
 
         // =============================================================================
@@ -343,6 +438,8 @@ namespace Arcontio.View.ArcGraph
                 toggleKey,
                 CountAssignedRoots(mapGridVisualRoots),
                 CountAssignedRoots(arcGraphVisualRoots),
+                CountActiveRoots(mapGridVisualRoots),
+                CountActiveRoots(arcGraphVisualRoots),
                 runtimeWrapper != null,
                 terrainRenderer != null,
                 npcRenderer != null,
@@ -365,6 +462,8 @@ namespace Arcontio.View.ArcGraph
                 ", key=" + _lastDiagnostics.ToggleKey +
                 ", mapGridRoots=" + _lastDiagnostics.MapGridVisualRootCount +
                 ", arcGraphRoots=" + _lastDiagnostics.ArcGraphVisualRootCount +
+                ", mapGridActiveRoots=" + _lastDiagnostics.MapGridActiveRootCount +
+                ", arcGraphActiveRoots=" + _lastDiagnostics.ArcGraphActiveRootCount +
                 ", wrapper=" + _lastDiagnostics.HasRuntimeWrapper +
                 ", terrainRenderer=" + _lastDiagnostics.HasTerrainRenderer +
                 ", npcRenderer=" + _lastDiagnostics.HasNpcRenderer +
@@ -381,6 +480,24 @@ namespace Arcontio.View.ArcGraph
             for (int i = 0; i < roots.Length; i++)
             {
                 if (roots[i] != null)
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static int CountActiveRoots(GameObject[] roots)
+        {
+            if (roots == null)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < roots.Length; i++)
+            {
+                // Usiamo activeSelf e non activeInHierarchy: qui vogliamo sapere
+                // se lo switcher ha applicato lo stato richiesto al root assegnato,
+                // non se un parent esterno lo sta mascherando per altri motivi.
+                if (roots[i] != null && roots[i].activeSelf)
                     count++;
             }
 

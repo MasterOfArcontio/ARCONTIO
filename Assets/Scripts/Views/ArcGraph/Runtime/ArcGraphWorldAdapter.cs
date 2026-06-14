@@ -303,16 +303,18 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Risolve la chiave sprite di un oggetto usando la stessa policy base della
-        /// view MapGrid corrente.
+        /// Risolve la chiave sprite di un oggetto preferendo la sezione visuale
+        /// ArcGraph dichiarata in <c>object_defs.json</c>.
         /// </para>
         ///
         /// <para><b>Riuso controllato della convenzione legacy</b></para>
         /// <para>
-        /// Se la definizione oggetto contiene <c>SpriteKey</c>, l'adapter usa quel
-        /// valore. In caso contrario produce il fallback storico
-        /// <c>MapGrid/Sprites/Objects/{defId}</c>. Non chiama <c>Resources.Load</c>:
-        /// la risoluzione asset resta responsabilita' del renderer.
+        /// Se la definizione oggetto contiene <c>Visual.SpritePath</c>, l'adapter
+        /// usa quello. Se manca, torna a <c>SpriteKey</c>, cioe' la convenzione
+        /// legacy ancora usata da MapGrid. In caso contrario produce il fallback
+        /// storico <c>MapGrid/Sprites/Objects/{defId}</c>. Non chiama
+        /// <c>Resources.Load</c>: la risoluzione asset resta responsabilita' del
+        /// renderer.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -328,10 +330,11 @@ namespace Arcontio.View.ArcGraph
 
             if (world != null
                 && world.TryGetObjectDef(instance.DefId, out var def)
-                && def != null
-                && !string.IsNullOrWhiteSpace(def.SpriteKey))
+                && def != null)
             {
-                return def.SpriteKey;
+                string visualSpritePath = def.ResolveArcGraphSpritePath();
+                if (!string.IsNullOrWhiteSpace(visualSpritePath))
+                    return visualSpritePath;
             }
 
             return _fallbackObjectSpritePrefix + instance.DefId;

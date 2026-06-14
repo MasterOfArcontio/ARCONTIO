@@ -118,6 +118,30 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphTerrainRuntimeMapGridAdapterDiagnostics LastDiagnostics => _lastDiagnostics;
 
         // =============================================================================
+        // SetMapGridSources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna da codice le sorgenti MapGrid usate dall'adapter runtime.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: wiring scena dichiarato</b></para>
+        /// <para>
+        /// Il metodo permette a un installer di scena controllato di cablare
+        /// l'adapter senza ricorrere a reflection o a modifiche manuali dei campi
+        /// privati serializzati. L'adapter continua comunque a leggere solo
+        /// riferimenti espliciti gia' risolti dal bordo scena.
+        /// </para>
+        /// </summary>
+        public void SetMapGridSources(
+            MapGridBootstrap bootstrap,
+            MapGridWorldView worldView)
+        {
+            mapGridBootstrap = bootstrap;
+            mapGridWorldView = worldView;
+        }
+
+        // =============================================================================
         // BuildTerrainRuntimeContext
         // =============================================================================
         /// <summary>

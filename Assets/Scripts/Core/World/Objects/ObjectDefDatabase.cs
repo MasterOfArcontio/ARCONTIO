@@ -15,9 +15,73 @@ namespace Arcontio.Core
         public float Value;
     }
 
+    // =============================================================================
+    // ObjectVisualDef
+    // =============================================================================
     /// <summary>
-    /// ObjectDef: definizione data-driven di un oggetto del mondo.
-    /// Nota: NON contiene Sprite Unity, solo SpriteKey (string) risolto dalla View.
+    /// <para>
+    /// Sezione visuale opzionale di una definizione oggetto.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: catalogo unico, lettura separata</b></para>
+    /// <para>
+    /// ARCONTIO conserva le informazioni principali dell'oggetto nello stesso
+    /// catalogo <c>object_defs.json</c>, cosi' l'authoring resta semplice. Questo
+    /// non significa pero' che il core simulativo debba dipendere dalla grafica:
+    /// i sistemi di simulazione ignorano questa sezione, mentre ArcGraph puo'
+    /// leggerla per sapere quale asset mostrare e con quali regole visuali.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>SpritePath</b>: path Resources preferito da ArcGraph per il PNG dell'oggetto.</item>
+    ///   <item><b>WidthPixels/HeightPixels</b>: dimensione nominale dello sprite, utile per authoring e probe.</item>
+    ///   <item><b>Pivot</b>: convenzione visuale del punto di ancoraggio, per ora testuale.</item>
+    ///   <item><b>OffsetX/OffsetY</b>: correzione visuale in pixel, senza effetto sulla cella logica.</item>
+    ///   <item><b>FadeWhenActorBehind</b>: abilita futura trasparenza quando un NPC passa dietro.</item>
+    ///   <item><b>UseShadow</b>: abilita futura ombra visuale locale dell'oggetto.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class ObjectVisualDef
+    {
+        public string SpritePath;
+        public int WidthPixels;
+        public int HeightPixels;
+        public string Pivot;
+        public int OffsetX;
+        public int OffsetY;
+        public bool FadeWhenActorBehind;
+        public bool UseShadow;
+    }
+
+    // =============================================================================
+    // ObjectDef
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Definizione data-driven di un oggetto del mondo.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: dato unico, consumer specializzati</b></para>
+    /// <para>
+    /// Questa struttura nasce come sorgente dati unica per un tipo oggetto. I campi
+    /// logici vengono usati dal core, dai job, dalla percezione e dalle cache di
+    /// movimento/visione. La sezione <c>Visual</c> viene invece consumata dalla
+    /// view. In questo modo evitiamo cataloghi paralleli difficili da mantenere,
+    /// ma non costringiamo la simulazione a conoscere dettagli come pixel, pivot o
+    /// ombre.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Id/DisplayName</b>: identita' data-driven leggibile.</item>
+    ///   <item><b>SpriteKey</b>: path legacy ancora usato da MapGrid.</item>
+    ///   <item><b>FootprintWidth/FootprintHeight</b>: ingombro logico XY in celle.</item>
+    ///   <item><b>Flags logici</b>: occlusione, interazione, porte, movimento e visione.</item>
+    ///   <item><b>Visual</b>: dati grafici opzionali per ArcGraph.</item>
+    ///   <item><b>Properties</b>: proprieta' generiche per letti, workbench, stock e altri oggetti.</item>
+    /// </list>
     /// </summary>
     [Serializable]
     public sealed class ObjectDef
@@ -26,13 +90,15 @@ namespace Arcontio.Core
         public string DisplayName;
 
         public string SpriteKey;
+        public int FootprintWidth;
+        public int FootprintHeight;
 
         // Classificazione logica
         public bool IsOccluder;       // se true: entra nella occlusion map
         public bool IsInteractable;
-        public bool IsDoor;           // se true: questo oggetto Ã¨ una porta
+        public bool IsDoor;           // se true: questo oggetto e' una porta
         public bool IsLockable;       // se true: supporta il lock (valido solo se IsDoor=true)
-        public string KeyId;          // DefId dell'oggetto chiave richiesto (valido solo se IsLockable=true)   // se true: può finire nella “memoria oggetti interagibili”
+        public string KeyId;          // DefId dell'oggetto chiave richiesto (valido solo se IsLockable=true)
 
         // Occlusion params (validi se IsOccluder=true)
         public bool BlocksVision;
@@ -43,8 +109,34 @@ namespace Arcontio.Core
         public int MaxHp;
         public float Hardness;
 
-        // Proprietà generiche (letto, workbench, food, ecc.)
+        public ObjectVisualDef Visual;
+
+        // Proprieta' generiche (letto, workbench, food, ecc.)
         public List<ObjectPropertyKV> Properties;
+
+        // =============================================================================
+        // ResolveArcGraphSpritePath
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il path sprite preferito per ArcGraph mantenendo compatibile
+        /// il vecchio campo <c>SpriteKey</c>.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' progressiva</b></para>
+        /// <para>
+        /// Se <c>Visual.SpritePath</c> e' compilato, ArcGraph usa quello. Se manca,
+        /// torna a <c>SpriteKey</c>, cosi' le definizioni esistenti continuano a
+        /// funzionare mentre migriamo gli asset da MapGrid ad ArcGraph.
+        /// </para>
+        /// </summary>
+        public string ResolveArcGraphSpritePath()
+        {
+            if (Visual != null && !string.IsNullOrWhiteSpace(Visual.SpritePath))
+                return Visual.SpritePath;
+
+            return SpriteKey ?? string.Empty;
+        }
     }
 
     /// <summary>

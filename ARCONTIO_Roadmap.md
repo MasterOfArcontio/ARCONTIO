@@ -14737,6 +14737,409 @@ verificare in un unico gate terrain tile base, varianti, animazioni e transizion
 
 ---
 
+## Roadmap residua v0.38 - Chiusura ArcGraph minimo stabile
+
+La chiusura di `v0.38` non coincide con l'aggiunta di tutti i futuri layer
+ambientali. In questa fase ArcGraph deve diventare una vista minima stabile:
+terreno, NPC, switch runtime, interazione minima e base UI modulare.
+
+Restano fuori da questa chiusura:
+
+- biosfera produttiva;
+- simulazione acqua;
+- vegetazione runtime;
+- luci locali produttive;
+- meteo produttivo;
+- incendi, fumo ed effetti particellari produttivi;
+- eliminazione fisica immediata di MapGrid.
+
+Questi moduli verranno introdotti dopo che ArcGraph sara' abbastanza stabile da
+ricevere dati visuali senza dipendere dal monolite `MapGridWorldView`.
+
+---
+
+### v0.38i.21 - Terrain Visual Gate Finale
+
+Obiettivo:
+
+```text
+verificare che il terrain renderer ArcGraph mostri correttamente tile base,
+varianti, animazioni e transizioni usando cataloghi dati e atlas coerenti
+```
+
+Compiti:
+
+- allineare `ArcGraphTerrainCatalog.json` con tutti i tile id richiesti da
+  `ArcGraphTerrainVisualCatalog.json`;
+- verificare che l'atlas terrain contenga i tile dichiarati;
+- testare terrain base, per esempio `grass`;
+- testare varianti statiche deterministicamente stabili;
+- testare `stone_floor`;
+- testare acqua animata;
+- testare transizioni `grass -> stone_floor`;
+- leggere la diagnostica di coverage tile/atlas;
+- verificare che il rendering lavori sui chunk previsti e non ricostruisca tutta
+  la mappa senza motivo.
+
+Output atteso:
+
+```text
+Terrain ArcGraph configurabile da cataloghi e verificato in Unity
+```
+
+Esito operativo:
+
+```text
+SUPERATO NEL GATE VISUALE OPERATORE
+```
+
+Risultato consolidato:
+
+- `TerrainAtlas.png` viene letto tramite catalogo visuale dati;
+- il prato supporta varianti statiche pesate;
+- la pietra supporta varianti statiche pesate;
+- l'acqua supporta animazione catalogata;
+- la distribuzione delle varianti e' deterministica per cella, ma non piu'
+  bloccata su un pattern troppo evidente;
+- il renderer terrain resta guidato da dati runtime, non da logica hardcoded in
+  scena.
+
+---
+
+### v0.38i.22 - Terrain Visual Gate Fix
+
+Obiettivo:
+
+```text
+correggere solo eventuali problemi emersi dal gate visuale terrain
+```
+
+Compiti possibili:
+
+- correggere UV sbagliate;
+- correggere tile id mancanti;
+- correggere atlas non coerente col catalogo;
+- correggere refresh dei chunk animati;
+- correggere transizioni non applicate;
+- correggere fallback visuali troppo invasivi;
+- aggiornare istruzioni asset terrain se il gate mostra ambiguita'.
+
+Output atteso:
+
+```text
+Terrain renderer stabile per test minimi ripetibili
+```
+
+Esito operativo:
+
+```text
+COMPLETATO COME FIX MIRATO POST-GATE
+```
+
+Correzioni consolidate:
+
+- le transizioni prato/roccia sono state spostate verso una logica dual-grid;
+- la riga dual-grid dell'atlas contiene 14 maschere operative, escludendo i casi
+  pieni `0000` e `1111`;
+- la lettura della maschera segue l'ordine:
+  `alto-sinistra`, `alto-destra`, `basso-sinistra`, `basso-destra`;
+- la regola visuale usa il prato come layer superiore e lascia il materiale
+  sottostante indipendente;
+- i bordi non vengono piu' trattati come semplice autotile cardinale;
+- l'acqua resta catalogata come tile animato separato: le transizioni animate
+  acqua/prato e acqua/pietra sono rimandate al blocco specifico acqua;
+- i dettagli decorativi terrain restano supportati a catalogo come possibilita',
+  ma non sostituiscono gli oggetti simulativi veri.
+
+Nota di confine:
+
+```text
+Questo step chiude il terreno minimo ArcGraph, non introduce ancora il sistema
+oggetti/alberi/vegetazione produttiva.
+```
+
+---
+
+### v0.38j - NPC Animation Gate
+
+Obiettivo:
+
+```text
+chiudere la resa visuale NPC base con sprite modulari reali
+```
+
+Compiti:
+
+- verificare idle a 4 frame;
+- verificare walk a 8/9 frame secondo scelta catalogo corrente;
+- verificare direzioni `north`, `south`, `east`, `west`;
+- verificare movimento fluido multitick da cella a cella;
+- verificare ordine layer;
+- formalizzare la lista layer NPC minima;
+- decidere se mantenere `arms` separato da `body`;
+- decidere quando introdurre `hair`, `clothes`, `held_item`;
+- mantenere l'ombra automatica come fallback grafico controllato.
+
+Output atteso:
+
+```text
+NPC ArcGraph minimo stabile e leggibile con sprite reali
+```
+
+Nota corrente:
+
+```text
+Il gate visuale base NPC/F12 e' stato superato: sprite modulare visibile, offset
+verticale corretto, shadow automatica mantenuta e fallback magenta rimosso dalle
+parti modulari mancanti.
+```
+
+Nota operativa:
+
+```text
+I test visuali sono congelati su richiesta dell'operatore.
+Durante il congelamento v0.38j procede solo con preparazione tecnica data-only.
+Il probe risorse NPC ora deve riportare parti, direzioni, animazioni, slot catalogo,
+prima sprite mancante e summary frame idle/walk prima del recupero del gate Unity.
+L'auto-installer runtime prepara il probe sul visual root ArcGraph usando lo stesso
+catalogo e lo stesso resolver del renderer NPC.
+```
+
+Aggiornamento operativo:
+
+```text
+Il gate visuale base NPC/F12 e' stato recuperato e superato. Restano da chiudere
+le parti di animazione completa: idle/walk per direzione, movimento fluido in
+runtime e completamento del catalogo layer definitivo.
+```
+
+Ponte preparatorio collegato:
+
+- `object_defs.json` diventa il punto naturale per unire definizione simulativa e
+  definizione visuale degli oggetti;
+- il catalogo oggetti puo' esporre footprint XY e dati visuali senza creare un
+  secondo catalogo parallelo;
+- ArcGraph deve leggere questi dati come snapshot/passaggio read-only, non come
+  autorita' simulativa.
+
+---
+
+### v0.38k - ArcGraph Runtime Switch Stabilization
+
+Obiettivo:
+
+```text
+stabilizzare il passaggio MapGrid / ArcGraph senza rompere la simulazione
+```
+
+Compiti:
+
+- verificare comportamento `F12`;
+- separare root visuali da root runtime;
+- evitare overlay doppi;
+- evitare spegnimenti di componenti che servono ancora come sorgente dati;
+- chiarire se l'auto-installer runtime resta solo gate temporaneo o diventa
+  cablaggio ufficiale;
+- rendere la diagnostica dello switch leggibile;
+- documentare quali oggetti sono accesi in modalita' MapGrid e quali in
+  modalita' ArcGraph.
+
+Output atteso:
+
+```text
+Switch visuale ripetibile, diagnosticabile e non distruttivo
+```
+
+Nota operativa:
+
+```text
+Durante il congelamento dei test visuali, lo switcher viene preparato con
+diagnostica non visuale aggiuntiva: root assegnati e root effettivamente attivi
+per MapGrid/ArcGraph dopo il cambio modalita'.
+```
+
+---
+
+### v0.38l - ArcGraph Interaction Minimum Gate
+
+Obiettivo:
+
+```text
+validare l'interazione minima dentro ArcGraph senza portare dentro tutto il debug
+legacy MapGrid
+```
+
+Compiti:
+
+- hover cella;
+- hover NPC;
+- selezione NPC;
+- pointer HUD minimo;
+- pannello info NPC minimo;
+- verifica che l'interazione consumi queue/snapshot ArcGraph;
+- evitare dipendenze dirette non necessarie da `MapGridWorldView`;
+- mantenere eventuali tool operativi fuori da ArcGraph fino a decisione dedicata.
+
+Output atteso:
+
+```text
+ArcGraph permette ispezione minima del mondo visualizzato
+```
+
+---
+
+### v0.38m - ArcGraph UI Archetype Foundation
+
+Obiettivo:
+
+```text
+creare la base riutilizzabile per pulsanti, menu, pannelli e overlay definitivi
+```
+
+Per pulsanti e menu definitivi ArcGraph deve usare archetipi riutilizzabili.
+In Unity questo significa combinare:
+
+```text
+Prefab UI riutilizzabili
++
+componenti C# view/controller piccoli e riusabili
+```
+
+Esempi di archetipi previsti:
+
+```text
+ArcGraphButton.prefab
+ArcGraphTopBar.prefab
+ArcGraphSidePanel.prefab
+ArcGraphNpcOverlay.prefab
+ArcGraphDebugRow.prefab
+ArcGraphMenuItem.prefab
+```
+
+Principio:
+
+```text
+il prefab definisce forma e gerarchia visuale
+il componente C# definisce stato e comportamento view-side
+la simulazione non viene modificata direttamente da un bottone
+```
+
+Flusso corretto:
+
+```text
+click bottone
+-> evento UI
+-> controller/tool autorizzato
+-> command ufficiale se serve mutare il World
+```
+
+Flusso vietato:
+
+```text
+click bottone
+-> modifica diretta del World dal componente grafico
+```
+
+Compiti:
+
+- definire `ArcGraphUIRoot`;
+- definire top bar;
+- definire side panel;
+- definire area overlay world-space/screen-space;
+- definire componente pulsante base;
+- definire stati comuni: normale, hover, pressed, disabled, selected;
+- definire stile comune: font, colori, padding, bordo, dimensioni;
+- definire evento UI neutro, non simulativo;
+- creare una prima checklist per prefab UI da costruire manualmente in Unity;
+- separare UI definitiva da debug temporaneo.
+
+Output atteso:
+
+```text
+base UI ArcGraph riutilizzabile senza duplicare pannelli MapGrid
+```
+
+---
+
+### v0.38n - ArcGraph Debug/UI Migration Cleanup
+
+Obiettivo:
+
+```text
+spostare solo i debug utili nel nuovo schema modulare ArcGraph
+```
+
+Compiti:
+
+- non copiare `MapGridWorldView` come blocco unico;
+- distinguere debug temporaneo da UI definitiva;
+- migrare pointer, selection e pannelli informativi minimi;
+- mantenere DevTools e command tools fuori dal core ArcGraph;
+- preparare pannelli leggibili ma non onniscienti per il giocatore/operatore.
+
+Output atteso:
+
+```text
+debug ArcGraph leggibile, modulare e separato dai tool legacy
+```
+
+---
+
+### v0.38o - MapGrid Dependency Audit Finale
+
+Obiettivo:
+
+```text
+capire cosa impedisce ancora di pensionare MapGrid
+```
+
+Compiti:
+
+- elencare dipendenze residue da `MapGridBootstrap`;
+- elencare dipendenze residue da `MapGridWorldView`;
+- distinguere sorgenti dati provvisorie da rendering legacy;
+- decidere cosa migrare verso adapter neutri;
+- decidere cosa puo' restare congelato;
+- decidere cosa puo' essere rimosso solo dopo gate completi;
+- non cancellare fisicamente MapGrid senza piano approvato.
+
+Output atteso:
+
+```text
+piano tecnico esplicito per il pensionamento controllato di MapGrid
+```
+
+---
+
+### v0.38p - ArcGraph Minimum Stable Closure
+
+Obiettivo:
+
+```text
+chiudere ArcGraph come vista minima stabile
+```
+
+Criteri di chiusura:
+
+- terrain visibile e configurabile;
+- NPC visibili e animabili;
+- switch runtime funzionante;
+- interaction minima funzionante;
+- UI archetype foundation presente;
+- debug minimo presente;
+- dipendenze MapGrid residue dichiarate;
+- nessuna mutazione simulativa dal renderer;
+- nessun accesso onnisciente introdotto;
+- documentazione e taskboard aggiornate.
+
+Output atteso:
+
+```text
+ArcGraph minimo stabile, pronto per ricevere moduli visuali futuri uno alla volta
+```
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato

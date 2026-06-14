@@ -1,20 +1,188 @@
 {
   "terrainAtlasResourcePath": "MapGrid/Atlas/TerrainAtlas",
   "tilePixels": 32,
-  "atlasWidthPixels": 64,
-  "atlasHeightPixels": 32,
+  "atlasWidthPixels": 512,
+  "atlasHeightPixels": 512,
   "tiles": [
     {
       "id": 0,
-      "name": "iron_barren",
+      "name": "grass_variant_0",
       "uvX": 0,
       "uvY": 0
     },
     {
       "id": 1,
-      "name": "rocky",
+      "name": "grass_variant_1",
       "uvX": 1,
       "uvY": 0
+    },
+    {
+      "id": 2,
+      "name": "grass_variant_2",
+      "uvX": 2,
+      "uvY": 0
+    },
+    {
+      "id": 3,
+      "name": "grass_variant_3",
+      "uvX": 3,
+      "uvY": 0
+    },
+    {
+      "id": 4,
+      "name": "grass_variant_4",
+      "uvX": 4,
+      "uvY": 0
+    },
+    {
+      "id": 5,
+      "name": "grass_variant_5",
+      "uvX": 5,
+      "uvY": 0
+    },
+    {
+      "id": 6,
+      "name": "grass_variant_6",
+      "uvX": 6,
+      "uvY": 0
+    },
+    {
+      "id": 7,
+      "name": "grass_variant_7",
+      "uvX": 7,
+      "uvY": 0
+    },
+    {
+      "id": 8,
+      "name": "grass_variant_8",
+      "uvX": 8,
+      "uvY": 0
+    },
+    {
+      "id": 10,
+      "name": "stone_variant_0",
+      "uvX": 0,
+      "uvY": 1
+    },
+    {
+      "id": 11,
+      "name": "stone_variant_1",
+      "uvX": 1,
+      "uvY": 1
+    },
+    {
+      "id": 12,
+      "name": "stone_variant_2",
+      "uvX": 2,
+      "uvY": 1
+    },
+    {
+      "id": 30,
+      "name": "water_frame_0",
+      "uvX": 0,
+      "uvY": 2
+    },
+    {
+      "id": 31,
+      "name": "water_frame_1",
+      "uvX": 1,
+      "uvY": 2
+    },
+    {
+      "id": 32,
+      "name": "water_frame_2",
+      "uvX": 2,
+      "uvY": 2
+    },
+    {
+      "id": 33,
+      "name": "water_frame_3",
+      "uvX": 3,
+      "uvY": 2
+    },
+    {
+      "id": 200,
+      "name": "grass_dual_grid_0001",
+      "uvX": 0,
+      "uvY": 12
+    },
+    {
+      "id": 201,
+      "name": "grass_dual_grid_0010",
+      "uvX": 1,
+      "uvY": 12
+    },
+    {
+      "id": 202,
+      "name": "grass_dual_grid_0011",
+      "uvX": 2,
+      "uvY": 12
+    },
+    {
+      "id": 203,
+      "name": "grass_dual_grid_0100",
+      "uvX": 3,
+      "uvY": 12
+    },
+    {
+      "id": 204,
+      "name": "grass_dual_grid_0101",
+      "uvX": 4,
+      "uvY": 12
+    },
+    {
+      "id": 205,
+      "name": "grass_dual_grid_0110",
+      "uvX": 5,
+      "uvY": 12
+    },
+    {
+      "id": 206,
+      "name": "grass_dual_grid_0111",
+      "uvX": 6,
+      "uvY": 12
+    },
+    {
+      "id": 207,
+      "name": "grass_dual_grid_1000",
+      "uvX": 7,
+      "uvY": 12
+    },
+    {
+      "id": 208,
+      "name": "grass_dual_grid_1001",
+      "uvX": 8,
+      "uvY": 12
+    },
+    {
+      "id": 209,
+      "name": "grass_dual_grid_1010",
+      "uvX": 9,
+      "uvY": 12
+    },
+    {
+      "id": 210,
+      "name": "grass_dual_grid_1011",
+      "uvX": 10,
+      "uvY": 12
+    },
+    {
+      "id": 211,
+      "name": "grass_dual_grid_1100",
+      "uvX": 11,
+      "uvY": 12
+    },
+    {
+      "id": 212,
+      "name": "grass_dual_grid_1101",
+      "uvX": 12,
+      "uvY": 12
+    },
+    {
+      "id": 213,
+      "name": "grass_dual_grid_1110",
+      "uvX": 13,
+      "uvY": 12
     }
   ]
 }

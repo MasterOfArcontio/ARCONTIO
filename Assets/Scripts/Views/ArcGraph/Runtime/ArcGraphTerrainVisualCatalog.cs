@@ -47,6 +47,49 @@ namespace Arcontio.View.ArcGraph
     }
 
     // =============================================================================
+    // ArcGraphTerrainVisualDetail
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Dettaglio decorativo visuale applicabile sopra un tipo terreno.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: decorazione senza peso simulativo</b></para>
+    /// <para>
+    /// Il dettaglio non e' un oggetto, non blocca il movimento, non occlude la
+    /// vista e non entra nel layer degli item. Serve solo a disegnare piccoli
+    /// elementi atmosferici sopra il tile base, ad esempio fiori, ciuffi, pietre
+    /// decorative o foglie. La scelta resta deterministica per coordinata, cosi'
+    /// la scena non cambia aspetto a ogni frame.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>TileId</b>: id tile atlas del dettaglio decorativo.</item>
+    ///   <item><b>Weight</b>: peso relativo nella scelta del dettaglio.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ArcGraphTerrainVisualDetail
+    {
+        public readonly int TileId;
+        public readonly int Weight;
+
+        // =============================================================================
+        // ArcGraphTerrainVisualDetail
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un dettaglio decorativo normalizzando il peso.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualDetail(int tileId, int weight)
+        {
+            TileId = tileId;
+            Weight = weight > 0 ? weight : 1;
+        }
+    }
+
+    // =============================================================================
     // ArcGraphTerrainVisualAnimation
     // =============================================================================
     /// <summary>
@@ -72,10 +115,10 @@ namespace Arcontio.View.ArcGraph
     {
         private readonly int[] _frameTileIds;
 
-        public IReadOnlyList<int> FrameTileIds => _frameTileIds;
-        public int FrameCount => _frameTileIds.Length;
+        public IReadOnlyList<int> FrameTileIds => _frameTileIds ?? Array.Empty<int>();
+        public int FrameCount => _frameTileIds != null ? _frameTileIds.Length : 0;
         public float FrameSeconds { get; }
-        public bool IsValid => _frameTileIds.Length > 0 && FrameSeconds > 0f;
+        public bool IsValid => _frameTileIds != null && _frameTileIds.Length > 0 && FrameSeconds > 0f;
 
         // =============================================================================
         // ArcGraphTerrainVisualAnimation
@@ -93,7 +136,7 @@ namespace Arcontio.View.ArcGraph
 
         public int GetFrameTileId(int frameIndex)
         {
-            if (_frameTileIds.Length == 0)
+            if (_frameTileIds == null || _frameTileIds.Length == 0)
                 return 0;
 
             int safeIndex = frameIndex % _frameTileIds.Length;
@@ -134,13 +177,16 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Mask</b>: direzioni cardinali normalizzate.</item>
-    ///   <item><b>TileId</b>: tile atlas da usare se la maschera combacia.</item>
+    ///   <item><b>TileId</b>: tile atlas statico o fallback del primo frame.</item>
+    ///   <item><b>Animation</b>: sequenza opzionale per bordi animati, ad esempio acqua-prato.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphTerrainVisualTransitionRule
     {
         public readonly string Mask;
         public readonly int TileId;
+        public readonly ArcGraphTerrainVisualAnimation Animation;
+        public bool HasAnimation => Animation.IsValid;
 
         // =============================================================================
         // ArcGraphTerrainVisualTransitionRule
@@ -151,14 +197,48 @@ namespace Arcontio.View.ArcGraph
         /// </para>
         /// </summary>
         public ArcGraphTerrainVisualTransitionRule(string mask, int tileId)
+            : this(mask, tileId, new ArcGraphTerrainVisualAnimation(null, 0f))
+        {
+        }
+
+        // =============================================================================
+        // ArcGraphTerrainVisualTransitionRule
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una regola di transizione normalizzando la maschera e
+        /// registrando una eventuale sequenza animata.
+        /// </para>
+        ///
+        /// <para>
+        /// Se l'animazione non e' valida, la regola resta identica al modello
+        /// statico precedente e usa solo <c>TileId</c>. Questo mantiene compatibili
+        /// i bordi gia' dichiarati, come prato-pietra.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualTransitionRule(
+            string mask,
+            int tileId,
+            ArcGraphTerrainVisualAnimation animation)
         {
             Mask = NormalizeMask(mask);
             TileId = tileId;
+            Animation = animation;
         }
 
         public bool Matches(string mask)
         {
             return string.Equals(Mask, NormalizeMask(mask), StringComparison.Ordinal);
+        }
+
+        public int ResolveTileId(float visualTimeSeconds)
+        {
+            if (!Animation.IsValid)
+                return TileId;
+
+            float safeTime = visualTimeSeconds < 0f ? 0f : visualTimeSeconds;
+            int frameIndex = (int)(safeTime / Animation.FrameSeconds);
+            return Animation.GetFrameTileId(frameIndex);
         }
 
         private static string NormalizeMask(string mask)
@@ -238,16 +318,27 @@ namespace Arcontio.View.ArcGraph
 
         public bool TryResolveTileId(string mask, out int tileId)
         {
+            return TryResolveTileId(mask, 0f, out tileId, out _);
+        }
+
+        public bool TryResolveTileId(
+            string mask,
+            float visualTimeSeconds,
+            out int tileId,
+            out bool usedAnimation)
+        {
             for (int i = 0; i < _rules.Length; i++)
             {
                 if (_rules[i].Matches(mask))
                 {
-                    tileId = _rules[i].TileId;
+                    tileId = _rules[i].ResolveTileId(visualTimeSeconds);
+                    usedAnimation = _rules[i].HasAnimation;
                     return true;
                 }
             }
 
             tileId = 0;
+            usedAnimation = false;
             return false;
         }
 
@@ -292,11 +383,13 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>DefaultTileId</b>: tile fallback stabile.</item>
     ///   <item><b>Variants</b>: varianti visuali pesate.</item>
     ///   <item><b>Animation</b>: animazione opzionale.</item>
+    ///   <item><b>Details</b>: overlay decorativi opzionali e non simulativi.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphTerrainVisualDefinition
     {
         private readonly ArcGraphTerrainVisualVariant[] _variants;
+        private readonly ArcGraphTerrainVisualDetail[] _details;
 
         public string TerrainId { get; }
         public int DefaultTileId { get; }
@@ -304,6 +397,10 @@ namespace Arcontio.View.ArcGraph
         public int VariantCount => _variants.Length;
         public ArcGraphTerrainVisualAnimation Animation { get; }
         public bool HasAnimation => Animation.IsValid;
+        public IReadOnlyList<ArcGraphTerrainVisualDetail> Details => _details;
+        public int DetailCount => _details.Length;
+        public int DetailChancePermille { get; }
+        public bool HasDetails => _details.Length > 0 && DetailChancePermille > 0;
 
         // =============================================================================
         // ArcGraphTerrainVisualDefinition
@@ -318,11 +415,33 @@ namespace Arcontio.View.ArcGraph
             int defaultTileId,
             ArcGraphTerrainVisualVariant[] variants,
             ArcGraphTerrainVisualAnimation animation)
+            : this(terrainId, defaultTileId, variants, animation, null, 0)
+        {
+        }
+
+        // =============================================================================
+        // ArcGraphTerrainVisualDefinition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una definizione visuale terrain normalizzata, includendo
+        /// eventuali dettagli decorativi puramente grafici.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualDefinition(
+            string terrainId,
+            int defaultTileId,
+            ArcGraphTerrainVisualVariant[] variants,
+            ArcGraphTerrainVisualAnimation animation,
+            ArcGraphTerrainVisualDetail[] details,
+            int detailChancePermille)
         {
             TerrainId = ArcGraphTerrainVisualTransitionSet.NormalizeTerrainId(terrainId);
             DefaultTileId = defaultTileId;
             _variants = NormalizeVariants(defaultTileId, variants);
             Animation = animation;
+            _details = NormalizeDetails(details);
+            DetailChancePermille = ClampPermille(detailChancePermille);
         }
 
         public int ResolveVariantTileId(int seed)
@@ -350,6 +469,42 @@ namespace Arcontio.View.ArcGraph
             return _variants[_variants.Length - 1].TileId;
         }
 
+        public bool TryResolveDetailTileId(int seed, out int tileId)
+        {
+            tileId = 0;
+
+            if (!HasDetails)
+                return false;
+
+            // Il primo roll decide se la cella riceve davvero un dettaglio. La
+            // soglia in permille evita float e mantiene stabile il risultato.
+            int chanceRoll = PositiveModulo(seed, 1000);
+            if (chanceRoll >= DetailChancePermille)
+                return false;
+
+            int totalWeight = 0;
+            for (int i = 0; i < _details.Length; i++)
+                totalWeight += _details[i].Weight;
+
+            if (totalWeight <= 0)
+                return false;
+
+            int detailRoll = PositiveModulo(seed / 1000, totalWeight);
+            int cursor = 0;
+            for (int i = 0; i < _details.Length; i++)
+            {
+                cursor += _details[i].Weight;
+                if (detailRoll < cursor)
+                {
+                    tileId = _details[i].TileId;
+                    return true;
+                }
+            }
+
+            tileId = _details[_details.Length - 1].TileId;
+            return true;
+        }
+
         private static ArcGraphTerrainVisualVariant[] NormalizeVariants(
             int defaultTileId,
             ArcGraphTerrainVisualVariant[] variants)
@@ -367,6 +522,25 @@ namespace Arcontio.View.ArcGraph
             return copy;
         }
 
+        private static ArcGraphTerrainVisualDetail[] NormalizeDetails(
+            ArcGraphTerrainVisualDetail[] details)
+        {
+            if (details == null || details.Length == 0)
+                return Array.Empty<ArcGraphTerrainVisualDetail>();
+
+            var copy = new ArcGraphTerrainVisualDetail[details.Length];
+            details.CopyTo(copy, 0);
+            return copy;
+        }
+
+        private static int ClampPermille(int value)
+        {
+            if (value < 0)
+                return 0;
+
+            return value > 1000 ? 1000 : value;
+        }
+
         private static int PositiveModulo(int value, int modulo)
         {
             if (modulo <= 0)
@@ -374,6 +548,184 @@ namespace Arcontio.View.ArcGraph
 
             int result = value % modulo;
             return result < 0 ? result + modulo : result;
+        }
+    }
+
+    // =============================================================================
+    // ArcGraphTerrainVisualDualGridRule
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Regola visuale dual-grid che collega una maschera a quattro quadranti a un
+    /// tile atlas.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: bordo derivato da 2x2 semantico</b></para>
+    /// <para>
+    /// La regola non guarda una singola cella e i suoi lati, ma una finestra di
+    /// quattro celle logiche. La maschera usa sempre l'ordine dichiarato dal
+    /// progetto: alto sinistra, alto destra, basso sinistra, basso destra. Per il
+    /// prato questo significa che <c>0001</c> rappresenta tre quadranti non prato e
+    /// prato solo in basso a destra.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Mask</b>: stringa normalizzata di quattro caratteri 0/1.</item>
+    ///   <item><b>TileId</b>: tile atlas della transizione dual-grid.</item>
+    ///   <item><b>Animation</b>: sequenza opzionale futura per transizioni animate.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ArcGraphTerrainVisualDualGridRule
+    {
+        public readonly string Mask;
+        public readonly int TileId;
+        public readonly ArcGraphTerrainVisualAnimation Animation;
+        public bool HasAnimation => Animation.IsValid;
+
+        // =============================================================================
+        // ArcGraphTerrainVisualDualGridRule
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una regola dual-grid normalizzando maschera e animazione.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualDualGridRule(
+            string mask,
+            int tileId,
+            ArcGraphTerrainVisualAnimation animation)
+        {
+            Mask = NormalizeMask(mask);
+            TileId = tileId;
+            Animation = animation;
+        }
+
+        public bool Matches(string mask)
+        {
+            return string.Equals(Mask, NormalizeMask(mask), StringComparison.Ordinal);
+        }
+
+        public int ResolveTileId(float visualTimeSeconds)
+        {
+            if (!Animation.IsValid)
+                return TileId;
+
+            float safeTime = visualTimeSeconds < 0f ? 0f : visualTimeSeconds;
+            int frameIndex = (int)(safeTime / Animation.FrameSeconds);
+            return Animation.GetFrameTileId(frameIndex);
+        }
+
+        internal static string NormalizeMask(string mask)
+        {
+            if (string.IsNullOrWhiteSpace(mask))
+                return "0000";
+
+            char[] normalized = { '0', '0', '0', '0' };
+            int cursor = 0;
+            for (int i = 0; i < mask.Length && cursor < normalized.Length; i++)
+            {
+                char c = mask[i];
+                if (c != '0' && c != '1')
+                    continue;
+
+                normalized[cursor] = c;
+                cursor++;
+            }
+
+            return new string(normalized);
+        }
+    }
+
+    // =============================================================================
+    // ArcGraphTerrainVisualDualGridOverlay
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Overlay dual-grid per un terrain type che deve stare sopra ai terreni
+    /// sottostanti.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: terreno superiore indipendente dal fondo</b></para>
+    /// <para>
+    /// Il caso guida e' il prato: il codice non deve sapere se sotto c'e' pietra,
+    /// mattonella, terra o acqua. L'overlay dice solo dove il prato compare nei
+    /// quattro quadranti della finestra 2x2. Il mesh builder puo' quindi disegnare
+    /// prima il terreno sottostante e poi il tile prato trasparente in overlay.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>OverlayTerrainId</b>: terrain type che produce gli 1 della maschera.</item>
+    ///   <item><b>Priority</b>: ordine futuro tra piu' overlay concorrenti.</item>
+    ///   <item><b>Rules</b>: regole maschera 2x2 -> tile atlas.</item>
+    /// </list>
+    /// </summary>
+    public sealed class ArcGraphTerrainVisualDualGridOverlay
+    {
+        private readonly ArcGraphTerrainVisualDualGridRule[] _rules;
+
+        public string OverlayTerrainId { get; }
+        public int Priority { get; }
+        public IReadOnlyList<ArcGraphTerrainVisualDualGridRule> Rules => _rules;
+        public int RuleCount => _rules.Length;
+
+        // =============================================================================
+        // ArcGraphTerrainVisualDualGridOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un overlay dual-grid normalizzato.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualDualGridOverlay(
+            string overlayTerrainId,
+            int priority,
+            ArcGraphTerrainVisualDualGridRule[] rules)
+        {
+            OverlayTerrainId = ArcGraphTerrainVisualTransitionSet.NormalizeTerrainId(overlayTerrainId);
+            Priority = priority;
+            _rules = CopyRules(rules);
+        }
+
+        public bool IsOverlayTerrain(string terrainId)
+        {
+            return string.Equals(
+                OverlayTerrainId,
+                ArcGraphTerrainVisualTransitionSet.NormalizeTerrainId(terrainId),
+                StringComparison.Ordinal);
+        }
+
+        public bool TryResolveTileId(
+            string mask,
+            float visualTimeSeconds,
+            out int tileId,
+            out bool usedAnimation)
+        {
+            for (int i = 0; i < _rules.Length; i++)
+            {
+                if (_rules[i].Matches(mask))
+                {
+                    tileId = _rules[i].ResolveTileId(visualTimeSeconds);
+                    usedAnimation = _rules[i].HasAnimation;
+                    return true;
+                }
+            }
+
+            tileId = 0;
+            usedAnimation = false;
+            return false;
+        }
+
+        private static ArcGraphTerrainVisualDualGridRule[] CopyRules(
+            ArcGraphTerrainVisualDualGridRule[] rules)
+        {
+            if (rules == null || rules.Length == 0)
+                return Array.Empty<ArcGraphTerrainVisualDualGridRule>();
+
+            var copy = new ArcGraphTerrainVisualDualGridRule[rules.Length];
+            rules.CopyTo(copy, 0);
+            return copy;
         }
     }
 
@@ -387,16 +739,18 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Principio architetturale: authoring terrain senza renderer onnisciente</b></para>
     /// <para>
-    /// Il catalogo conserva definizioni di terreno, varianti, animazioni e
-    /// transizioni. Non legge la mappa, non carica texture, non crea mesh e non
-    /// interroga il <c>World</c>. Il renderer potra' usarlo tramite un resolver
-    /// passivo, mantenendo separati dato simulativo, dato visuale e scena Unity.
+    /// Il catalogo conserva definizioni di terreno, varianti, dettagli decorativi,
+    /// animazioni e transizioni. Non legge la mappa, non carica texture, non crea
+    /// mesh e non interroga il <c>World</c>. Il renderer potra' usarlo tramite un
+    /// resolver passivo, mantenendo separati dato simulativo, dato visuale e scena
+    /// Unity.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Definitions</b>: tipi terreno indicizzati per id leggibile.</item>
     ///   <item><b>TransitionSets</b>: regole opzionali per bordi tra terreni.</item>
+    ///   <item><b>DualGridOverlays</b>: overlay 2x2 per terreni superiori come il prato.</item>
     ///   <item><b>TryGetDefinition</b>: lookup runtime senza scansione esterna.</item>
     ///   <item><b>TryGetTransitionSet</b>: lookup da terreno sorgente a terreno vicino.</item>
     /// </list>
@@ -405,13 +759,16 @@ namespace Arcontio.View.ArcGraph
     {
         private readonly ArcGraphTerrainVisualDefinition[] _definitions;
         private readonly ArcGraphTerrainVisualTransitionSet[] _transitionSets;
+        private readonly ArcGraphTerrainVisualDualGridOverlay[] _dualGridOverlays;
         private readonly Dictionary<string, ArcGraphTerrainVisualDefinition> _definitionsById;
         private readonly Dictionary<string, ArcGraphTerrainVisualTransitionSet> _transitionSetsByPair;
 
         public IReadOnlyList<ArcGraphTerrainVisualDefinition> Definitions => _definitions;
         public IReadOnlyList<ArcGraphTerrainVisualTransitionSet> TransitionSets => _transitionSets;
+        public IReadOnlyList<ArcGraphTerrainVisualDualGridOverlay> DualGridOverlays => _dualGridOverlays;
         public int DefinitionCount => _definitions.Length;
         public int TransitionSetCount => _transitionSets.Length;
+        public int DualGridOverlayCount => _dualGridOverlays.Length;
 
         // =============================================================================
         // ArcGraphTerrainVisualCatalog
@@ -424,6 +781,22 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphTerrainVisualCatalog(
             ArcGraphTerrainVisualDefinition[] definitions,
             ArcGraphTerrainVisualTransitionSet[] transitionSets)
+            : this(definitions, transitionSets, null)
+        {
+        }
+
+        // =============================================================================
+        // ArcGraphTerrainVisualCatalog
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un catalogo visuale terrain completo di overlay dual-grid.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainVisualCatalog(
+            ArcGraphTerrainVisualDefinition[] definitions,
+            ArcGraphTerrainVisualTransitionSet[] transitionSets,
+            ArcGraphTerrainVisualDualGridOverlay[] dualGridOverlays)
         {
             _definitions = definitions != null
                 ? CopyDefinitions(definitions)
@@ -432,6 +805,10 @@ namespace Arcontio.View.ArcGraph
             _transitionSets = transitionSets != null
                 ? CopyTransitionSets(transitionSets)
                 : Array.Empty<ArcGraphTerrainVisualTransitionSet>();
+
+            _dualGridOverlays = dualGridOverlays != null
+                ? CopyDualGridOverlays(dualGridOverlays)
+                : Array.Empty<ArcGraphTerrainVisualDualGridOverlay>();
 
             _definitionsById = BuildDefinitionsIndex(_definitions);
             _transitionSetsByPair = BuildTransitionSetIndex(_transitionSets);
@@ -477,6 +854,31 @@ namespace Arcontio.View.ArcGraph
             var copy = new ArcGraphTerrainVisualTransitionSet[transitionSets.Length];
             transitionSets.CopyTo(copy, 0);
             return copy;
+        }
+
+        private static ArcGraphTerrainVisualDualGridOverlay[] CopyDualGridOverlays(
+            ArcGraphTerrainVisualDualGridOverlay[] dualGridOverlays)
+        {
+            var copy = new ArcGraphTerrainVisualDualGridOverlay[dualGridOverlays.Length];
+            dualGridOverlays.CopyTo(copy, 0);
+            Array.Sort(copy, CompareDualGridOverlays);
+            return copy;
+        }
+
+        private static int CompareDualGridOverlays(
+            ArcGraphTerrainVisualDualGridOverlay left,
+            ArcGraphTerrainVisualDualGridOverlay right)
+        {
+            if (left == null && right == null)
+                return 0;
+
+            if (left == null)
+                return 1;
+
+            if (right == null)
+                return -1;
+
+            return right.Priority.CompareTo(left.Priority);
         }
 
         private static Dictionary<string, ArcGraphTerrainVisualDefinition> BuildDefinitionsIndex(

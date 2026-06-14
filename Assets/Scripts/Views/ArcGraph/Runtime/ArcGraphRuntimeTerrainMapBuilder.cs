@@ -210,13 +210,15 @@ namespace Arcontio.View.ArcGraph
         {
             unchecked
             {
-                int h = 17;
-                h = (h * 31) + x;
-                h = (h * 31) + y;
-                h ^= (h << 13);
-                h ^= (h >> 17);
-                h ^= (h << 5);
-                return h;
+                uint hash = 2166136261u;
+                hash ^= (uint)x + 0x9E3779B9u + (hash << 6) + (hash >> 2);
+                hash ^= (uint)y + 0x9E3779B9u + (hash << 6) + (hash >> 2);
+                hash ^= hash >> 16;
+                hash *= 2246822519u;
+                hash ^= hash >> 13;
+                hash *= 3266489917u;
+                hash ^= hash >> 16;
+                return (int)hash;
             }
         }
 
