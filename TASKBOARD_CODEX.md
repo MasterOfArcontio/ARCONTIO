@@ -100,8 +100,8 @@ MICRO-ROADMAP OPERATIVA v0.38j:
 ```text
 v0.38j.01 -> COMPLETATO - Traversabilita' terrain: acqua non camminabile, tile_floor registrato e separazione blocco terrain/blocco muro
 v0.38j.02 -> COMPLETATO - Metadati muri: sprite 32x83, footprint 1x1, blocco movimento e visione
-v0.38j.03 -> PROSSIMO - Resolver muri cardinali: variante muro da vicini N/E/S/W
-v0.38j.04 -> Rendering muri/oggetti alti: pivot, sorting, altezza sprite e base cella
+v0.38j.03 -> COMPLETATO - Resolver muri cardinali: variante muro da vicini N/E/S/W
+v0.38j.04 -> PROSSIMO - Rendering muri/oggetti alti: pivot, sorting, altezza sprite e base cella
 v0.38j.05 -> Mini-tile pavimento 16x16: giunzioni interno/esterno sotto muri sottili
 ```
 
@@ -750,6 +750,17 @@ Regola corrente:
   - il prossimo step tecnico e' `v0.38j.03`, cioe' resolver cardinali dei muri N/E/S/W;
   - il rendering effettivo di oggetti grandi, alberi e trasparenza dietro NPC resta uno step futuro;
   - verifica `dotnet build Assembly-CSharp.csproj --no-restore` non eseguibile: manca `Temp/obj/Assembly-CSharp/project.assets.json`; non eseguito restore per non scrivere in `Temp/Obj`.
+- micro-step `v0.38j.03 - Resolver muri cardinali` completato:
+  - aggiunto `ArcGraphWallCardinalResolver`;
+  - il resolver considera solo snapshot oggetto con `VisualKind = wall`;
+  - i muri vengono collegati solo a muri della stessa famiglia visuale, tramite `VisualResolverKey` o `DefId`;
+  - la maschera cardinale segue l'ordine `N/E/S/W`;
+  - esempi chiave: `1010` = nord/sud, `0101` = est/ovest;
+  - la sprite key finale diventa `spriteKeyBase_maschera`, per esempio `MapGrid/Sprites/Objects/wall_stone_1010`;
+  - `ArcGraphObjectRenderQueueBuilder` costruisce un indice temporaneo delle celle muro e risolve la variante prima di creare l'item oggetto;
+  - aggiunto `ArcGraphWallCardinalResolverHarness` per smoke test data-only verticale/orizzontale;
+  - nessun renderer Unity, nessun asset load, nessun GameObject, nessuna scena/prefab modificati;
+  - prossimo step tecnico: `v0.38j.04 - Rendering muri/oggetti alti`.
 - micro-step preparatorio `v0.38i.21` avviato:
   - `ArcGraphTerrainCatalog.json` ora registra tutti i tile richiesti da `ArcGraphTerrainVisualCatalog.json`;
   - atlas dichiarato come `512x512` con tile `32x32`, coerente con `TerrainAtlas.png` attuale;

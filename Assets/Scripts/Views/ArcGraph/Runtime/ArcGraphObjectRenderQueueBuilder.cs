@@ -87,13 +87,18 @@ namespace Arcontio.View.ArcGraph
 
             var snapshots = new List<ArcGraphObjectVisualSnapshot>();
             objectLayer.CopySnapshotsTo(snapshots);
+            Dictionary<string, HashSet<ArcGraphCellCoord>> wallCellsByFamily =
+                ArcGraphWallCardinalResolver.BuildWallCellIndex(snapshots);
 
             int visibleCount = 0;
             int hiddenCount = 0;
 
             for (int i = 0; i < snapshots.Count; i++)
             {
-                ArcGraphObjectRenderItem item = CreateItem(snapshots[i], lodProfile);
+                ArcGraphObjectRenderItem item = CreateItem(
+                    snapshots[i],
+                    lodProfile,
+                    wallCellsByFamily);
 
                 if (item.IsVisible)
                     visibleCount++;
@@ -116,10 +121,14 @@ namespace Arcontio.View.ArcGraph
 
         private static ArcGraphObjectRenderItem CreateItem(
             ArcGraphObjectVisualSnapshot snapshot,
-            ArcGraphZoomLodProfile lodProfile)
+            ArcGraphZoomLodProfile lodProfile,
+            IReadOnlyDictionary<string, HashSet<ArcGraphCellCoord>> wallCellsByFamily)
         {
             bool isVisible = true;
             string hiddenReason = "None";
+            string spriteKey = ArcGraphWallCardinalResolver.ResolveSpriteKey(
+                snapshot,
+                wallCellsByFamily);
 
             if (snapshot.ObjectId <= 0)
             {
@@ -131,7 +140,7 @@ namespace Arcontio.View.ArcGraph
                 isVisible = false;
                 hiddenReason = "HeldObject";
             }
-            else if (string.IsNullOrWhiteSpace(snapshot.SpriteKey))
+            else if (string.IsNullOrWhiteSpace(spriteKey))
             {
                 isVisible = false;
                 hiddenReason = "MissingSpriteKey";
@@ -147,7 +156,7 @@ namespace Arcontio.View.ArcGraph
                 snapshot.ObjectId,
                 snapshot.DefId,
                 snapshot.Cell,
-                snapshot.SpriteKey,
+                spriteKey,
                 lodProfile.ObjectMode,
                 lodProfile.UsesSimplifiedRepresentation,
                 lodProfile.ShowMinorItems,

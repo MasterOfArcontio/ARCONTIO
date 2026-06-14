@@ -7190,7 +7190,7 @@ La chiusura di questa fase richiedera':
 | v0.38h | QA finale ArcGraph come renderer principale o decisione stop-go motivata | Pending |
 | v0.38j.01 | Metadati traversabilita' terrain: acqua non camminabile e pavimento a piastrella configurabile | Completato |
 | v0.38j.02 | Metadati muri: struttura 32x83, footprint 1x1, blocco movimento e blocco visione | Completato |
-| v0.38j.03 | Resolver muri cardinali: scelta sprite in base ai vicini N/E/S/W | Pending |
+| v0.38j.03 | Resolver muri cardinali: scelta sprite in base ai vicini N/E/S/W | Completato data-only |
 | v0.38j.04 | Renderer oggetti/muri ArcGraph con altezza sprite e ordinamento dietro/davanti NPC | Pending |
 | v0.38j.05 | Composizione pavimenti a mini-tile 16x16 per giunzioni interno/esterno sotto muri sottili | Pending |
 
@@ -7253,6 +7253,45 @@ v0.38j.03 - Resolver muri cardinali
 Il resolver dovra' scegliere quale variante del muro usare in base ai vicini
 cardinali N/E/S/W, senza leggere dati globali in modo onnisciente e senza
 trasformare il muro in terrain.
+
+## Esito v0.38j.03 - Resolver muri cardinali
+
+La `v0.38j.03` ha introdotto il resolver passivo per le varianti dei muri.
+
+Regola implementata:
+
+- vengono considerati solo oggetti con `VisualKind = wall`;
+- i muri trasportati o con id non valido non partecipano al resolver;
+- i muri vengono collegati solo ad altri muri della stessa famiglia visuale;
+- la famiglia visuale deriva da `VisualResolverKey`, oppure da `DefId` se la
+  chiave resolver non e' presente;
+- la maschera cardinale usa l'ordine `N/E/S/W`;
+- esempio: `1010` indica collegamento nord + sud;
+- esempio: `0101` indica collegamento est + ovest;
+- la sprite key finale diventa `spriteKeyBase_maschera`, per esempio
+  `MapGrid/Sprites/Objects/wall_stone_1010`.
+
+Confini preservati:
+
+- nessun renderer Unity nuovo;
+- nessun `Resources.Load`;
+- nessun `GameObject`;
+- nessuna modifica a scene o prefab;
+- nessuna lettura diretta di `World` dal resolver;
+- nessuna trasformazione del muro in terrain.
+
+Il resolver viene agganciato alla build della render queue oggetti: ArcGraph
+costruisce un indice temporaneo delle celle muro e poi risolve la variante
+sprite di ogni muro prima che il piano scena consumi la queue.
+
+Prossimo step:
+
+```text
+v0.38j.04 - Rendering muri/oggetti alti
+```
+
+Il renderer dovra' usare le sprite key gia' risolte e gestire pivot, altezza
+83px, sorting e base cella.
 
 ## Esito v0.38a - ArcGraph Legacy Absorption Audit
 
