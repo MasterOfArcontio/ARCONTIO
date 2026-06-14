@@ -164,6 +164,7 @@ namespace Arcontio.View.ArcGraph
                 visualHeightPixels: 83,
                 visualBaseWidthPixels: 32,
                 visualBaseHeightPixels: 32,
+                visualBaseMiniTileMask: "0110",
                 visualPivot: "bottom_center",
                 visualOffsetX: 0,
                 visualOffsetY: 0,

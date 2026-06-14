@@ -102,7 +102,8 @@ v0.38j.01 -> COMPLETATO - Traversabilita' terrain: acqua non camminabile, tile_f
 v0.38j.02 -> COMPLETATO - Metadati muri: sprite 32x83, footprint 1x1, blocco movimento e visione
 v0.38j.03 -> COMPLETATO - Resolver muri cardinali: variante muro da vicini N/E/S/W
 v0.38j.04 -> COMPLETATO DATA-ONLY - Rendering muri/oggetti alti: pivot, altezza sprite e base cella
-v0.38j.05 -> PROSSIMO - Mini-tile pavimento 16x16: giunzioni interno/esterno sotto muri sottili
+v0.38j.05 -> COMPLETATO DATA-ONLY - Contratto mini-tile 16x16: BaseMiniTileMask per base muri sottili
+v0.38j.06 -> PROSSIMO - Renderer/overlay mini-tile pavimento 16x16
 ```
 
 Regola corrente:
@@ -771,6 +772,15 @@ Regola corrente:
   - verifica data-only Roslyn del sottoinsieme actor/object/wall: `exit=0`, `warning_count=0`;
   - nessun renderer oggetti produttivo definitivo, nessuna scena/prefab, nessun asset load e nessuna trasparenza NPC dietro muro introdotti;
   - prossimo step tecnico: `v0.38j.05 - Mini-tile pavimento 16x16`.
+- micro-step `v0.38j.05 - Contratto mini-tile base muri` completato:
+  - aggiunto `BaseMiniTileMask` alla sezione visuale degli oggetti;
+  - la maschera usa ordine alto-sinistra, alto-destra, basso-sinistra, basso-destra;
+  - `1` indica quarto coperto dall'oggetto, `0` indica quarto pavimento visibile/componibile;
+  - `wall_stone` dichiara `BaseMiniTileMask = 0110` come dato iniziale;
+  - ArcGraph propaga la maschera da `ObjectDef` a snapshot, render item e entry scena;
+  - harness actor/object e wall cardinal aggiornati per conservare la maschera;
+  - nessun renderer mini-tile, nessuna mesh terrain, nessun asset e nessuna scena/prefab modificati;
+  - prossimo step tecnico: `v0.38j.06 - Renderer/overlay mini-tile pavimento 16x16`.
 - micro-step preparatorio `v0.38i.21` avviato:
   - `ArcGraphTerrainCatalog.json` ora registra tutti i tile richiesti da `ArcGraphTerrainVisualCatalog.json`;
   - atlas dichiarato come `512x512` con tile `32x32`, coerente con `TerrainAtlas.png` attuale;

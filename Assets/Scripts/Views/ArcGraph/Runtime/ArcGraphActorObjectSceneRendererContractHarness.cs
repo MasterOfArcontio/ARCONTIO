@@ -27,6 +27,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>ActorUsesInterpolatedPose</b>: verifica posizione actor frazionaria.</item>
     ///   <item><b>ObjectCarriesVisualMetadata</b>: verifica propagazione dati visuali oggetto.</item>
     ///   <item><b>TallObjectUsesBottomPivot</b>: verifica ancoraggio basso di oggetti alti.</item>
+    ///   <item><b>ObjectCarriesMiniTileMask</b>: verifica propagazione della maschera base 2x2.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphActorObjectSceneRendererContractHarnessResult
@@ -40,6 +41,7 @@ namespace Arcontio.View.ArcGraph
         public readonly bool ActorUsesInterpolatedPose;
         public readonly bool ObjectCarriesVisualMetadata;
         public readonly bool TallObjectUsesBottomPivot;
+        public readonly bool ObjectCarriesMiniTileMask;
         public readonly bool ContractSafe;
 
         public ArcGraphActorObjectSceneRendererContractHarnessResult(
@@ -52,6 +54,7 @@ namespace Arcontio.View.ArcGraph
             bool actorUsesInterpolatedPose,
             bool objectCarriesVisualMetadata,
             bool tallObjectUsesBottomPivot,
+            bool objectCarriesMiniTileMask,
             bool contractSafe)
         {
             Passed = passed;
@@ -63,6 +66,7 @@ namespace Arcontio.View.ArcGraph
             ActorUsesInterpolatedPose = actorUsesInterpolatedPose;
             ObjectCarriesVisualMetadata = objectCarriesVisualMetadata;
             TallObjectUsesBottomPivot = tallObjectUsesBottomPivot;
+            ObjectCarriesMiniTileMask = objectCarriesMiniTileMask;
             ContractSafe = contractSafe;
         }
     }
@@ -158,7 +162,8 @@ namespace Arcontio.View.ArcGraph
                           && objectBeforeActor
                           && actorInterpolated
                           && ObjectCarriesVisualMetadata(plan)
-                          && TallObjectUsesBottomPivot(plan);
+                          && TallObjectUsesBottomPivot(plan)
+                          && ObjectCarriesMiniTileMask(plan);
 
             return new ArcGraphActorObjectSceneRendererContractHarnessResult(
                 passed,
@@ -170,6 +175,7 @@ namespace Arcontio.View.ArcGraph
                 actorInterpolated,
                 ObjectCarriesVisualMetadata(plan),
                 TallObjectUsesBottomPivot(plan),
+                ObjectCarriesMiniTileMask(plan),
                 diagnostics.ContractSafe);
         }
 
@@ -207,6 +213,7 @@ namespace Arcontio.View.ArcGraph
                 visualHeightPixels: 83,
                 visualBaseWidthPixels: 32,
                 visualBaseHeightPixels: 32,
+                visualBaseMiniTileMask: "0110",
                 visualPivot: "bottom_center",
                 visualOffsetX: 0,
                 visualOffsetY: 0,
@@ -228,8 +235,20 @@ namespace Arcontio.View.ArcGraph
                    && entry.VisualHeightPixels == 83
                    && entry.VisualBaseWidthPixels == 32
                    && entry.VisualBaseHeightPixels == 32
+                   && entry.VisualBaseMiniTileMask == "0110"
                    && entry.VisualPivot == "bottom_center"
                    && entry.FadeWhenActorBehind;
+        }
+
+        private static bool ObjectCarriesMiniTileMask(
+            ArcGraphActorObjectSceneRenderPlan plan)
+        {
+            if (plan == null || plan.Entries.Count <= 0)
+                return false;
+
+            ArcGraphActorObjectSceneRenderEntry entry = plan.Entries[0];
+            return entry.Kind == ArcGraphRenderItemKind.Object
+                   && entry.VisualBaseMiniTileMask == "0110";
         }
 
         private static bool TallObjectUsesBottomPivot(

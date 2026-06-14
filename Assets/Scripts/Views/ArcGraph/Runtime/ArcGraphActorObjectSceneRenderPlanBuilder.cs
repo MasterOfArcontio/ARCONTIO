@@ -221,6 +221,7 @@ namespace Arcontio.View.ArcGraph
                 item.VisualHeightPixels,
                 item.VisualBaseWidthPixels,
                 item.VisualBaseHeightPixels,
+                item.VisualBaseMiniTileMask,
                 item.VisualPivot,
                 item.VisualOffsetX,
                 item.VisualOffsetY,

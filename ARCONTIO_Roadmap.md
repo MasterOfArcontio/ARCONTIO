@@ -1,4 +1,4 @@
-﻿# ARCONTIO — Development Roadmap
+# ARCONTIO — Development Roadmap
 
 > **Ritmo di lavoro:** 3 sessioni/settimana (Lunedì, Mercoledì, Giovedì) · 2 ore per sessione · 6 ore/settimana
 > **Target v1.00:** Prima demo giocabile pubblica
@@ -7192,7 +7192,7 @@ La chiusura di questa fase richiedera':
 | v0.38j.02 | Metadati muri: struttura 32x83, footprint 1x1, blocco movimento e blocco visione | Completato |
 | v0.38j.03 | Resolver muri cardinali: scelta sprite in base ai vicini N/E/S/W | Completato data-only |
 | v0.38j.04 | Renderer oggetti/muri ArcGraph con altezza sprite e ordinamento dietro/davanti NPC | Completato data-only |
-| v0.38j.05 | Composizione pavimenti a mini-tile 16x16 per giunzioni interno/esterno sotto muri sottili | Pending |
+| v0.38j.05 | Contratto mini-tile 16x16 per base muri sottili e giunzioni pavimento | Completato data-only |
 
 ## Roadmap operativa v0.38j - Terreno, muri e blocchi fisici
 
@@ -7344,6 +7344,38 @@ Lo step successivo dovra' affrontare il problema dei muri sottili che lasciano
 vedere porzioni di pavimento ai lati, specialmente quando pavimento interno ed
 esterno sono diversi.
 
+## Esito v0.38j.05 - Contratto mini-tile base muri
+
+La `v0.38j.05` ha introdotto il contratto data-only per descrivere quali quarti 16x16 della cella base sono coperti da un oggetto alto, in particolare dai muri sottili.
+
+Comportamento introdotto:
+
+- `ObjectVisualDef` espone ora `BaseMiniTileMask` dentro `object_defs.json`;
+- la maschera usa quattro cifre in ordine alto-sinistra, alto-destra, basso-sinistra, basso-destra;
+- `1` significa porzione coperta dall'oggetto;
+- `0` significa porzione in cui il pavimento resta visibile o dovra' essere composto dal renderer futuro;
+- `wall_stone` dichiara `BaseMiniTileMask = 0110` come primo dato di test per muro sottile;
+- `ArcGraphWorldAdapter` copia la maschera dalla definizione oggetto allo snapshot visuale;
+- `ArcGraphObjectVisualSnapshot`, `ArcGraphObjectRenderItem` e `ArcGraphActorObjectSceneRenderEntry` propagano la maschera senza leggere il World e senza creare renderer;
+- gli harness actor/object e wall cardinal verificano che la maschera arrivi fino al piano scena.
+
+Confini preservati:
+
+- nessun renderer pavimento 16x16 produttivo;
+- nessuna mesh terrain modificata;
+- nessun nuovo asset;
+- nessun `GameObject`;
+- nessuna scena o prefab modificati;
+- nessuna modifica a MapGrid;
+- nessuna logica simulativa di muro o pavimento introdotta.
+
+Prossimo step:
+
+```text
+v0.38j.06 - Renderer/overlay mini-tile pavimento 16x16
+```
+
+Lo step successivo potra' usare `BaseMiniTileMask` per decidere quali quarti di pavimento comporre quando un muro sottile separa interno ed esterno con pavimenti diversi.
 ## Esito v0.38a - ArcGraph Legacy Absorption Audit
 
 La `v0.38a` ha auditato il perimetro legacy MapGrid che dovra' essere assorbito

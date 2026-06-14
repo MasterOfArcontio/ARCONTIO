@@ -199,6 +199,7 @@ namespace Arcontio.View.ArcGraph
                     ResolveNonNegative(visual?.HeightPixels ?? 0),
                     ResolveNonNegative(visual?.BaseWidthPixels ?? 0),
                     ResolveNonNegative(visual?.BaseHeightPixels ?? 0),
+                    visual?.BaseMiniTileMask ?? string.Empty,
                     visual?.Pivot ?? string.Empty,
                     visual?.OffsetX ?? 0,
                     visual?.OffsetY ?? 0,

@@ -171,6 +171,7 @@ namespace Arcontio.View.ArcGraph
                 snapshot.VisualHeightPixels,
                 snapshot.VisualBaseWidthPixels,
                 snapshot.VisualBaseHeightPixels,
+                snapshot.VisualBaseMiniTileMask,
                 snapshot.VisualPivot,
                 snapshot.VisualOffsetX,
                 snapshot.VisualOffsetY,

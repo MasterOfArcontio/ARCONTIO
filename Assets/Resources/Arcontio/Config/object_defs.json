@@ -218,6 +218,7 @@
         "HeightPixels": 83,
         "BaseWidthPixels": 32,
         "BaseHeightPixels": 32,
+        "BaseMiniTileMask": "0110",
         "Pivot": "bottom_center",
         "OffsetX": 0,
         "OffsetY": 0,

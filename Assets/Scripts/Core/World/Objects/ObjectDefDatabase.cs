@@ -39,6 +39,7 @@ namespace Arcontio.Core
     ///   <item><b>ResolverKey</b>: chiave opzionale per scegliere una famiglia di varianti visuali.</item>
     ///   <item><b>WidthPixels/HeightPixels</b>: dimensione nominale dello sprite, utile per authoring e probe.</item>
     ///   <item><b>BaseWidthPixels/BaseHeightPixels</b>: dimensione della base logica appoggiata alla cella.</item>
+    ///   <item><b>BaseMiniTileMask</b>: copertura 2x2 della base, usata dai futuri raccordi pavimento a 16 pixel.</item>
     ///   <item><b>Pivot</b>: convenzione visuale del punto di ancoraggio, per ora testuale.</item>
     ///   <item><b>OffsetX/OffsetY</b>: correzione visuale in pixel, senza effetto sulla cella logica.</item>
     ///   <item><b>FadeWhenActorBehind</b>: abilita futura trasparenza quando un NPC passa dietro.</item>
@@ -55,6 +56,7 @@ namespace Arcontio.Core
         public int HeightPixels;
         public int BaseWidthPixels;
         public int BaseHeightPixels;
+        public string BaseMiniTileMask;
         public string Pivot;
         public int OffsetX;
         public int OffsetY;

@@ -25,6 +25,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>HasMotion/MotionProgress01</b>: stato movimento actor copiato.</item>
     ///   <item><b>VisualWidth/Height</b>: dimensione sprite oggetto, se disponibile.</item>
     ///   <item><b>VisualBaseWidth/Height</b>: base dello sprite appoggiata alla cella.</item>
+    ///   <item><b>VisualBaseMiniTileMask</b>: copertura 2x2 della base visuale su quarti 16x16.</item>
     ///   <item><b>VisualPivot</b>: convenzione di ancoraggio, per esempio <c>bottom_center</c>.</item>
     ///   <item><b>VisualOffset</b>: offset grafico in pixel gia' copiato dal catalogo.</item>
     ///   <item><b>FadeWhenActorBehind/UseShadow</b>: flag visuali futuri non simulativi.</item>
@@ -46,6 +47,7 @@ namespace Arcontio.View.ArcGraph
         public readonly int VisualHeightPixels;
         public readonly int VisualBaseWidthPixels;
         public readonly int VisualBaseHeightPixels;
+        public readonly string VisualBaseMiniTileMask;
         public readonly string VisualPivot;
         public readonly int VisualOffsetX;
         public readonly int VisualOffsetY;
@@ -58,6 +60,7 @@ namespace Arcontio.View.ArcGraph
                 || VisualHeightPixels > 0
                 || VisualBaseWidthPixels > 0
                 || VisualBaseHeightPixels > 0
+                || !string.IsNullOrWhiteSpace(VisualBaseMiniTileMask)
                 || !string.IsNullOrWhiteSpace(VisualPivot));
 
         public bool IsTallObjectVisual =>
@@ -101,6 +104,7 @@ namespace Arcontio.View.ArcGraph
                 0,
                 0,
                 string.Empty,
+                string.Empty,
                 0,
                 0,
                 false,
@@ -140,6 +144,7 @@ namespace Arcontio.View.ArcGraph
             int visualHeightPixels,
             int visualBaseWidthPixels,
             int visualBaseHeightPixels,
+            string visualBaseMiniTileMask,
             string visualPivot,
             int visualOffsetX,
             int visualOffsetY,
@@ -160,6 +165,7 @@ namespace Arcontio.View.ArcGraph
             VisualHeightPixels = visualHeightPixels < 0 ? 0 : visualHeightPixels;
             VisualBaseWidthPixels = visualBaseWidthPixels < 0 ? 0 : visualBaseWidthPixels;
             VisualBaseHeightPixels = visualBaseHeightPixels < 0 ? 0 : visualBaseHeightPixels;
+            VisualBaseMiniTileMask = visualBaseMiniTileMask ?? string.Empty;
             VisualPivot = visualPivot ?? string.Empty;
             VisualOffsetX = visualOffsetX;
             VisualOffsetY = visualOffsetY;

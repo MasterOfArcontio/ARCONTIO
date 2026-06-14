@@ -27,6 +27,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>VisualKind/VisualResolverKey</b>: classificazione visuale passiva per resolver futuri.</item>
     ///   <item><b>VisualWidthPixels/VisualHeightPixels</b>: dimensione nominale sprite.</item>
     ///   <item><b>VisualBaseWidthPixels/VisualBaseHeightPixels</b>: base grafica/logica appoggiata alla cella.</item>
+    ///   <item><b>VisualBaseMiniTileMask</b>: copertura 2x2 della base visuale su quarti 16x16.</item>
     ///   <item><b>VisualPivot</b>: convenzione testuale del pivot sprite.</item>
     ///   <item><b>VisualOffsetX/VisualOffsetY</b>: offset grafico copiato.</item>
     ///   <item><b>FadeWhenActorBehind/UseShadow</b>: flag visuali non simulativi.</item>
@@ -54,6 +55,7 @@ namespace Arcontio.View.ArcGraph
         public readonly int VisualHeightPixels;
         public readonly int VisualBaseWidthPixels;
         public readonly int VisualBaseHeightPixels;
+        public readonly string VisualBaseMiniTileMask;
         public readonly string VisualPivot;
         public readonly int VisualOffsetX;
         public readonly int VisualOffsetY;
@@ -111,6 +113,7 @@ namespace Arcontio.View.ArcGraph
                 0,
                 0,
                 0,
+                string.Empty,
                 string.Empty,
                 0,
                 0,
@@ -181,6 +184,7 @@ namespace Arcontio.View.ArcGraph
                 0,
                 0,
                 string.Empty,
+                string.Empty,
                 visualOffsetX,
                 visualOffsetY,
                 fadeWhenActorBehind,
@@ -219,6 +223,7 @@ namespace Arcontio.View.ArcGraph
             int visualHeightPixels,
             int visualBaseWidthPixels,
             int visualBaseHeightPixels,
+            string visualBaseMiniTileMask,
             string visualPivot,
             int visualOffsetX,
             int visualOffsetY,
@@ -247,6 +252,7 @@ namespace Arcontio.View.ArcGraph
             VisualHeightPixels = visualHeightPixels < 0 ? 0 : visualHeightPixels;
             VisualBaseWidthPixels = visualBaseWidthPixels < 0 ? 0 : visualBaseWidthPixels;
             VisualBaseHeightPixels = visualBaseHeightPixels < 0 ? 0 : visualBaseHeightPixels;
+            VisualBaseMiniTileMask = visualBaseMiniTileMask ?? string.Empty;
             VisualPivot = visualPivot ?? string.Empty;
             VisualOffsetX = visualOffsetX;
             VisualOffsetY = visualOffsetY;
