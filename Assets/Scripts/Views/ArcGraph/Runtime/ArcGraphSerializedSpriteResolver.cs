@@ -63,6 +63,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>TryResolveSprite</b>: risoluzione richiesta dal probe.</item>
     ///   <item><b>BuildCacheIfNeeded</b>: cache locale delle entry serializzate.</item>
     ///   <item><b>ResolveFromResources</b>: lookup scene-side con cache hit/miss.</item>
+    ///   <item><b>TryResolveFromResourceSheetKey</b>: lookup sub-sprite da PNG sliced.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphSerializedSpriteResolver : MonoBehaviour, IArcGraphSpriteResolver
@@ -77,6 +78,7 @@ namespace Arcontio.View.ArcGraph
 
         private readonly Dictionary<string, Sprite> _spritesByTypedKey = new();
         private readonly Dictionary<string, Sprite> _resourceSpritesByKey = new();
+        private readonly Dictionary<string, Dictionary<string, Sprite>> _resourceSheetSpritesByPath = new();
         private readonly HashSet<string> _resourceMissesByKey = new();
         private bool _cacheDirty = true;
         private int _manualHitCount;
@@ -167,6 +169,7 @@ namespace Arcontio.View.ArcGraph
             _cacheDirty = true;
             _spritesByTypedKey.Clear();
             _resourceSpritesByKey.Clear();
+            _resourceSheetSpritesByPath.Clear();
             _resourceMissesByKey.Clear();
             _manualHitCount = 0;
             _resourceHitCount = 0;
@@ -210,11 +213,28 @@ namespace Arcontio.View.ArcGraph
             // estensione. Le sprite key del catalogo NPC sono gia' prodotte in
             // quella forma, per esempio:
             // ArcGraph/NPC/human_default/body/south_idle_00
+            //
+            // Per gli sprite sliced usiamo invece una convenzione esplicita:
+            // sheet#subSprite. Esempio:
+            // MapGrid/Sprites/Objects/wall_stone#wall_stone_1010
+            // In quel caso si carica una volta la sheet con Resources.LoadAll e
+            // poi si cerca il nome della sub-sprite dentro gli asset importati.
             if (_resourceSpritesByKey.TryGetValue(spriteKey, out sprite) && sprite != null)
                 return true;
 
             if (_resourceMissesByKey.Contains(spriteKey))
                 return false;
+
+            if (TryResolveFromResourceSheetKey(spriteKey, out sprite))
+            {
+                if (cacheResourcesHits)
+                    _resourceSpritesByKey[spriteKey] = sprite;
+
+                if (logDiagnostics)
+                    Debug.Log("[ArcGraphSerializedSpriteResolver] Resources sheet hit: " + spriteKey, this);
+
+                return true;
+            }
 
             sprite = Resources.Load<Sprite>(spriteKey);
             if (sprite != null)
@@ -236,6 +256,87 @@ namespace Arcontio.View.ArcGraph
                 Debug.Log("[ArcGraphSerializedSpriteResolver] Resources miss: " + spriteKey, this);
 
             return false;
+        }
+
+        // =============================================================================
+        // TryResolveFromResourceSheetKey
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova a risolvere una sprite key nel formato <c>sheet#subSprite</c>.
+        /// </para>
+        ///
+        /// <para><b>Contratto per spritesheet sliced</b></para>
+        /// <para>
+        /// Unity importa una PNG con <c>Sprite Mode = Multiple</c> come gruppo di
+        /// sub-sprite. <c>Resources.Load&lt;Sprite&gt;</c> non basta a recuperare in modo
+        /// affidabile una singola sub-sprite da quel gruppo; per questo il resolver
+        /// carica la sheet con <c>Resources.LoadAll&lt;Sprite&gt;</c> e indicizza i nomi.
+        /// Il lookup resta confinato al bordo scena: i builder ArcGraph continuano a
+        /// produrre solo stringhe.
+        /// </para>
+        /// </summary>
+        private bool TryResolveFromResourceSheetKey(
+            string spriteKey,
+            out Sprite sprite)
+        {
+            sprite = null;
+
+            if (!TryParseResourceSheetKey(spriteKey, out string sheetPath, out string subSpriteName))
+                return false;
+
+            Dictionary<string, Sprite> spritesByName = GetOrBuildResourceSheetCache(sheetPath);
+            if (spritesByName == null || spritesByName.Count == 0)
+                return false;
+
+            return spritesByName.TryGetValue(subSpriteName, out sprite) && sprite != null;
+        }
+
+        private Dictionary<string, Sprite> GetOrBuildResourceSheetCache(string sheetPath)
+        {
+            if (string.IsNullOrWhiteSpace(sheetPath))
+                return null;
+
+            if (_resourceSheetSpritesByPath.TryGetValue(sheetPath, out var cached))
+                return cached;
+
+            var result = new Dictionary<string, Sprite>(StringComparer.Ordinal);
+            Sprite[] sprites = Resources.LoadAll<Sprite>(sheetPath);
+            if (sprites != null)
+            {
+                for (int i = 0; i < sprites.Length; i++)
+                {
+                    Sprite candidate = sprites[i];
+                    if (candidate == null || string.IsNullOrWhiteSpace(candidate.name))
+                        continue;
+
+                    result[candidate.name] = candidate;
+                }
+            }
+
+            _resourceSheetSpritesByPath[sheetPath] = result;
+            return result;
+        }
+
+        private static bool TryParseResourceSheetKey(
+            string spriteKey,
+            out string sheetPath,
+            out string subSpriteName)
+        {
+            sheetPath = string.Empty;
+            subSpriteName = string.Empty;
+
+            if (string.IsNullOrWhiteSpace(spriteKey))
+                return false;
+
+            int separatorIndex = spriteKey.IndexOf('#');
+            if (separatorIndex <= 0 || separatorIndex >= spriteKey.Length - 1)
+                return false;
+
+            sheetPath = spriteKey.Substring(0, separatorIndex).Trim();
+            subSpriteName = spriteKey.Substring(separatorIndex + 1).Trim();
+            return !string.IsNullOrWhiteSpace(sheetPath)
+                   && !string.IsNullOrWhiteSpace(subSpriteName);
         }
 
         private Sprite ResolveFallback(ArcGraphRenderItemKind kind)

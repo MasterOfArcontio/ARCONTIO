@@ -7193,6 +7193,7 @@ La chiusura di questa fase richiedera':
 | v0.38j.03 | Resolver muri cardinali: scelta sprite in base ai vicini N/E/S/W | Completato data-only |
 | v0.38j.04 | Renderer oggetti/muri ArcGraph con altezza sprite e ordinamento dietro/davanti NPC | Completato data-only |
 | v0.38j.05 | Contratto mini-tile 16x16 per base muri sottili e giunzioni pavimento | Completato data-only |
+| v0.38j.06 | Resolver spritesheet muri: striscia unica 17 slot 32x83 e sub-sprite sliced | Completato data-only |
 
 ## Roadmap operativa v0.38j - Terreno, muri e blocchi fisici
 
@@ -7220,7 +7221,17 @@ terreno, acqua, pavimenti e muri come elementi grafici e semi-fisici coerenti.
    un NPC passa dietro resta una fase successiva se richiede regole occlusive
    dedicate.
 
-5. `v0.38j.05` - Mini-tile pavimento.
+5. `v0.38j.05` - Contratto mini-tile base muri.
+   Gli oggetti alti, in particolare i muri sottili, dichiarano quali quarti
+   16x16 della cella base coprono. Il dato resta visuale e non cambia
+   passabilita', occlusione o simulazione.
+
+6. `v0.38j.06` - Resolver spritesheet muri.
+   Il muro viene letto da una striscia unica alta 83 pixel, composta da 17 slot
+   larghi 32 pixel. Le varianti cardinali non richiedono piu' file separati:
+   ArcGraph produce chiavi `sheet#subSprite` risolte dal resolver scene-side.
+
+7. `v0.38j.07` - Mini-tile pavimento.
    I muri sottili lasciano vedere porzioni di pavimento ai lati. Quando interno
    ed esterno hanno pavimenti diversi, alcuni casi richiederanno composizione
    16x16 o overlay dedicati.
@@ -7372,10 +7383,75 @@ Confini preservati:
 Prossimo step:
 
 ```text
-v0.38j.06 - Renderer/overlay mini-tile pavimento 16x16
+v0.38j.06 - Resolver spritesheet muri 17 slot
 ```
 
-Lo step successivo potra' usare `BaseMiniTileMask` per decidere quali quarti di pavimento comporre quando un muro sottile separa interno ed esterno con pavimenti diversi.
+Lo step successivo deve prima adattare il resolver muri alla striscia PNG unica
+32x83, evitando il modello precedente basato su file separati.
+
+## Esito v0.38j.06 - Resolver spritesheet muri 17 slot
+
+La `v0.38j.06` ha adattato il percorso visuale dei muri alla scelta grafica
+definitiva per questa fase: una striscia PNG unica alta 83 pixel, con slot fissi
+da 32 pixel.
+
+Contratto grafico consolidato:
+
+| Slot | Maschera `N/E/S/W` | Nome sub-sprite | Significato |
+|---:|---|---|---|
+| 0 | `0101` | `wall_stone_0101_0` | muro orizzontale variante 1 |
+| 1 | `0101` | `wall_stone_0101_1` | muro orizzontale variante 2 |
+| 2 | `1010` | `wall_stone_1010` | muro verticale |
+| 3 | `1111` | `wall_stone_1111` | incrocio a croce |
+| 4 | `1101` | `wall_stone_1101` | T sopra, sinistra, destra |
+| 5 | `0111` | `wall_stone_0111` | T sotto, sinistra, destra |
+| 6 | `1110` | `wall_stone_1110` | T sopra, sotto, destra |
+| 7 | `1011` | `wall_stone_1011` | T sopra, sotto, sinistra |
+| 8 | `0110` | `wall_stone_0110` | L sotto, destra |
+| 9 | `0011` | `wall_stone_0011` | L sotto, sinistra |
+| 10 | `1100` | `wall_stone_1100` | L sopra, destra |
+| 11 | `1001` | `wall_stone_1001` | L sopra, sinistra |
+| 12 | `0001` | `wall_stone_0001` | terminale verso sinistra |
+| 13 | `0100` | `wall_stone_0100` | terminale verso destra |
+| 14 | `0010` | `wall_stone_0010` | terminale verso sotto |
+| 15 | `1000` | `wall_stone_1000` | terminale verso sopra |
+| 16 | `0000` | `wall_stone_0000` | muro realmente isolato |
+
+Nota terminologica:
+
+```text
+I casi "isolato a sinistra/destra/sotto/sopra" sono terminali con un solo
+vicino. Il solo isolato vero e' la maschera 0000.
+```
+
+Comportamento introdotto:
+
+- `ArcGraphWallCardinalResolver` produce chiavi nel formato `sheet#subSprite`;
+- esempio: `MapGrid/Sprites/Objects/wall_stone#wall_stone_1010`;
+- il resolver scene-side `ArcGraphSerializedSpriteResolver` supporta ora
+  `Resources.LoadAll<Sprite>` per PNG sliced;
+- il vecchio lookup `Resources.Load<Sprite>` resta funzionante per PNG singole;
+- la variante orizzontale `0101` viene scelta con hash stabile della cella e
+  dell'oggetto, senza random runtime;
+- lo harness del resolver muri verifica il nuovo formato delle chiavi.
+
+Confini preservati:
+
+- nessuna scena modificata;
+- nessun prefab modificato;
+- nessun asset PNG aggiunto o modificato;
+- nessuna modifica alla simulazione;
+- nessuna modifica a collisioni, blocco movimento o blocco visione.
+
+Prossimo step:
+
+```text
+v0.38j.07 - Renderer/overlay mini-tile pavimento 16x16
+```
+
+Lo step successivo potra' usare `BaseMiniTileMask` per decidere quali quarti di
+pavimento comporre quando un muro sottile separa interno ed esterno con
+pavimenti diversi.
 ## Esito v0.38a - ArcGraph Legacy Absorption Audit
 
 La `v0.38a` ha auditato il perimetro legacy MapGrid che dovra' essere assorbito

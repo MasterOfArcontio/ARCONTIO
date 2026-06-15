@@ -116,8 +116,9 @@ namespace Arcontio.View.ArcGraph
             string verticalSpriteKey = FindSpriteKey(queue.ObjectItems, VerticalCenterObjectId);
             string horizontalSpriteKey = FindSpriteKey(queue.ObjectItems, HorizontalCenterObjectId);
 
-            bool verticalResolved = verticalSpriteKey == WallBaseSpriteKey + "_1010";
-            bool horizontalResolved = horizontalSpriteKey == WallBaseSpriteKey + "_0101";
+            bool verticalResolved = verticalSpriteKey == WallBaseSpriteKey + "#wall_stone_1010";
+            bool horizontalResolved = horizontalSpriteKey == WallBaseSpriteKey + "#wall_stone_0101_0"
+                                      || horizontalSpriteKey == WallBaseSpriteKey + "#wall_stone_0101_1";
             bool passed = diagnostics.ObjectItemCount == 6
                           && diagnostics.VisibleItemCount == 6
                           && diagnostics.HiddenItemCount == 0

@@ -34,7 +34,7 @@ STATUS:
 TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; TEST VISUALI AVANZATI CONGELATI, PROSECUZIONE SU IMPLEMENTAZIONE/DIAGNOSTICA NON VISUALE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38j-04-wall-object-height-rendering`
+`ai-task/v0.38j-06-wall-strip-sprite-resolver`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -103,7 +103,8 @@ v0.38j.02 -> COMPLETATO - Metadati muri: sprite 32x83, footprint 1x1, blocco mov
 v0.38j.03 -> COMPLETATO - Resolver muri cardinali: variante muro da vicini N/E/S/W
 v0.38j.04 -> COMPLETATO DATA-ONLY - Rendering muri/oggetti alti: pivot, altezza sprite e base cella
 v0.38j.05 -> COMPLETATO DATA-ONLY - Contratto mini-tile 16x16: BaseMiniTileMask per base muri sottili
-v0.38j.06 -> PROSSIMO - Renderer/overlay mini-tile pavimento 16x16
+v0.38j.06 -> COMPLETATO DATA-ONLY - Resolver spritesheet muri: striscia 17 slot 32x83 e sub-sprite sliced
+v0.38j.07 -> PROSSIMO - Renderer/overlay mini-tile pavimento 16x16
 ```
 
 Regola corrente:
@@ -780,7 +781,15 @@ Regola corrente:
   - ArcGraph propaga la maschera da `ObjectDef` a snapshot, render item e entry scena;
   - harness actor/object e wall cardinal aggiornati per conservare la maschera;
   - nessun renderer mini-tile, nessuna mesh terrain, nessun asset e nessuna scena/prefab modificati;
-  - prossimo step tecnico: `v0.38j.06 - Renderer/overlay mini-tile pavimento 16x16`.
+  - prossimo step tecnico: `v0.38j.06 - Resolver spritesheet muri 17 slot`.
+- micro-step `v0.38j.06 - Resolver spritesheet muri 17 slot` completato:
+  - il resolver muri non produce piu' chiavi da file separati come `wall_stone_1010`;
+  - la chiave prodotta usa ora la forma `sheet#subSprite`, per esempio `MapGrid/Sprites/Objects/wall_stone#wall_stone_1010`;
+  - `ArcGraphSerializedSpriteResolver` supporta `Resources.LoadAll<Sprite>` per PNG sliced importate come `Sprite Mode = Multiple`;
+  - la striscia muri prevista e' larga 544 pixel e alta 83 pixel, con 17 slot da 32x83;
+  - la maschera resta in ordine `N/E/S/W`;
+  - il muro orizzontale `0101` supporta due varianti deterministiche, `_0` e `_1`;
+  - prossimo step tecnico: `v0.38j.07 - Renderer/overlay mini-tile pavimento 16x16`.
 - micro-step preparatorio `v0.38i.21` avviato:
   - `ArcGraphTerrainCatalog.json` ora registra tutti i tile richiesti da `ArcGraphTerrainVisualCatalog.json`;
   - atlas dichiarato come `512x512` con tile `32x32`, coerente con `TerrainAtlas.png` attuale;

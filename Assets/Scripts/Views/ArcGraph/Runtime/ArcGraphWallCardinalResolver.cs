@@ -24,14 +24,16 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>BuildWallCellIndex</b>: indicizza le celle occupate da muri compatibili.</item>
-    ///   <item><b>ResolveSpriteKey</b>: aggiunge il suffisso cardinale alla sprite key base.</item>
+    ///   <item><b>ResolveSpriteKey</b>: produce la chiave della sub-sprite dentro la striscia muro.</item>
     ///   <item><b>ResolveMask</b>: calcola la maschera <c>N/E/S/W</c> in quattro cifre.</item>
+    ///   <item><b>ResolveSubSpriteName</b>: traduce la maschera nel nome dello sprite sliced.</item>
     ///   <item><b>IsWallSnapshot</b>: riconosce gli snapshot con <c>VisualKind = wall</c>.</item>
     /// </list>
     /// </summary>
     public static class ArcGraphWallCardinalResolver
     {
         private const string WallVisualKind = "wall";
+        private const char SpriteSheetSeparator = '#';
 
         // =============================================================================
         // BuildWallCellIndex
@@ -85,17 +87,17 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Risolve la sprite key finale di un oggetto, aggiungendo il suffisso
-        /// cardinale solo se l'oggetto e' un muro.
+        /// Risolve la sprite key finale di un oggetto, usando la variante cardinale
+        /// solo se l'oggetto e' un muro.
         /// </para>
         ///
-        /// <para><b>Convenzione variante</b></para>
+        /// <para><b>Convenzione spritesheet</b></para>
         /// <para>
-        /// La maschera e' ordinata come <c>N/E/S/W</c>. Per esempio
-        /// <c>1010</c> significa muro collegato a nord e sud, mentre
-        /// <c>0101</c> significa collegato a est e ovest. La sprite key finale
-        /// diventa quindi, per esempio,
-        /// <c>MapGrid/Sprites/Objects/wall_stone_1010</c>.
+        /// La maschera e' ordinata come <c>N/E/S/W</c>. La chiave finale usa la
+        /// forma <c>sheet#subSprite</c>, per esempio
+        /// <c>MapGrid/Sprites/Objects/wall_stone#wall_stone_1010</c>. Questo
+        /// permette a Unity di caricare una sola PNG sliced, alta 83 pixel e
+        /// divisa in slot larghi 32 pixel, senza richiedere file separati.
         /// </para>
         /// </summary>
         public static string ResolveSpriteKey(
@@ -114,11 +116,18 @@ namespace Arcontio.View.ArcGraph
                 return baseSpriteKey;
             }
 
-            string mask = ResolveMask(snapshot.Cell, wallCells);
             if (string.IsNullOrWhiteSpace(baseSpriteKey))
                 return string.Empty;
 
-            return baseSpriteKey + "_" + mask;
+            string mask = ResolveMask(snapshot.Cell, wallCells);
+            string subSpriteName = ResolveSubSpriteName(
+                baseSpriteKey,
+                mask,
+                snapshot);
+            if (string.IsNullOrWhiteSpace(subSpriteName))
+                return baseSpriteKey;
+
+            return baseSpriteKey + SpriteSheetSeparator + subSpriteName;
         }
 
         // =============================================================================
@@ -155,6 +164,45 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // ResolveSubSpriteName
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce una maschera cardinale nel nome della sub-sprite dentro la
+        /// striscia muro.
+        /// </para>
+        ///
+        /// <para><b>Contratto grafico striscia 17 slot</b></para>
+        /// <para>
+        /// Il file grafico e' una striscia unica di 17 elementi <c>32x83</c>, larga
+        /// quindi <c>544x83</c>. I nomi delle sub-sprite devono essere coerenti con
+        /// la maschera <c>N/E/S/W</c>. Solo il muro orizzontale <c>0101</c> possiede
+        /// due varianti, scelte con hash stabile della cella e dell'oggetto per
+        /// evitare sia pattern completamente fisso sia casualita' non deterministica.
+        /// </para>
+        /// </summary>
+        public static string ResolveSubSpriteName(
+            string baseSpriteKey,
+            string mask,
+            ArcGraphObjectVisualSnapshot snapshot)
+        {
+            string prefix = ResolveSpriteNamePrefix(baseSpriteKey);
+            if (string.IsNullOrWhiteSpace(prefix) || string.IsNullOrWhiteSpace(mask))
+                return string.Empty;
+
+            if (mask == "0101")
+            {
+                int variant = ResolveHorizontalVariant(snapshot);
+                return prefix + "_0101_" + variant;
+            }
+
+            if (IsKnownWallMask(mask))
+                return prefix + "_" + mask;
+
+            return string.Empty;
+        }
+
+        // =============================================================================
         // IsWallSnapshot
         // =============================================================================
         /// <summary>
@@ -179,6 +227,47 @@ namespace Arcontio.View.ArcGraph
                        StringComparison.OrdinalIgnoreCase);
         }
 
+        private static bool IsKnownWallMask(string mask)
+        {
+            switch (mask)
+            {
+                case "1010":
+                case "1111":
+                case "1101":
+                case "0111":
+                case "1110":
+                case "1011":
+                case "0110":
+                case "0011":
+                case "1100":
+                case "1001":
+                case "0001":
+                case "0100":
+                case "0010":
+                case "1000":
+                case "0000":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        private static int ResolveHorizontalVariant(ArcGraphObjectVisualSnapshot snapshot)
+        {
+            unchecked
+            {
+                // Hash intenzionalmente piccolo e stabile: non deve essere una
+                // sorgente casuale runtime, ma solo una distribuzione ripetibile
+                // delle due varianti orizzontali disponibili nello spritesheet.
+                int hash = 17;
+                hash = (hash * 31) + snapshot.ObjectId;
+                hash = (hash * 31) + snapshot.Cell.X;
+                hash = (hash * 31) + snapshot.Cell.Y;
+                hash = (hash * 31) + snapshot.Cell.Z;
+                return (hash & 1) == 0 ? 0 : 1;
+            }
+        }
+
         private static string ResolveBaseSpriteKey(ArcGraphObjectVisualSnapshot snapshot)
         {
             return string.IsNullOrWhiteSpace(snapshot.SpriteKey)
@@ -194,6 +283,22 @@ namespace Arcontio.View.ArcGraph
             return string.IsNullOrWhiteSpace(snapshot.DefId)
                 ? string.Empty
                 : snapshot.DefId.Trim();
+        }
+
+        private static string ResolveSpriteNamePrefix(string baseSpriteKey)
+        {
+            string normalized = string.IsNullOrWhiteSpace(baseSpriteKey)
+                ? string.Empty
+                : baseSpriteKey.Trim().Replace('\\', '/');
+
+            if (string.IsNullOrWhiteSpace(normalized))
+                return string.Empty;
+
+            int separatorIndex = normalized.LastIndexOf('/');
+            if (separatorIndex < 0 || separatorIndex >= normalized.Length - 1)
+                return normalized;
+
+            return normalized.Substring(separatorIndex + 1);
         }
     }
 }
