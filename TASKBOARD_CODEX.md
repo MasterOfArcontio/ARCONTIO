@@ -31,10 +31,10 @@ CHECKPOINT CORRENTE:
 `v0.38j - ArcGraph terrain/object physical metadata: acqua, pavimenti, muri`
 
 STATUS:
-TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; TEST VISUALI AVANZATI CONGELATI, PROSECUZIONE SU IMPLEMENTAZIONE/DIAGNOSTICA NON VISUALE
+TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; MINI-TILE 16x16 RINVIATO COME DEBITO NON BLOCCANTE; PROSSIMO BLOCCO: v0.38k RUNTIME SWITCH STABILIZATION
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38j-06-wall-strip-sprite-resolver`
+`ai-task/v0.38j-18-wall-visual-gate-closeout`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -104,10 +104,16 @@ v0.38j.03 -> COMPLETATO - Resolver muri cardinali: variante muro da vicini N/E/S
 v0.38j.04 -> COMPLETATO DATA-ONLY - Rendering muri/oggetti alti: pivot, altezza sprite e base cella
 v0.38j.05 -> COMPLETATO DATA-ONLY - Contratto mini-tile 16x16: BaseMiniTileMask per base muri sottili
 v0.38j.06 -> COMPLETATO DATA-ONLY - Resolver spritesheet muri: striscia 17 slot 32x83 e sub-sprite sliced
-v0.38j.07 -> PROSSIMO - Renderer/overlay mini-tile pavimento 16x16
+v0.38j.07 -> RINVIATO NON BLOCCANTE - Renderer/overlay mini-tile pavimento 16x16 sotto muri sottili
+v0.38j.08 -> COMPLETATO - Gate visuale muri/F3: inserimento, preview, connessioni, sorting e allineamento sprite
+v0.38k -> PROSSIMO - Runtime Switch Stabilization: F12, root visuali, auto-installer e diagnostica
 ```
 
 Regola corrente:
+
+- gate visuale muri ArcGraph superato: l'inserimento F3 di `wall_stone` e' visibile in ArcGraph, la preview cella/oggetto segue la cella reale del DevTools, le connessioni cardinali vengono risolte e gli sprite muro sono stati riallineati manualmente dall'operatore;
+- il debito mini-tile 16x16 resta noto ma non blocca il passaggio a `v0.38k`, perche' riguarda la composizione futura dei pavimenti sotto muri sottili quando interno/esterno useranno floor diversi;
+- prima del pensionamento MapGrid, il mini-tile dovra' essere recuperato o esplicitamente trasformato in requisito del blocco object/floor avanzato;
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;

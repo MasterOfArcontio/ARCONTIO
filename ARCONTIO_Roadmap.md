@@ -43,20 +43,20 @@
 | v0.36 | ArcGraph Environment Visual Layers | Agosto-Settembre 2026 | ✅ Completata come contratti visuali preparatori |
 | v0.37 | ArcGraph Debug/Overlay Migration | Settembre 2026 | ✅ Completata come migrazione debug minima |
 | v0.38 | ArcGraph Legacy Absorption / Retirement | Settembre 2026 | 🔄 In corso |
-| v0.39 | Environment Foundation Data-Only | Post-v0.38 | ⏳ Pending |
-| v0.40 | Calendar, Time, Season | Post-v0.39 | ⏳ Pending |
-| v0.41 | Global Climate & Weather | Post-v0.40 | ⏳ Pending |
-| v0.42 | Environment Area Registry | Post-v0.41 | ⏳ Pending |
-| v0.43 | Fertility Areas | Post-v0.42 | ⏳ Pending |
-| v0.44 | Water Areas / Water Map | Post-v0.43 | ⏳ Pending |
-| v0.45 | Vegetation Areas & SeedBank | Post-v0.44 | ⏳ Pending |
-| v0.46 | Plant Catalog | Post-v0.45 | ⏳ Pending |
-| v0.47 | PlantInstance Lifecycle | Post-v0.46 | ⏳ Pending |
-| v0.48 | Natural Growth Loop | Post-v0.47 | ⏳ Pending |
-| v0.49 | Agriculture Foundation | Post-v0.48 | ⏳ Pending |
-| v0.50 | Environment Read-Only Snapshots | Post-v0.49 | ⏳ Pending |
-| v0.51 | Save/Load Environment | Post-v0.50 | ⏳ Pending |
-| v0.52 | ArcGraph Environment Adapter | Post-v0.51 | ⏳ Pending |
+| v0.39 | Environment Foundation Data-Only | Post-v0.38 | ✅ Completata foundation/data-only |
+| v0.40 | Calendar, Time, Season | Post-v0.39 | ✅ Completata foundation/data-only |
+| v0.41 | Global Climate & Weather | Post-v0.40 | ✅ Completata foundation/data-only |
+| v0.42 | Environment Area Registry | Post-v0.41 | ✅ Completata foundation/data-only |
+| v0.43 | Fertility Areas | Post-v0.42 | ✅ Completata foundation/data-only |
+| v0.44 | Water Areas / Water Map | Post-v0.43 | ✅ Completata foundation/data-only |
+| v0.45 | Vegetation Areas & SeedBank | Post-v0.44 | ✅ Completata foundation/data-only |
+| v0.46 | Plant Catalog | Post-v0.45 | ✅ Completata foundation/data-only |
+| v0.47 | PlantInstance Lifecycle | Post-v0.46 | ✅ Completata foundation/data-only |
+| v0.48 | Natural Growth Loop | Post-v0.47 | ✅ Completata foundation/data-only |
+| v0.49 | Agriculture Foundation | Post-v0.48 | ✅ Completata foundation/data-only |
+| v0.50 | Environment Read-Only Snapshots | Post-v0.49 | ✅ Completata foundation/data-only |
+| v0.51 | Save/Load Environment | Post-v0.50 | ✅ Completata foundation/data-only |
+| v0.52 | ArcGraph Environment Adapter | Post-v0.51 | ✅ Completata adapter passivo |
 | v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Dopo observer prerequisites | ⏳ Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | 🎯 Target |
@@ -15211,6 +15211,48 @@ Micro-step completato:
 - non e' stato introdotto alcun renderer produttivo per alberi, mobili grandi o
   vegetazione.
 
+Esito operativo `v0.38j.08 - Gate visuale muri/F3`:
+
+```text
+SUPERATO NEL GATE VISUALE OPERATORE
+```
+
+Risultato consolidato:
+
+- il tool F3 puo' inserire `wall_stone` e ArcGraph riceve gli oggetti dalla queue
+  runtime;
+- il renderer oggetti ArcGraph mostra i muri come sprite alti `32x83`;
+- il resolver cardinalita' muri usa la maschera `N/W/S/E` e sceglie la variante
+  corretta nella striscia sprite;
+- la preview rossa semi-trasparente usa la cella reale risolta dal DevTools, non
+  una seconda conversione camera/mouse divergente;
+- lo sorting davanti/dietro e' stato corretto per ridurre inversioni visive tra
+  segmenti muro;
+- il problema di slicing della spritesheet e il successivo disallineamento di
+  alcuni sprite sono stati risolti lato asset dall'operatore;
+- l'acqua resta non camminabile come dato terrain/oggetto separato gia'
+  consolidato nel blocco;
+- i test visuali muri non autorizzano ancora il pensionamento fisico di MapGrid:
+  confermano solo che il percorso minimo object/wall e' abbastanza stabile per
+  procedere con lo switch runtime.
+
+Debito rinviato:
+
+```text
+v0.38j.07 - Renderer/overlay mini-tile pavimento 16x16 sotto muri sottili
+```
+
+Il mini-tile resta necessario per gestire in modo elegante muri sottili sopra
+pavimenti diversi tra interno ed esterno. Non blocca pero' il passaggio a
+`v0.38k`, perche' il gate attuale ha validato muri su pavimenti omogenei e non
+richiede ancora composizione 16x16 della base.
+
+Prossimo step:
+
+```text
+v0.38k - ArcGraph Runtime Switch Stabilization
+```
+
 ---
 
 ### v0.38k - ArcGraph Runtime Switch Stabilization
@@ -15492,7 +15534,7 @@ Rendering = consumer separato che legge snapshot derivati
 
 ### v0.39 - Environment Foundation Data-Only
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15514,15 +15556,15 @@ Contratti previsti:
 
 | Blocco | Strutture candidate | Stato |
 |---|---|---|
-| Coordinate | `EnvironmentCellCoord`, `EnvironmentChunkCoord` | ⏳ Pending |
-| Aree | `EnvironmentAreaId`, `EnvironmentAreaKind`, `EnvironmentAreaBounds`, `EnvironmentAreaDefinition` | ⏳ Pending |
-| Calendario | `EnvironmentCalendarState`, `EnvironmentDate`, `EnvironmentTimeOfDay` | ⏳ Pending |
-| Stagioni | `EnvironmentSeasonKind`, `EnvironmentSeasonProfile` | ⏳ Pending |
-| Clima | `EnvironmentGlobalClimateState`, `EnvironmentWeatherKind` | ⏳ Pending |
-| Fertilita' | `EnvironmentFertilityAreaState` | ⏳ Pending |
-| Acqua | `EnvironmentWaterAreaState`, `EnvironmentWaterDepthLevel` | ⏳ Pending |
-| Vegetazione | `EnvironmentVegetationAreaState`, `EnvironmentSeedBankEntry` | ⏳ Pending |
-| Snapshot | `EnvironmentSnapshot`, `EnvironmentAreaSnapshot`, snapshot per dominio | ⏳ Pending |
+| Coordinate | `EnvironmentCellCoord`, coordinate `x/y/z` | ✅ Completato |
+| Aree | `EnvironmentAreaId`, `EnvironmentAreaKind`, `EnvironmentAreaBounds`, `EnvironmentAreaDefinition` | ✅ Completato |
+| Calendario | `EnvironmentCalendarState`, `EnvironmentDate`, `EnvironmentTimeOfDay` | ✅ Completato |
+| Stagioni | `EnvironmentSeasonKind`, `EnvironmentSeasonProfile` | ✅ Completato |
+| Clima | `EnvironmentGlobalClimateState`, `EnvironmentWeatherKind` | ✅ Completato |
+| Fertilita' | `EnvironmentFertilityAreaState` | ✅ Completato |
+| Acqua | `EnvironmentWaterAreaState`, `EnvironmentWaterDepthLevel` | ✅ Completato |
+| Vegetazione | `EnvironmentVegetationAreaState`, `EnvironmentSeedBankEntry` | ✅ Completato |
+| Snapshot | `EnvironmentSnapshot`, `EnvironmentAreaSnapshot`, snapshot per dominio | ✅ Completato |
 
 Definition of Done:
 
@@ -15531,6 +15573,15 @@ Definition of Done:
 - nessun coupling con ArcGraph/MapGrid;
 - nessuna modifica a `World.cs` o `SimulationHost`;
 - snapshot Core-side pronti per consumer futuri.
+
+Esito implementativo:
+
+- commit `8e2d159055772e43004e498034d334614acff7a4`;
+- namespace Core: `Assets/Scripts/Core/Environment`;
+- nessun rendering produttivo;
+- nessun `MonoBehaviour`;
+- nessuna modifica a `World.cs`, `SimulationHost`, `MapGrid`, scene, prefab o `.meta`;
+- snapshot e query read-only pronti per consumer futuri.
 
 ---
 
