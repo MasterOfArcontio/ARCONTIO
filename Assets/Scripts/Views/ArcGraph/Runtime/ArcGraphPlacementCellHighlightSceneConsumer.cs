@@ -155,6 +155,12 @@ namespace Arcontio.View.ArcGraph
             if (!enableSceneCameraUpdateFallback)
                 return;
 
+            if (TryResolveCellFromDevTools(out ArcGraphCellCoord devToolsCell, out _))
+            {
+                ShowPlacementPreviewAtCell(devToolsCell, CreateSyntheticInteractionFrame(devToolsCell));
+                return;
+            }
+
             if (!TryResolveCellFromSceneCamera(out ArcGraphCellCoord cell, out string reason))
             {
                 HideAndStore(ArcGraphInteractionFrame.Empty(reason), false, reason);
@@ -210,6 +216,60 @@ namespace Arcontio.View.ArcGraph
             }
 
             ShowPlacementPreviewAtCell(interactionFrame.Cell, interactionFrame);
+        }
+
+        // =============================================================================
+        // TryResolveCellFromDevTools
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova a leggere dal DevTools legacy la cella che il tool F3 userebbe per
+        /// piazzare l'oggetto corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: una sola verita' per il placement</b></para>
+        /// <para>
+        /// Durante il gate MapGrid/ArcGraph la camera, lo zoom e il pan possono
+        /// attraversare ancora percorsi legacy. Per evitare che la preview ArcGraph
+        /// disegni su una cella diversa da quella realmente usata dal click, questo
+        /// metodo preferisce la cella esposta dal DevTools. ArcGraph resta comunque
+        /// passivo: legge coordinate, non invia comandi e non modifica il mondo.
+        /// </para>
+        /// </summary>
+        private bool TryResolveCellFromDevTools(
+            out ArcGraphCellCoord cell,
+            out string reason)
+        {
+            cell = new ArcGraphCellCoord(0, 0, 0);
+            reason = "None";
+
+            if (!highlightEnabled)
+            {
+                reason = "HighlightDisabled";
+                return false;
+            }
+
+            if (devToolsOverlay == null)
+            {
+                reason = "DevToolsOverlayMissing";
+                return false;
+            }
+
+            if (!devToolsOverlay.IsObjectPlacementPreviewActive)
+            {
+                reason = "PlacementPreviewInactive";
+                return false;
+            }
+
+            if (!devToolsOverlay.TryGetObjectPlacementPreviewCell(out int x, out int y))
+            {
+                reason = "DevToolsPlacementCellUnavailable";
+                return false;
+            }
+
+            cell = new ArcGraphCellCoord(x, y, 0);
+            reason = "DevToolsPlacementCellResolved";
+            return true;
         }
 
         // =============================================================================

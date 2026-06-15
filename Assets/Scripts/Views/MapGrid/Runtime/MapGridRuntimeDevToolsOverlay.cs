@@ -250,6 +250,49 @@ namespace Arcontio.View.MapGrid
         }
 
         // =============================================================================
+        // TryGetObjectPlacementPreviewCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone in sola lettura la cella che il tool di inserimento oggetti
+        /// userebbe se l'utente cliccasse in questo frame.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: preview agganciata al comando reale</b></para>
+        /// <para>
+        /// ArcGraph non deve duplicare il piazzamento muri, cibo, porte o oggetti
+        /// futuri. Questo metodo rende disponibile solo la cella gia' risolta dal
+        /// DevTools legacy, usando la stessa camera, lo stesso provider puntatore e
+        /// gli stessi controlli anti-click-through del percorso che poi accoda il
+        /// comando reale.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate tool</b>: fallisce se il DevTools non e' in inserimento oggetti.</item>
+        ///   <item><b>Gate UI</b>: fallisce se il puntatore e' sopra il pannello DevTools o altra UI bloccante.</item>
+        ///   <item><b>Risoluzione cella</b>: riusa <c>TryGetPointerCell</c>, quindi resta coerente con il click reale.</item>
+        /// </list>
+        /// </summary>
+        public bool TryGetObjectPlacementPreviewCell(
+            out int cellX,
+            out int cellY)
+        {
+            cellX = 0;
+            cellY = 0;
+
+            if (!IsObjectPlacementPreviewActive)
+                return false;
+
+            UpdatePointerOverUiWindowFlag();
+            if (_isPointerOverUiWindow)
+                return false;
+
+            return TryGetPointerCell(out cellX, out cellY, out bool inBounds)
+                   && inBounds;
+        }
+
+        // =============================================================================
         // ToggleSpawnToolOverlay
         // =============================================================================
         /// <summary>
