@@ -362,6 +362,36 @@ namespace Arcontio.View.ArcGraph
             SetHighlightEnabled(false);
         }
 
+        // =============================================================================
+        // LogPlacementHighlightDiagnosticsFromInspector
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Stampa in Console l'ultima diagnostica della preview inserimento.
+        /// </para>
+        ///
+        /// <para><b>Diagnostica manuale per gate visuale</b></para>
+        /// <para>
+        /// Durante i test ArcGraph l'operatore puo' avere bisogno di capire se la
+        /// preview non si vede per assenza tool, cella non risolta, DevTools
+        /// mancante o semplice problema di rendering. Questo context menu non
+        /// modifica stato runtime: rende solo leggibile l'ultimo motivo registrato.
+        /// </para>
+        /// </summary>
+        [ContextMenu("ArcGraph/Log Placement Cell Highlight Diagnostics")]
+        public void LogPlacementHighlightDiagnosticsFromInspector()
+        {
+            Debug.Log(
+                "[ArcGraphPlacementCellHighlightSceneConsumer] " +
+                _lastDiagnostics.Reason +
+                ", enabled=" + _lastDiagnostics.HighlightEnabled +
+                ", devTools=" + _lastDiagnostics.HasDevToolsOverlay +
+                ", placement=" + _lastDiagnostics.PlacementPreviewActive +
+                ", validCell=" + _lastDiagnostics.HasValidCell +
+                ", cell=" + _lastDiagnostics.Cell +
+                ", shown=" + _lastDiagnostics.DidShowHighlight);
+        }
+
         private void OnDestroy()
         {
             if (_highlightSprite != null)
