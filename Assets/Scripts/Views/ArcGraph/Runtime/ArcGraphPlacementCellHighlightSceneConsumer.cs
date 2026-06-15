@@ -2,6 +2,7 @@ using Arcontio.Core;
 using Arcontio.View.MapGrid;
 using System;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -94,6 +95,8 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool highlightEnabled = true;
         [SerializeField] private MapGridRuntimeDevToolsOverlay devToolsOverlay;
         [SerializeField] private MonoBehaviour spriteResolverBehaviour;
+        [SerializeField] private Camera sceneCamera;
+        [SerializeField] private bool enableSceneCameraUpdateFallback = true;
         [SerializeField] private Color validPlacementColor = new Color(1f, 0.18f, 0.12f, 0.38f);
         [SerializeField] private Color previewSpriteColor = new Color(1f, 0.05f, 0.05f, 0.58f);
         [SerializeField] private float tileWorldSize = 1f;
@@ -126,6 +129,40 @@ namespace Arcontio.View.ArcGraph
 
         public ArcGraphPlacementCellHighlightDiagnostics LastDiagnostics => _lastDiagnostics;
         public bool HighlightEnabled => highlightEnabled;
+
+        // =============================================================================
+        // Update
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna opzionalmente la preview placement usando direttamente la camera
+        /// di scena.
+        /// </para>
+        ///
+        /// <para><b>Fallback pratico sullo spazio reale della scena</b></para>
+        /// <para>
+        /// Il normale frame interattivo ArcGraph passa dal mapper viewport/zoom, che
+        /// e' corretto per HUD e selection ma puo' divergere dalla camera Unity
+        /// durante il gate MapGrid/ArcGraph provvisorio. Il DevTool F3, invece,
+        /// inserisce oggetti nello spazio mappa visibile. Questo fallback converte
+        /// mouse -> world -> cella con la camera reale, cosi' la preview resta
+        /// agganciata allo stesso spazio in cui l'utente sta piazzando muri, cibo,
+        /// porte o oggetti futuri.
+        /// </para>
+        /// </summary>
+        private void Update()
+        {
+            if (!enableSceneCameraUpdateFallback)
+                return;
+
+            if (!TryResolveCellFromSceneCamera(out ArcGraphCellCoord cell, out string reason))
+            {
+                HideAndStore(ArcGraphInteractionFrame.Empty(reason), false, reason);
+                return;
+            }
+
+            ShowPlacementPreviewAtCell(cell, CreateSyntheticInteractionFrame(cell));
+        }
 
         // =============================================================================
         // ConsumeInteractionFrame
@@ -172,20 +209,7 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            EnsureHighlightRenderer();
-            Vector3 worldPosition = ResolveWorldPosition(interactionFrame.Cell);
-
-            _highlightObject.transform.position = worldPosition;
-            _highlightObject.transform.localScale = new Vector3(tileWorldSize, tileWorldSize, 1f);
-            _highlightRenderer.color = validPlacementColor;
-            _highlightRenderer.sortingOrder = sortingOrder;
-            _highlightObject.SetActive(true);
-
-            bool didShowPreview = TryShowPlacementSpritePreview(interactionFrame.Cell);
-            StoreDiagnostics(
-                interactionFrame,
-                true,
-                didShowPreview ? "PlacementCellAndSpritePreviewShown" : "PlacementCellHighlighted");
+            ShowPlacementPreviewAtCell(interactionFrame.Cell, interactionFrame);
         }
 
         // =============================================================================
@@ -220,6 +244,19 @@ namespace Arcontio.View.ArcGraph
         public void SetSpriteResolverBehaviour(MonoBehaviour resolverBehaviour)
         {
             spriteResolverBehaviour = resolverBehaviour;
+        }
+
+        // =============================================================================
+        // SetSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna la camera usata dal fallback mouse -> cella.
+        /// </para>
+        /// </summary>
+        public void SetSceneCamera(Camera camera)
+        {
+            sceneCamera = camera;
         }
 
         // =============================================================================
@@ -336,6 +373,41 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // ShowPlacementPreviewAtCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna highlight e anteprima oggetto sulla cella risolta.
+        /// </para>
+        ///
+        /// <para><b>Un solo punto di applicazione visuale</b></para>
+        /// <para>
+        /// Sia il frame interattivo ArcGraph sia il fallback camera passano da qui.
+        /// In questo modo colore, scala, sorting e diagnostica restano identici e
+        /// non si creano due comportamenti visuali diversi.
+        /// </para>
+        /// </summary>
+        private void ShowPlacementPreviewAtCell(
+            ArcGraphCellCoord cell,
+            ArcGraphInteractionFrame interactionFrame)
+        {
+            EnsureHighlightRenderer();
+            Vector3 worldPosition = ResolveWorldPosition(cell);
+
+            _highlightObject.transform.position = worldPosition;
+            _highlightObject.transform.localScale = new Vector3(tileWorldSize, tileWorldSize, 1f);
+            _highlightRenderer.color = validPlacementColor;
+            _highlightRenderer.sortingOrder = sortingOrder;
+            _highlightObject.SetActive(true);
+
+            bool didShowPreview = TryShowPlacementSpritePreview(cell);
+            StoreDiagnostics(
+                interactionFrame,
+                true,
+                didShowPreview ? "PlacementCellAndSpritePreviewShown" : "PlacementCellHighlighted");
+        }
+
+        // =============================================================================
         // TryShowPlacementSpritePreview
         // =============================================================================
         /// <summary>
@@ -404,6 +476,90 @@ namespace Arcontio.View.ArcGraph
             _previewRenderer.color = previewSpriteColor;
             _previewRenderer.sortingOrder = previewSortingOrder;
             _previewObject.SetActive(true);
+            return true;
+        }
+
+        // =============================================================================
+        // TryResolveCellFromSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la cella sotto il mouse usando la camera Unity reale.
+        /// </para>
+        ///
+        /// <para><b>Contratto locale al gate F3</b></para>
+        /// <para>
+        /// Il metodo non interpreta click e non produce comandi. Serve solo a sapere
+        /// dove disegnare l'anteprima se il mapper interattivo ArcGraph non e'
+        /// ancora perfettamente sincronizzato con camera, zoom e pan della scena.
+        /// </para>
+        /// </summary>
+        private bool TryResolveCellFromSceneCamera(
+            out ArcGraphCellCoord cell,
+            out string reason)
+        {
+            cell = new ArcGraphCellCoord(0, 0, 0);
+            reason = "None";
+
+            if (!highlightEnabled)
+            {
+                reason = "HighlightDisabled";
+                return false;
+            }
+
+            if (devToolsOverlay == null)
+            {
+                reason = "DevToolsOverlayMissing";
+                return false;
+            }
+
+            if (!devToolsOverlay.IsObjectPlacementPreviewActive)
+            {
+                reason = "PlacementPreviewInactive";
+                return false;
+            }
+
+            if (devToolsOverlay.IsPointerOverDevToolsWindow)
+            {
+                reason = "PointerOverDevToolsWindow";
+                return false;
+            }
+
+            Mouse mouse = Mouse.current;
+            if (mouse == null)
+            {
+                reason = "MouseMissing";
+                return false;
+            }
+
+            Camera camera = ResolveSceneCamera();
+            if (camera == null)
+            {
+                reason = "SceneCameraMissing";
+                return false;
+            }
+
+            Vector2 screenPosition = mouse.position.ReadValue();
+            float planeDistance = ResolveWorldPlaneDistance(camera);
+            Vector3 worldPosition = camera.ScreenToWorldPoint(new Vector3(
+                screenPosition.x,
+                screenPosition.y,
+                planeDistance));
+
+            float safeTileWorldSize = ResolvePositiveScale(tileWorldSize);
+            int x = Mathf.FloorToInt((worldPosition.x - originOffset.x) / safeTileWorldSize);
+            int y = Mathf.FloorToInt((worldPosition.y - originOffset.y) / safeTileWorldSize);
+
+            World world = MapGridWorldProvider.TryGetWorld();
+            if (world != null
+                && (x < 0 || y < 0 || x >= world.MapWidth || y >= world.MapHeight))
+            {
+                reason = "CellOutOfWorld";
+                return false;
+            }
+
+            cell = new ArcGraphCellCoord(x, y, 0);
+            reason = "SceneCameraCellResolved";
             return true;
         }
 
@@ -634,6 +790,74 @@ namespace Arcontio.View.ArcGraph
                 (cell.X + 0.5f) * tileWorldSize,
                 (cell.Y + 0.5f) * tileWorldSize,
                 zOffset);
+        }
+
+        // =============================================================================
+        // CreateSyntheticInteractionFrame
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un frame diagnostico valido quando la cella arriva dal fallback
+        /// camera invece che dal boundary interattivo ArcGraph.
+        /// </para>
+        /// </summary>
+        private static ArcGraphInteractionFrame CreateSyntheticInteractionFrame(
+            ArcGraphCellCoord cell)
+        {
+            var coordinate = new ArcGraphViewCoordinateResult(
+                true,
+                cell,
+                0f,
+                0f,
+                new ArcGraphViewCellRect(cell.X, cell.Y, cell.X + 1, cell.Y + 1),
+                "SceneCameraFallback");
+
+            return new ArcGraphInteractionFrame(
+                ArcGraphViewInputFrame.Empty(),
+                coordinate,
+                ArcGraphInteractionTargetKind.Cell,
+                cell,
+                -1,
+                -1,
+                true,
+                false,
+                "SceneCameraFallback");
+        }
+
+        // =============================================================================
+        // ResolveSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce la camera esplicita o, in fallback, <c>Camera.main</c>.
+        /// </para>
+        /// </summary>
+        private Camera ResolveSceneCamera()
+        {
+            if (sceneCamera != null)
+                return sceneCamera;
+
+            return Camera.main;
+        }
+
+        // =============================================================================
+        // ResolveWorldPlaneDistance
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola la distanza da usare con <c>ScreenToWorldPoint</c> per il piano
+        /// Z della mappa ArcGraph.
+        /// </para>
+        /// </summary>
+        private float ResolveWorldPlaneDistance(Camera camera)
+        {
+            if (camera == null)
+                return 0f;
+
+            float distance = originOffset.z - camera.transform.position.z;
+            return Mathf.Abs(distance) > 0.001f
+                ? Mathf.Abs(distance)
+                : Mathf.Max(0.001f, camera.nearClipPlane);
         }
 
         private void HideAndStore(
