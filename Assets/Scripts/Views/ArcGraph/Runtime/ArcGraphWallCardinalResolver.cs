@@ -25,7 +25,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>BuildWallCellIndex</b>: indicizza le celle occupate da muri compatibili.</item>
     ///   <item><b>ResolveSpriteKey</b>: produce la chiave della sub-sprite dentro la striscia muro.</item>
-    ///   <item><b>ResolveMask</b>: calcola la maschera <c>N/E/S/W</c> in quattro cifre.</item>
+    ///   <item><b>ResolveMask</b>: calcola la maschera <c>N/W/S/E</c> in quattro cifre.</item>
     ///   <item><b>ResolveSubSpriteName</b>: traduce la maschera nel nome dello sprite sliced.</item>
     ///   <item><b>IsWallSnapshot</b>: riconosce gli snapshot con <c>VisualKind = wall</c>.</item>
     /// </list>
@@ -93,7 +93,8 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Convenzione spritesheet</b></para>
         /// <para>
-        /// La maschera e' ordinata come <c>N/E/S/W</c>. La chiave finale usa la
+        /// La maschera e' ordinata come <c>N/W/S/E</c>, cioe' sopra, sinistra,
+        /// sotto, destra in senso antiorario. La chiave finale usa la
         /// forma <c>sheet#subSprite</c>, per esempio
         /// <c>MapGrid/Sprites/Objects/wall_stone#wall_stone_1010</c>. Questo
         /// permette a Unity di caricare una sola PNG sliced, alta 83 pixel e
@@ -135,7 +136,7 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Calcola la maschera cardinale <c>N/E/S/W</c> per una cella muro.
+        /// Calcola la maschera cardinale <c>N/W/S/E</c> per una cella muro.
         /// </para>
         ///
         /// <para><b>Regola locale</b></para>
@@ -153,14 +154,14 @@ namespace Arcontio.View.ArcGraph
                 return "0000";
 
             bool north = wallCells.Contains(new ArcGraphCellCoord(cell.X, cell.Y + 1, cell.Z));
-            bool east = wallCells.Contains(new ArcGraphCellCoord(cell.X + 1, cell.Y, cell.Z));
-            bool south = wallCells.Contains(new ArcGraphCellCoord(cell.X, cell.Y - 1, cell.Z));
             bool west = wallCells.Contains(new ArcGraphCellCoord(cell.X - 1, cell.Y, cell.Z));
+            bool south = wallCells.Contains(new ArcGraphCellCoord(cell.X, cell.Y - 1, cell.Z));
+            bool east = wallCells.Contains(new ArcGraphCellCoord(cell.X + 1, cell.Y, cell.Z));
 
             return (north ? "1" : "0")
-                   + (east ? "1" : "0")
+                   + (west ? "1" : "0")
                    + (south ? "1" : "0")
-                   + (west ? "1" : "0");
+                   + (east ? "1" : "0");
         }
 
         // =============================================================================
@@ -176,7 +177,7 @@ namespace Arcontio.View.ArcGraph
         /// <para>
         /// Il file grafico e' una striscia unica di 17 elementi <c>32x83</c>, larga
         /// quindi <c>544x83</c>. I nomi delle sub-sprite devono essere coerenti con
-        /// la maschera <c>N/E/S/W</c>. Solo il muro orizzontale <c>0101</c> possiede
+        /// la maschera <c>N/W/S/E</c>. Solo il muro orizzontale <c>0101</c> possiede
         /// due varianti, scelte con hash stabile della cella e dell'oggetto per
         /// evitare sia pattern completamente fisso sia casualita' non deterministica.
         /// </para>
