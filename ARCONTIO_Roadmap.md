@@ -15587,7 +15587,7 @@ Esito implementativo:
 
 ### v0.40 - Calendar, Time, Season
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15606,25 +15606,25 @@ Componenti previsti:
 
 | Componente | Funzione | Stato |
 |---|---|---|
-| Calendar resolver | converte tick ambientali in data/ora | ⏳ Pending |
-| Season resolver | ricava stagione da giorno/mese | ⏳ Pending |
-| Daylight resolver | calcola ore luce e intensita' luce | ⏳ Pending |
-| Config data | giorni per mese, mesi per anno, stagioni | ⏳ Pending |
+| Calendar resolver | converte tick ambientali in data/ora | ✅ Completato |
+| Season resolver | ricava stagione da giorno/mese | ✅ Completato |
+| Daylight resolver | calcola ore luce e intensita' luce | ✅ Completato |
+| Config data | giorni per mese, mesi per anno, stagioni | ✅ Completato come DTO/config foundation |
 
 Valori baseline da configurare:
 
 | Parametro | Valore baseline | Stato |
 |---|---|---|
-| ore per giorno | 24 | ⏳ Pending |
-| durata giorno simulato | 20 minuti reali | ⏳ Pending |
-| durata ora simulata | 50 secondi reali | ⏳ Pending |
-| giorni per mese | 25 | ⏳ Pending |
-| mesi per anno | 12 | ⏳ Pending |
-| giorni per anno | 300 | ⏳ Pending |
-| stagione primavera | 12 ore luce / 12 buio | ⏳ Pending |
-| stagione estate | 16 ore luce / 8 buio | ⏳ Pending |
-| stagione autunno | 12 ore luce / 12 buio | ⏳ Pending |
-| stagione inverno | 8 ore luce / 16 buio | ⏳ Pending |
+| ore per giorno | 24 | ✅ Configurato come baseline |
+| durata giorno simulato | 20 minuti reali | ✅ Configurato come baseline |
+| durata ora simulata | 50 secondi reali | ✅ Derivato dalla baseline |
+| giorni per mese | 25 | ✅ Configurato come baseline |
+| mesi per anno | 12 | ✅ Configurato come baseline |
+| giorni per anno | 300 | ✅ Derivato dalla baseline |
+| stagione primavera | 12 ore luce / 12 buio | ✅ Configurato come baseline |
+| stagione estate | 16 ore luce / 8 buio | ✅ Configurato come baseline |
+| stagione autunno | 12 ore luce / 12 buio | ✅ Configurato come baseline |
+| stagione inverno | 8 ore luce / 16 buio | ✅ Configurato come baseline |
 
 Vincoli:
 
@@ -15636,7 +15636,7 @@ Vincoli:
 
 ### v0.41 - Global Climate & Weather
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15656,11 +15656,11 @@ Regole previste:
 
 | Regola | Descrizione | Stato |
 |---|---|---|
-| Generazione giornaliera | meteo principale scelto a inizio giorno | ⏳ Pending |
-| Variazione oraria | piccole oscillazioni temperatura/umidita' | ⏳ Pending |
-| Persistenza | parte del meteo precedente influenza il successivo | ⏳ Pending |
-| Stagionalita' | primavera/estate/autunno/inverno pesano eventi diversi | ⏳ Pending |
-| Aridita' | caldo e vento aumentano aridita', pioggia/neve la riducono | ⏳ Pending |
+| Generazione giornaliera | meteo principale scelto a inizio giorno | ✅ Foundation pronta |
+| Variazione oraria | piccole oscillazioni temperatura/umidita' | ✅ Foundation pronta |
+| Persistenza | parte del meteo precedente influenza il successivo | ✅ Foundation pronta |
+| Stagionalita' | primavera/estate/autunno/inverno pesano eventi diversi | ✅ Foundation pronta |
+| Aridita' | caldo e vento aumentano aridita', pioggia/neve la riducono | ✅ Foundation pronta |
 
 Fuori scope:
 
@@ -15673,7 +15673,7 @@ Fuori scope:
 
 ### v0.42 - Environment Area Registry
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15692,11 +15692,11 @@ Componenti previsti:
 
 | Componente | Funzione | Stato |
 |---|---|---|
-| Area registry | elenco aree e lookup per id | ⏳ Pending |
-| Area layer index | separa fertility/water/vegetation/room/territory | ⏳ Pending |
-| Cell membership | appartenenza cella -> area per layer | ⏳ Pending |
-| Bounds/mask | bounding box e futura maschera celle | ⏳ Pending |
-| Chunk mask | elenco aree presenti per chunk | ⏳ Pending |
+| Area registry | elenco aree e lookup per id | ✅ Completato |
+| Area layer index | separa fertility/water/vegetation/room/territory | ✅ Completato per layer foundation |
+| Cell membership | appartenenza cella -> area per layer | ✅ Completato come query/bounds |
+| Bounds/mask | bounding box e futura maschera celle | ✅ Bounds completati, maschera fine rinviata |
+| Chunk mask | elenco aree presenti per chunk | ⏳ Pending runtime/ottimizzazione futura |
 
 Vincoli:
 
@@ -15709,7 +15709,7 @@ Vincoli:
 
 ### v0.43 - Fertility Areas
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15727,12 +15727,12 @@ Dati minimi:
 
 | Campo | Significato | Stato |
 |---|---|---|
-| `BaseFertility01` | fertilita' naturale dell'area | ⏳ Pending |
-| `CurrentFertility01` | fertilita' runtime modificabile lentamente | ⏳ Pending |
-| `SoilKind` | tipo terreno/suolo astratto | ⏳ Pending |
-| `GrowthModifier01` | modificatore crescita piante | ⏳ Pending |
-| `Exhaustion01` | esaurimento da uso agricolo futuro | ⏳ Pending |
-| `Recovery01` | ripristino naturale lento | ⏳ Pending |
+| `BaseFertility01` | fertilita' naturale dell'area | ✅ Completato |
+| `CurrentFertility01` | fertilita' runtime modificabile lentamente | ✅ Completato |
+| `SoilKind` | tipo terreno/suolo astratto | ✅ Completato |
+| `GrowthModifier01` | modificatore crescita piante | ✅ Completato |
+| `Exhaustion01` | esaurimento da uso agricolo futuro | ✅ Completato |
+| `Recovery01` | ripristino naturale lento | ✅ Completato |
 
 Fuori scope:
 
@@ -15745,7 +15745,7 @@ Fuori scope:
 
 ### v0.44 - Water Areas / Water Map
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15764,11 +15764,11 @@ Profondita' iniziale:
 
 | Livello | Significato | Stato |
 |---|---|---|
-| 0 | nessuna acqua | ⏳ Pending |
-| 1 | pozzanghera / basso | ⏳ Pending |
-| 2 | guado / medio | ⏳ Pending |
-| 3 | profondo | ⏳ Pending |
-| 4 | molto profondo / pericolo | ⏳ Pending |
+| 0 | nessuna acqua | ✅ Completato |
+| 1 | pozzanghera / basso | ✅ Completato |
+| 2 | guado / medio | ✅ Completato |
+| 3 | profondo | ✅ Completato |
+| 4 | molto profondo / pericolo | ✅ Completato |
 
 Vincoli:
 
@@ -15782,7 +15782,7 @@ Vincoli:
 
 ### v0.45 - Vegetation Areas & SeedBank
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15801,12 +15801,12 @@ Dati minimi:
 
 | Campo | Significato | Stato |
 |---|---|---|
-| `Density01` | densita' vegetazione diffusa | ⏳ Pending |
-| `SpeciesKeys` | specie/categorie possibili | ⏳ Pending |
-| `SeedBank` | pressione semi astratta per specie | ⏳ Pending |
-| `FertilityInfluence01` | influenza fertilita' | ⏳ Pending |
-| `ClimateInfluence01` | influenza clima globale | ⏳ Pending |
-| `GrowthPotential01` | capacita' di crescita corrente | ⏳ Pending |
+| `Density01` | densita' vegetazione diffusa | ✅ Completato |
+| `SpeciesKeys` | specie/categorie possibili | ✅ Completato |
+| `SeedBank` | pressione semi astratta per specie | ✅ Completato |
+| `FertilityInfluence01` | influenza fertilita' | ✅ Completato |
+| `ClimateInfluence01` | influenza clima globale | ✅ Completato |
+| `GrowthPotential01` | capacita' di crescita corrente | ✅ Completato |
 
 Regola chiave:
 
@@ -15819,7 +15819,7 @@ semi agricoli posseduti dagli NPC = risorsa concreta futura
 
 ### v0.46 - Plant Catalog
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15851,7 +15851,7 @@ Fuori scope:
 
 ### v0.47 - PlantInstance Lifecycle
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15870,13 +15870,13 @@ Dati minimi:
 
 | Campo | Significato | Stato |
 |---|---|---|
-| `PlantId` | identita' runtime/persistibile futura | ⏳ Pending |
-| `SpeciesKey` | specie dal catalogo | ⏳ Pending |
-| `Cell` | coordinata x/y/z | ⏳ Pending |
-| `AgeDays` | eta' in giorni ambientali | ⏳ Pending |
-| `GrowthStage` | germoglio/giovane/adulta/secca/morta | ⏳ Pending |
-| `Health01` | salute normalizzata | ⏳ Pending |
-| `Maturity01` | maturita' produttiva | ⏳ Pending |
+| `PlantId` | identita' runtime/persistibile futura | ✅ Completato |
+| `SpeciesKey` | specie dal catalogo | ✅ Completato |
+| `Cell` | coordinata x/y/z | ✅ Completato |
+| `AgeDays` | eta' in giorni ambientali | ✅ Completato |
+| `GrowthStage` | germoglio/giovane/adulta/secca/morta | ✅ Completato |
+| `Health01` | salute normalizzata | ✅ Completato |
+| `Maturity01` | maturita' produttiva | ✅ Completato |
 
 Regola:
 
@@ -15889,7 +15889,7 @@ albero / arbusto raccoglibile / coltura = PlantInstance
 
 ### v0.48 - Natural Growth Loop
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15921,7 +15921,7 @@ Vincoli:
 
 ### v0.49 - Agriculture Foundation
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15933,11 +15933,11 @@ Blocchi previsti:
 
 | Blocco | Funzione | Stato |
 |---|---|---|
-| Crop plant | coltura come PlantInstance controllata | ⏳ Pending |
-| Cultivated area | area coltivabile o campo | ⏳ Pending |
-| Seed resource boundary | semi agricoli come risorsa concreta futura | ⏳ Pending |
-| Harvest output | produzione raccolto come dato, non ancora job | ⏳ Pending |
-| Job hooks futuri | punti di integrazione semina/raccolta | ⏳ Pending |
+| Crop plant | coltura come PlantInstance controllata | ✅ Completato come contratto |
+| Cultivated area | area coltivabile o campo | ✅ Completato come contratto |
+| Seed resource boundary | semi agricoli come risorsa concreta futura | ✅ Completato come boundary |
+| Harvest output | produzione raccolto come dato, non ancora job | ✅ Completato come dato |
+| Job hooks futuri | punti di integrazione semina/raccolta | ✅ Completato come hook passivo |
 
 Fuori scope:
 
@@ -15950,7 +15950,7 @@ Fuori scope:
 
 ### v0.50 - Environment Read-Only Snapshots
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15982,7 +15982,7 @@ Vincoli:
 
 ### v0.51 - Save/Load Environment
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata foundation/data-only
 
 Obiettivo:
 
@@ -15994,15 +15994,15 @@ Dati candidati:
 
 | Dato | Persistenza | Stato |
 |---|---|---|
-| calendario | persistente | ⏳ Pending |
-| clima/meteo corrente | persistente o ricostruibile dichiarato | ⏳ Pending |
-| area registry | persistente | ⏳ Pending |
-| fertility areas | persistente | ⏳ Pending |
-| water areas | persistente | ⏳ Pending |
-| vegetation areas | persistente | ⏳ Pending |
-| seedBank | persistente | ⏳ Pending |
-| PlantInstance | persistente | ⏳ Pending |
-| snapshot visuali | non persistenti | ⏳ Pending |
+| calendario | persistente | ✅ Completato come DTO |
+| clima/meteo corrente | persistente o ricostruibile dichiarato | ✅ Completato come DTO |
+| area registry | persistente | ✅ Completato come DTO |
+| fertility areas | persistente | ✅ Completato come DTO |
+| water areas | persistente | ✅ Completato come DTO |
+| vegetation areas | persistente | ✅ Completato come DTO |
+| seedBank | persistente | ✅ Completato come DTO |
+| PlantInstance | persistente | ✅ Completato come DTO |
+| snapshot visuali | non persistenti | ✅ Dichiarato ricostruibile/non persistente |
 
 Vincoli:
 
@@ -16014,7 +16014,7 @@ Vincoli:
 
 ### v0.52 - ArcGraph Environment Adapter
 
-**Stato:** ⏳ Pending
+**Stato:** ✅ Completata adapter passivo
 
 Obiettivo:
 
@@ -16026,11 +16026,11 @@ Conversioni future:
 
 | Core Environment | ArcGraph visuale | Stato |
 |---|---|---|
-| water snapshot | `ArcGraphWaterVisualSnapshot` | ⏳ Pending |
-| vegetation snapshot | `ArcGraphVegetationVisualSnapshot` | ⏳ Pending |
-| weather snapshot | `ArcGraphWeatherVisualSnapshot` | ⏳ Pending |
-| light/day-night snapshot | `ArcGraphLightVisualSnapshot` | ⏳ Pending |
-| effects ambientali futuri | `ArcGraphEffectVisualSnapshot` | ⏳ Pending |
+| water snapshot | `ArcGraphWaterVisualSnapshot` | ✅ Completato |
+| vegetation snapshot | `ArcGraphVegetationVisualSnapshot` | ✅ Completato |
+| weather snapshot | `ArcGraphWeatherVisualSnapshot` | ✅ Completato |
+| light/day-night snapshot | `ArcGraphLightVisualSnapshot` | ✅ Completato |
+| effects ambientali futuri | `ArcGraphEffectVisualSnapshot` | ✅ Completato come proiezione passiva |
 
 Vincoli:
 
@@ -16039,6 +16039,14 @@ Vincoli:
 - nessuna simulazione dentro ArcGraph;
 - nessuna dipendenza inversa Core -> View;
 - nessuna attivazione automatica senza gate dedicato.
+
+Closeout documentale:
+
+- pagine diario Notion create per `v0.39`-`v0.52`;
+- adapter mantenuto fuori dal Core Environment;
+- ArcGraph resta consumer di snapshot/proiezioni;
+- integrazione runtime con tick ufficiale ancora da pianificare tramite boundary neutro;
+- nessuna attivazione automatica della biosfera nel runtime produttivo.
 
 ---
 

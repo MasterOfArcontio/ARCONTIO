@@ -31,7 +31,7 @@ CHECKPOINT CORRENTE:
 `v0.38j - ArcGraph terrain/object physical metadata: acqua, pavimenti, muri`
 
 STATUS:
-TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; MINI-TILE 16x16 RINVIATO COME DEBITO NON BLOCCANTE; PROSSIMO BLOCCO: v0.38k RUNTIME SWITCH STABILIZATION
+TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; MINI-TILE 16x16 RINVIATO COME DEBITO NON BLOCCANTE; BIOSFERA v0.39-v0.52 DOCUMENTATA COME FOUNDATION; PROSSIMO BLOCCO: v0.38k RUNTIME SWITCH STABILIZATION
 
 RAMO BASE CORRENTE:
 `ai-task/v0.38j-18-wall-visual-gate-closeout`
@@ -98,15 +98,36 @@ v0.38p    -> ArcGraph Minimum Stable Closure: vista minima stabile e documentata
 MICRO-ROADMAP OPERATIVA v0.38j:
 
 ```text
-v0.38j.01 -> COMPLETATO - Traversabilita' terrain: acqua non camminabile, tile_floor registrato e separazione blocco terrain/blocco muro
-v0.38j.02 -> COMPLETATO - Metadati muri: sprite 32x83, footprint 1x1, blocco movimento e visione
-v0.38j.03 -> COMPLETATO - Resolver muri cardinali: variante muro da vicini N/E/S/W
-v0.38j.04 -> COMPLETATO DATA-ONLY - Rendering muri/oggetti alti: pivot, altezza sprite e base cella
-v0.38j.05 -> COMPLETATO DATA-ONLY - Contratto mini-tile 16x16: BaseMiniTileMask per base muri sottili
-v0.38j.06 -> COMPLETATO DATA-ONLY - Resolver spritesheet muri: striscia 17 slot 32x83 e sub-sprite sliced
-v0.38j.07 -> RINVIATO NON BLOCCANTE - Renderer/overlay mini-tile pavimento 16x16 sotto muri sottili
-v0.38j.08 -> COMPLETATO - Gate visuale muri/F3: inserimento, preview, connessioni, sorting e allineamento sprite
-v0.38k -> PROSSIMO - Runtime Switch Stabilization: F12, root visuali, auto-installer e diagnostica
+✅ v0.38j.01 -> COMPLETATO - Traversabilita' terrain: acqua non camminabile, tile_floor registrato e separazione blocco terrain/blocco muro
+✅ v0.38j.02 -> COMPLETATO - Metadati muri: sprite 32x83, footprint 1x1, blocco movimento e visione
+✅ v0.38j.03 -> COMPLETATO - Resolver muri cardinali: variante muro da vicini N/E/S/W
+✅ v0.38j.04 -> COMPLETATO DATA-ONLY - Rendering muri/oggetti alti: pivot, altezza sprite e base cella
+✅ v0.38j.05 -> COMPLETATO DATA-ONLY - Contratto mini-tile 16x16: BaseMiniTileMask per base muri sottili
+✅ v0.38j.06 -> COMPLETATO DATA-ONLY - Resolver spritesheet muri: striscia 17 slot 32x83 e sub-sprite sliced
+⚠️ v0.38j.07 -> RINVIATO NON BLOCCANTE - Renderer/overlay mini-tile pavimento 16x16 sotto muri sottili
+✅ v0.38j.08 -> COMPLETATO - Gate visuale muri/F3: inserimento, preview, connessioni, sorting e allineamento sprite
+⏳ v0.38k -> PROSSIMO - Runtime Switch Stabilization: F12, root visuali, auto-installer e diagnostica
+```
+
+ROADMAP BIOSFERA v0.39-v0.52 - STATO DOCUMENTALE / FOUNDATION:
+
+```text
+✅ v0.39 -> Environment Foundation Data-Only: completata come Core data foundation
+✅ v0.40 -> Calendar, Time, Season: completata come foundation configurabile
+✅ v0.41 -> Global Climate & Weather: completata come modello clima/meteo leggero
+✅ v0.42 -> Environment Area Registry: completata come registry passivo layer-based
+✅ v0.43 -> Fertility Areas: completata come proprieta' d'area
+✅ v0.44 -> Water Areas / Water Map: completata come acqua stabile a profondita' discreta
+✅ v0.45 -> Vegetation Areas & SeedBank: completata come vegetazione diffusa + seed bank
+✅ v0.46 -> Plant Catalog: completata come catalogo data-driven foundation
+✅ v0.47 -> PlantInstance Lifecycle: completata come entita' ambientale persistibile futura
+✅ v0.48 -> Natural Growth Loop: completata come loop giornaliero esplicito, non auto-attivato
+✅ v0.49 -> Agriculture Foundation: completata come contratti coltivazione/raccolto
+✅ v0.50 -> Environment Read-Only Snapshots: completata come modello consumer-safe
+✅ v0.51 -> Save/Load Environment: completata come DTO capture/restore, senza file IO
+✅ v0.52 -> ArcGraph Environment Adapter: completata come adapter passivo read-only
+⏳ Runtime integration -> pending: aggancio futuro al tick ufficiale tramite boundary neutro
+⏳ Config files produttivi -> pending: spostamento valori baseline in file config reali
 ```
 
 Regola corrente:
@@ -114,6 +135,7 @@ Regola corrente:
 - gate visuale muri ArcGraph superato: l'inserimento F3 di `wall_stone` e' visibile in ArcGraph, la preview cella/oggetto segue la cella reale del DevTools, le connessioni cardinali vengono risolte e gli sprite muro sono stati riallineati manualmente dall'operatore;
 - il debito mini-tile 16x16 resta noto ma non blocca il passaggio a `v0.38k`, perche' riguarda la composizione futura dei pavimenti sotto muri sottili quando interno/esterno useranno floor diversi;
 - prima del pensionamento MapGrid, il mini-tile dovra' essere recuperato o esplicitamente trasformato in requisito del blocco object/floor avanzato;
+- il blocco biosfera `v0.39-v0.52` e' stato documentato in roadmap e diario Notion come foundation dati/snapshot/query/adapter; non e' ancora agganciato al tick runtime e non attiva simulazione produttiva automatica;
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;
