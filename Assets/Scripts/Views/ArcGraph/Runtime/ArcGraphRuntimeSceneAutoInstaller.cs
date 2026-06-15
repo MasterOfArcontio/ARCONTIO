@@ -295,6 +295,7 @@ namespace Arcontio.View.ArcGraph
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
+            _placementHighlightConsumer.SetSceneCamera(Camera.main);
         }
 
         // =============================================================================
