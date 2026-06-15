@@ -346,8 +346,9 @@ namespace Arcontio.View.ArcGraph
 
             var go = new GameObject(CreateSceneObjectName(entry));
             go.transform.SetParent(_root, false);
-            go.transform.position = ResolveWorldPosition(entry);
-            go.transform.localScale = Vector3.one * ResolveScale(entry);
+            float scale = ResolveScale(entry);
+            go.transform.position = ResolveWorldPosition(entry, sprite, scale);
+            go.transform.localScale = Vector3.one * scale;
 
             var renderer = go.AddComponent<SpriteRenderer>();
             renderer.sprite = sprite;
@@ -463,12 +464,58 @@ namespace Arcontio.View.ArcGraph
         }
 
         private Vector3 ResolveWorldPosition(
-            ArcGraphActorObjectSceneRenderEntry entry)
+            ArcGraphActorObjectSceneRenderEntry entry,
+            Sprite sprite,
+            float scale)
         {
-            return originOffset + new Vector3(
+            Vector3 position = originOffset + new Vector3(
                 entry.WorldX,
                 entry.WorldY,
                 entry.WorldZ + probeZOffset);
+            position += ResolveSpritePivotCompensation(entry, sprite, scale);
+            return position;
+        }
+
+        private static Vector3 ResolveSpritePivotCompensation(
+            ArcGraphActorObjectSceneRenderEntry entry,
+            Sprite sprite,
+            float scale)
+        {
+            if (sprite == null || entry.Kind != ArcGraphRenderItemKind.Object)
+                return Vector3.zero;
+
+            float safeScale = scale > 0f ? scale : 1f;
+            Bounds bounds = sprite.bounds;
+            float x = 0f;
+            float y = 0f;
+
+            if (IsPivot(entry.VisualPivot, "bottom_left"))
+                x = -bounds.min.x * safeScale;
+            else if (IsPivot(entry.VisualPivot, "bottom_right"))
+                x = -bounds.max.x * safeScale;
+
+            if (IsBottomPivot(entry.VisualPivot))
+                y = -bounds.min.y * safeScale;
+
+            return new Vector3(x, y, 0f);
+        }
+
+        private static bool IsBottomPivot(
+            string pivot)
+        {
+            return IsPivot(pivot, "bottom_center")
+                   || IsPivot(pivot, "bottom_left")
+                   || IsPivot(pivot, "bottom_right");
+        }
+
+        private static bool IsPivot(
+            string pivot,
+            string expected)
+        {
+            return string.Equals(
+                pivot ?? string.Empty,
+                expected ?? string.Empty,
+                System.StringComparison.OrdinalIgnoreCase);
         }
 
         private float ResolveScale(

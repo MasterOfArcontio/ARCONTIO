@@ -26,7 +26,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>ObjectBeforeActor</b>: verifica ordine su stessa cella.</item>
     ///   <item><b>ActorUsesInterpolatedPose</b>: verifica posizione actor frazionaria.</item>
     ///   <item><b>ObjectCarriesVisualMetadata</b>: verifica propagazione dati visuali oggetto.</item>
-    ///   <item><b>TallObjectUsesBottomPivot</b>: verifica ancoraggio basso di oggetti alti.</item>
+    ///   <item><b>TallObjectUsesBottomPivot</b>: verifica ancoraggio basso centrato sulla cella di oggetti alti.</item>
     ///   <item><b>ObjectCarriesMiniTileMask</b>: verifica propagazione della maschera base 2x2.</item>
     /// </list>
     /// </summary>
@@ -260,7 +260,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphActorObjectSceneRenderEntry entry = plan.Entries[0];
             return entry.Kind == ArcGraphRenderItemKind.Object
                    && Approximately(entry.WorldX, 1.5f)
-                   && Approximately(entry.WorldY, 1.0f);
+                   && Approximately(entry.WorldY, 1.5f);
         }
 
         private static bool Approximately(float left, float right)

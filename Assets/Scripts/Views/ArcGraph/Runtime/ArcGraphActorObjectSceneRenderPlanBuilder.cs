@@ -253,26 +253,17 @@ namespace Arcontio.View.ArcGraph
             ArcGraphObjectRenderItem item,
             float tileSize)
         {
-            // Gli oggetti normali restano centrati nella footprint. Gli oggetti con
-            // pivot basso, come i muri 32x83, vengono invece ancorati al bordo basso
-            // della cella base: lo sprite cresce verso l'alto senza slittare di mezza
-            // cella.
+            // Gli oggetti normali e gli oggetti con pivot basso condividono lo
+            // stesso centro della footprint logica. Per i muri 32x83 questo centro
+            // e' il punto di appoggio scelto dal tool F3: la correzione del pivot
+            // reale dello sprite viene applicata solo nel renderer scene-side,
+            // perche' dipende dal pivot importato da Unity nella sub-sprite.
             float anchor = (item.Cell.Y + (item.FootprintHeight * 0.5f)) * tileSize;
-            if (IsBottomPivot(item.VisualPivot))
-                anchor = item.Cell.Y * tileSize;
 
             return anchor + ConvertPixelOffsetToWorld(
                 item.VisualOffsetY,
                 item.VisualBaseHeightPixels,
                 tileSize);
-        }
-
-        private static bool IsBottomPivot(
-            string pivot)
-        {
-            return IsPivot(pivot, "bottom_center")
-                   || IsPivot(pivot, "bottom_left")
-                   || IsPivot(pivot, "bottom_right");
         }
 
         private static bool IsPivot(

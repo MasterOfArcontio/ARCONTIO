@@ -360,16 +360,67 @@ namespace Arcontio.View.ArcGraph
         {
             // Posizione e sorting arrivano dal plan builder: il renderer aggiunge
             // solo offset e scala locali, senza rileggere celle, World o MapGrid.
-            handle.GameObject.transform.localPosition = contract.OriginOffset + new Vector3(
+            // Per gli oggetti con pivot basso compensiamo anche il pivot reale
+            // importato da Unity: se una sub-sprite 32x83 resta con pivot Center,
+            // il bordo basso verrebbe disegnato molto sotto la cella logica.
+            Vector3 localPosition = contract.OriginOffset + new Vector3(
                 entry.WorldX,
                 entry.WorldY,
                 entry.WorldZ + contract.ZOffset);
+            localPosition += ResolveSpritePivotCompensation(
+                entry,
+                sprite,
+                contract.ObjectScale);
+
+            handle.GameObject.transform.localPosition = localPosition;
             handle.GameObject.transform.localScale = Vector3.one * contract.ObjectScale;
             handle.Renderer.sprite = sprite;
             handle.Renderer.sortingOrder = entry.SortingOrder;
             handle.Renderer.enabled = true;
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
+        }
+
+        private static Vector3 ResolveSpritePivotCompensation(
+            ArcGraphActorObjectSceneRenderEntry entry,
+            Sprite sprite,
+            float objectScale)
+        {
+            if (sprite == null || entry.Kind != ArcGraphRenderItemKind.Object)
+                return Vector3.zero;
+
+            float safeScale = objectScale > 0f ? objectScale : 1f;
+            Bounds bounds = sprite.bounds;
+            float x = 0f;
+            float y = 0f;
+
+            if (IsPivot(entry.VisualPivot, "bottom_left"))
+                x = -bounds.min.x * safeScale;
+            else if (IsPivot(entry.VisualPivot, "bottom_right"))
+                x = -bounds.max.x * safeScale;
+
+            if (IsBottomPivot(entry.VisualPivot))
+                y = -bounds.min.y * safeScale;
+
+            return new Vector3(x, y, 0f);
+        }
+
+        private static bool IsBottomPivot(
+            string pivot)
+        {
+            return IsPivot(pivot, "bottom_center")
+                   || IsPivot(pivot, "bottom_left")
+                   || IsPivot(pivot, "bottom_right");
+        }
+
+        private static bool IsPivot(
+            string pivot,
+            string expected)
+        {
+            return string.Equals(
+                pivot ?? string.Empty,
+                expected ?? string.Empty,
+                System.StringComparison.OrdinalIgnoreCase);
         }
 
         private void EnsureRoot(ArcGraphObjectRuntimeSceneRendererContract contract)
