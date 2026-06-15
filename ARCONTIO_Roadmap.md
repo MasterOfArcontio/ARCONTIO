@@ -15289,6 +15289,40 @@ diagnostica non visuale aggiuntiva: root assegnati e root effettivamente attivi
 per MapGrid/ArcGraph dopo il cambio modalita'.
 ```
 
+Esito operativo `v0.38k.01 - Late binding robusto F12`:
+
+```text
+COMPLETATO COME STABILIZZAZIONE TECNICA NON VISUALE
+```
+
+Risultato:
+
+- l'auto-installer ArcGraph non usa piu' `GameObject.Find(...)` per i root
+  visuali MapGrid da spegnere/riaccendere;
+- la ricerca dei root e dei componenti MapGrid avviene dentro la scena attiva
+  includendo anche GameObject inattivi;
+- lo switcher riapplica lo stato corrente quando riceve un nuovo cablaggio
+  durante il late binding;
+- la riapplicazione non processa un frame ArcGraph extra e non ricostruisce
+  mesh/queue inutilmente;
+- la Console riceve una diagnostica `BindingState` solo quando cambiano root o
+  componenti sorgente rilevanti.
+
+Motivazione:
+
+```text
+F12 deve essere reversibile anche dopo avere spento root MapGrid. Se il
+late-binding perde i riferimenti agli oggetti inattivi, ArcGraph puo' accendersi
+ma il ritorno a MapGrid diventa fragile.
+```
+
+Prossimo gate:
+
+```text
+v0.38k.02 - Test manuale F12:
+MapGrid -> ArcGraph -> MapGrid, verificando terrain, NPC, muri e preview F3.
+```
+
 ---
 
 ### v0.38l - ArcGraph Interaction Minimum Gate

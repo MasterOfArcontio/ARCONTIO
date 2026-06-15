@@ -64,6 +64,11 @@ namespace Arcontio.View.ArcGraph
         private GameObject _visualRoot;
         private Material _terrainMaterial;
         private int _lateBindFramesLeft;
+        private int _configuredMapGridRootCount;
+        private int _lastMapGridRootCount = -1;
+        private bool _lastHadBootstrap;
+        private bool _lastHadWorldView;
+        private bool _lastHadDevToolsOverlay;
         private bool _installed;
 
         // =============================================================================
@@ -310,6 +315,7 @@ namespace Arcontio.View.ArcGraph
         {
             GameObject[] mapGridVisualRoots = FindMapGridVisualRoots();
             GameObject[] arcGraphVisualRoots = { _visualRoot };
+            _configuredMapGridRootCount = mapGridVisualRoots.Length;
 
             _switcher.ConfigureRuntimeWiring(
                 mapGridVisualRoots,
@@ -330,9 +336,9 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private void RefreshMapGridSources()
         {
-            MapGridBootstrap bootstrap = FindObjectOfType<MapGridBootstrap>();
-            MapGridWorldView worldView = FindObjectOfType<MapGridWorldView>();
-            MapGridRuntimeDevToolsOverlay devToolsOverlay = FindObjectOfType<MapGridRuntimeDevToolsOverlay>();
+            MapGridBootstrap bootstrap = FindSceneComponent<MapGridBootstrap>();
+            MapGridWorldView worldView = FindSceneComponent<MapGridWorldView>();
+            MapGridRuntimeDevToolsOverlay devToolsOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
 
             if (_adapter != null)
                 _adapter.SetMapGridSources(bootstrap, worldView);
@@ -345,6 +351,8 @@ namespace Arcontio.View.ArcGraph
             // frame rende il gate F12 meno dipendente dall'ordine di Start.
             if (_switcher != null && _visualRoot != null)
                 ConfigureSwitcher();
+
+            LogBindingStateIfChanged(bootstrap, worldView, devToolsOverlay);
         }
 
         // =============================================================================
@@ -380,12 +388,146 @@ namespace Arcontio.View.ArcGraph
             var roots = new List<GameObject>();
             for (int i = 0; i < names.Length; i++)
             {
-                GameObject root = GameObject.Find(names[i]);
+                GameObject root = FindSceneGameObjectByName(names[i]);
                 if (root != null)
                     roots.Add(root);
             }
 
             return roots.ToArray();
+        }
+
+        // =============================================================================
+        // FindSceneComponent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca un componente nella scena attiva includendo anche GameObject
+        /// temporaneamente disattivati.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: switch F12 reversibile</b></para>
+        /// <para>
+        /// Durante la modalita' ArcGraph alcuni root MapGrid vengono spenti. Le API
+        /// globali piu' semplici di Unity possono ignorare oggetti inattivi; se il
+        /// late binding usasse solo quelle, lo switcher potrebbe perdere i
+        /// riferimenti necessari per tornare a MapGrid. La scansione resta confinata
+        /// alla scena attiva e viene usata solo nel breve budget di bootstrap.
+        /// </para>
+        /// </summary>
+        private static T FindSceneComponent<T>()
+            where T : Component
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid())
+                return null;
+
+            GameObject[] rootObjects = scene.GetRootGameObjects();
+            for (int i = 0; i < rootObjects.Length; i++)
+            {
+                T component = rootObjects[i].GetComponentInChildren<T>(includeInactive: true);
+                if (component != null)
+                    return component;
+            }
+
+            return null;
+        }
+
+        // =============================================================================
+        // FindSceneGameObjectByName
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca un GameObject per nome nella scena attiva, includendo i figli
+        /// inattivi.
+        /// </para>
+        /// </summary>
+        private static GameObject FindSceneGameObjectByName(string objectName)
+        {
+            if (string.IsNullOrWhiteSpace(objectName))
+                return null;
+
+            Scene scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid())
+                return null;
+
+            GameObject[] rootObjects = scene.GetRootGameObjects();
+            for (int i = 0; i < rootObjects.Length; i++)
+            {
+                GameObject found = FindGameObjectByNameRecursive(rootObjects[i].transform, objectName);
+                if (found != null)
+                    return found;
+            }
+
+            return null;
+        }
+
+        // =============================================================================
+        // FindGameObjectByNameRecursive
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Attraversa ricorsivamente un sottoalbero Unity per trovare un nome
+        /// specifico, senza dipendere dallo stato active del GameObject.
+        /// </para>
+        /// </summary>
+        private static GameObject FindGameObjectByNameRecursive(
+            Transform root,
+            string objectName)
+        {
+            if (root == null)
+                return null;
+
+            if (root.name == objectName)
+                return root.gameObject;
+
+            for (int i = 0; i < root.childCount; i++)
+            {
+                GameObject found = FindGameObjectByNameRecursive(root.GetChild(i), objectName);
+                if (found != null)
+                    return found;
+            }
+
+            return null;
+        }
+
+        // =============================================================================
+        // LogBindingStateIfChanged
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scrive diagnostica di binding solo quando cambia qualcosa di rilevante.
+        /// </para>
+        /// </summary>
+        private void LogBindingStateIfChanged(
+            MapGridBootstrap bootstrap,
+            MapGridWorldView worldView,
+            MapGridRuntimeDevToolsOverlay devToolsOverlay)
+        {
+            bool hasBootstrap = bootstrap != null;
+            bool hasWorldView = worldView != null;
+            bool hasDevToolsOverlay = devToolsOverlay != null;
+            int rootCount = _configuredMapGridRootCount;
+
+            if (_lastMapGridRootCount == rootCount
+                && _lastHadBootstrap == hasBootstrap
+                && _lastHadWorldView == hasWorldView
+                && _lastHadDevToolsOverlay == hasDevToolsOverlay)
+            {
+                return;
+            }
+
+            _lastMapGridRootCount = rootCount;
+            _lastHadBootstrap = hasBootstrap;
+            _lastHadWorldView = hasWorldView;
+            _lastHadDevToolsOverlay = hasDevToolsOverlay;
+
+            Debug.Log(
+                "[ArcGraphRuntimeSceneAutoInstaller] BindingState " +
+                "mapGridRoots=" + rootCount +
+                ", bootstrap=" + hasBootstrap +
+                ", worldView=" + hasWorldView +
+                ", devToolsOverlay=" + hasDevToolsOverlay +
+                ", visualRoot=" + (_visualRoot != null));
         }
 
         // =============================================================================

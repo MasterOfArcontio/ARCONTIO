@@ -143,6 +143,7 @@ namespace Arcontio.View.ArcGraph
 
         private ArcGraphViewMode _currentMode;
         private ArcGraphViewModeSwitcherDiagnostics _lastDiagnostics;
+        private bool _hasAppliedMode;
 
         public ArcGraphViewMode CurrentMode => _currentMode;
         public ArcGraphViewModeSwitcherDiagnostics LastDiagnostics => _lastDiagnostics;
@@ -178,6 +179,9 @@ namespace Arcontio.View.ArcGraph
             terrainRenderer = terrain;
             npcRenderer = npc;
             objectRenderer = objects;
+
+            if (_hasAppliedMode)
+                ReapplyCurrentModeWithoutFrame();
         }
 
         // =============================================================================
@@ -355,6 +359,7 @@ namespace Arcontio.View.ArcGraph
             }
 
             _currentMode = mode;
+            _hasAppliedMode = true;
             bool arcGraphMode = mode == ArcGraphViewMode.ArcGraph;
 
             SetRootsActive(mapGridVisualRoots, !arcGraphMode);
@@ -370,6 +375,33 @@ namespace Arcontio.View.ArcGraph
                 didToggle,
                 processedFrame,
                 arcGraphMode ? "ArcGraphViewActive" : "MapGridViewActive");
+        }
+
+        // =============================================================================
+        // ReapplyCurrentModeWithoutFrame
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riapplica la visibilita' della modalita' corrente senza processare un
+        /// nuovo frame ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: late binding senza lavoro grafico extra</b></para>
+        /// <para>
+        /// L'auto-installer puo' scoprire root MapGrid o ArcGraph alcuni frame dopo
+        /// lo Start. Quando succede, i nuovi riferimenti devono assumere subito lo
+        /// stato visuale corretto, ma non serve ricostruire mesh, queue o renderer.
+        /// Questo metodo sincronizza solo root e gate runtime, evitando frame
+        /// ridondanti e log rumorosi durante il binding ritardato.
+        /// </para>
+        /// </summary>
+        private void ReapplyCurrentModeWithoutFrame()
+        {
+            bool arcGraphMode = _currentMode == ArcGraphViewMode.ArcGraph;
+
+            SetRootsActive(mapGridVisualRoots, !arcGraphMode);
+            SetRootsActive(arcGraphVisualRoots, arcGraphMode);
+            ConfigureArcGraphRuntime(arcGraphMode);
         }
 
         private void ConfigureArcGraphRuntime(bool arcGraphMode)

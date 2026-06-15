@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38j - ArcGraph terrain/object physical metadata: acqua, pavimenti, muri`
+`v0.38k - ArcGraph Runtime Switch Stabilization`
 
 STATUS:
-TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; MINI-TILE 16x16 RINVIATO COME DEBITO NON BLOCCANTE; BIOSFERA v0.39-v0.52 DOCUMENTATA COME FOUNDATION; PROSSIMO BLOCCO: v0.38k RUNTIME SWITCH STABILIZATION
+TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; MINI-TILE 16x16 RINVIATO COME DEBITO NON BLOCCANTE; BIOSFERA v0.39-v0.52 DOCUMENTATA COME FOUNDATION; BLOCCO ATTIVO: v0.38k RUNTIME SWITCH STABILIZATION
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38j-18-wall-visual-gate-closeout`
+`ai-task/v0.38k-runtime-switch-stabilization`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -106,7 +106,9 @@ MICRO-ROADMAP OPERATIVA v0.38j:
 ✅ v0.38j.06 -> COMPLETATO DATA-ONLY - Resolver spritesheet muri: striscia 17 slot 32x83 e sub-sprite sliced
 ⚠️ v0.38j.07 -> RINVIATO NON BLOCCANTE - Renderer/overlay mini-tile pavimento 16x16 sotto muri sottili
 ✅ v0.38j.08 -> COMPLETATO - Gate visuale muri/F3: inserimento, preview, connessioni, sorting e allineamento sprite
-⏳ v0.38k -> PROSSIMO - Runtime Switch Stabilization: F12, root visuali, auto-installer e diagnostica
+⏳ v0.38k -> IN CORSO - Runtime Switch Stabilization: F12, root visuali, auto-installer e diagnostica
+✅ v0.38k.01 -> COMPLETATO - Late binding robusto: root MapGrid trovati anche se inattivi e stato F12 riapplicato senza frame extra
+⏳ v0.38k.02 -> PROSSIMO - Gate manuale F12: MapGrid -> ArcGraph -> MapGrid, terrain/NPC/muri/preview
 ```
 
 ROADMAP BIOSFERA v0.39-v0.52 - STATO DOCUMENTALE / FOUNDATION:
