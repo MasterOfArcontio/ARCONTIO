@@ -23,6 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Passed</b>: esito complessivo.</item>
     ///   <item><b>Reason</b>: descrizione sintetica.</item>
     ///   <item><b>PlannedEntryCount</b>: entry scene-side prodotte.</item>
+    ///   <item><b>BackObjectBeforeFrontObject</b>: verifica ordine retro/fronte su celle diverse.</item>
     ///   <item><b>ObjectBeforeActor</b>: verifica ordine su stessa cella.</item>
     ///   <item><b>ActorUsesInterpolatedPose</b>: verifica posizione actor frazionaria.</item>
     ///   <item><b>ObjectCarriesVisualMetadata</b>: verifica propagazione dati visuali oggetto.</item>
@@ -37,6 +38,7 @@ namespace Arcontio.View.ArcGraph
         public readonly int PlannedEntryCount;
         public readonly int ActorEntryCount;
         public readonly int ObjectEntryCount;
+        public readonly bool BackObjectBeforeFrontObject;
         public readonly bool ObjectBeforeActor;
         public readonly bool ActorUsesInterpolatedPose;
         public readonly bool ObjectCarriesVisualMetadata;
@@ -50,6 +52,7 @@ namespace Arcontio.View.ArcGraph
             int plannedEntryCount,
             int actorEntryCount,
             int objectEntryCount,
+            bool backObjectBeforeFrontObject,
             bool objectBeforeActor,
             bool actorUsesInterpolatedPose,
             bool objectCarriesVisualMetadata,
@@ -62,6 +65,7 @@ namespace Arcontio.View.ArcGraph
             PlannedEntryCount = plannedEntryCount;
             ActorEntryCount = actorEntryCount;
             ObjectEntryCount = objectEntryCount;
+            BackObjectBeforeFrontObject = backObjectBeforeFrontObject;
             ObjectBeforeActor = objectBeforeActor;
             ActorUsesInterpolatedPose = actorUsesInterpolatedPose;
             ObjectCarriesVisualMetadata = objectCarriesVisualMetadata;
@@ -108,9 +112,9 @@ namespace Arcontio.View.ArcGraph
         /// <para>
         /// L'actor si muove da (1,1) a (2,1) con progresso 50%. La sua posizione
         /// visuale attesa e' quindi centrata a x = 2.0, y = 1.5 in world units
-        /// quando tile size = 1. L'oggetto e l'actor passano dalla render queue,
-        /// quindi lo sorting order deve seguire l'ordine globale gia' prodotto da
-        /// ArcGraph.
+        /// quando tile size = 1. Un oggetto alto sta sulla stessa cella dell'actor,
+        /// mentre un secondo oggetto sta piu' arretrato. Il piano scena deve quindi
+        /// mantenere sorting order crescente dal retro verso il fronte.
         /// </para>
         /// </summary>
         public static ArcGraphActorObjectSceneRendererContractHarnessResult RunDefaultSmoke()
@@ -143,22 +147,30 @@ namespace Arcontio.View.ArcGraph
                 plan,
                 hasSpriteResolver: true);
 
-            bool objectBeforeActor = plan.Entries.Count == 2
-                                     && plan.Entries[0].Kind == ArcGraphRenderItemKind.Object
-                                     && plan.Entries[1].Kind == ArcGraphRenderItemKind.Actor
-                                     && plan.Entries[0].SortingOrder < plan.Entries[1].SortingOrder;
+            bool backObjectBeforeFrontObject = plan.Entries.Count == 3
+                                               && plan.Entries[0].Kind == ArcGraphRenderItemKind.Object
+                                               && plan.Entries[0].EntityId == 20
+                                               && plan.Entries[1].Kind == ArcGraphRenderItemKind.Object
+                                               && plan.Entries[1].EntityId == 10
+                                               && plan.Entries[0].SortingOrder < plan.Entries[1].SortingOrder;
 
-            bool actorInterpolated = plan.Entries.Count == 2
-                                     && plan.Entries[1].Kind == ArcGraphRenderItemKind.Actor
-                                     && Approximately(plan.Entries[1].WorldX, 2.0f)
-                                     && Approximately(plan.Entries[1].WorldY, 1.5f)
-                                     && plan.Entries[1].HasMotion
-                                     && Approximately(plan.Entries[1].MotionProgress01, 0.5f);
+            bool objectBeforeActor = plan.Entries.Count == 3
+                                     && plan.Entries[1].Kind == ArcGraphRenderItemKind.Object
+                                     && plan.Entries[2].Kind == ArcGraphRenderItemKind.Actor
+                                     && plan.Entries[1].SortingOrder < plan.Entries[2].SortingOrder;
+
+            bool actorInterpolated = plan.Entries.Count == 3
+                                     && plan.Entries[2].Kind == ArcGraphRenderItemKind.Actor
+                                     && Approximately(plan.Entries[2].WorldX, 2.0f)
+                                     && Approximately(plan.Entries[2].WorldY, 1.5f)
+                                     && plan.Entries[2].HasMotion
+                                     && Approximately(plan.Entries[2].MotionProgress01, 0.5f);
 
             bool passed = diagnostics.ContractSafe
-                          && diagnostics.PlannedEntryCount == 2
+                          && diagnostics.PlannedEntryCount == 3
                           && diagnostics.ActorEntryCount == 1
-                          && diagnostics.ObjectEntryCount == 1
+                          && diagnostics.ObjectEntryCount == 2
+                          && backObjectBeforeFrontObject
                           && objectBeforeActor
                           && actorInterpolated
                           && ObjectCarriesVisualMetadata(plan)
@@ -171,6 +183,7 @@ namespace Arcontio.View.ArcGraph
                 diagnostics.PlannedEntryCount,
                 diagnostics.ActorEntryCount,
                 diagnostics.ObjectEntryCount,
+                backObjectBeforeFrontObject,
                 objectBeforeActor,
                 actorInterpolated,
                 ObjectCarriesVisualMetadata(plan),
@@ -197,6 +210,15 @@ namespace Arcontio.View.ArcGraph
 
         private static IEnumerable<ArcGraphObjectVisualSnapshot> CreateObjects()
         {
+            yield return new ArcGraphObjectVisualSnapshot(
+                20,
+                "back_wall",
+                new ArcGraphCellCoord(1, 3, 0),
+                "MapGrid/Sprites/Objects/back_wall",
+                isHeld: false,
+                holderActorId: 0,
+                foodStockUnits: -1);
+
             yield return new ArcGraphObjectVisualSnapshot(
                 10,
                 "tall_crate",
@@ -227,7 +249,9 @@ namespace Arcontio.View.ArcGraph
             if (plan == null || plan.Entries.Count <= 0)
                 return false;
 
-            ArcGraphActorObjectSceneRenderEntry entry = plan.Entries[0];
+            if (!TryFindEntry(plan, 10, out ArcGraphActorObjectSceneRenderEntry entry))
+                return false;
+
             return entry.Kind == ArcGraphRenderItemKind.Object
                    && entry.HasObjectVisualMetadata
                    && entry.IsTallObjectVisual
@@ -246,7 +270,9 @@ namespace Arcontio.View.ArcGraph
             if (plan == null || plan.Entries.Count <= 0)
                 return false;
 
-            ArcGraphActorObjectSceneRenderEntry entry = plan.Entries[0];
+            if (!TryFindEntry(plan, 10, out ArcGraphActorObjectSceneRenderEntry entry))
+                return false;
+
             return entry.Kind == ArcGraphRenderItemKind.Object
                    && entry.VisualBaseMiniTileMask == "0110";
         }
@@ -257,10 +283,34 @@ namespace Arcontio.View.ArcGraph
             if (plan == null || plan.Entries.Count <= 0)
                 return false;
 
-            ArcGraphActorObjectSceneRenderEntry entry = plan.Entries[0];
+            if (!TryFindEntry(plan, 10, out ArcGraphActorObjectSceneRenderEntry entry))
+                return false;
+
             return entry.Kind == ArcGraphRenderItemKind.Object
                    && Approximately(entry.WorldX, 1.5f)
                    && Approximately(entry.WorldY, 1.5f);
+        }
+
+        private static bool TryFindEntry(
+            ArcGraphActorObjectSceneRenderPlan plan,
+            int entityId,
+            out ArcGraphActorObjectSceneRenderEntry entry)
+        {
+            entry = default;
+
+            if (plan == null)
+                return false;
+
+            for (int i = 0; i < plan.Entries.Count; i++)
+            {
+                if (plan.Entries[i].EntityId != entityId)
+                    continue;
+
+                entry = plan.Entries[i];
+                return true;
+            }
+
+            return false;
         }
 
         private static bool Approximately(float left, float right)

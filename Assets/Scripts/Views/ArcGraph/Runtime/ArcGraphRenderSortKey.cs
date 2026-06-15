@@ -15,7 +15,9 @@ namespace Arcontio.View.ArcGraph
     /// Il futuro wrapper Unity avra' bisogno di tradurre la posizione logica in
     /// sorting layer, sorting order o draw order. Questa struttura prepara quel
     /// dato senza creare sprite e senza consultare camera o scena. L'ordinamento e'
-    /// stabile: prima livello Z, poi Y, poi X, poi layer visuale, poi kind e id.
+    /// stabile: prima livello Z, poi Y visuale, poi X, poi layer visuale, poi kind
+    /// e id. L'asse Y viene ordinato dal retro verso il fronte, cosi' gli item
+    /// piu' vicini alla camera ricevono un sorting order Unity piu' alto.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -95,13 +97,34 @@ namespace Arcontio.View.ArcGraph
                 entityId);
         }
 
+        // =============================================================================
+        // CompareTo
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Confronta due chiavi usando l'ordine visuale ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: painter order esplicito</b></para>
+        /// <para>
+        /// Unity disegna sopra gli sprite con <c>sortingOrder</c> piu' alto. Poiche'
+        /// il piano scena traduce l'indice della queue in sorting order crescente,
+        /// la queue deve essere ordinata dal retro verso il fronte: prima gli
+        /// elementi piu' alti sullo schermo, poi quelli piu' bassi. In questo modo
+        /// muri, alberi e actor davanti non vengono coperti da sprite posteriori.
+        /// </para>
+        /// </summary>
         public int CompareTo(ArcGraphRenderSortKey other)
         {
             int z = Z.CompareTo(other.Z);
             if (z != 0)
                 return z;
 
-            int y = Y.CompareTo(other.Y);
+            // Y e' invertito rispetto al confronto numerico naturale: a parita' di
+            // Z, una cella con Y maggiore e' considerata piu' arretrata e deve
+            // comparire prima nella queue. Le celle con Y minore arrivano dopo e
+            // ricevono uno sorting order piu' alto nel renderer Unity.
+            int y = other.Y.CompareTo(Y);
             if (y != 0)
                 return y;
 
