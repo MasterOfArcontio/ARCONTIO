@@ -26,6 +26,8 @@ namespace Arcontio.View.MapGrid
     /// </summary>
     public sealed class MapGridRuntimeDevToolsOverlay : MonoBehaviour
     {
+        private const string WallStoneDefId = "wall_stone";
+
         // ============================================================
         // TOOL MODEL (v1)
         // ============================================================
@@ -45,6 +47,7 @@ namespace Arcontio.View.MapGrid
             PlaceDoor = 5,
             PlaceFoodStock = 6,
             ForcedTransportObject = 7,
+            PlaceWall = 8,
         }
 
         /// <summary>
@@ -379,6 +382,7 @@ namespace Arcontio.View.MapGrid
             {
                 case Tool.Place:
                 case Tool.Erase:
+                case Tool.PlaceWall:
                     HandleObjectPainting(mouse, cx, cy);
                     break;
 
@@ -416,8 +420,9 @@ namespace Arcontio.View.MapGrid
 
         private void HandleObjectPainting(Mouse mouse, int cx, int cy)
         {
-            // Tool base determina l'azione.
-            bool isPlace = (_tool == Tool.Place);
+            // Tool base determina l'azione. PlaceWall usa lo stesso percorso di painting
+            // del tool Place, ma risolve sempre la ObjectDef tecnica wall_stone.
+            bool isPlace = (_tool == Tool.Place || _tool == Tool.PlaceWall);
 
             // ------------------------------------------------------------
             // Shape: CLICK (v0 behaviour)
@@ -429,8 +434,8 @@ namespace Arcontio.View.MapGrid
 
                 if (isPlace)
                 {
-                    if (!string.IsNullOrWhiteSpace(_selectedDefId))
-                        Enqueue(new DevPlaceObjectCommand(_selectedDefId, cx, cy));
+                    if (TryResolveActivePlacementDefId(out string defId))
+                        Enqueue(new DevPlaceObjectCommand(defId, cx, cy));
                 }
                 else
                 {
@@ -462,8 +467,8 @@ namespace Arcontio.View.MapGrid
 
                 if (isPlace)
                 {
-                    if (!string.IsNullOrWhiteSpace(_selectedDefId))
-                        Enqueue(new DevPlaceObjectCommand(_selectedDefId, cx, cy));
+                    if (TryResolveActivePlacementDefId(out string defId))
+                        Enqueue(new DevPlaceObjectCommand(defId, cx, cy));
                 }
                 else
                 {
@@ -516,7 +521,8 @@ namespace Arcontio.View.MapGrid
             int minY = Mathf.Min(ay, by);
             int maxY = Mathf.Max(ay, by);
 
-            if (isPlace && string.IsNullOrWhiteSpace(_selectedDefId))
+            string defId = null;
+            if (isPlace && !TryResolveActivePlacementDefId(out defId))
                 return;
 
             // Nota:
@@ -527,11 +533,78 @@ namespace Arcontio.View.MapGrid
                 for (int x = minX; x <= maxX; x++)
                 {
                     if (isPlace)
-                        Enqueue(new DevPlaceObjectCommand(_selectedDefId, x, y));
+                        Enqueue(new DevPlaceObjectCommand(defId, x, y));
                     else
                         Enqueue(new DevEraseObjectCommand(x, y));
                 }
             }
+        }
+
+        // =============================================================================
+        // UsesObjectPaintingShape
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se il tool corrente puo' usare le forme di pittura della Dev UI:
+        /// click singolo, brush continuo e rettangolo. Questa distinzione evita di
+        /// duplicare codice quando un oggetto ha un bottone dedicato ma resta comunque
+        /// un normale <c>ObjectDef</c> del mondo.
+        /// </para>
+        ///
+        /// <para><b>Dev UI semantica sopra comando generico</b></para>
+        /// <para>
+        /// Il muro usa un tool dedicato per essere piu' comodo da testare, ma continua
+        /// a passare da <c>DevPlaceObjectCommand</c>. In questo modo salvataggio,
+        /// caricamento e cache del mondo restano concentrati nel percorso core gia'
+        /// esistente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Place</b>: piazza la definizione scelta nella palette generica.</item>
+        ///   <item><b>Erase</b>: rimuove oggetti con la stessa ergonomia di painting.</item>
+        ///   <item><b>PlaceWall</b>: piazza sempre <c>wall_stone</c>.</item>
+        /// </list>
+        /// </summary>
+        private static bool UsesObjectPaintingShape(Tool tool)
+        {
+            return tool == Tool.Place || tool == Tool.Erase || tool == Tool.PlaceWall;
+        }
+
+        // =============================================================================
+        // TryResolveActivePlacementDefId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve quale <c>ObjectDef.Id</c> deve essere passato al comando di placement
+        /// in base al tool attivo. Per il tool generico usa la selezione della palette;
+        /// per i muri usa il valore tecnico stabile <c>wall_stone</c>.
+        /// </para>
+        ///
+        /// <para><b>Un solo canale di scrittura verso il World</b></para>
+        /// <para>
+        /// La UI puo' avere bottoni specializzati, ma il mondo riceve sempre comandi
+        /// normali. Questo mantiene i muri compatibili con DevMap save/load senza
+        /// introdurre una seconda strada di persistenza.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>PlaceWall</b>: ritorna sempre <c>wall_stone</c>.</item>
+        ///   <item><b>Place</b>: ritorna la definizione scelta nella palette.</item>
+        ///   <item><b>Validazione minima</b>: fallisce se l'id risolto e' vuoto.</item>
+        /// </list>
+        /// </summary>
+        private bool TryResolveActivePlacementDefId(out string defId)
+        {
+            if (_tool == Tool.PlaceWall)
+            {
+                defId = WallStoneDefId;
+                return true;
+            }
+
+            defId = _selectedDefId;
+            return !string.IsNullOrWhiteSpace(defId);
         }
 
         private void OnGUI()
@@ -587,14 +660,15 @@ namespace Arcontio.View.MapGrid
             GUILayout.BeginHorizontal();
             if (GUILayout.Toggle(_tool == Tool.PlaceDoor, "Inserisci porta", "Button")) SelectTool(Tool.PlaceDoor);
             if (GUILayout.Toggle(_tool == Tool.PlaceFoodStock, "Inserisci cibo", "Button")) SelectTool(Tool.PlaceFoodStock);
+            if (GUILayout.Toggle(_tool == Tool.PlaceWall, "Inserisci muro", "Button")) SelectTool(Tool.PlaceWall);
             GUILayout.EndHorizontal();
 
             GUI.enabled = toolButtonsEnabled;
 
             // ------------------------------------------------------------
-            // Shape selection (only relevant for Place/Erase)
+            // Shape selection (only relevant for strumenti che pitturano oggetti su cella).
             // ------------------------------------------------------------
-            if (_tool == Tool.Place || _tool == Tool.Erase)
+            if (UsesObjectPaintingShape(_tool))
             {
                 GUILayout.Space(6);
                 GUILayout.Label("Paint Shape");
@@ -633,6 +707,7 @@ namespace Arcontio.View.MapGrid
             DrawNpcCarriedFoodControls(world);
             DrawDoorPlacementControls();
             DrawFoodStockPlacementControls(world);
+            DrawWallPlacementControls(world);
             DrawForcedTransportObjectControls(world);
 
             GUILayout.Space(8);
@@ -993,6 +1068,47 @@ namespace Arcontio.View.MapGrid
 
             if (_tool == Tool.PlaceFoodStock)
                 GUILayout.Label("Click mappa: inserisce cibo con queste proprieta'");
+        }
+
+        // =============================================================================
+        // DrawWallPlacementControls
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna il blocco informativo del tool muri. Il muro non ha ancora opzioni
+        /// proprie nella Dev UI: viene piazzata la definizione tecnica <c>wall_stone</c>,
+        /// che ArcGraph poi interpreta visivamente attraverso il resolver della striscia
+        /// spritesheet dei muri.
+        /// </para>
+        ///
+        /// <para><b>Placement debug come oggetto mondo reale</b></para>
+        /// <para>
+        /// Il muro viene creato come normale oggetto del <c>World</c>, non come overlay
+        /// grafico provvisorio. Questo significa che il salvataggio DevMap lo esporta
+        /// nella lista oggetti e il caricamento lo ricostruisce come ogni altro oggetto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Presenza ObjectDef</b>: mostra se <c>wall_stone</c> e' disponibile nel catalogo runtime.</item>
+        ///   <item><b>Istruzione tool</b>: quando attivo, ricorda che click, brush e rettangolo sono supportati.</item>
+        ///   <item><b>Nessuna mutazione diretta</b>: la UI non scrive sul mondo, ma crea comandi.</item>
+        /// </list>
+        /// </summary>
+        private void DrawWallPlacementControls(World world)
+        {
+            GUILayout.Space(8);
+            GUILayout.Label("Muro");
+
+            bool hasWallDef = world != null &&
+                world.TryGetObjectDef(WallStoneDefId, out ObjectDef wallDef) &&
+                wallDef != null;
+
+            if (!hasWallDef)
+                GUILayout.Label("wall_stone non caricato in ObjectDefs");
+
+            if (_tool == Tool.PlaceWall)
+                GUILayout.Label("Click/Brush/Rect mappa: inserisce wall_stone");
         }
 
         // =============================================================================
@@ -1454,6 +1570,7 @@ namespace Arcontio.View.MapGrid
         /// <list type="bullet">
         ///   <item><b>IsDoor</b>: tutte le porte passano dal pannello porta.</item>
         ///   <item><b>food_stock</b>: il cibo passa dal pannello proprieta' cibo.</item>
+        ///   <item><b>wall_stone</b>: i muri passano dal tool dedicato "Inserisci muro".</item>
         /// </list>
         /// </summary>
         private static bool IsDedicatedDevToolObject(ObjectDef def)
@@ -1464,7 +1581,7 @@ namespace Arcontio.View.MapGrid
             if (def.IsDoor)
                 return true;
 
-            return def.Id == "food_stock";
+            return def.Id == "food_stock" || def.Id == WallStoneDefId;
         }
 
         private static CardinalDirection NextFacing(CardinalDirection dir)
@@ -1567,6 +1684,7 @@ namespace Arcontio.View.MapGrid
                 if (def == null) continue;
                 if (string.IsNullOrWhiteSpace(def.Id)) continue;
                 if (def.Id == "_runtime_occluder") continue;
+                if (IsDedicatedDevToolObject(def)) continue;
                 return def.Id;
             }
 
