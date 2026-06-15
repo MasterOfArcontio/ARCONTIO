@@ -215,6 +215,41 @@ namespace Arcontio.View.MapGrid
         public bool IsPointerOverDevToolsWindow => _enabled && _isPointerOverUiWindow;
 
         // =============================================================================
+        // TryGetActiveObjectPlacementPreviewDefId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone in sola lettura quale <c>ObjectDef.Id</c> verrebbe piazzato dal
+        /// tool di inserimento attualmente attivo.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: preview view-side senza comando</b></para>
+        /// <para>
+        /// ArcGraph ha bisogno di mostrare un'anteprima grafica, ma non deve
+        /// duplicare la logica dei click, accodare comandi o modificare il
+        /// <c>World</c>. Questo metodo restituisce solo l'identita' data-driven
+        /// dell'oggetto potenziale: il comando reale resta prodotto esclusivamente
+        /// da <c>MapGridRuntimeDevToolsOverlay</c> quando l'utente clicca.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate preview</b>: fallisce se il tool corrente non inserisce oggetti.</item>
+        ///   <item><b>DefId attivo</b>: riusa la stessa risoluzione interna usata dai tool F3.</item>
+        ///   <item><b>Contratto neutro</b>: non espone comandi, owner, quantita' o stato mutabile.</item>
+        /// </list>
+        /// </summary>
+        public bool TryGetActiveObjectPlacementPreviewDefId(out string defId)
+        {
+            defId = string.Empty;
+
+            if (!IsObjectPlacementPreviewActive)
+                return false;
+
+            return TryResolveActivePlacementDefId(out defId);
+        }
+
+        // =============================================================================
         // ToggleSpawnToolOverlay
         // =============================================================================
         /// <summary>
@@ -633,6 +668,18 @@ namespace Arcontio.View.MapGrid
             if (_tool == Tool.PlaceWall)
             {
                 defId = WallStoneDefId;
+                return true;
+            }
+
+            if (_tool == Tool.PlaceDoor)
+            {
+                defId = _doorWithLock ? "door_wood_locked" : "door_wood_good";
+                return true;
+            }
+
+            if (_tool == Tool.PlaceFoodStock)
+            {
+                defId = "food_stock";
                 return true;
             }
 

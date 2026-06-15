@@ -1,4 +1,6 @@
+using Arcontio.Core;
 using Arcontio.View.MapGrid;
+using System;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -91,18 +93,26 @@ namespace Arcontio.View.ArcGraph
     {
         [SerializeField] private bool highlightEnabled = true;
         [SerializeField] private MapGridRuntimeDevToolsOverlay devToolsOverlay;
+        [SerializeField] private MonoBehaviour spriteResolverBehaviour;
         [SerializeField] private Color validPlacementColor = new Color(1f, 0.18f, 0.12f, 0.38f);
+        [SerializeField] private Color previewSpriteColor = new Color(1f, 0.05f, 0.05f, 0.58f);
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float zOffset = -0.035f;
-        [SerializeField] private int sortingOrder = 30;
+        [SerializeField] private float previewZOffset = -0.045f;
+        [SerializeField] private float previewObjectScale = 1f;
+        [SerializeField] private int sortingOrder = 250;
+        [SerializeField] private int previewSortingOrder = 260;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private string highlightObjectName = "ArcGraphPlacementCellHighlight";
+        [SerializeField] private string previewObjectName = "ArcGraphPlacementObjectPreview";
         [SerializeField] private bool logDiagnostics;
 
         private GameObject _highlightObject;
         private SpriteRenderer _highlightRenderer;
         private Texture2D _highlightTexture;
         private Sprite _highlightSprite;
+        private GameObject _previewObject;
+        private SpriteRenderer _previewRenderer;
         private ArcGraphPlacementCellHighlightDiagnostics _lastDiagnostics =
             new ArcGraphPlacementCellHighlightDiagnostics(
                 false,
@@ -171,7 +181,11 @@ namespace Arcontio.View.ArcGraph
             _highlightRenderer.sortingOrder = sortingOrder;
             _highlightObject.SetActive(true);
 
-            StoreDiagnostics(interactionFrame, true, "PlacementCellHighlighted");
+            bool didShowPreview = TryShowPlacementSpritePreview(interactionFrame.Cell);
+            StoreDiagnostics(
+                interactionFrame,
+                true,
+                didShowPreview ? "PlacementCellAndSpritePreviewShown" : "PlacementCellHighlighted");
         }
 
         // =============================================================================
@@ -185,6 +199,27 @@ namespace Arcontio.View.ArcGraph
         public void SetDevToolsOverlay(MapGridRuntimeDevToolsOverlay overlay)
         {
             devToolsOverlay = overlay;
+        }
+
+        // =============================================================================
+        // SetSpriteResolverBehaviour
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il resolver sprite scene-side usato anche dal renderer oggetti.
+        /// </para>
+        ///
+        /// <para><b>Anteprima sullo stesso contratto degli oggetti reali</b></para>
+        /// <para>
+        /// Il consumer non carica PNG direttamente e non conosce cartelle Unity:
+        /// costruisce una <c>ArcGraphSpriteResolveRequest</c> e lascia al resolver
+        /// esistente la conversione chiave -> <c>Sprite</c>. Cosi' muri, cibo e
+        /// oggetti futuri passano dallo stesso canale visuale.
+        /// </para>
+        /// </summary>
+        public void SetSpriteResolverBehaviour(MonoBehaviour resolverBehaviour)
+        {
+            spriteResolverBehaviour = resolverBehaviour;
         }
 
         // =============================================================================
@@ -272,6 +307,327 @@ namespace Arcontio.View.ArcGraph
             _highlightObject.SetActive(false);
         }
 
+        // =============================================================================
+        // EnsurePreviewRenderer
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una sola volta il renderer della preview oggetto e poi lo riusa.
+        /// </para>
+        ///
+        /// <para><b>Pooling minimale per overlay di input</b></para>
+        /// <para>
+        /// La preview segue il mouse e puo' aggiornarsi ogni frame. Creare e
+        /// distruggere GameObject a ogni cella sarebbe inutile: un solo
+        /// <c>SpriteRenderer</c> disattivabile e' sufficiente e tiene basso il costo.
+        /// </para>
+        /// </summary>
+        private void EnsurePreviewRenderer()
+        {
+            if (_previewRenderer != null)
+                return;
+
+            _previewObject = new GameObject(previewObjectName);
+            _previewObject.transform.SetParent(transform, false);
+            _previewRenderer = _previewObject.AddComponent<SpriteRenderer>();
+            _previewRenderer.sortingOrder = previewSortingOrder;
+            _previewRenderer.color = previewSpriteColor;
+            _previewObject.SetActive(false);
+        }
+
+        // =============================================================================
+        // TryShowPlacementSpritePreview
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova a mostrare lo sprite dell'oggetto che il DevTool inserirebbe nella
+        /// cella indicata.
+        /// </para>
+        ///
+        /// <para><b>Preview come lettura passiva del catalogo</b></para>
+        /// <para>
+        /// Il metodo legge il <c>defId</c> attivo dal DevTool, recupera la
+        /// <c>ObjectDef</c> dal <c>World</c> e chiede al resolver ArcGraph lo sprite.
+        /// Non accoda comandi e non crea istanze mondo: produce soltanto un fantasma
+        /// grafico rosso e semi-trasparente.
+        /// </para>
+        /// </summary>
+        private bool TryShowPlacementSpritePreview(ArcGraphCellCoord cell)
+        {
+            if (devToolsOverlay == null
+                || !devToolsOverlay.TryGetActiveObjectPlacementPreviewDefId(out string defId)
+                || string.IsNullOrWhiteSpace(defId))
+            {
+                HidePreview();
+                return false;
+            }
+
+            World world = MapGridWorldProvider.TryGetWorld();
+            if (world == null || !world.TryGetObjectDef(defId, out ObjectDef def) || def == null)
+            {
+                HidePreview();
+                return false;
+            }
+
+            IArcGraphSpriteResolver spriteResolver = spriteResolverBehaviour as IArcGraphSpriteResolver;
+            if (spriteResolver == null)
+            {
+                HidePreview();
+                return false;
+            }
+
+            string spriteKey = ResolvePreviewSpriteKey(world, def, cell);
+            if (string.IsNullOrWhiteSpace(spriteKey))
+            {
+                HidePreview();
+                return false;
+            }
+
+            var request = new ArcGraphSpriteResolveRequest(
+                ArcGraphRenderItemKind.Object,
+                -1,
+                spriteKey,
+                def.Id,
+                false);
+
+            if (!spriteResolver.TryResolveSprite(request, out Sprite sprite) || sprite == null)
+            {
+                HidePreview();
+                return false;
+            }
+
+            EnsurePreviewRenderer();
+
+            _previewObject.transform.position = ResolveObjectPreviewWorldPosition(cell, def, sprite);
+            _previewObject.transform.localScale = Vector3.one * ResolvePositiveScale(previewObjectScale);
+            _previewRenderer.sprite = sprite;
+            _previewRenderer.color = previewSpriteColor;
+            _previewRenderer.sortingOrder = previewSortingOrder;
+            _previewObject.SetActive(true);
+            return true;
+        }
+
+        // =============================================================================
+        // ResolvePreviewSpriteKey
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la sprite key da usare per l'anteprima dell'oggetto.
+        /// </para>
+        ///
+        /// <para><b>Stessa convenzione degli oggetti reali</b></para>
+        /// <para>
+        /// Gli oggetti normali usano il path dichiarato in <c>object_defs</c>. I
+        /// muri, che sono cardinali, costruiscono invece una chiave
+        /// <c>sheet#subSprite</c> basata sui muri vicini gia' presenti, cosi'
+        /// l'anteprima assomiglia alla variante che verra' renderizzata dopo il
+        /// click.
+        /// </para>
+        /// </summary>
+        private string ResolvePreviewSpriteKey(
+            World world,
+            ObjectDef def,
+            ArcGraphCellCoord cell)
+        {
+            if (def == null || string.IsNullOrWhiteSpace(def.Id))
+                return string.Empty;
+
+            string baseSpriteKey = ResolveBaseSpriteKey(def);
+            if (string.IsNullOrWhiteSpace(baseSpriteKey))
+                return string.Empty;
+
+            // I muri sono l'unico oggetto che oggi cambia sprite in base ai vicini.
+            // Per la preview usiamo la stessa convenzione della queue oggetti:
+            // maschera N/W/S/E e sub-sprite dentro la striscia PNG sliced.
+            if (!IsVisualKind(def.Visual, "wall"))
+                return baseSpriteKey;
+
+            string mask = ResolveProspectiveWallMask(world, def, cell);
+            var previewSnapshot = new ArcGraphObjectVisualSnapshot(
+                int.MaxValue,
+                def.Id,
+                cell,
+                baseSpriteKey,
+                false,
+                0,
+                -1,
+                ResolvePositive(def.FootprintWidth, 1),
+                ResolvePositive(def.FootprintHeight, 1),
+                def.Visual?.VisualKind ?? string.Empty,
+                def.Visual?.ResolverKey ?? string.Empty,
+                ResolveNonNegative(def.Visual?.WidthPixels ?? 0),
+                ResolveNonNegative(def.Visual?.HeightPixels ?? 0),
+                ResolveNonNegative(def.Visual?.BaseWidthPixels ?? 0),
+                ResolveNonNegative(def.Visual?.BaseHeightPixels ?? 0),
+                def.Visual?.BaseMiniTileMask ?? string.Empty,
+                def.Visual?.Pivot ?? string.Empty,
+                def.Visual?.OffsetX ?? 0,
+                def.Visual?.OffsetY ?? 0,
+                def.Visual?.FadeWhenActorBehind ?? false,
+                def.Visual?.UseShadow ?? false);
+
+            string subSpriteName = ArcGraphWallCardinalResolver.ResolveSubSpriteName(
+                baseSpriteKey,
+                mask,
+                previewSnapshot);
+
+            return string.IsNullOrWhiteSpace(subSpriteName)
+                ? baseSpriteKey
+                : baseSpriteKey + "#" + subSpriteName;
+        }
+
+        // =============================================================================
+        // ResolveProspectiveWallMask
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola la maschera cardinale che avrebbe un muro se venisse inserito
+        /// nella cella sotto il mouse.
+        /// </para>
+        ///
+        /// <para><b>Regola locale e leggibile</b></para>
+        /// <para>
+        /// La preview non ricostruisce una queue completa: guarda solo nord,
+        /// ovest, sud ed est sullo stesso piano logico 2D usato oggi dal tool F3.
+        /// Questo basta per mostrare il potenziale collegamento senza introdurre
+        /// un secondo sistema di piazzamento.
+        /// </para>
+        /// </summary>
+        private string ResolveProspectiveWallMask(
+            World world,
+            ObjectDef previewDef,
+            ArcGraphCellCoord cell)
+        {
+            bool north = HasCompatibleWallAt(world, previewDef, cell.X, cell.Y + 1);
+            bool west = HasCompatibleWallAt(world, previewDef, cell.X - 1, cell.Y);
+            bool south = HasCompatibleWallAt(world, previewDef, cell.X, cell.Y - 1);
+            bool east = HasCompatibleWallAt(world, previewDef, cell.X + 1, cell.Y);
+
+            return (north ? "1" : "0")
+                   + (west ? "1" : "0")
+                   + (south ? "1" : "0")
+                   + (east ? "1" : "0");
+        }
+
+        // =============================================================================
+        // HasCompatibleWallAt
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se una cella vicina contiene un muro compatibile con quello in
+        /// preview.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' per famiglia visuale</b></para>
+        /// <para>
+        /// Due muri si collegano solo se appartengono alla stessa famiglia
+        /// <c>ResolverKey</c>. Questo evita che futuri muri di pietra, legno o
+        /// mattoni si aggancino automaticamente tra loro solo perche' condividono
+        /// <c>VisualKind = wall</c>.
+        /// </para>
+        /// </summary>
+        private static bool HasCompatibleWallAt(
+            World world,
+            ObjectDef previewDef,
+            int cellX,
+            int cellY)
+        {
+            if (world == null || previewDef == null)
+                return false;
+
+            int objectId = world.GetObjectAt(cellX, cellY);
+            if (objectId <= 0
+                || !world.Objects.TryGetValue(objectId, out WorldObjectInstance instance)
+                || instance == null
+                || instance.IsHeld
+                || !world.TryGetObjectDef(instance.DefId, out ObjectDef existingDef)
+                || existingDef == null)
+            {
+                return false;
+            }
+
+            return IsVisualKind(existingDef.Visual, "wall")
+                   && string.Equals(
+                       ResolveWallFamilyKey(existingDef),
+                       ResolveWallFamilyKey(previewDef),
+                       StringComparison.Ordinal);
+        }
+
+        // =============================================================================
+        // ResolveObjectPreviewWorldPosition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola la posizione world-space della preview usando pivot, footprint e
+        /// offset visuali dell'oggetto.
+        /// </para>
+        ///
+        /// <para><b>Allineamento con il renderer oggetti</b></para>
+        /// <para>
+        /// I muri 32x83 e gli oggetti futuri piu' alti della cella devono poggiare
+        /// sulla stessa base usata dal renderer reale. Per questo la preview applica
+        /// la stessa compensazione del pivot basso, invece di limitarsi a centrare
+        /// lo sprite nella cella.
+        /// </para>
+        /// </summary>
+        private Vector3 ResolveObjectPreviewWorldPosition(
+            ArcGraphCellCoord cell,
+            ObjectDef def,
+            Sprite sprite)
+        {
+            ObjectVisualDef visual = def?.Visual;
+            int footprintWidth = ResolvePositive(def?.FootprintWidth ?? 0, 1);
+            int footprintHeight = ResolvePositive(def?.FootprintHeight ?? 0, 1);
+            string pivot = visual?.Pivot ?? string.Empty;
+
+            float worldX = (cell.X + (footprintWidth * 0.5f)) * tileWorldSize;
+            if (IsPivot(pivot, "bottom_left"))
+                worldX = cell.X * tileWorldSize;
+            else if (IsPivot(pivot, "bottom_right"))
+                worldX = (cell.X + footprintWidth) * tileWorldSize;
+
+            float worldY = (cell.Y + (footprintHeight * 0.5f)) * tileWorldSize;
+            worldX += ConvertPixelOffsetToWorld(visual?.OffsetX ?? 0, visual?.BaseWidthPixels ?? 0);
+            worldY += ConvertPixelOffsetToWorld(visual?.OffsetY ?? 0, visual?.BaseHeightPixels ?? 0);
+
+            Vector3 position = originOffset + new Vector3(worldX, worldY, previewZOffset);
+            position += ResolveSpritePivotCompensation(pivot, sprite, ResolvePositiveScale(previewObjectScale));
+            return position;
+        }
+
+        // =============================================================================
+        // ResolveSpritePivotCompensation
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Compensa il pivot importato da Unity quando il catalogo dichiara un pivot
+        /// basso come <c>bottom_center</c>.
+        /// </para>
+        /// </summary>
+        private static Vector3 ResolveSpritePivotCompensation(
+            string pivot,
+            Sprite sprite,
+            float objectScale)
+        {
+            if (sprite == null)
+                return Vector3.zero;
+
+            float safeScale = ResolvePositiveScale(objectScale);
+            Bounds bounds = sprite.bounds;
+            float x = 0f;
+            float y = 0f;
+
+            if (IsPivot(pivot, "bottom_left"))
+                x = -bounds.min.x * safeScale;
+            else if (IsPivot(pivot, "bottom_right"))
+                x = -bounds.max.x * safeScale;
+
+            if (IsBottomPivot(pivot))
+                y = -bounds.min.y * safeScale;
+
+            return new Vector3(x, y, 0f);
+        }
+
         private Vector3 ResolveWorldPosition(ArcGraphCellCoord cell)
         {
             return originOffset + new Vector3(
@@ -293,6 +649,181 @@ namespace Arcontio.View.ArcGraph
         {
             if (_highlightObject != null)
                 _highlightObject.SetActive(false);
+
+            HidePreview();
+        }
+
+        // =============================================================================
+        // HidePreview
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Spegne il GameObject della preview senza distruggerlo.
+        /// </para>
+        /// </summary>
+        private void HidePreview()
+        {
+            if (_previewObject != null)
+                _previewObject.SetActive(false);
+        }
+
+        // =============================================================================
+        // ResolveBaseSpriteKey
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il path base dello sprite ArcGraph partendo dalla definizione
+        /// oggetto.
+        /// </para>
+        /// </summary>
+        private string ResolveBaseSpriteKey(ObjectDef def)
+        {
+            if (def == null)
+                return string.Empty;
+
+            string spriteKey = def.ResolveArcGraphSpritePath();
+            if (!string.IsNullOrWhiteSpace(spriteKey))
+                return spriteKey.Trim();
+
+            return string.IsNullOrWhiteSpace(def.Id)
+                ? string.Empty
+                : "MapGrid/Sprites/Objects/" + def.Id.Trim();
+        }
+
+        // =============================================================================
+        // ResolveWallFamilyKey
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce la famiglia visuale usata per decidere se due muri possono
+        /// collegarsi graficamente.
+        /// </para>
+        /// </summary>
+        private static string ResolveWallFamilyKey(ObjectDef def)
+        {
+            if (def == null)
+                return string.Empty;
+
+            if (def.Visual != null && !string.IsNullOrWhiteSpace(def.Visual.ResolverKey))
+                return def.Visual.ResolverKey.Trim();
+
+            return string.IsNullOrWhiteSpace(def.Id) ? string.Empty : def.Id.Trim();
+        }
+
+        // =============================================================================
+        // ConvertPixelOffsetToWorld
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte un offset espresso in pixel catalogo in un offset world-space.
+        /// </para>
+        /// </summary>
+        private float ConvertPixelOffsetToWorld(
+            int offsetPixels,
+            int basePixels)
+        {
+            if (offsetPixels == 0)
+                return 0f;
+
+            int safeBasePixels = basePixels > 0 ? basePixels : 32;
+            return offsetPixels * (tileWorldSize / safeBasePixels);
+        }
+
+        // =============================================================================
+        // IsVisualKind
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Confronta la categoria visuale di una definizione oggetto con una stringa
+        /// attesa.
+        /// </para>
+        /// </summary>
+        private static bool IsVisualKind(
+            ObjectVisualDef visual,
+            string expected)
+        {
+            return visual != null
+                   && string.Equals(
+                       visual.VisualKind ?? string.Empty,
+                       expected ?? string.Empty,
+                       StringComparison.OrdinalIgnoreCase);
+        }
+
+        // =============================================================================
+        // IsBottomPivot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se una convenzione pivot appartiene alla famiglia dei pivot bassi.
+        /// </para>
+        /// </summary>
+        private static bool IsBottomPivot(
+            string pivot)
+        {
+            return IsPivot(pivot, "bottom_center")
+                   || IsPivot(pivot, "bottom_left")
+                   || IsPivot(pivot, "bottom_right");
+        }
+
+        // =============================================================================
+        // IsPivot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Confronta due convenzioni pivot ignorando maiuscole e minuscole.
+        /// </para>
+        /// </summary>
+        private static bool IsPivot(
+            string pivot,
+            string expected)
+        {
+            return string.Equals(
+                pivot ?? string.Empty,
+                expected ?? string.Empty,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
+        // =============================================================================
+        // ResolvePositive
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza un intero che deve essere positivo.
+        /// </para>
+        /// </summary>
+        private static int ResolvePositive(
+            int value,
+            int fallback)
+        {
+            return value > 0 ? value : fallback;
+        }
+
+        // =============================================================================
+        // ResolveNonNegative
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza un intero che puo' essere zero ma non negativo.
+        /// </para>
+        /// </summary>
+        private static int ResolveNonNegative(
+            int value)
+        {
+            return value < 0 ? 0 : value;
+        }
+
+        // =============================================================================
+        // ResolvePositiveScale
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza una scala Unity evitando valori nulli o negativi.
+        /// </para>
+        /// </summary>
+        private static float ResolvePositiveScale(
+            float value)
+        {
+            return value > 0f ? value : 1f;
         }
 
         private void StoreDiagnostics(

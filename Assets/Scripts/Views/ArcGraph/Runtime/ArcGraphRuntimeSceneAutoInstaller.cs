@@ -294,6 +294,7 @@ namespace Arcontio.View.ArcGraph
             _interactionWrapper.SetConfig(ArcGraphMapViewConfig.CreateDefaultV033());
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
+            _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
         }
 
         // =============================================================================
