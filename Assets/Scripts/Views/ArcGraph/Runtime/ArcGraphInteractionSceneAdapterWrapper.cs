@@ -166,6 +166,27 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetProcessInUpdate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita il processing automatico in <c>Update</c>.
+        /// </para>
+        ///
+        /// <para><b>Gate esplicito del costo per frame</b></para>
+        /// <para>
+        /// Il wrapper puo' restare cablato in scena senza leggere input ogni frame.
+        /// Lo switch visuale ArcGraph abilita questo flag solo quando la vista
+        /// ArcGraph e' attiva e i consumer interattivi devono ricevere hover,
+        /// selection o overlay cella.
+        /// </para>
+        /// </summary>
+        public void SetProcessInUpdate(bool enabled)
+        {
+            processInUpdate = enabled;
+        }
+
+        // =============================================================================
         // SetConfig
         // =============================================================================
         /// <summary>

@@ -274,6 +274,31 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetInteractionRouting
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Configura l'inoltro della queue actor/object verso il wrapper interattivo.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: interazione come uscita opzionale</b></para>
+        /// <para>
+        /// Il wrapper minimo puo' renderizzare terrain, NPC e oggetti senza attivare
+        /// picking, HUD o overlay. Questo setter permette allo switch F12 e
+        /// all'auto-installer di accendere esplicitamente il percorso interattivo
+        /// quando ArcGraph e' la vista attiva, senza rendere l'interaction una
+        /// responsabilita' sempre accesa del renderer.
+        /// </para>
+        /// </summary>
+        public void SetInteractionRouting(
+            bool pushQueue,
+            bool enableInteractionAfterPush)
+        {
+            pushQueueToInteractionWrapper = pushQueue;
+            enableInteractionWrapperAfterPush = enableInteractionAfterPush;
+        }
+
+        // =============================================================================
         // ProcessFrameFromInspector
         // =============================================================================
         /// <summary>
@@ -484,7 +509,10 @@ namespace Arcontio.View.ArcGraph
             interactionWrapper.SetRenderQueue(_coordinator.RenderQueue);
 
             if (enableInteractionWrapperAfterPush)
+            {
                 interactionWrapper.SetAdapterEnabled(true);
+                interactionWrapper.SetProcessInUpdate(true);
+            }
 
             return true;
         }

@@ -388,6 +388,9 @@ namespace Arcontio.View.ArcGraph
 
             runtimeWrapper.SetWrapperEnabled(arcGraphMode);
             runtimeWrapper.SetProcessInUpdate(arcGraphMode && enableWrapperUpdateInArcGraphMode);
+            runtimeWrapper.SetInteractionRouting(
+                pushQueue: arcGraphMode,
+                enableInteractionAfterPush: arcGraphMode);
 
             if (configureWrapperRenderingOnSwitch)
             {

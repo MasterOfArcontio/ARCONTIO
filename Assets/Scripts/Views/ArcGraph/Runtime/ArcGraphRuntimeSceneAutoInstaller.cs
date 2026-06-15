@@ -55,6 +55,9 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainRuntimeSceneRenderer _terrainRenderer;
         private ArcGraphNpcRuntimeSceneRenderer _npcRenderer;
         private ArcGraphObjectRuntimeSceneRenderer _objectRenderer;
+        private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
+        private ArcGraphInteractionConsumerRouter _interactionRouter;
+        private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
         private ArcGraphSerializedSpriteResolver _spriteResolver;
         private ArcGraphViewModeSwitcher _switcher;
@@ -218,6 +221,9 @@ namespace Arcontio.View.ArcGraph
             _terrainRenderer = _visualRoot.AddComponent<ArcGraphTerrainRuntimeSceneRenderer>();
             _npcRenderer = _visualRoot.AddComponent<ArcGraphNpcRuntimeSceneRenderer>();
             _objectRenderer = _visualRoot.AddComponent<ArcGraphObjectRuntimeSceneRenderer>();
+            _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
+            _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
+            _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
             _switcher = gameObject.AddComponent<ArcGraphViewModeSwitcher>();
@@ -283,6 +289,11 @@ namespace Arcontio.View.ArcGraph
             _wrapper.SetTerrainRenderer(_terrainRenderer);
             _wrapper.SetNpcRenderer(_npcRenderer);
             _wrapper.SetObjectRenderer(_objectRenderer);
+            _wrapper.SetInteractionWrapper(_interactionWrapper);
+            _interactionWrapper.SetConsumer(_interactionRouter);
+            _interactionWrapper.SetConfig(ArcGraphMapViewConfig.CreateDefaultV033());
+            _interactionRouter.SetRouterEnabled(true);
+            _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
         }
 
         // =============================================================================
@@ -319,9 +330,13 @@ namespace Arcontio.View.ArcGraph
         {
             MapGridBootstrap bootstrap = FindObjectOfType<MapGridBootstrap>();
             MapGridWorldView worldView = FindObjectOfType<MapGridWorldView>();
+            MapGridRuntimeDevToolsOverlay devToolsOverlay = FindObjectOfType<MapGridRuntimeDevToolsOverlay>();
 
             if (_adapter != null)
                 _adapter.SetMapGridSources(bootstrap, worldView);
+
+            if (_placementHighlightConsumer != null)
+                _placementHighlightConsumer.SetDevToolsOverlay(devToolsOverlay);
 
             // Anche i root visuali MapGrid possono essere creati dal bootstrap
             // legacy dopo l'installazione ArcGraph. Ricablare lo switcher per pochi

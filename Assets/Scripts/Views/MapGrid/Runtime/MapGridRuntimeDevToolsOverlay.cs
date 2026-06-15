@@ -190,6 +190,31 @@ namespace Arcontio.View.MapGrid
         public bool IsDevModeEnabled => _enabled;
 
         // =============================================================================
+        // IsObjectPlacementPreviewActive
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se il pannello DevTools e' attualmente in una modalita' che
+        /// inserisce oggetti sulla mappa e quindi puo' mostrare una preview cella.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: stato UI read-only per renderer esterni</b></para>
+        /// <para>
+        /// ArcGraph non deve diventare proprietario dei DevTools e non deve inviare
+        /// comandi di piazzamento. Questo flag espone solo una informazione
+        /// osservabile: il tool legacy e' aperto e il click mappa produrrebbe un
+        /// inserimento oggetto, muro, porta o stock cibo. La mutazione resta ancora
+        /// nel percorso storico <c>ICommand</c> del DevTools.
+        /// </para>
+        /// </summary>
+        public bool IsObjectPlacementPreviewActive =>
+            _enabled
+            && !_transportModeActive
+            && IsObjectPlacementPreviewTool(_tool);
+
+        public bool IsPointerOverDevToolsWindow => _enabled && _isPointerOverUiWindow;
+
+        // =============================================================================
         // ToggleSpawnToolOverlay
         // =============================================================================
         /// <summary>
@@ -569,6 +594,14 @@ namespace Arcontio.View.MapGrid
         private static bool UsesObjectPaintingShape(Tool tool)
         {
             return tool == Tool.Place || tool == Tool.Erase || tool == Tool.PlaceWall;
+        }
+
+        private static bool IsObjectPlacementPreviewTool(Tool tool)
+        {
+            return tool == Tool.Place
+                   || tool == Tool.PlaceWall
+                   || tool == Tool.PlaceDoor
+                   || tool == Tool.PlaceFoodStock;
         }
 
         // =============================================================================
