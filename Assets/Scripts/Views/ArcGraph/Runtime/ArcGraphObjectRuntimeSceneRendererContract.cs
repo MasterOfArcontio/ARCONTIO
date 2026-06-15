@@ -3,69 +3,69 @@ using UnityEngine;
 namespace Arcontio.View.ArcGraph
 {
     // =============================================================================
-    // ArcGraphNpcRuntimeSceneRendererContract
+    // ArcGraphObjectRuntimeSceneRendererContract
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Contratto operativo del renderer runtime minimo per gli NPC ArcGraph.
+    /// Contratto operativo del renderer runtime minimo per gli oggetti ArcGraph.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: NPC renderer confinato e non decisionale</b></para>
+    /// <para><b>Principio architetturale: oggetti come viste, non come simulazione</b></para>
     /// <para>
-    /// Il renderer NPC deve ricevere una <c>ArcGraphRenderQueue</c> gia' preparata
-    /// dal runtime ArcGraph e limitarsi a materializzare gli actor visibili in
-    /// scena. Non legge il <c>World</c>, non cerca MapGrid, non invia comandi e non
-    /// decide quali NPC esistano: usa solo il payload visuale gia' ordinato.
+    /// Il renderer oggetti riceve una <c>ArcGraphRenderQueue</c> gia' costruita dal
+    /// runtime minimo e materializza solo gli oggetti visibili. Non legge il
+    /// <c>World</c>, non consulta MapGrid, non invia comandi e non decide cosa
+    /// esista: usa solo snapshot visuali derivati.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>RootName</b>: root locale sotto cui vengono creati gli NPC ArcGraph.</item>
+    ///   <item><b>RootName</b>: root locale sotto cui vengono creati gli oggetti.</item>
     ///   <item><b>TileWorldSize</b>: scala cella usata dal piano actor/object.</item>
     ///   <item><b>OriginOffset</b>: offset scena applicato agli sprite.</item>
-    ///   <item><b>ZOffset</b>: piccolo offset di profondita' per separare layer scena.</item>
-    ///   <item><b>ActorScale</b>: scala uniforme degli sprite NPC.</item>
-    ///   <item><b>DisableMissingActorsAfterRender</b>: disattiva handle non presenti nel frame.</item>
+    ///   <item><b>ZOffset</b>: piccolo offset di profondita' per separare gli oggetti dal terreno.</item>
+    ///   <item><b>ObjectScale</b>: scala uniforme degli sprite oggetto.</item>
+    ///   <item><b>DisableMissingObjectsAfterRender</b>: disattiva handle non presenti nel frame.</item>
     /// </list>
     /// </summary>
-    public readonly struct ArcGraphNpcRuntimeSceneRendererContract
+    public readonly struct ArcGraphObjectRuntimeSceneRendererContract
     {
         public readonly string RootName;
         public readonly float TileWorldSize;
         public readonly Vector3 OriginOffset;
         public readonly float ZOffset;
-        public readonly float ActorScale;
-        public readonly bool DisableMissingActorsAfterRender;
+        public readonly float ObjectScale;
+        public readonly bool DisableMissingObjectsAfterRender;
 
         public bool IsRuntimeSafe =>
             !string.IsNullOrWhiteSpace(RootName)
             && TileWorldSize > 0f
-            && ActorScale > 0f;
+            && ObjectScale > 0f;
 
         // =============================================================================
-        // ArcGraphNpcRuntimeSceneRendererContract
+        // ArcGraphObjectRuntimeSceneRendererContract
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce un contratto NPC runtime normalizzando i valori rischiosi.
+        /// Costruisce un contratto oggetti runtime normalizzando i valori rischiosi.
         /// </para>
         /// </summary>
-        public ArcGraphNpcRuntimeSceneRendererContract(
+        public ArcGraphObjectRuntimeSceneRendererContract(
             string rootName,
             float tileWorldSize,
             Vector3 originOffset,
             float zOffset,
-            float actorScale,
-            bool disableMissingActorsAfterRender)
+            float objectScale,
+            bool disableMissingObjectsAfterRender)
         {
             RootName = string.IsNullOrWhiteSpace(rootName)
-                ? "ArcGraphNpcRuntimeRoot"
+                ? "ArcGraphObjectRuntimeRoot"
                 : rootName;
             TileWorldSize = tileWorldSize > 0f ? tileWorldSize : 1f;
             OriginOffset = originOffset;
             ZOffset = zOffset;
-            ActorScale = actorScale > 0f ? actorScale : 1f;
-            DisableMissingActorsAfterRender = disableMissingActorsAfterRender;
+            ObjectScale = objectScale > 0f ? objectScale : 1f;
+            DisableMissingObjectsAfterRender = disableMissingObjectsAfterRender;
         }
 
         // =============================================================================
@@ -74,13 +74,6 @@ namespace Arcontio.View.ArcGraph
         /// <summary>
         /// <para>
         /// Crea il contratto passivo usato dal builder actor/object esistente.
-        /// </para>
-        ///
-        /// <para><b>Riuso controllato</b></para>
-        /// <para>
-        /// Il renderer NPC usa il builder actor/object solo per calcolare posizione,
-        /// sorting e sprite request. Dopo il build filtra le entry actor e ignora le
-        /// entry object, che sono gestite dal renderer oggetti dedicato.
         /// </para>
         /// </summary>
         public ArcGraphActorObjectSceneRendererContract CreateActorObjectPlanContract()

@@ -26,6 +26,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>runtimeMapAdapter</b>: sorgente esplicita del context ArcGraph provvisorio.</item>
     ///   <item><b>terrainRenderer</b>: renderer runtime terrain opzionale e gated.</item>
     ///   <item><b>npcRenderer</b>: renderer runtime NPC opzionale e gated.</item>
+    ///   <item><b>objectRenderer</b>: renderer runtime oggetti opzionale e gated.</item>
     ///   <item><b>interactionWrapper</b>: consumer opzionale della queue actor/object per input e hover.</item>
     ///   <item><b>Gate di esecuzione</b>: wrapper spento di default, Update spento di default.</item>
     ///   <item><b>_coordinator</b>: orchestratore C# passivo del bootstrap e della render queue.</item>
@@ -37,6 +38,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private ArcGraphTerrainRuntimeMapGridAdapter runtimeMapAdapter;
         [SerializeField] private ArcGraphTerrainRuntimeSceneRenderer terrainRenderer;
         [SerializeField] private ArcGraphNpcRuntimeSceneRenderer npcRenderer;
+        [SerializeField] private ArcGraphObjectRuntimeSceneRenderer objectRenderer;
         [SerializeField] private ArcGraphInteractionSceneAdapterWrapper interactionWrapper;
         [SerializeField] private bool wrapperEnabled;
         [SerializeField] private bool processInUpdate;
@@ -44,8 +46,10 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool buildActorObjectQueue = true;
         [SerializeField] private bool renderTerrainRuntime;
         [SerializeField] private bool renderNpcRuntime;
+        [SerializeField] private bool renderObjectRuntime;
         [SerializeField] private bool enableTerrainRendererBeforeRender;
         [SerializeField] private bool enableNpcRendererBeforeRender;
+        [SerializeField] private bool enableObjectRendererBeforeRender;
         [SerializeField] private bool pushQueueToInteractionWrapper;
         [SerializeField] private bool enableInteractionWrapperAfterPush;
         [SerializeField] private bool logDiagnostics = true;
@@ -55,12 +59,14 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphMinimalRuntimeSceneWrapperDiagnostics _lastDiagnostics;
         private ArcGraphTerrainRuntimeSceneRendererDiagnostics _lastTerrainRendererDiagnostics;
         private ArcGraphNpcRuntimeSceneRendererDiagnostics _lastNpcRendererDiagnostics;
+        private ArcGraphObjectRuntimeSceneRendererDiagnostics _lastObjectRendererDiagnostics;
         private long _sourceFrameIndex;
 
         public ArcGraphMinimalRuntimeSceneWrapperDiagnostics LastDiagnostics => _lastDiagnostics;
         public ArcGraphMinimalRuntimeCoordinatorDiagnostics LastCoordinatorDiagnostics => _coordinator.LastDiagnostics;
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastTerrainRendererDiagnostics => _lastTerrainRendererDiagnostics;
         public ArcGraphNpcRuntimeSceneRendererDiagnostics LastNpcRendererDiagnostics => _lastNpcRendererDiagnostics;
+        public ArcGraphObjectRuntimeSceneRendererDiagnostics LastObjectRendererDiagnostics => _lastObjectRendererDiagnostics;
         public ArcGraphRenderQueue RenderQueue => _coordinator.RenderQueue;
         public bool WrapperEnabled => wrapperEnabled;
 
@@ -158,10 +164,45 @@ namespace Arcontio.View.ArcGraph
             bool enableTerrainBeforeRender,
             bool enableNpcBeforeRender)
         {
+            SetRuntimeRendering(
+                renderTerrain,
+                renderNpc,
+                renderObject: renderNpc,
+                enableTerrainBeforeRender,
+                enableNpcBeforeRender,
+                enableObjectBeforeRender: enableNpcBeforeRender);
+        }
+
+        // =============================================================================
+        // SetRuntimeRendering
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Configura i gate di rendering runtime terrain, NPC e oggetti.
+        /// </para>
+        ///
+        /// <para><b>Queue condivisa, renderer separati</b></para>
+        /// <para>
+        /// Actor e oggetti vengono ancora prodotti da una sola queue ordinata, ma
+        /// sono materializzati da renderer separati. Questo mantiene semplice il
+        /// cablaggio F12 e separa le responsabilita' tra animazioni NPC e oggetti
+        /// fisici come muri, mobili e alberi.
+        /// </para>
+        /// </summary>
+        public void SetRuntimeRendering(
+            bool renderTerrain,
+            bool renderNpc,
+            bool renderObject,
+            bool enableTerrainBeforeRender,
+            bool enableNpcBeforeRender,
+            bool enableObjectBeforeRender)
+        {
             renderTerrainRuntime = renderTerrain;
             renderNpcRuntime = renderNpc;
+            renderObjectRuntime = renderObject;
             enableTerrainRendererBeforeRender = enableTerrainBeforeRender;
             enableNpcRendererBeforeRender = enableNpcBeforeRender;
+            enableObjectRendererBeforeRender = enableObjectBeforeRender;
         }
 
         // =============================================================================
@@ -203,6 +244,20 @@ namespace Arcontio.View.ArcGraph
         public void SetNpcRenderer(ArcGraphNpcRuntimeSceneRenderer renderer)
         {
             npcRenderer = renderer;
+        }
+
+        // =============================================================================
+        // SetObjectRenderer
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna esplicitamente il renderer oggetti runtime che puo' ricevere la
+        /// queue actor/object prodotta dal coordinator.
+        /// </para>
+        /// </summary>
+        public void SetObjectRenderer(ArcGraphObjectRuntimeSceneRenderer renderer)
+        {
+            objectRenderer = renderer;
         }
 
         // =============================================================================
@@ -264,6 +319,7 @@ namespace Arcontio.View.ArcGraph
                     didProcessCoordinator: true,
                     didRenderTerrainRuntime: false,
                     didRenderNpcRuntime: false,
+                    didRenderObjectRuntime: false,
                     didPushQueueToInteractionWrapper: false,
                     disabledDiagnostics,
                     "WrapperDisabled");
@@ -285,6 +341,7 @@ namespace Arcontio.View.ArcGraph
                     didProcessCoordinator: true,
                     didRenderTerrainRuntime: false,
                     didRenderNpcRuntime: false,
+                    didRenderObjectRuntime: false,
                     didPushQueueToInteractionWrapper: false,
                     disabledDiagnostics,
                     "RuntimeMapAdapterMissing");
@@ -307,6 +364,7 @@ namespace Arcontio.View.ArcGraph
 
             bool renderedTerrain = TryRenderTerrainRuntime(context, coordinatorDiagnostics);
             bool renderedNpc = TryRenderNpcRuntime(coordinatorDiagnostics);
+            bool renderedObject = TryRenderObjectRuntime(coordinatorDiagnostics);
             bool pushedQueue = TryPushQueueToInteractionWrapper(coordinatorDiagnostics);
 
             _lastDiagnostics = CreateDiagnostics(
@@ -314,9 +372,10 @@ namespace Arcontio.View.ArcGraph
                 didProcessCoordinator: true,
                 didRenderTerrainRuntime: renderedTerrain,
                 didRenderNpcRuntime: renderedNpc,
+                didRenderObjectRuntime: renderedObject,
                 didPushQueueToInteractionWrapper: pushedQueue,
                 coordinatorDiagnostics,
-                ResolveReason(coordinatorDiagnostics, renderedTerrain, renderedNpc, pushedQueue));
+                ResolveReason(coordinatorDiagnostics, renderedTerrain, renderedNpc, renderedObject, pushedQueue));
 
             LogLastDiagnostics();
             return _lastDiagnostics;
@@ -371,6 +430,28 @@ namespace Arcontio.View.ArcGraph
             return true;
         }
 
+        private bool TryRenderObjectRuntime(
+            ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics)
+        {
+            // Gli oggetti dipendono dalla stessa queue actor/object degli NPC. Se
+            // la queue non e' stata costruita, il renderer non viene chiamato e non
+            // puo' mostrare dati vecchi.
+            if (!renderObjectRuntime)
+                return false;
+
+            if (objectRenderer == null)
+                return false;
+
+            if (!coordinatorDiagnostics.DidBuildActorObjectQueue)
+                return false;
+
+            if (enableObjectRendererBeforeRender)
+                objectRenderer.SetRendererEnabled(true);
+
+            _lastObjectRendererDiagnostics = objectRenderer.RenderFromQueue(_coordinator.RenderQueue);
+            return true;
+        }
+
         private bool TryPushQueueToInteractionWrapper(
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics)
         {
@@ -402,6 +483,7 @@ namespace Arcontio.View.ArcGraph
             bool didProcessCoordinator,
             bool didRenderTerrainRuntime,
             bool didRenderNpcRuntime,
+            bool didRenderObjectRuntime,
             bool didPushQueueToInteractionWrapper,
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics,
             string reason)
@@ -414,22 +496,26 @@ namespace Arcontio.View.ArcGraph
                 interactionWrapper != null,
                 terrainRenderer != null,
                 npcRenderer != null,
+                objectRenderer != null,
                 wrapperEnabled,
                 processInUpdate,
                 refreshSnapshots,
                 buildActorObjectQueue,
                 renderTerrainRuntime,
                 renderNpcRuntime,
+                renderObjectRuntime,
                 pushQueueToInteractionWrapper,
                 enableInteractionWrapperAfterPush,
                 didBuildContext,
                 didProcessCoordinator,
                 didRenderTerrainRuntime,
                 didRenderNpcRuntime,
+                didRenderObjectRuntime,
                 didPushQueueToInteractionWrapper,
                 coordinatorDiagnostics,
                 _lastTerrainRendererDiagnostics,
                 _lastNpcRendererDiagnostics,
+                _lastObjectRendererDiagnostics,
                 reason);
         }
 
@@ -437,13 +523,23 @@ namespace Arcontio.View.ArcGraph
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics,
             bool renderedTerrain,
             bool renderedNpc,
+            bool renderedObject,
             bool pushedQueue)
         {
             if (pushedQueue)
                 return "MinimalRuntimeFrameProcessedAndQueuePushed";
 
+            if (renderedTerrain && renderedNpc && renderedObject)
+                return "MinimalRuntimeFrameProcessedAndRenderedTerrainNpcObject";
+
             if (renderedTerrain && renderedNpc)
                 return "MinimalRuntimeFrameProcessedAndRenderedTerrainNpc";
+
+            if (renderedTerrain && renderedObject)
+                return "MinimalRuntimeFrameProcessedAndRenderedTerrainObject";
+
+            if (renderedObject)
+                return "MinimalRuntimeFrameProcessedAndRenderedObject";
 
             if (renderedTerrain)
                 return "MinimalRuntimeFrameProcessedAndRenderedTerrain";
@@ -472,6 +568,7 @@ namespace Arcontio.View.ArcGraph
                 ", runtimeAdapter=" + _lastDiagnostics.HasRuntimeMapAdapter +
                 ", terrainRenderer=" + _lastDiagnostics.HasTerrainRenderer +
                 ", npcRenderer=" + _lastDiagnostics.HasNpcRenderer +
+                ", objectRenderer=" + _lastDiagnostics.HasObjectRenderer +
                 ", interactionWrapper=" + _lastDiagnostics.HasInteractionWrapper +
                 ", contextBuilt=" + _lastDiagnostics.DidBuildContext +
                 ", coordinatorProcessed=" + _lastDiagnostics.DidProcessCoordinator +
@@ -484,6 +581,8 @@ namespace Arcontio.View.ArcGraph
                 ", terrainReason=" + _lastDiagnostics.TerrainRendererDiagnostics.Reason +
                 ", renderedNpc=" + _lastDiagnostics.DidRenderNpcRuntime +
                 ", npcReason=" + _lastDiagnostics.NpcRendererDiagnostics.Reason +
+                ", renderedObject=" + _lastDiagnostics.DidRenderObjectRuntime +
+                ", objectReason=" + _lastDiagnostics.ObjectRendererDiagnostics.Reason +
                 ", pushedInteraction=" + _lastDiagnostics.DidPushQueueToInteractionWrapper);
         }
     }

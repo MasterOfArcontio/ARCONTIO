@@ -54,6 +54,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphMinimalRuntimeSceneWrapper _wrapper;
         private ArcGraphTerrainRuntimeSceneRenderer _terrainRenderer;
         private ArcGraphNpcRuntimeSceneRenderer _npcRenderer;
+        private ArcGraphObjectRuntimeSceneRenderer _objectRenderer;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
         private ArcGraphSerializedSpriteResolver _spriteResolver;
         private ArcGraphViewModeSwitcher _switcher;
@@ -216,6 +217,7 @@ namespace Arcontio.View.ArcGraph
             _wrapper = _visualRoot.AddComponent<ArcGraphMinimalRuntimeSceneWrapper>();
             _terrainRenderer = _visualRoot.AddComponent<ArcGraphTerrainRuntimeSceneRenderer>();
             _npcRenderer = _visualRoot.AddComponent<ArcGraphNpcRuntimeSceneRenderer>();
+            _objectRenderer = _visualRoot.AddComponent<ArcGraphObjectRuntimeSceneRenderer>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
             _switcher = gameObject.AddComponent<ArcGraphViewModeSwitcher>();
@@ -264,6 +266,12 @@ namespace Arcontio.View.ArcGraph
             _npcRenderer.SetUseLayeredActorCatalog(true);
             _npcRenderer.SetRenderActorShadow(true);
 
+            // Gli oggetti ArcGraph, inclusi i muri wall_stone, usano lo stesso
+            // resolver scene-side. Il resolver supporta anche la forma
+            // sheet#subSprite necessaria alla striscia muro 32x83 sliced.
+            _objectRenderer.SetRuntimeWrapper(_wrapper);
+            _objectRenderer.SetSpriteResolverBehaviour(_spriteResolver);
+
             // Il probe NPC resta passivo: viene solo preparato con lo stesso
             // catalogo e lo stesso resolver del renderer. Non gira in Update, non
             // disegna e non modifica scena; serve al prossimo gate per capire
@@ -274,6 +282,7 @@ namespace Arcontio.View.ArcGraph
             _wrapper.SetRuntimeMapAdapter(_adapter);
             _wrapper.SetTerrainRenderer(_terrainRenderer);
             _wrapper.SetNpcRenderer(_npcRenderer);
+            _wrapper.SetObjectRenderer(_objectRenderer);
         }
 
         // =============================================================================
@@ -294,7 +303,8 @@ namespace Arcontio.View.ArcGraph
                 arcGraphVisualRoots,
                 _wrapper,
                 _terrainRenderer,
-                _npcRenderer);
+                _npcRenderer,
+                _objectRenderer);
         }
 
         // =============================================================================
