@@ -116,11 +116,18 @@ namespace Arcontio.View.ArcGraph
                 {
                     // MapGridData garantisce l'indicizzazione per coordinate in bounds.
                     // L'adapter aggiunge solo il livello z=0, senza inventare altitudini.
+                    //
+                    // Nota importante:
+                    // MapGridData distingue il blocco "fisico/occluder" dal blocco
+                    // di attraversamento del terreno. L'acqua, per esempio, puo'
+                    // non essere camminabile ma deve restare visualmente acqua.
+                    // Passare IsMovementBlocked ad ArcGraph confondeva questi due
+                    // concetti e faceva disegnare l'acqua come blocco legacy/pietra.
                     var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(x, y);
                     target.Add(new ArcGraphTerrainCellSnapshot(
                         cell,
                         map.GetTerrain(x, y),
-                        map.IsMovementBlocked(x, y)));
+                        map.IsBlocked(x, y)));
                 }
             }
         }

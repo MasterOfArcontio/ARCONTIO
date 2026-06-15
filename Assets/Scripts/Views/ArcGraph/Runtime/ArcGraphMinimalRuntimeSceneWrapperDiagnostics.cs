@@ -49,6 +49,9 @@ namespace Arcontio.View.ArcGraph
         public readonly bool DidRenderNpcRuntime;
         public readonly bool DidRenderObjectRuntime;
         public readonly bool DidPushQueueToInteractionWrapper;
+        public readonly int ContextWorldObjectCount;
+        public readonly int FirstContextObjectId;
+        public readonly string FirstContextObjectDefId;
         public readonly ArcGraphMinimalRuntimeCoordinatorDiagnostics CoordinatorDiagnostics;
         public readonly ArcGraphTerrainRuntimeSceneRendererDiagnostics TerrainRendererDiagnostics;
         public readonly ArcGraphNpcRuntimeSceneRendererDiagnostics NpcRendererDiagnostics;
@@ -91,6 +94,9 @@ namespace Arcontio.View.ArcGraph
             bool didRenderNpcRuntime,
             bool didRenderObjectRuntime,
             bool didPushQueueToInteractionWrapper,
+            int contextWorldObjectCount,
+            int firstContextObjectId,
+            string firstContextObjectDefId,
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics,
             ArcGraphTerrainRuntimeSceneRendererDiagnostics terrainRendererDiagnostics,
             ArcGraphNpcRuntimeSceneRendererDiagnostics npcRendererDiagnostics,
@@ -117,6 +123,11 @@ namespace Arcontio.View.ArcGraph
             DidRenderNpcRuntime = didRenderNpcRuntime;
             DidRenderObjectRuntime = didRenderObjectRuntime;
             DidPushQueueToInteractionWrapper = didPushQueueToInteractionWrapper;
+            ContextWorldObjectCount = contextWorldObjectCount < 0 ? 0 : contextWorldObjectCount;
+            FirstContextObjectId = firstContextObjectId;
+            FirstContextObjectDefId = string.IsNullOrWhiteSpace(firstContextObjectDefId)
+                ? string.Empty
+                : firstContextObjectDefId;
             CoordinatorDiagnostics = coordinatorDiagnostics;
             TerrainRendererDiagnostics = terrainRendererDiagnostics;
             NpcRendererDiagnostics = npcRendererDiagnostics;

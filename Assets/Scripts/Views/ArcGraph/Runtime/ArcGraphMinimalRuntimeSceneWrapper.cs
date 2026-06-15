@@ -321,6 +321,9 @@ namespace Arcontio.View.ArcGraph
                     didRenderNpcRuntime: false,
                     didRenderObjectRuntime: false,
                     didPushQueueToInteractionWrapper: false,
+                    contextWorldObjectCount: 0,
+                    firstContextObjectId: -1,
+                    firstContextObjectDefId: string.Empty,
                     disabledDiagnostics,
                     "WrapperDisabled");
 
@@ -343,6 +346,9 @@ namespace Arcontio.View.ArcGraph
                     didRenderNpcRuntime: false,
                     didRenderObjectRuntime: false,
                     didPushQueueToInteractionWrapper: false,
+                    contextWorldObjectCount: 0,
+                    firstContextObjectId: -1,
+                    firstContextObjectDefId: string.Empty,
                     disabledDiagnostics,
                     "RuntimeMapAdapterMissing");
 
@@ -362,6 +368,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics =
                 _coordinator.Process(frame);
 
+            int contextWorldObjectCount = CountContextWorldObjects(context);
+            int firstContextObjectId = ResolveFirstContextObjectId(context, out string firstContextObjectDefId);
             bool renderedTerrain = TryRenderTerrainRuntime(context, coordinatorDiagnostics);
             bool renderedNpc = TryRenderNpcRuntime(coordinatorDiagnostics);
             bool renderedObject = TryRenderObjectRuntime(coordinatorDiagnostics);
@@ -374,6 +382,9 @@ namespace Arcontio.View.ArcGraph
                 didRenderNpcRuntime: renderedNpc,
                 didRenderObjectRuntime: renderedObject,
                 didPushQueueToInteractionWrapper: pushedQueue,
+                contextWorldObjectCount,
+                firstContextObjectId,
+                firstContextObjectDefId,
                 coordinatorDiagnostics,
                 ResolveReason(coordinatorDiagnostics, renderedTerrain, renderedNpc, renderedObject, pushedQueue));
 
@@ -485,6 +496,9 @@ namespace Arcontio.View.ArcGraph
             bool didRenderNpcRuntime,
             bool didRenderObjectRuntime,
             bool didPushQueueToInteractionWrapper,
+            int contextWorldObjectCount,
+            int firstContextObjectId,
+            string firstContextObjectDefId,
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics,
             string reason)
         {
@@ -512,6 +526,9 @@ namespace Arcontio.View.ArcGraph
                 didRenderNpcRuntime,
                 didRenderObjectRuntime,
                 didPushQueueToInteractionWrapper,
+                contextWorldObjectCount,
+                firstContextObjectId,
+                firstContextObjectDefId,
                 coordinatorDiagnostics,
                 _lastTerrainRendererDiagnostics,
                 _lastNpcRendererDiagnostics,
@@ -583,7 +600,66 @@ namespace Arcontio.View.ArcGraph
                 ", npcReason=" + _lastDiagnostics.NpcRendererDiagnostics.Reason +
                 ", renderedObject=" + _lastDiagnostics.DidRenderObjectRuntime +
                 ", objectReason=" + _lastDiagnostics.ObjectRendererDiagnostics.Reason +
+                ", contextWorldObjects=" + _lastDiagnostics.ContextWorldObjectCount +
+                ", firstContextObjectId=" + _lastDiagnostics.FirstContextObjectId +
+                ", firstContextObjectDefId=" + _lastDiagnostics.FirstContextObjectDefId +
                 ", pushedInteraction=" + _lastDiagnostics.DidPushQueueToInteractionWrapper);
+        }
+
+        // =============================================================================
+        // CountContextWorldObjects
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Conta gli oggetti presenti nel World ricevuto dal context del frame.
+        /// </para>
+        ///
+        /// <para><b>Diagnostica del ponte, non lettura decisionale</b></para>
+        /// <para>
+        /// Questo conteggio serve solo a capire se ArcGraph sta leggendo lo stesso
+        /// World che i DevTools hanno modificato con F3. Non viene usato per
+        /// decidere rendering, pathfinding o logica simulativa.
+        /// </para>
+        /// </summary>
+        private static int CountContextWorldObjects(ArcGraphRuntimeContext context)
+        {
+            return context?.World?.Objects != null
+                ? context.World.Objects.Count
+                : 0;
+        }
+
+        // =============================================================================
+        // ResolveFirstContextObjectId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Recupera un primo oggetto diagnostico dal World ricevuto da ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Uso previsto</b></para>
+        /// <para>
+        /// Se dopo un piazzamento F3 questo valore resta <c>-1</c>, il problema e'
+        /// prima della render queue: ArcGraph non sta leggendo un World con oggetti.
+        /// Se invece mostra <c>wall_stone</c> ma la queue resta vuota, il problema e'
+        /// nello snapshot/layer/LOD oggetti.
+        /// </para>
+        /// </summary>
+        private static int ResolveFirstContextObjectId(
+            ArcGraphRuntimeContext context,
+            out string firstObjectDefId)
+        {
+            firstObjectDefId = string.Empty;
+
+            if (context?.World?.Objects == null || context.World.Objects.Count <= 0)
+                return -1;
+
+            foreach (var pair in context.World.Objects)
+            {
+                firstObjectDefId = pair.Value != null ? pair.Value.DefId : string.Empty;
+                return pair.Key;
+            }
+
+            return -1;
         }
     }
 }
