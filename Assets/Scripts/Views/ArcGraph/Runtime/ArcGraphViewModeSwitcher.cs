@@ -324,6 +324,29 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // LogViewSwitchGateProbeFromInspector
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scrive in Console una diagnostica sintetica per il gate manuale F12.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: gate visuale assistito, non automazione del test</b></para>
+        /// <para>
+        /// Il metodo non alterna modalita', non crea componenti, non processa frame
+        /// e non muta il mondo simulativo. Serve solo a leggere lo stato gia'
+        /// applicato dallo switcher dopo uno Start o dopo una pressione di F12.
+        /// L'operatore umano resta responsabile della validazione visiva:
+        /// terrain, NPC, muri e preview devono essere osservati in Game view.
+        /// </para>
+        /// </summary>
+        [ContextMenu("ArcGraph/Log F12 Manual Gate Probe")]
+        public void LogViewSwitchGateProbeFromInspector()
+        {
+            LogViewSwitchGateProbe();
+        }
+
+        // =============================================================================
         // ToggleMode
         // =============================================================================
         /// <summary>
@@ -338,6 +361,60 @@ namespace Arcontio.View.ArcGraph
                 : ArcGraphViewMode.ArcGraph;
 
             SetMode(nextMode, didToggle: true);
+        }
+
+        // =============================================================================
+        // LogViewSwitchGateProbe
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce una lettura diagnostica dello stato corrente dello switch F12.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Cablaggio</b>: verifica presenza di root MapGrid, root ArcGraph, wrapper e renderer.</item>
+        ///   <item><b>Coerenza modalita'</b>: verifica che i root attivi siano coerenti con la modalita' corrente.</item>
+        ///   <item><b>Esito</b>: segnala se il gate e' pronto per controllo visivo o se manca un prerequisito tecnico.</item>
+        /// </list>
+        /// </summary>
+        public void LogViewSwitchGateProbe()
+        {
+            int mapGridRootCount = CountAssignedRoots(mapGridVisualRoots);
+            int arcGraphRootCount = CountAssignedRoots(arcGraphVisualRoots);
+            int mapGridActiveCount = CountActiveRoots(mapGridVisualRoots);
+            int arcGraphActiveCount = CountActiveRoots(arcGraphVisualRoots);
+            bool hasVisualRoots = mapGridRootCount > 0 && arcGraphRootCount > 0;
+            bool hasRuntimeWiring = runtimeWrapper != null
+                && terrainRenderer != null
+                && npcRenderer != null
+                && objectRenderer != null;
+            bool rootsMatchCurrentMode = AreRootsCoherentWithCurrentMode(
+                mapGridActiveCount,
+                arcGraphActiveCount);
+            bool readyForVisualCheck = switcherEnabled
+                && _hasAppliedMode
+                && hasVisualRoots
+                && hasRuntimeWiring
+                && rootsMatchCurrentMode;
+
+            Debug.Log(
+                "[ArcGraphViewModeSwitcher] F12ManualGateProbe " +
+                "readyForVisualCheck=" + readyForVisualCheck +
+                ", enabled=" + switcherEnabled +
+                ", modeApplied=" + _hasAppliedMode +
+                ", mode=" + _currentMode +
+                ", key=" + toggleKey +
+                ", mapGridRoots=" + mapGridRootCount +
+                ", arcGraphRoots=" + arcGraphRootCount +
+                ", mapGridActiveRoots=" + mapGridActiveCount +
+                ", arcGraphActiveRoots=" + arcGraphActiveCount +
+                ", wrapper=" + (runtimeWrapper != null) +
+                ", terrainRenderer=" + (terrainRenderer != null) +
+                ", npcRenderer=" + (npcRenderer != null) +
+                ", objectRenderer=" + (objectRenderer != null) +
+                ", rootsCoherent=" + rootsMatchCurrentMode +
+                ", expectedHumanCheck=terrain+npc+muri+previewF3");
         }
 
         // =============================================================================
@@ -458,6 +535,33 @@ namespace Arcontio.View.ArcGraph
 
             if (objectRenderer != null)
                 objectRenderer.ClearRuntimeRenderer();
+        }
+
+        // =============================================================================
+        // AreRootsCoherentWithCurrentMode
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se lo stato active dei root visuali e' coerente con la modalita'
+        /// corrente.
+        /// </para>
+        ///
+        /// <para>
+        /// In modalita' ArcGraph ci aspettiamo almeno un root ArcGraph attivo e
+        /// nessun root MapGrid visuale attivo. In modalita' MapGrid ci aspettiamo
+        /// almeno un root MapGrid attivo e nessun root ArcGraph attivo. La funzione
+        /// controlla solo i root assegnati allo switcher: altri overlay legacy non
+        /// ancora migrati restano fuori da questo gate tecnico.
+        /// </para>
+        /// </summary>
+        private bool AreRootsCoherentWithCurrentMode(
+            int mapGridActiveCount,
+            int arcGraphActiveCount)
+        {
+            if (_currentMode == ArcGraphViewMode.ArcGraph)
+                return mapGridActiveCount == 0 && arcGraphActiveCount > 0;
+
+            return mapGridActiveCount > 0 && arcGraphActiveCount == 0;
         }
 
         private static void SetRootsActive(

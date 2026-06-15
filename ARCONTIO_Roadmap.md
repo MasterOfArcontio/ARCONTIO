@@ -15323,6 +15323,53 @@ v0.38k.02 - Test manuale F12:
 MapGrid -> ArcGraph -> MapGrid, verificando terrain, NPC, muri e preview F3.
 ```
 
+Esito operativo `v0.38k.02 - Preparazione gate manuale F12`:
+
+```text
+PRONTO PER TEST OPERATORE, NON ANCORA VALIDATO VISIVAMENTE
+```
+
+Supporto aggiunto:
+
+- `ArcGraphViewModeSwitcher` espone il context menu
+  `ArcGraph/Log F12 Manual Gate Probe`;
+- il probe non cambia modalita', non processa frame, non crea oggetti e non
+  modifica il `World`;
+- il probe scrive in Console una riga `F12ManualGateProbe`;
+- il campo `readyForVisualCheck=True` indica solo che il cablaggio tecnico e'
+  coerente per eseguire il controllo umano;
+- il campo non sostituisce la validazione visiva di terrain, NPC, muri e preview
+  F3.
+
+Formato atteso della riga Console:
+
+```text
+[ArcGraphViewModeSwitcher] F12ManualGateProbe
+readyForVisualCheck=True/False,
+mode=MapGrid/ArcGraph,
+mapGridRoots=N,
+arcGraphRoots=N,
+mapGridActiveRoots=N,
+arcGraphActiveRoots=N,
+wrapper=True/False,
+terrainRenderer=True/False,
+npcRenderer=True/False,
+objectRenderer=True/False,
+rootsCoherent=True/False
+```
+
+Lettura operativa:
+
+- in modalita' MapGrid e' corretto avere `mapGridActiveRoots > 0` e
+  `arcGraphActiveRoots = 0`;
+- in modalita' ArcGraph e' corretto avere `mapGridActiveRoots = 0` e
+  `arcGraphActiveRoots > 0`;
+- se `rootsCoherent=False`, il problema e' nello switch dei root visuali;
+- se uno tra `wrapper`, `terrainRenderer`, `npcRenderer` o `objectRenderer` e'
+  `False`, il problema e' nel cablaggio auto-installer;
+- se il probe e' verde ma il Game view e' sbagliato, il problema e' nel renderer
+  specifico o negli asset, non nello switch F12.
+
 ---
 
 ### v0.38l - ArcGraph Interaction Minimum Gate

@@ -108,7 +108,8 @@ MICRO-ROADMAP OPERATIVA v0.38j:
 ✅ v0.38j.08 -> COMPLETATO - Gate visuale muri/F3: inserimento, preview, connessioni, sorting e allineamento sprite
 ⏳ v0.38k -> IN CORSO - Runtime Switch Stabilization: F12, root visuali, auto-installer e diagnostica
 ✅ v0.38k.01 -> COMPLETATO - Late binding robusto: root MapGrid trovati anche se inattivi e stato F12 riapplicato senza frame extra
-⏳ v0.38k.02 -> PROSSIMO - Gate manuale F12: MapGrid -> ArcGraph -> MapGrid, terrain/NPC/muri/preview
+⏳ v0.38k.02 -> PRONTO PER TEST OPERATORE - Gate manuale F12 assistito da probe Console: MapGrid -> ArcGraph -> MapGrid, terrain/NPC/muri/preview
+⏳ v0.38k.03 -> PROSSIMO CONDIZIONALE - Fix mirato solo se il gate F12 fallisce
 ```
 
 ROADMAP BIOSFERA v0.39-v0.52 - STATO DOCUMENTALE / FOUNDATION:
