@@ -15326,7 +15326,7 @@ MapGrid -> ArcGraph -> MapGrid, verificando terrain, NPC, muri e preview F3.
 Esito operativo `v0.38k.02 - Preparazione gate manuale F12`:
 
 ```text
-PRONTO PER TEST OPERATORE, NON ANCORA VALIDATO VISIVAMENTE
+SUPERATO NEL GATE VISUALE OPERATORE
 ```
 
 Supporto aggiunto:
@@ -15369,6 +15369,44 @@ Lettura operativa:
   `False`, il problema e' nel cablaggio auto-installer;
 - se il probe e' verde ma il Game view e' sbagliato, il problema e' nel renderer
   specifico o negli asset, non nello switch F12.
+
+Validazione operatore:
+
+```text
+CONFERMATA
+```
+
+Valori confermati in modalita' ArcGraph:
+
+```text
+readyForVisualCheck=True
+rootsCoherent=True
+arcGraphActiveRoots > 0
+mapGridActiveRoots = 0
+```
+
+Valori confermati in modalita' MapGrid:
+
+```text
+readyForVisualCheck=True
+rootsCoherent=True
+mapGridActiveRoots > 0
+arcGraphActiveRoots = 0
+```
+
+Conclusione `v0.38k`:
+
+```text
+COMPLETATA
+```
+
+Lo switch F12 e' ora considerato tecnicamente stabile nel gate minimo:
+
+- MapGrid e ArcGraph alternano correttamente i root visuali;
+- il cablaggio auto-installer risulta presente;
+- wrapper, terrain renderer, NPC renderer e object renderer risultano collegati;
+- non sono richiesti fix mirati `v0.38k.03`;
+- il passaggio successivo puo' concentrarsi sull'interazione minima ArcGraph.
 
 ---
 
