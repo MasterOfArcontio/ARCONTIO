@@ -35,7 +35,9 @@ namespace Arcontio.View.EnvironmentDebug
         private const int DefaultTelemetryCapacity = 1200;
         private const int MinimumTelemetryCapacity = 32;
         private const int MaximumTelemetryCapacity = 10000;
-        private const float GraphHeight = 180f;
+        private const float DefaultPanelWidth = 780f;
+        private const float DefaultPanelHeight = 1120f;
+        private const float GraphHeight = 360f;
         private const float PlantGraphScale = 24f;
 
         [SerializeField] private bool controllerEnabled;
@@ -53,7 +55,8 @@ namespace Arcontio.View.EnvironmentDebug
         [SerializeField] private int telemetryCapacity = DefaultTelemetryCapacity;
         [SerializeField] private EnvironmentProtectedTestSpeedPreset speedPreset =
             EnvironmentProtectedTestSpeedPreset.Paused;
-        [SerializeField] private Rect panelRect = new Rect(16f, 16f, 390f, 560f);
+        [SerializeField] private Rect panelRect =
+            new Rect(16f, 16f, DefaultPanelWidth, DefaultPanelHeight);
 
         private EnvironmentProtectedTestDriver _driver;
         private EnvironmentProtectedTestAdvanceReport _lastReport;
@@ -177,6 +180,7 @@ namespace Arcontio.View.EnvironmentDebug
                 return;
 
             EnsureDriver();
+            EnsurePanelMinimumSize();
             panelRect = GUI.Window(
                 GetInstanceID(),
                 panelRect,
@@ -254,7 +258,15 @@ namespace Arcontio.View.EnvironmentDebug
 
         private void DrawPanelWindow(int windowId)
         {
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Width(374f), GUILayout.Height(520f));
+            // La finestra e il suo scroll sono stati raddoppiati su entrambi gli assi
+            // rispetto al primo pannello debug: l'area utile cresce circa quattro
+            // volte e il grafico diventa leggibile anche con molte curve attive.
+            float scrollWidth = Mathf.Max(374f, panelRect.width - 16f);
+            float scrollHeight = Mathf.Max(520f, panelRect.height - 40f);
+            _scroll = GUILayout.BeginScrollView(
+                _scroll,
+                GUILayout.Width(scrollWidth),
+                GUILayout.Height(scrollHeight));
 
             DrawGateControls();
             GUILayout.Space(8f);
@@ -406,7 +418,9 @@ namespace Arcontio.View.EnvironmentDebug
 
             // Il layout assegna un rettangolo stabile al grafico: le curve non
             // ridimensionano il pannello mentre i valori cambiano.
-            Rect graphRect = GUILayoutUtility.GetRect(350f, GraphHeight);
+            Rect graphRect = GUILayoutUtility.GetRect(
+                Mathf.Max(350f, panelRect.width - 40f),
+                GraphHeight);
             DrawTelemetryGraph(graphRect);
             DrawTelemetryLegend();
         }
@@ -606,6 +620,26 @@ namespace Arcontio.View.EnvironmentDebug
             _lastReport = _driver.LastReport;
             ResetTelemetryHistory();
             RecordTelemetrySample(true);
+        }
+
+        // =============================================================================
+        // EnsurePanelMinimumSize
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Forza una dimensione minima leggibile per il pannello debug.
+        /// </para>
+        /// </summary>
+        private void EnsurePanelMinimumSize()
+        {
+            // Il valore di panelRect puo' essere gia' serializzato in scena con la
+            // dimensione precedente. Questo controllo runtime aggiorna anche quei
+            // componenti esistenti senza richiedere ricreazione manuale.
+            if (panelRect.width < DefaultPanelWidth)
+                panelRect.width = DefaultPanelWidth;
+
+            if (panelRect.height < DefaultPanelHeight)
+                panelRect.height = DefaultPanelHeight;
         }
 
         // =============================================================================
