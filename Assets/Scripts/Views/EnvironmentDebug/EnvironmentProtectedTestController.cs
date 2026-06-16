@@ -24,6 +24,7 @@ namespace Arcontio.View.EnvironmentDebug
     /// <list type="bullet">
     ///   <item><b>controllerEnabled/processInUpdate</b>: gate manuali dell'avanzamento automatico.</item>
     ///   <item><b>speedPreset</b>: conversione secondi reali/tick ambientali.</item>
+    ///   <item><b>telemetry</b>: history runtime in memoria per disegnare grafici diagnostici.</item>
     ///   <item><b>Update</b>: avanza solo quando i gate sono attivi.</item>
     ///   <item><b>OnGUI</b>: pannello dati e comandi manuali.</item>
     ///   <item><b>ContextMenu</b>: comandi rapidi da Inspector.</item>
@@ -31,10 +32,25 @@ namespace Arcontio.View.EnvironmentDebug
     /// </summary>
     public sealed class EnvironmentProtectedTestController : MonoBehaviour
     {
+        private const int DefaultTelemetryCapacity = 1200;
+        private const int MinimumTelemetryCapacity = 32;
+        private const int MaximumTelemetryCapacity = 10000;
+        private const float GraphHeight = 180f;
+        private const float PlantGraphScale = 24f;
+
         [SerializeField] private bool controllerEnabled;
         [SerializeField] private bool processInUpdate;
         [SerializeField] private bool showPanel = true;
         [SerializeField] private bool logDiagnostics;
+        [SerializeField] private bool showTelemetryGraph = true;
+        [SerializeField] private bool sampleTelemetryOnDayChange = true;
+        [SerializeField] private bool graphFertility = true;
+        [SerializeField] private bool graphWater = true;
+        [SerializeField] private bool graphVegetation = true;
+        [SerializeField] private bool graphSeedBank = true;
+        [SerializeField] private bool graphClimate;
+        [SerializeField] private bool graphPlants = true;
+        [SerializeField] private int telemetryCapacity = DefaultTelemetryCapacity;
         [SerializeField] private EnvironmentProtectedTestSpeedPreset speedPreset =
             EnvironmentProtectedTestSpeedPreset.Paused;
         [SerializeField] private Rect panelRect = new Rect(16f, 16f, 390f, 560f);
@@ -42,7 +58,89 @@ namespace Arcontio.View.EnvironmentDebug
         private EnvironmentProtectedTestDriver _driver;
         private EnvironmentProtectedTestAdvanceReport _lastReport;
         private EnvironmentProtectedTestHarnessResult _lastHarness;
+        private EnvironmentProtectedTelemetrySample[] _telemetrySamples;
+        private Texture2D _graphPixel;
         private Vector2 _scroll;
+        private int _telemetryStart;
+        private int _telemetryCount;
+        private long _lastTelemetryDay = -1L;
+
+        // =============================================================================
+        // EnvironmentProtectedTelemetrySample
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Campione compatto della biosfera usato dal grafico runtime protetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: diagnostica locale senza persistenza</b></para>
+        /// <para>
+        /// Il campione e' una copia dei valori read-only gia' esposti dal full
+        /// snapshot. Non conserva riferimenti mutabili, non scrive file, non crea
+        /// asset e non diventa parte del contratto produttivo della simulazione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Tick/Day</b>: coordinate temporali del campione.</item>
+        ///   <item><b>Fertility/Water</b>: stato sintetico dei layer fisici.</item>
+        ///   <item><b>Vegetation*</b>: densita' e salute della vegetazione diffusa.</item>
+        ///   <item><b>Seed*</b>: amount e viability della seed bank.</item>
+        ///   <item><b>Climate*</b>: temperatura, umidita' e aridita' globali.</item>
+        ///   <item><b>PlantCount</b>: numero di piante importanti nello snapshot.</item>
+        /// </list>
+        /// </summary>
+        private readonly struct EnvironmentProtectedTelemetrySample
+        {
+            public readonly long Tick;
+            public readonly long Day;
+            public readonly float Fertility;
+            public readonly float Water;
+            public readonly float VegetationDensity;
+            public readonly float VegetationHealth;
+            public readonly float SeedAmount;
+            public readonly float SeedViability;
+            public readonly float Temperature;
+            public readonly float Humidity;
+            public readonly float Aridity;
+            public readonly int PlantCount;
+
+            // =============================================================================
+            // EnvironmentProtectedTelemetrySample
+            // =============================================================================
+            /// <summary>
+            /// <para>
+            /// Costruisce un campione normalizzato per il grafico.
+            /// </para>
+            /// </summary>
+            public EnvironmentProtectedTelemetrySample(
+                long tick,
+                long day,
+                float fertility,
+                float water,
+                float vegetationDensity,
+                float vegetationHealth,
+                float seedAmount,
+                float seedViability,
+                float temperature,
+                float humidity,
+                float aridity,
+                int plantCount)
+            {
+                Tick = tick < 0 ? 0 : tick;
+                Day = day < 0 ? 0 : day;
+                Fertility = Mathf.Clamp01(fertility);
+                Water = Mathf.Clamp01(water);
+                VegetationDensity = Mathf.Clamp01(vegetationDensity);
+                VegetationHealth = Mathf.Clamp01(vegetationHealth);
+                SeedAmount = Mathf.Clamp01(seedAmount);
+                SeedViability = Mathf.Clamp01(seedViability);
+                Temperature = Mathf.Clamp01(temperature);
+                Humidity = Mathf.Clamp01(humidity);
+                Aridity = Mathf.Clamp01(aridity);
+                PlantCount = plantCount < 0 ? 0 : plantCount;
+            }
+        }
 
         // =============================================================================
         // Update
@@ -62,6 +160,7 @@ namespace Arcontio.View.EnvironmentDebug
             _lastReport = _driver.AdvanceRealSeconds(
                 Time.unscaledDeltaTime,
                 speedPreset);
+            RecordTelemetrySample(false);
         }
 
         // =============================================================================
@@ -99,6 +198,8 @@ namespace Arcontio.View.EnvironmentDebug
             EnsureDriver();
             _driver.ResetToProtectedDefaults();
             _lastReport = _driver.LastReport;
+            ResetTelemetryHistory();
+            RecordTelemetrySample(true);
             Log("Bootstrap protetto completato.");
         }
 
@@ -115,6 +216,7 @@ namespace Arcontio.View.EnvironmentDebug
         {
             EnsureDriver();
             _lastReport = _driver.AdvanceDays(1);
+            RecordTelemetrySample(true);
             Log("Step giorno completato.");
         }
 
@@ -131,6 +233,7 @@ namespace Arcontio.View.EnvironmentDebug
         {
             EnsureDriver();
             _lastReport = _driver.AdvanceMonths(1);
+            RecordTelemetrySample(true);
             Log("Step mese completato.");
         }
 
@@ -160,6 +263,8 @@ namespace Arcontio.View.EnvironmentDebug
             DrawManualStepControls();
             GUILayout.Space(8f);
             DrawSnapshotData();
+            GUILayout.Space(8f);
+            DrawTelemetryGraphPanel();
             GUILayout.Space(8f);
             DrawLastReport();
 
@@ -205,18 +310,36 @@ namespace Arcontio.View.EnvironmentDebug
             GUILayout.Label("Step manuali");
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("+1h"))
+            {
                 _lastReport = _driver.AdvanceHours(1);
+                RecordTelemetrySample(true);
+            }
+
             if (GUILayout.Button("+1g"))
+            {
                 _lastReport = _driver.AdvanceDays(1);
+                RecordTelemetrySample(true);
+            }
+
             if (GUILayout.Button("+1m"))
+            {
                 _lastReport = _driver.AdvanceMonths(1);
+                RecordTelemetrySample(true);
+            }
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("+1 stagione"))
+            {
                 _lastReport = _driver.AdvanceSeasons(1);
+                RecordTelemetrySample(true);
+            }
+
             if (GUILayout.Button("+1 anno"))
+            {
                 _lastReport = _driver.AdvanceYears(1);
+                RecordTelemetrySample(true);
+            }
             GUILayout.EndHorizontal();
 
             GUILayout.BeginHorizontal();
@@ -224,6 +347,8 @@ namespace Arcontio.View.EnvironmentDebug
             {
                 _driver.ResetToProtectedDefaults();
                 _lastReport = _driver.LastReport;
+                ResetTelemetryHistory();
+                RecordTelemetrySample(true);
             }
 
             if (GUILayout.Button("Harness"))
@@ -235,6 +360,141 @@ namespace Arcontio.View.EnvironmentDebug
                 GUILayout.Label("Harness: " + (_lastHarness.Passed ? "OK" : "FAIL"));
                 GUILayout.Label(_lastHarness.Message);
             }
+        }
+
+        // =============================================================================
+        // DrawTelemetryGraphPanel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna controlli e grafico della telemetria runtime.
+        /// </para>
+        /// </summary>
+        private void DrawTelemetryGraphPanel()
+        {
+            GUILayout.Label("Grafico runtime");
+            showTelemetryGraph = GUILayout.Toggle(showTelemetryGraph, "showTelemetryGraph");
+            sampleTelemetryOnDayChange = GUILayout.Toggle(
+                sampleTelemetryOnDayChange,
+                "sampleTelemetryOnDayChange");
+
+            GUILayout.BeginHorizontal();
+            graphFertility = GUILayout.Toggle(graphFertility, "Fert");
+            graphWater = GUILayout.Toggle(graphWater, "Water");
+            graphVegetation = GUILayout.Toggle(graphVegetation, "Veg");
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            graphSeedBank = GUILayout.Toggle(graphSeedBank, "Seed");
+            graphClimate = GUILayout.Toggle(graphClimate, "Climate");
+            graphPlants = GUILayout.Toggle(graphPlants, "Plants");
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("Samples: " + _telemetryCount + "/" + ResolveTelemetryCapacity());
+            if (GUILayout.Button("Sample"))
+                RecordTelemetrySample(true);
+            if (GUILayout.Button("Clear Graph"))
+            {
+                ResetTelemetryHistory();
+                RecordTelemetrySample(true);
+            }
+            GUILayout.EndHorizontal();
+
+            if (!showTelemetryGraph)
+                return;
+
+            // Il layout assegna un rettangolo stabile al grafico: le curve non
+            // ridimensionano il pannello mentre i valori cambiano.
+            Rect graphRect = GUILayoutUtility.GetRect(350f, GraphHeight);
+            DrawTelemetryGraph(graphRect);
+            DrawTelemetryLegend();
+        }
+
+        // =============================================================================
+        // DrawTelemetryGraph
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna assi, griglia e curve della telemetria.
+        /// </para>
+        /// </summary>
+        private void DrawTelemetryGraph(Rect rect)
+        {
+            EnsureGraphPixel();
+            DrawGraphBackground(rect);
+
+            if (_telemetryCount < 2)
+            {
+                GUI.Label(rect, "In attesa di campioni...");
+                return;
+            }
+
+            if (graphFertility)
+                DrawTelemetrySeries(rect, new Color(0.85f, 0.74f, 0.35f), GetFertilityValue);
+
+            if (graphWater)
+                DrawTelemetrySeries(rect, new Color(0.25f, 0.65f, 1.00f), GetWaterValue);
+
+            if (graphVegetation)
+            {
+                DrawTelemetrySeries(rect, new Color(0.20f, 0.82f, 0.32f), GetVegetationDensityValue);
+                DrawTelemetrySeries(rect, new Color(0.52f, 1.00f, 0.45f), GetVegetationHealthValue);
+            }
+
+            if (graphSeedBank)
+            {
+                DrawTelemetrySeries(rect, new Color(0.90f, 0.52f, 0.22f), GetSeedAmountValue);
+                DrawTelemetrySeries(rect, new Color(1.00f, 0.34f, 0.18f), GetSeedViabilityValue);
+            }
+
+            if (graphClimate)
+            {
+                DrawTelemetrySeries(rect, new Color(1.00f, 0.42f, 0.38f), GetTemperatureValue);
+                DrawTelemetrySeries(rect, new Color(0.35f, 0.78f, 1.00f), GetHumidityValue);
+                DrawTelemetrySeries(rect, new Color(0.82f, 0.66f, 0.42f), GetAridityValue);
+            }
+
+            if (graphPlants)
+                DrawTelemetrySeries(rect, new Color(0.82f, 0.50f, 1.00f), GetPlantValue);
+        }
+
+        // =============================================================================
+        // DrawTelemetryLegend
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna la legenda testuale dei valori tracciati.
+        /// </para>
+        /// </summary>
+        private void DrawTelemetryLegend()
+        {
+            if (_telemetryCount <= 0)
+                return;
+
+            var latest = GetTelemetrySample(_telemetryCount - 1);
+            GUILayout.Label(
+                "Latest d" + latest.Day
+                + " fert=" + latest.Fertility.ToString("0.00")
+                + " water=" + latest.Water.ToString("0.00"));
+            GUILayout.Label(
+                "veg dens/health="
+                + latest.VegetationDensity.ToString("0.00")
+                + "/"
+                + latest.VegetationHealth.ToString("0.00")
+                + " seed amount/via="
+                + latest.SeedAmount.ToString("0.00")
+                + "/"
+                + latest.SeedViability.ToString("0.00"));
+            GUILayout.Label(
+                "clima T/H/A="
+                + latest.Temperature.ToString("0.00")
+                + "/"
+                + latest.Humidity.ToString("0.00")
+                + "/"
+                + latest.Aridity.ToString("0.00")
+                + " plants="
+                + latest.PlantCount);
         }
 
         private void DrawSnapshotData()
@@ -344,6 +604,331 @@ namespace Arcontio.View.EnvironmentDebug
             _driver = new EnvironmentProtectedTestDriver();
             _driver.Bootstrap();
             _lastReport = _driver.LastReport;
+            ResetTelemetryHistory();
+            RecordTelemetrySample(true);
+        }
+
+        // =============================================================================
+        // RecordTelemetrySample
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un campione della biosfera corrente nella history del grafico.
+        /// </para>
+        /// </summary>
+        private void RecordTelemetrySample(bool force)
+        {
+            EnsureTelemetryStorage();
+
+            var snapshot = _driver.FullSnapshot;
+            long tick = snapshot.Calendar.ElapsedEnvironmentTicks;
+            long ticksPerDay = EnvironmentProtectedTestDriver.ResolveTicksPerDay(_driver.Config.calendar);
+            long day = ticksPerDay <= 0 ? 0 : tick / ticksPerDay;
+
+            // In modalita' giornaliera evitiamo di campionare ogni frame. Il grafico
+            // resta leggibile anche con velocita' alte e non cresce inutilmente.
+            if (!force && sampleTelemetryOnDayChange && day == _lastTelemetryDay)
+                return;
+
+            var sample = CreateTelemetrySample(snapshot, tick, day);
+            int capacity = ResolveTelemetryCapacity();
+            int writeIndex = (_telemetryStart + _telemetryCount) % capacity;
+
+            if (_telemetryCount == capacity)
+            {
+                writeIndex = _telemetryStart;
+                _telemetryStart = (_telemetryStart + 1) % capacity;
+            }
+            else
+            {
+                _telemetryCount++;
+            }
+
+            _telemetrySamples[writeIndex] = sample;
+            _lastTelemetryDay = day;
+        }
+
+        // =============================================================================
+        // CreateTelemetrySample
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Estrae i valori principali dal full snapshot corrente.
+        /// </para>
+        /// </summary>
+        private static EnvironmentProtectedTelemetrySample CreateTelemetrySample(
+            EnvironmentFullSnapshot snapshot,
+            long tick,
+            long day)
+        {
+            float fertility = snapshot.FertilityAreas.Count > 0
+                ? snapshot.FertilityAreas[0].CurrentFertility01
+                : 0f;
+            float water = snapshot.WaterAreas.Count > 0
+                ? snapshot.WaterAreas[0].WaterLevel01
+                : 0f;
+            float vegetationDensity = snapshot.VegetationAreas.Count > 0
+                ? snapshot.VegetationAreas[0].Density01
+                : 0f;
+            float vegetationHealth = snapshot.VegetationAreas.Count > 0
+                ? snapshot.VegetationAreas[0].Health01
+                : 0f;
+            float seedAmount = snapshot.SeedBankAreas.Count > 0
+                ? snapshot.SeedBankAreas[0].TotalAmount01
+                : 0f;
+            float seedViability = snapshot.SeedBankAreas.Count > 0
+                ? snapshot.SeedBankAreas[0].AverageViability01
+                : 0f;
+
+            return new EnvironmentProtectedTelemetrySample(
+                tick,
+                day,
+                fertility,
+                water,
+                vegetationDensity,
+                vegetationHealth,
+                seedAmount,
+                seedViability,
+                snapshot.Climate.Temperature01,
+                snapshot.Climate.Humidity01,
+                snapshot.Climate.Aridity01,
+                snapshot.PlantCount);
+        }
+
+        // =============================================================================
+        // ResetTelemetryHistory
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Svuota la history del grafico senza alterare lo stato biosfera.
+        /// </para>
+        /// </summary>
+        private void ResetTelemetryHistory()
+        {
+            EnsureTelemetryStorage();
+            _telemetryStart = 0;
+            _telemetryCount = 0;
+            _lastTelemetryDay = -1L;
+        }
+
+        // =============================================================================
+        // EnsureTelemetryStorage
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Garantisce che il buffer circolare abbia una dimensione valida.
+        /// </para>
+        /// </summary>
+        private void EnsureTelemetryStorage()
+        {
+            int capacity = ResolveTelemetryCapacity();
+            if (_telemetrySamples != null && _telemetrySamples.Length == capacity)
+                return;
+
+            // Quando cambia la capacita' ripartiamo puliti: e' un pannello debug e
+            // non vale la pena copiare parzialmente una history diagnostica.
+            _telemetrySamples = new EnvironmentProtectedTelemetrySample[capacity];
+            _telemetryStart = 0;
+            _telemetryCount = 0;
+            _lastTelemetryDay = -1L;
+        }
+
+        // =============================================================================
+        // DrawGraphBackground
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna sfondo e griglia del grafico.
+        /// </para>
+        /// </summary>
+        private void DrawGraphBackground(Rect rect)
+        {
+            DrawFilledRect(rect, new Color(0.06f, 0.07f, 0.08f, 0.92f));
+            DrawRectOutline(rect, new Color(0.70f, 0.70f, 0.70f, 0.70f));
+
+            for (int i = 1; i < 4; i++)
+            {
+                float y = rect.y + (rect.height * i / 4f);
+                DrawLine(
+                    new Vector2(rect.x, y),
+                    new Vector2(rect.xMax, y),
+                    new Color(1f, 1f, 1f, 0.12f),
+                    1f);
+            }
+        }
+
+        // =============================================================================
+        // DrawTelemetrySeries
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna una singola curva normalizzata 0..1.
+        /// </para>
+        /// </summary>
+        private void DrawTelemetrySeries(
+            Rect rect,
+            Color color,
+            System.Func<EnvironmentProtectedTelemetrySample, float> selector)
+        {
+            if (_telemetryCount < 2 || selector == null)
+                return;
+
+            Vector2 previous = ResolveGraphPoint(
+                rect,
+                0,
+                Mathf.Clamp01(selector(GetTelemetrySample(0))));
+
+            for (int i = 1; i < _telemetryCount; i++)
+            {
+                var sample = GetTelemetrySample(i);
+                Vector2 current = ResolveGraphPoint(
+                    rect,
+                    i,
+                    Mathf.Clamp01(selector(sample)));
+                DrawLine(previous, current, color, 2f);
+                previous = current;
+            }
+        }
+
+        // =============================================================================
+        // ResolveGraphPoint
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte indice campione e valore normalizzato in coordinate pannello.
+        /// </para>
+        /// </summary>
+        private Vector2 ResolveGraphPoint(Rect rect, int sampleIndex, float value01)
+        {
+            float x01 = _telemetryCount <= 1
+                ? 0f
+                : sampleIndex / (float)(_telemetryCount - 1);
+            return new Vector2(
+                rect.x + (x01 * rect.width),
+                rect.yMax - (Mathf.Clamp01(value01) * rect.height));
+        }
+
+        // =============================================================================
+        // DrawLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna una linea IMGUI usando una texture runtime 1x1.
+        /// </para>
+        /// </summary>
+        private void DrawLine(Vector2 from, Vector2 to, Color color, float width)
+        {
+            EnsureGraphPixel();
+            Color previousColor = GUI.color;
+            Matrix4x4 previousMatrix = GUI.matrix;
+            Vector2 delta = to - from;
+            float angle = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+
+            // IMGUI non offre una primitiva linea: ruotiamo una rect riempita con un
+            // pixel bianco runtime, senza creare asset o materiali.
+            GUI.color = color;
+            GUIUtility.RotateAroundPivot(angle, from);
+            GUI.DrawTexture(
+                new Rect(from.x, from.y - (width * 0.5f), delta.magnitude, width),
+                _graphPixel);
+            GUI.matrix = previousMatrix;
+            GUI.color = previousColor;
+        }
+
+        private void DrawFilledRect(Rect rect, Color color)
+        {
+            EnsureGraphPixel();
+            Color previousColor = GUI.color;
+            GUI.color = color;
+            GUI.DrawTexture(rect, _graphPixel);
+            GUI.color = previousColor;
+        }
+
+        private void DrawRectOutline(Rect rect, Color color)
+        {
+            DrawFilledRect(new Rect(rect.x, rect.y, rect.width, 1f), color);
+            DrawFilledRect(new Rect(rect.x, rect.yMax - 1f, rect.width, 1f), color);
+            DrawFilledRect(new Rect(rect.x, rect.y, 1f, rect.height), color);
+            DrawFilledRect(new Rect(rect.xMax - 1f, rect.y, 1f, rect.height), color);
+        }
+
+        private void EnsureGraphPixel()
+        {
+            if (_graphPixel != null)
+                return;
+
+            _graphPixel = new Texture2D(1, 1, TextureFormat.RGBA32, false)
+            {
+                hideFlags = HideFlags.HideAndDontSave
+            };
+            _graphPixel.SetPixel(0, 0, Color.white);
+            _graphPixel.Apply(false, true);
+        }
+
+        private EnvironmentProtectedTelemetrySample GetTelemetrySample(int index)
+        {
+            int capacity = ResolveTelemetryCapacity();
+            int safeIndex = Mathf.Clamp(index, 0, Mathf.Max(0, _telemetryCount - 1));
+            int actualIndex = (_telemetryStart + safeIndex) % capacity;
+            return _telemetrySamples[actualIndex];
+        }
+
+        private int ResolveTelemetryCapacity()
+        {
+            return Mathf.Clamp(
+                telemetryCapacity,
+                MinimumTelemetryCapacity,
+                MaximumTelemetryCapacity);
+        }
+
+        private static float GetFertilityValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.Fertility;
+        }
+
+        private static float GetWaterValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.Water;
+        }
+
+        private static float GetVegetationDensityValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.VegetationDensity;
+        }
+
+        private static float GetVegetationHealthValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.VegetationHealth;
+        }
+
+        private static float GetSeedAmountValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.SeedAmount;
+        }
+
+        private static float GetSeedViabilityValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.SeedViability;
+        }
+
+        private static float GetTemperatureValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.Temperature;
+        }
+
+        private static float GetHumidityValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.Humidity;
+        }
+
+        private static float GetAridityValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return sample.Aridity;
+        }
+
+        private static float GetPlantValue(EnvironmentProtectedTelemetrySample sample)
+        {
+            return Mathf.Clamp01(sample.PlantCount / PlantGraphScale);
         }
 
         private void Log(string message)
