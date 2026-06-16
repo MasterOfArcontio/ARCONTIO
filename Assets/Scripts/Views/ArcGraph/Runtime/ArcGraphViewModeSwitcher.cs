@@ -43,6 +43,7 @@ namespace Arcontio.View.ArcGraph
     public readonly struct ArcGraphViewModeSwitcherDiagnostics
     {
         public readonly bool SwitcherEnabled;
+        public readonly bool KeyboardToggleEnabled;
         public readonly ArcGraphViewMode CurrentMode;
         public readonly KeyCode ToggleKey;
         public readonly int MapGridVisualRootCount;
@@ -67,6 +68,7 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public ArcGraphViewModeSwitcherDiagnostics(
             bool switcherEnabled,
+            bool keyboardToggleEnabled,
             ArcGraphViewMode currentMode,
             KeyCode toggleKey,
             int mapGridVisualRootCount,
@@ -82,6 +84,7 @@ namespace Arcontio.View.ArcGraph
             string reason)
         {
             SwitcherEnabled = switcherEnabled;
+            KeyboardToggleEnabled = keyboardToggleEnabled;
             CurrentMode = currentMode;
             ToggleKey = toggleKey;
             MapGridVisualRootCount = mapGridVisualRootCount < 0 ? 0 : mapGridVisualRootCount;
@@ -103,7 +106,7 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Componente scena che permette di passare da vista MapGrid a vista ArcGraph.
+    /// Componente scena che applica la modalita' visuale MapGrid/ArcGraph.
     /// </para>
     ///
     /// <para><b>Principio architetturale: frontiera visuale esplicita</b></para>
@@ -111,7 +114,9 @@ namespace Arcontio.View.ArcGraph
     /// Lo switcher non cerca componenti globali e non deduce da solo cosa spegnere.
     /// L'operatore assegna da Inspector le radici visuali MapGrid e ArcGraph. Il
     /// componente si limita ad abilitarle/disabilitarle e, quando entra in ArcGraph,
-    /// chiede al wrapper minimo di processare un frame visuale.
+    /// chiede al wrapper minimo di processare un frame visuale. Il cambio da
+    /// tastiera e' separato dal gate principale: ArcGraph puo' diventare la vista
+    /// iniziale stabile senza lasciare attivo il vecchio toggle F12.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -120,14 +125,16 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>arcGraphVisualRoots</b>: GameObject del nuovo renderer da mostrare in modalita' ArcGraph.</item>
     ///   <item><b>runtimeWrapper</b>: ponte ArcGraph gia' cablato nella scena.</item>
     ///   <item><b>terrainRenderer/npcRenderer/objectRenderer</b>: renderer minimi che possono essere accesi dal wrapper.</item>
-    ///   <item><b>toggleKey</b>: tasto di cambio modalita', di default F12.</item>
+    ///   <item><b>keyboardToggleEnabled</b>: abilita o disabilita il vecchio toggle da tastiera.</item>
+    ///   <item><b>toggleKey</b>: tasto legacy di cambio modalita' usato solo se il toggle tastiera e' abilitato.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphViewModeSwitcher : MonoBehaviour
     {
         [SerializeField] private bool switcherEnabled = true;
+        [SerializeField] private bool keyboardToggleEnabled;
         [SerializeField] private KeyCode toggleKey = KeyCode.F12;
-        [SerializeField] private ArcGraphViewMode startMode = ArcGraphViewMode.MapGrid;
+        [SerializeField] private ArcGraphViewMode startMode = ArcGraphViewMode.ArcGraph;
         [SerializeField] private GameObject[] mapGridVisualRoots;
         [SerializeField] private GameObject[] arcGraphVisualRoots;
         [SerializeField] private ArcGraphMinimalRuntimeSceneWrapper runtimeWrapper;
@@ -149,6 +156,34 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphViewModeSwitcherDiagnostics LastDiagnostics => _lastDiagnostics;
 
         // =============================================================================
+        // ConfigureRuntimePolicy
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Configura la policy runtime della modalita' visuale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: soft retirement del renderer legacy</b></para>
+        /// <para>
+        /// Il metodo permette all'auto-installer di dichiarare che ArcGraph e' la
+        /// vista iniziale e che il vecchio toggle da tastiera deve restare spento.
+        /// Non rimuove MapGrid, non disattiva il bootstrap dati e non cancella
+        /// componenti legacy: cambia solo la policy visuale applicata da questo
+        /// controller.
+        /// </para>
+        /// </summary>
+        public void ConfigureRuntimePolicy(
+            ArcGraphViewMode initialMode,
+            bool enableKeyboardToggle)
+        {
+            startMode = initialMode;
+            keyboardToggleEnabled = enableKeyboardToggle;
+
+            if (_hasAppliedMode)
+                SetMode(startMode, didToggle: false);
+        }
+
+        // =============================================================================
         // ConfigureRuntimeWiring
         // =============================================================================
         /// <summary>
@@ -161,8 +196,9 @@ namespace Arcontio.View.ArcGraph
         /// <para>
         /// Il metodo non cerca oggetti, non crea renderer e non deduce quali root
         /// spegnere. Riceve tutto dall'installer o dall'Inspector e aggiorna solo
-        /// i riferimenti interni usati da <c>SetMode</c>. In questo modo lo switch
-        /// F12 resta un puro cambio di vista, non un secondo bootstrap simulativo.
+        /// i riferimenti interni usati da <c>SetMode</c>. In questo modo il
+        /// controller resta un puro cambio di vista, non un secondo bootstrap
+        /// simulativo.
         /// </para>
         /// </summary>
         public void ConfigureRuntimeWiring(
@@ -209,7 +245,7 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Ascolta il tasto configurato e alterna la modalita' visuale.
+        /// Ascolta opzionalmente il tasto configurato e alterna la modalita' visuale.
         /// </para>
         /// </summary>
         private void Update()
@@ -217,6 +253,9 @@ namespace Arcontio.View.ArcGraph
             // Se lo switcher e' spento non interroghiamo neppure Input: costo nullo
             // lato runtime e nessun cambio accidentale di visuale.
             if (!switcherEnabled)
+                return;
+
+            if (!keyboardToggleEnabled)
                 return;
 
             if (!WasToggleKeyPressedThisFrame())
@@ -328,19 +367,20 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Scrive in Console una diagnostica sintetica per il gate manuale F12.
+        /// Scrive in Console una diagnostica sintetica per il gate manuale della vista.
         /// </para>
         ///
         /// <para><b>Principio architetturale: gate visuale assistito, non automazione del test</b></para>
         /// <para>
         /// Il metodo non alterna modalita', non crea componenti, non processa frame
         /// e non muta il mondo simulativo. Serve solo a leggere lo stato gia'
-        /// applicato dallo switcher dopo uno Start o dopo una pressione di F12.
+        /// applicato dallo switcher dopo lo Start o dopo un cambio manuale da
+        /// Inspector.
         /// L'operatore umano resta responsabile della validazione visiva:
         /// terrain, NPC, muri e preview devono essere osservati in Game view.
         /// </para>
         /// </summary>
-        [ContextMenu("ArcGraph/Log F12 Manual Gate Probe")]
+        [ContextMenu("ArcGraph/Log View Mode Manual Gate Probe")]
         public void LogViewSwitchGateProbeFromInspector()
         {
             LogViewSwitchGateProbe();
@@ -368,7 +408,7 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Produce una lettura diagnostica dello stato corrente dello switch F12.
+        /// Produce una lettura diagnostica dello stato corrente del controller vista.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -399,9 +439,10 @@ namespace Arcontio.View.ArcGraph
                 && rootsMatchCurrentMode;
 
             Debug.Log(
-                "[ArcGraphViewModeSwitcher] F12ManualGateProbe " +
+                "[ArcGraphViewModeSwitcher] ViewModeManualGateProbe " +
                 "readyForVisualCheck=" + readyForVisualCheck +
                 ", enabled=" + switcherEnabled +
+                ", keyboardToggle=" + keyboardToggleEnabled +
                 ", modeApplied=" + _hasAppliedMode +
                 ", mode=" + _currentMode +
                 ", key=" + toggleKey +
@@ -587,6 +628,7 @@ namespace Arcontio.View.ArcGraph
         {
             _lastDiagnostics = new ArcGraphViewModeSwitcherDiagnostics(
                 switcherEnabled,
+                keyboardToggleEnabled,
                 _currentMode,
                 toggleKey,
                 CountAssignedRoots(mapGridVisualRoots),
@@ -612,6 +654,7 @@ namespace Arcontio.View.ArcGraph
             Debug.Log(
                 "[ArcGraphViewModeSwitcher] " + _lastDiagnostics.Reason +
                 " enabled=" + _lastDiagnostics.SwitcherEnabled +
+                ", keyboardToggle=" + _lastDiagnostics.KeyboardToggleEnabled +
                 ", mode=" + _lastDiagnostics.CurrentMode +
                 ", key=" + _lastDiagnostics.ToggleKey +
                 ", mapGridRoots=" + _lastDiagnostics.MapGridVisualRootCount +

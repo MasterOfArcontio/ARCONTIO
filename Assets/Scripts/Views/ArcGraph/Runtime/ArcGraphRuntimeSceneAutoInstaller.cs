@@ -12,7 +12,7 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// Installer runtime controllato che crea il cablaggio minimo ArcGraph dentro
     /// <c>Scene_MapGrid</c> quando la scena non contiene ancora i componenti
-    /// necessari al test F12.
+    /// necessari alla vista ArcGraph runtime.
     /// </para>
     ///
     /// <para><b>Principio architetturale: bootstrap visuale di bordo, non simulazione</b></para>
@@ -21,19 +21,19 @@ namespace Arcontio.View.ArcGraph
     /// <c>ArcGraphMinimalRuntimeSceneWrapper</c>,
     /// <c>ArcGraphTerrainRuntimeSceneRenderer</c>,
     /// <c>ArcGraphNpcRuntimeSceneRenderer</c> e
-    /// <c>ArcGraphViewModeSwitcher</c> non sono presenti in Hierarchy, il tasto F12
-    /// non puo' produrre alcun effetto. L'installer crea quindi solo GameObject e
-    /// MonoBehaviour visuali, carica cataloghi da <c>Resources</c> e collega
-    /// riferimenti gia' esistenti della MapGrid. Non modifica il <c>World</c>, non
-    /// invia comandi, non crea job, non decide nulla per gli NPC e non rende
-    /// ArcGraph una sorgente parallela della simulazione.
+    /// <c>ArcGraphViewModeSwitcher</c> non sono presenti in Hierarchy, ArcGraph non
+    /// puo' diventare la vista runtime principale. L'installer crea quindi solo
+    /// GameObject e MonoBehaviour visuali, carica cataloghi da <c>Resources</c> e
+    /// collega riferimenti gia' esistenti della MapGrid. Non modifica il
+    /// <c>World</c>, non invia comandi, non crea job, non decide nulla per gli NPC e
+    /// non rende ArcGraph una sorgente parallela della simulazione.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>RuntimeInitializeOnLoadMethod</b>: registra l'installer sulle scene caricate.</item>
-    ///   <item><b>Controller root</b>: GameObject sempre attivo che contiene lo switch F12.</item>
-    ///   <item><b>Visual root</b>: GameObject attivato solo in modalita' ArcGraph.</item>
+    ///   <item><b>Controller root</b>: GameObject sempre attivo che contiene il controller vista.</item>
+    ///   <item><b>Visual root</b>: GameObject attivato in modalita' ArcGraph.</item>
     ///   <item><b>Adapter</b>: ponte read-only verso MapGridBootstrap e MapGridWorldView.</item>
     ///   <item><b>Wrapper e renderer</b>: percorso runtime minimo terrain + NPC.</item>
     ///   <item><b>Late binding</b>: pochi frame di ricontrollo per agganciare view/runtime creati dopo il load scena.</item>
@@ -217,8 +217,9 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             // Il controller resta sempre attivo. Il visual root invece viene
-            // acceso/spento dallo switcher F12, cosi' ArcGraph puo' essere nascosto
-            // senza disattivare il componente che ascolta il tasto.
+            // acceso/spento dal controller vista, cosi' ArcGraph puo' diventare la
+            // modalita' principale senza disattivare i componenti che processano
+            // wrapper, renderer e interazione.
             _visualRoot = new GameObject(VisualRootName);
             _visualRoot.transform.SetParent(transform, false);
             _visualRoot.SetActive(false);
@@ -234,6 +235,9 @@ namespace Arcontio.View.ArcGraph
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
             _switcher = gameObject.AddComponent<ArcGraphViewModeSwitcher>();
+            _switcher.ConfigureRuntimePolicy(
+                ArcGraphViewMode.ArcGraph,
+                enableKeyboardToggle: false);
 
             ConfigureAdapterAndRenderers();
             ConfigureSwitcher();
@@ -246,7 +250,7 @@ namespace Arcontio.View.ArcGraph
             {
                 Debug.Log(
                     "[ArcGraphRuntimeSceneAutoInstaller] Installed runtime ArcGraph wiring. " +
-                    "Premi F12 per alternare MapGrid/ArcGraph.");
+                    "ArcGraph e' la vista runtime iniziale; toggle F12 disattivato.");
             }
         }
 
@@ -313,7 +317,7 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Prepara lo switcher F12 con root MapGrid euristiche e root ArcGraph auto.
+        /// Prepara il controller vista con root MapGrid euristiche e root ArcGraph auto.
         /// </para>
         /// </summary>
         private void ConfigureSwitcher()
@@ -352,8 +356,9 @@ namespace Arcontio.View.ArcGraph
                 _placementHighlightConsumer.SetDevToolsOverlay(devToolsOverlay);
 
             // Anche i root visuali MapGrid possono essere creati dal bootstrap
-            // legacy dopo l'installazione ArcGraph. Ricablare lo switcher per pochi
-            // frame rende il gate F12 meno dipendente dall'ordine di Start.
+            // legacy dopo l'installazione ArcGraph. Ricablare il controller per
+            // pochi frame mantiene il soft retirement stabile rispetto all'ordine
+            // di Start dei componenti legacy.
             if (_switcher != null && _visualRoot != null)
                 ConfigureSwitcher();
 
@@ -413,8 +418,8 @@ namespace Arcontio.View.ArcGraph
         /// Il vecchio percorso MapGrid puo' creare piu' root con lo stesso nome in
         /// momenti diversi. Il caso piu' evidente e' <c>NPCViews</c>: puo' esistere
         /// un root placeholder creato dal bootstrap e un root runtime creato dal
-        /// <c>MapGridWorldView</c>. Se lo switcher F12 ne spegne solo uno, entrando
-        /// in ArcGraph resta visibile il vecchio sprite statico dell'NPC. Per questo
+        /// <c>MapGridWorldView</c>. Se il controller vista ne spegne solo uno,
+        /// entrando in ArcGraph resta visibile il vecchio sprite statico dell'NPC. Per questo
         /// l'auto-installer non cerca piu' il primo match, ma registra tutti i match
         /// legacy visuali trovati nella scena.
         /// </para>
@@ -444,13 +449,13 @@ namespace Arcontio.View.ArcGraph
         /// temporaneamente disattivati.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: switch F12 reversibile</b></para>
+        /// <para><b>Principio architetturale: vista ArcGraph con sorgenti legacy leggibili</b></para>
         /// <para>
         /// Durante la modalita' ArcGraph alcuni root MapGrid vengono spenti. Le API
         /// globali piu' semplici di Unity possono ignorare oggetti inattivi; se il
-        /// late binding usasse solo quelle, lo switcher potrebbe perdere i
-        /// riferimenti necessari per tornare a MapGrid. La scansione resta confinata
-        /// alla scena attiva e viene usata solo nel breve budget di bootstrap.
+        /// late binding usasse solo quelle, l'adapter potrebbe perdere i riferimenti
+        /// dati legacy ancora necessari. La scansione resta confinata alla scena
+        /// attiva e viene usata solo nel breve budget di bootstrap.
         /// </para>
         /// </summary>
         private static T FindSceneComponent<T>()
