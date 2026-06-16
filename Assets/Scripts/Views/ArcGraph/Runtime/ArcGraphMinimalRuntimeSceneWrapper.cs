@@ -61,6 +61,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainRuntimeSceneRendererDiagnostics _lastTerrainRendererDiagnostics;
         private ArcGraphNpcRuntimeSceneRendererDiagnostics _lastNpcRendererDiagnostics;
         private ArcGraphObjectRuntimeSceneRendererDiagnostics _lastObjectRendererDiagnostics;
+        private ArcGraphMapViewConfig _configuredViewConfig;
         private ArcGraphMapViewConfig _currentViewConfig;
         private long _sourceFrameIndex;
         private float _nextActorObjectRefreshTime;
@@ -282,6 +283,34 @@ namespace Arcontio.View.ArcGraph
         public void SetInteractionWrapper(ArcGraphInteractionSceneAdapterWrapper wrapper)
         {
             interactionWrapper = wrapper;
+        }
+
+        // =============================================================================
+        // SetViewConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna la configurazione view ArcGraph caricata dal confine scena.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: configurazione esterna, stato locale</b></para>
+        /// <para>
+        /// Il wrapper non carica direttamente <c>Resources</c> e non conosce il
+        /// file system Unity. Riceve invece una <c>ArcGraphMapViewConfig</c> gia'
+        /// normalizzata dall'auto-installer o da un futuro prefab. In questo modo
+        /// il JSON resta la fonte del profilo zoom, mentre il wrapper continua a
+        /// limitarsi a comporre dati runtime gia' autorizzati.
+        /// </para>
+        /// </summary>
+        public void SetViewConfig(ArcGraphMapViewConfig config)
+        {
+            _configuredViewConfig = config;
+
+            // L'interaction wrapper deve vedere subito la stessa configurazione
+            // del wrapper runtime. Se lo lasciassimo su default hardcoded, input e
+            // rendering potrebbero usare profili zoom diversi nello stesso frame.
+            if (interactionWrapper != null && config != null)
+                interactionWrapper.SetConfig(config);
         }
 
         // =============================================================================
@@ -599,21 +628,26 @@ namespace Arcontio.View.ArcGraph
 
         private ArcGraphMapViewConfig CreateViewConfigForContext(ArcGraphRuntimeContext context)
         {
-            ArcGraphMapViewConfig defaults = ArcGraphMapViewConfig.CreateDefaultV033();
+            ArcGraphMapViewConfig template = _configuredViewConfig ?? ArcGraphMapViewConfig.CreateDefaultV033();
             int width = context?.Map != null && context.Map.Width > 0
                 ? context.Map.Width
-                : defaults.MapWidthCells;
+                : template.MapWidthCells;
             int height = context?.Map != null && context.Map.Height > 0
                 ? context.Map.Height
-                : defaults.MapHeightCells;
+                : template.MapHeightCells;
 
+            // La dimensione mappa puo' arrivare dal runtime MapGrid provvisorio,
+            // ma il comportamento dello zoom deve restare quello della config
+            // ArcGraph. Questo preserva i quattro livelli decisi nel JSON evitando
+            // che il campo serializzato legacy <c>zoomLevel</c> diventi una seconda
+            // fonte di verita'.
             return new ArcGraphMapViewConfig(
                 width,
                 height,
-                defaults.ZoomLevels,
-                zoomLevel > 0 ? zoomLevel : defaults.DefaultZoomLevel,
-                defaults.MouseWheelStepsPerZoomLevel,
-                defaults.PanUsesMiddleMouseButton);
+                template.ZoomLevels,
+                template.DefaultZoomLevel,
+                template.MouseWheelStepsPerZoomLevel,
+                template.PanUsesMiddleMouseButton);
         }
 
         private ArcGraphMinimalRuntimeSceneWrapperDiagnostics CreateDiagnostics(

@@ -45,6 +45,7 @@ namespace Arcontio.View.ArcGraph
         private const string ControllerRootName = "ArcGraphRuntimeController_Auto";
         private const string VisualRootName = "ArcGraphRuntimeVisualRoot_Auto";
         private const string TerrainAtlasPath = "MapGrid/Atlas/TerrainAtlas";
+        private const string ViewConfigPath = ArcGraphMapViewConfigJson.DefaultResourcePath;
         private const string TerrainCatalogPath = "ArcGraph/Config/ArcGraphTerrainCatalog";
         private const string TerrainVisualCatalogPath = "ArcGraph/Config/ArcGraphTerrainVisualCatalog";
         private const string NpcVisualCatalogPath = "ArcGraph/Config/ArcGraphNpcVisualCatalog";
@@ -65,6 +66,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphViewModeSwitcher _switcher;
         private GameObject _visualRoot;
         private Material _terrainMaterial;
+        private ArcGraphMapViewConfig _viewConfig;
         private int _lateBindFramesLeft;
         private int _configuredMapGridRootCount;
         private int _lastMapGridRootCount = -1;
@@ -264,9 +266,12 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private void ConfigureAdapterAndRenderers()
         {
+            TextAsset viewConfigJson = Resources.Load<TextAsset>(ViewConfigPath);
             TextAsset terrainCatalog = Resources.Load<TextAsset>(TerrainCatalogPath);
             TextAsset terrainVisualCatalog = Resources.Load<TextAsset>(TerrainVisualCatalogPath);
             TextAsset npcVisualCatalog = Resources.Load<TextAsset>(NpcVisualCatalogPath);
+            _viewConfig = ArcGraphMapViewConfigJson.ParseOrDefault(
+                viewConfigJson != null ? viewConfigJson.text : null);
 
             _terrainMaterial = CreateTerrainMaterial();
 
@@ -304,8 +309,9 @@ namespace Arcontio.View.ArcGraph
             _wrapper.SetNpcRenderer(_npcRenderer);
             _wrapper.SetObjectRenderer(_objectRenderer);
             _wrapper.SetInteractionWrapper(_interactionWrapper);
+            _wrapper.SetViewConfig(_viewConfig);
             _interactionWrapper.SetConsumer(_interactionRouter);
-            _interactionWrapper.SetConfig(ArcGraphMapViewConfig.CreateDefaultV033());
+            _interactionWrapper.SetConfig(_viewConfig);
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
@@ -348,12 +354,15 @@ namespace Arcontio.View.ArcGraph
             MapGridBootstrap bootstrap = FindSceneComponent<MapGridBootstrap>();
             MapGridWorldView worldView = FindSceneComponent<MapGridWorldView>();
             MapGridRuntimeDevToolsOverlay devToolsOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
+            MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
 
             if (_adapter != null)
                 _adapter.SetMapGridSources(bootstrap, worldView);
 
             if (_placementHighlightConsumer != null)
                 _placementHighlightConsumer.SetDevToolsOverlay(devToolsOverlay);
+
+            DisableLegacyMapGridCameraController(cameraController);
 
             // Anche i root visuali MapGrid possono essere creati dal bootstrap
             // legacy dopo l'installazione ArcGraph. Ricablare il controller per
@@ -363,6 +372,37 @@ namespace Arcontio.View.ArcGraph
                 ConfigureSwitcher();
 
             LogBindingStateIfChanged(bootstrap, worldView, devToolsOverlay);
+        }
+
+        // =============================================================================
+        // DisableLegacyMapGridCameraController
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disattiva il controller camera legacy della MapGrid durante la vista
+        /// runtime ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: una sola autorita' sullo zoom visuale</b></para>
+        /// <para>
+        /// ArcGraph usa <c>ArcGraphViewConfig</c> e <c>ArcGraphViewState</c> per
+        /// lavorare con livelli zoom discreti. Il vecchio
+        /// <c>MapGridCameraController</c>, invece, continua a leggere la rotellina
+        /// e modifica direttamente camera o <c>PixelPerfectCamera</c>. Lasciarlo
+        /// acceso crea due autorita' concorrenti: ArcGraph crede di essere su uno
+        /// dei quattro livelli configurati, mentre la camera legacy produce molti
+        /// livelli fisici intermedi. Per questo il soft retirement non cancella
+        /// MapGrid, ma spegne il suo controller camera quando ArcGraph e' la vista
+        /// attiva.
+        /// </para>
+        /// </summary>
+        private static void DisableLegacyMapGridCameraController(
+            MapGridCameraController cameraController)
+        {
+            if (cameraController == null || !cameraController.enabled)
+                return;
+
+            cameraController.enabled = false;
         }
 
         // =============================================================================
