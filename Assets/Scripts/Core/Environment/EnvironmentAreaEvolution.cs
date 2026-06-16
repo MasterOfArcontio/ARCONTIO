@@ -301,17 +301,25 @@ namespace Arcontio.Core.Environment
             if (!context.ShouldRunDailyEvolution)
                 return water;
 
-            float precipitationGain = context.Climate.Weather.Precipitation01 * 0.060f;
-            float humidityGain = context.Climate.Humidity01 * 0.015f;
-            float evaporationLoss = context.Climate.Aridity01 * 0.040f
-                                    + context.Climate.Temperature01 * 0.020f;
-
-            // L'acqua stagionale risponde di piu' al meteo; laghi e fiumi stabili
-            // cambiano lentamente in questa foundation.
-            float seasonalMultiplier = water.IsSeasonal ? 1.35f : 0.65f;
-            float nextLevel = water.WaterLevel01
-                              + ((precipitationGain + humidityGain - evaporationLoss)
-                                 * seasonalMultiplier);
+            // L'acqua non deve inseguire direttamente il meteo del giorno. Un fiume
+            // o lago stabile assorbe precipitazioni e aridita' con molta inerzia,
+            // mentre un bacino stagionale puo' oscillare di piu' senza comunque
+            // rimbalzare continuamente tra zero e uno.
+            float weatherMoisture = (context.Climate.Weather.Precipitation01 * 0.48f)
+                                    + (context.Climate.Humidity01 * 0.30f)
+                                    + (context.BiomeProfile.BaseMoisture01 * 0.22f);
+            float evaporationPressure = (context.Climate.Aridity01 * 0.30f)
+                                        + (context.Climate.Temperature01 * 0.12f);
+            float climateTarget = EnvironmentMath.Clamp01(weatherMoisture - evaporationPressure);
+            float structuralTarget = water.IsSeasonal
+                ? climateTarget
+                : EnvironmentMath.Clamp01((water.WaterLevel01 * 0.86f) + (climateTarget * 0.14f));
+            float approachRate = water.IsSeasonal ? 0.070f : 0.022f;
+            float rainImpulse = context.Climate.Weather.Precipitation01 * (water.IsSeasonal ? 0.012f : 0.004f);
+            float aridityImpulse = context.Climate.Aridity01 * (water.IsSeasonal ? 0.010f : 0.003f);
+            float nextLevel = Approach01(water.WaterLevel01, structuralTarget, approachRate)
+                              + rainImpulse
+                              - aridityImpulse;
 
             return new EnvironmentWaterAreaState(
                 water.AreaId,

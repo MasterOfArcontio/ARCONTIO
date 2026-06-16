@@ -223,6 +223,7 @@ namespace Arcontio.Core.Environment
                 nextState,
                 plantCatalog,
                 climate,
+                seasonProfile,
                 transition,
                 safeConfig,
                 safeBiome);
@@ -328,10 +329,17 @@ namespace Arcontio.Core.Environment
 
                     int plantCountForArea = CountPlantsForArea(snapshot, area.Definition.AreaId);
                     int effectivePlantCapacity = ResolveEffectivePlantCapacity(evolved, biomeProfile);
+                    int desiredPlantCount = ResolveDesiredPlantCount(
+                        evolved,
+                        nextSeedBank,
+                        climate,
+                        seasonProfile,
+                        biomeProfile,
+                        effectivePlantCapacity);
                     if (config.allowNewPlantInstances
                         && transition.DayChanged
                         && plantsCreated < SafeMax(config.maxNewPlantsPerDay)
-                        && plantCountForArea < effectivePlantCapacity
+                        && plantCountForArea < desiredPlantCount
                         && TryCreatePlantFromArea(
                             area,
                             nextSeedBank,
@@ -343,6 +351,7 @@ namespace Arcontio.Core.Environment
                             plantsCreated,
                             transition,
                             plantCountForArea,
+                            desiredPlantCount,
                             effectivePlantCapacity,
                             out EnvironmentPlantInstance plant))
                     {
@@ -439,6 +448,7 @@ namespace Arcontio.Core.Environment
             EnvironmentState nextState,
             EnvironmentPlantCatalog plantCatalog,
             EnvironmentGlobalClimateState climate,
+            EnvironmentSeasonProfile seasonProfile,
             EnvironmentTemporalTransition transition,
             EnvironmentNaturalGrowthConfig config,
             EnvironmentBiomeProfile biomeProfile)
@@ -456,10 +466,17 @@ namespace Arcontio.Core.Environment
                     current,
                     plantCatalog,
                     climate,
+                    seasonProfile,
                     transition,
                     config,
                     biomeProfile,
-                    CountPlantsForArea(snapshot, current.SourceAreaId));
+                    CountPlantsForArea(snapshot, current.SourceAreaId),
+                    ResolveDesiredPlantCountForArea(
+                        snapshot,
+                        current.SourceAreaId,
+                        climate,
+                        seasonProfile,
+                        biomeProfile));
 
                 if (!next.IsAlive)
                 {
@@ -478,10 +495,12 @@ namespace Arcontio.Core.Environment
             EnvironmentPlantSnapshot current,
             EnvironmentPlantCatalog plantCatalog,
             EnvironmentGlobalClimateState climate,
+            EnvironmentSeasonProfile seasonProfile,
             EnvironmentTemporalTransition transition,
             EnvironmentNaturalGrowthConfig config,
             EnvironmentBiomeProfile biomeProfile,
-            int areaPlantCount)
+            int areaPlantCount,
+            int desiredPlantCount)
         {
             int nextAge = current.AgeDays + (transition.DayChanged && current.IsAlive ? 1 : 0);
             float healthDelta = 0f;
@@ -497,17 +516,41 @@ namespace Arcontio.Core.Environment
                                        && species.IsSeasonFavorable(climate.Season);
                 healthDelta = favorableSeason
                     ? EnvironmentMath.Clamp01(config.healthRecoveryStep01)
-                    : -EnvironmentMath.Clamp01(config.healthStressStep01);
-                healthDelta -= climate.Aridity01 * 0.025f;
+                    : -EnvironmentMath.Clamp01(config.healthStressStep01)
+                      * ResolveUnfavorableSeasonStressMultiplier(species);
+                healthDelta -= climate.Aridity01
+                               * (1f - biomeProfile.DroughtResistance01)
+                               * 0.014f;
 
                 float occupancy01 = biomeProfile.MaxPlantInstancesPerArea <= 0
                     ? 0f
                     : areaPlantCount / (float)biomeProfile.MaxPlantInstancesPerArea;
                 if (occupancy01 > 0.55f)
                     healthDelta -= (occupancy01 - 0.55f) * 0.080f;
+
+                float desiredOccupancy01 = desiredPlantCount <= 0
+                    ? 1f
+                    : areaPlantCount / (float)desiredPlantCount;
+                if (desiredOccupancy01 > 1f)
+                    healthDelta -= (desiredOccupancy01 - 1f) * 0.045f;
+
+                float ageStress = ResolveAgeStress01(nextAge, current.PlantId.Value);
+                healthDelta -= ageStress * 0.008f;
             }
 
             float nextHealth = current.Health01 + healthDelta;
+            if (transition.DayChanged
+                && ShouldPlantDieThisDay(
+                    current,
+                    nextHealth,
+                    climate,
+                    seasonProfile,
+                    transition,
+                    areaPlantCount,
+                    desiredPlantCount))
+            {
+                nextHealth = 0f;
+            }
 
             if (hasSpecies)
             {
@@ -545,6 +588,7 @@ namespace Arcontio.Core.Environment
             int alreadyCreatedToday,
             EnvironmentTemporalTransition transition,
             int plantCountForArea,
+            int desiredPlantCount,
             int effectivePlantCapacity,
             out EnvironmentPlantInstance plant)
         {
@@ -582,6 +626,7 @@ namespace Arcontio.Core.Environment
                     entry,
                     transition,
                     plantCountForArea,
+                    desiredPlantCount,
                     effectivePlantCapacity,
                     alreadyCreatedToday))
                 {
@@ -614,18 +659,27 @@ namespace Arcontio.Core.Environment
             EnvironmentSeedBankEntry entry,
             EnvironmentTemporalTransition transition,
             int plantCountForArea,
+            int desiredPlantCount,
             int effectivePlantCapacity,
             int alreadyCreatedToday)
         {
-            if (effectivePlantCapacity <= 0 || plantCountForArea >= effectivePlantCapacity)
+            if (effectivePlantCapacity <= 0
+                || desiredPlantCount <= 0
+                || plantCountForArea >= effectivePlantCapacity
+                || plantCountForArea >= desiredPlantCount)
+            {
                 return false;
+            }
 
             float occupancy01 = plantCountForArea / (float)effectivePlantCapacity;
+            float deficit01 = EnvironmentMath.Clamp01(
+                (desiredPlantCount - plantCountForArea) / (float)desiredPlantCount);
             float recruitmentPressure = EnvironmentMath.Clamp01(
                 (score * 0.55f)
                 + (entry.Amount01 * 0.25f)
                 + (entry.Viability01 * 0.20f)
-                - (occupancy01 * 0.65f));
+                + (deficit01 * 0.36f)
+                - (occupancy01 * 0.44f));
             float roll = Hash01(
                 transition.Current.Date.Year,
                 transition.Current.Date.DayOfYear,
@@ -633,7 +687,7 @@ namespace Arcontio.Core.Environment
 
             // Il recruitment e' deterministico ma probabilistico: non crea una pianta
             // ogni giorno buono fino al cap, permettendo curve piu' naturali.
-            return roll < recruitmentPressure * 0.35f;
+            return roll < recruitmentPressure * 0.32f;
         }
 
         private static float ComputeGerminationScore(
@@ -721,6 +775,150 @@ namespace Arcontio.Core.Environment
                 + (evolved.Fertility.CurrentFertility01 * 0.10f));
             float capacity01 = 0.08f + (habitat01 * 0.72f);
             return System.Math.Max(1, (int)System.Math.Round(max * capacity01));
+        }
+
+        private static int ResolveDesiredPlantCount(
+            EnvironmentAreaEvolutionResult evolved,
+            EnvironmentSeedBankAreaState seedBank,
+            EnvironmentGlobalClimateState climate,
+            EnvironmentSeasonProfile seasonProfile,
+            EnvironmentBiomeProfile biomeProfile,
+            int effectivePlantCapacity)
+        {
+            if (effectivePlantCapacity <= 0)
+                return 0;
+
+            float seedSupport = ResolveSeedSupport01(seedBank);
+            float seasonSupport = (1f - biomeProfile.Seasonality01)
+                                  + (seasonProfile.VegetationGrowthBias01 * biomeProfile.Seasonality01);
+            float climateStress = climate.Aridity01 * (1f - biomeProfile.DroughtResistance01);
+            float habitat01 = EnvironmentMath.Clamp01(
+                (evolved.Vegetation.Density01 * 0.42f)
+                + (evolved.Vegetation.Health01 * 0.25f)
+                + (evolved.Fertility.CurrentFertility01 * 0.12f)
+                + (seedSupport * 0.14f)
+                + (seasonSupport * 0.07f)
+                - (climateStress * 0.25f));
+            float desired01 = EnvironmentMath.Clamp01(
+                0.08f + (habitat01 * biomeProfile.TargetVegetationDensity01 * 0.90f));
+
+            // Il numero desiderato e' volutamente piu' basso del limite massimo:
+            // PlantInstance rappresenta piante importanti/leggibili, non tutta la
+            // biomassa dell'area. La vegetazione diffusa resta nel payload area.
+            return System.Math.Max(1, (int)System.Math.Round(effectivePlantCapacity * desired01));
+        }
+
+        private static int ResolveDesiredPlantCountForArea(
+            EnvironmentSnapshot snapshot,
+            EnvironmentAreaId areaId,
+            EnvironmentGlobalClimateState climate,
+            EnvironmentSeasonProfile seasonProfile,
+            EnvironmentBiomeProfile biomeProfile)
+        {
+            var areas = snapshot?.Areas ?? new EnvironmentAreaSnapshot[0];
+            for (int i = 0; i < areas.Count; i++)
+            {
+                var area = areas[i];
+                if (!area.Definition.AreaId.Equals(areaId))
+                    continue;
+
+                var evolved = new EnvironmentAreaEvolutionResult(
+                    area.HasFertility ? area.FertilityState : CreateNeutralFertility(areaId),
+                    area.HasWater ? area.WaterState : CreateNeutralWater(areaId),
+                    area.HasVegetation ? area.VegetationState : CreateNeutralVegetation(areaId),
+                    new EnvironmentAreaEvolutionDelta(0f, 0f, 0f, 0f));
+                int capacity = ResolveEffectivePlantCapacity(evolved, biomeProfile);
+                var seedBank = area.HasSeedBank
+                    ? area.SeedBankState
+                    : new EnvironmentSeedBankAreaState(areaId, new EnvironmentSeedBankEntry[0]);
+                return ResolveDesiredPlantCount(
+                    evolved,
+                    seedBank,
+                    climate,
+                    seasonProfile,
+                    biomeProfile,
+                    capacity);
+            }
+
+            return 0;
+        }
+
+        private static float ResolveSeedSupport01(EnvironmentSeedBankAreaState seedBank)
+        {
+            var entries = seedBank?.Entries ?? new EnvironmentSeedBankEntry[0];
+            if (entries.Count == 0)
+                return 0f;
+
+            float total = 0f;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                var entry = entries[i];
+                total += (entry.Amount01 * 0.55f) + (entry.Viability01 * 0.45f);
+            }
+
+            return EnvironmentMath.Clamp01(total / entries.Count);
+        }
+
+        private static float ResolveAgeStress01(int ageDays, int plantIdValue)
+        {
+            // La foundation non possiede ancora lifespan per specie. Applicare una
+            // vecchiaia generica a erba, arbusti e alberi produrrebbe collassi falsi
+            // e non parametrizzabili. Il punto di estensione resta qui, ma per ora
+            // la mortalita' deve derivare da salute, stress climatico e competizione.
+            return 0f;
+        }
+
+        private static float ResolveUnfavorableSeasonStressMultiplier(
+            EnvironmentPlantSpeciesDefinition species)
+        {
+            if (species == null)
+                return 1f;
+
+            switch (species.SeasonalBehavior)
+            {
+                case EnvironmentPlantSeasonalBehavior.Perennial:
+                    return 0.28f;
+
+                case EnvironmentPlantSeasonalBehavior.Deciduous:
+                    return 0.18f;
+
+                case EnvironmentPlantSeasonalBehavior.Evergreen:
+                    return 0.12f;
+
+                default:
+                    return 1f;
+            }
+        }
+
+        private static bool ShouldPlantDieThisDay(
+            EnvironmentPlantSnapshot current,
+            float nextHealth,
+            EnvironmentGlobalClimateState climate,
+            EnvironmentSeasonProfile seasonProfile,
+            EnvironmentTemporalTransition transition,
+            int areaPlantCount,
+            int desiredPlantCount)
+        {
+            if (!current.IsAlive || nextHealth > 0.14f)
+                return false;
+
+            float desiredPressure = desiredPlantCount <= 0
+                ? 0.35f
+                : EnvironmentMath.Clamp01((areaPlantCount - desiredPlantCount) / (float)desiredPlantCount);
+            float stress01 = EnvironmentMath.Clamp01(
+                (1f - EnvironmentMath.Clamp01(nextHealth))
+                + (climate.Aridity01 * 0.22f)
+                + ((1f - seasonProfile.VegetationGrowthBias01) * 0.14f)
+                + (desiredPressure * 0.24f));
+            float mortalityChance = 0.006f + (stress01 * 0.045f);
+            float roll = Hash01(
+                transition.Current.Date.Year,
+                transition.Current.Date.DayOfYear,
+                1700 + current.PlantId.Value);
+
+            // La mortalita' resta deterministica, ma distribuita per id pianta e
+            // giorno: evita collassi sincronizzati dell'intera popolazione.
+            return roll < mortalityChance;
         }
 
         private static int ResolvePlantDaySalt(EnvironmentTemporalTransition transition)
