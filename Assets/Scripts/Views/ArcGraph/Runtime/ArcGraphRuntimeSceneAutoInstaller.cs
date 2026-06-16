@@ -50,6 +50,8 @@ namespace Arcontio.View.ArcGraph
         private const string NpcVisualCatalogPath = "ArcGraph/Config/ArcGraphNpcVisualCatalog";
         private const int LateBindFrameBudget = 240;
 
+        [SerializeField] private bool logDiagnostics;
+
         private ArcGraphTerrainRuntimeMapGridAdapter _adapter;
         private ArcGraphMinimalRuntimeSceneWrapper _wrapper;
         private ArcGraphTerrainRuntimeSceneRenderer _terrainRenderer;
@@ -240,9 +242,12 @@ namespace Arcontio.View.ArcGraph
             _lateBindFramesLeft = LateBindFrameBudget;
             _installed = true;
 
-            Debug.Log(
-                "[ArcGraphRuntimeSceneAutoInstaller] Installed runtime ArcGraph wiring. " +
-                "Premi F12 per alternare MapGrid/ArcGraph.");
+            if (logDiagnostics)
+            {
+                Debug.Log(
+                    "[ArcGraphRuntimeSceneAutoInstaller] Installed runtime ArcGraph wiring. " +
+                    "Premi F12 per alternare MapGrid/ArcGraph.");
+            }
         }
 
         // =============================================================================
@@ -561,6 +566,9 @@ namespace Arcontio.View.ArcGraph
             MapGridWorldView worldView,
             MapGridRuntimeDevToolsOverlay devToolsOverlay)
         {
+            if (!logDiagnostics)
+                return;
+
             bool hasBootstrap = bootstrap != null;
             bool hasWorldView = worldView != null;
             bool hasDevToolsOverlay = devToolsOverlay != null;

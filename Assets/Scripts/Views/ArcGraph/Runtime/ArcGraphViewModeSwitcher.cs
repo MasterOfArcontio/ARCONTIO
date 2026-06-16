@@ -139,7 +139,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool processArcGraphFrameOnSwitch = true;
         [SerializeField] private bool clearArcGraphWhenReturningToMapGrid;
         [SerializeField] private bool applyStartModeOnStart = true;
-        [SerializeField] private bool logDiagnostics = true;
+        [SerializeField] private bool logDiagnostics;
 
         private ArcGraphViewMode _currentMode;
         private ArcGraphViewModeSwitcherDiagnostics _lastDiagnostics;
