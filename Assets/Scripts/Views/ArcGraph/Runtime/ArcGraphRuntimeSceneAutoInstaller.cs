@@ -429,6 +429,10 @@ namespace Arcontio.View.ArcGraph
         {
             string[] names =
             {
+                // MapGridBootstrap crea il terreno legacy sotto questo root.
+                // Se resta attivo mentre ArcGraph e' la vista principale, a zoom
+                // larghi possono riemergere vecchi chunk e layout diagnostici.
+                "TerrainChunks",
                 "GridRoot",
                 "NPCViews",
                 "ObjectViews",
