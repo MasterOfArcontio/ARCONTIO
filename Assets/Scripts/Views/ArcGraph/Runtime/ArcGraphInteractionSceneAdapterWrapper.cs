@@ -196,8 +196,31 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void SetConfig(ArcGraphMapViewConfig config)
         {
+            ArcGraphMapViewConfig previousConfig = ResolveConfig();
+            int previousDefaultZoomLevel = previousConfig.DefaultZoomLevel;
+            bool shouldMoveDefaultViewState =
+                _viewState != null &&
+                _viewState.ActiveZoomLevel == previousDefaultZoomLevel;
+
             _config = config;
-            _viewState ??= ArcGraphViewState.CreateDefault(ResolveConfig());
+            ArcGraphMapViewConfig currentConfig = ResolveConfig();
+
+            if (_viewState == null)
+            {
+                _viewState = ArcGraphViewState.CreateDefault(currentConfig);
+                return;
+            }
+
+            // Quando un producer sostituisce la configurazione provvisoria con una
+            // configurazione runtime piu' specifica, lo stato vista puo' essere
+            // ancora fermo sul vecchio default. In quel solo caso lo riallineiamo
+            // al nuovo default; se invece l'utente ha gia' zoomato o pannato, non
+            // sovrascriviamo la sua scelta a ogni frame.
+            if (shouldMoveDefaultViewState &&
+                previousDefaultZoomLevel != currentConfig.DefaultZoomLevel)
+            {
+                _viewState.SetZoomLevel(currentConfig.DefaultZoomLevel, currentConfig);
+            }
         }
 
         // =============================================================================
