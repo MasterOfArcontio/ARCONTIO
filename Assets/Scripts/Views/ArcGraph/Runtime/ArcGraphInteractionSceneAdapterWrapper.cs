@@ -279,8 +279,8 @@ namespace Arcontio.View.ArcGraph
             {
                 _lastWrapperDiagnostics = CreateWrapperDiagnostics(
                     hasMouse,
-                    config != null,
-                    viewState != null,
+                    _config != null,
+                    _viewState != null,
                     hasValidViewport,
                     didProcessContract: false,
                     default,
