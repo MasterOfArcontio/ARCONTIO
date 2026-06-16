@@ -224,7 +224,8 @@ namespace Arcontio.Core.Environment
                 plantCatalog,
                 climate,
                 transition,
-                safeConfig);
+                safeConfig,
+                safeBiome);
 
             return new EnvironmentNaturalGrowthResult(
                 nextState,
@@ -325,10 +326,12 @@ namespace Arcontio.Core.Environment
                     seedBanksUpdated++;
                     nextState.SetSeedBankArea(nextSeedBank);
 
+                    int plantCountForArea = CountPlantsForArea(snapshot, area.Definition.AreaId);
+                    int effectivePlantCapacity = ResolveEffectivePlantCapacity(evolved, biomeProfile);
                     if (config.allowNewPlantInstances
                         && transition.DayChanged
                         && plantsCreated < SafeMax(config.maxNewPlantsPerDay)
-                        && CountPlantsForArea(snapshot, area.Definition.AreaId) < biomeProfile.MaxPlantInstancesPerArea
+                        && plantCountForArea < effectivePlantCapacity
                         && TryCreatePlantFromArea(
                             area,
                             nextSeedBank,
@@ -339,6 +342,8 @@ namespace Arcontio.Core.Environment
                             config,
                             plantsCreated,
                             transition,
+                            plantCountForArea,
+                            effectivePlantCapacity,
                             out EnvironmentPlantInstance plant))
                     {
                         nextState.SetPlantInstance(plant);
@@ -435,7 +440,8 @@ namespace Arcontio.Core.Environment
             EnvironmentPlantCatalog plantCatalog,
             EnvironmentGlobalClimateState climate,
             EnvironmentTemporalTransition transition,
-            EnvironmentNaturalGrowthConfig config)
+            EnvironmentNaturalGrowthConfig config,
+            EnvironmentBiomeProfile biomeProfile)
         {
             int visited = 0;
             int updated = 0;
@@ -451,9 +457,11 @@ namespace Arcontio.Core.Environment
                     plantCatalog,
                     climate,
                     transition,
-                    config);
+                    config,
+                    biomeProfile,
+                    CountPlantsForArea(snapshot, current.SourceAreaId));
 
-                if (config.removeDeadPlants && !next.IsAlive)
+                if (!next.IsAlive)
                 {
                     removed++;
                     continue;
@@ -471,7 +479,9 @@ namespace Arcontio.Core.Environment
             EnvironmentPlantCatalog plantCatalog,
             EnvironmentGlobalClimateState climate,
             EnvironmentTemporalTransition transition,
-            EnvironmentNaturalGrowthConfig config)
+            EnvironmentNaturalGrowthConfig config,
+            EnvironmentBiomeProfile biomeProfile,
+            int areaPlantCount)
         {
             int nextAge = current.AgeDays + (transition.DayChanged && current.IsAlive ? 1 : 0);
             float healthDelta = 0f;
@@ -489,6 +499,12 @@ namespace Arcontio.Core.Environment
                     ? EnvironmentMath.Clamp01(config.healthRecoveryStep01)
                     : -EnvironmentMath.Clamp01(config.healthStressStep01);
                 healthDelta -= climate.Aridity01 * 0.025f;
+
+                float occupancy01 = biomeProfile.MaxPlantInstancesPerArea <= 0
+                    ? 0f
+                    : areaPlantCount / (float)biomeProfile.MaxPlantInstancesPerArea;
+                if (occupancy01 > 0.55f)
+                    healthDelta -= (occupancy01 - 0.55f) * 0.080f;
             }
 
             float nextHealth = current.Health01 + healthDelta;
@@ -528,6 +544,8 @@ namespace Arcontio.Core.Environment
             EnvironmentNaturalGrowthConfig config,
             int alreadyCreatedToday,
             EnvironmentTemporalTransition transition,
+            int plantCountForArea,
+            int effectivePlantCapacity,
             out EnvironmentPlantInstance plant)
         {
             plant = default;
@@ -559,6 +577,17 @@ namespace Arcontio.Core.Environment
                 if (score < EnvironmentMath.Clamp01(config.minimumGerminationScore01))
                     continue;
 
+                if (!ShouldRecruitPlant(
+                    score,
+                    entry,
+                    transition,
+                    plantCountForArea,
+                    effectivePlantCapacity,
+                    alreadyCreatedToday))
+                {
+                    continue;
+                }
+
                 int daySalt = ResolvePlantDaySalt(transition);
                 var cell = ChooseDeterministicPlantCell(
                     area.Definition.Bounds,
@@ -578,6 +607,33 @@ namespace Arcontio.Core.Environment
             }
 
             return false;
+        }
+
+        private static bool ShouldRecruitPlant(
+            float score,
+            EnvironmentSeedBankEntry entry,
+            EnvironmentTemporalTransition transition,
+            int plantCountForArea,
+            int effectivePlantCapacity,
+            int alreadyCreatedToday)
+        {
+            if (effectivePlantCapacity <= 0 || plantCountForArea >= effectivePlantCapacity)
+                return false;
+
+            float occupancy01 = plantCountForArea / (float)effectivePlantCapacity;
+            float recruitmentPressure = EnvironmentMath.Clamp01(
+                (score * 0.55f)
+                + (entry.Amount01 * 0.25f)
+                + (entry.Viability01 * 0.20f)
+                - (occupancy01 * 0.65f));
+            float roll = Hash01(
+                transition.Current.Date.Year,
+                transition.Current.Date.DayOfYear,
+                700 + alreadyCreatedToday + plantCountForArea);
+
+            // Il recruitment e' deterministico ma probabilistico: non crea una pianta
+            // ogni giorno buono fino al cap, permettendo curve piu' naturali.
+            return roll < recruitmentPressure * 0.35f;
         }
 
         private static float ComputeGerminationScore(
@@ -651,6 +707,22 @@ namespace Arcontio.Core.Environment
             return count;
         }
 
+        private static int ResolveEffectivePlantCapacity(
+            EnvironmentAreaEvolutionResult evolved,
+            EnvironmentBiomeProfile biomeProfile)
+        {
+            int max = biomeProfile.MaxPlantInstancesPerArea;
+            if (max <= 0)
+                return 0;
+
+            float habitat01 = EnvironmentMath.Clamp01(
+                (evolved.Vegetation.Density01 * 0.65f)
+                + (evolved.Vegetation.Health01 * 0.25f)
+                + (evolved.Fertility.CurrentFertility01 * 0.10f));
+            float capacity01 = 0.08f + (habitat01 * 0.72f);
+            return System.Math.Max(1, (int)System.Math.Round(max * capacity01));
+        }
+
         private static int ResolvePlantDaySalt(EnvironmentTemporalTransition transition)
         {
             // Il sale include anno e giorno ambientale. In questo modo una nuova
@@ -666,6 +738,22 @@ namespace Arcontio.Core.Environment
             float safeRate = EnvironmentMath.Clamp01(rate);
             return EnvironmentMath.Clamp01(
                 safeCurrent + ((safeTarget - safeCurrent) * safeRate));
+        }
+
+        private static float Hash01(int year, int dayOfYear, int salt)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = (hash * 31) + year;
+                hash = (hash * 31) + dayOfYear;
+                hash = (hash * 31) + salt;
+                hash ^= hash << 13;
+                hash ^= hash >> 17;
+                hash ^= hash << 5;
+                uint normalized = (uint)hash;
+                return (normalized % 10000) / 10000f;
+            }
         }
 
         private static int ComputeStableSpeciesHash(string speciesKey)

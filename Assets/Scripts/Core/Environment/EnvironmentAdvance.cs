@@ -113,7 +113,8 @@ namespace Arcontio.Core.Environment
                 safeCalendarConfig);
             var climate = EnvironmentClimateResolver.Resolve(
                 transition.Current,
-                safeClimateConfig);
+                safeClimateConfig,
+                safeCalendarConfig);
             var seasonProfile = EnvironmentCalendarResolver.ResolveSeasonProfile(
                 safeCalendarConfig,
                 transition.Current.Date.Season);

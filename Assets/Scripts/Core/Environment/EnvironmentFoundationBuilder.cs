@@ -153,7 +153,8 @@ namespace Arcontio.Core.Environment
                 safeCalendarConfig);
             var climate = EnvironmentClimateResolver.Resolve(
                 calendar,
-                safeClimateConfig);
+                safeClimateConfig,
+                safeCalendarConfig);
 
             state.SetCalendar(calendar);
             state.SetClimate(climate);
