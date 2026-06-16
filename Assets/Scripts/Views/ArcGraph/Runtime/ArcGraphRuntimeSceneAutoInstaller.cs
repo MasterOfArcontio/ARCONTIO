@@ -388,12 +388,46 @@ namespace Arcontio.View.ArcGraph
             var roots = new List<GameObject>();
             for (int i = 0; i < names.Length; i++)
             {
-                GameObject root = FindSceneGameObjectByName(names[i]);
-                if (root != null)
-                    roots.Add(root);
+                AddSceneGameObjectsByName(names[i], roots);
             }
 
             return roots.ToArray();
+        }
+
+        // =============================================================================
+        // AddSceneGameObjectsByName
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiunge alla lista tutti i GameObject della scena attiva che hanno il
+        /// nome richiesto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: spegnimento completo del legacy visuale</b></para>
+        /// <para>
+        /// Il vecchio percorso MapGrid puo' creare piu' root con lo stesso nome in
+        /// momenti diversi. Il caso piu' evidente e' <c>NPCViews</c>: puo' esistere
+        /// un root placeholder creato dal bootstrap e un root runtime creato dal
+        /// <c>MapGridWorldView</c>. Se lo switcher F12 ne spegne solo uno, entrando
+        /// in ArcGraph resta visibile il vecchio sprite statico dell'NPC. Per questo
+        /// l'auto-installer non cerca piu' il primo match, ma registra tutti i match
+        /// legacy visuali trovati nella scena.
+        /// </para>
+        /// </summary>
+        private static void AddSceneGameObjectsByName(
+            string objectName,
+            List<GameObject> results)
+        {
+            if (string.IsNullOrWhiteSpace(objectName) || results == null)
+                return;
+
+            Scene scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid())
+                return;
+
+            GameObject[] rootObjects = scene.GetRootGameObjects();
+            for (int i = 0; i < rootObjects.Length; i++)
+                AddGameObjectsByNameRecursive(rootObjects[i].transform, objectName, results);
         }
 
         // =============================================================================
@@ -488,6 +522,30 @@ namespace Arcontio.View.ArcGraph
             }
 
             return null;
+        }
+
+        // =============================================================================
+        // AddGameObjectsByNameRecursive
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Attraversa un sottoalbero Unity e aggiunge tutti i nodi con il nome
+        /// richiesto, includendo oggetti inattivi.
+        /// </para>
+        /// </summary>
+        private static void AddGameObjectsByNameRecursive(
+            Transform root,
+            string objectName,
+            List<GameObject> results)
+        {
+            if (root == null || results == null)
+                return;
+
+            if (root.name == objectName && !results.Contains(root.gameObject))
+                results.Add(root.gameObject);
+
+            for (int i = 0; i < root.childCount; i++)
+                AddGameObjectsByNameRecursive(root.GetChild(i), objectName, results);
         }
 
         // =============================================================================
