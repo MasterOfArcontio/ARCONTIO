@@ -1,0 +1,26 @@
+{
+  "width": 128,
+  "height": 128,
+
+  "terrain": {
+    "fill": 0,
+    "patches": []
+  },
+
+  "occluders": [],
+
+  "resources": [
+    {
+      "type": "food",
+      "x": 15,
+      "y": 15,
+      "amount": 8
+    },
+    {
+      "type": "textile",
+      "x": 16,
+      "y": 15,
+      "amount": 4
+    }
+  ]
+}
