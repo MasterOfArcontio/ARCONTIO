@@ -54,6 +54,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool enableInteractionWrapperAfterPush;
         [SerializeField] private bool logDiagnostics;
         [SerializeField] private int zoomLevel = 4;
+        [SerializeField] private float actorObjectRefreshSeconds = 0.1f;
 
         private readonly ArcGraphMinimalRuntimeCoordinator _coordinator = new();
         private ArcGraphMinimalRuntimeSceneWrapperDiagnostics _lastDiagnostics;
@@ -62,6 +63,9 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphObjectRuntimeSceneRendererDiagnostics _lastObjectRendererDiagnostics;
         private ArcGraphMapViewConfig _currentViewConfig;
         private long _sourceFrameIndex;
+        private float _nextActorObjectRefreshTime;
+        private bool _hasRenderedActorObjectFrame;
+        private bool _didEnableInteractionAfterPush;
 
         public ArcGraphMinimalRuntimeSceneWrapperDiagnostics LastDiagnostics => _lastDiagnostics;
         public ArcGraphMinimalRuntimeCoordinatorDiagnostics LastCoordinatorDiagnostics => _coordinator.LastDiagnostics;
@@ -128,6 +132,12 @@ namespace Arcontio.View.ArcGraph
         public void SetWrapperEnabled(bool enabled)
         {
             wrapperEnabled = enabled;
+
+            if (!enabled)
+            {
+                _didEnableInteractionAfterPush = false;
+                _hasRenderedActorObjectFrame = false;
+            }
         }
 
         // =============================================================================
@@ -387,11 +397,12 @@ namespace Arcontio.View.ArcGraph
             if (interactionWrapper != null)
                 interactionWrapper.SetConfig(_currentViewConfig);
 
+            bool shouldRefreshActorObjectFrame = ShouldRefreshActorObjectFrame();
             var frame = new ArcGraphMinimalRuntimeCoordinatorFrame(
                 context,
                 isCoordinatorEnabled: true,
-                shouldRefreshSnapshots: refreshSnapshots,
-                shouldBuildActorObjectQueue: buildActorObjectQueue,
+                shouldRefreshSnapshots: refreshSnapshots && shouldRefreshActorObjectFrame,
+                shouldBuildActorObjectQueue: buildActorObjectQueue && shouldRefreshActorObjectFrame,
                 zoomLevel: ResolveEffectiveZoomLevel(),
                 sourceTick: _sourceFrameIndex++);
 
@@ -401,8 +412,8 @@ namespace Arcontio.View.ArcGraph
             int contextWorldObjectCount = CountContextWorldObjects(context);
             int firstContextObjectId = ResolveFirstContextObjectId(context, out string firstContextObjectDefId);
             bool renderedTerrain = TryRenderTerrainRuntime(context, coordinatorDiagnostics);
-            bool renderedNpc = TryRenderNpcRuntime(coordinatorDiagnostics);
-            bool renderedObject = TryRenderObjectRuntime(coordinatorDiagnostics);
+            bool renderedNpc = shouldRefreshActorObjectFrame && TryRenderNpcRuntime(coordinatorDiagnostics);
+            bool renderedObject = shouldRefreshActorObjectFrame && TryRenderObjectRuntime(coordinatorDiagnostics);
             bool pushedQueue = TryPushQueueToInteractionWrapper(coordinatorDiagnostics);
 
             _lastDiagnostics = CreateDiagnostics(
@@ -418,8 +429,36 @@ namespace Arcontio.View.ArcGraph
                 coordinatorDiagnostics,
                 ResolveReason(coordinatorDiagnostics, renderedTerrain, renderedNpc, renderedObject, pushedQueue));
 
+            if (shouldRefreshActorObjectFrame)
+                _hasRenderedActorObjectFrame = true;
+
             LogLastDiagnostics();
             return _lastDiagnostics;
+        }
+
+        private bool ShouldRefreshActorObjectFrame()
+        {
+            if (!_hasRenderedActorObjectFrame)
+            {
+                _nextActorObjectRefreshTime = Time.unscaledTime + ResolveActorObjectRefreshSeconds();
+                return true;
+            }
+
+            float refreshSeconds = ResolveActorObjectRefreshSeconds();
+            if (refreshSeconds <= 0.0001f)
+                return true;
+
+            float now = Time.unscaledTime;
+            if (now < _nextActorObjectRefreshTime)
+                return false;
+
+            _nextActorObjectRefreshTime = now + refreshSeconds;
+            return true;
+        }
+
+        private float ResolveActorObjectRefreshSeconds()
+        {
+            return actorObjectRefreshSeconds < 0f ? 0f : actorObjectRefreshSeconds;
         }
 
         private bool TryRenderTerrainRuntime(
@@ -517,8 +556,12 @@ namespace Arcontio.View.ArcGraph
 
             if (enableInteractionWrapperAfterPush)
             {
-                interactionWrapper.SetAdapterEnabled(true);
-                interactionWrapper.SetProcessInUpdate(true);
+                if (!_didEnableInteractionAfterPush)
+                {
+                    interactionWrapper.SetAdapterEnabled(true);
+                    interactionWrapper.SetProcessInUpdate(true);
+                    _didEnableInteractionAfterPush = true;
+                }
             }
 
             return true;

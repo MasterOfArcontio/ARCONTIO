@@ -56,6 +56,7 @@ namespace Arcontio.View.ArcGraph
 
         private readonly Dictionary<ArcGraphChunkCoord, ChunkHandle> _chunkPool = new();
         private readonly HashSet<ArcGraphChunkCoord> _animatedTerrainChunks = new();
+        private readonly List<ArcGraphChunkCoord> _dirtyChunkBuffer = new();
         private readonly ArcGraphTerrainAnimationClock _terrainAnimationClock = new();
         private Transform _root;
         private ArcGraphTerrainCatalog _terrainCatalog;
@@ -549,15 +550,15 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainVisibleChunkFilterResult FilterDirtyChunks(ArcGraphRenderState renderState)
         {
             var filter = new ArcGraphTerrainVisibleChunkFilter();
-            var dirtyChunks = new List<ArcGraphChunkCoord>();
+            _dirtyChunkBuffer.Clear();
             if (renderState != null)
             {
                 foreach (ArcGraphChunkCoord dirtyChunk in renderState.Dirty.DirtyChunks)
-                    dirtyChunks.Add(dirtyChunk);
+                    _dirtyChunkBuffer.Add(dirtyChunk);
             }
 
             return filter.Filter(
-                dirtyChunks,
+                _dirtyChunkBuffer,
                 renderState != null ? renderState.ChunkSizeCells : 16,
                 renderState != null ? renderState.VisibleZLevel : ArcGraphZLevelPolicy.DefaultVisibleZLevel,
                 useViewportCulling,

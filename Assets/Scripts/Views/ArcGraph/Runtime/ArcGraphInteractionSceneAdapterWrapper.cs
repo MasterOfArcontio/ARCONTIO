@@ -272,9 +272,6 @@ namespace Arcontio.View.ArcGraph
         {
             Mouse mouse = Mouse.current;
             bool hasMouse = mouse != null;
-            ArcGraphMapViewConfig config = ResolveConfig();
-            ArcGraphViewState viewState = EnsureViewState();
-            IArcGraphInteractionFrameConsumer consumer = ResolveConsumer();
             ResolveViewport(out int viewportWidth, out int viewportHeight);
             bool hasValidViewport = viewportWidth > 0 && viewportHeight > 0;
 
@@ -292,6 +289,10 @@ namespace Arcontio.View.ArcGraph
                 LogLastDiagnostics();
                 return _lastWrapperDiagnostics;
             }
+
+            ArcGraphMapViewConfig config = ResolveConfig();
+            ArcGraphViewState viewState = EnsureViewState();
+            IArcGraphInteractionFrameConsumer consumer = ResolveConsumer();
 
             ArcGraphViewInputFrame input = BuildInputFrame(mouse);
             var sceneFrame = new ArcGraphInteractionSceneFrame(
