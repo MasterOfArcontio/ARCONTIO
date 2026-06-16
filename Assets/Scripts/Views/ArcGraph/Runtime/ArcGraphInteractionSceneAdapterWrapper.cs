@@ -386,6 +386,7 @@ namespace Arcontio.View.ArcGraph
                 config,
                 viewState,
                 input,
+                contractDiagnostics.DidChangeZoom,
                 viewportHeight);
 
             _lastWrapperDiagnostics = CreateWrapperDiagnostics(
@@ -423,6 +424,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphMapViewConfig config,
             ArcGraphViewState viewState,
             ArcGraphViewInputFrame input,
+            bool didChangeLogicalZoom,
             int viewportPixelHeight)
         {
             if (!syncSceneCameraZoomToViewState || config == null || viewState == null)
@@ -440,10 +442,13 @@ namespace Arcontio.View.ArcGraph
                 minimumSceneCameraOrthographicSize,
                 zoom.VisibleCellsY * 0.5f);
 
-            bool hasPointerWorldAnchor = TryResolvePointerWorldOnZ0(
-                camera,
-                input,
-                out Vector3 pointerWorldBeforeZoom);
+            Vector3 pointerWorldBeforeZoom = default;
+            bool hasPointerWorldAnchor =
+                didChangeLogicalZoom &&
+                TryResolvePointerWorldOnZ0(
+                    camera,
+                    input,
+                    out pointerWorldBeforeZoom);
 
             bool didChangePixelPerfectZoom = ApplyPixelPerfectCameraZoomIfPresent(
                 camera,
@@ -456,11 +461,12 @@ namespace Arcontio.View.ArcGraph
             if (didChangeOrthographicSize)
                 camera.orthographicSize = targetOrthographicSize;
 
-            // La view logica mantiene gia' stabile la cella sotto il puntatore. Qui
-            // applichiamo lo stesso principio alla camera Unity reale, altrimenti
-            // l'utente vedrebbe lo zoom avvenire dal centro dello schermo invece
-            // che dal punto indicato dal mouse.
-            if ((didChangePixelPerfectZoom || didChangeOrthographicSize) &&
+            // La compensazione verso puntatore deve avvenire solo nel frame in cui
+            // il livello zoom logico e' cambiato davvero. Il sync camera puo'
+            // rieseguire ogni frame per riallineare orthographicSize/PPC, ma non
+            // deve mai trasformare un semplice movimento mouse in pan automatico.
+            if (didChangeLogicalZoom &&
+                (didChangePixelPerfectZoom || didChangeOrthographicSize) &&
                 hasPointerWorldAnchor)
             {
                 ApplyCameraPointerAnchor(
