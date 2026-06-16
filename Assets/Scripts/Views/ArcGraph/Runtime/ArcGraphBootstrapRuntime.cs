@@ -186,6 +186,36 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // RefreshDynamicSnapshots
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna solo snapshot dinamici di oggetti e attori, lasciando fermo il
+        /// terreno gia' copiato al bootstrap iniziale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: terreno statico, entita' dinamiche</b></para>
+        /// <para>
+        /// Nel runtime attuale il terreno viene letto da MapGrid come base visuale
+        /// quasi statica, mentre NPC e oggetti possono cambiare a ogni frame/tick.
+        /// Questo metodo evita la scansione completa della mappa per frame e
+        /// mantiene aggiornati i layer che alimentano la render queue.
+        /// </para>
+        /// </summary>
+        public bool RefreshDynamicSnapshots()
+        {
+            if (!IsInitialized)
+            {
+                _diagnostics = BuildDiagnostics(ArcGraphBootstrapStatus.Failed, "DynamicRefreshRequestedBeforeInitialize");
+                return false;
+            }
+
+            PopulateDynamicSnapshotsFromContext();
+            _diagnostics = BuildDiagnostics(ArcGraphBootstrapStatus.Initialized, "DynamicSnapshotsRefreshed");
+            return true;
+        }
+
+        // =============================================================================
         // Dispose
         // =============================================================================
         /// <summary>
@@ -219,8 +249,6 @@ namespace Arcontio.View.ArcGraph
         {
             // Ogni lista viene svuotata prima del nuovo riempimento: le cache sono derivate.
             _terrainSnapshots.Clear();
-            _objectSnapshots.Clear();
-            _actorSnapshots.Clear();
 
             if (_context?.Map != null)
             {
@@ -230,16 +258,33 @@ namespace Arcontio.View.ArcGraph
                     terrainLayer.ReplaceSnapshots(_terrainSnapshots, _renderState);
             }
 
+            PopulateDynamicSnapshotsFromContext();
+        }
+
+        private void PopulateDynamicSnapshotsFromContext()
+        {
+            // Oggetti e attori sono la parte mobile del ponte MapGrid/World. Sono
+            // aggiornati spesso, ma non devono invalidare il terrain renderer.
+            _objectSnapshots.Clear();
+            _actorSnapshots.Clear();
+
             if (_context?.World != null)
             {
                 _adapter.FillObjectSnapshots(_context.World, _objectSnapshots);
                 _adapter.FillActorSnapshots(_context.World, _actorSnapshots);
 
                 if (_layerStack.TryGetLayer<ArcGraphObjectLayer>(out var objectLayer))
-                    objectLayer.ReplaceSnapshots(_objectSnapshots, _renderState);
+                {
+                    // Oggetti e attori vengono renderizzati dalla queue actor/object,
+                    // non dal renderer terrain. Non passiamo quindi il render state
+                    // condiviso a questi layer, altrimenti ogni movimento NPC o
+                    // refresh oggetto sporca chunk che il terrain renderer interpreta
+                    // come terreno da ricostruire.
+                    objectLayer.ReplaceSnapshots(_objectSnapshots, null);
+                }
 
                 if (_layerStack.TryGetLayer<ArcGraphActorLayer>(out var actorLayer))
-                    actorLayer.ReplaceSnapshots(_actorSnapshots, _renderState);
+                    actorLayer.ReplaceSnapshots(_actorSnapshots, null);
             }
         }
 

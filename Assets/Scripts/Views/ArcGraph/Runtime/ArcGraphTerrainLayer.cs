@@ -62,17 +62,52 @@ namespace Arcontio.View.ArcGraph
             IEnumerable<ArcGraphTerrainCellSnapshot> snapshots,
             ArcGraphRenderState renderState = null)
         {
-            _cells.Clear();
-            _runtimeTerrainMap = null;
-
             if (snapshots == null)
+            {
+                if (_cells.Count > 0)
+                {
+                    foreach (ArcGraphCellCoord previousCell in _cells.Keys)
+                        MarkTerrainCellAndVisualNeighborsDirty(previousCell, renderState);
+
+                    _cells.Clear();
+                    _runtimeTerrainMap = null;
+                }
+
                 return;
+            }
+
+            var incoming = new Dictionary<ArcGraphCellCoord, ArcGraphTerrainCellSnapshot>();
+            bool changed = false;
 
             foreach (var snapshot in snapshots)
             {
-                _cells[snapshot.Cell] = snapshot;
-                renderState?.MarkCellAndChunkDirty(snapshot.Cell);
+                incoming[snapshot.Cell] = snapshot;
+
+                if (!_cells.TryGetValue(snapshot.Cell, out ArcGraphTerrainCellSnapshot previous)
+                    || !AreSameTerrainSnapshot(previous, snapshot))
+                {
+                    changed = true;
+                    MarkTerrainCellAndVisualNeighborsDirty(snapshot.Cell, renderState);
+                }
             }
+
+            foreach (ArcGraphCellCoord previousCell in _cells.Keys)
+            {
+                if (incoming.ContainsKey(previousCell))
+                    continue;
+
+                changed = true;
+                MarkTerrainCellAndVisualNeighborsDirty(previousCell, renderState);
+            }
+
+            if (!changed && incoming.Count == _cells.Count)
+                return;
+
+            _cells.Clear();
+            foreach (var pair in incoming)
+                _cells[pair.Key] = pair.Value;
+
+            _runtimeTerrainMap = null;
         }
 
         // =============================================================================
@@ -135,6 +170,60 @@ namespace Arcontio.View.ArcGraph
                 visualBuildOptions);
 
             return _runtimeTerrainMap;
+        }
+
+        // =============================================================================
+        // GetOrRebuildRuntimeTerrainMap
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce la mappa runtime terrain gia' risolta, ricostruendola solo
+        /// quando la cache e' stata invalidata da un cambio reale degli snapshot.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: terreno statico finche' non cambia</b></para>
+        /// <para>
+        /// Le animazioni visuali, gli NPC e gli oggetti non devono costringere il
+        /// terreno a ricalcolare tutta la propria semantica. La runtime map viene
+        /// quindi conservata tra frame e rigenerata solo dopo una modifica di
+        /// terreno, caricamento mappa o cleanup esplicito.
+        /// </para>
+        /// </summary>
+        public ArcGraphRuntimeTerrainMap GetOrRebuildRuntimeTerrainMap(
+            ArcGraphTerrainVisualPolicy visualPolicy,
+            ArcGraphTerrainVisualBuildOptions visualBuildOptions)
+        {
+            return _runtimeTerrainMap ?? RebuildRuntimeTerrainMap(
+                visualPolicy,
+                visualBuildOptions);
+        }
+
+        private static bool AreSameTerrainSnapshot(
+            ArcGraphTerrainCellSnapshot left,
+            ArcGraphTerrainCellSnapshot right)
+        {
+            return left.Cell.Equals(right.Cell)
+                   && left.TileId == right.TileId
+                   && left.IsBlocked == right.IsBlocked;
+        }
+
+        private static void MarkTerrainCellAndVisualNeighborsDirty(
+            ArcGraphCellCoord cell,
+            ArcGraphRenderState renderState)
+        {
+            if (renderState == null)
+                return;
+
+            for (int dy = -1; dy <= 1; dy++)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    renderState.MarkCellAndChunkDirty(new ArcGraphCellCoord(
+                        cell.X + dx,
+                        cell.Y + dy,
+                        cell.Z));
+                }
+            }
         }
 
         // =============================================================================

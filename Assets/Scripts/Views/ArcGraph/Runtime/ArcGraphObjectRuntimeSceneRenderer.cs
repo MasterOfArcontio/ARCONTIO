@@ -35,7 +35,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private MonoBehaviour spriteResolverBehaviour;
         [SerializeField] private bool rendererEnabled;
         [SerializeField] private bool renderOnStart;
-        [SerializeField] private bool logDiagnostics = true;
+        [SerializeField] private bool logDiagnostics;
         [SerializeField] private bool disableMissingObjectsAfterRender = true;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float tileWorldSize = 1f;

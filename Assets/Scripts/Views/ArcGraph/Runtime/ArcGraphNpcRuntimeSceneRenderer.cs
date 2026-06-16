@@ -38,7 +38,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool useLayeredActorCatalog;
         [SerializeField] private bool rendererEnabled;
         [SerializeField] private bool renderOnStart;
-        [SerializeField] private bool logDiagnostics = true;
+        [SerializeField] private bool logDiagnostics;
         [SerializeField] private bool allowGeneratedFallbackSprites = true;
         [SerializeField] private bool disableMissingActorsAfterRender = true;
         [SerializeField] private int idleFrameStep = 12;

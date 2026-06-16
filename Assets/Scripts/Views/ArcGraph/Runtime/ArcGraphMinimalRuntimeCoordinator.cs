@@ -93,7 +93,13 @@ namespace Arcontio.View.ArcGraph
 
             bool refreshed = false;
             if (frame.ShouldRefreshSnapshots && _runtime != null)
-                refreshed = _runtime.RefreshSnapshots();
+            {
+                // Il terreno viene popolato durante Initialize e resta cache statica
+                // finche' non cambia la sorgente MapGrid. Nel frame loop ordinario
+                // aggiorniamo solo actor/oggetti, altrimenti una vista con molti
+                // tile pagherebbe una scansione completa della mappa ogni frame.
+                refreshed = _runtime.RefreshDynamicSnapshots();
+            }
 
             bool hasTerrainLayer = HasLayer<ArcGraphTerrainLayer>();
             bool hasActorLayer = TryGetLayer(out ArcGraphActorLayer actorLayer);

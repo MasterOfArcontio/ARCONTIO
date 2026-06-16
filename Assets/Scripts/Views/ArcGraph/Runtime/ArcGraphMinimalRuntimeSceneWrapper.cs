@@ -52,7 +52,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool enableObjectRendererBeforeRender;
         [SerializeField] private bool pushQueueToInteractionWrapper;
         [SerializeField] private bool enableInteractionWrapperAfterPush;
-        [SerializeField] private bool logDiagnostics = true;
+        [SerializeField] private bool logDiagnostics;
         [SerializeField] private int zoomLevel = 4;
 
         private readonly ArcGraphMinimalRuntimeCoordinator _coordinator = new();
@@ -60,6 +60,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainRuntimeSceneRendererDiagnostics _lastTerrainRendererDiagnostics;
         private ArcGraphNpcRuntimeSceneRendererDiagnostics _lastNpcRendererDiagnostics;
         private ArcGraphObjectRuntimeSceneRendererDiagnostics _lastObjectRendererDiagnostics;
+        private ArcGraphMapViewConfig _currentViewConfig;
         private long _sourceFrameIndex;
 
         public ArcGraphMinimalRuntimeSceneWrapperDiagnostics LastDiagnostics => _lastDiagnostics;
@@ -382,12 +383,16 @@ namespace Arcontio.View.ArcGraph
             }
 
             ArcGraphRuntimeContext context = runtimeMapAdapter.BuildTerrainRuntimeContext();
+            _currentViewConfig = CreateViewConfigForContext(context);
+            if (interactionWrapper != null)
+                interactionWrapper.SetConfig(_currentViewConfig);
+
             var frame = new ArcGraphMinimalRuntimeCoordinatorFrame(
                 context,
                 isCoordinatorEnabled: true,
                 shouldRefreshSnapshots: refreshSnapshots,
                 shouldBuildActorObjectQueue: buildActorObjectQueue,
-                zoomLevel: zoomLevel,
+                zoomLevel: ResolveEffectiveZoomLevel(),
                 sourceTick: _sourceFrameIndex++);
 
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics =
@@ -437,6 +442,8 @@ namespace Arcontio.View.ArcGraph
 
             if (enableTerrainRendererBeforeRender)
                 terrainRenderer.SetRendererEnabled(true);
+
+            ApplyTerrainViewport(context);
 
             _lastTerrainRendererDiagnostics = terrainRenderer.RenderFromRuntime(
                 context,
@@ -505,7 +512,7 @@ namespace Arcontio.View.ArcGraph
 
             // Il wrapper interattivo riceve solo config view e queue gia' derivate.
             // Non riceve World, MapGridData o accesso agli adapter.
-            interactionWrapper.SetConfig(ArcGraphMapViewConfig.CreateDefaultV033());
+            interactionWrapper.SetConfig(_currentViewConfig ?? ArcGraphMapViewConfig.CreateDefaultV033());
             interactionWrapper.SetRenderQueue(_coordinator.RenderQueue);
 
             if (enableInteractionWrapperAfterPush)
@@ -515,6 +522,55 @@ namespace Arcontio.View.ArcGraph
             }
 
             return true;
+        }
+
+        private void ApplyTerrainViewport(ArcGraphRuntimeContext context)
+        {
+            if (terrainRenderer == null)
+                return;
+
+            ArcGraphMapViewConfig viewConfig = _currentViewConfig ?? CreateViewConfigForContext(context);
+            ArcGraphViewState viewState = interactionWrapper != null
+                ? interactionWrapper.ViewState
+                : ArcGraphViewState.CreateDefault(viewConfig);
+
+            if (viewState == null)
+            {
+                terrainRenderer.ClearVisibleCellRect();
+                return;
+            }
+
+            terrainRenderer.SetVisibleCellRect(viewState.ResolveVisibleCellRect(viewConfig));
+        }
+
+        private int ResolveEffectiveZoomLevel()
+        {
+            ArcGraphViewState viewState = interactionWrapper != null
+                ? interactionWrapper.ViewState
+                : null;
+
+            return viewState != null
+                ? viewState.ActiveZoomLevel
+                : zoomLevel;
+        }
+
+        private ArcGraphMapViewConfig CreateViewConfigForContext(ArcGraphRuntimeContext context)
+        {
+            ArcGraphMapViewConfig defaults = ArcGraphMapViewConfig.CreateDefaultV033();
+            int width = context?.Map != null && context.Map.Width > 0
+                ? context.Map.Width
+                : defaults.MapWidthCells;
+            int height = context?.Map != null && context.Map.Height > 0
+                ? context.Map.Height
+                : defaults.MapHeightCells;
+
+            return new ArcGraphMapViewConfig(
+                width,
+                height,
+                defaults.ZoomLevels,
+                zoomLevel > 0 ? zoomLevel : defaults.DefaultZoomLevel,
+                defaults.MouseWheelStepsPerZoomLevel,
+                defaults.PanUsesMiddleMouseButton);
         }
 
         private ArcGraphMinimalRuntimeSceneWrapperDiagnostics CreateDiagnostics(

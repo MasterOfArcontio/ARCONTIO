@@ -107,7 +107,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool adapterEnabled;
         [SerializeField] private bool processInUpdate;
         [SerializeField] private bool dispatchToConsumer;
-        [SerializeField] private bool logDiagnostics = true;
+        [SerializeField] private bool logDiagnostics;
         [SerializeField] private bool useScreenAsViewport = true;
         [SerializeField] private int manualViewportPixelWidth = 1920;
         [SerializeField] private int manualViewportPixelHeight = 1080;

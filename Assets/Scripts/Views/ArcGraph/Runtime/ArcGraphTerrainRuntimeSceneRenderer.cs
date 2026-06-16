@@ -48,7 +48,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private int viewportMinY;
         [SerializeField] private int viewportMaxXExclusive;
         [SerializeField] private int viewportMaxYExclusive;
-        [SerializeField] private bool logDiagnostics = true;
+        [SerializeField] private bool logDiagnostics;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float terrainZOffset = -0.05f;
         [SerializeField] private int terrainSortingOrder = -5;
@@ -92,6 +92,9 @@ namespace Arcontio.View.ArcGraph
         private int _lastAnimatedTerrainChunkCount;
         private bool _lastTerrainAnimationRefreshQueued;
         private float _lastTerrainAnimationVisualTimeSeconds;
+        private bool _hasLastQueuedVisibleRect;
+        private bool _lastQueuedUsedViewportCulling;
+        private ArcGraphViewCellRect _lastQueuedVisibleRect;
 
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
         public bool RendererEnabled => rendererEnabled;
@@ -384,6 +387,7 @@ namespace Arcontio.View.ArcGraph
                 return StoreAndLogDiagnostics(context, runtime, null, contract, false, false, runtime.RenderState.Dirty.DirtyChunks.Count, 0, 0, 0, 0, 0, 0, false, "TerrainLayerMissing");
             }
 
+            QueueVisibleTerrainChunksIfViewportChanged(runtime.RenderState);
             QueueAnimatedTerrainChunksIfDue(runtime.RenderState);
 
             int dirtyChunkCount = runtime.RenderState.Dirty.DirtyChunks.Count;
@@ -409,7 +413,7 @@ namespace Arcontio.View.ArcGraph
             disabled += _lastDisabledOutsideViewportChunkCount;
 
             bool didClearDirty = false;
-            if (contract.ClearDirtyAfterRender && _lastCulledDirtyChunkCount <= 0)
+            if (contract.ClearDirtyAfterRender)
             {
                 runtime.RenderState.ClearDirty();
                 didClearDirty = true;
@@ -511,7 +515,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphTerrainVisualPolicy visualPolicy = ArcGraphTerrainVisualPolicy.CreateLegacyDefault();
             ArcGraphTerrainVisualBuildOptions visualBuildOptions = CreateVisualBuildOptions();
             ArcGraphRuntimeTerrainMap runtimeTerrainMap = terrainLayer != null
-                ? terrainLayer.RebuildRuntimeTerrainMap(visualPolicy, visualBuildOptions)
+                ? terrainLayer.GetOrRebuildRuntimeTerrainMap(visualPolicy, visualBuildOptions)
                 : null;
             RefreshAnimatedTerrainChunks(runtimeTerrainMap, renderState);
 
@@ -632,6 +636,65 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // QueueVisibleTerrainChunksIfViewportChanged
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca dirty i chunk della nuova finestra visibile quando cambia il
+        /// viewport ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: culling recuperabile</b></para>
+        /// <para>
+        /// Quando il renderer costruisce solo la porzione visibile, i chunk fuori
+        /// viewport possono restare non materializzati. Al cambio di pan/zoom questo
+        /// metodo accoda i chunk entrati nella finestra, cosi' il renderer puo'
+        /// pulire il dirty globale senza perdere la capacita' di disegnare zone
+        /// nuove appena diventano visibili.
+        /// </para>
+        /// </summary>
+        private void QueueVisibleTerrainChunksIfViewportChanged(ArcGraphRenderState renderState)
+        {
+            if (renderState == null)
+                return;
+
+            ArcGraphViewCellRect rect = CreateVisibleCellRect();
+            bool changed = !_hasLastQueuedVisibleRect
+                           || _lastQueuedUsedViewportCulling != useViewportCulling
+                           || _lastQueuedVisibleRect.MinX != rect.MinX
+                           || _lastQueuedVisibleRect.MinY != rect.MinY
+                           || _lastQueuedVisibleRect.MaxXExclusive != rect.MaxXExclusive
+                           || _lastQueuedVisibleRect.MaxYExclusive != rect.MaxYExclusive;
+
+            if (!changed)
+                return;
+
+            _hasLastQueuedVisibleRect = true;
+            _lastQueuedUsedViewportCulling = useViewportCulling;
+            _lastQueuedVisibleRect = rect;
+
+            if (!useViewportCulling || rect.IsEmpty)
+                return;
+
+            int chunkSize = renderState.ChunkSizeCells > 0 ? renderState.ChunkSizeCells : 1;
+            int minChunkX = FloorDiv(rect.MinX, chunkSize);
+            int minChunkY = FloorDiv(rect.MinY, chunkSize);
+            int maxChunkX = FloorDiv(rect.MaxXExclusive - 1, chunkSize);
+            int maxChunkY = FloorDiv(rect.MaxYExclusive - 1, chunkSize);
+
+            for (int cy = minChunkY; cy <= maxChunkY; cy++)
+            {
+                for (int cx = minChunkX; cx <= maxChunkX; cx++)
+                {
+                    renderState.Dirty.MarkChunkDirty(new ArcGraphChunkCoord(
+                        cx,
+                        cy,
+                        renderState.VisibleZLevel));
+                }
+            }
+        }
+
+        // =============================================================================
         // RefreshAnimatedTerrainChunks
         // =============================================================================
         /// <summary>
@@ -743,6 +806,15 @@ namespace Arcontio.View.ArcGraph
                 viewportMinY,
                 viewportMaxXExclusive,
                 viewportMaxYExclusive);
+        }
+
+        private static int FloorDiv(int value, int divisor)
+        {
+            int quotient = value / divisor;
+            int remainder = value % divisor;
+            if (remainder != 0 && ((remainder < 0) != (divisor < 0)))
+                quotient--;
+            return quotient;
         }
 
         private void ApplyChunks(
