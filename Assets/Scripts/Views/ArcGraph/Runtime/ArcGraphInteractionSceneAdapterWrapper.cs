@@ -598,13 +598,21 @@ namespace Arcontio.View.ArcGraph
             int wheelStepDelta = ResolveWheelStep(scrollY);
             bool isPointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
+            // Durante il soft retirement di MapGrid conserviamo il gesto pratico
+            // gia' usato dall'operatore: RMB trascina la mappa. Il controller
+            // ArcGraph riceve comunque un input astratto di pan, senza conoscere
+            // quale tasto fisico lo ha prodotto.
+            bool isPanButtonHeld =
+                mouse.middleButton.isPressed ||
+                mouse.rightButton.isPressed;
+
             Vector2 viewportPoint = useScreenAsViewport
                 ? position
                 : position - manualViewportOriginPixels;
 
             return new ArcGraphViewInputFrame(
                 wheelStepDelta,
-                mouse.middleButton.isPressed,
+                isPanButtonHeld,
                 delta.x,
                 delta.y,
                 viewportPoint.x,

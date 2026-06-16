@@ -381,8 +381,8 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Configura il controller camera legacy MapGrid come pan provvisorio per
-        /// la vista runtime ArcGraph.
+        /// Configura il controller camera legacy MapGrid come bridge camera
+        /// provvisorio per la vista runtime ArcGraph.
         /// </para>
         ///
         /// <para><b>Principio architetturale: assorbimento parziale del legacy</b></para>
@@ -390,11 +390,11 @@ namespace Arcontio.View.ArcGraph
         /// ArcGraph usa <c>ArcGraphViewConfig</c> e <c>ArcGraphViewState</c> per
         /// lavorare con livelli zoom discreti. Il vecchio
         /// <c>MapGridCameraController</c> contiene pero' anche il pan fisico della
-        /// camera, che ArcGraph non ha ancora assorbito in un componente proprio.
-        /// Per questo il soft retirement non spegne piu' tutto il controller:
-        /// riabilita il componente se necessario, ma disattiva solo la lettura
-        /// della rotellina legacy. Lo zoom resta quindi ArcGraph-only, mentre il
-        /// pan resta temporaneamente ereditato.
+        /// camera. Ora pero' il pan operativo e' stato assorbito nel controller
+        /// logico ArcGraph: il componente legacy resta acceso solo per ricevere
+        /// offset esterni e tenere allineato il proprio target interno. Spegniamo
+        /// quindi sia la rotellina sia la lettura diretta del pan legacy, evitando
+        /// due sorgenti concorrenti sullo stesso transform camera.
         /// </para>
         /// </summary>
         private static void ConfigureLegacyMapGridCameraControllerForArcGraph(
@@ -407,6 +407,7 @@ namespace Arcontio.View.ArcGraph
                 cameraController.enabled = true;
 
             cameraController.SetZoomInputEnabled(false);
+            cameraController.SetPanInputEnabled(false);
         }
 
         // =============================================================================

@@ -23,6 +23,7 @@ namespace Arcontio.View.MapGrid
     public sealed class MapGridCameraController : MonoBehaviour
     {
         [SerializeField] private bool zoomInputEnabled = true;
+        [SerializeField] private bool panInputEnabled = true;
 
         private Camera _camera;
         private MapGridData _map;
@@ -106,6 +107,44 @@ namespace Arcontio.View.MapGrid
         }
 
         // =============================================================================
+        // SetPanInputEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita la lettura diretta del pan da parte del controller
+        /// camera legacy MapGrid.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: singola sorgente del pan runtime</b></para>
+        /// <para>
+        /// Quando ArcGraph e' la vista principale, il centro della mappa deve essere
+        /// governato da <c>ArcGraphViewState</c>. Il vecchio controller MapGrid puo'
+        /// ancora ricevere offset esterni per riallineare il proprio target interno,
+        /// ma non deve leggere il tasto destro e muovere la camera in autonomia.
+        /// Altrimenti il pan fisico verrebbe annullato dal sync ArcGraph nel frame
+        /// successivo, producendo una camera apparentemente bloccata.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>panInputEnabled</b>: gate della lettura RMB/edge-pan legacy.</item>
+        ///   <item><b>_targetPos</b>: riallineato alla posizione corrente quando il gate viene spento.</item>
+        ///   <item><b>_panVelocity</b>: azzerata per evitare trascinamenti residui.</item>
+        /// </list>
+        /// </summary>
+        public void SetPanInputEnabled(bool enabled)
+        {
+            panInputEnabled = enabled;
+
+            if (enabled)
+                return;
+
+            _isRmbDragging = false;
+            _targetPos = transform.position;
+            _panVelocity = Vector3.zero;
+        }
+
+        // =============================================================================
         // ApplyExternalCameraOffset
         // =============================================================================
         /// <summary>
@@ -172,8 +211,11 @@ namespace Arcontio.View.MapGrid
                 return;
 
             HandleZoomToCursor();
-            HandleRmbDragPanTarget();
-            //HandleEdgePanTarget(); // edge-pan viene ignorato mentre trascini RMB
+            if (panInputEnabled)
+            {
+                HandleRmbDragPanTarget();
+                //HandleEdgePanTarget(); // edge-pan viene ignorato mentre trascini RMB
+            }
 
             // Clamp target prima di applicare inerzia (così non inseguiamo target fuori mappa)
             _targetPos = ClampToMapBounds(_targetPos);
