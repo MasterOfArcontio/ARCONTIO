@@ -312,6 +312,8 @@ namespace Arcontio.View.ArcGraph
             _wrapper.SetViewConfig(_viewConfig);
             _interactionWrapper.SetConsumer(_interactionRouter);
             _interactionWrapper.SetConfig(_viewConfig);
+            _interactionWrapper.SetSceneCamera(Camera.main);
+            _interactionWrapper.SetSceneCameraZoomSyncEnabled(true);
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
@@ -362,7 +364,7 @@ namespace Arcontio.View.ArcGraph
             if (_placementHighlightConsumer != null)
                 _placementHighlightConsumer.SetDevToolsOverlay(devToolsOverlay);
 
-            DisableLegacyMapGridCameraController(cameraController);
+            ConfigureLegacyMapGridCameraControllerForArcGraph(cameraController);
 
             // Anche i root visuali MapGrid possono essere creati dal bootstrap
             // legacy dopo l'installazione ArcGraph. Ricablare il controller per
@@ -375,34 +377,36 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // DisableLegacyMapGridCameraController
+        // ConfigureLegacyMapGridCameraControllerForArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Disattiva il controller camera legacy della MapGrid durante la vista
-        /// runtime ArcGraph.
+        /// Configura il controller camera legacy MapGrid come pan provvisorio per
+        /// la vista runtime ArcGraph.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: una sola autorita' sullo zoom visuale</b></para>
+        /// <para><b>Principio architetturale: assorbimento parziale del legacy</b></para>
         /// <para>
         /// ArcGraph usa <c>ArcGraphViewConfig</c> e <c>ArcGraphViewState</c> per
         /// lavorare con livelli zoom discreti. Il vecchio
-        /// <c>MapGridCameraController</c>, invece, continua a leggere la rotellina
-        /// e modifica direttamente camera o <c>PixelPerfectCamera</c>. Lasciarlo
-        /// acceso crea due autorita' concorrenti: ArcGraph crede di essere su uno
-        /// dei quattro livelli configurati, mentre la camera legacy produce molti
-        /// livelli fisici intermedi. Per questo il soft retirement non cancella
-        /// MapGrid, ma spegne il suo controller camera quando ArcGraph e' la vista
-        /// attiva.
+        /// <c>MapGridCameraController</c> contiene pero' anche il pan fisico della
+        /// camera, che ArcGraph non ha ancora assorbito in un componente proprio.
+        /// Per questo il soft retirement non spegne piu' tutto il controller:
+        /// riabilita il componente se necessario, ma disattiva solo la lettura
+        /// della rotellina legacy. Lo zoom resta quindi ArcGraph-only, mentre il
+        /// pan resta temporaneamente ereditato.
         /// </para>
         /// </summary>
-        private static void DisableLegacyMapGridCameraController(
+        private static void ConfigureLegacyMapGridCameraControllerForArcGraph(
             MapGridCameraController cameraController)
         {
-            if (cameraController == null || !cameraController.enabled)
+            if (cameraController == null)
                 return;
 
-            cameraController.enabled = false;
+            if (!cameraController.enabled)
+                cameraController.enabled = true;
+
+            cameraController.SetZoomInputEnabled(false);
         }
 
         // =============================================================================

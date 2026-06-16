@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.U2D;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -113,6 +114,9 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private int manualViewportPixelHeight = 1080;
         [SerializeField] private Vector2 manualViewportOriginPixels = Vector2.zero;
         [SerializeField] private MonoBehaviour interactionConsumerBehaviour;
+        [SerializeField] private Camera sceneCamera;
+        [SerializeField] private bool syncSceneCameraZoomToViewState;
+        [SerializeField] private float minimumSceneCameraOrthographicSize = 0.5f;
 
         private readonly ArcGraphInteractionSceneAdapterContract _contract = new();
 
@@ -263,6 +267,51 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna la camera Unity da sincronizzare con lo stato zoom ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: camera come uscita visuale, non input simulativo</b></para>
+        /// <para>
+        /// Lo stato di zoom nasce da <c>ArcGraphViewConfig</c> e
+        /// <c>ArcGraphViewState</c>. La camera Unity e' solo il terminale visivo
+        /// che rende percepibile quel livello. Questo setter evita ricerche scena
+        /// diffuse e permette all'auto-installer di dichiarare esplicitamente quale
+        /// camera deve seguire ArcGraph.
+        /// </para>
+        /// </summary>
+        public void SetSceneCamera(Camera camera)
+        {
+            sceneCamera = camera;
+        }
+
+        // =============================================================================
+        // SetSceneCameraZoomSyncEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita la sincronizzazione dello zoom fisico della camera
+        /// con il livello zoom ArcGraph corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: zoom ArcGraph discreto</b></para>
+        /// <para>
+        /// La rotellina viene ancora letta da questo wrapper, ma produce solo uno
+        /// scatto logico dentro <c>ArcGraphViewState</c>. Quando questo gate e'
+        /// acceso, il wrapper applica poi alla camera una dimensione coerente con
+        /// il livello risolto dal JSON. In questo modo non esistono piu' livelli
+        /// intermedi generati dal vecchio controller MapGrid.
+        /// </para>
+        /// </summary>
+        public void SetSceneCameraZoomSyncEnabled(bool enabled)
+        {
+            syncSceneCameraZoomToViewState = enabled;
+        }
+
+        // =============================================================================
         // ProcessCurrentFrameFromInspector
         // =============================================================================
         /// <summary>
@@ -333,6 +382,11 @@ namespace Arcontio.View.ArcGraph
                     _renderQueue,
                     consumer);
 
+            ApplySceneCameraZoomIfEnabled(
+                config,
+                viewState,
+                viewportHeight);
+
             _lastWrapperDiagnostics = CreateWrapperDiagnostics(
                 hasMouse,
                 config != null,
@@ -344,6 +398,87 @@ namespace Arcontio.View.ArcGraph
 
             LogLastDiagnostics();
             return _lastWrapperDiagnostics;
+        }
+
+        // =============================================================================
+        // ApplySceneCameraZoomIfEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica alla camera Unity il livello zoom discreto risolto da ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ponte temporaneo view-state -> camera</b></para>
+        /// <para>
+        /// ArcGraph possiede gia' il contratto logico dello zoom, ma non ha ancora
+        /// un controller camera completo. Questa funzione e' un ponte piccolo e
+        /// confinato: legge solo config e stato view, calcola la dimensione
+        /// ortografica coerente con le celle visibili del livello corrente e la
+        /// applica alla camera. Non legge il World, non sposta NPC e non modifica
+        /// dati simulativi.
+        /// </para>
+        /// </summary>
+        private void ApplySceneCameraZoomIfEnabled(
+            ArcGraphMapViewConfig config,
+            ArcGraphViewState viewState,
+            int viewportPixelHeight)
+        {
+            if (!syncSceneCameraZoomToViewState || config == null || viewState == null)
+                return;
+
+            Camera camera = ResolveSceneCamera();
+            if (camera == null)
+                return;
+
+            ArcGraphViewZoomLevelDefinition zoom = viewState.CurrentZoom(config);
+            if (zoom.VisibleCellsY <= 0)
+                return;
+
+            float targetOrthographicSize = Mathf.Max(
+                minimumSceneCameraOrthographicSize,
+                zoom.VisibleCellsY * 0.5f);
+
+            ApplyPixelPerfectCameraZoomIfPresent(
+                camera,
+                zoom,
+                viewportPixelHeight);
+
+            if (!Mathf.Approximately(camera.orthographicSize, targetOrthographicSize))
+                camera.orthographicSize = targetOrthographicSize;
+
+        }
+
+        private Camera ResolveSceneCamera()
+        {
+            if (sceneCamera != null)
+                return sceneCamera;
+
+            sceneCamera = Camera.main;
+            return sceneCamera;
+        }
+
+        private void ApplyPixelPerfectCameraZoomIfPresent(
+            Camera camera,
+            ArcGraphViewZoomLevelDefinition zoom,
+            int viewportPixelHeight)
+        {
+            PixelPerfectCamera pixelPerfectCamera = camera.GetComponent<PixelPerfectCamera>();
+            if (pixelPerfectCamera == null || !pixelPerfectCamera.enabled)
+                return;
+
+            int height = viewportPixelHeight > 0
+                ? viewportPixelHeight
+                : Screen.height;
+
+            if (height <= 0)
+                return;
+
+            int targetAssetsPpu = Mathf.Max(
+                1,
+                Mathf.RoundToInt(height / (float)zoom.VisibleCellsY));
+
+            if (pixelPerfectCamera.assetsPPU != targetAssetsPpu)
+                pixelPerfectCamera.assetsPPU = targetAssetsPpu;
         }
 
         private ArcGraphMapViewConfig ResolveConfig()

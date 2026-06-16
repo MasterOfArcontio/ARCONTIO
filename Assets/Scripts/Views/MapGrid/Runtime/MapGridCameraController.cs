@@ -22,6 +22,8 @@ namespace Arcontio.View.MapGrid
     /// </summary>
     public sealed class MapGridCameraController : MonoBehaviour
     {
+        [SerializeField] private bool zoomInputEnabled = true;
+
         private Camera _camera;
         private MapGridData _map;
         private MapGridConfig _cfg;
@@ -71,6 +73,37 @@ namespace Arcontio.View.MapGrid
 
         // Stato drag RMB
         private bool _isRmbDragging;
+
+        // =============================================================================
+        // SetZoomInputEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita solo la lettura della rotellina del mouse da parte
+        /// del controller camera MapGrid.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: pensionamento parziale del legacy</b></para>
+        /// <para>
+        /// Durante la transizione ArcGraph, questo componente contiene ancora due
+        /// responsabilita' storiche: pan fisico della camera e zoom legacy. ArcGraph
+        /// deve prendere possesso dello zoom tramite <c>ArcGraphViewConfig</c>, ma
+        /// non possiede ancora un controller camera completo per il pan. Questo gate
+        /// permette quindi di spegnere soltanto la rotellina legacy, lasciando vivo
+        /// il trascinamento della camera finche' il pan non verra' assorbito in un
+        /// componente ArcGraph dedicato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>enabled</b>: quando falso, <c>HandleZoomToCursor</c> non modifica camera o PixelPerfectCamera.</item>
+        ///   <item><b>pan</b>: il pan RMB resta gestito dal normale <c>Update</c> del controller.</item>
+        /// </list>
+        /// </summary>
+        public void SetZoomInputEnabled(bool enabled)
+        {
+            zoomInputEnabled = enabled;
+        }
 
         public void Init(Camera cam, MapGridData map, MapGridConfig cfg)
         {
@@ -123,6 +156,9 @@ namespace Arcontio.View.MapGrid
         /// </summary>
         private void HandleZoomToCursor()
         {
+            if (!zoomInputEnabled)
+                return;
+
             var mouse = Mouse.current;
             if (mouse == null) return;
 
