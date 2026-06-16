@@ -21,6 +21,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>Climate</b>: clima globale corrente.</item>
     ///   <item><b>SeasonProfile</b>: profilo stagionale usato dai bias ecologici.</item>
     ///   <item><b>Transition</b>: confine temporale che abilita update giornalieri.</item>
+    ///   <item><b>BiomeProfile</b>: profilo biome che definisce target e resistenze.</item>
     /// </list>
     /// </summary>
     public readonly struct EnvironmentAreaEvolutionContext
@@ -29,6 +30,7 @@ namespace Arcontio.Core.Environment
         public readonly EnvironmentGlobalClimateState Climate;
         public readonly EnvironmentSeasonProfile SeasonProfile;
         public readonly EnvironmentTemporalTransition Transition;
+        public readonly EnvironmentBiomeProfile BiomeProfile;
 
         public bool ShouldRunDailyEvolution => Transition.DayChanged;
 
@@ -45,11 +47,37 @@ namespace Arcontio.Core.Environment
             EnvironmentGlobalClimateState climate,
             EnvironmentSeasonProfile seasonProfile,
             EnvironmentTemporalTransition transition)
+            : this(
+                calendar,
+                climate,
+                seasonProfile,
+                transition,
+                EnvironmentBiomeProfile.Default)
+        {
+        }
+
+        // =============================================================================
+        // EnvironmentAreaEvolutionContext
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il contesto includendo un profilo biome esplicito.
+        /// </para>
+        /// </summary>
+        public EnvironmentAreaEvolutionContext(
+            EnvironmentCalendarState calendar,
+            EnvironmentGlobalClimateState climate,
+            EnvironmentSeasonProfile seasonProfile,
+            EnvironmentTemporalTransition transition,
+            EnvironmentBiomeProfile biomeProfile)
         {
             Calendar = calendar;
             Climate = climate;
             SeasonProfile = seasonProfile;
             Transition = transition;
+            BiomeProfile = biomeProfile.IsValid
+                ? biomeProfile
+                : EnvironmentBiomeProfile.Default;
         }
     }
 
@@ -312,24 +340,113 @@ namespace Arcontio.Core.Environment
             if (!context.ShouldRunDailyEvolution)
                 return vegetation;
 
-            float fertilitySupport = fertility.CurrentFertility01 * vegetation.FertilityInfluence01;
-            float climateSupport = context.SeasonProfile.VegetationGrowthBias01
-                                   * vegetation.ClimateInfluence01;
-            float waterSupport = water.WaterLevel01 * 0.5f + context.Climate.Humidity01 * 0.5f;
-            float stress = context.Climate.Aridity01 * 0.045f
-                           + fertility.Exhaustion01 * 0.030f;
-            float growthPressure = (fertilitySupport + climateSupport + waterSupport) / 3f;
-            float densityDelta = (growthPressure * vegetation.GrowthPotential01 * 0.035f) - stress;
-            float healthDelta = ((growthPressure - 0.45f) * 0.050f) - (context.Climate.Aridity01 * 0.015f);
+            var biome = context.BiomeProfile;
+            float fertilitySupport = ResolveFertilitySuitability(fertility, vegetation, biome);
+            float moistureSupport = ResolveMoistureSuitability(water, context, biome);
+            float temperatureSupport = ResolveTemperatureSuitability(context, biome);
+            float seasonSupport = ResolveSeasonSuitability(context, biome);
+            float droughtStress = context.Climate.Aridity01 * (1f - biome.DroughtResistance01);
+            float exhaustionStress = fertility.Exhaustion01 * 0.35f;
+            float stress = EnvironmentMath.Clamp01(
+                (droughtStress + exhaustionStress)
+                * biome.DisturbanceSensitivity01);
+            float ecologicalSupport = EnvironmentMath.Clamp01(
+                (fertilitySupport * 0.32f)
+                + (moistureSupport * 0.30f)
+                + (temperatureSupport * 0.18f)
+                + (seasonSupport * 0.20f));
+            float targetDensity = EnvironmentMath.Clamp01(
+                biome.TargetVegetationDensity01
+                * ecologicalSupport
+                * (1f - (stress * 0.65f)));
+            float targetHealth = EnvironmentMath.Clamp01(
+                (biome.TargetVegetationHealth01 * 0.50f)
+                + (ecologicalSupport * 0.45f)
+                - (stress * 0.35f));
+            float densityRate = 0.010f
+                                + (biome.NaturalRecoveryRate01 * 0.040f)
+                                + (vegetation.GrowthPotential01 * 0.020f);
+            float healthRate = 0.014f
+                               + (biome.NaturalRecoveryRate01 * 0.050f);
+            float nextDensity = Approach01(
+                vegetation.Density01,
+                targetDensity,
+                densityRate);
+            float nextHealth = Approach01(
+                vegetation.Health01,
+                targetHealth,
+                healthRate);
+
+            // Solo stress molto alto e persistente deve distruggere davvero una area.
+            // Negli altri casi la vegetazione tende al target del biome invece di
+            // scivolare verso zero per somma di delta giornalieri.
+            if (stress > 0.85f && ecologicalSupport < 0.20f)
+            {
+                nextDensity -= (stress - 0.85f) * 0.020f;
+                nextHealth -= (stress - 0.85f) * 0.030f;
+            }
 
             return new EnvironmentVegetationAreaState(
                 vegetation.AreaId,
                 vegetation.VegetationKind,
-                vegetation.Density01 + densityDelta,
+                nextDensity,
                 vegetation.GrowthPotential01,
-                vegetation.Health01 + healthDelta,
+                nextHealth,
                 vegetation.FertilityInfluence01,
                 vegetation.ClimateInfluence01);
+        }
+
+        private static float ResolveFertilitySuitability(
+            EnvironmentFertilityAreaState fertility,
+            EnvironmentVegetationAreaState vegetation,
+            EnvironmentBiomeProfile biome)
+        {
+            float local = fertility.CurrentFertility01 * vegetation.FertilityInfluence01;
+            float target = biome.TargetFertility01 <= 0f ? 0.01f : biome.TargetFertility01;
+            return EnvironmentMath.Clamp01(local / target);
+        }
+
+        private static float ResolveMoistureSuitability(
+            EnvironmentWaterAreaState water,
+            EnvironmentAreaEvolutionContext context,
+            EnvironmentBiomeProfile biome)
+        {
+            float available = (water.WaterLevel01 * 0.25f)
+                              + (context.Climate.Humidity01 * 0.40f)
+                              + (context.Climate.Weather.Precipitation01 * 0.20f)
+                              + (biome.BaseMoisture01 * 0.15f);
+            float droughtPenalty = context.Climate.Aridity01 * (1f - biome.DroughtResistance01) * 0.50f;
+            return EnvironmentMath.Clamp01(available - droughtPenalty);
+        }
+
+        private static float ResolveTemperatureSuitability(
+            EnvironmentAreaEvolutionContext context,
+            EnvironmentBiomeProfile biome)
+        {
+            float coldStress = EnvironmentMath.Clamp01((0.45f - context.Climate.Temperature01) * 2f)
+                               * (1f - biome.ColdResistance01);
+            float heatStress = EnvironmentMath.Clamp01((context.Climate.Temperature01 - 0.55f) * 2f)
+                               * (1f - biome.HeatResistance01);
+            return EnvironmentMath.Clamp01(1f - coldStress - heatStress);
+        }
+
+        private static float ResolveSeasonSuitability(
+            EnvironmentAreaEvolutionContext context,
+            EnvironmentBiomeProfile biome)
+        {
+            float seasonBias = context.SeasonProfile.VegetationGrowthBias01;
+            return EnvironmentMath.Clamp01(
+                (1f - biome.Seasonality01)
+                + (seasonBias * biome.Seasonality01));
+        }
+
+        private static float Approach01(float current, float target, float rate)
+        {
+            float safeCurrent = EnvironmentMath.Clamp01(current);
+            float safeTarget = EnvironmentMath.Clamp01(target);
+            float safeRate = EnvironmentMath.Clamp01(rate);
+            return EnvironmentMath.Clamp01(
+                safeCurrent + ((safeTarget - safeCurrent) * safeRate));
         }
 
         private static EnvironmentWaterDepthLevel ResolveDepthFromLevel(

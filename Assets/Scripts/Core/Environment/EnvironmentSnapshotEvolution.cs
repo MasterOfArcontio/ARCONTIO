@@ -136,7 +136,8 @@ namespace Arcontio.Core.Environment
             EnvironmentSnapshot snapshot,
             EnvironmentTemporalTransition transition,
             EnvironmentGlobalClimateState climate,
-            EnvironmentSeasonProfile seasonProfile)
+            EnvironmentSeasonProfile seasonProfile,
+            EnvironmentBiomeProfile biomeProfile = default)
         {
             var nextState = new EnvironmentState();
             var currentCalendar = transition.Current;
@@ -155,7 +156,12 @@ namespace Arcontio.Core.Environment
             int waterEvolved = 0;
             int vegetationEvolved = 0;
             int changedAreas = 0;
-            var context = BuildContext(currentCalendar, climate, seasonProfile, transition);
+            var context = BuildContext(
+                currentCalendar,
+                climate,
+                seasonProfile,
+                transition,
+                biomeProfile);
 
             for (int i = 0; i < areas.Count; i++)
             {
@@ -243,13 +249,17 @@ namespace Arcontio.Core.Environment
             EnvironmentCalendarState calendar,
             EnvironmentGlobalClimateState climate,
             EnvironmentSeasonProfile seasonProfile,
-            EnvironmentTemporalTransition transition)
+            EnvironmentTemporalTransition transition,
+            EnvironmentBiomeProfile biomeProfile)
         {
             return new EnvironmentAreaEvolutionContext(
                 calendar,
                 climate,
                 seasonProfile,
-                transition);
+                transition,
+                biomeProfile.IsValid
+                    ? biomeProfile
+                    : EnvironmentBiomeProfile.Default);
         }
 
         private static EnvironmentFertilityAreaState CreateNeutralFertility(

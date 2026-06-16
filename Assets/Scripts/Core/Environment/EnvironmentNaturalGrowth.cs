@@ -191,9 +191,13 @@ namespace Arcontio.Core.Environment
             EnvironmentTemporalTransition transition,
             EnvironmentGlobalClimateState climate,
             EnvironmentSeasonProfile seasonProfile,
-            EnvironmentNaturalGrowthConfig config = null)
+            EnvironmentNaturalGrowthConfig config = null,
+            EnvironmentBiomeProfile biomeProfile = default)
         {
             var safeConfig = config ?? new EnvironmentNaturalGrowthConfig();
+            var safeBiome = biomeProfile.IsValid
+                ? biomeProfile
+                : EnvironmentBiomeProfile.Default;
             var nextState = new EnvironmentState();
             nextState.SetCalendar(transition.Current);
             nextState.SetClimate(climate);
@@ -212,7 +216,8 @@ namespace Arcontio.Core.Environment
                 transition,
                 climate,
                 seasonProfile,
-                safeConfig);
+                safeConfig,
+                safeBiome);
             var plantStats = CopyAndEvolvePlants(
                 snapshot,
                 nextState,
@@ -277,7 +282,8 @@ namespace Arcontio.Core.Environment
             EnvironmentTemporalTransition transition,
             EnvironmentGlobalClimateState climate,
             EnvironmentSeasonProfile seasonProfile,
-            EnvironmentNaturalGrowthConfig config)
+            EnvironmentNaturalGrowthConfig config,
+            EnvironmentBiomeProfile biomeProfile)
         {
             int seedEntriesVisited = 0;
             int seedBanksUpdated = 0;
@@ -287,7 +293,8 @@ namespace Arcontio.Core.Environment
                 transition.Current,
                 climate,
                 seasonProfile,
-                transition);
+                transition,
+                biomeProfile);
 
             for (int i = 0; i < areas.Count; i++)
             {
@@ -312,6 +319,7 @@ namespace Arcontio.Core.Environment
                         climate,
                         seasonProfile,
                         transition,
+                        biomeProfile,
                         out int visited);
                     seedEntriesVisited += visited;
                     seedBanksUpdated++;
@@ -320,6 +328,7 @@ namespace Arcontio.Core.Environment
                     if (config.allowNewPlantInstances
                         && transition.DayChanged
                         && plantsCreated < SafeMax(config.maxNewPlantsPerDay)
+                        && CountPlantsForArea(snapshot, area.Definition.AreaId) < biomeProfile.MaxPlantInstancesPerArea
                         && TryCreatePlantFromArea(
                             area,
                             nextSeedBank,
@@ -329,6 +338,7 @@ namespace Arcontio.Core.Environment
                             seasonProfile,
                             config,
                             plantsCreated,
+                            transition,
                             out EnvironmentPlantInstance plant))
                     {
                         nextState.SetPlantInstance(plant);
@@ -371,6 +381,7 @@ namespace Arcontio.Core.Environment
             EnvironmentGlobalClimateState climate,
             EnvironmentSeasonProfile seasonProfile,
             EnvironmentTemporalTransition transition,
+            EnvironmentBiomeProfile biomeProfile,
             out int entriesVisited)
         {
             var entries = seedBank?.Entries ?? new EnvironmentSeedBankEntry[0];
@@ -380,22 +391,37 @@ namespace Arcontio.Core.Environment
             for (int i = 0; i < entries.Count; i++)
             {
                 var entry = entries[i];
-                float climateSupport = (climate.Humidity01
-                                        + seasonProfile.VegetationGrowthBias01
-                                        + vegetation.Health01) / 3f;
-                float dailyPressure = transition.DayChanged
-                    ? (climateSupport * 0.030f) - (climate.Aridity01 * 0.020f)
+                float biomeMoisture = (climate.Humidity01 * 0.45f)
+                                      + (climate.Weather.Precipitation01 * 0.25f)
+                                      + (biomeProfile.BaseMoisture01 * 0.30f);
+                float droughtStress = climate.Aridity01 * (1f - biomeProfile.DroughtResistance01);
+                float seasonSupport = (1f - biomeProfile.Seasonality01)
+                                      + (seasonProfile.VegetationGrowthBias01 * biomeProfile.Seasonality01);
+                float ecologicalSupport = EnvironmentMath.Clamp01(
+                    (vegetation.Density01 * 0.25f)
+                    + (vegetation.Health01 * 0.30f)
+                    + (biomeMoisture * 0.25f)
+                    + (seasonSupport * 0.20f)
+                    - (droughtStress * biomeProfile.DisturbanceSensitivity01 * 0.35f));
+                float targetAmount = EnvironmentMath.Clamp01(
+                    biomeProfile.TargetSeedBankAmount01
+                    * (0.45f + (ecologicalSupport * 0.55f)));
+                float targetViability = EnvironmentMath.Clamp01(
+                    biomeProfile.TargetSeedBankViability01
+                    * (0.35f + (vegetation.Health01 * 0.65f))
+                    * (1f - (droughtStress * 0.45f)));
+                float recoveryRate = transition.DayChanged
+                    ? 0.010f + (biomeProfile.NaturalRecoveryRate01 * 0.035f)
                     : 0f;
-                float viabilityPressure = transition.DayChanged
-                    ? (vegetation.Health01 * 0.020f) - (climate.Aridity01 * 0.015f)
-                    : 0f;
+                float nextAmount = Approach01(entry.Amount01, targetAmount, recoveryRate);
+                float nextViability = Approach01(entry.Viability01, targetViability, recoveryRate);
 
                 // La seed bank cresce o decade come pressione astratta. Non crea semi
                 // fisici e non consuma inventari NPC.
                 nextEntries.Add(new EnvironmentSeedBankEntry(
                     entry.SpeciesKey,
-                    entry.Amount01 + dailyPressure,
-                    entry.Viability01 + viabilityPressure));
+                    nextAmount,
+                    nextViability));
             }
 
             return new EnvironmentSeedBankAreaState(
@@ -501,6 +527,7 @@ namespace Arcontio.Core.Environment
             EnvironmentSeasonProfile seasonProfile,
             EnvironmentNaturalGrowthConfig config,
             int alreadyCreatedToday,
+            EnvironmentTemporalTransition transition,
             out EnvironmentPlantInstance plant)
         {
             plant = default;
@@ -532,10 +559,13 @@ namespace Arcontio.Core.Environment
                 if (score < EnvironmentMath.Clamp01(config.minimumGerminationScore01))
                     continue;
 
-                var cell = ChooseDeterministicPlantCell(area.Definition.Bounds, alreadyCreatedToday);
+                int daySalt = ResolvePlantDaySalt(transition);
+                var cell = ChooseDeterministicPlantCell(
+                    area.Definition.Bounds,
+                    alreadyCreatedToday + daySalt);
                 var plantId = CreateDeterministicPlantId(
                     area.Definition.AreaId,
-                    alreadyCreatedToday,
+                    alreadyCreatedToday + daySalt,
                     entry.SpeciesKey);
                 plant = EnvironmentPlantInstance.CreateFromSpecies(
                     plantId,
@@ -604,6 +634,38 @@ namespace Arcontio.Core.Environment
                         + System.Math.Abs(hash % 97);
 
             return new EnvironmentPlantId(value);
+        }
+
+        private static int CountPlantsForArea(
+            EnvironmentSnapshot snapshot,
+            EnvironmentAreaId areaId)
+        {
+            var plants = snapshot?.Plants ?? new EnvironmentPlantSnapshot[0];
+            int count = 0;
+            for (int i = 0; i < plants.Count; i++)
+            {
+                if (plants[i].SourceAreaId.Equals(areaId))
+                    count++;
+            }
+
+            return count;
+        }
+
+        private static int ResolvePlantDaySalt(EnvironmentTemporalTransition transition)
+        {
+            // Il sale include anno e giorno ambientale. In questo modo una nuova
+            // germinazione futura non sovrascrive sempre la stessa PlantInstance.
+            return (transition.Current.Date.Year * 400)
+                   + transition.Current.Date.DayOfYear;
+        }
+
+        private static float Approach01(float current, float target, float rate)
+        {
+            float safeCurrent = EnvironmentMath.Clamp01(current);
+            float safeTarget = EnvironmentMath.Clamp01(target);
+            float safeRate = EnvironmentMath.Clamp01(rate);
+            return EnvironmentMath.Clamp01(
+                safeCurrent + ((safeTarget - safeCurrent) * safeRate));
         }
 
         private static int ComputeStableSpeciesHash(string speciesKey)

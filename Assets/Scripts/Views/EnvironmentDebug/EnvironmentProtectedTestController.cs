@@ -57,6 +57,8 @@ namespace Arcontio.View.EnvironmentDebug
         [SerializeField] private bool graphClimate;
         [SerializeField] private bool graphPlants = true;
         [SerializeField] private int telemetryCapacity = DefaultTelemetryCapacity;
+        [SerializeField] private EnvironmentProtectedTestBiomePreset biomePreset =
+            EnvironmentProtectedTestBiomePreset.TemperateGrassland;
         [SerializeField] private EnvironmentProtectedTestSpeedPreset speedPreset =
             EnvironmentProtectedTestSpeedPreset.Paused;
         [SerializeField] private Rect panelRect =
@@ -276,6 +278,8 @@ namespace Arcontio.View.EnvironmentDebug
 
             DrawGateControls();
             GUILayout.Space(8f);
+            DrawBiomeControls();
+            GUILayout.Space(8f);
             DrawSpeedControls();
             GUILayout.Space(8f);
             DrawManualStepControls();
@@ -314,6 +318,44 @@ namespace Arcontio.View.EnvironmentDebug
                 _driver.Config.calendar);
             GUILayout.Label("Preset attivo: " + profile.DisplayName);
             GUILayout.Label("Tick/s: " + profile.EnvironmentTicksPerRealSecond.ToString("0.###"));
+        }
+
+        // =============================================================================
+        // DrawBiomeControls
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna i preset biome del test protetto.
+        /// </para>
+        /// </summary>
+        private void DrawBiomeControls()
+        {
+            GUILayout.Label("Biome");
+            GUILayout.BeginHorizontal();
+            DrawBiomeButton(EnvironmentProtectedTestBiomePreset.TemperateGrassland);
+            DrawBiomeButton(EnvironmentProtectedTestBiomePreset.Desert);
+            GUILayout.EndHorizontal();
+
+            GUILayout.BeginHorizontal();
+            DrawBiomeButton(EnvironmentProtectedTestBiomePreset.Jungle);
+            DrawBiomeButton(EnvironmentProtectedTestBiomePreset.Tundra);
+            GUILayout.EndHorizontal();
+
+            GUILayout.Label("Biome attivo: " + _driver.BiomeProfile.BiomeKey);
+        }
+
+        private void DrawBiomeButton(EnvironmentProtectedTestBiomePreset preset)
+        {
+            string label = biomePreset == preset ? "[x] " + preset : "[ ] " + preset;
+            if (!GUILayout.Button(label))
+                return;
+
+            biomePreset = preset;
+            _driver.SetBiomePreset(biomePreset);
+            _driver.ResetToProtectedDefaults();
+            _lastReport = _driver.LastReport;
+            ResetTelemetryHistory();
+            RecordTelemetrySample(true);
         }
 
         private void DrawSpeedButton(EnvironmentProtectedTestSpeedPreset preset)
@@ -908,6 +950,7 @@ namespace Arcontio.View.EnvironmentDebug
                 return;
 
             _driver = new EnvironmentProtectedTestDriver();
+            _driver.SetBiomePreset(biomePreset);
             _driver.Bootstrap();
             _lastReport = _driver.LastReport;
             ResetTelemetryHistory();

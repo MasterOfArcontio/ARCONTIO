@@ -3,6 +3,37 @@ using System;
 namespace Arcontio.Core.Environment
 {
     // =============================================================================
+    // EnvironmentProtectedTestBiomePreset
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Preset biome disponibili nello scenario protetto della biosfera.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: test comparativo dei biomi</b></para>
+    /// <para>
+    /// Il controller protetto deve poter confrontare lo stesso modello ecologico con
+    /// target diversi. Questi preset non sono il catalogo finale dei biomi: sono una
+    /// finestra di test su profili biome gia' data-driven.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>TemperateGrassland</b>: prato temperato fertile.</item>
+    ///   <item><b>Desert</b>: ambiente arido con bassa densita' vegetale.</item>
+    ///   <item><b>Jungle</b>: ambiente umido ad alta densita'.</item>
+    ///   <item><b>Tundra</b>: ambiente freddo, stagionale e lento.</item>
+    /// </list>
+    /// </summary>
+    public enum EnvironmentProtectedTestBiomePreset
+    {
+        TemperateGrassland = 0,
+        Desert = 10,
+        Jungle = 20,
+        Tundra = 30
+    }
+
+    // =============================================================================
     // EnvironmentProtectedTestSpeedPreset
     // =============================================================================
     /// <summary>
@@ -271,6 +302,7 @@ namespace Arcontio.Core.Environment
         private EnvironmentFullSnapshot _fullSnapshot;
         private EnvironmentFoundationBootstrapResult _bootstrap;
         private EnvironmentProtectedTestAdvanceReport _lastReport;
+        private EnvironmentBiomeProfile _biomeProfile = EnvironmentBiomeProfile.Default;
         private double _fractionalTicks;
 
         public bool IsBootstrapped => _state != null && _snapshot != null;
@@ -280,6 +312,9 @@ namespace Arcontio.Core.Environment
         public EnvironmentPlantCatalog PlantCatalog => _plantCatalog ?? new EnvironmentPlantCatalog(null);
         public EnvironmentFoundationBootstrapResult BootstrapResult => _bootstrap;
         public EnvironmentProtectedTestAdvanceReport LastReport => _lastReport;
+        public EnvironmentBiomeProfile BiomeProfile => _biomeProfile.IsValid
+            ? _biomeProfile
+            : EnvironmentBiomeProfile.Default;
         public EnvironmentFullSnapshot FullSnapshot =>
             _fullSnapshot ?? EnvironmentReadOnlySnapshotResolver.BuildFullSnapshot(Snapshot);
         public long CurrentTicks => Snapshot.Calendar.ElapsedEnvironmentTicks;
@@ -299,6 +334,8 @@ namespace Arcontio.Core.Environment
             // Copiamo il riferimento config per rendere evidente quale documento dati
             // ha alimentato il test. I futuri loader potranno passare qui asset/JSON.
             _config = config ?? CreateProtectedDefaultConfig();
+            if (!_biomeProfile.IsValid)
+                _biomeProfile = EnvironmentBiomeProfile.Default;
             _bootstrap = EnvironmentFoundationBootstrap.Bootstrap(_config);
             _state = _bootstrap.Build.State ?? new EnvironmentState();
             _snapshot = _state.CreateSnapshot();
@@ -321,6 +358,19 @@ namespace Arcontio.Core.Environment
         public EnvironmentFoundationBootstrapResult ResetToProtectedDefaults()
         {
             return Bootstrap(CreateProtectedDefaultConfig());
+        }
+
+        // =============================================================================
+        // SetBiomePreset
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un preset biome allo scenario protetto.
+        /// </para>
+        /// </summary>
+        public void SetBiomePreset(EnvironmentProtectedTestBiomePreset preset)
+        {
+            _biomeProfile = ResolveBiomePreset(preset);
         }
 
         // =============================================================================
@@ -648,7 +698,8 @@ namespace Arcontio.Core.Environment
                 _state,
                 targetTicks,
                 _config.calendar,
-                _config.climate);
+                _config.climate,
+                BiomeProfile);
             _state = advance.State;
             _snapshot = advance.Snapshot;
             growthReport = default;
@@ -660,7 +711,9 @@ namespace Arcontio.Core.Environment
                     _plantCatalog,
                     advance.Transition,
                     advance.Climate,
-                    advance.SeasonProfile);
+                    advance.SeasonProfile,
+                    null,
+                    BiomeProfile);
                 _state = growth.State;
                 _snapshot = _state.CreateSnapshot();
                 growthReport = growth.Report;
@@ -674,6 +727,25 @@ namespace Arcontio.Core.Environment
         {
             if (!IsBootstrapped)
                 Bootstrap();
+        }
+
+        private static EnvironmentBiomeProfile ResolveBiomePreset(
+            EnvironmentProtectedTestBiomePreset preset)
+        {
+            switch (preset)
+            {
+                case EnvironmentProtectedTestBiomePreset.Desert:
+                    return EnvironmentBiomeProfile.CreateDesert();
+
+                case EnvironmentProtectedTestBiomePreset.Jungle:
+                    return EnvironmentBiomeProfile.CreateJungle();
+
+                case EnvironmentProtectedTestBiomePreset.Tundra:
+                    return EnvironmentBiomeProfile.CreateTundra();
+
+                default:
+                    return EnvironmentBiomeProfile.CreateTemperateGrassland();
+            }
         }
 
         private EnvironmentProtectedTestAdvanceReport CreateIdleReport(long ticks)
