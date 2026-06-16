@@ -353,6 +353,7 @@ namespace Arcontio.Core.Environment
                             plantCountForArea,
                             desiredPlantCount,
                             effectivePlantCapacity,
+                            biomeProfile,
                             out EnvironmentPlantInstance plant))
                     {
                         nextState.SetPlantInstance(plant);
@@ -590,6 +591,7 @@ namespace Arcontio.Core.Environment
             int plantCountForArea,
             int desiredPlantCount,
             int effectivePlantCapacity,
+            EnvironmentBiomeProfile biomeProfile,
             out EnvironmentPlantInstance plant)
         {
             plant = default;
@@ -605,6 +607,9 @@ namespace Arcontio.Core.Environment
             for (int i = 0; i < seedBank.Entries.Count; i++)
             {
                 var entry = seedBank.Entries[i];
+                if (!biomeProfile.AllowsPlantSpecies(entry.SpeciesKey))
+                    continue;
+
                 if (!plantCatalog.TryGetSpecies(
                     entry.SpeciesKey,
                     out EnvironmentPlantSpeciesDefinition species))

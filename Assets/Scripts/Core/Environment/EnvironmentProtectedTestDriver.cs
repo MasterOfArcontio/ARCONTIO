@@ -303,6 +303,7 @@ namespace Arcontio.Core.Environment
         private EnvironmentFoundationBootstrapResult _bootstrap;
         private EnvironmentProtectedTestAdvanceReport _lastReport;
         private EnvironmentBiomeProfile _biomeProfile = EnvironmentBiomeProfile.Default;
+        private EnvironmentBiomeCatalog _biomeCatalog = EnvironmentBiomeCatalog.CreateDefault();
         private double _fractionalTicks;
 
         public bool IsBootstrapped => _state != null && _snapshot != null;
@@ -371,6 +372,19 @@ namespace Arcontio.Core.Environment
         public void SetBiomePreset(EnvironmentProtectedTestBiomePreset preset)
         {
             _biomeProfile = ResolveBiomePreset(preset);
+        }
+
+        // =============================================================================
+        // SetBiomeCatalog
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce il catalogo biomi usato dai preset protetti.
+        /// </para>
+        /// </summary>
+        public void SetBiomeCatalog(EnvironmentBiomeCatalog biomeCatalog)
+        {
+            _biomeCatalog = biomeCatalog ?? EnvironmentBiomeCatalog.CreateDefault();
         }
 
         // =============================================================================
@@ -729,23 +743,32 @@ namespace Arcontio.Core.Environment
                 Bootstrap();
         }
 
-        private static EnvironmentBiomeProfile ResolveBiomePreset(
+        private EnvironmentBiomeProfile ResolveBiomePreset(
             EnvironmentProtectedTestBiomePreset preset)
         {
+            string biomeKey;
             switch (preset)
             {
                 case EnvironmentProtectedTestBiomePreset.Desert:
-                    return EnvironmentBiomeProfile.CreateDesert();
+                    biomeKey = "desert";
+                    break;
 
                 case EnvironmentProtectedTestBiomePreset.Jungle:
-                    return EnvironmentBiomeProfile.CreateJungle();
+                    biomeKey = "jungle";
+                    break;
 
                 case EnvironmentProtectedTestBiomePreset.Tundra:
-                    return EnvironmentBiomeProfile.CreateTundra();
+                    biomeKey = "tundra";
+                    break;
 
                 default:
-                    return EnvironmentBiomeProfile.CreateTemperateGrassland();
+                    biomeKey = "temperate_grassland";
+                    break;
             }
+
+            return _biomeCatalog != null && _biomeCatalog.TryGetProfile(biomeKey, out EnvironmentBiomeProfile profile)
+                ? profile
+                : EnvironmentBiomeProfile.Default;
         }
 
         private EnvironmentProtectedTestAdvanceReport CreateIdleReport(long ticks)

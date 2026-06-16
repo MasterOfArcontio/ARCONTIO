@@ -43,6 +43,7 @@ namespace Arcontio.View.EnvironmentDebug
         private const int ExportGraphWidth = 1920;
         private const int ExportGraphHeight = 720;
         private const float PlantGraphScale = 24f;
+        private const string BiomeConfigResourcePath = "Arcontio/Config/environment_biomes";
 
         [SerializeField] private bool controllerEnabled;
         [SerializeField] private bool processInUpdate;
@@ -69,8 +70,10 @@ namespace Arcontio.View.EnvironmentDebug
         private EnvironmentProtectedTestHarnessResult _lastHarness;
         private EnvironmentProtectedTelemetrySample[] _telemetrySamples;
         private Texture2D _graphPixel;
+        private EnvironmentBiomeCatalog _biomeCatalog;
         private string _lastGraphExportPath = string.Empty;
         private string _lastGraphExportStatus = string.Empty;
+        private string _biomeConfigStatus = string.Empty;
         private Vector2 _scroll;
         private int _telemetryStart;
         private int _telemetryCount;
@@ -342,6 +345,11 @@ namespace Arcontio.View.EnvironmentDebug
             GUILayout.EndHorizontal();
 
             GUILayout.Label("Biome attivo: " + _driver.BiomeProfile.BiomeKey);
+            if (!string.IsNullOrWhiteSpace(_biomeConfigStatus))
+                GUILayout.Label(_biomeConfigStatus);
+            GUILayout.Label(
+                "Specie bioma: "
+                + FormatSpeciesKeys(_driver.BiomeProfile.AllowedPlantSpeciesKeys));
         }
 
         private void DrawBiomeButton(EnvironmentProtectedTestBiomePreset preset)
@@ -351,6 +359,8 @@ namespace Arcontio.View.EnvironmentDebug
                 return;
 
             biomePreset = preset;
+            EnsureBiomeCatalogLoaded();
+            _driver.SetBiomeCatalog(_biomeCatalog);
             _driver.SetBiomePreset(biomePreset);
             _driver.ResetToProtectedDefaults();
             _lastReport = _driver.LastReport;
@@ -950,11 +960,56 @@ namespace Arcontio.View.EnvironmentDebug
                 return;
 
             _driver = new EnvironmentProtectedTestDriver();
+            EnsureBiomeCatalogLoaded();
+            _driver.SetBiomeCatalog(_biomeCatalog);
             _driver.SetBiomePreset(biomePreset);
             _driver.Bootstrap();
             _lastReport = _driver.LastReport;
             ResetTelemetryHistory();
             RecordTelemetrySample(true);
+        }
+
+        // =============================================================================
+        // EnsureBiomeCatalogLoaded
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica i profili biome dal file Resources protetto, con fallback default.
+        /// </para>
+        /// </summary>
+        private void EnsureBiomeCatalogLoaded()
+        {
+            if (_biomeCatalog != null)
+                return;
+
+            var asset = Resources.Load<TextAsset>(BiomeConfigResourcePath);
+            if (asset == null)
+            {
+                _biomeCatalog = EnvironmentBiomeCatalog.CreateDefault();
+                _biomeConfigStatus = "Biome config: default interno";
+                return;
+            }
+
+            try
+            {
+                var config = JsonUtility.FromJson<EnvironmentBiomeCatalogConfig>(asset.text)
+                             ?? EnvironmentBiomeCatalogConfig.CreateDefault();
+                _biomeCatalog = config.ToCatalog();
+                _biomeConfigStatus = "Biome config: Resources/" + BiomeConfigResourcePath + ".json";
+            }
+            catch (Exception exception)
+            {
+                _biomeCatalog = EnvironmentBiomeCatalog.CreateDefault();
+                _biomeConfigStatus = "Biome config fallback: " + exception.Message;
+            }
+        }
+
+        private static string FormatSpeciesKeys(string[] speciesKeys)
+        {
+            if (speciesKeys == null || speciesKeys.Length == 0)
+                return "tutte";
+
+            return string.Join(", ", speciesKeys);
         }
 
         // =============================================================================

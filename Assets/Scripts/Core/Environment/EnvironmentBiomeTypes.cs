@@ -34,6 +34,8 @@ namespace Arcontio.Core.Environment
     /// </summary>
     public readonly struct EnvironmentBiomeProfile
     {
+        private static readonly string[] EmptySpeciesKeys = new string[0];
+
         public readonly string BiomeKey;
         public readonly float TargetFertility01;
         public readonly float TargetVegetationDensity01;
@@ -48,6 +50,8 @@ namespace Arcontio.Core.Environment
         public readonly float NaturalRecoveryRate01;
         public readonly float DisturbanceSensitivity01;
         public readonly int MaxPlantInstancesPerArea;
+        public readonly string[] AllowedPlantSpeciesKeys;
+        public readonly string[] PreferredSeedBankSpeciesKeys;
 
         public bool IsValid => !string.IsNullOrWhiteSpace(BiomeKey);
 
@@ -73,7 +77,9 @@ namespace Arcontio.Core.Environment
             float seasonality01,
             float naturalRecoveryRate01,
             float disturbanceSensitivity01,
-            int maxPlantInstancesPerArea)
+            int maxPlantInstancesPerArea,
+            string[] allowedPlantSpeciesKeys = null,
+            string[] preferredSeedBankSpeciesKeys = null)
         {
             BiomeKey = string.IsNullOrWhiteSpace(biomeKey)
                 ? "temperate_grassland"
@@ -91,6 +97,38 @@ namespace Arcontio.Core.Environment
             NaturalRecoveryRate01 = EnvironmentMath.Clamp01(naturalRecoveryRate01);
             DisturbanceSensitivity01 = EnvironmentMath.Clamp01(disturbanceSensitivity01);
             MaxPlantInstancesPerArea = maxPlantInstancesPerArea < 0 ? 0 : maxPlantInstancesPerArea;
+            AllowedPlantSpeciesKeys = CopySpeciesKeys(allowedPlantSpeciesKeys);
+            PreferredSeedBankSpeciesKeys = CopySpeciesKeys(preferredSeedBankSpeciesKeys);
+        }
+
+        // =============================================================================
+        // AllowsPlantSpecies
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se una specie puo' essere reclutata come PlantInstance nel bioma.
+        /// </para>
+        /// </summary>
+        public bool AllowsPlantSpecies(string speciesKey)
+        {
+            if (AllowedPlantSpeciesKeys == null || AllowedPlantSpeciesKeys.Length == 0)
+                return true;
+
+            if (string.IsNullOrWhiteSpace(speciesKey))
+                return false;
+
+            for (int i = 0; i < AllowedPlantSpeciesKeys.Length; i++)
+            {
+                if (string.Equals(
+                    AllowedPlantSpeciesKeys[i],
+                    speciesKey,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // =============================================================================
@@ -117,7 +155,9 @@ namespace Arcontio.Core.Environment
                 0.55f,
                 0.62f,
                 0.45f,
-                96);
+                96,
+                new[] { "wild_grass", "oak_tree" },
+                new[] { "wild_grass", "oak_tree" });
         }
 
         public static EnvironmentBiomeProfile CreateDesert()
@@ -136,7 +176,9 @@ namespace Arcontio.Core.Environment
                 0.25f,
                 0.28f,
                 0.30f,
-                20);
+                20,
+                new[] { "wild_grass" },
+                new[] { "wild_grass" });
         }
 
         public static EnvironmentBiomeProfile CreateJungle()
@@ -155,7 +197,9 @@ namespace Arcontio.Core.Environment
                 0.22f,
                 0.84f,
                 0.72f,
-                180);
+                180,
+                new[] { "wild_grass", "oak_tree" },
+                new[] { "oak_tree", "wild_grass" });
         }
 
         public static EnvironmentBiomeProfile CreateTundra()
@@ -174,10 +218,29 @@ namespace Arcontio.Core.Environment
                 0.86f,
                 0.22f,
                 0.56f,
-                36);
+                36,
+                new[] { "wild_grass" },
+                new[] { "wild_grass" });
         }
 
         public static EnvironmentBiomeProfile Default => CreateTemperateGrassland();
+
+        private static string[] CopySpeciesKeys(string[] source)
+        {
+            if (source == null || source.Length == 0)
+                return EmptySpeciesKeys;
+
+            var buffer = new List<string>(source.Length);
+            for (int i = 0; i < source.Length; i++)
+            {
+                if (string.IsNullOrWhiteSpace(source[i]))
+                    continue;
+
+                buffer.Add(source[i]);
+            }
+
+            return buffer.Count == 0 ? EmptySpeciesKeys : buffer.ToArray();
+        }
     }
 
     // =============================================================================
@@ -218,6 +281,8 @@ namespace Arcontio.Core.Environment
         public float naturalRecoveryRate01 = 0.62f;
         public float disturbanceSensitivity01 = 0.45f;
         public int maxPlantInstancesPerArea = 96;
+        public string[] allowedPlantSpeciesKeys = { "wild_grass", "oak_tree" };
+        public string[] preferredSeedBankSpeciesKeys = { "wild_grass", "oak_tree" };
 
         public EnvironmentBiomeProfile ToProfile()
         {
@@ -235,7 +300,97 @@ namespace Arcontio.Core.Environment
                 seasonality01,
                 naturalRecoveryRate01,
                 disturbanceSensitivity01,
-                maxPlantInstancesPerArea);
+                maxPlantInstancesPerArea,
+                allowedPlantSpeciesKeys,
+                preferredSeedBankSpeciesKeys);
+        }
+
+        public static EnvironmentBiomeProfileConfig[] CreateDefaultSet()
+        {
+            return new[]
+            {
+                FromProfile(EnvironmentBiomeProfile.CreateTemperateGrassland()),
+                FromProfile(EnvironmentBiomeProfile.CreateDesert()),
+                FromProfile(EnvironmentBiomeProfile.CreateJungle()),
+                FromProfile(EnvironmentBiomeProfile.CreateTundra())
+            };
+        }
+
+        private static EnvironmentBiomeProfileConfig FromProfile(EnvironmentBiomeProfile profile)
+        {
+            return new EnvironmentBiomeProfileConfig
+            {
+                biomeKey = profile.BiomeKey,
+                targetFertility01 = profile.TargetFertility01,
+                targetVegetationDensity01 = profile.TargetVegetationDensity01,
+                targetVegetationHealth01 = profile.TargetVegetationHealth01,
+                targetSeedBankAmount01 = profile.TargetSeedBankAmount01,
+                targetSeedBankViability01 = profile.TargetSeedBankViability01,
+                baseMoisture01 = profile.BaseMoisture01,
+                droughtResistance01 = profile.DroughtResistance01,
+                coldResistance01 = profile.ColdResistance01,
+                heatResistance01 = profile.HeatResistance01,
+                seasonality01 = profile.Seasonality01,
+                naturalRecoveryRate01 = profile.NaturalRecoveryRate01,
+                disturbanceSensitivity01 = profile.DisturbanceSensitivity01,
+                maxPlantInstancesPerArea = profile.MaxPlantInstancesPerArea,
+                allowedPlantSpeciesKeys = profile.AllowedPlantSpeciesKeys,
+                preferredSeedBankSpeciesKeys = profile.PreferredSeedBankSpeciesKeys
+            };
+        }
+    }
+
+    // =============================================================================
+    // EnvironmentBiomeCatalogConfig
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Wrapper serializzabile dei profili biome caricabili da file di configurazione.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: parametri ecologici fuori dal codice</b></para>
+    /// <para>
+    /// Il file JSON puo' dichiarare target, resistenze, limiti di PlantInstance e
+    /// specie vegetali ammesse per ogni bioma. Il Core riceve poi un catalogo
+    /// read-only, senza conoscere Resources, TextAsset o altri dettagli Unity.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>profiles</b>: profili biome disponibili.</item>
+    ///   <item><b>ToCatalog</b>: converte i DTO in un catalogo read-only.</item>
+    ///   <item><b>CreateDefault</b>: fallback coerente con i preset protetti.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class EnvironmentBiomeCatalogConfig
+    {
+        public EnvironmentBiomeProfileConfig[] profiles =
+            EnvironmentBiomeProfileConfig.CreateDefaultSet();
+
+        public EnvironmentBiomeCatalog ToCatalog()
+        {
+            var safeProfiles = profiles ?? new EnvironmentBiomeProfileConfig[0];
+            var resolved = new List<EnvironmentBiomeProfile>(safeProfiles.Length);
+            for (int i = 0; i < safeProfiles.Length; i++)
+            {
+                if (safeProfiles[i] == null)
+                    continue;
+
+                resolved.Add(safeProfiles[i].ToProfile());
+            }
+
+            return resolved.Count == 0
+                ? EnvironmentBiomeCatalog.CreateDefault()
+                : new EnvironmentBiomeCatalog(resolved);
+        }
+
+        public static EnvironmentBiomeCatalogConfig CreateDefault()
+        {
+            return new EnvironmentBiomeCatalogConfig
+            {
+                profiles = EnvironmentBiomeProfileConfig.CreateDefaultSet()
+            };
         }
     }
 
