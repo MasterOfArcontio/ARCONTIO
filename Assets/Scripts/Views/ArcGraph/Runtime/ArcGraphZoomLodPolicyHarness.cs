@@ -11,13 +11,14 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: policy verificabile senza renderer</b></para>
     /// <para>
     /// La policy LOD deve essere verificabile prima di avere renderer actor,
-    /// vegetation, object o effect. Questo harness controlla solo i profili risolti
-    /// dai default <c>v0.33</c>.
+    /// vegetation, object o effect. Questo harness controlla i profili default e
+    /// un profilo extra non canonico, cosi' la policy resta indipendente dal numero
+    /// storico di livelli zoom.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>RunDefaultSmoke</b>: verifica zoom 1, 2, 3 e 4.</item>
+    ///   <item><b>RunDefaultSmoke</b>: verifica zoom default e un livello extra arbitrario.</item>
     ///   <item><b>Fail</b>: restituisce motivo esplicito.</item>
     /// </list>
     /// </summary>
@@ -28,7 +29,7 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica la policy LOD sui quattro zoom default.
+        /// Verifica la policy LOD sui default e su un livello extra arbitrario.
         /// </para>
         /// </summary>
         public static bool RunDefaultSmoke(out string failureReason)
@@ -70,6 +71,24 @@ namespace Arcontio.View.ArcGraph
                 zoom4.UsesSimplifiedRepresentation)
             {
                 return Fail("Unexpected zoom 4 LOD profile.", out failureReason);
+            }
+
+            var customZoom = new ArcGraphViewZoomLevelDefinition(
+                10,
+                12,
+                12,
+                true,
+                false,
+                false,
+                false);
+            var zoom10 = ArcGraphZoomLodPolicy.ResolveFromZoom(customZoom);
+            if (zoom10.ActorMode != ArcGraphActorLodMode.FullFlatSprite ||
+                zoom10.AllowsSpriteAnimation ||
+                zoom10.AllowsLayeredActorSprites ||
+                zoom10.UsesSimplifiedRepresentation ||
+                zoom10.ObjectMode != ArcGraphObjectLodMode.StaticSprites)
+            {
+                return Fail("Expected arbitrary zoom level 10 to follow JSON flags, not hardcoded level buckets.", out failureReason);
             }
 
             return true;

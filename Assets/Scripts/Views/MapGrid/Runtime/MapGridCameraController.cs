@@ -105,6 +105,41 @@ namespace Arcontio.View.MapGrid
             zoomInputEnabled = enabled;
         }
 
+        // =============================================================================
+        // ApplyExternalCameraOffset
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica uno spostamento camera richiesto da un controller esterno.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bridge temporaneo verso ArcGraph</b></para>
+        /// <para>
+        /// Durante il pensionamento di MapGrid, ArcGraph controlla gia' lo zoom
+        /// discreto ma questo componente gestisce ancora il pan fisico della camera.
+        /// Quando ArcGraph compensa la camera per mantenere il puntatore fermo
+        /// durante lo zoom, anche il target interno di questo controller deve essere
+        /// spostato. Altrimenti l'inerzia del pan riporterebbe la camera al vecchio
+        /// target nel frame successivo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>offset</b>: spostamento world-space gia' calcolato dal chiamante.</item>
+        ///   <item><b>_targetPos</b>: target del pan legacy riallineato alla camera.</item>
+        ///   <item><b>_panVelocity</b>: azzerata per evitare scivolamenti dopo la compensazione.</item>
+        /// </list>
+        /// </summary>
+        public void ApplyExternalCameraOffset(Vector3 offset)
+        {
+            if (offset.sqrMagnitude < 0.000001f)
+                return;
+
+            transform.position += offset;
+            _targetPos += offset;
+            _panVelocity = Vector3.zero;
+        }
+
         public void Init(Camera cam, MapGridData map, MapGridConfig cfg)
         {
             _camera = cam;

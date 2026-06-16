@@ -115,7 +115,46 @@ namespace Arcontio.View.ArcGraph
             if (state.CenterCellX != beforeUiX)
                 return Fail("Expected pointer-over-UI frame to leave center unchanged.", out failureReason);
 
+            var anchorState = new ArcGraphViewState(
+                config,
+                125f,
+                125f,
+                2);
+
+            var anchorResult = controller.ApplyInputFrame(
+                config,
+                anchorState,
+                new ArcGraphViewInputFrame(
+                    1,
+                    false,
+                    0f,
+                    0f,
+                    250f,
+                    250f,
+                    true,
+                    false),
+                1000,
+                1000);
+
+            if (!anchorResult.DidChangeZoom || anchorState.ActiveZoomLevel != 3)
+                return Fail("Expected anchored wheel step to move from zoom 2 to zoom 3.", out failureReason);
+
+            if (!Approximately(anchorState.CenterCellX, 106.25f) ||
+                !Approximately(anchorState.CenterCellY, 106.25f))
+            {
+                return Fail("Expected zoom-to-pointer to compensate view center around the pointer anchor.", out failureReason);
+            }
+
             return true;
+        }
+
+        private static bool Approximately(float left, float right)
+        {
+            float diff = left - right;
+            if (diff < 0f)
+                diff = -diff;
+
+            return diff <= 0.001f;
         }
 
         private static bool Fail(string reason, out string failureReason)

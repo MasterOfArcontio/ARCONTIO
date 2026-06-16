@@ -385,6 +385,7 @@ namespace Arcontio.View.ArcGraph
             ApplySceneCameraZoomIfEnabled(
                 config,
                 viewState,
+                input,
                 viewportHeight);
 
             _lastWrapperDiagnostics = CreateWrapperDiagnostics(
@@ -421,6 +422,7 @@ namespace Arcontio.View.ArcGraph
         private void ApplySceneCameraZoomIfEnabled(
             ArcGraphMapViewConfig config,
             ArcGraphViewState viewState,
+            ArcGraphViewInputFrame input,
             int viewportPixelHeight)
         {
             if (!syncSceneCameraZoomToViewState || config == null || viewState == null)
@@ -438,14 +440,34 @@ namespace Arcontio.View.ArcGraph
                 minimumSceneCameraOrthographicSize,
                 zoom.VisibleCellsY * 0.5f);
 
-            ApplyPixelPerfectCameraZoomIfPresent(
+            bool hasPointerWorldAnchor = TryResolvePointerWorldOnZ0(
+                camera,
+                input,
+                out Vector3 pointerWorldBeforeZoom);
+
+            bool didChangePixelPerfectZoom = ApplyPixelPerfectCameraZoomIfPresent(
                 camera,
                 zoom,
                 viewportPixelHeight);
 
-            if (!Mathf.Approximately(camera.orthographicSize, targetOrthographicSize))
+            bool didChangeOrthographicSize =
+                !Mathf.Approximately(camera.orthographicSize, targetOrthographicSize);
+
+            if (didChangeOrthographicSize)
                 camera.orthographicSize = targetOrthographicSize;
 
+            // La view logica mantiene gia' stabile la cella sotto il puntatore. Qui
+            // applichiamo lo stesso principio alla camera Unity reale, altrimenti
+            // l'utente vedrebbe lo zoom avvenire dal centro dello schermo invece
+            // che dal punto indicato dal mouse.
+            if ((didChangePixelPerfectZoom || didChangeOrthographicSize) &&
+                hasPointerWorldAnchor)
+            {
+                ApplyCameraPointerAnchor(
+                    camera,
+                    input,
+                    pointerWorldBeforeZoom);
+            }
         }
 
         private Camera ResolveSceneCamera()
@@ -457,28 +479,133 @@ namespace Arcontio.View.ArcGraph
             return sceneCamera;
         }
 
-        private void ApplyPixelPerfectCameraZoomIfPresent(
+        // =============================================================================
+        // ApplyPixelPerfectCameraZoomIfPresent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sincronizza la PixelPerfectCamera con il livello zoom ArcGraph corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: zoom fisico derivato dal JSON</b></para>
+        /// <para>
+        /// Il valore non nasce dalla rotellina legacy e non e' continuo. Viene
+        /// derivato dalle celle visibili dichiarate dalla configurazione ArcGraph,
+        /// cosi' ogni livello zoom resta discreto e governato dal file JSON.
+        /// </para>
+        /// </summary>
+        private bool ApplyPixelPerfectCameraZoomIfPresent(
             Camera camera,
             ArcGraphViewZoomLevelDefinition zoom,
             int viewportPixelHeight)
         {
             PixelPerfectCamera pixelPerfectCamera = camera.GetComponent<PixelPerfectCamera>();
             if (pixelPerfectCamera == null || !pixelPerfectCamera.enabled)
-                return;
+                return false;
 
             int height = viewportPixelHeight > 0
                 ? viewportPixelHeight
                 : Screen.height;
 
             if (height <= 0)
-                return;
+                return false;
 
             int targetAssetsPpu = Mathf.Max(
                 1,
                 Mathf.RoundToInt(height / (float)zoom.VisibleCellsY));
 
-            if (pixelPerfectCamera.assetsPPU != targetAssetsPpu)
-                pixelPerfectCamera.assetsPPU = targetAssetsPpu;
+            if (pixelPerfectCamera.assetsPPU == targetAssetsPpu)
+                return false;
+
+            pixelPerfectCamera.assetsPPU = targetAssetsPpu;
+            return true;
+        }
+
+        // =============================================================================
+        // TryResolvePointerWorldOnZ0
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il punto world sotto il puntatore sul piano visuale <c>Z=0</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: input fisico confinato al wrapper</b></para>
+        /// <para>
+        /// Solo il wrapper Unity traduce coordinate viewport in coordinate camera.
+        /// Il controller ArcGraph resta invece puro e lavora con input astratto.
+        /// Questo metodo esiste solo per compensare la camera reale durante lo
+        /// zoom-to-pointer.
+        /// </para>
+        /// </summary>
+        private bool TryResolvePointerWorldOnZ0(
+            Camera camera,
+            ArcGraphViewInputFrame input,
+            out Vector3 worldPosition)
+        {
+            worldPosition = Vector3.zero;
+
+            if (camera == null || !input.HasPointerScreenPosition)
+                return false;
+
+            Vector2 screenPosition = useScreenAsViewport
+                ? new Vector2(input.PointerScreenX, input.PointerScreenY)
+                : new Vector2(
+                    input.PointerScreenX + manualViewportOriginPixels.x,
+                    input.PointerScreenY + manualViewportOriginPixels.y);
+
+            float distanceToZ0 = Mathf.Abs(camera.transform.position.z);
+            worldPosition = camera.ScreenToWorldPoint(new Vector3(
+                screenPosition.x,
+                screenPosition.y,
+                distanceToZ0));
+            worldPosition.z = 0f;
+            return true;
+        }
+
+        // =============================================================================
+        // ApplyCameraPointerAnchor
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sposta la camera per mantenere stabile il world point sotto il mouse.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ponte temporaneo con il pan legacy</b></para>
+        /// <para>
+        /// Finche' il pan fisico resta gestito dal vecchio controller MapGrid, la
+        /// compensazione deve aggiornare anche il suo target interno. Se quel bridge
+        /// non e' presente, il wrapper sposta direttamente la camera.
+        /// </para>
+        /// </summary>
+        private void ApplyCameraPointerAnchor(
+            Camera camera,
+            ArcGraphViewInputFrame input,
+            Vector3 pointerWorldBeforeZoom)
+        {
+            if (!TryResolvePointerWorldOnZ0(
+                camera,
+                input,
+                out Vector3 pointerWorldAfterZoom))
+            {
+                return;
+            }
+
+            Vector3 offset = pointerWorldBeforeZoom - pointerWorldAfterZoom;
+            offset.z = 0f;
+
+            if (offset.sqrMagnitude < 0.000001f)
+                return;
+
+            var legacyCameraBridge =
+                camera.GetComponent<Arcontio.View.MapGrid.MapGridCameraController>();
+
+            if (legacyCameraBridge != null)
+            {
+                legacyCameraBridge.ApplyExternalCameraOffset(offset);
+                return;
+            }
+
+            camera.transform.position += offset;
         }
 
         private ArcGraphMapViewConfig ResolveConfig()
