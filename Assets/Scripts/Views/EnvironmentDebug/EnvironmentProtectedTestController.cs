@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Arcontio.Core.Environment;
 using UnityEngine;
 
@@ -38,6 +40,8 @@ namespace Arcontio.View.EnvironmentDebug
         private const float DefaultPanelWidth = 780f;
         private const float DefaultPanelHeight = 1120f;
         private const float GraphHeight = 360f;
+        private const int ExportGraphWidth = 1920;
+        private const int ExportGraphHeight = 720;
         private const float PlantGraphScale = 24f;
 
         [SerializeField] private bool controllerEnabled;
@@ -63,6 +67,8 @@ namespace Arcontio.View.EnvironmentDebug
         private EnvironmentProtectedTestHarnessResult _lastHarness;
         private EnvironmentProtectedTelemetrySample[] _telemetrySamples;
         private Texture2D _graphPixel;
+        private string _lastGraphExportPath = string.Empty;
+        private string _lastGraphExportStatus = string.Empty;
         private Vector2 _scroll;
         private int _telemetryStart;
         private int _telemetryCount;
@@ -413,6 +419,14 @@ namespace Arcontio.View.EnvironmentDebug
             }
             GUILayout.EndHorizontal();
 
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button("Export Graph PNG"))
+                ExportTelemetryGraphPng();
+            GUILayout.EndHorizontal();
+
+            if (!string.IsNullOrWhiteSpace(_lastGraphExportStatus))
+                GUILayout.Label(_lastGraphExportStatus);
+
             if (!showTelemetryGraph)
                 return;
 
@@ -509,6 +523,284 @@ namespace Arcontio.View.EnvironmentDebug
                 + latest.Aridity.ToString("0.00")
                 + " plants="
                 + latest.PlantCount);
+        }
+
+        // =============================================================================
+        // ExportTelemetryGraphPng
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esporta il grafico corrente in un file PNG generato dai campioni runtime.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: export diagnostico fuori dagli asset</b></para>
+        /// <para>
+        /// L'immagine viene salvata in <see cref="Application.persistentDataPath"/> e
+        /// non dentro <c>Assets</c>. In questo modo l'export non genera file meta, non
+        /// entra nella pipeline asset Unity e resta un artefatto locale di test.
+        /// </para>
+        /// </summary>
+        private void ExportTelemetryGraphPng()
+        {
+            EnsureDriver();
+            RecordTelemetrySample(true);
+
+            if (_telemetryCount < 2)
+            {
+                _lastGraphExportStatus = "Export PNG: servono almeno 2 campioni.";
+                return;
+            }
+
+            var texture = new Texture2D(
+                ExportGraphWidth,
+                ExportGraphHeight,
+                TextureFormat.RGBA32,
+                false);
+
+            try
+            {
+                DrawTelemetryGraphToTexture(texture);
+                byte[] png = texture.EncodeToPNG();
+                string directory = Path.Combine(
+                    Application.persistentDataPath,
+                    "BiosphereGraphs");
+                Directory.CreateDirectory(directory);
+
+                var latest = GetTelemetrySample(_telemetryCount - 1);
+                string fileName =
+                    "biosphere_graph_day_"
+                    + latest.Day
+                    + "_"
+                    + DateTime.Now.ToString("yyyyMMdd_HHmmss")
+                    + ".png";
+                string path = Path.Combine(directory, fileName);
+                File.WriteAllBytes(path, png);
+
+                _lastGraphExportPath = path;
+                _lastGraphExportStatus = "Export PNG OK: " + path;
+                Log(_lastGraphExportStatus);
+            }
+            catch (Exception exception)
+            {
+                _lastGraphExportStatus = "Export PNG FAIL: " + exception.Message;
+                if (logDiagnostics)
+                    Debug.LogException(exception, this);
+            }
+            finally
+            {
+                Destroy(texture);
+            }
+        }
+
+        // =============================================================================
+        // DrawTelemetryGraphToTexture
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ridisegna le curve della telemetria su una texture esportabile.
+        /// </para>
+        /// </summary>
+        private void DrawTelemetryGraphToTexture(Texture2D texture)
+        {
+            if (texture == null)
+                return;
+
+            var background = new Color32(10, 12, 14, 255);
+            var pixels = new Color32[texture.width * texture.height];
+            for (int i = 0; i < pixels.Length; i++)
+                pixels[i] = background;
+
+            texture.SetPixels32(pixels);
+
+            var plot = new RectInt(
+                56,
+                32,
+                texture.width - 88,
+                texture.height - 96);
+            DrawExportGrid(texture, plot);
+
+            if (graphFertility)
+                DrawExportTelemetrySeries(texture, plot, new Color32(217, 189, 89, 255), GetFertilityValue);
+
+            if (graphWater)
+                DrawExportTelemetrySeries(texture, plot, new Color32(64, 166, 255, 255), GetWaterValue);
+
+            if (graphVegetation)
+            {
+                DrawExportTelemetrySeries(texture, plot, new Color32(51, 209, 82, 255), GetVegetationDensityValue);
+                DrawExportTelemetrySeries(texture, plot, new Color32(133, 255, 115, 255), GetVegetationHealthValue);
+            }
+
+            if (graphSeedBank)
+            {
+                DrawExportTelemetrySeries(texture, plot, new Color32(230, 133, 56, 255), GetSeedAmountValue);
+                DrawExportTelemetrySeries(texture, plot, new Color32(255, 87, 46, 255), GetSeedViabilityValue);
+            }
+
+            if (graphClimate)
+            {
+                DrawExportTelemetrySeries(texture, plot, new Color32(255, 107, 97, 255), GetTemperatureValue);
+                DrawExportTelemetrySeries(texture, plot, new Color32(89, 199, 255, 255), GetHumidityValue);
+                DrawExportTelemetrySeries(texture, plot, new Color32(209, 168, 107, 255), GetAridityValue);
+            }
+
+            if (graphPlants)
+                DrawExportTelemetrySeries(texture, plot, new Color32(209, 128, 255, 255), GetPlantValue);
+
+            DrawExportRectOutline(texture, plot, new Color32(190, 190, 190, 255));
+            texture.Apply(false, false);
+        }
+
+        // =============================================================================
+        // DrawExportGrid
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna griglia e baseline nel PNG esportato.
+        /// </para>
+        /// </summary>
+        private void DrawExportGrid(Texture2D texture, RectInt plot)
+        {
+            var grid = new Color32(44, 49, 54, 255);
+            for (int i = 1; i < 4; i++)
+            {
+                int y = plot.y + (plot.height * i / 4);
+                DrawExportLine(
+                    texture,
+                    plot.x,
+                    y,
+                    plot.x + plot.width,
+                    y,
+                    grid,
+                    1);
+            }
+        }
+
+        // =============================================================================
+        // DrawExportTelemetrySeries
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna una curva normalizzata 0..1 sulla texture PNG.
+        /// </para>
+        /// </summary>
+        private void DrawExportTelemetrySeries(
+            Texture2D texture,
+            RectInt plot,
+            Color32 color,
+            Func<EnvironmentProtectedTelemetrySample, float> selector)
+        {
+            if (texture == null || _telemetryCount < 2 || selector == null)
+                return;
+
+            Vector2Int previous = ResolveExportGraphPoint(
+                plot,
+                0,
+                Mathf.Clamp01(selector(GetTelemetrySample(0))));
+
+            for (int i = 1; i < _telemetryCount; i++)
+            {
+                Vector2Int current = ResolveExportGraphPoint(
+                    plot,
+                    i,
+                    Mathf.Clamp01(selector(GetTelemetrySample(i))));
+                DrawExportLine(
+                    texture,
+                    previous.x,
+                    previous.y,
+                    current.x,
+                    current.y,
+                    color,
+                    3);
+                previous = current;
+            }
+        }
+
+        // =============================================================================
+        // ResolveExportGraphPoint
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte indice campione e valore normalizzato in pixel della texture.
+        /// </para>
+        /// </summary>
+        private Vector2Int ResolveExportGraphPoint(RectInt plot, int sampleIndex, float value01)
+        {
+            float x01 = _telemetryCount <= 1
+                ? 0f
+                : sampleIndex / (float)(_telemetryCount - 1);
+            int x = plot.x + Mathf.RoundToInt(x01 * plot.width);
+            int y = plot.y + plot.height - Mathf.RoundToInt(Mathf.Clamp01(value01) * plot.height);
+            return new Vector2Int(x, y);
+        }
+
+        // =============================================================================
+        // DrawExportLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna una linea su texture con spessore discreto.
+        /// </para>
+        /// </summary>
+        private void DrawExportLine(
+            Texture2D texture,
+            int x0,
+            int y0,
+            int x1,
+            int y1,
+            Color32 color,
+            int thickness)
+        {
+            int dx = Math.Abs(x1 - x0);
+            int dy = Math.Abs(y1 - y0);
+            int sx = x0 < x1 ? 1 : -1;
+            int sy = y0 < y1 ? 1 : -1;
+            int error = dx - dy;
+            int radius = Mathf.Max(0, thickness / 2);
+
+            while (true)
+            {
+                DrawExportPoint(texture, x0, y0, color, radius);
+                if (x0 == x1 && y0 == y1)
+                    break;
+
+                int doubledError = error * 2;
+                if (doubledError > -dy)
+                {
+                    error -= dy;
+                    x0 += sx;
+                }
+
+                if (doubledError < dx)
+                {
+                    error += dx;
+                    y0 += sy;
+                }
+            }
+        }
+
+        private void DrawExportPoint(Texture2D texture, int x, int y, Color32 color, int radius)
+        {
+            for (int oy = -radius; oy <= radius; oy++)
+            {
+                for (int ox = -radius; ox <= radius; ox++)
+                {
+                    int px = x + ox;
+                    int py = y + oy;
+                    if (px < 0 || py < 0 || px >= texture.width || py >= texture.height)
+                        continue;
+
+                    texture.SetPixel(px, py, color);
+                }
+            }
+        }
+
+        private void DrawExportRectOutline(Texture2D texture, RectInt rect, Color32 color)
+        {
+            DrawExportLine(texture, rect.x, rect.y, rect.x + rect.width, rect.y, color, 2);
+            DrawExportLine(texture, rect.x, rect.y + rect.height, rect.x + rect.width, rect.y + rect.height, color, 2);
+            DrawExportLine(texture, rect.x, rect.y, rect.x, rect.y + rect.height, color, 2);
+            DrawExportLine(texture, rect.x + rect.width, rect.y, rect.x + rect.width, rect.y + rect.height, color, 2);
         }
 
         private void DrawSnapshotData()
