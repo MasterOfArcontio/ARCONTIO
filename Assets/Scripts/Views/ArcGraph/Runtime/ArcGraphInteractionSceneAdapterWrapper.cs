@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
+using UnityEngine.U2D;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -108,11 +109,15 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool processInUpdate;
         [SerializeField] private bool dispatchToConsumer;
         [SerializeField] private bool logDiagnostics;
+        [SerializeField] private bool viewInputEnabled = true;
         [SerializeField] private bool useScreenAsViewport = true;
         [SerializeField] private int manualViewportPixelWidth = 1920;
         [SerializeField] private int manualViewportPixelHeight = 1080;
         [SerializeField] private Vector2 manualViewportOriginPixels = Vector2.zero;
         [SerializeField] private MonoBehaviour interactionConsumerBehaviour;
+        [SerializeField] private Camera sceneCamera;
+        [SerializeField] private bool syncSceneCameraZoomToViewState;
+        [SerializeField] private float minimumSceneCameraOrthographicSize = 0.5f;
 
         private readonly ArcGraphInteractionSceneAdapterContract _contract = new();
 
@@ -263,6 +268,73 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna la camera Unity da sincronizzare con lo stato zoom ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: camera come uscita visuale, non input simulativo</b></para>
+        /// <para>
+        /// Lo stato di zoom nasce da <c>ArcGraphViewConfig</c> e
+        /// <c>ArcGraphViewState</c>. La camera Unity e' solo il terminale visivo
+        /// che rende percepibile quel livello. Questo setter evita ricerche scena
+        /// diffuse e permette all'auto-installer di dichiarare esplicitamente quale
+        /// camera deve seguire ArcGraph.
+        /// </para>
+        /// </summary>
+        public void SetSceneCamera(Camera camera)
+        {
+            sceneCamera = camera;
+        }
+
+        // =============================================================================
+        // SetSceneCameraZoomSyncEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita la sincronizzazione dello zoom fisico della camera
+        /// con il livello zoom ArcGraph corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: zoom ArcGraph discreto</b></para>
+        /// <para>
+        /// La rotellina viene ancora letta da questo wrapper, ma produce solo uno
+        /// scatto logico dentro <c>ArcGraphViewState</c>. Quando questo gate e'
+        /// acceso, il wrapper applica poi alla camera una dimensione coerente con
+        /// il livello risolto dal JSON. In questo modo non esistono piu' livelli
+        /// intermedi generati dal vecchio controller MapGrid.
+        /// </para>
+        /// </summary>
+        public void SetSceneCameraZoomSyncEnabled(bool enabled)
+        {
+            syncSceneCameraZoomToViewState = enabled;
+        }
+
+        // =============================================================================
+        // SetViewInputEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita l'applicazione di pan e zoom dentro il contratto
+        /// interattivo.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: camera controller separato dal picking</b></para>
+        /// <para>
+        /// Durante il passaggio al COCC, il wrapper interattivo deve continuare a
+        /// leggere puntatore e click per hover, HUD e selezione, ma non deve piu'
+        /// cambiare lo <c>ArcGraphViewState</c> con rotellina o drag. In questo
+        /// modo esiste un solo proprietario effettivo di zoom, pan e clamp camera.
+        /// </para>
+        /// </summary>
+        public void SetViewInputEnabled(bool enabled)
+        {
+            viewInputEnabled = enabled;
+        }
+
+        // =============================================================================
         // ProcessCurrentFrameFromInspector
         // =============================================================================
         /// <summary>
@@ -333,6 +405,11 @@ namespace Arcontio.View.ArcGraph
                     _renderQueue,
                     consumer);
 
+            ApplySceneCameraZoomIfEnabled(
+                config,
+                viewState,
+                viewportHeight);
+
             _lastWrapperDiagnostics = CreateWrapperDiagnostics(
                 hasMouse,
                 config != null,
@@ -344,6 +421,161 @@ namespace Arcontio.View.ArcGraph
 
             LogLastDiagnostics();
             return _lastWrapperDiagnostics;
+        }
+
+        // =============================================================================
+        // ApplySceneCameraZoomIfEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica alla camera Unity il livello zoom discreto risolto da ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ponte temporaneo view-state -> camera</b></para>
+        /// <para>
+        /// ArcGraph possiede gia' il contratto logico dello zoom e del centro
+        /// vista. Questa funzione e' un ponte piccolo e confinato: legge solo config
+        /// e stato view, calcola la dimensione ortografica coerente con le celle
+        /// visibili e porta la camera sul centro dichiarato dallo stato. Non legge
+        /// il World, non sposta NPC e non modifica dati simulativi.
+        /// </para>
+        /// </summary>
+        private void ApplySceneCameraZoomIfEnabled(
+            ArcGraphMapViewConfig config,
+            ArcGraphViewState viewState,
+            int viewportPixelHeight)
+        {
+            if (!syncSceneCameraZoomToViewState || config == null || viewState == null)
+                return;
+
+            Camera camera = ResolveSceneCamera();
+            if (camera == null)
+                return;
+
+            ArcGraphViewZoomLevelDefinition zoom = viewState.CurrentZoom(config);
+            if (zoom.VisibleCellsY <= 0)
+                return;
+
+            float targetOrthographicSize = Mathf.Max(
+                minimumSceneCameraOrthographicSize,
+                zoom.VisibleCellsY * 0.5f);
+
+            ApplyPixelPerfectCameraZoomIfPresent(
+                camera,
+                zoom,
+                viewportPixelHeight);
+
+            bool didChangeOrthographicSize =
+                !Mathf.Approximately(camera.orthographicSize, targetOrthographicSize);
+
+            if (didChangeOrthographicSize)
+                camera.orthographicSize = targetOrthographicSize;
+
+            // Lo zoom-to-pointer e' gia' stato applicato al centro logico da
+            // ArcGraphViewController. Qui non compensiamo una seconda volta la
+            // camera: la sincronizziamo al centro finale dello ViewState, cosi'
+            // terrain, muri, NPC e culling restano nello stesso sistema di
+            // coordinate.
+            SyncSceneCameraCenterToViewState(camera, viewState);
+        }
+
+        private Camera ResolveSceneCamera()
+        {
+            if (sceneCamera != null)
+                return sceneCamera;
+
+            sceneCamera = Camera.main;
+            return sceneCamera;
+        }
+
+        // =============================================================================
+        // SyncSceneCameraCenterToViewState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Porta la camera Unity sul centro mappa dichiarato dallo stato ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: una sola fonte per il centro vista</b></para>
+        /// <para>
+        /// Il centro autorevole della vista e' <c>ArcGraphViewState</c>. Se la
+        /// camera fisica accumula un offset indipendente, il terrain viene cullato
+        /// usando una finestra e oggetti/NPC vengono osservati da un'altra. Questo
+        /// metodo elimina quel disallineamento, ma resta confinato alla camera:
+        /// non modifica mappa, oggetti o simulazione.
+        /// </para>
+        /// </summary>
+        private static void SyncSceneCameraCenterToViewState(
+            Camera camera,
+            ArcGraphViewState viewState)
+        {
+            if (camera == null || viewState == null)
+                return;
+
+            Vector3 current = camera.transform.position;
+            Vector3 desired = new Vector3(
+                viewState.CenterCellX,
+                viewState.CenterCellY,
+                current.z);
+            Vector3 offset = desired - current;
+            offset.z = 0f;
+
+            if (offset.sqrMagnitude < 0.000001f)
+                return;
+
+            var legacyCameraBridge =
+                camera.GetComponent<Arcontio.View.MapGrid.MapGridCameraController>()
+                ?? camera.GetComponentInParent<Arcontio.View.MapGrid.MapGridCameraController>();
+
+            if (legacyCameraBridge != null)
+            {
+                legacyCameraBridge.ApplyExternalCameraOffset(offset);
+                return;
+            }
+
+            camera.transform.position += offset;
+        }
+
+        // =============================================================================
+        // ApplyPixelPerfectCameraZoomIfPresent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sincronizza la PixelPerfectCamera con il livello zoom ArcGraph corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: zoom fisico derivato dal JSON</b></para>
+        /// <para>
+        /// Il valore non nasce dalla rotellina legacy e non e' continuo. Viene
+        /// derivato dalle celle visibili dichiarate dalla configurazione ArcGraph,
+        /// cosi' ogni livello zoom resta discreto e governato dal file JSON.
+        /// </para>
+        /// </summary>
+        private bool ApplyPixelPerfectCameraZoomIfPresent(
+            Camera camera,
+            ArcGraphViewZoomLevelDefinition zoom,
+            int viewportPixelHeight)
+        {
+            PixelPerfectCamera pixelPerfectCamera = camera.GetComponent<PixelPerfectCamera>();
+            if (pixelPerfectCamera == null || !pixelPerfectCamera.enabled)
+                return false;
+
+            int height = viewportPixelHeight > 0
+                ? viewportPixelHeight
+                : Screen.height;
+
+            if (height <= 0)
+                return false;
+
+            int targetAssetsPpu = Mathf.Max(
+                1,
+                Mathf.RoundToInt(height / (float)zoom.VisibleCellsY));
+
+            if (pixelPerfectCamera.assetsPPU == targetAssetsPpu)
+                return false;
+
+            pixelPerfectCamera.assetsPPU = targetAssetsPpu;
+            return true;
         }
 
         private ArcGraphMapViewConfig ResolveConfig()
@@ -385,19 +617,30 @@ namespace Arcontio.View.ArcGraph
 
             Vector2 position = mouse.position.ReadValue();
             Vector2 delta = mouse.delta.ReadValue();
-            float scrollY = mouse.scroll.ReadValue().y;
-            int wheelStepDelta = ResolveWheelStep(scrollY);
             bool isPointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+
+            // Durante il soft retirement di MapGrid conserviamo il gesto pratico
+            // gia' usato dall'operatore: RMB trascina la mappa. Il controller
+            // ArcGraph riceve comunque un input astratto di pan, senza conoscere
+            // quale tasto fisico lo ha prodotto.
+            bool isPanButtonHeld =
+                viewInputEnabled &&
+                (mouse.middleButton.isPressed ||
+                 mouse.rightButton.isPressed);
 
             Vector2 viewportPoint = useScreenAsViewport
                 ? position
                 : position - manualViewportOriginPixels;
 
+            int wheelStepDelta = viewInputEnabled
+                ? ResolveWheelStep(mouse.scroll.ReadValue().y)
+                : 0;
+
             return new ArcGraphViewInputFrame(
                 wheelStepDelta,
-                mouse.middleButton.isPressed,
-                delta.x,
-                delta.y,
+                isPanButtonHeld,
+                viewInputEnabled ? delta.x : 0f,
+                viewInputEnabled ? delta.y : 0f,
                 viewportPoint.x,
                 viewportPoint.y,
                 true,

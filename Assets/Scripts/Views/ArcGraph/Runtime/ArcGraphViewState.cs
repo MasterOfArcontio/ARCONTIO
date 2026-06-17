@@ -132,6 +132,34 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetCenterCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Imposta direttamente il centro vista in coordinate cella.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: centro view esplicito</b></para>
+        /// <para>
+        /// Questo metodo resta nel solo layer view. Serve ai controller grafici per
+        /// compensare operazioni come lo zoom verso puntatore, dove il centro deve
+        /// cambiare per mantenere stabile la cella sotto il mouse. Non modifica
+        /// mappa, NPC, oggetti, job o stato simulativo.
+        /// </para>
+        /// </summary>
+        public void SetCenterCell(
+            float centerCellX,
+            float centerCellY,
+            ArcGraphMapViewConfig config)
+        {
+            config = config ?? ArcGraphMapViewConfig.CreateDefaultV033();
+
+            CenterCellX = centerCellX;
+            CenterCellY = centerCellY;
+            ClampCenterToMap(config);
+        }
+
+        // =============================================================================
         // ApplyWheelZoom
         // =============================================================================
         /// <summary>

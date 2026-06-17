@@ -32,6 +32,8 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphNpcRuntimeSceneRenderer : MonoBehaviour
     {
+        private const string LegacyMapGridSpritePrefix = "MapGrid/Sprites/";
+
         [SerializeField] private ArcGraphMinimalRuntimeSceneWrapper runtimeWrapper;
         [SerializeField] private MonoBehaviour spriteResolverBehaviour;
         [SerializeField] private TextAsset npcVisualCatalogJson;
@@ -514,6 +516,16 @@ namespace Arcontio.View.ArcGraph
         {
             usedGeneratedFallback = false;
 
+            // I livelli zoom semplificati non devono tornare al vecchio NPC
+            // MapGrid. Durante la fase di transizione la queue puo' ancora portare
+            // una chiave legacy come fallback storico, ma visualizzarla in ArcGraph
+            // confonde il contratto: sembra che MapGrid sia ancora attiva anche se
+            // la vista runtime e' ArcGraph. Finche' non esiste un marker LOD
+            // dedicato, preferiamo non disegnare l'attore semplificato invece di
+            // mostrare lo sprite sbagliato.
+            if (IsLegacyMapGridSpriteRequest(entry.SpriteRequest))
+                return null;
+
             if (spriteResolver != null
                 && spriteResolver.TryResolveSprite(entry.SpriteRequest, out Sprite resolved)
                 && resolved != null)
@@ -526,6 +538,34 @@ namespace Arcontio.View.ArcGraph
 
             usedGeneratedFallback = true;
             return GetOrCreateFallbackSprite();
+        }
+
+        // =============================================================================
+        // IsLegacyMapGridSpriteRequest
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riconosce una richiesta LOD semplificata che punta ancora a sprite
+        /// legacy MapGrid.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: niente fallback grafici cross-view</b></para>
+        /// <para>
+        /// ArcGraph puo' leggere dati provvisori derivati da MapGrid, ma non deve
+        /// usare sprite MapGrid come rappresentazione visuale quando il proprio
+        /// profilo zoom dichiara una rappresentazione semplificata. La grafica
+        /// semplificata ArcGraph dovra' diventare una risorsa esplicita ArcGraph,
+        /// non un residuo nascosto del renderer precedente.
+        /// </para>
+        /// </summary>
+        private static bool IsLegacyMapGridSpriteRequest(
+            ArcGraphSpriteResolveRequest request)
+        {
+            if (!request.UsesSimplifiedRepresentation)
+                return false;
+
+            return !string.IsNullOrWhiteSpace(request.SpriteKey)
+                   && request.SpriteKey.StartsWith(LegacyMapGridSpritePrefix);
         }
 
         private ActorHandle GetOrCreateActorHandle(

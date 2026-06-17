@@ -12,8 +12,10 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// La policy concentra le decisioni su cosa mostrare a ogni zoom. I renderer
     /// futuri potranno leggere un <c>ArcGraphZoomLodProfile</c> invece di duplicare
-    /// condizioni su livello zoom, animazioni, marker, sprite semplificati e layer
-    /// actor.
+    /// condizioni su animazioni, marker, sprite semplificati e layer actor. Il
+    /// numero dei livelli e le caratteristiche di ogni livello non sono fissati
+    /// nel codice: arrivano dalla configurazione view, normalmente caricata da
+    /// <c>ArcGraphViewConfig.json</c>.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -56,79 +58,115 @@ namespace Arcontio.View.ArcGraph
         /// Risolve il profilo LOD partendo da una definizione zoom.
         /// </para>
         ///
-        /// <para><b>Traduzione dei quattro livelli v0.33</b></para>
+        /// <para><b>Policy guidata dalla configurazione</b></para>
         /// <para>
-        /// I livelli lontani usano rappresentazione semplificata. Il livello 1 usa
-        /// marker strategici e aggregazioni; il livello 2 usa sprite statici
-        /// semplificati; il livello 3 usa sprite completi flat; il livello 4 abilita
-        /// actor layered e dettagli locali.
+        /// Questo metodo non assume piu' che esistano quattro livelli. Interpreta
+        /// solo i flag della definizione zoom ricevuta: rappresentazione
+        /// semplificata, pan ammesso, animazioni sprite e actor a layer. In questo
+        /// modo il JSON puo' dichiarare uno, cinque, dieci o piu' livelli senza
+        /// richiedere nuove condizioni numeriche dentro la policy.
         /// </para>
         /// </summary>
         public static ArcGraphZoomLodProfile ResolveFromZoom(
             ArcGraphViewZoomLevelDefinition zoom)
         {
-            if (zoom.Level <= 1)
-            {
-                return new ArcGraphZoomLodProfile(
-                    zoom.Level,
-                    ArcGraphActorLodMode.StrategicMarker,
-                    ArcGraphVegetationLodMode.AreaAggregate,
-                    ArcGraphObjectLodMode.HideMinorObjects,
-                    ArcGraphEffectLodMode.StaticSignalOnly,
-                    allowsSpriteAnimation: false,
-                    allowsLayeredActorSprites: false,
-                    usesSimplifiedRepresentation: true,
-                    showMinorItems: false,
-                    showWeatherOverlay: true);
-            }
-
-            if (zoom.Level == 2)
-            {
-                return new ArcGraphZoomLodProfile(
-                    zoom.Level,
-                    ArcGraphActorLodMode.SimplifiedStaticSprite,
-                    ArcGraphVegetationLodMode.SimplifiedStaticSprite,
-                    ArcGraphObjectLodMode.SimplifiedImportantObjects,
-                    ArcGraphEffectLodMode.SimplifiedStaticEffect,
-                    allowsSpriteAnimation: false,
-                    allowsLayeredActorSprites: false,
-                    usesSimplifiedRepresentation: true,
-                    showMinorItems: false,
-                    showWeatherOverlay: true);
-            }
-
-            if (zoom.Level == 3)
-            {
-                return new ArcGraphZoomLodProfile(
-                    zoom.Level,
-                    ArcGraphActorLodMode.FullFlatSprite,
-                    zoom.AllowsSpriteAnimation
-                        ? ArcGraphVegetationLodMode.IndividualAnimatedSprite
-                        : ArcGraphVegetationLodMode.IndividualStaticSprite,
-                    ArcGraphObjectLodMode.StaticSprites,
-                    ArcGraphEffectLodMode.AnimatedMajorEffects,
-                    allowsSpriteAnimation: zoom.AllowsSpriteAnimation,
-                    allowsLayeredActorSprites: false,
-                    usesSimplifiedRepresentation: false,
-                    showMinorItems: true,
-                    showWeatherOverlay: true);
-            }
+            bool usesSimplifiedRepresentation = zoom.UsesSimplifiedRepresentation;
+            bool allowsSpriteAnimation =
+                !usesSimplifiedRepresentation &&
+                zoom.AllowsSpriteAnimation;
+            bool allowsLayeredActorSprites =
+                !usesSimplifiedRepresentation &&
+                zoom.AllowsLayeredActorSprites;
 
             return new ArcGraphZoomLodProfile(
                 zoom.Level,
-                zoom.AllowsLayeredActorSprites
-                    ? ArcGraphActorLodMode.LayeredSprite
-                    : ArcGraphActorLodMode.FullFlatSprite,
-                zoom.AllowsSpriteAnimation
-                    ? ArcGraphVegetationLodMode.IndividualAnimatedSprite
-                    : ArcGraphVegetationLodMode.IndividualStaticSprite,
-                ArcGraphObjectLodMode.DetailedSprites,
-                ArcGraphEffectLodMode.FullLocalEffects,
-                allowsSpriteAnimation: zoom.AllowsSpriteAnimation,
-                allowsLayeredActorSprites: zoom.AllowsLayeredActorSprites,
-                usesSimplifiedRepresentation: false,
-                showMinorItems: true,
+                ResolveActorMode(zoom, usesSimplifiedRepresentation, allowsLayeredActorSprites),
+                ResolveVegetationMode(zoom, usesSimplifiedRepresentation, allowsSpriteAnimation),
+                ResolveObjectMode(zoom, usesSimplifiedRepresentation, allowsLayeredActorSprites),
+                ResolveEffectMode(zoom, usesSimplifiedRepresentation, allowsSpriteAnimation, allowsLayeredActorSprites),
+                allowsSpriteAnimation,
+                allowsLayeredActorSprites,
+                usesSimplifiedRepresentation,
+                showMinorItems: !usesSimplifiedRepresentation,
                 showWeatherOverlay: true);
+        }
+
+        private static ArcGraphActorLodMode ResolveActorMode(
+            ArcGraphViewZoomLevelDefinition zoom,
+            bool usesSimplifiedRepresentation,
+            bool allowsLayeredActorSprites)
+        {
+            // Se il JSON dichiara rappresentazione semplificata, gli actor non
+            // entrano nella catena completa. Un livello senza pan viene trattato
+            // come vista strategica/aggregata; un livello pannabile mostra sprite
+            // semplificati statici.
+            if (usesSimplifiedRepresentation)
+                return zoom.AllowsPan
+                    ? ArcGraphActorLodMode.SimplifiedStaticSprite
+                    : ArcGraphActorLodMode.StrategicMarker;
+
+            return allowsLayeredActorSprites
+                ? ArcGraphActorLodMode.LayeredSprite
+                : ArcGraphActorLodMode.FullFlatSprite;
+        }
+
+        private static ArcGraphVegetationLodMode ResolveVegetationMode(
+            ArcGraphViewZoomLevelDefinition zoom,
+            bool usesSimplifiedRepresentation,
+            bool allowsSpriteAnimation)
+        {
+            // La vegetazione lontana puo' diventare aggregata o semplificata. Il
+            // dettaglio individuale entra solo quando il JSON spegne la
+            // rappresentazione semplificata.
+            if (usesSimplifiedRepresentation)
+                return zoom.AllowsPan
+                    ? ArcGraphVegetationLodMode.SimplifiedStaticSprite
+                    : ArcGraphVegetationLodMode.AreaAggregate;
+
+            return allowsSpriteAnimation
+                ? ArcGraphVegetationLodMode.IndividualAnimatedSprite
+                : ArcGraphVegetationLodMode.IndividualStaticSprite;
+        }
+
+        private static ArcGraphObjectLodMode ResolveObjectMode(
+            ArcGraphViewZoomLevelDefinition zoom,
+            bool usesSimplifiedRepresentation,
+            bool allowsLayeredActorSprites)
+        {
+            // Gli oggetti minori restano nascosti nelle viste strategiche; quando
+            // il livello e' pannabile ma semplificato mostriamo solo oggetti
+            // importanti. Il dettaglio completo arriva dai flag di dettaglio del
+            // livello, non dal numero del livello.
+            if (usesSimplifiedRepresentation)
+                return zoom.AllowsPan
+                    ? ArcGraphObjectLodMode.SimplifiedImportantObjects
+                    : ArcGraphObjectLodMode.HideMinorObjects;
+
+            return allowsLayeredActorSprites
+                ? ArcGraphObjectLodMode.DetailedSprites
+                : ArcGraphObjectLodMode.StaticSprites;
+        }
+
+        private static ArcGraphEffectLodMode ResolveEffectMode(
+            ArcGraphViewZoomLevelDefinition zoom,
+            bool usesSimplifiedRepresentation,
+            bool allowsSpriteAnimation,
+            bool allowsLayeredActorSprites)
+        {
+            // Gli effetti seguono la stessa idea: segnale statico se il livello e'
+            // strategico, effetto semplificato se il livello e' ancora LOD basso,
+            // effetto animato o locale se il JSON abilita dettaglio e animazioni.
+            if (usesSimplifiedRepresentation)
+                return zoom.AllowsPan
+                    ? ArcGraphEffectLodMode.SimplifiedStaticEffect
+                    : ArcGraphEffectLodMode.StaticSignalOnly;
+
+            if (!allowsSpriteAnimation)
+                return ArcGraphEffectLodMode.SimplifiedStaticEffect;
+
+            return allowsLayeredActorSprites
+                ? ArcGraphEffectLodMode.FullLocalEffects
+                : ArcGraphEffectLodMode.AnimatedMajorEffects;
         }
     }
 }
