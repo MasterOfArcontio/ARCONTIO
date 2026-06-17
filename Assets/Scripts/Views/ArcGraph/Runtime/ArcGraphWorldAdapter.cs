@@ -25,7 +25,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>CurrentRuntimeZLevel</b>: livello <c>z = 0</c> usato dal runtime attuale.</item>
-    ///   <item><b>FillTerrainSnapshots</b>: converte il buffer terreno MapGrid in celle ArcGraph.</item>
+    ///   <item><b>FillTerrainSnapshots</b>: converte superficie Core o buffer terreno legacy in celle ArcGraph.</item>
     ///   <item><b>FillObjectSnapshots</b>: converte gli oggetti del World in snapshot visuali.</item>
     ///   <item><b>FillActorSnapshots</b>: converte gli NPC del World in snapshot actor e motion read-only.</item>
     ///   <item><b>ResolveObjectSpriteKey</b>: replica solo la policy di fallback sprite corrente.</item>
@@ -78,15 +78,16 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Converte tutte le celle di <c>MapGridData</c> in snapshot terreno ArcGraph.
+        /// Converte tutte le celle terreno in snapshot ArcGraph.
         /// </para>
         ///
         /// <para><b>Confine MapGrid -> ArcGraph</b></para>
         /// <para>
-        /// La sorgente e' ancora il buffer view-side della MapGrid attuale. Questo
-        /// metodo non legge il <c>World</c> e non modifica il buffer: percorre la
-        /// griglia, copia tile e blocco, assegna <c>z = 0</c> e riempie la lista
-        /// fornita dal chiamante.
+        /// La sorgente preferita e' <c>World.CellSurfaces</c>, quando il layer e'
+        /// stato popolato con assegnazioni esplicite. Durante la transizione, se il
+        /// layer esiste solo come default iniziale, il metodo conserva il fallback
+        /// <c>MapGridData</c> per non perdere acqua, roccia o pavimenti gia' presenti
+        /// nella mappa legacy.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -101,18 +102,50 @@ namespace Arcontio.View.ArcGraph
             IList<ArcGraphTerrainCellSnapshot> target,
             bool clearTarget = true)
         {
+            FillTerrainSnapshots(map, null, target, clearTarget);
+        }
+
+        // =============================================================================
+        // FillTerrainSnapshots
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte le celle terreno preferendo il layer Core autoritativo quando
+        /// risulta realmente popolato.
+        /// </para>
+        ///
+        /// <para><b>Transizione controllata MapGrid -> World</b></para>
+        /// <para>
+        /// <c>CellSurfaceLayer</c> nasce dentro il <c>World</c> con un default grass.
+        /// Quel default serve a evitare null e a dare una semantica stabile, ma non
+        /// basta per sostituire il layout reale della mappa. Per questo l'adapter usa
+        /// la superficie Core solo quando <c>HasExplicitAssignments</c> e' true.
+        /// </para>
+        /// </summary>
+        public void FillTerrainSnapshots(
+            MapGridData map,
+            CellSurfaceLayer cellSurfaces,
+            IList<ArcGraphTerrainCellSnapshot> target,
+            bool clearTarget = true)
+        {
             if (target == null)
                 return;
 
             if (clearTarget)
                 target.Clear();
 
-            if (map == null)
+            bool useAuthoritativeSurfaces = cellSurfaces != null
+                && cellSurfaces.HasExplicitAssignments;
+
+            if (map == null && !useAuthoritativeSurfaces)
                 return;
 
-            for (int y = 0; y < map.Height; y++)
+            int width = map != null ? map.Width : cellSurfaces.Width;
+            int height = map != null ? map.Height : cellSurfaces.Height;
+
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < map.Width; x++)
+                for (int x = 0; x < width; x++)
                 {
                     // MapGridData garantisce l'indicizzazione per coordinate in bounds.
                     // L'adapter aggiunge solo il livello z=0, senza inventare altitudini.
@@ -124,10 +157,30 @@ namespace Arcontio.View.ArcGraph
                     // Passare IsMovementBlocked ad ArcGraph confondeva questi due
                     // concetti e faceva disegnare l'acqua come blocco legacy/pietra.
                     var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(x, y);
-                    target.Add(new ArcGraphTerrainCellSnapshot(
-                        cell,
-                        map.GetTerrain(x, y),
-                        map.IsBlocked(x, y)));
+                    int tileId = map != null && map.InBounds(x, y)
+                        ? map.GetTerrain(x, y)
+                        : 0;
+                    bool isBlocked = map != null && map.InBounds(x, y) && map.IsBlocked(x, y);
+
+                    if (useAuthoritativeSurfaces
+                        && cellSurfaces.TryGetSurface(x, y, out CellSurfaceSnapshot surface))
+                    {
+                        target.Add(new ArcGraphTerrainCellSnapshot(
+                            cell,
+                            tileId,
+                            isBlocked,
+                            surface.MacroSurface,
+                            surface.SurfaceKey,
+                            surface.VisualRuleKey,
+                            true));
+                    }
+                    else
+                    {
+                        target.Add(new ArcGraphTerrainCellSnapshot(
+                            cell,
+                            tileId,
+                            isBlocked));
+                    }
                 }
             }
         }

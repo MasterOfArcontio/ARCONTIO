@@ -250,9 +250,12 @@ namespace Arcontio.View.ArcGraph
             // Ogni lista viene svuotata prima del nuovo riempimento: le cache sono derivate.
             _terrainSnapshots.Clear();
 
-            if (_context?.Map != null)
+            if (_context?.Map != null || _context?.World?.CellSurfaces != null)
             {
-                _adapter.FillTerrainSnapshots(_context.Map, _terrainSnapshots);
+                _adapter.FillTerrainSnapshots(
+                    _context.Map,
+                    _context.World?.CellSurfaces,
+                    _terrainSnapshots);
 
                 if (_layerStack.TryGetLayer<ArcGraphTerrainLayer>(out var terrainLayer))
                     terrainLayer.ReplaceSnapshots(_terrainSnapshots, _renderState);

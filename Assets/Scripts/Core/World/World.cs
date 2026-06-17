@@ -165,6 +165,20 @@ namespace Arcontio.Core
         /// </summary>
         public int MapHeight { get; private set; }
 
+        /// <summary>
+        /// Layer autoritativo delle superfici cella, separato dalle cache di
+        /// movimento, occlusione e occupazione oggetti.
+        ///
+        /// Nota architetturale:
+        /// - <c>CellSurfaces</c> descrive cosa e' la cella: erba, acqua, pavimento.
+        /// - <c>_blocksMovement</c> descrive se la cella e' attraversabile ora.
+        /// - <c>_objIdByCell</c> descrive quale oggetto occupa la cella ora.
+        ///
+        /// Tenere questi dati separati evita che ArcGraph, UI o futuri sistemi
+        /// ambientali ricavino il pavimento da cache nate per altri scopi.
+        /// </summary>
+        public CellSurfaceLayer CellSurfaces { get; private set; }
+
         // ============================================================
         // DEBUG / TELEMETRY (view-only diagnostics)
         // ============================================================
@@ -379,6 +393,7 @@ namespace Arcontio.Core
             _objIdByCell = new int[size];
             _blocksVision = new bool[size];
             _blocksMovement = new bool[size];
+            CellSurfaces = new CellSurfaceLayer(MapWidth, MapHeight);
 
             // Pulizia cache: default Ã¨ ok per OcclusionCell/bool,
             // ma _objIdByCell deve essere inizializzato a -1 (empty).

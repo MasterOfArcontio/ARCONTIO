@@ -204,7 +204,11 @@ namespace Arcontio.View.ArcGraph
         {
             return left.Cell.Equals(right.Cell)
                    && left.TileId == right.TileId
-                   && left.IsBlocked == right.IsBlocked;
+                   && left.IsBlocked == right.IsBlocked
+                   && left.SurfaceMacro == right.SurfaceMacro
+                   && left.SurfaceKey == right.SurfaceKey
+                   && left.VisualRuleKey == right.VisualRuleKey
+                   && left.HasAuthoritativeSurface == right.HasAuthoritativeSurface;
         }
 
         private static void MarkTerrainCellAndVisualNeighborsDirty(
