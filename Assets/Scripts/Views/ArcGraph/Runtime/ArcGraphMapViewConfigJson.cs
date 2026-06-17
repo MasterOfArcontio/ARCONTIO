@@ -139,9 +139,6 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>defaultZoomLevel</b>: livello iniziale richiesto.</item>
     ///   <item><b>mouseWheelStepsPerZoomLevel</b>: scatti rotellina per livello.</item>
     ///   <item><b>panUsesMiddleMouseButton</b>: policy del futuro pan.</item>
-    ///   <item><b>zoomTransitionSeconds</b>: durata della transizione visuale tra livelli zoom.</item>
-    ///   <item><b>panSmoothTime</b>: inerzia visuale del pan camera-side.</item>
-    ///   <item><b>panMaxSpeedCellsPerSecond</b>: limite massimo del pan visuale.</item>
     ///   <item><b>zoomLevels</b>: profilo zoom serializzato.</item>
     /// </list>
     /// </summary>
@@ -153,9 +150,6 @@ namespace Arcontio.View.ArcGraph
         public int defaultZoomLevel = 1;
         public int mouseWheelStepsPerZoomLevel = 1;
         public bool panUsesMiddleMouseButton = true;
-        public float zoomTransitionSeconds = 0.12f;
-        public float panSmoothTime = 0.18f;
-        public float panMaxSpeedCellsPerSecond = 90f;
         public ArcGraphZoomLevelConfigDto[] zoomLevels;
 
         // =============================================================================
@@ -186,16 +180,7 @@ namespace Arcontio.View.ArcGraph
                 mouseWheelStepsPerZoomLevel > 0
                     ? mouseWheelStepsPerZoomLevel
                     : defaults.MouseWheelStepsPerZoomLevel,
-                panUsesMiddleMouseButton,
-                zoomTransitionSeconds >= 0f
-                    ? zoomTransitionSeconds
-                    : defaults.ZoomTransitionSeconds,
-                panSmoothTime >= 0f
-                    ? panSmoothTime
-                    : defaults.PanSmoothTime,
-                panMaxSpeedCellsPerSecond > 0f
-                    ? panMaxSpeedCellsPerSecond
-                    : defaults.PanMaxSpeedCellsPerSecond);
+                panUsesMiddleMouseButton);
         }
 
         private ArcGraphViewZoomLevelDefinition[] BuildRuntimeZoomLevels(
