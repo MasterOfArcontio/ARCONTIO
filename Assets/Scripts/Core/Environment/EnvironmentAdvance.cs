@@ -102,7 +102,8 @@ namespace Arcontio.Core.Environment
             long previousEnvironmentTicks,
             long currentEnvironmentTicks,
             EnvironmentCalendarConfig calendarConfig,
-            EnvironmentClimateConfig climateConfig)
+            EnvironmentClimateConfig climateConfig,
+            EnvironmentBiomeProfile biomeProfile = default)
         {
             var safeCalendarConfig = calendarConfig ?? new EnvironmentCalendarConfig();
             var safeClimateConfig = climateConfig ?? new EnvironmentClimateConfig();
@@ -112,7 +113,8 @@ namespace Arcontio.Core.Environment
                 safeCalendarConfig);
             var climate = EnvironmentClimateResolver.Resolve(
                 transition.Current,
-                safeClimateConfig);
+                safeClimateConfig,
+                safeCalendarConfig);
             var seasonProfile = EnvironmentCalendarResolver.ResolveSeasonProfile(
                 safeCalendarConfig,
                 transition.Current.Date.Season);
@@ -123,7 +125,8 @@ namespace Arcontio.Core.Environment
                 sourceSnapshot,
                 transition,
                 climate,
-                seasonProfile);
+                seasonProfile,
+                biomeProfile);
             var snapshot = evolution.State.CreateSnapshot();
             var diff = EnvironmentSnapshotDiffResolver.Diff(
                 sourceSnapshot,
@@ -151,7 +154,8 @@ namespace Arcontio.Core.Environment
             EnvironmentState sourceState,
             long currentEnvironmentTicks,
             EnvironmentCalendarConfig calendarConfig,
-            EnvironmentClimateConfig climateConfig)
+            EnvironmentClimateConfig climateConfig,
+            EnvironmentBiomeProfile biomeProfile = default)
         {
             var sourceSnapshot = sourceState != null
                 ? sourceState.CreateSnapshot()
@@ -163,7 +167,8 @@ namespace Arcontio.Core.Environment
                 previousTicks,
                 currentEnvironmentTicks,
                 calendarConfig,
-                climateConfig);
+                climateConfig,
+                biomeProfile);
         }
     }
 }

@@ -1,0 +1,102 @@
+{
+  "profiles": [
+    {
+      "biomeKey": "temperate_grassland",
+      "targetFertility01": 0.72,
+      "targetVegetationDensity01": 0.72,
+      "targetVegetationHealth01": 0.78,
+      "targetSeedBankAmount01": 0.76,
+      "targetSeedBankViability01": 0.72,
+      "baseMoisture01": 0.52,
+      "droughtResistance01": 0.40,
+      "coldResistance01": 0.45,
+      "heatResistance01": 0.55,
+      "seasonality01": 0.55,
+      "naturalRecoveryRate01": 0.62,
+      "disturbanceSensitivity01": 0.45,
+      "maxPlantInstancesPerArea": 96,
+      "allowedPlantSpeciesKeys": [
+        "wild_grass",
+        "oak_tree",
+        "berry_bush"
+      ],
+      "preferredSeedBankSpeciesKeys": [
+        "wild_grass",
+        "oak_tree",
+        "berry_bush"
+      ]
+    },
+    {
+      "biomeKey": "desert",
+      "targetFertility01": 0.22,
+      "targetVegetationDensity01": 0.10,
+      "targetVegetationHealth01": 0.58,
+      "targetSeedBankAmount01": 0.24,
+      "targetSeedBankViability01": 0.62,
+      "baseMoisture01": 0.08,
+      "droughtResistance01": 0.92,
+      "coldResistance01": 0.25,
+      "heatResistance01": 0.86,
+      "seasonality01": 0.25,
+      "naturalRecoveryRate01": 0.28,
+      "disturbanceSensitivity01": 0.30,
+      "maxPlantInstancesPerArea": 20,
+      "allowedPlantSpeciesKeys": [
+        "desert_shrub",
+        "cactus"
+      ],
+      "preferredSeedBankSpeciesKeys": [
+        "desert_shrub",
+        "cactus"
+      ]
+    },
+    {
+      "biomeKey": "jungle",
+      "targetFertility01": 0.82,
+      "targetVegetationDensity01": 0.94,
+      "targetVegetationHealth01": 0.88,
+      "targetSeedBankAmount01": 0.90,
+      "targetSeedBankViability01": 0.84,
+      "baseMoisture01": 0.88,
+      "droughtResistance01": 0.30,
+      "coldResistance01": 0.18,
+      "heatResistance01": 0.78,
+      "seasonality01": 0.22,
+      "naturalRecoveryRate01": 0.84,
+      "disturbanceSensitivity01": 0.72,
+      "maxPlantInstancesPerArea": 180,
+      "allowedPlantSpeciesKeys": [
+        "jungle_fern",
+        "jungle_tree"
+      ],
+      "preferredSeedBankSpeciesKeys": [
+        "jungle_tree",
+        "jungle_fern"
+      ]
+    },
+    {
+      "biomeKey": "tundra",
+      "targetFertility01": 0.34,
+      "targetVegetationDensity01": 0.24,
+      "targetVegetationHealth01": 0.62,
+      "targetSeedBankAmount01": 0.34,
+      "targetSeedBankViability01": 0.55,
+      "baseMoisture01": 0.32,
+      "droughtResistance01": 0.58,
+      "coldResistance01": 0.88,
+      "heatResistance01": 0.18,
+      "seasonality01": 0.86,
+      "naturalRecoveryRate01": 0.22,
+      "disturbanceSensitivity01": 0.56,
+      "maxPlantInstancesPerArea": 36,
+      "allowedPlantSpeciesKeys": [
+        "tundra_moss",
+        "lichen"
+      ],
+      "preferredSeedBankSpeciesKeys": [
+        "tundra_moss",
+        "lichen"
+      ]
+    }
+  ]
+}

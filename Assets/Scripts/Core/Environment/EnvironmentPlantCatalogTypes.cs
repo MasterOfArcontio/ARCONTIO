@@ -128,12 +128,13 @@ namespace Arcontio.Core.Environment
     /// Definizione passiva di una specie vegetale importante.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: specie come contratto dati</b></para>
+    /// <para><b>Principio architetturale: specie biologica con bridge verso ObjectDef</b></para>
     /// <para>
     /// La specie descrive requisiti ecologici, stagioni favorevoli, stadi e output
-    /// potenziale. Non e' una risorsa concreta, non e' un oggetto nel World e non
-    /// e' uno sprite. Questo evita di confondere catalogo biologico, istanze vive e
-    /// rendering.
+    /// potenziale. Non copia dati di <c>ObjectDef</c>, non decide sprite e non crea
+    /// oggetti nel World. I campi bridge conservano soltanto chiavi opzionali verso
+    /// il catalogo oggetti ufficiale, cosi' la biosfera puo' restare biologica senza
+    /// generare un catalogo materiale duplicato.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -145,6 +146,8 @@ namespace Arcontio.Core.Environment
     ///   <item><b>IdealTemperature01/IdealHumidity01</b>: preferenze climatiche normalizzate.</item>
     ///   <item><b>MinimumFertility01</b>: fertilita' minima consigliata.</item>
     ///   <item><b>ResourceOutputKey</b>: chiave output futura, non risorsa concreta.</item>
+    ///   <item><b>LiveObjectDefinitionKey</b>: ObjectDef futuro della pianta viva materializzata.</item>
+    ///   <item><b>HarvestObjectDefinitionKey</b>: ObjectDef futuro del prodotto raccoglibile.</item>
     ///   <item><b>SeasonalBehavior</b>: comportamento stagionale generale.</item>
     /// </list>
     /// </summary>
@@ -161,6 +164,8 @@ namespace Arcontio.Core.Environment
         public float IdealHumidity01 { get; }
         public float MinimumFertility01 { get; }
         public string ResourceOutputKey { get; }
+        public string LiveObjectDefinitionKey { get; }
+        public string HarvestObjectDefinitionKey { get; }
         public EnvironmentPlantSeasonalBehavior SeasonalBehavior { get; }
 
         // =============================================================================
@@ -180,6 +185,8 @@ namespace Arcontio.Core.Environment
             float idealHumidity01,
             float minimumFertility01,
             string resourceOutputKey,
+            string liveObjectDefinitionKey,
+            string harvestObjectDefinitionKey,
             EnvironmentPlantSeasonalBehavior seasonalBehavior)
         {
             SpeciesKey = string.IsNullOrWhiteSpace(speciesKey)
@@ -192,6 +199,10 @@ namespace Arcontio.Core.Environment
             IdealHumidity01 = EnvironmentMath.Clamp01(idealHumidity01);
             MinimumFertility01 = EnvironmentMath.Clamp01(minimumFertility01);
             ResourceOutputKey = resourceOutputKey ?? string.Empty;
+            LiveObjectDefinitionKey = liveObjectDefinitionKey ?? string.Empty;
+            HarvestObjectDefinitionKey = string.IsNullOrWhiteSpace(harvestObjectDefinitionKey)
+                ? ResourceOutputKey
+                : harvestObjectDefinitionKey;
             SeasonalBehavior = seasonalBehavior;
         }
 
