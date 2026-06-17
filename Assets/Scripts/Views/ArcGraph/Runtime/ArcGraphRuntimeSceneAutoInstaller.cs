@@ -58,6 +58,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainRuntimeSceneRenderer _terrainRenderer;
         private ArcGraphNpcRuntimeSceneRenderer _npcRenderer;
         private ArcGraphObjectRuntimeSceneRenderer _objectRenderer;
+        private ArcGraphCameraViewportController _cameraViewportController;
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
@@ -231,6 +232,7 @@ namespace Arcontio.View.ArcGraph
             _terrainRenderer = _visualRoot.AddComponent<ArcGraphTerrainRuntimeSceneRenderer>();
             _npcRenderer = _visualRoot.AddComponent<ArcGraphNpcRuntimeSceneRenderer>();
             _objectRenderer = _visualRoot.AddComponent<ArcGraphObjectRuntimeSceneRenderer>();
+            _cameraViewportController = _visualRoot.AddComponent<ArcGraphCameraViewportController>();
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
@@ -309,11 +311,18 @@ namespace Arcontio.View.ArcGraph
             _wrapper.SetNpcRenderer(_npcRenderer);
             _wrapper.SetObjectRenderer(_objectRenderer);
             _wrapper.SetInteractionWrapper(_interactionWrapper);
+            _wrapper.SetCameraViewportController(_cameraViewportController);
             _wrapper.SetViewConfig(_viewConfig);
+            _cameraViewportController.SetConfig(_viewConfig);
+            _cameraViewportController.SetSceneCamera(Camera.main);
+            _cameraViewportController.SetControllerEnabled(true);
+            _cameraViewportController.SetProcessInUpdate(false);
             _interactionWrapper.SetConsumer(_interactionRouter);
             _interactionWrapper.SetConfig(_viewConfig);
+            _interactionWrapper.SetViewState(_cameraViewportController.ViewState);
+            _interactionWrapper.SetViewInputEnabled(false);
             _interactionWrapper.SetSceneCamera(Camera.main);
-            _interactionWrapper.SetSceneCameraZoomSyncEnabled(true);
+            _interactionWrapper.SetSceneCameraZoomSyncEnabled(false);
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
@@ -363,6 +372,9 @@ namespace Arcontio.View.ArcGraph
 
             if (_placementHighlightConsumer != null)
                 _placementHighlightConsumer.SetDevToolsOverlay(devToolsOverlay);
+
+            if (_cameraViewportController != null)
+                _cameraViewportController.SetSceneCamera(Camera.main);
 
             ConfigureLegacyMapGridCameraControllerForArcGraph(cameraController);
 

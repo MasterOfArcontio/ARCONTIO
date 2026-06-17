@@ -40,6 +40,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private ArcGraphNpcRuntimeSceneRenderer npcRenderer;
         [SerializeField] private ArcGraphObjectRuntimeSceneRenderer objectRenderer;
         [SerializeField] private ArcGraphInteractionSceneAdapterWrapper interactionWrapper;
+        [SerializeField] private ArcGraphCameraViewportController cameraViewportController;
         [SerializeField] private bool wrapperEnabled;
         [SerializeField] private bool processInUpdate;
         [SerializeField] private bool refreshSnapshots = true;
@@ -286,6 +287,34 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetCameraViewportController
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna esplicitamente il controller camera/viewport ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: viewport come boundary visuale unico</b></para>
+        /// <para>
+        /// Il wrapper runtime continua a produrre dati e a chiamare renderer, ma il
+        /// controllo della camera resta confinato in un componente dedicato. Questo
+        /// setter permette al wrapper di processare il controller prima del culling
+        /// terrain e di condividere lo stesso <c>ArcGraphViewState</c> con il
+        /// wrapper interattivo.
+        /// </para>
+        /// </summary>
+        public void SetCameraViewportController(ArcGraphCameraViewportController controller)
+        {
+            cameraViewportController = controller;
+
+            if (cameraViewportController != null && _configuredViewConfig != null)
+                cameraViewportController.SetConfig(_configuredViewConfig);
+
+            if (interactionWrapper != null && cameraViewportController != null)
+                interactionWrapper.SetViewState(cameraViewportController.ViewState);
+        }
+
+        // =============================================================================
         // SetViewConfig
         // =============================================================================
         /// <summary>
@@ -311,6 +340,9 @@ namespace Arcontio.View.ArcGraph
             // rendering potrebbero usare profili zoom diversi nello stesso frame.
             if (interactionWrapper != null && config != null)
                 interactionWrapper.SetConfig(config);
+
+            if (cameraViewportController != null && config != null)
+                cameraViewportController.SetConfig(config);
         }
 
         // =============================================================================
@@ -425,6 +457,7 @@ namespace Arcontio.View.ArcGraph
             _currentViewConfig = CreateViewConfigForContext(context);
             if (interactionWrapper != null)
                 interactionWrapper.SetConfig(_currentViewConfig);
+            ProcessCameraViewportFrame();
 
             bool shouldRefreshActorObjectFrame = ShouldRefreshActorObjectFrame();
             var frame = new ArcGraphMinimalRuntimeCoordinatorFrame(
@@ -581,6 +614,8 @@ namespace Arcontio.View.ArcGraph
             // Il wrapper interattivo riceve solo config view e queue gia' derivate.
             // Non riceve World, MapGridData o accesso agli adapter.
             interactionWrapper.SetConfig(_currentViewConfig ?? ArcGraphMapViewConfig.CreateDefaultV033());
+            if (cameraViewportController != null)
+                interactionWrapper.SetViewState(cameraViewportController.ViewState);
             interactionWrapper.SetRenderQueue(_coordinator.RenderQueue);
 
             if (enableInteractionWrapperAfterPush)
@@ -602,6 +637,12 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             ArcGraphMapViewConfig viewConfig = _currentViewConfig ?? CreateViewConfigForContext(context);
+            if (cameraViewportController != null)
+            {
+                terrainRenderer.SetVisibleCellRect(cameraViewportController.ResolveVisibleCellRect());
+                return;
+            }
+
             ArcGraphViewState viewState = interactionWrapper != null
                 ? interactionWrapper.ViewState
                 : ArcGraphViewState.CreateDefault(viewConfig);
@@ -617,13 +658,27 @@ namespace Arcontio.View.ArcGraph
 
         private int ResolveEffectiveZoomLevel()
         {
-            ArcGraphViewState viewState = interactionWrapper != null
+            ArcGraphViewState viewState = cameraViewportController != null
+                ? cameraViewportController.ViewState
+                : interactionWrapper != null
                 ? interactionWrapper.ViewState
                 : null;
 
             return viewState != null
                 ? viewState.ActiveZoomLevel
                 : zoomLevel;
+        }
+
+        private void ProcessCameraViewportFrame()
+        {
+            if (cameraViewportController == null)
+                return;
+
+            cameraViewportController.SetConfig(_currentViewConfig ?? ArcGraphMapViewConfig.CreateDefaultV033());
+            cameraViewportController.ProcessCurrentFrame();
+
+            if (interactionWrapper != null)
+                interactionWrapper.SetViewState(cameraViewportController.ViewState);
         }
 
         private ArcGraphMapViewConfig CreateViewConfigForContext(ArcGraphRuntimeContext context)

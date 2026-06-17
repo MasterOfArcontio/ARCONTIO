@@ -109,6 +109,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool processInUpdate;
         [SerializeField] private bool dispatchToConsumer;
         [SerializeField] private bool logDiagnostics;
+        [SerializeField] private bool viewInputEnabled = true;
         [SerializeField] private bool useScreenAsViewport = true;
         [SerializeField] private int manualViewportPixelWidth = 1920;
         [SerializeField] private int manualViewportPixelHeight = 1080;
@@ -309,6 +310,28 @@ namespace Arcontio.View.ArcGraph
         public void SetSceneCameraZoomSyncEnabled(bool enabled)
         {
             syncSceneCameraZoomToViewState = enabled;
+        }
+
+        // =============================================================================
+        // SetViewInputEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita l'applicazione di pan e zoom dentro il contratto
+        /// interattivo.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: camera controller separato dal picking</b></para>
+        /// <para>
+        /// Durante il passaggio al COCC, il wrapper interattivo deve continuare a
+        /// leggere puntatore e click per hover, HUD e selezione, ma non deve piu'
+        /// cambiare lo <c>ArcGraphViewState</c> con rotellina o drag. In questo
+        /// modo esiste un solo proprietario effettivo di zoom, pan e clamp camera.
+        /// </para>
+        /// </summary>
+        public void SetViewInputEnabled(bool enabled)
+        {
+            viewInputEnabled = enabled;
         }
 
         // =============================================================================
@@ -594,8 +617,6 @@ namespace Arcontio.View.ArcGraph
 
             Vector2 position = mouse.position.ReadValue();
             Vector2 delta = mouse.delta.ReadValue();
-            float scrollY = mouse.scroll.ReadValue().y;
-            int wheelStepDelta = ResolveWheelStep(scrollY);
             bool isPointerOverUi = EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
 
             // Durante il soft retirement di MapGrid conserviamo il gesto pratico
@@ -603,18 +624,23 @@ namespace Arcontio.View.ArcGraph
             // ArcGraph riceve comunque un input astratto di pan, senza conoscere
             // quale tasto fisico lo ha prodotto.
             bool isPanButtonHeld =
-                mouse.middleButton.isPressed ||
-                mouse.rightButton.isPressed;
+                viewInputEnabled &&
+                (mouse.middleButton.isPressed ||
+                 mouse.rightButton.isPressed);
 
             Vector2 viewportPoint = useScreenAsViewport
                 ? position
                 : position - manualViewportOriginPixels;
 
+            int wheelStepDelta = viewInputEnabled
+                ? ResolveWheelStep(mouse.scroll.ReadValue().y)
+                : 0;
+
             return new ArcGraphViewInputFrame(
                 wheelStepDelta,
                 isPanButtonHeld,
-                delta.x,
-                delta.y,
+                viewInputEnabled ? delta.x : 0f,
+                viewInputEnabled ? delta.y : 0f,
                 viewportPoint.x,
                 viewportPoint.y,
                 true,
