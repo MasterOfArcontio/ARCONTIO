@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Arcontio.Core.Environment
@@ -28,6 +29,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>removeDeadPlants</b>: gate per rimozione piante morte.</item>
     /// </list>
     /// </summary>
+    [Serializable]
     public sealed class EnvironmentNaturalGrowthConfig
     {
         public bool allowNewPlantInstances = true;
@@ -37,6 +39,64 @@ namespace Arcontio.Core.Environment
         public float healthRecoveryStep01 = 0.04f;
         public float healthStressStep01 = 0.06f;
         public bool removeDeadPlants = false;
+        public float seedBankHumidityWeight01 = 0.45f;
+        public float seedBankPrecipitationWeight01 = 0.25f;
+        public float seedBankBiomeMoistureWeight01 = 0.30f;
+        public float seedBankVegetationDensityWeight01 = 0.25f;
+        public float seedBankVegetationHealthWeight01 = 0.30f;
+        public float seedBankMoistureWeight01 = 0.25f;
+        public float seedBankSeasonSupportWeight01 = 0.20f;
+        public float seedBankDroughtStressScale01 = 0.35f;
+        public float seedBankTargetAmountBase01 = 0.45f;
+        public float seedBankTargetAmountSupportScale01 = 0.55f;
+        public float seedBankTargetViabilityBase01 = 0.35f;
+        public float seedBankTargetViabilityVegetationScale01 = 0.65f;
+        public float seedBankViabilityDroughtStressScale01 = 0.45f;
+        public float seedBankRecoveryBase01 = 0.010f;
+        public float seedBankRecoveryBiomeScale01 = 0.035f;
+        public float plantAridityHealthStressScale01 = 0.014f;
+        public float plantOvercrowdingStart01 = 0.55f;
+        public float plantOvercrowdingStressScale01 = 0.080f;
+        public float plantDesiredOverageStressScale01 = 0.045f;
+        public float plantAgeStressScale01 = 0.008f;
+        public float effectiveCapacityDensityWeight01 = 0.65f;
+        public float effectiveCapacityHealthWeight01 = 0.25f;
+        public float effectiveCapacityFertilityWeight01 = 0.10f;
+        public float effectiveCapacityBase01 = 0.08f;
+        public float effectiveCapacityHabitatScale01 = 0.72f;
+        public float desiredDensityWeight01 = 0.42f;
+        public float desiredHealthWeight01 = 0.25f;
+        public float desiredFertilityWeight01 = 0.12f;
+        public float desiredSeedSupportWeight01 = 0.14f;
+        public float desiredSeasonSupportWeight01 = 0.07f;
+        public float desiredClimateStressScale01 = 0.25f;
+        public float desiredPlantBase01 = 0.08f;
+        public float desiredPlantHabitatScale01 = 0.90f;
+        public float recruitmentScoreWeight01 = 0.55f;
+        public float recruitmentSeedAmountWeight01 = 0.25f;
+        public float recruitmentSeedViabilityWeight01 = 0.20f;
+        public float recruitmentDeficitWeight01 = 0.36f;
+        public float recruitmentOccupancyPenalty01 = 0.44f;
+        public float recruitmentChanceScale01 = 0.32f;
+        public float germinationSeedAmountWeight01 = 0.20f;
+        public float germinationSeedViabilityWeight01 = 0.20f;
+        public float germinationFertilityWeight01 = 0.18f;
+        public float germinationVegetationHealthWeight01 = 0.12f;
+        public float germinationTemperatureFitWeight01 = 0.10f;
+        public float germinationHumidityFitWeight01 = 0.10f;
+        public float germinationSeasonWeight01 = 0.07f;
+        public float germinationSeasonBiasWeight01 = 0.03f;
+        public float unfavorableSeasonFallbackStressMultiplier01 = 1.00f;
+        public float perennialDormancyStressMultiplier01 = 0.28f;
+        public float deciduousDormancyStressMultiplier01 = 0.18f;
+        public float evergreenDormancyStressMultiplier01 = 0.12f;
+        public float mortalityHealthThreshold01 = 0.14f;
+        public float mortalityEmptyDesiredPressure01 = 0.35f;
+        public float mortalityAridityWeight01 = 0.22f;
+        public float mortalitySeasonStressWeight01 = 0.14f;
+        public float mortalityDesiredPressureWeight01 = 0.24f;
+        public float mortalityBaseChance01 = 0.006f;
+        public float mortalityStressChanceScale01 = 0.045f;
     }
 
     // =============================================================================
@@ -322,19 +382,24 @@ namespace Arcontio.Core.Environment
                         seasonProfile,
                         transition,
                         biomeProfile,
+                        config,
                         out int visited);
                     seedEntriesVisited += visited;
                     seedBanksUpdated++;
                     nextState.SetSeedBankArea(nextSeedBank);
 
                     int plantCountForArea = CountPlantsForArea(snapshot, area.Definition.AreaId);
-                    int effectivePlantCapacity = ResolveEffectivePlantCapacity(evolved, biomeProfile);
+                    int effectivePlantCapacity = ResolveEffectivePlantCapacity(
+                        evolved,
+                        biomeProfile,
+                        config);
                     int desiredPlantCount = ResolveDesiredPlantCount(
                         evolved,
                         nextSeedBank,
                         climate,
                         seasonProfile,
                         biomeProfile,
+                        config,
                         effectivePlantCapacity);
                     if (config.allowNewPlantInstances
                         && transition.DayChanged
@@ -397,6 +462,7 @@ namespace Arcontio.Core.Environment
             EnvironmentSeasonProfile seasonProfile,
             EnvironmentTemporalTransition transition,
             EnvironmentBiomeProfile biomeProfile,
+            EnvironmentNaturalGrowthConfig config,
             out int entriesVisited)
         {
             var entries = seedBank?.Entries ?? new EnvironmentSeedBankEntry[0];
@@ -406,27 +472,33 @@ namespace Arcontio.Core.Environment
             for (int i = 0; i < entries.Count; i++)
             {
                 var entry = entries[i];
-                float biomeMoisture = (climate.Humidity01 * 0.45f)
-                                      + (climate.Weather.Precipitation01 * 0.25f)
-                                      + (biomeProfile.BaseMoisture01 * 0.30f);
+                float biomeMoisture =
+                    (climate.Humidity01 * EnvironmentMath.Clamp01(config.seedBankHumidityWeight01))
+                    + (climate.Weather.Precipitation01 * EnvironmentMath.Clamp01(config.seedBankPrecipitationWeight01))
+                    + (biomeProfile.BaseMoisture01 * EnvironmentMath.Clamp01(config.seedBankBiomeMoistureWeight01));
                 float droughtStress = climate.Aridity01 * (1f - biomeProfile.DroughtResistance01);
                 float seasonSupport = (1f - biomeProfile.Seasonality01)
                                       + (seasonProfile.VegetationGrowthBias01 * biomeProfile.Seasonality01);
                 float ecologicalSupport = EnvironmentMath.Clamp01(
-                    (vegetation.Density01 * 0.25f)
-                    + (vegetation.Health01 * 0.30f)
-                    + (biomeMoisture * 0.25f)
-                    + (seasonSupport * 0.20f)
-                    - (droughtStress * biomeProfile.DisturbanceSensitivity01 * 0.35f));
+                    (vegetation.Density01 * EnvironmentMath.Clamp01(config.seedBankVegetationDensityWeight01))
+                    + (vegetation.Health01 * EnvironmentMath.Clamp01(config.seedBankVegetationHealthWeight01))
+                    + (biomeMoisture * EnvironmentMath.Clamp01(config.seedBankMoistureWeight01))
+                    + (seasonSupport * EnvironmentMath.Clamp01(config.seedBankSeasonSupportWeight01))
+                    - (droughtStress
+                       * biomeProfile.DisturbanceSensitivity01
+                       * EnvironmentMath.Clamp01(config.seedBankDroughtStressScale01)));
                 float targetAmount = EnvironmentMath.Clamp01(
                     biomeProfile.TargetSeedBankAmount01
-                    * (0.45f + (ecologicalSupport * 0.55f)));
+                    * (EnvironmentMath.Clamp01(config.seedBankTargetAmountBase01)
+                       + (ecologicalSupport * EnvironmentMath.Clamp01(config.seedBankTargetAmountSupportScale01))));
                 float targetViability = EnvironmentMath.Clamp01(
                     biomeProfile.TargetSeedBankViability01
-                    * (0.35f + (vegetation.Health01 * 0.65f))
-                    * (1f - (droughtStress * 0.45f)));
+                    * (EnvironmentMath.Clamp01(config.seedBankTargetViabilityBase01)
+                       + (vegetation.Health01 * EnvironmentMath.Clamp01(config.seedBankTargetViabilityVegetationScale01)))
+                    * (1f - (droughtStress * EnvironmentMath.Clamp01(config.seedBankViabilityDroughtStressScale01))));
                 float recoveryRate = transition.DayChanged
-                    ? 0.010f + (biomeProfile.NaturalRecoveryRate01 * 0.035f)
+                    ? EnvironmentMath.Clamp01(config.seedBankRecoveryBase01)
+                      + (biomeProfile.NaturalRecoveryRate01 * EnvironmentMath.Clamp01(config.seedBankRecoveryBiomeScale01))
                     : 0f;
                 float nextAmount = Approach01(entry.Amount01, targetAmount, recoveryRate);
                 float nextViability = Approach01(entry.Viability01, targetViability, recoveryRate);
@@ -477,7 +549,8 @@ namespace Arcontio.Core.Environment
                         current.SourceAreaId,
                         climate,
                         seasonProfile,
-                        biomeProfile));
+                        biomeProfile,
+                        config));
 
                 if (!next.IsAlive)
                 {
@@ -518,25 +591,28 @@ namespace Arcontio.Core.Environment
                 healthDelta = favorableSeason
                     ? EnvironmentMath.Clamp01(config.healthRecoveryStep01)
                     : -EnvironmentMath.Clamp01(config.healthStressStep01)
-                      * ResolveUnfavorableSeasonStressMultiplier(species);
+                      * ResolveUnfavorableSeasonStressMultiplier(species, config);
                 healthDelta -= climate.Aridity01
                                * (1f - biomeProfile.DroughtResistance01)
-                               * 0.014f;
+                               * EnvironmentMath.Clamp01(config.plantAridityHealthStressScale01);
 
                 float occupancy01 = biomeProfile.MaxPlantInstancesPerArea <= 0
                     ? 0f
                     : areaPlantCount / (float)biomeProfile.MaxPlantInstancesPerArea;
-                if (occupancy01 > 0.55f)
-                    healthDelta -= (occupancy01 - 0.55f) * 0.080f;
+                float overcrowdingStart01 = EnvironmentMath.Clamp01(config.plantOvercrowdingStart01);
+                if (occupancy01 > overcrowdingStart01)
+                    healthDelta -= (occupancy01 - overcrowdingStart01)
+                                   * EnvironmentMath.Clamp01(config.plantOvercrowdingStressScale01);
 
                 float desiredOccupancy01 = desiredPlantCount <= 0
                     ? 1f
                     : areaPlantCount / (float)desiredPlantCount;
                 if (desiredOccupancy01 > 1f)
-                    healthDelta -= (desiredOccupancy01 - 1f) * 0.045f;
+                    healthDelta -= (desiredOccupancy01 - 1f)
+                                   * EnvironmentMath.Clamp01(config.plantDesiredOverageStressScale01);
 
                 float ageStress = ResolveAgeStress01(nextAge, current.PlantId.Value);
-                healthDelta -= ageStress * 0.008f;
+                healthDelta -= ageStress * EnvironmentMath.Clamp01(config.plantAgeStressScale01);
             }
 
             float nextHealth = current.Health01 + healthDelta;
@@ -548,7 +624,8 @@ namespace Arcontio.Core.Environment
                     seasonProfile,
                     transition,
                     areaPlantCount,
-                    desiredPlantCount))
+                    desiredPlantCount,
+                    config))
             {
                 nextHealth = 0f;
             }
@@ -622,7 +699,8 @@ namespace Arcontio.Core.Environment
                     species,
                     evolved,
                     climate,
-                    seasonProfile);
+                    seasonProfile,
+                    config);
                 if (score < EnvironmentMath.Clamp01(config.minimumGerminationScore01))
                     continue;
 
@@ -633,7 +711,8 @@ namespace Arcontio.Core.Environment
                     plantCountForArea,
                     desiredPlantCount,
                     effectivePlantCapacity,
-                    alreadyCreatedToday))
+                    alreadyCreatedToday,
+                    config))
                 {
                     continue;
                 }
@@ -666,7 +745,8 @@ namespace Arcontio.Core.Environment
             int plantCountForArea,
             int desiredPlantCount,
             int effectivePlantCapacity,
-            int alreadyCreatedToday)
+            int alreadyCreatedToday,
+            EnvironmentNaturalGrowthConfig config)
         {
             if (effectivePlantCapacity <= 0
                 || desiredPlantCount <= 0
@@ -680,11 +760,11 @@ namespace Arcontio.Core.Environment
             float deficit01 = EnvironmentMath.Clamp01(
                 (desiredPlantCount - plantCountForArea) / (float)desiredPlantCount);
             float recruitmentPressure = EnvironmentMath.Clamp01(
-                (score * 0.55f)
-                + (entry.Amount01 * 0.25f)
-                + (entry.Viability01 * 0.20f)
-                + (deficit01 * 0.36f)
-                - (occupancy01 * 0.44f));
+                (score * EnvironmentMath.Clamp01(config.recruitmentScoreWeight01))
+                + (entry.Amount01 * EnvironmentMath.Clamp01(config.recruitmentSeedAmountWeight01))
+                + (entry.Viability01 * EnvironmentMath.Clamp01(config.recruitmentSeedViabilityWeight01))
+                + (deficit01 * EnvironmentMath.Clamp01(config.recruitmentDeficitWeight01))
+                - (occupancy01 * EnvironmentMath.Clamp01(config.recruitmentOccupancyPenalty01)));
             float roll = Hash01(
                 transition.Current.Date.Year,
                 transition.Current.Date.DayOfYear,
@@ -692,7 +772,7 @@ namespace Arcontio.Core.Environment
 
             // Il recruitment e' deterministico ma probabilistico: non crea una pianta
             // ogni giorno buono fino al cap, permettendo curve piu' naturali.
-            return roll < recruitmentPressure * 0.32f;
+            return roll < recruitmentPressure * EnvironmentMath.Clamp01(config.recruitmentChanceScale01);
         }
 
         private static float ComputeGerminationScore(
@@ -700,7 +780,8 @@ namespace Arcontio.Core.Environment
             EnvironmentPlantSpeciesDefinition species,
             EnvironmentAreaEvolutionResult evolved,
             EnvironmentGlobalClimateState climate,
-            EnvironmentSeasonProfile seasonProfile)
+            EnvironmentSeasonProfile seasonProfile,
+            EnvironmentNaturalGrowthConfig config)
         {
             float speciesSeason = species.IsSeasonFavorable(climate.Season) ? 1f : 0.35f;
             float fertility = evolved.Fertility.CurrentFertility01 >= species.MinimumFertility01
@@ -710,14 +791,14 @@ namespace Arcontio.Core.Environment
             float humidityFit = 1f - System.Math.Abs(climate.Humidity01 - species.IdealHumidity01);
 
             return EnvironmentMath.Clamp01(
-                (entry.Amount01 * 0.20f)
-                + (entry.Viability01 * 0.20f)
-                + (fertility * 0.18f)
-                + (evolved.Vegetation.Health01 * 0.12f)
-                + (climateFit * 0.10f)
-                + (humidityFit * 0.10f)
-                + (speciesSeason * 0.07f)
-                + (seasonProfile.VegetationGrowthBias01 * 0.03f));
+                (entry.Amount01 * EnvironmentMath.Clamp01(config.germinationSeedAmountWeight01))
+                + (entry.Viability01 * EnvironmentMath.Clamp01(config.germinationSeedViabilityWeight01))
+                + (fertility * EnvironmentMath.Clamp01(config.germinationFertilityWeight01))
+                + (evolved.Vegetation.Health01 * EnvironmentMath.Clamp01(config.germinationVegetationHealthWeight01))
+                + (climateFit * EnvironmentMath.Clamp01(config.germinationTemperatureFitWeight01))
+                + (humidityFit * EnvironmentMath.Clamp01(config.germinationHumidityFitWeight01))
+                + (speciesSeason * EnvironmentMath.Clamp01(config.germinationSeasonWeight01))
+                + (seasonProfile.VegetationGrowthBias01 * EnvironmentMath.Clamp01(config.germinationSeasonBiasWeight01)));
         }
 
         private static EnvironmentCellCoord ChooseDeterministicPlantCell(
@@ -768,17 +849,19 @@ namespace Arcontio.Core.Environment
 
         private static int ResolveEffectivePlantCapacity(
             EnvironmentAreaEvolutionResult evolved,
-            EnvironmentBiomeProfile biomeProfile)
+            EnvironmentBiomeProfile biomeProfile,
+            EnvironmentNaturalGrowthConfig config)
         {
             int max = biomeProfile.MaxPlantInstancesPerArea;
             if (max <= 0)
                 return 0;
 
             float habitat01 = EnvironmentMath.Clamp01(
-                (evolved.Vegetation.Density01 * 0.65f)
-                + (evolved.Vegetation.Health01 * 0.25f)
-                + (evolved.Fertility.CurrentFertility01 * 0.10f));
-            float capacity01 = 0.08f + (habitat01 * 0.72f);
+                (evolved.Vegetation.Density01 * EnvironmentMath.Clamp01(config.effectiveCapacityDensityWeight01))
+                + (evolved.Vegetation.Health01 * EnvironmentMath.Clamp01(config.effectiveCapacityHealthWeight01))
+                + (evolved.Fertility.CurrentFertility01 * EnvironmentMath.Clamp01(config.effectiveCapacityFertilityWeight01)));
+            float capacity01 = EnvironmentMath.Clamp01(config.effectiveCapacityBase01)
+                               + (habitat01 * EnvironmentMath.Clamp01(config.effectiveCapacityHabitatScale01));
             return System.Math.Max(1, (int)System.Math.Round(max * capacity01));
         }
 
@@ -788,6 +871,7 @@ namespace Arcontio.Core.Environment
             EnvironmentGlobalClimateState climate,
             EnvironmentSeasonProfile seasonProfile,
             EnvironmentBiomeProfile biomeProfile,
+            EnvironmentNaturalGrowthConfig config,
             int effectivePlantCapacity)
         {
             if (effectivePlantCapacity <= 0)
@@ -798,14 +882,17 @@ namespace Arcontio.Core.Environment
                                   + (seasonProfile.VegetationGrowthBias01 * biomeProfile.Seasonality01);
             float climateStress = climate.Aridity01 * (1f - biomeProfile.DroughtResistance01);
             float habitat01 = EnvironmentMath.Clamp01(
-                (evolved.Vegetation.Density01 * 0.42f)
-                + (evolved.Vegetation.Health01 * 0.25f)
-                + (evolved.Fertility.CurrentFertility01 * 0.12f)
-                + (seedSupport * 0.14f)
-                + (seasonSupport * 0.07f)
-                - (climateStress * 0.25f));
+                (evolved.Vegetation.Density01 * EnvironmentMath.Clamp01(config.desiredDensityWeight01))
+                + (evolved.Vegetation.Health01 * EnvironmentMath.Clamp01(config.desiredHealthWeight01))
+                + (evolved.Fertility.CurrentFertility01 * EnvironmentMath.Clamp01(config.desiredFertilityWeight01))
+                + (seedSupport * EnvironmentMath.Clamp01(config.desiredSeedSupportWeight01))
+                + (seasonSupport * EnvironmentMath.Clamp01(config.desiredSeasonSupportWeight01))
+                - (climateStress * EnvironmentMath.Clamp01(config.desiredClimateStressScale01)));
             float desired01 = EnvironmentMath.Clamp01(
-                0.08f + (habitat01 * biomeProfile.TargetVegetationDensity01 * 0.90f));
+                EnvironmentMath.Clamp01(config.desiredPlantBase01)
+                + (habitat01
+                   * biomeProfile.TargetVegetationDensity01
+                   * EnvironmentMath.Clamp01(config.desiredPlantHabitatScale01)));
 
             // Il numero desiderato e' volutamente piu' basso del limite massimo:
             // PlantInstance rappresenta piante importanti/leggibili, non tutta la
@@ -818,7 +905,8 @@ namespace Arcontio.Core.Environment
             EnvironmentAreaId areaId,
             EnvironmentGlobalClimateState climate,
             EnvironmentSeasonProfile seasonProfile,
-            EnvironmentBiomeProfile biomeProfile)
+            EnvironmentBiomeProfile biomeProfile,
+            EnvironmentNaturalGrowthConfig config)
         {
             var areas = snapshot?.Areas ?? new EnvironmentAreaSnapshot[0];
             for (int i = 0; i < areas.Count; i++)
@@ -832,7 +920,7 @@ namespace Arcontio.Core.Environment
                     area.HasWater ? area.WaterState : CreateNeutralWater(areaId),
                     area.HasVegetation ? area.VegetationState : CreateNeutralVegetation(areaId),
                     new EnvironmentAreaEvolutionDelta(0f, 0f, 0f, 0f));
-                int capacity = ResolveEffectivePlantCapacity(evolved, biomeProfile);
+                int capacity = ResolveEffectivePlantCapacity(evolved, biomeProfile, config);
                 var seedBank = area.HasSeedBank
                     ? area.SeedBankState
                     : new EnvironmentSeedBankAreaState(areaId, new EnvironmentSeedBankEntry[0]);
@@ -842,6 +930,7 @@ namespace Arcontio.Core.Environment
                     climate,
                     seasonProfile,
                     biomeProfile,
+                    config,
                     capacity);
             }
 
@@ -874,24 +963,25 @@ namespace Arcontio.Core.Environment
         }
 
         private static float ResolveUnfavorableSeasonStressMultiplier(
-            EnvironmentPlantSpeciesDefinition species)
+            EnvironmentPlantSpeciesDefinition species,
+            EnvironmentNaturalGrowthConfig config)
         {
             if (species == null)
-                return 1f;
+                return EnvironmentMath.Clamp01(config.unfavorableSeasonFallbackStressMultiplier01);
 
             switch (species.SeasonalBehavior)
             {
                 case EnvironmentPlantSeasonalBehavior.Perennial:
-                    return 0.28f;
+                    return EnvironmentMath.Clamp01(config.perennialDormancyStressMultiplier01);
 
                 case EnvironmentPlantSeasonalBehavior.Deciduous:
-                    return 0.18f;
+                    return EnvironmentMath.Clamp01(config.deciduousDormancyStressMultiplier01);
 
                 case EnvironmentPlantSeasonalBehavior.Evergreen:
-                    return 0.12f;
+                    return EnvironmentMath.Clamp01(config.evergreenDormancyStressMultiplier01);
 
                 default:
-                    return 1f;
+                    return EnvironmentMath.Clamp01(config.unfavorableSeasonFallbackStressMultiplier01);
             }
         }
 
@@ -902,20 +992,22 @@ namespace Arcontio.Core.Environment
             EnvironmentSeasonProfile seasonProfile,
             EnvironmentTemporalTransition transition,
             int areaPlantCount,
-            int desiredPlantCount)
+            int desiredPlantCount,
+            EnvironmentNaturalGrowthConfig config)
         {
-            if (!current.IsAlive || nextHealth > 0.14f)
+            if (!current.IsAlive || nextHealth > EnvironmentMath.Clamp01(config.mortalityHealthThreshold01))
                 return false;
 
             float desiredPressure = desiredPlantCount <= 0
-                ? 0.35f
+                ? EnvironmentMath.Clamp01(config.mortalityEmptyDesiredPressure01)
                 : EnvironmentMath.Clamp01((areaPlantCount - desiredPlantCount) / (float)desiredPlantCount);
             float stress01 = EnvironmentMath.Clamp01(
                 (1f - EnvironmentMath.Clamp01(nextHealth))
-                + (climate.Aridity01 * 0.22f)
-                + ((1f - seasonProfile.VegetationGrowthBias01) * 0.14f)
-                + (desiredPressure * 0.24f));
-            float mortalityChance = 0.006f + (stress01 * 0.045f);
+                + (climate.Aridity01 * EnvironmentMath.Clamp01(config.mortalityAridityWeight01))
+                + ((1f - seasonProfile.VegetationGrowthBias01) * EnvironmentMath.Clamp01(config.mortalitySeasonStressWeight01))
+                + (desiredPressure * EnvironmentMath.Clamp01(config.mortalityDesiredPressureWeight01)));
+            float mortalityChance = EnvironmentMath.Clamp01(config.mortalityBaseChance01)
+                                    + (stress01 * EnvironmentMath.Clamp01(config.mortalityStressChanceScale01));
             float roll = Hash01(
                 transition.Current.Date.Year,
                 transition.Current.Date.DayOfYear,

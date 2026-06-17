@@ -17,11 +17,13 @@
       "maxPlantInstancesPerArea": 96,
       "allowedPlantSpeciesKeys": [
         "wild_grass",
-        "oak_tree"
+        "oak_tree",
+        "berry_bush"
       ],
       "preferredSeedBankSpeciesKeys": [
         "wild_grass",
-        "oak_tree"
+        "oak_tree",
+        "berry_bush"
       ]
     },
     {
@@ -40,10 +42,12 @@
       "disturbanceSensitivity01": 0.30,
       "maxPlantInstancesPerArea": 20,
       "allowedPlantSpeciesKeys": [
-        "wild_grass"
+        "desert_shrub",
+        "cactus"
       ],
       "preferredSeedBankSpeciesKeys": [
-        "wild_grass"
+        "desert_shrub",
+        "cactus"
       ]
     },
     {
@@ -62,12 +66,12 @@
       "disturbanceSensitivity01": 0.72,
       "maxPlantInstancesPerArea": 180,
       "allowedPlantSpeciesKeys": [
-        "wild_grass",
-        "oak_tree"
+        "jungle_fern",
+        "jungle_tree"
       ],
       "preferredSeedBankSpeciesKeys": [
-        "oak_tree",
-        "wild_grass"
+        "jungle_tree",
+        "jungle_fern"
       ]
     },
     {
@@ -86,10 +90,12 @@
       "disturbanceSensitivity01": 0.56,
       "maxPlantInstancesPerArea": 36,
       "allowedPlantSpeciesKeys": [
-        "wild_grass"
+        "tundra_moss",
+        "lichen"
       ],
       "preferredSeedBankSpeciesKeys": [
-        "wild_grass"
+        "tundra_moss",
+        "lichen"
       ]
     }
   ]

@@ -112,11 +112,13 @@ namespace Arcontio.Core.Environment
     /// DTO serializzabile di una specie vegetale importante.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: specie separata da item e oggetti</b></para>
+    /// <para><b>Principio architetturale: specie separata ma collegabile agli oggetti</b></para>
     /// <para>
-    /// Una specie non e' un oggetto raccoglibile e non e' una risorsa posseduta. Il
-    /// campo <c>resourceOutputKey</c> e' solo una promessa dati per sistemi futuri,
-    /// cosi' il catalogo resta indipendente da inventario, economia e rendering.
+    /// Una specie non duplica <c>ObjectDef</c>: descrive biologia, stadi e requisiti
+    /// ecologici. Quando una pianta viva o un raccolto dovranno diventare oggetti
+    /// del mondo, questa configurazione conservera' soltanto le chiavi ponte verso
+    /// il catalogo oggetti, lasciando a <c>object_defs.json</c> l'autorita' su
+    /// sprite, ingombro, interazione e proprieta' materiali.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -127,6 +129,8 @@ namespace Arcontio.Core.Environment
     ///   <item><b>favorableSeasons</b>: nomi stagione favorevoli.</item>
     ///   <item><b>idealTemperature01/idealHumidity01/minimumFertility01</b>: requisiti ecologici.</item>
     ///   <item><b>resourceOutputKey</b>: output futuro dichiarativo.</item>
+    ///   <item><b>liveObjectDefinitionKey</b>: ObjectDef futuro per la pianta viva, se materializzata.</item>
+    ///   <item><b>harvestObjectDefinitionKey</b>: ObjectDef futuro per il prodotto raccolto, se materializzato.</item>
     ///   <item><b>seasonalBehavior</b>: comportamento stagionale configurabile.</item>
     /// </list>
     /// </summary>
@@ -142,6 +146,8 @@ namespace Arcontio.Core.Environment
         public float idealHumidity01 = 0.55f;
         public float minimumFertility01 = 0.25f;
         public string resourceOutputKey = string.Empty;
+        public string liveObjectDefinitionKey = string.Empty;
+        public string harvestObjectDefinitionKey = string.Empty;
         public string seasonalBehavior = "Perennial";
 
         // =============================================================================
@@ -175,6 +181,8 @@ namespace Arcontio.Core.Environment
                 idealHumidity01,
                 minimumFertility01,
                 resourceOutputKey,
+                liveObjectDefinitionKey,
+                harvestObjectDefinitionKey,
                 EnvironmentPlantCatalogParsing.ParseSeasonalBehavior(seasonalBehavior));
         }
 
@@ -192,6 +200,7 @@ namespace Arcontio.Core.Environment
                     idealHumidity01 = 0.55f,
                     minimumFertility01 = 0.20f,
                     resourceOutputKey = "grass_cuttings",
+                    harvestObjectDefinitionKey = "grass_cuttings",
                     seasonalBehavior = "Perennial"
                 },
                 new EnvironmentPlantSpeciesConfig
@@ -225,6 +234,7 @@ namespace Arcontio.Core.Environment
                     idealHumidity01 = 0.65f,
                     minimumFertility01 = 0.55f,
                     resourceOutputKey = "wood",
+                    harvestObjectDefinitionKey = "wood",
                     seasonalBehavior = "Deciduous"
                 }
             };

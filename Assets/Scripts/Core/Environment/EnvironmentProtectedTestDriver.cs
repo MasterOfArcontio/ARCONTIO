@@ -299,6 +299,8 @@ namespace Arcontio.Core.Environment
         private EnvironmentState _state;
         private EnvironmentSnapshot _snapshot;
         private EnvironmentPlantCatalog _plantCatalog;
+        private EnvironmentPlantCatalog _externalPlantCatalog;
+        private EnvironmentNaturalGrowthConfig _naturalGrowthConfig = new EnvironmentNaturalGrowthConfig();
         private EnvironmentFullSnapshot _fullSnapshot;
         private EnvironmentFoundationBootstrapResult _bootstrap;
         private EnvironmentProtectedTestAdvanceReport _lastReport;
@@ -340,7 +342,9 @@ namespace Arcontio.Core.Environment
             _bootstrap = EnvironmentFoundationBootstrap.Bootstrap(_config);
             _state = _bootstrap.Build.State ?? new EnvironmentState();
             _snapshot = _state.CreateSnapshot();
-            _plantCatalog = _bootstrap.PlantCatalog ?? new EnvironmentPlantCatalog(null);
+            _plantCatalog = _externalPlantCatalog
+                            ?? _bootstrap.PlantCatalog
+                            ?? new EnvironmentPlantCatalog(null);
             _fullSnapshot = EnvironmentReadOnlySnapshotResolver.BuildFullSnapshot(_snapshot);
             _fractionalTicks = 0d;
             _lastReport = CreateIdleReport(_snapshot.Calendar.ElapsedEnvironmentTicks);
@@ -385,6 +389,42 @@ namespace Arcontio.Core.Environment
         public void SetBiomeCatalog(EnvironmentBiomeCatalog biomeCatalog)
         {
             _biomeCatalog = biomeCatalog ?? EnvironmentBiomeCatalog.CreateDefault();
+        }
+
+        // =============================================================================
+        // SetPlantCatalog
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce il catalogo biologico delle specie usato dallo scenario protetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: catalogo piante esterno al bootstrap world</b></para>
+        /// <para>
+        /// Il driver continua a non leggere file e a non conoscere <c>ObjectDef</c>.
+        /// Un adapter esterno puo' pero' consegnargli un catalogo gia' caricato da
+        /// JSON, cosi' i test protetti esercitano gli stessi dati che useranno i
+        /// futuri sistemi runtime.
+        /// </para>
+        /// </summary>
+        public void SetPlantCatalog(EnvironmentPlantCatalog plantCatalog)
+        {
+            _externalPlantCatalog = plantCatalog;
+            if (IsBootstrapped)
+                _plantCatalog = plantCatalog ?? _bootstrap?.PlantCatalog ?? new EnvironmentPlantCatalog(null);
+        }
+
+        // =============================================================================
+        // SetNaturalGrowthConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce i coefficienti fini della crescita naturale protetta.
+        /// </para>
+        /// </summary>
+        public void SetNaturalGrowthConfig(EnvironmentNaturalGrowthConfig naturalGrowthConfig)
+        {
+            _naturalGrowthConfig = naturalGrowthConfig ?? new EnvironmentNaturalGrowthConfig();
         }
 
         // =============================================================================
@@ -664,6 +704,48 @@ namespace Arcontio.Core.Environment
                                 speciesKey = "oak_tree",
                                 amount01 = 0.28f,
                                 viability01 = 0.66f
+                            },
+                            new EnvironmentSeedBankEntryConfig
+                            {
+                                speciesKey = "berry_bush",
+                                amount01 = 0.34f,
+                                viability01 = 0.64f
+                            },
+                            new EnvironmentSeedBankEntryConfig
+                            {
+                                speciesKey = "desert_shrub",
+                                amount01 = 0.30f,
+                                viability01 = 0.70f
+                            },
+                            new EnvironmentSeedBankEntryConfig
+                            {
+                                speciesKey = "cactus",
+                                amount01 = 0.22f,
+                                viability01 = 0.68f
+                            },
+                            new EnvironmentSeedBankEntryConfig
+                            {
+                                speciesKey = "jungle_fern",
+                                amount01 = 0.62f,
+                                viability01 = 0.78f
+                            },
+                            new EnvironmentSeedBankEntryConfig
+                            {
+                                speciesKey = "jungle_tree",
+                                amount01 = 0.42f,
+                                viability01 = 0.72f
+                            },
+                            new EnvironmentSeedBankEntryConfig
+                            {
+                                speciesKey = "tundra_moss",
+                                amount01 = 0.36f,
+                                viability01 = 0.62f
+                            },
+                            new EnvironmentSeedBankEntryConfig
+                            {
+                                speciesKey = "lichen",
+                                amount01 = 0.28f,
+                                viability01 = 0.58f
                             }
                         }
                     }
@@ -726,7 +808,7 @@ namespace Arcontio.Core.Environment
                     advance.Transition,
                     advance.Climate,
                     advance.SeasonProfile,
-                    null,
+                    _naturalGrowthConfig,
                     BiomeProfile);
                 _state = growth.State;
                 _snapshot = _state.CreateSnapshot();

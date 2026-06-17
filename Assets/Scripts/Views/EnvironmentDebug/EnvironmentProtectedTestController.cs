@@ -44,6 +44,8 @@ namespace Arcontio.View.EnvironmentDebug
         private const int ExportGraphHeight = 720;
         private const float PlantGraphScale = 24f;
         private const string BiomeConfigResourcePath = "Arcontio/Config/environment_biomes";
+        private const string PlantCatalogResourcePath = "Arcontio/Config/environment_plants";
+        private const string NaturalGrowthConfigResourcePath = "Arcontio/Config/environment_natural_growth";
 
         [SerializeField] private bool controllerEnabled;
         [SerializeField] private bool processInUpdate;
@@ -71,9 +73,13 @@ namespace Arcontio.View.EnvironmentDebug
         private EnvironmentProtectedTelemetrySample[] _telemetrySamples;
         private Texture2D _graphPixel;
         private EnvironmentBiomeCatalog _biomeCatalog;
+        private EnvironmentPlantCatalog _plantCatalog;
+        private EnvironmentNaturalGrowthConfig _naturalGrowthConfig;
         private string _lastGraphExportPath = string.Empty;
         private string _lastGraphExportStatus = string.Empty;
         private string _biomeConfigStatus = string.Empty;
+        private string _plantCatalogStatus = string.Empty;
+        private string _naturalGrowthConfigStatus = string.Empty;
         private Vector2 _scroll;
         private int _telemetryStart;
         private int _telemetryCount;
@@ -347,6 +353,10 @@ namespace Arcontio.View.EnvironmentDebug
             GUILayout.Label("Biome attivo: " + _driver.BiomeProfile.BiomeKey);
             if (!string.IsNullOrWhiteSpace(_biomeConfigStatus))
                 GUILayout.Label(_biomeConfigStatus);
+            if (!string.IsNullOrWhiteSpace(_plantCatalogStatus))
+                GUILayout.Label(_plantCatalogStatus);
+            if (!string.IsNullOrWhiteSpace(_naturalGrowthConfigStatus))
+                GUILayout.Label(_naturalGrowthConfigStatus);
             GUILayout.Label(
                 "Specie bioma: "
                 + FormatSpeciesKeys(_driver.BiomeProfile.AllowedPlantSpeciesKeys));
@@ -961,7 +971,11 @@ namespace Arcontio.View.EnvironmentDebug
 
             _driver = new EnvironmentProtectedTestDriver();
             EnsureBiomeCatalogLoaded();
+            EnsurePlantCatalogLoaded();
+            EnsureNaturalGrowthConfigLoaded();
             _driver.SetBiomeCatalog(_biomeCatalog);
+            _driver.SetPlantCatalog(_plantCatalog);
+            _driver.SetNaturalGrowthConfig(_naturalGrowthConfig);
             _driver.SetBiomePreset(biomePreset);
             _driver.Bootstrap();
             _lastReport = _driver.LastReport;
@@ -1001,6 +1015,84 @@ namespace Arcontio.View.EnvironmentDebug
             {
                 _biomeCatalog = EnvironmentBiomeCatalog.CreateDefault();
                 _biomeConfigStatus = "Biome config fallback: " + exception.Message;
+            }
+        }
+
+        // =============================================================================
+        // EnsurePlantCatalogLoaded
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica il catalogo biologico delle specie dal file Resources protetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: nessun catalogo oggetti duplicato</b></para>
+        /// <para>
+        /// Il JSON delle piante descrive solo parametri biologici e chiavi ponte
+        /// opzionali verso <c>object_defs</c>. Il controller non valida ancora quelle
+        /// chiavi contro il World per restare isolato dal runtime stabile.
+        /// </para>
+        /// </summary>
+        private void EnsurePlantCatalogLoaded()
+        {
+            if (_plantCatalog != null)
+                return;
+
+            var asset = Resources.Load<TextAsset>(PlantCatalogResourcePath);
+            if (asset == null)
+            {
+                _plantCatalog = new EnvironmentPlantCatalogConfig().ToCatalog();
+                _plantCatalogStatus = "Plant catalog: default interno";
+                return;
+            }
+
+            try
+            {
+                var config = JsonUtility.FromJson<EnvironmentPlantCatalogConfig>(asset.text)
+                             ?? new EnvironmentPlantCatalogConfig();
+                _plantCatalog = config.ToCatalog();
+                _plantCatalogStatus = "Plant catalog: Resources/" + PlantCatalogResourcePath + ".json";
+            }
+            catch (Exception exception)
+            {
+                _plantCatalog = new EnvironmentPlantCatalogConfig().ToCatalog();
+                _plantCatalogStatus = "Plant catalog fallback: " + exception.Message;
+            }
+        }
+
+        // =============================================================================
+        // EnsureNaturalGrowthConfigLoaded
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica i coefficienti fini del ciclo naturale dal file Resources protetto.
+        /// </para>
+        /// </summary>
+        private void EnsureNaturalGrowthConfigLoaded()
+        {
+            if (_naturalGrowthConfig != null)
+                return;
+
+            var asset = Resources.Load<TextAsset>(NaturalGrowthConfigResourcePath);
+            if (asset == null)
+            {
+                _naturalGrowthConfig = new EnvironmentNaturalGrowthConfig();
+                _naturalGrowthConfigStatus = "Growth config: default interno";
+                return;
+            }
+
+            try
+            {
+                _naturalGrowthConfig =
+                    JsonUtility.FromJson<EnvironmentNaturalGrowthConfig>(asset.text)
+                    ?? new EnvironmentNaturalGrowthConfig();
+                _naturalGrowthConfigStatus =
+                    "Growth config: Resources/" + NaturalGrowthConfigResourcePath + ".json";
+            }
+            catch (Exception exception)
+            {
+                _naturalGrowthConfig = new EnvironmentNaturalGrowthConfig();
+                _naturalGrowthConfigStatus = "Growth config fallback: " + exception.Message;
             }
         }
 
