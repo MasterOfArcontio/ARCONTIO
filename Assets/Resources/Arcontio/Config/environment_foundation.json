@@ -1,0 +1,173 @@
+{
+  "schemaVersion": 1,
+  "configKey": "runtime_environment_baseline",
+  "initialEnvironmentTicks": 0,
+  "calendar": {
+    "hoursPerDay": 24,
+    "calendarTicksPerSimulatedHour": 50,
+    "daysPerMonth": 25,
+    "monthsPerYear": 12,
+    "monthsPerSeason": 3,
+    "seasonProfiles": [
+      {
+        "season": "Spring",
+        "daylightHours": 12.0,
+        "temperatureBias01": 0.55,
+        "rainfallBias01": 0.65,
+        "fertilityBias01": 0.75,
+        "vegetationGrowthBias01": 0.85
+      },
+      {
+        "season": "Summer",
+        "daylightHours": 16.0,
+        "temperatureBias01": 0.85,
+        "rainfallBias01": 0.30,
+        "fertilityBias01": 0.55,
+        "vegetationGrowthBias01": 0.70
+      },
+      {
+        "season": "Autumn",
+        "daylightHours": 12.0,
+        "temperatureBias01": 0.45,
+        "rainfallBias01": 0.75,
+        "fertilityBias01": 0.65,
+        "vegetationGrowthBias01": 0.45
+      },
+      {
+        "season": "Winter",
+        "daylightHours": 8.0,
+        "temperatureBias01": 0.15,
+        "rainfallBias01": 0.45,
+        "fertilityBias01": 0.30,
+        "vegetationGrowthBias01": 0.15
+      }
+    ]
+  },
+  "climate": {
+    "weatherPersistence01": 0.35,
+    "hourlyTemperatureVariation01": 0.10,
+    "seasonClimateProfiles": [
+      {
+        "season": "Spring",
+        "meanTemperature01": 0.55,
+        "temperatureVariation01": 0.15,
+        "rainProbability01": 0.65,
+        "snowProbability01": 0.05,
+        "windProbability01": 0.35,
+        "heatWaveProbability01": 0.05,
+        "baseHumidity01": 0.60,
+        "averageEventDurationHours": 5
+      },
+      {
+        "season": "Summer",
+        "meanTemperature01": 0.85,
+        "temperatureVariation01": 0.18,
+        "rainProbability01": 0.25,
+        "snowProbability01": 0.00,
+        "windProbability01": 0.25,
+        "heatWaveProbability01": 0.25,
+        "baseHumidity01": 0.35,
+        "averageEventDurationHours": 4
+      },
+      {
+        "season": "Autumn",
+        "meanTemperature01": 0.45,
+        "temperatureVariation01": 0.18,
+        "rainProbability01": 0.75,
+        "snowProbability01": 0.05,
+        "windProbability01": 0.60,
+        "heatWaveProbability01": 0.03,
+        "baseHumidity01": 0.70,
+        "averageEventDurationHours": 6
+      },
+      {
+        "season": "Winter",
+        "meanTemperature01": 0.15,
+        "temperatureVariation01": 0.16,
+        "rainProbability01": 0.35,
+        "snowProbability01": 0.45,
+        "windProbability01": 0.50,
+        "heatWaveProbability01": 0.00,
+        "baseHumidity01": 0.55,
+        "averageEventDurationHours": 6
+      }
+    ]
+  },
+  "areas": {
+    "areas": [
+      {
+        "areaId": 1,
+        "kind": "Vegetation",
+        "minX": 0,
+        "minY": 0,
+        "maxX": 11,
+        "maxY": 7,
+        "z": 0,
+        "priority": 10,
+        "isEnabled": true,
+        "key": "runtime_meadow"
+      },
+      {
+        "areaId": 2,
+        "kind": "Water",
+        "minX": 2,
+        "minY": 2,
+        "maxX": 10,
+        "maxY": 3,
+        "z": 0,
+        "priority": 20,
+        "isEnabled": true,
+        "key": "runtime_stream"
+      }
+    ],
+    "fertilityAreas": [
+      {
+        "areaId": 1,
+        "soilKind": "Grassland",
+        "baseFertility01": 0.72,
+        "currentFertility01": 0.70,
+        "growthModifier01": 0.78,
+        "exhaustion01": 0.08,
+        "recovery01": 0.62
+      }
+    ],
+    "waterAreas": [
+      {
+        "areaId": 2,
+        "waterKind": "River",
+        "depthLevel": "Ford",
+        "waterLevel01": 0.64,
+        "flowIntensity01": 0.42,
+        "isDrinkable": true,
+        "isSeasonal": false
+      }
+    ],
+    "vegetationAreas": [
+      {
+        "areaId": 1,
+        "vegetationKind": "Grass",
+        "density01": 0.58,
+        "growthPotential01": 0.74,
+        "health01": 0.82,
+        "fertilityInfluence01": 0.70,
+        "climateInfluence01": 0.55
+      }
+    ],
+    "seedBankAreas": [
+      {
+        "areaId": 1,
+        "entries": [
+          { "speciesKey": "wild_grass", "amount01": 0.82, "viability01": 0.78 },
+          { "speciesKey": "oak_tree", "amount01": 0.28, "viability01": 0.66 },
+          { "speciesKey": "berry_bush", "amount01": 0.34, "viability01": 0.64 },
+          { "speciesKey": "desert_shrub", "amount01": 0.30, "viability01": 0.70 },
+          { "speciesKey": "cactus", "amount01": 0.22, "viability01": 0.68 },
+          { "speciesKey": "jungle_fern", "amount01": 0.62, "viability01": 0.78 },
+          { "speciesKey": "jungle_tree", "amount01": 0.42, "viability01": 0.72 },
+          { "speciesKey": "tundra_moss", "amount01": 0.36, "viability01": 0.62 },
+          { "speciesKey": "lichen", "amount01": 0.28, "viability01": 0.58 }
+        ]
+      }
+    ]
+  }
+}

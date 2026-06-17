@@ -1,5 +1,6 @@
 // Assets/Scripts/Core/Runtime/SimulationHost.cs
 using Arcontio.Core.Diagnostics;
+using Arcontio.Core.Environment;
 using Arcontio.Core.Config;
 using Arcontio.Core.Logging;
 using Arcontio.Core.Save;
@@ -80,6 +81,38 @@ namespace Arcontio.Core
         // Log sintetico per tick (solo per questo scenario)
         [SerializeField] private int day8LogEveryTicks = 10;
 
+        [Header("Environment Runtime")]
+        // =============================================================================
+        // enableEnvironmentRuntime
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita il runtime data-only della biosfera dentro il tick ufficiale del
+        /// simulatore.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: biosfera agganciata al clock unico</b></para>
+        /// <para>
+        /// La biosfera non possiede un proprio <c>Update</c>, non usa delta time
+        /// Unity e non entra nel renderer. Quando il gate e' attivo,
+        /// <see cref="SimulationHost"/> carica i JSON ambientali, costruisce un
+        /// <see cref="EnvironmentRuntimeSystem"/> e lo avanza una volta per tick
+        /// completato.
+        /// </para>
+        /// </summary>
+        [SerializeField] private bool enableEnvironmentRuntime = true;
+
+        [SerializeField] private string environmentFoundationResourcePath =
+            "Arcontio/Config/environment_foundation";
+        [SerializeField] private string environmentBiomeCatalogResourcePath =
+            "Arcontio/Config/environment_biomes";
+        [SerializeField] private string environmentPlantCatalogResourcePath =
+            "Arcontio/Config/environment_plants";
+        [SerializeField] private string environmentNaturalGrowthResourcePath =
+            "Arcontio/Config/environment_natural_growth";
+        [SerializeField] private string environmentRuntimeBiomeKey =
+            "temperate_grassland";
+
 
         // Core state
         private World _world;
@@ -87,6 +120,7 @@ namespace Arcontio.Core
         private Scheduler _scheduler;
         private Telemetry _telemetry;
         private JobTemplateRegistry _jobTemplateRegistry;
+        private EnvironmentRuntimeSystem _environmentRuntime;
 
         private NpcCommunicationPipeline _npcCommunication;
         // MemoryTrace
@@ -146,6 +180,13 @@ namespace Arcontio.Core
         // Singleton / accesso per le viste
         public static SimulationHost Instance { get; private set; }
         public World World => _world;
+        public bool HasEnvironmentRuntime =>
+            _environmentRuntime != null
+            && _environmentRuntime.IsBootstrapped;
+        public EnvironmentFullSnapshot EnvironmentFullSnapshot =>
+            _environmentRuntime?.FullSnapshot;
+        public EnvironmentRuntimeAdvanceReport LastEnvironmentAdvanceReport =>
+            _environmentRuntime?.LastReport;
         /// <summary>
         /// EnqueueExternalCommand:
         /// API per le viste (DevTools) per richiedere una modifica al World tramite ICommand.
@@ -728,6 +769,14 @@ namespace Arcontio.Core
             // 4.4) Carica pesi QuerySystem BeliefStore da JSON
             // ******************************************************************************************************************************
             // Caricato da LoadWorldRuntimeJsonConfig.
+
+            // ******************************************************************************************************************************
+            // 4.4B) Carica la Environment Foundation runtime da JSON
+            // ******************************************************************************************************************************
+            // La biosfera resta esterna al World e allo scheduler NPC: qui viene solo
+            // inizializzata come stato Core consultabile. L'avanzamento avverra' poi
+            // a fine tick, usando lo stesso _tickIndex del simulatore.
+            InitializeEnvironmentRuntime();
 
             // ******************************************************************************************************************************
             // 4.5) Carica template job runtime minimali da JSON
@@ -1313,6 +1362,14 @@ namespace Arcontio.Core
             _world.DebugFovTelemetry?.AdvanceTickWindow();
             _world.RuntimeCostObserver?.TryWriteJsonlSnapshot(_tickIndex);
 
+            // ============================================================
+            // ENVIRONMENT RUNTIME:
+            // La biosfera viene avanzata sul tick ufficiale appena completato.
+            // Usiamo _tickIndex + 1 per allinearla al "prossimo tick da eseguire",
+            // cioe' alla stessa semantica usata dal save/load world-level.
+            // ============================================================
+            AdvanceEnvironmentRuntimeToTick(_tickIndex + 1);
+
             _tickIndex++;
 
             // Debug: verifica che l'host resti vivo cambiando scena
@@ -1568,6 +1625,227 @@ namespace Arcontio.Core
             var diagnostics = simParams?.ResolveLoggerDiagnostics();
             return new Telemetry(diagnostics?.telemetry != null && diagnostics.telemetry.enabled);
         }
+
+        // =============================================================================
+        // InitializeEnvironmentRuntime
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica i JSON della biosfera e crea il runtime ambientale data-only.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: loader Unity al bordo, Core puro</b></para>
+        /// <para>
+        /// <see cref="EnvironmentRuntimeSystem"/> riceve solo DTO e cataloghi gia'
+        /// costruiti. L'accesso a <c>Resources</c>, <c>TextAsset</c> e
+        /// <c>JsonUtility</c> resta confinato qui dentro <c>SimulationHost</c>,
+        /// cioe' nello strato Unity che gia' possiede il bootstrap runtime.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate</b>: se il runtime ambientale e' disattivato, rimuove il riferimento vivo.</item>
+        ///   <item><b>Config</b>: carica foundation, catalogo piante, parametri crescita e bioma.</item>
+        ///   <item><b>Bootstrap</b>: costruisce stato e snapshot iniziali.</item>
+        ///   <item><b>Align</b>: porta la biosfera al tick corrente del simulatore.</item>
+        /// </list>
+        /// </summary>
+        private void InitializeEnvironmentRuntime()
+        {
+            if (!enableEnvironmentRuntime)
+            {
+                _environmentRuntime = null;
+                return;
+            }
+
+            // Ogni bootstrap legge file configurabili ma consegna al Core soltanto
+            // oggetti gia' tipizzati. Questo mantiene la biosfera testabile senza
+            // dipendenze Unity dirette.
+            EnvironmentFoundationConfig foundationConfig =
+                LoadEnvironmentFoundationConfigFromResources();
+            EnvironmentPlantCatalog plantCatalog =
+                LoadEnvironmentPlantCatalogFromResources();
+            EnvironmentNaturalGrowthConfig naturalGrowthConfig =
+                LoadEnvironmentNaturalGrowthConfigFromResources();
+            EnvironmentBiomeProfile biomeProfile =
+                ResolveEnvironmentRuntimeBiomeProfileFromResources();
+
+            _environmentRuntime = new EnvironmentRuntimeSystem();
+            EnvironmentFoundationBootstrapResult result = _environmentRuntime.Bootstrap(
+                foundationConfig,
+                plantCatalog,
+                naturalGrowthConfig,
+                biomeProfile);
+
+            if (result != null
+                && result.Validation != null
+                && (result.Validation.ErrorCount > 0 || result.Validation.WarningCount > 0))
+            {
+                Debug.LogWarning(
+                    "[SimulationHost] Environment runtime config diagnostics: "
+                    + $"errors={result.Validation.ErrorCount} warnings={result.Validation.WarningCount}");
+            }
+
+            AdvanceEnvironmentRuntimeToTick(_tickIndex);
+        }
+
+        // =============================================================================
+        // AdvanceEnvironmentRuntimeToTick
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Allinea il runtime ambientale a un tick assoluto del simulatore.
+        /// </para>
+        /// </summary>
+        private void AdvanceEnvironmentRuntimeToTick(long targetTick)
+        {
+            if (!enableEnvironmentRuntime || _environmentRuntime == null)
+                return;
+
+            // La biosfera usa gli stessi numeri di tick del SimulationHost. Il file
+            // calendario decide poi quanti tick servono per ora, giorno, mese e anno.
+            _environmentRuntime.AdvanceToEnvironmentTicks(targetTick);
+        }
+
+        // =============================================================================
+        // RestoreEnvironmentRuntimeToTick
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricrea il runtime ambientale dopo un restore world-level e lo porta al
+        /// tick simulativo ripristinato.
+        /// </para>
+        /// </summary>
+        private void RestoreEnvironmentRuntimeToTick(long restoredTick)
+        {
+            if (!enableEnvironmentRuntime)
+                return;
+
+            // In questa fase v0.39.1 la biosfera non e' ancora serializzata dentro
+            // WorldSaveData. Dopo un load snapshot viene quindi ricostruita dai JSON
+            // runtime correnti e riallineata al tick salvato.
+            InitializeEnvironmentRuntime();
+            AdvanceEnvironmentRuntimeToTick(restoredTick);
+        }
+
+        // =============================================================================
+        // LoadEnvironmentFoundationConfigFromResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica la configurazione radice della Environment Foundation.
+        /// </para>
+        /// </summary>
+        private EnvironmentFoundationConfig LoadEnvironmentFoundationConfigFromResources()
+        {
+            return LoadJsonConfigFromResources(
+                environmentFoundationResourcePath,
+                EnvironmentFoundationBootstrap.CreateDefaultConfig());
+        }
+
+        // =============================================================================
+        // LoadEnvironmentPlantCatalogFromResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica il catalogo biologico delle specie vegetali.
+        /// </para>
+        /// </summary>
+        private EnvironmentPlantCatalog LoadEnvironmentPlantCatalogFromResources()
+        {
+            var config = LoadJsonConfigFromResources(
+                environmentPlantCatalogResourcePath,
+                new EnvironmentPlantCatalogConfig());
+            return config != null
+                ? config.ToCatalog()
+                : new EnvironmentPlantCatalogConfig().ToCatalog();
+        }
+
+        // =============================================================================
+        // LoadEnvironmentNaturalGrowthConfigFromResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica i coefficienti fini del ciclo naturale giornaliero.
+        /// </para>
+        /// </summary>
+        private EnvironmentNaturalGrowthConfig LoadEnvironmentNaturalGrowthConfigFromResources()
+        {
+            return LoadJsonConfigFromResources(
+                environmentNaturalGrowthResourcePath,
+                new EnvironmentNaturalGrowthConfig());
+        }
+
+        // =============================================================================
+        // ResolveEnvironmentRuntimeBiomeProfileFromResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il profilo bioma runtime dal catalogo biomi configurabile.
+        /// </para>
+        /// </summary>
+        private EnvironmentBiomeProfile ResolveEnvironmentRuntimeBiomeProfileFromResources()
+        {
+            var config = LoadJsonConfigFromResources(
+                environmentBiomeCatalogResourcePath,
+                EnvironmentBiomeCatalogConfig.CreateDefault());
+            EnvironmentBiomeCatalog catalog = config != null
+                ? config.ToCatalog()
+                : EnvironmentBiomeCatalog.CreateDefault();
+
+            if (catalog.TryGetProfile(environmentRuntimeBiomeKey, out var profile))
+                return profile;
+
+            Debug.LogWarning(
+                "[SimulationHost] Environment biome key not found, using default: "
+                + environmentRuntimeBiomeKey);
+            return profile;
+        }
+
+        // =============================================================================
+        // LoadJsonConfigFromResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Helper piccolo per caricare un DTO JSON da <c>Resources</c> con fallback.
+        /// </para>
+        /// </summary>
+        private static T LoadJsonConfigFromResources<T>(
+            string resourcePathNoExt,
+            T fallback)
+            where T : class
+        {
+            if (string.IsNullOrWhiteSpace(resourcePathNoExt))
+                return fallback;
+
+            TextAsset asset = Resources.Load<TextAsset>(resourcePathNoExt);
+            if (asset == null)
+            {
+                Debug.LogWarning(
+                    "[SimulationHost] Config JSON missing, using fallback: Resources/"
+                    + resourcePathNoExt
+                    + ".json");
+                return fallback;
+            }
+
+            try
+            {
+                // JsonUtility richiede un DTO radice concreto. I file Environment
+                // seguono questa regola, quindi il parser resta semplice e coerente
+                // con il resto della repository.
+                T parsed = JsonUtility.FromJson<T>(asset.text);
+                return parsed ?? fallback;
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogWarning(
+                    "[SimulationHost] Config JSON parse failed, using fallback: Resources/"
+                    + resourcePathNoExt
+                    + ".json error="
+                    + exception.Message);
+                return fallback;
+            }
+        }
         // =============================================================================
         // LoadWorldRuntimeJsonConfig
         // =============================================================================
@@ -1705,6 +1983,8 @@ namespace Arcontio.Core
 
             if (_world != null)
                 _world.Global.CurrentTickIndex = _tickIndex;
+
+            RestoreEnvironmentRuntimeToTick(_tickIndex);
         }
 
         private void SeedTestWorld()
