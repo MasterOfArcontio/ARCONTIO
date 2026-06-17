@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Arcontio.View.MapGrid;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -331,7 +330,7 @@ namespace Arcontio.View.ArcGraph
             var builder = new ArcGraphTerrainChunkMeshBuilder();
             return builder.BuildDirtyChunks(
                 terrainLayer,
-                CreateUvMap(context?.Config),
+                CreateUvMap(),
                 renderState,
                 ArcGraphTerrainVisualPolicy.CreateLegacyDefault());
         }
@@ -433,7 +432,7 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private ArcGraphComparisonDiagnostics EvaluateGate(ArcGraphRuntimeContext context)
         {
-            bool hasArcGraphTerrainData = context != null && context.HasConfig && context.HasMap;
+            bool hasArcGraphTerrainData = context != null && context.HasMap;
             return ArcGraphComparisonGate.Evaluate(
                 ArcGraphComparisonOptions.CreateTemporaryDebugSceneProbe(),
                 hasLegacyRenderer: true,
@@ -447,21 +446,19 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Crea la UV map ArcGraph partendo dalla config terrain MapGrid.
+        /// Crea la UV map ArcGraph partendo dal materiale assegnato.
         /// </para>
         ///
-        /// <para><b>Catalogo visuale derivato</b></para>
+        /// <para><b>Fallback neutrale</b></para>
         /// <para>
-        /// La config MapGrid resta una sorgente legacy temporanea. Il probe copia
-        /// solo le definizioni tile id -> coordinate atlas in una struttura ArcGraph,
-        /// senza leggere o modificare <c>MapGridTileAtlas</c>.
+        /// Il probe non legge piu' <c>MapGridConfig</c>. La copertura completa deve
+        /// arrivare dai cataloghi ArcGraph; questo fallback crea solo una UV map
+        /// minima quando il probe viene usato senza catalogo.
         /// </para>
         /// </summary>
-        private ArcGraphTerrainTileUvMap CreateUvMap(MapGridConfig config)
+        private ArcGraphTerrainTileUvMap CreateUvMap()
         {
-            int tilePixels = config != null && config.tilePixels > 0
-                ? config.tilePixels
-                : 32;
+            int tilePixels = 32;
 
             Texture texture = terrainMaterial != null
                 ? terrainMaterial.mainTexture
@@ -469,68 +466,15 @@ namespace Arcontio.View.ArcGraph
 
             int atlasWidth = texture != null
                 ? texture.width
-                : InferAtlasPixels(config, tilePixels, useX: true);
+                : tilePixels;
             int atlasHeight = texture != null
                 ? texture.height
-                : InferAtlasPixels(config, tilePixels, useX: false);
+                : tilePixels;
 
-            var uvMap = new ArcGraphTerrainTileUvMap(
+            return new ArcGraphTerrainTileUvMap(
                 atlasWidth,
                 atlasHeight,
                 tilePixels);
-
-            if (config?.tileDefs == null)
-                return uvMap;
-
-            for (int i = 0; i < config.tileDefs.Length; i++)
-            {
-                MapGridConfig.TileDef definition = config.tileDefs[i];
-                if (definition == null)
-                    continue;
-
-                uvMap.Register(definition.id, definition.uvX, definition.uvY);
-            }
-
-            return uvMap;
-        }
-
-        // =============================================================================
-        // InferAtlasPixels
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Stima una dimensione atlas quando il materiale non espone una texture.
-        /// </para>
-        ///
-        /// <para><b>Fallback diagnostico</b></para>
-        /// <para>
-        /// Questo fallback serve solo a evitare divisioni per zero durante test
-        /// parziali. Il gate scena richiede comunque un materiale assegnato, quindi
-        /// nel percorso visuale normale la dimensione arriva dalla texture reale.
-        /// </para>
-        /// </summary>
-        private static int InferAtlasPixels(
-            MapGridConfig config,
-            int tilePixels,
-            bool useX)
-        {
-            int maxCell = 0;
-
-            if (config?.tileDefs != null)
-            {
-                for (int i = 0; i < config.tileDefs.Length; i++)
-                {
-                    MapGridConfig.TileDef definition = config.tileDefs[i];
-                    if (definition == null)
-                        continue;
-
-                    int coordinate = useX ? definition.uvX : definition.uvY;
-                    if (coordinate > maxCell)
-                        maxCell = coordinate;
-                }
-            }
-
-            return (maxCell + 1) * Mathf.Max(1, tilePixels);
         }
 
         // =============================================================================

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Arcontio.View.MapGrid;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -523,7 +522,7 @@ namespace Arcontio.View.ArcGraph
             return builder.BuildChunks(
                 terrainLayer,
                 runtimeTerrainMap,
-                CreateUvMap(context?.Config, contract.TerrainMaterial),
+                CreateUvMap(contract.TerrainMaterial),
                 filterResult?.Chunks,
                 renderState != null ? renderState.ChunkSizeCells : 16,
                 renderState != null ? renderState.TileSizeWorld : 1f,
@@ -1137,16 +1136,12 @@ namespace Arcontio.View.ArcGraph
             return count;
         }
 
-        private ArcGraphTerrainTileUvMap CreateUvMap(
-            MapGridConfig config,
-            Material material)
+        private ArcGraphTerrainTileUvMap CreateUvMap(Material material)
         {
             if (TryCreateCatalogUvMap(material, out var catalogUvMap))
                 return catalogUvMap;
 
-            int tilePixels = config != null && config.tilePixels > 0
-                ? config.tilePixels
-                : 32;
+            int tilePixels = 32;
 
             Texture texture = material != null
                 ? material.mainTexture
@@ -1154,52 +1149,12 @@ namespace Arcontio.View.ArcGraph
 
             int atlasWidth = texture != null
                 ? texture.width
-                : InferAtlasPixels(config, tilePixels, useX: true);
+                : tilePixels;
             int atlasHeight = texture != null
                 ? texture.height
-                : InferAtlasPixels(config, tilePixels, useX: false);
+                : tilePixels;
 
-            var uvMap = new ArcGraphTerrainTileUvMap(atlasWidth, atlasHeight, tilePixels);
-
-            if (config?.tileDefs == null)
-                return uvMap;
-
-            _uvUsedLegacyConfigMap = true;
-
-            for (int i = 0; i < config.tileDefs.Length; i++)
-            {
-                MapGridConfig.TileDef definition = config.tileDefs[i];
-                if (definition == null)
-                    continue;
-
-                uvMap.Register(definition.id, definition.uvX, definition.uvY);
-            }
-
-            return uvMap;
-        }
-
-        private static int InferAtlasPixels(
-            MapGridConfig config,
-            int tilePixels,
-            bool useX)
-        {
-            int maxCell = 0;
-
-            if (config?.tileDefs != null)
-            {
-                for (int i = 0; i < config.tileDefs.Length; i++)
-                {
-                    MapGridConfig.TileDef definition = config.tileDefs[i];
-                    if (definition == null)
-                        continue;
-
-                    int coordinate = useX ? definition.uvX : definition.uvY;
-                    if (coordinate > maxCell)
-                        maxCell = coordinate;
-                }
-            }
-
-            return (maxCell + 1) * Mathf.Max(1, tilePixels);
+            return new ArcGraphTerrainTileUvMap(atlasWidth, atlasHeight, tilePixels);
         }
 
         private bool TryCreateCatalogUvMap(

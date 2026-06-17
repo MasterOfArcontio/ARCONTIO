@@ -1,5 +1,4 @@
 using Arcontio.Core;
-using Arcontio.View.MapGrid;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -8,63 +7,82 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Pacchetto esplicito di sorgenti runtime che il bootstrap ArcGraph puo'
-    /// leggere come input.
+    /// Pacchetto esplicito di sorgenti runtime neutrali che il bootstrap ArcGraph
+    /// puo' leggere come input.
     /// </para>
     ///
     /// <para><b>Principio architetturale: dati ricevuti, non cercati globalmente</b></para>
     /// <para>
-    /// ArcGraph non deve chiamare <c>SimulationHost.Instance</c>, non deve cercare
-    /// <c>MapGridBootstrap</c> nella scena e non deve entrare in
-    /// <c>MapGridWorldView</c>. Un chiamante esterno costruisce questo context e lo
-    /// passa al bootstrap. Il bootstrap usa i riferimenti per copiare snapshot, non
-    /// per mutare il mondo o la MapGrid.
+    /// ArcGraph non deve ricevere <c>MapGridData</c> come sorgente terrain e non
+    /// deve trattare il renderer legacy come fonte della mappa. Un chiamante esterno
+    /// costruisce questo context partendo da sorgenti autorizzate e lo passa al
+    /// bootstrap. Il bootstrap usa i riferimenti per copiare snapshot, non per
+    /// mutare il mondo.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>Config</b>: configurazione view-side corrente.</item>
-    ///   <item><b>Map</b>: buffer terreno legacy, trattato come sorgente di sola lettura.</item>
     ///   <item><b>World</b>: source of truth oggettiva letta solo dall'adapter.</item>
+    ///   <item><b>MapWidthCells/MapHeightCells</b>: dimensioni runtime neutrali della vista.</item>
+    ///   <item><b>TileSizeWorld/ChunkSizeCells</b>: parametri grafici minimi non MapGrid.</item>
+    ///   <item><b>DefaultNpcSpriteKey</b>: fallback visuale finche' non esiste profilo NPC Core.</item>
     ///   <item><b>HasAnyRuntimeData</b>: segnala se il context contiene almeno una sorgente.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphRuntimeContext
     {
-        public MapGridConfig Config { get; }
-        public MapGridData Map { get; }
         public World World { get; }
+        public int MapWidthCells { get; }
+        public int MapHeightCells { get; }
+        public float TileSizeWorld { get; }
+        public int ChunkSizeCells { get; }
+        public string DefaultNpcSpriteKey { get; }
+        private readonly bool _hasRuntimeShape;
 
-        public bool HasConfig => Config != null;
-        public bool HasMap => Map != null;
         public bool HasWorld => World != null;
-        public bool HasAnyRuntimeData => HasConfig || HasMap || HasWorld;
-        public bool HasCompleteRuntimeData => HasConfig && HasMap && HasWorld;
+        public bool HasCellSurfaces => World?.CellSurfaces != null;
+        public bool HasConfig => _hasRuntimeShape && TileSizeWorld > 0.0001f && ChunkSizeCells > 0;
+        public bool HasMap => HasCellSurfaces;
+        public bool HasAnyRuntimeData => HasWorld || HasConfig;
+        public bool HasCompleteRuntimeData => HasWorld && HasCellSurfaces;
 
         // =============================================================================
         // ArcGraphRuntimeContext
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce un context runtime con riferimenti opzionali.
+        /// Costruisce un context runtime con riferimenti e parametri neutrali.
         /// </para>
         ///
         /// <para><b>Context parziale ammesso</b></para>
         /// <para>
-        /// In <c>v0.31</c> il bootstrap deve poter nascere anche quando non tutti i
-        /// dati sono disponibili. Per questo i parametri sono opzionali e la
-        /// diagnostica del bootstrap decide se copiare snapshot o limitarsi allo
-        /// stato interno.
+        /// Il <c>World</c> e' opzionale per permettere harness interni, ma il
+        /// percorso terrain produttivo richiede <c>World.CellSurfaces</c>. Le
+        /// dimensioni e i parametri grafici vengono normalizzati qui, non letti da
+        /// MapGrid.
         /// </para>
         /// </summary>
         public ArcGraphRuntimeContext(
-            MapGridConfig config = null,
-            MapGridData map = null,
-            World world = null)
+            World world = null,
+            int mapWidthCells = 0,
+            int mapHeightCells = 0,
+            float tileSizeWorld = 1f,
+            int chunkSizeCells = 16,
+            string defaultNpcSpriteKey = "human_default")
         {
-            Config = config;
-            Map = map;
             World = world;
+            MapWidthCells = mapWidthCells > 0
+                ? mapWidthCells
+                : world?.MapWidth > 0 ? world.MapWidth : 1;
+            MapHeightCells = mapHeightCells > 0
+                ? mapHeightCells
+                : world?.MapHeight > 0 ? world.MapHeight : 1;
+            TileSizeWorld = tileSizeWorld > 0.0001f ? tileSizeWorld : 1f;
+            ChunkSizeCells = chunkSizeCells > 0 ? chunkSizeCells : 16;
+            DefaultNpcSpriteKey = string.IsNullOrWhiteSpace(defaultNpcSpriteKey)
+                ? "human_default"
+                : defaultNpcSpriteKey;
+            _hasRuntimeShape = world != null || mapWidthCells > 0 || mapHeightCells > 0;
         }
 
         // =============================================================================

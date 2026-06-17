@@ -684,14 +684,14 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphMapViewConfig CreateViewConfigForContext(ArcGraphRuntimeContext context)
         {
             ArcGraphMapViewConfig template = _configuredViewConfig ?? ArcGraphMapViewConfig.CreateDefaultV033();
-            int width = context?.Map != null && context.Map.Width > 0
-                ? context.Map.Width
+            int width = context != null && context.MapWidthCells > 0
+                ? context.MapWidthCells
                 : template.MapWidthCells;
-            int height = context?.Map != null && context.Map.Height > 0
-                ? context.Map.Height
+            int height = context != null && context.MapHeightCells > 0
+                ? context.MapHeightCells
                 : template.MapHeightCells;
 
-            // La dimensione mappa puo' arrivare dal runtime MapGrid provvisorio,
+            // La dimensione mappa arriva dal context runtime neutrale,
             // ma il comportamento dello zoom deve restare quello della config
             // ArcGraph. Questo preserva i quattro livelli decisi nel JSON evitando
             // che il campo serializzato legacy <c>zoomLevel</c> diventi una seconda

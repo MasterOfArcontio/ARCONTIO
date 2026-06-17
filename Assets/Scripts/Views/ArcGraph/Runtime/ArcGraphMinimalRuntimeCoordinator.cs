@@ -254,9 +254,12 @@ namespace Arcontio.View.ArcGraph
             if (current == null || next == null)
                 return false;
 
-            return ReferenceEquals(current.Config, next.Config)
-                   && ReferenceEquals(current.Map, next.Map)
-                   && ReferenceEquals(current.World, next.World);
+            return ReferenceEquals(current.World, next.World)
+                   && current.MapWidthCells == next.MapWidthCells
+                   && current.MapHeightCells == next.MapHeightCells
+                   && current.TileSizeWorld == next.TileSizeWorld
+                   && current.ChunkSizeCells == next.ChunkSizeCells
+                   && current.DefaultNpcSpriteKey == next.DefaultNpcSpriteKey;
         }
 
         private static string ResolveSuccessReason(

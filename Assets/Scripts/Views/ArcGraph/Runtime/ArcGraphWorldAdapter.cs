@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Arcontio.Core;
-using Arcontio.View.MapGrid;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -15,7 +14,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Principio architetturale: ponte visuale senza authority simulativa</b></para>
     /// <para>
-    /// Questo adapter legge dati gia' esistenti da <c>MapGridData</c> e <c>World</c>
+    /// Questo adapter legge dati gia' esistenti dal <c>World</c>
     /// e li converte in snapshot grafici copiati. Non crea GameObject, non carica
     /// sprite, non aggiorna mesh, non chiama command, non muta il <c>World</c> e non
     /// decide cosa un NPC debba fare. Serve soltanto a stabilire il primo confine
@@ -25,7 +24,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>CurrentRuntimeZLevel</b>: livello <c>z = 0</c> usato dal runtime attuale.</item>
-    ///   <item><b>FillTerrainSnapshots</b>: converte superficie Core o buffer terreno legacy in celle ArcGraph.</item>
+    ///   <item><b>FillTerrainSnapshots</b>: converte <c>CellSurfaceLayer</c> in celle ArcGraph.</item>
     ///   <item><b>FillObjectSnapshots</b>: converte gli oggetti del World in snapshot visuali.</item>
     ///   <item><b>FillActorSnapshots</b>: converte gli NPC del World in snapshot actor e motion read-only.</item>
     ///   <item><b>ResolveObjectSpriteKey</b>: replica solo la policy di fallback sprite corrente.</item>
@@ -43,15 +42,15 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce un adapter con path fallback coerenti con la MapGrid attuale.
+        /// Costruisce un adapter con fallback visuali dichiarati.
         /// </para>
         ///
         /// <para><b>Compatibilita' con renderer legacy</b></para>
         /// <para>
-        /// Il default NPC replica lo sprite provvisorio oggi usato da
-        /// <c>MapGridWorldView</c>. Il prefisso oggetti replica il fallback
-        /// <c>MapGrid/Sprites/Objects/{defId}</c>. Questi valori non caricano asset:
-        /// vengono solo copiati negli snapshot per il renderer futuro.
+        /// Il default NPC usa la chiave del catalogo ArcGraph. Il fallback oggetti
+        /// resta temporaneo fino alla migrazione completa del catalogo visuale
+        /// oggetti, perche' alcuni <c>ObjectDef</c> puntano ancora ad asset legacy.
+        /// Questi valori non caricano asset: vengono solo copiati negli snapshot.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -61,11 +60,11 @@ namespace Arcontio.View.ArcGraph
         /// </list>
         /// </summary>
         public ArcGraphWorldAdapter(
-            string defaultNpcSpriteKey = "MapGrid/Sprites/NPC_Astro",
+            string defaultNpcSpriteKey = "human_default",
             string fallbackObjectSpritePrefix = "MapGrid/Sprites/Objects/")
         {
             _defaultNpcSpriteKey = string.IsNullOrWhiteSpace(defaultNpcSpriteKey)
-                ? "MapGrid/Sprites/NPC_Astro"
+                ? "human_default"
                 : defaultNpcSpriteKey;
 
             _fallbackObjectSpritePrefix = string.IsNullOrWhiteSpace(fallbackObjectSpritePrefix)
@@ -78,52 +77,19 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Converte tutte le celle terreno in snapshot ArcGraph.
+        /// Converte le superfici Core del mondo in snapshot terreno ArcGraph.
         /// </para>
         ///
-        /// <para><b>Confine MapGrid -> ArcGraph</b></para>
+        /// <para><b>Distacco terrain da MapGrid</b></para>
         /// <para>
-        /// La sorgente preferita e' <c>World.CellSurfaces</c>, quando il layer e'
-        /// stato popolato con assegnazioni esplicite. Durante la transizione, se il
-        /// layer esiste solo come default iniziale, il metodo conserva il fallback
-        /// <c>MapGridData</c> per non perdere acqua, roccia o pavimenti gia' presenti
-        /// nella mappa legacy.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>map</b>: sorgente terreno corrente.</item>
-        ///   <item><b>target</b>: lista riusabile da popolare.</item>
-        ///   <item><b>clearTarget</b>: se true, svuota la lista prima di aggiungere snapshot.</item>
-        /// </list>
-        /// </summary>
-        public void FillTerrainSnapshots(
-            MapGridData map,
-            IList<ArcGraphTerrainCellSnapshot> target,
-            bool clearTarget = true)
-        {
-            FillTerrainSnapshots(map, null, target, clearTarget);
-        }
-
-        // =============================================================================
-        // FillTerrainSnapshots
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Converte le celle terreno preferendo il layer Core autoritativo quando
-        /// risulta realmente popolato.
-        /// </para>
-        ///
-        /// <para><b>Transizione controllata MapGrid -> World</b></para>
-        /// <para>
-        /// <c>CellSurfaceLayer</c> nasce dentro il <c>World</c> con un default grass.
-        /// Quel default serve a evitare null e a dare una semantica stabile, ma non
-        /// basta per sostituire il layout reale della mappa. Per questo l'adapter usa
-        /// la superficie Core solo quando <c>HasExplicitAssignments</c> e' true.
+        /// Il metodo non riceve <c>MapGridData</c>, non legge tile id legacy e non
+        /// ricava pavimenti dal renderer storico. Ogni cella viene copiata da
+        /// <c>World.CellSurfaces</c>; il <c>TileId</c> dello snapshot resta a 0 come
+        /// campo compatibile, ma il mapper ArcGraph usa <c>SurfaceKey</c> e
+        /// <c>VisualRuleKey</c>.
         /// </para>
         /// </summary>
         public void FillTerrainSnapshots(
-            MapGridData map,
             CellSurfaceLayer cellSurfaces,
             IList<ArcGraphTerrainCellSnapshot> target,
             bool clearTarget = true)
@@ -134,53 +100,25 @@ namespace Arcontio.View.ArcGraph
             if (clearTarget)
                 target.Clear();
 
-            bool useAuthoritativeSurfaces = cellSurfaces != null
-                && cellSurfaces.HasExplicitAssignments;
-
-            if (map == null && !useAuthoritativeSurfaces)
+            if (cellSurfaces == null)
                 return;
 
-            int width = map != null ? map.Width : cellSurfaces.Width;
-            int height = map != null ? map.Height : cellSurfaces.Height;
-
-            for (int y = 0; y < height; y++)
+            for (int y = 0; y < cellSurfaces.Height; y++)
             {
-                for (int x = 0; x < width; x++)
+                for (int x = 0; x < cellSurfaces.Width; x++)
                 {
-                    // MapGridData garantisce l'indicizzazione per coordinate in bounds.
-                    // L'adapter aggiunge solo il livello z=0, senza inventare altitudini.
-                    //
-                    // Nota importante:
-                    // MapGridData distingue il blocco "fisico/occluder" dal blocco
-                    // di attraversamento del terreno. L'acqua, per esempio, puo'
-                    // non essere camminabile ma deve restare visualmente acqua.
-                    // Passare IsMovementBlocked ad ArcGraph confondeva questi due
-                    // concetti e faceva disegnare l'acqua come blocco legacy/pietra.
                     var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(x, y);
-                    int tileId = map != null && map.InBounds(x, y)
-                        ? map.GetTerrain(x, y)
-                        : 0;
-                    bool isBlocked = map != null && map.InBounds(x, y) && map.IsBlocked(x, y);
+                    if (!cellSurfaces.TryGetSurface(x, y, out CellSurfaceSnapshot surface))
+                        continue;
 
-                    if (useAuthoritativeSurfaces
-                        && cellSurfaces.TryGetSurface(x, y, out CellSurfaceSnapshot surface))
-                    {
-                        target.Add(new ArcGraphTerrainCellSnapshot(
-                            cell,
-                            tileId,
-                            isBlocked,
-                            surface.MacroSurface,
-                            surface.SurfaceKey,
-                            surface.VisualRuleKey,
-                            true));
-                    }
-                    else
-                    {
-                        target.Add(new ArcGraphTerrainCellSnapshot(
-                            cell,
-                            tileId,
-                            isBlocked));
-                    }
+                    target.Add(new ArcGraphTerrainCellSnapshot(
+                        cell,
+                        tileId: 0,
+                        isBlocked: false,
+                        surface.MacroSurface,
+                        surface.SurfaceKey,
+                        surface.VisualRuleKey,
+                        hasAuthoritativeSurface: true));
                 }
             }
         }

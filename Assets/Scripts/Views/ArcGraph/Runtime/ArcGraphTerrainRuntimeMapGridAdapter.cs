@@ -146,14 +146,14 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Costruisce un context ArcGraph con config, mappa terrain e World opzionale.
+        /// Costruisce un context ArcGraph neutrale usando il World esposto dal ponte legacy.
         /// </para>
         ///
         /// <para><b>Context esplicito</b></para>
         /// <para>
-        /// Il metodo non interroga la scena e non usa provider globali. Se il
-        /// bootstrap MapGrid non e' presente, restituisce un context vuoto e lascia
-        /// alla diagnostica il compito di spiegare il problema.
+        /// Questo componente resta un ponte transitorio da eliminare. Non passa piu'
+        /// <c>MapGridData</c> al context: le dimensioni vengono copiate come valori
+        /// primitivi e il terrain viene letto da <c>World.CellSurfaces</c>.
         /// </para>
         /// </summary>
         public ArcGraphRuntimeContext BuildTerrainRuntimeContext()
@@ -162,9 +162,12 @@ namespace Arcontio.View.ArcGraph
                 return ArcGraphRuntimeContext.Empty();
 
             return new ArcGraphRuntimeContext(
-                mapGridBootstrap.RuntimeConfig,
-                mapGridBootstrap.RuntimeMap,
-                mapGridWorldView != null ? mapGridWorldView.RuntimeWorld : null);
+                world: mapGridWorldView != null ? mapGridWorldView.RuntimeWorld : null,
+                mapWidthCells: mapGridBootstrap.RuntimeMap != null ? mapGridBootstrap.RuntimeMap.Width : 0,
+                mapHeightCells: mapGridBootstrap.RuntimeMap != null ? mapGridBootstrap.RuntimeMap.Height : 0,
+                tileSizeWorld: mapGridBootstrap.RuntimeConfig != null ? mapGridBootstrap.RuntimeConfig.tileSizeWorld : 1f,
+                chunkSizeCells: mapGridBootstrap.RuntimeConfig != null ? mapGridBootstrap.RuntimeConfig.chunkSize : 16,
+                defaultNpcSpriteKey: "human_default");
         }
 
         // =============================================================================
