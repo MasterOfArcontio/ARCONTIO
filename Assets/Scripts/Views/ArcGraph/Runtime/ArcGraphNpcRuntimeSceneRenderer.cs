@@ -707,7 +707,7 @@ namespace Arcontio.View.ArcGraph
                     handle,
                     visualFrame.PartKey,
                     out bool wasCreated);
-                ApplyPartRenderer(handle, partRenderer, visualFrame, entry, sprite, contract);
+                ApplyPartRenderer(handle, partRenderer, visualFrame, entry, sprite, catalog, contract);
 
                 appliedAnyPart = true;
                 if (usedGeneratedFallback)
@@ -789,6 +789,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphNpcVisualFrame visualFrame,
             ArcGraphActorObjectSceneRenderEntry entry,
             Sprite sprite,
+            ArcGraphNpcVisualCatalog catalog,
             ArcGraphNpcRuntimeSceneRendererContract contract)
         {
             handle.GameObject.transform.localPosition = contract.OriginOffset + new Vector3(
@@ -798,10 +799,47 @@ namespace Arcontio.View.ArcGraph
             handle.GameObject.transform.localScale = Vector3.one * contract.ActorScale;
 
             partRenderer.transform.localPosition = layeredActorSpriteLocalOffset;
-            partRenderer.transform.localScale = Vector3.one;
+            partRenderer.transform.localScale = ResolveLayeredSpriteScale(sprite, catalog);
             partRenderer.sprite = sprite;
             partRenderer.sortingOrder = entry.SortingOrder + visualFrame.SortingOffset;
             partRenderer.enabled = true;
+        }
+
+        // =============================================================================
+        // ResolveLayeredSpriteScale
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola la scala locale necessaria per rispettare il PPU dichiarato dal
+        /// catalogo NPC ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: il catalogo guida la resa, non il .meta</b></para>
+        /// <para>
+        /// Gli asset PNG possono arrivare da worktree diversi o essere reimportati
+        /// da Unity con <c>Pixels Per Unit</c> non coerente. Se il renderer usasse
+        /// direttamente quella scala, l'NPC modulare diventerebbe troppo piccolo o
+        /// sembrerebbe composto da frammenti. Qui normalizziamo solo la scala
+        /// visuale della parte, senza modificare file asset, importer, simulazione o
+        /// posizione dell'attore.
+        /// </para>
+        /// </summary>
+        private static Vector3 ResolveLayeredSpriteScale(
+            Sprite sprite,
+            ArcGraphNpcVisualCatalog catalog)
+        {
+            if (sprite == null || catalog == null)
+                return Vector3.one;
+
+            float desiredPixelsPerUnit = catalog.PixelsPerUnit > 0
+                ? catalog.PixelsPerUnit
+                : 32f;
+            float actualPixelsPerUnit = sprite.pixelsPerUnit > 0f
+                ? sprite.pixelsPerUnit
+                : desiredPixelsPerUnit;
+
+            float scale = actualPixelsPerUnit / desiredPixelsPerUnit;
+            return Vector3.one * scale;
         }
 
         private void ApplyActorShadow(
