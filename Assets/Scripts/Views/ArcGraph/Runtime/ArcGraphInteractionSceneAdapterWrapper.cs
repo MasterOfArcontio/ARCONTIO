@@ -125,6 +125,11 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphRenderQueue _renderQueue;
         private IArcGraphInteractionFrameConsumer _consumer;
         private long _sourceFrameIndex;
+        private float _cameraOrthographicSizeVelocity;
+        private float _pixelPerfectAssetsPpuVelocity;
+        private Vector3 _cameraCenterVelocity;
+        private bool _hasSyncedSceneCamera;
+        private float _lastCameraTargetOrthographicSize = float.NaN;
         private ArcGraphInteractionSceneAdapterWrapperDiagnostics _lastWrapperDiagnostics;
 
         public ArcGraphInteractionSceneAdapterWrapperDiagnostics LastWrapperDiagnostics => _lastWrapperDiagnostics;
@@ -285,6 +290,9 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void SetSceneCamera(Camera camera)
         {
+            if (sceneCamera != camera)
+                ResetSceneCameraSmoothingState();
+
             sceneCamera = camera;
         }
 
@@ -308,6 +316,9 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void SetSceneCameraZoomSyncEnabled(bool enabled)
         {
+            if (syncSceneCameraZoomToViewState != enabled)
+                ResetSceneCameraSmoothingState();
+
             syncSceneCameraZoomToViewState = enabled;
         }
 
@@ -440,20 +451,29 @@ namespace Arcontio.View.ArcGraph
             ApplyPixelPerfectCameraZoomIfPresent(
                 camera,
                 zoom,
-                viewportPixelHeight);
+                viewportPixelHeight,
+                config);
 
-            bool didChangeOrthographicSize =
-                !Mathf.Approximately(camera.orthographicSize, targetOrthographicSize);
+            bool targetZoomChanged =
+                !_hasSyncedSceneCamera ||
+                float.IsNaN(_lastCameraTargetOrthographicSize) ||
+                !Mathf.Approximately(_lastCameraTargetOrthographicSize, targetOrthographicSize);
 
-            if (didChangeOrthographicSize)
-                camera.orthographicSize = targetOrthographicSize;
+            ApplyCameraOrthographicSize(camera, targetOrthographicSize, config);
 
             // Lo zoom-to-pointer e' gia' stato applicato al centro logico da
             // ArcGraphViewController. Qui non compensiamo una seconda volta la
             // camera: la sincronizziamo al centro finale dello ViewState, cosi'
             // terrain, muri, NPC e culling restano nello stesso sistema di
             // coordinate.
-            SyncSceneCameraCenterToViewState(camera, viewState);
+            SyncSceneCameraCenterToViewState(
+                camera,
+                viewState,
+                config,
+                targetZoomChanged);
+
+            _lastCameraTargetOrthographicSize = targetOrthographicSize;
+            _hasSyncedSceneCamera = true;
         }
 
         private Camera ResolveSceneCamera()
@@ -482,9 +502,11 @@ namespace Arcontio.View.ArcGraph
         /// non modifica mappa, oggetti o simulazione.
         /// </para>
         /// </summary>
-        private static void SyncSceneCameraCenterToViewState(
+        private void SyncSceneCameraCenterToViewState(
             Camera camera,
-            ArcGraphViewState viewState)
+            ArcGraphViewState viewState,
+            ArcGraphMapViewConfig config,
+            bool targetZoomChanged)
         {
             if (camera == null || viewState == null)
                 return;
@@ -494,7 +516,16 @@ namespace Arcontio.View.ArcGraph
                 viewState.CenterCellX,
                 viewState.CenterCellY,
                 current.z);
-            Vector3 offset = desired - current;
+
+            float smoothTime = targetZoomChanged
+                ? config.ZoomTransitionSeconds
+                : config.PanSmoothTime;
+            Vector3 next = ResolveSmoothedCameraCenter(
+                current,
+                desired,
+                smoothTime,
+                config.PanMaxSpeedCellsPerSecond);
+            Vector3 offset = next - current;
             offset.z = 0f;
 
             if (offset.sqrMagnitude < 0.000001f)
@@ -511,6 +542,79 @@ namespace Arcontio.View.ArcGraph
             }
 
             camera.transform.position += offset;
+        }
+
+        // =============================================================================
+        // ApplyCameraOrthographicSize
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Accompagna la dimensione ortografica verso il target del livello zoom.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: easing solo visuale</b></para>
+        /// <para>
+        /// Lo zoom logico resta discreto e governato dal JSON. Questa funzione non
+        /// cambia livello zoom, culling o simulazione: rende solo piu' morbido il
+        /// passaggio della camera fisica verso la dimensione richiesta.
+        /// </para>
+        /// </summary>
+        private void ApplyCameraOrthographicSize(
+            Camera camera,
+            float targetOrthographicSize,
+            ArcGraphMapViewConfig config)
+        {
+            if (camera == null || config == null)
+                return;
+
+            if (!_hasSyncedSceneCamera || config.ZoomTransitionSeconds <= 0f)
+            {
+                camera.orthographicSize = targetOrthographicSize;
+                _cameraOrthographicSizeVelocity = 0f;
+                return;
+            }
+
+            float next = Mathf.SmoothDamp(
+                camera.orthographicSize,
+                targetOrthographicSize,
+                ref _cameraOrthographicSizeVelocity,
+                config.ZoomTransitionSeconds,
+                Mathf.Infinity,
+                Time.deltaTime);
+
+            if (Mathf.Abs(next - targetOrthographicSize) <= 0.001f)
+                next = targetOrthographicSize;
+
+            camera.orthographicSize = next;
+        }
+
+        private Vector3 ResolveSmoothedCameraCenter(
+            Vector3 current,
+            Vector3 desired,
+            float smoothTime,
+            float maxSpeed)
+        {
+            if (!_hasSyncedSceneCamera || smoothTime <= 0f)
+            {
+                _cameraCenterVelocity = Vector3.zero;
+                return desired;
+            }
+
+            Vector3 next = Vector3.SmoothDamp(
+                current,
+                desired,
+                ref _cameraCenterVelocity,
+                smoothTime,
+                Mathf.Max(0.01f, maxSpeed),
+                Time.deltaTime);
+
+            if ((next - desired).sqrMagnitude <= 0.000001f)
+            {
+                _cameraCenterVelocity = Vector3.zero;
+                return desired;
+            }
+
+            return next;
         }
 
         // =============================================================================
@@ -531,7 +635,8 @@ namespace Arcontio.View.ArcGraph
         private bool ApplyPixelPerfectCameraZoomIfPresent(
             Camera camera,
             ArcGraphViewZoomLevelDefinition zoom,
-            int viewportPixelHeight)
+            int viewportPixelHeight,
+            ArcGraphMapViewConfig config)
         {
             PixelPerfectCamera pixelPerfectCamera = camera.GetComponent<PixelPerfectCamera>();
             if (pixelPerfectCamera == null || !pixelPerfectCamera.enabled)
@@ -548,11 +653,48 @@ namespace Arcontio.View.ArcGraph
                 1,
                 Mathf.RoundToInt(height / (float)zoom.VisibleCellsY));
 
-            if (pixelPerfectCamera.assetsPPU == targetAssetsPpu)
+            int currentAssetsPpu = pixelPerfectCamera.assetsPPU;
+            if (currentAssetsPpu == targetAssetsPpu)
                 return false;
 
-            pixelPerfectCamera.assetsPPU = targetAssetsPpu;
+            if (!_hasSyncedSceneCamera || config == null || config.ZoomTransitionSeconds <= 0f)
+            {
+                pixelPerfectCamera.assetsPPU = targetAssetsPpu;
+                _pixelPerfectAssetsPpuVelocity = 0f;
+                return true;
+            }
+
+            float smoothed = Mathf.SmoothDamp(
+                currentAssetsPpu,
+                targetAssetsPpu,
+                ref _pixelPerfectAssetsPpuVelocity,
+                config.ZoomTransitionSeconds,
+                Mathf.Infinity,
+                Time.deltaTime);
+            int nextAssetsPpu = Mathf.RoundToInt(smoothed);
+
+            if (Mathf.Abs(smoothed - targetAssetsPpu) <= 0.5f)
+                nextAssetsPpu = targetAssetsPpu;
+
+            nextAssetsPpu = Mathf.Clamp(
+                nextAssetsPpu,
+                Mathf.Min(currentAssetsPpu, targetAssetsPpu),
+                Mathf.Max(currentAssetsPpu, targetAssetsPpu));
+
+            if (nextAssetsPpu == currentAssetsPpu)
+                return false;
+
+            pixelPerfectCamera.assetsPPU = nextAssetsPpu;
             return true;
+        }
+
+        private void ResetSceneCameraSmoothingState()
+        {
+            _cameraOrthographicSizeVelocity = 0f;
+            _pixelPerfectAssetsPpuVelocity = 0f;
+            _cameraCenterVelocity = Vector3.zero;
+            _hasSyncedSceneCamera = false;
+            _lastCameraTargetOrthographicSize = float.NaN;
         }
 
         private ArcGraphMapViewConfig ResolveConfig()

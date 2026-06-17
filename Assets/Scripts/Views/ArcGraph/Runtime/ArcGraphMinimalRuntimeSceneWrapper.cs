@@ -647,7 +647,10 @@ namespace Arcontio.View.ArcGraph
                 template.ZoomLevels,
                 template.DefaultZoomLevel,
                 template.MouseWheelStepsPerZoomLevel,
-                template.PanUsesMiddleMouseButton);
+                template.PanUsesMiddleMouseButton,
+                template.ZoomTransitionSeconds,
+                template.PanSmoothTime,
+                template.PanMaxSpeedCellsPerSecond);
         }
 
         private ArcGraphMinimalRuntimeSceneWrapperDiagnostics CreateDiagnostics(

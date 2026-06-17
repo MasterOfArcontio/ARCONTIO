@@ -25,6 +25,9 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>DefaultZoomLevel</b>: livello iniziale richiesto.</item>
     ///   <item><b>MouseWheelStepsPerZoomLevel</b>: scatti rotellina per cambiare livello.</item>
     ///   <item><b>PanUsesMiddleMouseButton</b>: policy input per pan futuro.</item>
+    ///   <item><b>ZoomTransitionSeconds</b>: durata visuale della transizione tra livelli zoom.</item>
+    ///   <item><b>PanSmoothTime</b>: inerzia visuale usata quando cambia il centro vista.</item>
+    ///   <item><b>PanMaxSpeedCellsPerSecond</b>: limite massimo del pan visuale.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphMapViewConfig
@@ -36,6 +39,9 @@ namespace Arcontio.View.ArcGraph
         public int DefaultZoomLevel { get; }
         public int MouseWheelStepsPerZoomLevel { get; }
         public bool PanUsesMiddleMouseButton { get; }
+        public float ZoomTransitionSeconds { get; }
+        public float PanSmoothTime { get; }
+        public float PanMaxSpeedCellsPerSecond { get; }
         public int ZoomLevelCount => _zoomLevels.Length;
         public ArcGraphViewZoomLevelDefinition[] ZoomLevels => CopyZoomLevels();
 
@@ -60,7 +66,10 @@ namespace Arcontio.View.ArcGraph
             ArcGraphViewZoomLevelDefinition[] zoomLevels,
             int defaultZoomLevel = 1,
             int mouseWheelStepsPerZoomLevel = 1,
-            bool panUsesMiddleMouseButton = true)
+            bool panUsesMiddleMouseButton = true,
+            float zoomTransitionSeconds = 0.12f,
+            float panSmoothTime = 0.18f,
+            float panMaxSpeedCellsPerSecond = 90f)
         {
             MapWidthCells = mapWidthCells > 0 ? mapWidthCells : 1;
             MapHeightCells = mapHeightCells > 0 ? mapHeightCells : 1;
@@ -70,6 +79,11 @@ namespace Arcontio.View.ArcGraph
                 ? mouseWheelStepsPerZoomLevel
                 : 1;
             PanUsesMiddleMouseButton = panUsesMiddleMouseButton;
+            ZoomTransitionSeconds = NormalizeSeconds(zoomTransitionSeconds, 0.12f);
+            PanSmoothTime = NormalizeSeconds(panSmoothTime, 0.18f);
+            PanMaxSpeedCellsPerSecond = panMaxSpeedCellsPerSecond > 0f
+                ? panMaxSpeedCellsPerSecond
+                : 90f;
         }
 
         // =============================================================================
@@ -102,7 +116,10 @@ namespace Arcontio.View.ArcGraph
                 },
                 defaultZoomLevel: 1,
                 mouseWheelStepsPerZoomLevel: 1,
-                panUsesMiddleMouseButton: true);
+                panUsesMiddleMouseButton: true,
+                zoomTransitionSeconds: 0.12f,
+                panSmoothTime: 0.18f,
+                panMaxSpeedCellsPerSecond: 90f);
         }
 
         // =============================================================================
@@ -208,6 +225,14 @@ namespace Arcontio.View.ArcGraph
             Array.Copy(zoomLevels, copy, zoomLevels.Length);
             Array.Sort(copy, (a, b) => a.Level.CompareTo(b.Level));
             return copy;
+        }
+
+        private static float NormalizeSeconds(float value, float fallback)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value) || value < 0f)
+                return fallback;
+
+            return value;
         }
     }
 }
