@@ -848,30 +848,42 @@ namespace Arcontio.View.ArcGraph
                 if (overlay == null || overlay.RuleCount == 0)
                     continue;
 
-                bool topLeftIsOverlay = IsDualGridOverlayTerrain(
-                    runtimeTerrainMap,
-                    runtimeCell.Cell.X,
-                    runtimeCell.Cell.Y + 1,
-                    runtimeCell.Cell.Z,
-                    overlay);
-                bool topRightIsOverlay = IsDualGridOverlayTerrain(
-                    runtimeTerrainMap,
-                    runtimeCell.Cell.X + 1,
-                    runtimeCell.Cell.Y + 1,
-                    runtimeCell.Cell.Z,
-                    overlay);
-                bool bottomLeftIsOverlay = IsDualGridOverlayTerrain(
-                    runtimeTerrainMap,
-                    runtimeCell.Cell.X,
-                    runtimeCell.Cell.Y,
-                    runtimeCell.Cell.Z,
-                    overlay);
-                bool bottomRightIsOverlay = IsDualGridOverlayTerrain(
-                    runtimeTerrainMap,
-                    runtimeCell.Cell.X + 1,
-                    runtimeCell.Cell.Y,
-                    runtimeCell.Cell.Z,
-                    overlay);
+                if (!TryResolveDualGridOverlayCell(
+                        runtimeTerrainMap,
+                        runtimeCell.Cell.X,
+                        runtimeCell.Cell.Y + 1,
+                        runtimeCell.Cell.Z,
+                        overlay,
+                        out bool topLeftIsOverlay)
+                    || !TryResolveDualGridOverlayCell(
+                        runtimeTerrainMap,
+                        runtimeCell.Cell.X + 1,
+                        runtimeCell.Cell.Y + 1,
+                        runtimeCell.Cell.Z,
+                        overlay,
+                        out bool topRightIsOverlay)
+                    || !TryResolveDualGridOverlayCell(
+                        runtimeTerrainMap,
+                        runtimeCell.Cell.X,
+                        runtimeCell.Cell.Y,
+                        runtimeCell.Cell.Z,
+                        overlay,
+                        out bool bottomLeftIsOverlay)
+                    || !TryResolveDualGridOverlayCell(
+                        runtimeTerrainMap,
+                        runtimeCell.Cell.X + 1,
+                        runtimeCell.Cell.Y,
+                        runtimeCell.Cell.Z,
+                        overlay,
+                        out bool bottomRightIsOverlay))
+                {
+                    // Fuori mappa non significa "terreno sottostante diverso".
+                    // Se una finestra 2x2 tocca celle mancanti, siamo al bordo
+                    // reale della mappa o su un context parziale: in entrambi i
+                    // casi non dobbiamo creare una falsa transizione dual-grid,
+                    // altrimenti il bordo produce pattern ripetuti/diagonali.
+                    continue;
+                }
 
                 if (!topLeftIsOverlay
                     && !topRightIsOverlay
@@ -925,17 +937,39 @@ namespace Arcontio.View.ArcGraph
             return false;
         }
 
-        private static bool IsDualGridOverlayTerrain(
+        // =============================================================================
+        // TryResolveDualGridOverlayCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Legge una cella della finestra dual-grid distinguendo cella mancante e
+        /// cella presente ma non appartenente all'overlay.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bordo mappa esplicito</b></para>
+        /// <para>
+        /// Il fuori-mappa non e' un tipo terreno. Se venisse trattato come
+        /// "non prato", le finestre 2x2 ai bordi della mappa genererebbero false
+        /// transizioni visuali. Questo helper permette al chiamante di saltare
+        /// l'overlay quando una delle quattro celle non esiste.
+        /// </para>
+        /// </summary>
+        private static bool TryResolveDualGridOverlayCell(
             ArcGraphRuntimeTerrainMap runtimeTerrainMap,
             int x,
             int y,
             int z,
-            ArcGraphTerrainVisualDualGridOverlay overlay)
+            ArcGraphTerrainVisualDualGridOverlay overlay,
+            out bool isOverlayTerrain)
         {
+            isOverlayTerrain = false;
+
             var coord = new ArcGraphCellCoord(x, y, z);
-            return runtimeTerrainMap.TryGetCell(coord, out ArcGraphRuntimeTerrainCell cell)
-                   && !cell.IsBlocked
-                   && overlay.IsOverlayTerrain(cell.TerrainId);
+            if (!runtimeTerrainMap.TryGetCell(coord, out ArcGraphRuntimeTerrainCell cell))
+                return false;
+
+            isOverlayTerrain = !cell.IsBlocked && overlay.IsOverlayTerrain(cell.TerrainId);
+            return true;
         }
 
         private static string BuildDualGridMask(

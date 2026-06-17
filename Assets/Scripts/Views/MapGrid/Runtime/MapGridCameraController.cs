@@ -22,6 +22,9 @@ namespace Arcontio.View.MapGrid
     /// </summary>
     public sealed class MapGridCameraController : MonoBehaviour
     {
+        [SerializeField] private bool zoomInputEnabled = true;
+        [SerializeField] private bool panInputEnabled = true;
+
         private Camera _camera;
         private MapGridData _map;
         private MapGridConfig _cfg;
@@ -72,6 +75,110 @@ namespace Arcontio.View.MapGrid
         // Stato drag RMB
         private bool _isRmbDragging;
 
+        // =============================================================================
+        // SetZoomInputEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita solo la lettura della rotellina del mouse da parte
+        /// del controller camera MapGrid.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: pensionamento parziale del legacy</b></para>
+        /// <para>
+        /// Durante la transizione ArcGraph, questo componente contiene ancora due
+        /// responsabilita' storiche: pan fisico della camera e zoom legacy. ArcGraph
+        /// deve prendere possesso dello zoom tramite <c>ArcGraphViewConfig</c>, ma
+        /// non possiede ancora un controller camera completo per il pan. Questo gate
+        /// permette quindi di spegnere soltanto la rotellina legacy, lasciando vivo
+        /// il trascinamento della camera finche' il pan non verra' assorbito in un
+        /// componente ArcGraph dedicato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>enabled</b>: quando falso, <c>HandleZoomToCursor</c> non modifica camera o PixelPerfectCamera.</item>
+        ///   <item><b>pan</b>: il pan RMB resta gestito dal normale <c>Update</c> del controller.</item>
+        /// </list>
+        /// </summary>
+        public void SetZoomInputEnabled(bool enabled)
+        {
+            zoomInputEnabled = enabled;
+        }
+
+        // =============================================================================
+        // SetPanInputEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita la lettura diretta del pan da parte del controller
+        /// camera legacy MapGrid.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: singola sorgente del pan runtime</b></para>
+        /// <para>
+        /// Quando ArcGraph e' la vista principale, il centro della mappa deve essere
+        /// governato da <c>ArcGraphViewState</c>. Il vecchio controller MapGrid puo'
+        /// ancora ricevere offset esterni per riallineare il proprio target interno,
+        /// ma non deve leggere il tasto destro e muovere la camera in autonomia.
+        /// Altrimenti il pan fisico verrebbe annullato dal sync ArcGraph nel frame
+        /// successivo, producendo una camera apparentemente bloccata.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>panInputEnabled</b>: gate della lettura RMB/edge-pan legacy.</item>
+        ///   <item><b>_targetPos</b>: riallineato alla posizione corrente quando il gate viene spento.</item>
+        ///   <item><b>_panVelocity</b>: azzerata per evitare trascinamenti residui.</item>
+        /// </list>
+        /// </summary>
+        public void SetPanInputEnabled(bool enabled)
+        {
+            panInputEnabled = enabled;
+
+            if (enabled)
+                return;
+
+            _isRmbDragging = false;
+            _targetPos = transform.position;
+            _panVelocity = Vector3.zero;
+        }
+
+        // =============================================================================
+        // ApplyExternalCameraOffset
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica uno spostamento camera richiesto da un controller esterno.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bridge temporaneo verso ArcGraph</b></para>
+        /// <para>
+        /// Durante il pensionamento di MapGrid, ArcGraph controlla gia' lo zoom
+        /// discreto ma questo componente gestisce ancora il pan fisico della camera.
+        /// Quando ArcGraph compensa la camera per mantenere il puntatore fermo
+        /// durante lo zoom, anche il target interno di questo controller deve essere
+        /// spostato. Altrimenti l'inerzia del pan riporterebbe la camera al vecchio
+        /// target nel frame successivo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>offset</b>: spostamento world-space gia' calcolato dal chiamante.</item>
+        ///   <item><b>_targetPos</b>: target del pan legacy riallineato alla camera.</item>
+        ///   <item><b>_panVelocity</b>: azzerata per evitare scivolamenti dopo la compensazione.</item>
+        /// </list>
+        /// </summary>
+        public void ApplyExternalCameraOffset(Vector3 offset)
+        {
+            if (offset.sqrMagnitude < 0.000001f)
+                return;
+
+            transform.position += offset;
+            _targetPos += offset;
+            _panVelocity = Vector3.zero;
+        }
+
         public void Init(Camera cam, MapGridData map, MapGridConfig cfg)
         {
             _camera = cam;
@@ -104,8 +211,11 @@ namespace Arcontio.View.MapGrid
                 return;
 
             HandleZoomToCursor();
-            HandleRmbDragPanTarget();
-            //HandleEdgePanTarget(); // edge-pan viene ignorato mentre trascini RMB
+            if (panInputEnabled)
+            {
+                HandleRmbDragPanTarget();
+                //HandleEdgePanTarget(); // edge-pan viene ignorato mentre trascini RMB
+            }
 
             // Clamp target prima di applicare inerzia (così non inseguiamo target fuori mappa)
             _targetPos = ClampToMapBounds(_targetPos);
@@ -123,6 +233,9 @@ namespace Arcontio.View.MapGrid
         /// </summary>
         private void HandleZoomToCursor()
         {
+            if (!zoomInputEnabled)
+                return;
+
             var mouse = Mouse.current;
             if (mouse == null) return;
 

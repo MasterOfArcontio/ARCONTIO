@@ -30,7 +30,7 @@
     33
   ],
 
-  "layoutResourcePath": "MapGrid/Layouts/Layout_ArcGraph_TerrainVisualTest",
+  "layoutResourcePath": "MapGrid/Layouts/Layout_ArcGraph_RuntimeBase",
 
   "camera": {
     "startZoom": 18.0,
