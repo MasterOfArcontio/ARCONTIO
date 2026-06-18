@@ -15509,6 +15509,69 @@ Output atteso:
 base UI ArcGraph riutilizzabile senza duplicare pannelli MapGrid
 ```
 
+Sotto-roadmap tecnica collegata al distacco MapGrid:
+
+| Step | Obiettivo | Stato |
+|---|---|---|
+| v0.38m.01 | Introdurre `CellSurfaceLayer` Core come sorgente autoritativa del pavimento cella | ✅ Completato |
+| v0.38m.02 | Far leggere ad ArcGraph il terrain da `World.CellSurfaces`, non da `MapGridData` | ✅ Completato |
+| v0.38m.03 | Spostare la mappa debug iniziale su file Core `cell_surface_layout.json`, con random map solo futura e seeded | ✅ Completato |
+| v0.38m.04 | Sostituire `ArcGraphTerrainRuntimeMapGridAdapter` con sorgente runtime neutra non MapGrid | ⏳ Pending |
+| v0.38m.05 | Rimuovere dipendenza di `ArcGraphRuntimeSceneAutoInstaller` da `MapGridBootstrap`, `MapGridWorldView` e root visuali MapGrid | ⏳ Pending |
+| v0.38m.06 | Eliminare i probe ArcGraph storici basati su MapGrid o marcarli legacy non runtime | ⏳ Pending |
+| v0.38m.07 | Migrare preview/placement ArcGraph fuori da `MapGridWorldProvider` | ⏳ Pending |
+| v0.38m.08 | Migrare asset/path oggetti ArcGraph fuori da path `MapGrid/Sprites/Objects` | ⏳ Pending |
+| v0.38m.09 | Definire profilo visuale NPC Core/ViewModel invece del fallback renderer hardcoded | ⏳ Pending |
+| v0.38m.10 | Creare catalogo unico `surface_defs.json` con dati simulativi e visuali dei pavimenti | ⏳ Pending |
+| v0.38m.11 | Creare file mappa unico con metadati, layer pavimenti e oggetti iniziali | ⏳ Pending |
+| v0.38m.12 | Spostare dimensioni mappa fuori da `game_params.json` e rimuovere duplicati tipo `worldWidth/worldHeight` da sorgenti non autoritative | ⏳ Pending |
+| v0.38m.13 | Implementare loader mappa Core che inizializza dimensioni, `CellSurfaceLayer` e oggetti iniziali dal file mappa unico | ⏳ Pending |
+| v0.38m.14 | Collassare i cataloghi terrain ArcGraph legacy dentro il catalogo superfici unico, mantenendo solo dati visuali strettamente renderer-side dove necessario | ⏳ Pending |
+| v0.38m.15 | Pensionare layout/config MapGrid dal percorso runtime ArcGraph dopo verifica del loader mappa unico | ⏳ Pending |
+
+Decisione tecnica `v0.38m`:
+
+```text
+La mappa debug iniziale deve essere letta da file Core ripetibile.
+La generazione random resta ammessa solo come futura modalita' dev con seed esplicito.
+ArcGraph non deve piu' usare MapGridData come sorgente terrain.
+Le dimensioni mappa devono appartenere al file mappa unico, non a game_params.json.
+```
+
+Decisione cataloghi e mappa `v0.38m.10+`:
+
+```text
+surface_defs.json
+-> definisce i tipi di pavimento possibili, con dati simulativi e visuali.
+
+map file unico
+-> definisce dimensioni mappa, pavimento di tutte le celle e oggetti iniziali.
+
+game_params.json
+-> non deve piu' essere sorgente autoritativa per worldWidth/worldHeight.
+```
+
+Connessioni MapGrid residue da eliminare esplicitamente:
+
+- `ArcGraphTerrainRuntimeMapGridAdapter`: ancora ponte legacy per ottenere context runtime;
+- `ArcGraphDebugRuntimeMapGridAdapter`: ancora ponte debug storico per Landmark/GVD;
+- `ArcGraphRuntimeSceneAutoInstaller`: ancora agganciato a `Scene_MapGrid`, root visuali MapGrid e componenti MapGrid;
+- `ArcGraphMinimalRuntimeSceneWrapper`: ancora serializza `ArcGraphTerrainRuntimeMapGridAdapter`;
+- `ArcGraphTerrainRuntimeSceneRenderer`, `ArcGraphTerrainSceneProbeRenderer`, `ArcGraphActorObjectSceneProbeRenderer` e probe collegati: ancora nominano/usano adapter MapGrid legacy;
+- `ArcGraphPlacementCellHighlightSceneConsumer`: legge ancora `MapGridWorldProvider`;
+- camera/viewport: esistono ancora bridge e configurazioni derivate dal vecchio percorso MapGrid;
+- object visual path: molti oggetti puntano ancora a sprite sotto `MapGrid/Sprites/Objects`;
+- debug/probe storici: alcune classi restano utili come riferimento, ma non devono restare nel runtime definitivo.
+
+Regola di avanzamento:
+
+```text
+Ogni dipendenza MapGrid rimasta deve diventare una delle tre cose:
+1. assorbita in un contratto ArcGraph/Core neutro;
+2. marcata legacy/probe e non usata nel runtime;
+3. rimossa quando il sostituto ArcGraph e' validato.
+```
+
 ---
 
 ### v0.38n - ArcGraph Debug/UI Migration Cleanup

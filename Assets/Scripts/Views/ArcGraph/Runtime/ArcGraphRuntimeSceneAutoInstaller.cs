@@ -64,6 +64,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
         private ArcGraphSerializedSpriteResolver _spriteResolver;
+        private ArcGraphUiRuntimeRoot _uiRoot;
         private ArcGraphViewModeSwitcher _switcher;
         private GameObject _visualRoot;
         private Material _terrainMaterial;
@@ -238,12 +239,14 @@ namespace Arcontio.View.ArcGraph
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
+            _uiRoot = gameObject.AddComponent<ArcGraphUiRuntimeRoot>();
             _switcher = gameObject.AddComponent<ArcGraphViewModeSwitcher>();
             _switcher.ConfigureRuntimePolicy(
                 ArcGraphViewMode.ArcGraph,
                 enableKeyboardToggle: false);
 
             ConfigureAdapterAndRenderers();
+            ConfigureUiRoot();
             ConfigureSwitcher();
             RefreshMapGridSources();
 
@@ -330,6 +333,32 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // ConfigureUiRoot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la shell UI runtime ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI shell senza dati simulativi</b></para>
+        /// <para>
+        /// La UI viene cablata accanto al runtime visuale ArcGraph, ma non riceve
+        /// <c>World</c>, <c>SimulationHost</c>, adapter MapGrid o command gateway.
+        /// Questo primo step crea solo root, pannelli e archetipi provvisori: i
+        /// futuri binder ViewModel e controller autorizzati verranno aggiunti in
+        /// step successivi.
+        /// </para>
+        /// </summary>
+        private void ConfigureUiRoot()
+        {
+            if (_uiRoot == null)
+                return;
+
+            _uiRoot.BuildRuntimeUi();
+            _uiRoot.SetUiEnabled(true);
+        }
+
+        // =============================================================================
         // ConfigureSwitcher
         // =============================================================================
         /// <summary>
@@ -340,7 +369,7 @@ namespace Arcontio.View.ArcGraph
         private void ConfigureSwitcher()
         {
             GameObject[] mapGridVisualRoots = FindMapGridVisualRoots();
-            GameObject[] arcGraphVisualRoots = { _visualRoot };
+            GameObject[] arcGraphVisualRoots = FindArcGraphVisualRoots();
             _configuredMapGridRootCount = mapGridVisualRoots.Length;
 
             _switcher.ConfigureRuntimeWiring(
@@ -350,6 +379,30 @@ namespace Arcontio.View.ArcGraph
                 _terrainRenderer,
                 _npcRenderer,
                 _objectRenderer);
+        }
+
+        // =============================================================================
+        // FindArcGraphVisualRoots
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce i root visuali ArcGraph controllabili dallo switcher.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI e rendering restano root separati</b></para>
+        /// <para>
+        /// Il renderer mappa e la UI runtime non vengono fusi nello stesso
+        /// GameObject. Lo switcher puo' pero' trattarli come due root visuali della
+        /// stessa vista ArcGraph, mantenendo separata la responsabilita' interna di
+        /// ciascun blocco.
+        /// </para>
+        /// </summary>
+        private GameObject[] FindArcGraphVisualRoots()
+        {
+            if (_uiRoot != null && _uiRoot.RootGameObject != null)
+                return new[] { _visualRoot, _uiRoot.RootGameObject };
+
+            return new[] { _visualRoot };
         }
 
         // =============================================================================

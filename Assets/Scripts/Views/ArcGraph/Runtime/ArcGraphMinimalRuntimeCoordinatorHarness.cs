@@ -78,8 +78,7 @@ namespace Arcontio.View.ArcGraph
         private static bool RunPartialMapContextGate()
         {
             var coordinator = new ArcGraphMinimalRuntimeCoordinator();
-            var map = new Arcontio.View.MapGrid.MapGridData(2, 2);
-            var context = new ArcGraphRuntimeContext(map: map);
+            var context = new ArcGraphRuntimeContext(mapWidthCells: 2, mapHeightCells: 2);
             var frame = new ArcGraphMinimalRuntimeCoordinatorFrame(
                 context,
                 isCoordinatorEnabled: true,

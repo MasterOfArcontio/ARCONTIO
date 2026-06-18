@@ -248,12 +248,83 @@ namespace Arcontio.View.ArcGraph
                 return true;
             }
 
+            if (TryResolveFromResourceSpriteCollection(spriteKey, out sprite))
+            {
+                if (cacheResourcesHits)
+                    _resourceSpritesByKey[spriteKey] = sprite;
+
+                if (logDiagnostics)
+                    Debug.Log("[ArcGraphSerializedSpriteResolver] Resources sprite collection hit: " + spriteKey, this);
+
+                return true;
+            }
+
             _resourceMissCount++;
             if (cacheResourcesMisses)
                 _resourceMissesByKey.Add(spriteKey);
 
             if (logDiagnostics)
                 Debug.Log("[ArcGraphSerializedSpriteResolver] Resources miss: " + spriteKey, this);
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryResolveFromResourceSpriteCollection
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova a risolvere una sprite caricando tutte le sprite presenti nello
+        /// stesso asset Resources.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: tolleranza agli import settings Unity</b></para>
+        /// <para>
+        /// Alcuni PNG singoli possono essere importati da Unity come
+        /// <c>Sprite Mode = Multiple</c>. In quel caso <c>Resources.Load&lt;Sprite&gt;</c>
+        /// puo' non trovare la sprite anche se il file esiste e anche se
+        /// <c>Resources.LoadAll&lt;Sprite&gt;</c> la restituisce correttamente. Questo
+        /// fallback resta confinato al resolver asset-side e non cambia il
+        /// contratto dei builder ArcGraph, che continuano a produrre solo sprite
+        /// key testuali.
+        /// </para>
+        /// </summary>
+        private static bool TryResolveFromResourceSpriteCollection(
+            string spriteKey,
+            out Sprite sprite)
+        {
+            sprite = null;
+
+            if (string.IsNullOrWhiteSpace(spriteKey))
+                return false;
+
+            Sprite[] sprites = Resources.LoadAll<Sprite>(spriteKey);
+            if (sprites == null || sprites.Length == 0)
+                return false;
+
+            string requestedName = ExtractResourceName(spriteKey);
+            for (int i = 0; i < sprites.Length; i++)
+            {
+                Sprite candidate = sprites[i];
+                if (candidate == null)
+                    continue;
+
+                if (string.Equals(candidate.name, requestedName, StringComparison.Ordinal)
+                    || string.Equals(candidate.name, requestedName + "_0", StringComparison.Ordinal))
+                {
+                    sprite = candidate;
+                    return true;
+                }
+            }
+
+            // Se il file contiene una sola sub-sprite, e' il fallback piu' sicuro:
+            // il path Resources identifica gia' il PNG richiesto e non una sheet
+            // condivisa con nomi multipli.
+            if (sprites.Length == 1 && sprites[0] != null)
+            {
+                sprite = sprites[0];
+                return true;
+            }
 
             return false;
         }
@@ -337,6 +408,17 @@ namespace Arcontio.View.ArcGraph
             subSpriteName = spriteKey.Substring(separatorIndex + 1).Trim();
             return !string.IsNullOrWhiteSpace(sheetPath)
                    && !string.IsNullOrWhiteSpace(subSpriteName);
+        }
+
+        private static string ExtractResourceName(string spriteKey)
+        {
+            if (string.IsNullOrWhiteSpace(spriteKey))
+                return string.Empty;
+
+            int slashIndex = spriteKey.LastIndexOf('/');
+            return slashIndex >= 0 && slashIndex < spriteKey.Length - 1
+                ? spriteKey.Substring(slashIndex + 1)
+                : spriteKey;
         }
 
         private Sprite ResolveFallback(ArcGraphRenderItemKind kind)

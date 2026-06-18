@@ -185,13 +185,12 @@ namespace Arcontio.View.ArcGraph
             if (!hasMapGridView)
                 return null;
 
-            // Per v0.37 il debug overlay Landmark/GVD usa World. La MapGridData non
-            // serve: passiamo null per evitare di trasformare questo adapter in un
-            // ponte terrain o in un accesso generale alla mappa legacy.
+            // Per v0.37 il debug overlay Landmark/GVD usa World. Questo ponte resta
+            // legacy, ma il context non riceve piu' MapGridData.
             return new ArcGraphRuntimeContext(
-                mapGridWorldView.RuntimeConfig,
-                map: null,
-                world);
+                world: world,
+                mapWidthCells: world != null ? world.MapWidth : 0,
+                mapHeightCells: world != null ? world.MapHeight : 0);
         }
 
         private static long ResolveSourceTick(World world)

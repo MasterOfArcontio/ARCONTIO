@@ -130,7 +130,7 @@ namespace Arcontio.View.ArcGraph
 
             _diagnostics = BuildDiagnostics(ArcGraphBootstrapStatus.Initializing, "Initializing");
 
-            // Parametri grafici: usiamo la config quando esiste, altrimenti fallback dalle opzioni.
+            // Parametri grafici neutrali: il context non dipende piu' da MapGrid.
             float tileSizeWorld = ResolveTileSizeWorld(_context, _options);
             int chunkSizeCells = ResolveChunkSizeCells(_context, _options);
 
@@ -250,9 +250,11 @@ namespace Arcontio.View.ArcGraph
             // Ogni lista viene svuotata prima del nuovo riempimento: le cache sono derivate.
             _terrainSnapshots.Clear();
 
-            if (_context?.Map != null)
+            if (_context?.World?.CellSurfaces != null)
             {
-                _adapter.FillTerrainSnapshots(_context.Map, _terrainSnapshots);
+                _adapter.FillTerrainSnapshots(
+                    _context.World?.CellSurfaces,
+                    _terrainSnapshots);
 
                 if (_layerStack.TryGetLayer<ArcGraphTerrainLayer>(out var terrainLayer))
                     terrainLayer.ReplaceSnapshots(_terrainSnapshots, _renderState);
@@ -312,9 +314,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphRuntimeContext context,
             ArcGraphBootstrapOptions options)
         {
-            // La config MapGrid resta la fonte piu' coerente quando e' presente.
-            if (context?.Config != null && context.Config.tileSizeWorld > 0.0001f)
-                return context.Config.tileSizeWorld;
+            if (context != null && context.TileSizeWorld > 0.0001f)
+                return context.TileSizeWorld;
 
             return options != null && options.DefaultTileSizeWorld > 0.0001f
                 ? options.DefaultTileSizeWorld
@@ -325,9 +326,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphRuntimeContext context,
             ArcGraphBootstrapOptions options)
         {
-            // La dimensione chunk eredita la MapGrid attuale, ma viene normalizzata.
-            if (context?.Config != null && context.Config.chunkSize > 0)
-                return context.Config.chunkSize;
+            if (context != null && context.ChunkSizeCells > 0)
+                return context.ChunkSizeCells;
 
             return options != null && options.DefaultChunkSizeCells > 0
                 ? options.DefaultChunkSizeCells
@@ -337,9 +337,9 @@ namespace Arcontio.View.ArcGraph
         private static string ResolveDefaultNpcSpriteKey(ArcGraphRuntimeContext context)
         {
             // L'adapter non carica sprite: conserva solo la chiave risolta.
-            string configured = context?.Config?.npc?.spriteResourcePath;
+            string configured = context?.DefaultNpcSpriteKey;
             return string.IsNullOrWhiteSpace(configured)
-                ? "MapGrid/Sprites/NPC_Astro"
+                ? "human_default"
                 : configured;
         }
     }

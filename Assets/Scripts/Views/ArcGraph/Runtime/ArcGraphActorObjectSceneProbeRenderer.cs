@@ -553,8 +553,8 @@ namespace Arcontio.View.ArcGraph
         private static float ResolveTileWorldSize(
             ArcGraphRuntimeContext context)
         {
-            if (context != null && context.HasConfig && context.Config.tileSizeWorld > 0.0001f)
-                return context.Config.tileSizeWorld;
+            if (context != null && context.TileSizeWorld > 0.0001f)
+                return context.TileSizeWorld;
 
             return 1f;
         }

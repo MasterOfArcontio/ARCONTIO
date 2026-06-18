@@ -5,16 +5,17 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Mapper provvisorio tra tile sorgente legacy e terrain id semantico ArcGraph.
+    /// Mapper provvisorio tra superficie Core, tile sorgente legacy e terrain id
+    /// semantico ArcGraph.
     /// </para>
     ///
     /// <para><b>Principio architetturale: ponte dichiarato, non euristica nascosta</b></para>
     /// <para>
-    /// La mappa attuale arriva ancora da <c>MapGridData</c> e usa tile id grafici.
-    /// ArcGraph invece deve convergere verso celle semantiche, per esempio
-    /// <c>grass</c>, <c>stone_floor</c> o <c>water</c>. Questo helper concentra la
-    /// traduzione temporanea in un solo punto, evitando che renderer, builder e
-    /// diagnostiche replichino euristiche diverse.
+    /// La mappa storica arriva ancora da <c>MapGridData</c> e usa tile id grafici.
+    /// Il percorso nuovo passa invece da <c>World.CellSurfaces</c>, che espone
+    /// chiavi semantiche come <c>grass</c>, <c>stone_floor</c> o <c>water</c>.
+    /// Questo helper concentra la transizione in un solo punto, evitando che
+    /// renderer, builder e diagnostiche replichino euristiche diverse.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -35,6 +36,15 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public static string ResolveTemporaryTerrainId(ArcGraphTerrainCellSnapshot snapshot)
         {
+            if (snapshot.HasAuthoritativeSurface)
+            {
+                if (!string.IsNullOrWhiteSpace(snapshot.VisualRuleKey))
+                    return snapshot.VisualRuleKey;
+
+                if (!string.IsNullOrWhiteSpace(snapshot.SurfaceKey))
+                    return snapshot.SurfaceKey;
+            }
+
             return ResolveTemporaryTerrainIdFromTile(snapshot.TileId);
         }
 
