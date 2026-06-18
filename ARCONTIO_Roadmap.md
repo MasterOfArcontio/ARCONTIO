@@ -15516,8 +15516,8 @@ Sotto-roadmap tecnica collegata al distacco MapGrid:
 | v0.38m.01 | Introdurre `CellSurfaceLayer` Core come sorgente autoritativa del pavimento cella | ✅ Completato |
 | v0.38m.02 | Far leggere ad ArcGraph il terrain da `World.CellSurfaces`, non da `MapGridData` | ✅ Completato |
 | v0.38m.03 | Spostare la mappa debug iniziale su file Core `cell_surface_layout.json`, con random map solo futura e seeded | ✅ Completato |
-| v0.38m.04 | Sostituire `ArcGraphTerrainRuntimeMapGridAdapter` con sorgente runtime neutra non MapGrid | ⏳ Pending |
-| v0.38m.05 | Rimuovere dipendenza di `ArcGraphRuntimeSceneAutoInstaller` da `MapGridBootstrap`, `MapGridWorldView` e root visuali MapGrid | ⏳ Pending |
+| v0.38m.04 | Sostituire `ArcGraphTerrainRuntimeMapGridAdapter` con sorgente runtime neutra non MapGrid | ✅ Completato |
+| v0.38m.05 | Rimuovere dipendenza di `ArcGraphRuntimeSceneAutoInstaller` da `MapGridBootstrap`, `MapGridWorldView` e root visuali MapGrid | ⏳ Parziale |
 | v0.38m.06 | Eliminare i probe ArcGraph storici basati su MapGrid o marcarli legacy non runtime | ⏳ Pending |
 | v0.38m.07 | Migrare preview/placement ArcGraph fuori da `MapGridWorldProvider` | ⏳ Pending |
 | v0.38m.08 | Migrare asset/path oggetti ArcGraph fuori da path `MapGrid/Sprites/Objects` | ⏳ Pending |
@@ -15527,7 +15527,7 @@ Sotto-roadmap tecnica collegata al distacco MapGrid:
 | v0.38m.12 | Spostare dimensioni mappa fuori da `game_params.json` e rimuovere duplicati tipo `worldWidth/worldHeight` da sorgenti non autoritative | ✅ Completato |
 | v0.38m.13 | Implementare loader mappa Core che inizializza dimensioni, `CellSurfaceLayer` e oggetti iniziali dal file mappa unico | ✅ Completato |
 | v0.38m.14 | Collassare i cataloghi terrain ArcGraph legacy dentro il catalogo superfici unico, mantenendo solo dati visuali strettamente renderer-side dove necessario | ✅ Completato |
-| v0.38m.15 | Pensionare layout/config MapGrid dal percorso runtime ArcGraph dopo verifica del loader mappa unico | ⏳ Pending |
+| v0.38m.15 | Pensionare layout/config MapGrid dal percorso runtime ArcGraph dopo verifica del loader mappa unico | ✅ Completato |
 
 Decisione tecnica `v0.38m`:
 
@@ -15553,16 +15553,26 @@ game_params.json
 
 Connessioni MapGrid residue da eliminare esplicitamente:
 
-- `ArcGraphTerrainRuntimeMapGridAdapter`: ancora ponte legacy per ottenere context runtime;
+- `ArcGraphTerrainRuntimeMapGridAdapter`: ancora presente come ponte legacy/probe, non piu' sorgente del runtime auto-installato;
 - `ArcGraphDebugRuntimeMapGridAdapter`: ancora ponte debug storico per Landmark/GVD;
-- `ArcGraphRuntimeSceneAutoInstaller`: ancora agganciato a `Scene_MapGrid`, root visuali MapGrid e componenti MapGrid;
-- `ArcGraphMinimalRuntimeSceneWrapper`: ancora serializza `ArcGraphTerrainRuntimeMapGridAdapter`;
-- `ArcGraphTerrainRuntimeSceneRenderer`, `ArcGraphTerrainSceneProbeRenderer`, `ArcGraphActorObjectSceneProbeRenderer` e probe collegati: ancora nominano/usano adapter MapGrid legacy;
+- `ArcGraphRuntimeSceneAutoInstaller`: ancora agganciato a `Scene_MapGrid`, root visuali MapGrid, DevTools/camera legacy e spegnimento del renderer MapGrid, ma non piu' a `MapGridBootstrap`/`MapGridWorldView` come sorgente context;
+- `ArcGraphMinimalRuntimeSceneWrapper`: serializza un `ArcGraphRuntimeContextProvider`, con alias legacy per adapter MapGrid;
+- `ArcGraphTerrainRuntimeSceneRenderer`, `ArcGraphTerrainSceneProbeRenderer`, `ArcGraphActorObjectSceneProbeRenderer` e probe collegati: ricevono un provider runtime neutro, ma mantengono alias/nomi legacy per compatibilita' temporanea;
 - `ArcGraphPlacementCellHighlightSceneConsumer`: legge ancora `MapGridWorldProvider`;
 - camera/viewport: esistono ancora bridge e configurazioni derivate dal vecchio percorso MapGrid;
 - object visual path: molti oggetti puntano ancora a sprite sotto `MapGrid/Sprites/Objects`;
 - `MapGridFovHeatmapOverlay`: contiene ancora il riferimento operativo per FOV current cone e FOV heatmap debug;
 - debug/probe storici: alcune classi restano utili come riferimento, ma non devono restare nel runtime definitivo.
+
+Aggiornamento `v0.38m.15`:
+
+- `ArcGraphRuntimeSceneAutoInstaller` non usa piu' `MapGridBootstrap` o `MapGridWorldView` per costruire il context runtime ArcGraph;
+- il percorso runtime auto-installato usa un provider neutro `SimulationHost.World -> ArcGraphRuntimeContext`;
+- `ArcGraphMinimalRuntimeSceneWrapper` e `ArcGraphTerrainRuntimeSceneRenderer` ricevono un `ArcGraphRuntimeContextProvider`, non piu' l'adapter MapGrid concreto;
+- `ArcGraphTerrainRuntimeMapGridAdapter` resta fisicamente presente come legacy/probe, ma non e' piu' la sorgente del runtime auto-installato;
+- i probe terrain/actor/object/wiring possono ricevere lo stesso provider neutro, pur mantenendo nomi diagnostici legacy per compatibilita';
+- resta parziale `v0.38m.05`: i root visuali MapGrid sono ancora cercati e spenti per evitare doppio rendering dentro `Scene_MapGrid`;
+- restano da eliminare in step successivi: DevTools/placement MapGrid, camera bridge legacy, path sprite oggetti sotto `MapGrid/Sprites/Objects`, debug FOV MapGrid e probe storici.
 
 Regola di avanzamento:
 

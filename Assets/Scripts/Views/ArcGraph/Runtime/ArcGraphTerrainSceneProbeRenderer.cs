@@ -21,7 +21,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>HasRuntimeAdapter</b>: adapter MapGrid -> ArcGraph assegnato.</item>
+    ///   <item><b>HasRuntimeAdapter</b>: provider runtime ArcGraph assegnato.</item>
     ///   <item><b>HasConfig/HasMap</b>: context terrain minimo disponibile.</item>
     ///   <item><b>HasCamera/HasMaterial</b>: prerequisiti dichiarati dal gate scena.</item>
     ///   <item><b>DidInitializeBootstrap</b>: bootstrap ArcGraph temporaneo riuscito.</item>
@@ -107,7 +107,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: scena temporanea, non renderer produttivo</b></para>
     /// <para>
     /// Questo componente consuma il context read-only prodotto da
-    /// <c>ArcGraphTerrainRuntimeMapGridAdapter</c>, inizializza un
+    /// <c>ArcGraphRuntimeContextProvider</c>, inizializza un
     /// <c>ArcGraphBootstrapRuntime</c> temporaneo, costruisce mesh data terrain e
     /// le applica a <c>GameObject</c> figli di un root dedicato. Non legge globali,
     /// non carica asset, non salva scene, non muta MapGrid e non sostituisce
@@ -125,7 +125,7 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphTerrainSceneProbeRenderer : MonoBehaviour
     {
-        [SerializeField] private ArcGraphTerrainRuntimeMapGridAdapter runtimeMapAdapter;
+        [SerializeField] private ArcGraphRuntimeContextProvider runtimeContextProvider;
         [SerializeField] private Camera sceneCamera;
         [SerializeField] private Material terrainMaterial;
         [SerializeField] private bool renderTerrainProbeOnStart;
@@ -203,8 +203,8 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public ArcGraphTerrainSceneProbeRendererDiagnostics RenderTerrainSceneProbeFromMapGrid()
         {
-            ArcGraphRuntimeContext context = runtimeMapAdapter != null
-                ? runtimeMapAdapter.BuildTerrainRuntimeContext()
+            ArcGraphRuntimeContext context = runtimeContextProvider != null
+                ? runtimeContextProvider.BuildTerrainRuntimeContext()
                 : ArcGraphRuntimeContext.Empty();
 
             ArcGraphComparisonDiagnostics gate = EvaluateGate(context);
@@ -504,7 +504,7 @@ namespace Arcontio.View.ArcGraph
             string reason)
         {
             _lastDiagnostics = new ArcGraphTerrainSceneProbeRendererDiagnostics(
-                runtimeMapAdapter != null,
+                runtimeContextProvider != null,
                 context != null && context.HasConfig,
                 context != null && context.HasMap,
                 sceneCamera != null,

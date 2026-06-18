@@ -23,17 +23,17 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>runtimeMapAdapter</b>: sorgente manuale opzionale per test da Inspector.</item>
+    ///   <item><b>runtimeContextProvider</b>: sorgente manuale opzionale per test da Inspector.</item>
     ///   <item><b>terrainMaterial</b>: materiale terrain assegnato dall'esterno.</item>
     ///   <item><b>_chunkPool</b>: chunk scene-side riusabili, uno per coordinata chunk.</item>
     ///   <item><b>RenderFromRuntime</b>: entry point futuro per wrapper/coordinator.</item>
-    ///   <item><b>RenderFromMapGridRuntime</b>: entry point manuale da adapter MapGrid.</item>
+    ///   <item><b>RenderFromConfiguredRuntimeContext</b>: entry point manuale da provider context.</item>
     ///   <item><b>ClearRuntimeRenderer</b>: cleanup confinato del solo root ArcGraph.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphTerrainRuntimeSceneRenderer : MonoBehaviour
     {
-        [SerializeField] private ArcGraphTerrainRuntimeMapGridAdapter runtimeMapAdapter;
+        [SerializeField] private ArcGraphRuntimeContextProvider runtimeContextProvider;
         [SerializeField] private Material terrainMaterial;
         [SerializeField] private TextAsset terrainCatalogJson;
         [SerializeField] private TextAsset terrainVisualCatalogJson;
@@ -139,7 +139,7 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Avvia opzionalmente il rendering terrain runtime da adapter MapGrid.
+        /// Avvia opzionalmente il rendering terrain runtime dal provider configurato.
         /// </para>
         ///
         /// <para><b>Default spento</b></para>
@@ -153,7 +153,7 @@ namespace Arcontio.View.ArcGraph
             if (!renderOnStart)
                 return;
 
-            RenderFromMapGridRuntime();
+            RenderFromConfiguredRuntimeContext();
         }
 
         // =============================================================================
@@ -170,16 +170,30 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetRuntimeContextProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il provider runtime usato dal path manuale di test.
+        /// </para>
+        /// </summary>
+        public void SetRuntimeContextProvider(ArcGraphRuntimeContextProvider provider)
+        {
+            runtimeContextProvider = provider;
+        }
+
+        // =============================================================================
         // SetRuntimeMapAdapter
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Assegna l'adapter MapGrid usato dal path manuale di test.
+        /// Compatibilita' temporanea per vecchi probe che passano ancora l'adapter
+        /// MapGrid concreto.
         /// </para>
         /// </summary>
         public void SetRuntimeMapAdapter(ArcGraphTerrainRuntimeMapGridAdapter adapter)
         {
-            runtimeMapAdapter = adapter;
+            runtimeContextProvider = adapter;
         }
 
         // =============================================================================
@@ -286,21 +300,21 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // RenderFromMapGridRuntimeContextMenu
+        // RenderFromConfiguredRuntimeContextMenu
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Entry point manuale da Inspector per renderizzare da adapter MapGrid.
+        /// Entry point manuale da Inspector per renderizzare dal provider context.
         /// </para>
         /// </summary>
-        [ContextMenu("ArcGraph/Render Terrain Runtime From MapGrid")]
-        public void RenderFromMapGridRuntimeContextMenu()
+        [ContextMenu("ArcGraph/Render Terrain Runtime From Context Provider")]
+        public void RenderFromConfiguredRuntimeContextMenu()
         {
-            RenderFromMapGridRuntime();
+            RenderFromConfiguredRuntimeContext();
         }
 
         // =============================================================================
-        // RenderFromMapGridRuntime
+        // RenderFromConfiguredRuntimeContext
         // =============================================================================
         /// <summary>
         /// <para>
@@ -315,10 +329,10 @@ namespace Arcontio.View.ArcGraph
         /// runtime.
         /// </para>
         /// </summary>
-        public ArcGraphTerrainRuntimeSceneRendererDiagnostics RenderFromMapGridRuntime()
+        public ArcGraphTerrainRuntimeSceneRendererDiagnostics RenderFromConfiguredRuntimeContext()
         {
-            ArcGraphRuntimeContext context = runtimeMapAdapter != null
-                ? runtimeMapAdapter.BuildTerrainRuntimeContext()
+            ArcGraphRuntimeContext context = runtimeContextProvider != null
+                ? runtimeContextProvider.BuildTerrainRuntimeContext()
                 : ArcGraphRuntimeContext.Empty();
 
             var runtime = new ArcGraphBootstrapRuntime();
@@ -345,6 +359,19 @@ namespace Arcontio.View.ArcGraph
 
             runtime.Dispose();
             return diagnostics;
+        }
+
+        // =============================================================================
+        // RenderFromMapGridRuntime
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Alias legacy per vecchi context menu e probe MapGrid.
+        /// </para>
+        /// </summary>
+        public ArcGraphTerrainRuntimeSceneRendererDiagnostics RenderFromMapGridRuntime()
+        {
+            return RenderFromConfiguredRuntimeContext();
         }
 
         // =============================================================================

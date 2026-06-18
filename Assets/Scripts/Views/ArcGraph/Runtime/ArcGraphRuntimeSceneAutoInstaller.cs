@@ -24,7 +24,7 @@ namespace Arcontio.View.ArcGraph
     /// <c>ArcGraphViewModeSwitcher</c> non sono presenti in Hierarchy, ArcGraph non
     /// puo' diventare la vista runtime principale. L'installer crea quindi solo
     /// GameObject e MonoBehaviour visuali, carica cataloghi da <c>Resources</c> e
-    /// collega riferimenti gia' esistenti della MapGrid. Non modifica il
+    /// collega solo i bridge legacy ancora necessari alla scena. Non modifica il
     /// <c>World</c>, non invia comandi, non crea job, non decide nulla per gli NPC e
     /// non rende ArcGraph una sorgente parallela della simulazione.
     /// </para>
@@ -34,7 +34,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>RuntimeInitializeOnLoadMethod</b>: registra l'installer sulle scene caricate.</item>
     ///   <item><b>Controller root</b>: GameObject sempre attivo che contiene il controller vista.</item>
     ///   <item><b>Visual root</b>: GameObject attivato in modalita' ArcGraph.</item>
-    ///   <item><b>Adapter</b>: ponte read-only verso MapGridBootstrap e MapGridWorldView.</item>
+    ///   <item><b>Provider</b>: ponte read-only verso SimulationHost/World.</item>
     ///   <item><b>Wrapper e renderer</b>: percorso runtime minimo terrain + NPC.</item>
     ///   <item><b>Late binding</b>: pochi frame di ricontrollo per agganciare view/runtime creati dopo il load scena.</item>
     /// </list>
@@ -53,7 +53,7 @@ namespace Arcontio.View.ArcGraph
 
         [SerializeField] private bool logDiagnostics;
 
-        private ArcGraphTerrainRuntimeMapGridAdapter _adapter;
+        private ArcGraphRuntimeWorldAdapter _contextProvider;
         private ArcGraphMinimalRuntimeSceneWrapper _wrapper;
         private ArcGraphTerrainRuntimeSceneRenderer _terrainRenderer;
         private ArcGraphNpcRuntimeSceneRenderer _npcRenderer;
@@ -72,9 +72,8 @@ namespace Arcontio.View.ArcGraph
         private int _lateBindFramesLeft;
         private int _configuredMapGridRootCount;
         private int _lastMapGridRootCount = -1;
-        private bool _lastHadBootstrap;
-        private bool _lastHadWorldView;
         private bool _lastHadDevToolsOverlay;
+        private bool _lastHadWorld;
         private bool _installed;
 
         // =============================================================================
@@ -187,7 +186,7 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             _lateBindFramesLeft--;
-            RefreshMapGridSources();
+            RefreshRuntimeSceneBindings();
         }
 
         // =============================================================================
@@ -228,7 +227,7 @@ namespace Arcontio.View.ArcGraph
             _visualRoot.transform.SetParent(transform, false);
             _visualRoot.SetActive(false);
 
-            _adapter = _visualRoot.AddComponent<ArcGraphTerrainRuntimeMapGridAdapter>();
+            _contextProvider = _visualRoot.AddComponent<ArcGraphRuntimeWorldAdapter>();
             _wrapper = _visualRoot.AddComponent<ArcGraphMinimalRuntimeSceneWrapper>();
             _terrainRenderer = _visualRoot.AddComponent<ArcGraphTerrainRuntimeSceneRenderer>();
             _npcRenderer = _visualRoot.AddComponent<ArcGraphNpcRuntimeSceneRenderer>();
@@ -248,7 +247,7 @@ namespace Arcontio.View.ArcGraph
             ConfigureAdapterAndRenderers();
             ConfigureUiRoot();
             ConfigureSwitcher();
-            RefreshMapGridSources();
+            RefreshRuntimeSceneBindings();
 
             _lateBindFramesLeft = LateBindFrameBudget;
             _installed = true;
@@ -280,10 +279,10 @@ namespace Arcontio.View.ArcGraph
 
             _terrainMaterial = CreateTerrainMaterial();
 
-            // Il terrain renderer riceve tutto in modo esplicito: adapter, JSON e
+            // Il terrain renderer riceve tutto in modo esplicito: provider, JSON e
             // materiale. Il materiale e' runtime-only e usa la texture atlas
             // esistente in Resources.
-            _terrainRenderer.SetRuntimeMapAdapter(_adapter);
+            _terrainRenderer.SetRuntimeContextProvider(_contextProvider);
             _terrainRenderer.SetTerrainMaterial(_terrainMaterial);
             _terrainRenderer.SetTerrainCatalogJson(terrainCatalog);
             _terrainRenderer.SetTerrainVisualCatalogJson(terrainVisualCatalog);
@@ -309,7 +308,7 @@ namespace Arcontio.View.ArcGraph
             _npcSpriteProbe.SetNpcVisualCatalogJson(npcVisualCatalog);
             _npcSpriteProbe.SetSpriteResolverBehaviour(_spriteResolver);
 
-            _wrapper.SetRuntimeMapAdapter(_adapter);
+            _wrapper.SetRuntimeContextProvider(_contextProvider);
             _wrapper.SetTerrainRenderer(_terrainRenderer);
             _wrapper.SetNpcRenderer(_npcRenderer);
             _wrapper.SetObjectRenderer(_objectRenderer);
@@ -406,22 +405,21 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // RefreshMapGridSources
+        // RefreshRuntimeSceneBindings
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Aggiorna i riferimenti MapGrid usati dall'adapter terrain/runtime.
+        /// Aggiorna i riferimenti runtime e legacy ancora necessari alla scena.
         /// </para>
         /// </summary>
-        private void RefreshMapGridSources()
+        private void RefreshRuntimeSceneBindings()
         {
-            MapGridBootstrap bootstrap = FindSceneComponent<MapGridBootstrap>();
-            MapGridWorldView worldView = FindSceneComponent<MapGridWorldView>();
             MapGridRuntimeDevToolsOverlay devToolsOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
             MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
+            Arcontio.Core.SimulationHost simulationHost = Arcontio.Core.SimulationHost.Instance;
 
-            if (_adapter != null)
-                _adapter.SetMapGridSources(bootstrap, worldView);
+            if (_contextProvider != null)
+                _contextProvider.SetSimulationHost(simulationHost);
 
             if (_placementHighlightConsumer != null)
                 _placementHighlightConsumer.SetDevToolsOverlay(devToolsOverlay);
@@ -438,7 +436,7 @@ namespace Arcontio.View.ArcGraph
             if (_switcher != null && _visualRoot != null)
                 ConfigureSwitcher();
 
-            LogBindingStateIfChanged(bootstrap, worldView, devToolsOverlay);
+            LogBindingStateIfChanged(simulationHost, devToolsOverlay);
         }
 
         // =============================================================================
@@ -567,9 +565,9 @@ namespace Arcontio.View.ArcGraph
         /// <para>
         /// Durante la modalita' ArcGraph alcuni root MapGrid vengono spenti. Le API
         /// globali piu' semplici di Unity possono ignorare oggetti inattivi; se il
-        /// late binding usasse solo quelle, l'adapter potrebbe perdere i riferimenti
-        /// dati legacy ancora necessari. La scansione resta confinata alla scena
-        /// attiva e viene usata solo nel breve budget di bootstrap.
+        /// late binding usasse solo quelle, i bridge legacy temporanei potrebbero
+        /// perdere riferimenti ancora necessari. La scansione resta confinata alla
+        /// scena attiva e viene usata solo nel breve budget di bootstrap.
         /// </para>
         /// </summary>
         private static T FindSceneComponent<T>()
@@ -681,36 +679,31 @@ namespace Arcontio.View.ArcGraph
         /// </para>
         /// </summary>
         private void LogBindingStateIfChanged(
-            MapGridBootstrap bootstrap,
-            MapGridWorldView worldView,
+            Arcontio.Core.SimulationHost simulationHost,
             MapGridRuntimeDevToolsOverlay devToolsOverlay)
         {
             if (!logDiagnostics)
                 return;
 
-            bool hasBootstrap = bootstrap != null;
-            bool hasWorldView = worldView != null;
             bool hasDevToolsOverlay = devToolsOverlay != null;
+            bool hasWorld = simulationHost != null && simulationHost.World != null;
             int rootCount = _configuredMapGridRootCount;
 
             if (_lastMapGridRootCount == rootCount
-                && _lastHadBootstrap == hasBootstrap
-                && _lastHadWorldView == hasWorldView
-                && _lastHadDevToolsOverlay == hasDevToolsOverlay)
+                && _lastHadDevToolsOverlay == hasDevToolsOverlay
+                && _lastHadWorld == hasWorld)
             {
                 return;
             }
 
             _lastMapGridRootCount = rootCount;
-            _lastHadBootstrap = hasBootstrap;
-            _lastHadWorldView = hasWorldView;
             _lastHadDevToolsOverlay = hasDevToolsOverlay;
+            _lastHadWorld = hasWorld;
 
             Debug.Log(
                 "[ArcGraphRuntimeSceneAutoInstaller] BindingState " +
                 "mapGridRoots=" + rootCount +
-                ", bootstrap=" + hasBootstrap +
-                ", worldView=" + hasWorldView +
+                ", world=" + hasWorld +
                 ", devToolsOverlay=" + hasDevToolsOverlay +
                 ", visualRoot=" + (_visualRoot != null));
         }

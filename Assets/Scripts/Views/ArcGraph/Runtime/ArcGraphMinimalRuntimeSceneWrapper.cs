@@ -14,7 +14,7 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// Il componente esiste solo per collegare oggetti scena gia' espliciti a un
     /// coordinator C# passivo. Riceve da Inspector il ponte dati
-    /// <c>ArcGraphTerrainRuntimeMapGridAdapter</c> e, opzionalmente, il wrapper
+    /// <c>ArcGraphRuntimeContextProvider</c> e, opzionalmente, il wrapper
     /// interattivo <c>ArcGraphInteractionSceneAdapterWrapper</c>. Non crea
     /// GameObject, non crea renderer, non legge <c>SimulationHost</c>, non cerca
     /// oggetti in scena, non invia comandi e non sostituisce ancora MapGrid come
@@ -23,7 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>runtimeMapAdapter</b>: sorgente esplicita del context ArcGraph provvisorio.</item>
+    ///   <item><b>runtimeContextProvider</b>: sorgente esplicita del context ArcGraph.</item>
     ///   <item><b>terrainRenderer</b>: renderer runtime terrain opzionale e gated.</item>
     ///   <item><b>npcRenderer</b>: renderer runtime NPC opzionale e gated.</item>
     ///   <item><b>objectRenderer</b>: renderer runtime oggetti opzionale e gated.</item>
@@ -35,7 +35,7 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphMinimalRuntimeSceneWrapper : MonoBehaviour
     {
-        [SerializeField] private ArcGraphTerrainRuntimeMapGridAdapter runtimeMapAdapter;
+        [SerializeField] private ArcGraphRuntimeContextProvider runtimeContextProvider;
         [SerializeField] private ArcGraphTerrainRuntimeSceneRenderer terrainRenderer;
         [SerializeField] private ArcGraphNpcRuntimeSceneRenderer npcRenderer;
         [SerializeField] private ArcGraphObjectRuntimeSceneRenderer objectRenderer;
@@ -219,16 +219,30 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetRuntimeContextProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna esplicitamente il provider runtime usato come sorgente dati.
+        /// </para>
+        /// </summary>
+        public void SetRuntimeContextProvider(ArcGraphRuntimeContextProvider provider)
+        {
+            runtimeContextProvider = provider;
+        }
+
+        // =============================================================================
         // SetRuntimeMapAdapter
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Assegna esplicitamente l'adapter runtime MapGrid usato come sorgente dati.
+        /// Compatibilita' temporanea per vecchi probe che passano ancora l'adapter
+        /// MapGrid concreto.
         /// </para>
         /// </summary>
         public void SetRuntimeMapAdapter(ArcGraphTerrainRuntimeMapGridAdapter adapter)
         {
-            runtimeMapAdapter = adapter;
+            runtimeContextProvider = adapter;
         }
 
         // =============================================================================
@@ -428,9 +442,9 @@ namespace Arcontio.View.ArcGraph
                 return _lastDiagnostics;
             }
 
-            if (runtimeMapAdapter == null)
+            if (runtimeContextProvider == null)
             {
-                // Il wrapper non cerca un adapter nella scena. Se manca il
+                // Il wrapper non cerca un provider nella scena. Se manca il
                 // riferimento esplicito, il gate fallisce in modo leggibile e senza
                 // fallback nascosti.
                 ArcGraphMinimalRuntimeCoordinatorDiagnostics disabledDiagnostics =
@@ -447,13 +461,13 @@ namespace Arcontio.View.ArcGraph
                     firstContextObjectId: -1,
                     firstContextObjectDefId: string.Empty,
                     disabledDiagnostics,
-                    "RuntimeMapAdapterMissing");
+                    "RuntimeContextProviderMissing");
 
                 LogLastDiagnostics();
                 return _lastDiagnostics;
             }
 
-            ArcGraphRuntimeContext context = runtimeMapAdapter.BuildTerrainRuntimeContext();
+            ArcGraphRuntimeContext context = runtimeContextProvider.BuildTerrainRuntimeContext();
             _currentViewConfig = CreateViewConfigForContext(context);
             if (interactionWrapper != null)
                 interactionWrapper.SetConfig(_currentViewConfig);
@@ -722,7 +736,7 @@ namespace Arcontio.View.ArcGraph
             // il significato dei flag in tutti i gate: spento, adapter mancante,
             // context parziale o successo.
             return new ArcGraphMinimalRuntimeSceneWrapperDiagnostics(
-                runtimeMapAdapter != null,
+                runtimeContextProvider != null,
                 interactionWrapper != null,
                 terrainRenderer != null,
                 npcRenderer != null,
@@ -798,7 +812,7 @@ namespace Arcontio.View.ArcGraph
                 "[ArcGraphMinimalRuntimeSceneWrapper] " + _lastDiagnostics.Reason +
                 " wrapperEnabled=" + _lastDiagnostics.IsWrapperEnabled +
                 ", update=" + _lastDiagnostics.ProcessesInUpdate +
-                ", runtimeAdapter=" + _lastDiagnostics.HasRuntimeMapAdapter +
+                ", runtimeContextProvider=" + _lastDiagnostics.HasRuntimeContextProvider +
                 ", terrainRenderer=" + _lastDiagnostics.HasTerrainRenderer +
                 ", npcRenderer=" + _lastDiagnostics.HasNpcRenderer +
                 ", objectRenderer=" + _lastDiagnostics.HasObjectRenderer +

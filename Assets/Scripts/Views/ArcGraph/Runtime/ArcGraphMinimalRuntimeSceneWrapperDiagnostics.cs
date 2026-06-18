@@ -11,7 +11,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: confine scena sottile e ispezionabile</b></para>
     /// <para>
     /// Questa struttura descrive se il wrapper scena era abilitato, se aveva gli
-    /// adapter richiesti, se ha chiamato il coordinator passivo e se ha inoltrato
+    /// provider richiesti, se ha chiamato il coordinator passivo e se ha inoltrato
     /// la render queue actor/object al wrapper interattivo. Non contiene riferimenti
     /// a GameObject, World, MapGridData o altri oggetti mutabili: espone solo esiti
     /// copiati, contatori e ragioni leggibili.
@@ -20,7 +20,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Wrapper gate</b>: stato di abilitazione e modalita' Update.</item>
-    ///   <item><b>Adapter gate</b>: presenza del runtime adapter MapGrid e del wrapper interattivo opzionale.</item>
+    ///   <item><b>Provider gate</b>: presenza del provider runtime e del wrapper interattivo opzionale.</item>
     ///   <item><b>Coordinator gate</b>: esecuzione del coordinator minimo e relativa diagnostica.</item>
     ///   <item><b>Renderer gate</b>: inoltro opzionale verso renderer terrain, NPC e oggetti runtime.</item>
     ///   <item><b>Interaction push</b>: inoltro opzionale della queue actor/object al sistema input ArcGraph.</item>
@@ -29,7 +29,7 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public readonly struct ArcGraphMinimalRuntimeSceneWrapperDiagnostics
     {
-        public readonly bool HasRuntimeMapAdapter;
+        public readonly bool HasRuntimeContextProvider;
         public readonly bool HasInteractionWrapper;
         public readonly bool HasTerrainRenderer;
         public readonly bool HasNpcRenderer;
@@ -74,7 +74,7 @@ namespace Arcontio.View.ArcGraph
         /// </para>
         /// </summary>
         public ArcGraphMinimalRuntimeSceneWrapperDiagnostics(
-            bool hasRuntimeMapAdapter,
+            bool hasRuntimeContextProvider,
             bool hasInteractionWrapper,
             bool hasTerrainRenderer,
             bool hasNpcRenderer,
@@ -103,7 +103,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphObjectRuntimeSceneRendererDiagnostics objectRendererDiagnostics,
             string reason)
         {
-            HasRuntimeMapAdapter = hasRuntimeMapAdapter;
+            HasRuntimeContextProvider = hasRuntimeContextProvider;
             HasInteractionWrapper = hasInteractionWrapper;
             HasTerrainRenderer = hasTerrainRenderer;
             HasNpcRenderer = hasNpcRenderer;

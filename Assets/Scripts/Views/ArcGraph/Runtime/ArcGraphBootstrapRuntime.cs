@@ -196,8 +196,9 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Principio architetturale: terreno statico, entita' dinamiche</b></para>
         /// <para>
-        /// Nel runtime attuale il terreno viene letto da MapGrid come base visuale
-        /// quasi statica, mentre NPC e oggetti possono cambiare a ogni frame/tick.
+        /// Nel runtime attuale il terreno viene letto dal <c>World.CellSurfaces</c>
+        /// come base visuale quasi statica, mentre NPC e oggetti possono cambiare a
+        /// ogni frame/tick.
         /// Questo metodo evita la scansione completa della mappa per frame e
         /// mantiene aggiornati i layer che alimentano la render queue.
         /// </para>
@@ -265,7 +266,7 @@ namespace Arcontio.View.ArcGraph
 
         private void PopulateDynamicSnapshotsFromContext()
         {
-            // Oggetti e attori sono la parte mobile del ponte MapGrid/World. Sono
+            // Oggetti e attori sono la parte mobile del context World/ArcGraph. Sono
             // aggiornati spesso, ma non devono invalidare il terrain renderer.
             _objectSnapshots.Clear();
             _actorSnapshots.Clear();

@@ -2335,6 +2335,16 @@ Aprire nuovo branch task quando:
 
 # 7. Stato repository attualmente noto
 
+Aggiornamento operativo `v0.38m.15`:
+
+- ArcGraph runtime auto-installato usa ora un provider neutro `SimulationHost.World -> ArcGraphRuntimeContext`;
+- `ArcGraphRuntimeSceneAutoInstaller` non legge piu' `MapGridBootstrap.RuntimeMap` o `MapGridWorldView.RuntimeWorld` per alimentare terrain/NPC/oggetti ArcGraph;
+- `ArcGraphMinimalRuntimeSceneWrapper`, `ArcGraphTerrainRuntimeSceneRenderer` e i probe runtime consumano `ArcGraphRuntimeContextProvider`;
+- `ArcGraphTerrainRuntimeMapGridAdapter` resta nel codice solo come adapter legacy/probe e compatibilita' temporanea;
+- `v0.38m.04` e `v0.38m.15` sono completati;
+- `v0.38m.05` resta parziale perche' `Scene_MapGrid`, spegnimento root visuali MapGrid, `MapGridRuntimeDevToolsOverlay`, camera bridge e placement bridge sono ancora necessari;
+- `MapGridFovHeatmapOverlay` non va cancellato: prima bisogna copiare/assorbire il comportamento utile FOV current cone / FOV heatmap in un producer e consumer ArcGraph verificati.
+
 Confermato:
 
 - `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `df7f211`;
