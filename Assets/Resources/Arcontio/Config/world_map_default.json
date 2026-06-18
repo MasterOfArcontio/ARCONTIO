@@ -1,0 +1,16 @@
+{
+  "Map": {
+    "Id": "debug_arcgraph_base",
+    "Width": 64,
+    "Height": 64,
+    "ZLevel": 0
+  },
+  "SurfaceLayer": {
+    "Fill": {
+      "SurfaceKey": "grass",
+      "BiomeAreaKey": "debug_grassland"
+    },
+    "Patches": []
+  },
+  "InitialObjects": []
+}

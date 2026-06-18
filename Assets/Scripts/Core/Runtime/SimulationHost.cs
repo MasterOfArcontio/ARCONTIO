@@ -1467,7 +1467,6 @@ namespace Arcontio.Core
             // dimensione salvata: bounds check, cache oggetti e occlusion map
             // devono validare contro la mappa persistita.
             loadedWorld.InitMap(data.worldWidth, data.worldHeight);
-            CellSurfaceLayerConfigLoader.LoadIntoWorld(loadedWorld);
 
             Debug.Log(
                 $"[WorldSnapshotLoadDiag][SimulationHost] Fresh World InitMap " +
@@ -1593,10 +1592,10 @@ namespace Arcontio.Core
 
             ObjectDatabaseLoader.LoadIntoWorld(world);
             CellSurfaceDatabaseLoader.LoadIntoWorld(world);
+            WorldMapConfigLoader.LoadIntoWorld(world);
             NeedsConfigLoader.LoadIntoWorld(world);
             BeliefDecayConfigLoader.LoadIntoWorld(world);
             BeliefQueryConfigLoader.LoadIntoWorld(world);
-            CellSurfaceLayerConfigLoader.LoadIntoWorld(world);
         }
 
         // =============================================================================
