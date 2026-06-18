@@ -28,13 +28,13 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 ## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
 
 CHECKPOINT CORRENTE:
-`v0.38l - ArcGraph Interaction Minimum Gate`
+`v0.38o - MapGrid Dependency Audit Finale / ArcGraph Visual Asset Policy Alignment`
 
 STATUS:
-TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; F12 RUNTIME SWITCH GATE SUPERATO; MINI-TILE 16x16 RINVIATO COME DEBITO NON BLOCCANTE; BIOSFERA v0.39-v0.52 DOCUMENTATA COME FOUNDATION; PROSSIMO BLOCCO: v0.38l INTERACTION MINIMUM GATE
+TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; F12 RUNTIME SWITCH GATE SUPERATO; FOV ARCGRAPH ASSORBITO COME MODALITA' VIEWMODE DA VALIDARE; FALLBACK SPRITE MAPGRID ELIMINATO; PAN/ZOOM SCOLLEGATI DA MAPGRID; POLICY VISUAL ASSET ARCGRAPH FORMALIZZATA; PROSSIMO BLOCCO: v0.38o.06 PLACEMENT/F3 AUTONOMO ARCGRAPH
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38k-runtime-switch-stabilization`
+`ai-task/v0.38o-policy-roadmap-alignment`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -111,6 +111,36 @@ MICRO-ROADMAP OPERATIVA v0.38j:
 ✅ v0.38k.02 -> SUPERATO OPERATORE - Gate manuale F12 assistito da probe Console: MapGrid -> ArcGraph -> MapGrid, terrain/NPC/muri/preview
 ✅ v0.38k.03 -> NON NECESSARIO - Nessun fix mirato richiesto dopo gate F12
 ⏳ v0.38l -> PROSSIMO - Interaction Minimum Gate: hover, selezione e pointer HUD dentro ArcGraph
+```
+
+MICRO-ROADMAP OPERATIVA v0.38o:
+
+```text
+✅ v0.38o.01 -> COMPLETATO - Audit bridge attivi MapGrid ancora usati da ArcGraph
+✅ v0.38o.02 -> COMPLETATO - Eliminazione fallback sprite oggetti ArcGraph verso MapGrid/Sprites/Objects/{defId}
+✅ v0.38o.03 -> COMPLETATO - Separazione preview placement/F3 dal tipo concreto MapGridRuntimeDevToolsOverlay
+✅ v0.38o.04 -> COMPLETATO - Scollegamento pan/zoom ArcGraph da offset camera MapGrid
+✅ v0.38o.05 -> COMPLETATO - Policy visual asset ArcGraph per oggetti, NPC, piante, vegetazione e resolver sprite
+⏳ v0.38o.06 -> PROSSIMO - Controller placement/F3 autonomo ArcGraph, fuori dal DevTools legacy MapGrid
+⏳ v0.38o.07 -> PENDING - Migrazione object_defs.json da path MapGrid/Sprites/Objects a path ArcGraph reali, solo con asset equivalenti
+⏳ v0.38o.08 -> PENDING - Introduzione ArcGraphEnvironmentVisualCatalog.json per vegetazione diffusa e PlantInstance
+⏳ v0.38o.09 -> PENDING - Collegamento plantVisualStateKey / visualStateKey al catalogo ambiente ArcGraph
+⏳ v0.38o.10 -> PENDING - Estensione ArcGraphNpcVisualCatalog.json per sheet NPC per parte/animazione
+⏳ v0.38o.11 -> PENDING - Eliminazione o congelamento adapter/probe MapGrid non-runtime
+⏳ v0.38o.12 -> PENDING - Rimozione ArcGraphViewModeSwitcher/root switch legacy quando ArcGraph resta unica vista
+⏳ v0.38o.13 -> PENDING - Gate finale prima della cancellazione fisica MapGrid: test Unity e zero dipendenze runtime
+```
+
+ROADMAP POLICY VISUAL ASSET ARCGRAPH - STATO OPERATIVO:
+
+```text
+✅ Policy step 1 -> Congelare ARCGRAPH_VISUAL_ASSET_POLICY.md e usarlo come vincolo operativo: coperto da v0.38o.05
+⏳ Policy step 2 -> Migrare object_defs.json da path MapGrid a path ArcGraph reali: coperto da v0.38o.07
+⏳ Policy step 3 -> Estendere ArcGraphNpcVisualCatalog.json per sheet per parte/animazione: coperto da v0.38o.10
+⏳ Policy step 4 -> Introdurre ArcGraphEnvironmentVisualCatalog.json: coperto da v0.38o.08
+⏳ Policy step 5 -> Collegare plantVisualStateKey / visualStateKey al catalogo ambiente: coperto da v0.38o.09
+⏳ Policy step 6 -> Rimuovere o congelare pattern NPC a frame sciolti quando le sheet esistono: dopo v0.38o.10
+⏳ Policy step 7 -> Eliminare path MapGrid residui dai cataloghi ArcGraph prima del delete fisico MapGrid: coperto da v0.38o.07 + v0.38o.13
 ```
 
 ROADMAP BIOSFERA v0.39-v0.52 - STATO DOCUMENTALE / FOUNDATION:
