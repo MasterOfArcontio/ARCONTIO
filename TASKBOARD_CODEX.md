@@ -243,6 +243,7 @@ Regola corrente:
   - il debug minimo assorbito in ArcGraph e' limitato a Landmark + GVD-DIN + DT heatmap;
   - la catena MapGridWorldView -> adapter -> wrapper -> coordinator -> feed -> queue -> probe renderer resta valida come ponte manuale read-only;
   - FOV current cone, FOV historical heatmap, pointer HUD, runtime cost HUD, label screen-space, summary cards, top bar, DevTools, click-to-move e selection restano fuori dal debug minimo;
+  - vincolo aggiunto: `MapGridFovHeatmapOverlay` non puo' essere cancellato fisicamente finche' ArcGraph non ha un equivalente verificato per FOV current cone / FOV heatmap debug;
   - questi elementi vanno auditati come strumenti interattivi/UI, non come semplice renderer.
 - audit `v0.38f` completato:
   - `MapGridWorldView` concentra ancora rendering, selection, click-to-move, FOV, summary overlay, pointer HUD, top bar, DevTools, audio feedback e rebind World;
@@ -293,6 +294,7 @@ Regola corrente:
   - summary card, movement panel e overlay NPC vanno dopo selection e frame interattivo stabile;
   - top bar, DevTools e click-to-move sono strumenti operativi, non renderer, e non devono essere posseduti da ArcGraph;
   - FOV current cone richiede un producer overlay dedicato e non appartiene al primo consumer;
+  - la migrazione FOV diventa gate esplicito prima della cancellazione fisica di MapGrid: copiare solo il comportamento utile, non `MapGridWorldView`;
   - ordine consigliato: Pointer HUD, selection, overlay NPC, side panel, top bar separata, DevTools command tool, FOV producer;
   - prossimo checkpoint: `v0.38f.06 - ArcGraph Pointer HUD Passive Contract`.
 - micro-step `v0.38f.06` completato:
@@ -2332,6 +2334,58 @@ Aprire nuovo branch task quando:
 ---
 
 # 7. Stato repository attualmente noto
+
+Aggiornamento operativo `v0.38m.15`:
+
+- ArcGraph runtime auto-installato usa ora un provider neutro `SimulationHost.World -> ArcGraphRuntimeContext`;
+- `ArcGraphRuntimeSceneAutoInstaller` non legge piu' `MapGridBootstrap.RuntimeMap` o `MapGridWorldView.RuntimeWorld` per alimentare terrain/NPC/oggetti ArcGraph;
+- `ArcGraphMinimalRuntimeSceneWrapper`, `ArcGraphTerrainRuntimeSceneRenderer` e i probe runtime consumano `ArcGraphRuntimeContextProvider`;
+- `ArcGraphTerrainRuntimeMapGridAdapter` resta nel codice solo come adapter legacy/probe e compatibilita' temporanea;
+- `v0.38m.04` e `v0.38m.15` sono completati;
+- `v0.38m.05` resta parziale perche' `Scene_MapGrid`, spegnimento root visuali MapGrid, `MapGridRuntimeDevToolsOverlay`, camera bridge e placement bridge sono ancora necessari;
+- `MapGridFovHeatmapOverlay` non va cancellato: prima bisogna copiare/assorbire il comportamento utile FOV current cone / FOV heatmap in un producer e consumer ArcGraph verificati.
+
+Aggiornamento operativo `v0.38n.01-v0.38n.03`:
+
+- assorbito il comportamento utile di `MapGridFovHeatmapOverlay.RenderCurrentCone(...)` dentro `ArcGraphFovDebugOverlayProducer`;
+- aggiunto consumer pooled `ArcGraphFovDebugOverlaySceneConsumer` per disegnare celle FOV in ArcGraph;
+- aggiunto controller `ArcGraphFovDebugOverlayRuntimeController`;
+- il pulsante `FOV` della `ViewModeBar` ArcGraph attiva/disattiva il cono FOV senza passare da `MapGridWorldView`;
+- resta obbligatorio il confronto Unity prima di cancellare fisicamente MapGrid;
+- cancellazione fisica MapGrid ancora vietata finche' l'audit `v0.38o` non conferma che non esistono piu' dipendenze runtime attive.
+- audit statico post-FOV: MapGrid resta ancora attivo come dipendenza tramite placement/DevTools, camera bridge, root visuali legacy, adapter legacy/probe, path sprite oggetti e view switcher;
+- prossimo step consigliato: `v0.38o.01 - MapGrid Active Runtime Bridge Audit`, poi rimozione o sostituzione un bridge alla volta.
+
+Aggiornamento operativo `v0.38o.01-v0.38o.04`:
+
+- eliminato il fallback automatico ArcGraph `MapGrid/Sprites/Objects/{defId}` per oggetti privi di path visuale;
+- `ObjectDef.ResolveArcGraphSpritePath()` usa solo `Visual.SpritePath`; `SpriteKey` resta legacy MapGrid e non viene piu' usato come fallback ArcGraph;
+- la preview placement ArcGraph ora consuma `IArcGraphPlacementPreviewSource`, non il tipo concreto `MapGridRuntimeDevToolsOverlay`;
+- `MapGridRuntimeDevToolsOverlay` implementa temporaneamente il contratto neutro, in attesa di un controller placement/F3 ArcGraph autonomo;
+- la preview placement legge il `World` tramite `ArcGraphRuntimeContextProvider`, non tramite `MapGridWorldProvider`;
+- `ArcGraphCameraViewportController` e `ArcGraphInteractionSceneAdapterWrapper` non inviano piu' offset camera a `MapGridCameraController`;
+- `ArcGraphRuntimeSceneAutoInstaller` disabilita il `MapGridCameraController` legacy quando installa ArcGraph;
+- pan ArcGraph resta vincolato alla rotellina premuta per default; RMB non e' piu' attivo come pan ArcGraph;
+- scelta tecnica pan/zoom: non riusare `MapGridCameraController`; proseguire con `ArcGraphViewConfig JSON -> ArcGraphViewController -> ArcGraphCameraViewportController`.
+
+Aggiornamento operativo `v0.38o.05`:
+
+- aggiunto `ARCGRAPH_VISUAL_ASSET_POLICY.md` come policy root per cataloghi visuali ArcGraph;
+- confermato che `object_defs.json` resta il catalogo per oggetti fisici/manipolabili, muri, porte, mobili, costruzioni e risorse concrete;
+- confermato che piante vive e vegetazione biosfera devono passare da `visualStateKey` / `plantVisualStateKey` a un catalogo visuale ambiente ArcGraph, non da `object_defs.json`;
+- definito come catalogo futuro `ArcGraphEnvironmentVisualCatalog.json`, con sezioni minime `VegetationAreas` e `Plants`;
+- confermato che NPC dovranno migrare gradualmente da frame separati a sheet per parte/animazione, mantenendo compatibile il formato attuale fino alla disponibilita' asset;
+- confermato che il resolver sprite puo' risolvere sprite singole e sheet sliced tramite `sheet#subSprite`, ma non deve generare fallback impliciti verso MapGrid.
+
+Residui bloccanti prima della cancellazione fisica MapGrid:
+
+- il comando operativo F3/placement vive ancora nel DevTools legacy;
+- `object_defs.json` contiene ancora `Visual.SpritePath` espliciti verso asset `MapGrid/Sprites/Objects`; non sono fallback, sono dati catalogo da migrare solo quando esistono asset ArcGraph equivalenti;
+- manca `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e piante vive della biosfera;
+- `ArcGraphNpcVisualCatalog.json` usa ancora pattern frame separati e non ancora sheet per parte/animazione;
+- restano adapter/probe MapGrid legacy;
+- resta logica di root switch/visual root MapGrid;
+- resta da validare in Unity che camera, preview, muri e FOV funzionino senza regressioni.
 
 Confermato:
 

@@ -107,7 +107,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>ProbeTerrainBootstrapDataOnly</b>: smoke manuale senza rendering.</item>
     /// </list>
     /// </summary>
-    public sealed class ArcGraphTerrainRuntimeMapGridAdapter : MonoBehaviour
+    public sealed class ArcGraphTerrainRuntimeMapGridAdapter : ArcGraphRuntimeContextProvider
     {
         [SerializeField] private MapGridBootstrap mapGridBootstrap;
         [SerializeField] private MapGridWorldView mapGridWorldView;
@@ -115,6 +115,7 @@ namespace Arcontio.View.ArcGraph
 
         private ArcGraphTerrainRuntimeMapGridAdapterDiagnostics _lastDiagnostics;
 
+        public override string ProviderKind => "LegacyMapGrid";
         public ArcGraphTerrainRuntimeMapGridAdapterDiagnostics LastDiagnostics => _lastDiagnostics;
 
         // =============================================================================
@@ -156,7 +157,7 @@ namespace Arcontio.View.ArcGraph
         /// primitivi e il terrain viene letto da <c>World.CellSurfaces</c>.
         /// </para>
         /// </summary>
-        public ArcGraphRuntimeContext BuildTerrainRuntimeContext()
+        public override ArcGraphRuntimeContext BuildTerrainRuntimeContext()
         {
             if (mapGridBootstrap == null)
                 return ArcGraphRuntimeContext.Empty();

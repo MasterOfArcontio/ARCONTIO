@@ -430,6 +430,15 @@ namespace Arcontio.View.ArcGraph
             Color color;
             switch (colorKey)
             {
+                case "debug/fov/observed":
+                    color = new Color(1f, 1f, 1f, 0.22f);
+                    break;
+                case "debug/fov/watched":
+                    color = new Color(0.45f, 0.92f, 1f, 0.16f);
+                    break;
+                case "debug/fov/heat":
+                    color = new Color(1f, 1f, 1f, Mathf.Clamp01(intensity01) * 0.50f);
+                    break;
                 case "debug/dt/heat":
                     color = Color.Lerp(new Color(0.10f, 0.18f, 1f, 0.35f), new Color(1f, 0.15f, 0.05f, 0.55f), Clamp01(intensity01));
                     break;

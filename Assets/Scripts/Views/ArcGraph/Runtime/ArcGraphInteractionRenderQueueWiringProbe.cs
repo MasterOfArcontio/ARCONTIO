@@ -13,14 +13,14 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Principio architetturale: wiring osservabile e non permanente</b></para>
     /// <para>
-    /// Questo risultato serve a capire se il probe ha ricevuto adapter, wrapper,
+    /// Questo risultato serve a capire se il probe ha ricevuto provider, wrapper,
     /// world, layer actor/object e queue valida. Il dato e' intenzionalmente piatto:
     /// spiega il gate visuale senza diventare un sistema produttivo nascosto.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>HasRuntimeAdapter</b>: adapter MapGrid -> ArcGraph assegnato.</item>
+    ///   <item><b>HasRuntimeAdapter</b>: provider runtime ArcGraph assegnato.</item>
     ///   <item><b>HasInteractionWrapper</b>: wrapper interazione assegnato.</item>
     ///   <item><b>DidInitializeBootstrap</b>: bootstrap temporaneo riuscito.</item>
     ///   <item><b>HasActorLayer/HasObjectLayer</b>: layer necessari presenti.</item>
@@ -85,7 +85,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: ponte di gate, non renderer produttivo</b></para>
     /// <para>
     /// Il componente esiste per il gate visuale dei consumer modulari. Riceve da
-    /// Inspector un <c>ArcGraphTerrainRuntimeMapGridAdapter</c> e un
+    /// Inspector un <c>ArcGraphRuntimeContextProvider</c> e un
     /// <c>ArcGraphInteractionSceneAdapterWrapper</c>, costruisce un bootstrap
     /// ArcGraph temporaneo in memoria, produce la queue actor/object e la passa al
     /// wrapper tramite <c>SetRenderQueue</c>. Non crea sprite, non crea GameObject di
@@ -94,7 +94,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>runtimeMapAdapter</b>: sorgente esplicita del context runtime.</item>
+    ///   <item><b>runtimeContextProvider</b>: sorgente esplicita del context runtime.</item>
     ///   <item><b>interactionWrapper</b>: wrapper che ricevera' la queue.</item>
     ///   <item><b>PushRenderQueueToInteractionWrapper</b>: build e consegna manuale.</item>
     ///   <item><b>ResolveLodProfile</b>: usa la policy LOD ArcGraph esistente.</item>
@@ -103,7 +103,7 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphInteractionRenderQueueWiringProbe : MonoBehaviour
     {
-        [SerializeField] private ArcGraphTerrainRuntimeMapGridAdapter runtimeMapAdapter;
+        [SerializeField] private ArcGraphRuntimeContextProvider runtimeContextProvider;
         [SerializeField] private ArcGraphInteractionSceneAdapterWrapper interactionWrapper;
         [SerializeField] private bool pushOnStart;
         [SerializeField] private bool enableWrapperAfterPush;
@@ -170,7 +170,7 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public ArcGraphInteractionRenderQueueWiringProbeDiagnostics PushRenderQueueToInteractionWrapper()
         {
-            if (runtimeMapAdapter == null || interactionWrapper == null)
+            if (runtimeContextProvider == null || interactionWrapper == null)
             {
                 _lastQueue = null;
                 _lastDiagnostics = BuildDiagnostics(
@@ -180,12 +180,12 @@ namespace Arcontio.View.ArcGraph
                     hasObjectLayer: false,
                     queue: null,
                     didPushToWrapper: false,
-                    reason: runtimeMapAdapter == null ? "RuntimeAdapterMissing" : "InteractionWrapperMissing");
+                    reason: runtimeContextProvider == null ? "RuntimeContextProviderMissing" : "InteractionWrapperMissing");
                 LogLastDiagnostics();
                 return _lastDiagnostics;
             }
 
-            ArcGraphRuntimeContext context = runtimeMapAdapter.BuildTerrainRuntimeContext();
+            ArcGraphRuntimeContext context = runtimeContextProvider.BuildTerrainRuntimeContext();
             var runtime = new ArcGraphBootstrapRuntime();
             bool initialized = runtime.Initialize(
                 context,
@@ -259,7 +259,7 @@ namespace Arcontio.View.ArcGraph
             string reason)
         {
             return new ArcGraphInteractionRenderQueueWiringProbeDiagnostics(
-                runtimeMapAdapter != null,
+                runtimeContextProvider != null,
                 interactionWrapper != null,
                 context != null,
                 context != null && context.HasWorld,

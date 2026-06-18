@@ -15533,8 +15533,8 @@ Sotto-roadmap tecnica collegata al distacco MapGrid:
 | v0.38m.01 | Introdurre `CellSurfaceLayer` Core come sorgente autoritativa del pavimento cella | ✅ Completato |
 | v0.38m.02 | Far leggere ad ArcGraph il terrain da `World.CellSurfaces`, non da `MapGridData` | ✅ Completato |
 | v0.38m.03 | Spostare la mappa debug iniziale su file Core `cell_surface_layout.json`, con random map solo futura e seeded | ✅ Completato |
-| v0.38m.04 | Sostituire `ArcGraphTerrainRuntimeMapGridAdapter` con sorgente runtime neutra non MapGrid | ⏳ Pending |
-| v0.38m.05 | Rimuovere dipendenza di `ArcGraphRuntimeSceneAutoInstaller` da `MapGridBootstrap`, `MapGridWorldView` e root visuali MapGrid | ⏳ Pending |
+| v0.38m.04 | Sostituire `ArcGraphTerrainRuntimeMapGridAdapter` con sorgente runtime neutra non MapGrid | ✅ Completato |
+| v0.38m.05 | Rimuovere dipendenza di `ArcGraphRuntimeSceneAutoInstaller` da `MapGridBootstrap`, `MapGridWorldView` e root visuali MapGrid | ⏳ Parziale |
 | v0.38m.06 | Eliminare i probe ArcGraph storici basati su MapGrid o marcarli legacy non runtime | ⏳ Pending |
 | v0.38m.07 | Migrare preview/placement ArcGraph fuori da `MapGridWorldProvider` | ⏳ Pending |
 | v0.38m.08 | Migrare asset/path oggetti ArcGraph fuori da path `MapGrid/Sprites/Objects` | ⏳ Pending |
@@ -15544,7 +15544,7 @@ Sotto-roadmap tecnica collegata al distacco MapGrid:
 | v0.38m.12 | Spostare dimensioni mappa fuori da `game_params.json` e rimuovere duplicati tipo `worldWidth/worldHeight` da sorgenti non autoritative | ✅ Completato |
 | v0.38m.13 | Implementare loader mappa Core che inizializza dimensioni, `CellSurfaceLayer` e oggetti iniziali dal file mappa unico | ✅ Completato |
 | v0.38m.14 | Collassare i cataloghi terrain ArcGraph legacy dentro il catalogo superfici unico, mantenendo solo dati visuali strettamente renderer-side dove necessario | ✅ Completato |
-| v0.38m.15 | Pensionare layout/config MapGrid dal percorso runtime ArcGraph dopo verifica del loader mappa unico | ⏳ Pending |
+| v0.38m.15 | Pensionare layout/config MapGrid dal percorso runtime ArcGraph dopo verifica del loader mappa unico | ✅ Completato |
 
 Decisione tecnica `v0.38m`:
 
@@ -15570,15 +15570,26 @@ game_params.json
 
 Connessioni MapGrid residue da eliminare esplicitamente:
 
-- `ArcGraphTerrainRuntimeMapGridAdapter`: ancora ponte legacy per ottenere context runtime;
+- `ArcGraphTerrainRuntimeMapGridAdapter`: ancora presente come ponte legacy/probe, non piu' sorgente del runtime auto-installato;
 - `ArcGraphDebugRuntimeMapGridAdapter`: ancora ponte debug storico per Landmark/GVD;
-- `ArcGraphRuntimeSceneAutoInstaller`: ancora agganciato a `Scene_MapGrid`, root visuali MapGrid e componenti MapGrid;
-- `ArcGraphMinimalRuntimeSceneWrapper`: ancora serializza `ArcGraphTerrainRuntimeMapGridAdapter`;
-- `ArcGraphTerrainRuntimeSceneRenderer`, `ArcGraphTerrainSceneProbeRenderer`, `ArcGraphActorObjectSceneProbeRenderer` e probe collegati: ancora nominano/usano adapter MapGrid legacy;
+- `ArcGraphRuntimeSceneAutoInstaller`: ancora agganciato a `Scene_MapGrid`, root visuali MapGrid, DevTools/camera legacy e spegnimento del renderer MapGrid, ma non piu' a `MapGridBootstrap`/`MapGridWorldView` come sorgente context;
+- `ArcGraphMinimalRuntimeSceneWrapper`: serializza un `ArcGraphRuntimeContextProvider`, con alias legacy per adapter MapGrid;
+- `ArcGraphTerrainRuntimeSceneRenderer`, `ArcGraphTerrainSceneProbeRenderer`, `ArcGraphActorObjectSceneProbeRenderer` e probe collegati: ricevono un provider runtime neutro, ma mantengono alias/nomi legacy per compatibilita' temporanea;
 - `ArcGraphPlacementCellHighlightSceneConsumer`: legge ancora `MapGridWorldProvider`;
 - camera/viewport: esistono ancora bridge e configurazioni derivate dal vecchio percorso MapGrid;
 - object visual path: molti oggetti puntano ancora a sprite sotto `MapGrid/Sprites/Objects`;
+- `MapGridFovHeatmapOverlay`: contiene ancora il riferimento operativo per FOV current cone e FOV heatmap debug;
 - debug/probe storici: alcune classi restano utili come riferimento, ma non devono restare nel runtime definitivo.
+
+Aggiornamento `v0.38m.15`:
+
+- `ArcGraphRuntimeSceneAutoInstaller` non usa piu' `MapGridBootstrap` o `MapGridWorldView` per costruire il context runtime ArcGraph;
+- il percorso runtime auto-installato usa un provider neutro `SimulationHost.World -> ArcGraphRuntimeContext`;
+- `ArcGraphMinimalRuntimeSceneWrapper` e `ArcGraphTerrainRuntimeSceneRenderer` ricevono un `ArcGraphRuntimeContextProvider`, non piu' l'adapter MapGrid concreto;
+- `ArcGraphTerrainRuntimeMapGridAdapter` resta fisicamente presente come legacy/probe, ma non e' piu' la sorgente del runtime auto-installato;
+- i probe terrain/actor/object/wiring possono ricevere lo stesso provider neutro, pur mantenendo nomi diagnostici legacy per compatibilita';
+- resta parziale `v0.38m.05`: i root visuali MapGrid sono ancora cercati e spenti per evitare doppio rendering dentro `Scene_MapGrid`;
+- restano da eliminare in step successivi: DevTools/placement MapGrid, camera bridge legacy, path sprite oggetti sotto `MapGrid/Sprites/Objects`, debug FOV MapGrid e probe storici.
 
 Regola di avanzamento:
 
@@ -15587,6 +15598,12 @@ Ogni dipendenza MapGrid rimasta deve diventare una delle tre cose:
 1. assorbita in un contratto ArcGraph/Core neutro;
 2. marcata legacy/probe e non usata nel runtime;
 3. rimossa quando il sostituto ArcGraph e' validato.
+
+Vincolo aggiuntivo:
+MapGridFovHeatmapOverlay non puo' essere cancellato fisicamente finche'
+ArcGraph non possiede un equivalente verificato per FOV current cone e FOV
+heatmap debug, attivabile come modalita' di visualizzazione e alimentato da
+snapshot/producer autorizzato.
 ```
 
 ---
@@ -15604,8 +15621,58 @@ Compiti:
 - non copiare `MapGridWorldView` come blocco unico;
 - distinguere debug temporaneo da UI definitiva;
 - migrare pointer, selection e pannelli informativi minimi;
+- assorbire il comportamento utile di `MapGridFovHeatmapOverlay` in un modulo ArcGraph dedicato, senza copiare il monolite `MapGridWorldView`;
+- attivare FOV current cone / FOV heatmap da icona visualizzazione, non da DevTools runtime;
 - mantenere DevTools e command tools fuori dal core ArcGraph;
 - preparare pannelli leggibili ma non onniscienti per il giocatore/operatore.
+
+Sotto-step FOV bloccante:
+
+| Step | Obiettivo | Stato |
+|---|---|---|
+| v0.38n.01 | Auditare `MapGridFovHeatmapOverlay` e separare calcolo dati FOV da resa visuale debug | ✅ Completato |
+| v0.38n.02 | Creare producer/snapshot ArcGraph autorizzato per FOV current cone e/o heatmap | ✅ Completato |
+| v0.38n.03 | Creare consumer overlay ArcGraph attivabile dalla ViewModeBar / icona visualizzazione | ✅ Completato |
+| v0.38n.04 | Confrontare visivamente ArcGraph FOV con MapGrid FOV prima di autorizzare rimozione legacy | ⏳ Pending |
+
+Aggiornamento `v0.38n.01-v0.38n.03`:
+
+- il metodo utile di `MapGridFovHeatmapOverlay.RenderCurrentCone(...)` e' stato assorbito come producer ArcGraph read-only;
+- il calcolo del cono usa ancora la geometria Core autorizzata: `FovUtils.Manhattan`, `FovUtils.IsInCone`, `FovUtils.IsInFront` e `World.HasLineOfSight`;
+- il producer non disegna, non muta il World, non marca dirty e non aggiorna telemetry;
+- ArcGraph possiede un consumer pooled world-space per celle FOV osservate e celle watched-margin;
+- la ViewModeBar collega il pulsante `FOV` a un controller ArcGraph, non a `MapGridWorldView`;
+- il comportamento resta da validare in Unity: selezione NPC, FOV ON/OFF, confronto visivo con MapGrid e costo runtime.
+
+Nota di pensionamento MapGrid:
+
+```text
+MapGrid non e' ancora cancellabile fisicamente solo perche' esiste il producer FOV.
+Prima della rimozione servono:
+1. compile Unity pulita;
+2. test Play Mode;
+3. conferma visiva ArcGraph FOV;
+4. audit finale delle dipendenze runtime ancora attive.
+```
+
+Audit statico residui MapGrid dopo assorbimento FOV:
+
+| Area | Stato | Decisione |
+|---|---|---|
+| `MapGridFovHeatmapOverlay` | metodo current cone assorbito in producer ArcGraph | non piu' blocco concettuale, ma serve confronto Unity |
+| `ArcGraphPlacementCellHighlightSceneConsumer` | usa ancora `MapGridRuntimeDevToolsOverlay` e `MapGridWorldProvider` | blocco attivo prima della cancellazione |
+| `ArcGraphRuntimeSceneAutoInstaller` | usa ancora `MapGridRuntimeDevToolsOverlay`, `MapGridCameraController` e root visuali legacy da spegnere | blocco attivo prima della cancellazione |
+| `ArcGraphCameraViewportController` / `ArcGraphInteractionSceneAdapterWrapper` | conservano bridge verso `MapGridCameraController` | blocco attivo prima della cancellazione |
+| `ArcGraphTerrainRuntimeMapGridAdapter` / `ArcGraphDebugRuntimeMapGridAdapter` | ancora presenti come legacy/probe | da marcare non-runtime o rimuovere dopo sostituti |
+| sprite oggetti | fallback ancora verso `MapGrid/Sprites/Objects` | da migrare su path/catalogo ArcGraph |
+| `ArcGraphViewModeSwitcher` | conserva enum/root MapGrid per transizione e diagnostica | da semplificare quando ArcGraph resta unica vista |
+
+Conclusione:
+
+```text
+Dopo v0.38n.03 MapGrid non e' ancora cancellabile fisicamente.
+Il prossimo passaggio deve essere v0.38o audit/fix dei bridge attivi, non delete.
+```
 
 Output atteso:
 
@@ -15625,13 +15692,86 @@ capire cosa impedisce ancora di pensionare MapGrid
 
 Compiti:
 
-- elencare dipendenze residue da `MapGridBootstrap`;
-- elencare dipendenze residue da `MapGridWorldView`;
-- distinguere sorgenti dati provvisorie da rendering legacy;
-- decidere cosa migrare verso adapter neutri;
-- decidere cosa puo' restare congelato;
-- decidere cosa puo' essere rimosso solo dopo gate completi;
-- non cancellare fisicamente MapGrid senza piano approvato.
+| Step | Obiettivo | Stato |
+|---|---|---|
+| v0.38o.01 | Auditare bridge attivi MapGrid ancora usati da ArcGraph | ✅ Completato |
+| v0.38o.02 | Eliminare fallback sprite oggetti ArcGraph verso `MapGrid/Sprites/Objects/{defId}` | ✅ Completato |
+| v0.38o.03 | Separare preview placement/F3 da tipo concreto `MapGridRuntimeDevToolsOverlay` | ✅ Completato |
+| v0.38o.04 | Scollegare pan/zoom ArcGraph da offset camera MapGrid | ✅ Completato |
+| v0.38o.05 | Formalizzare `ARCGRAPH_VISUAL_ASSET_POLICY.md` per oggetti, NPC, piante, vegetazione e resolver sprite | ✅ Completato |
+| v0.38o.06 | Progettare e implementare controller placement/F3 autonomo ArcGraph | ⏳ Pending |
+| v0.38o.07 | Migrare path asset oggetti da `MapGrid/Sprites/Objects` a catalogo/path ArcGraph reali | ⏳ Pending |
+| v0.38o.08 | Eliminare o congelare adapter/probe MapGrid non-runtime | ⏳ Pending |
+| v0.38o.09 | Rimuovere `ArcGraphViewModeSwitcher`/root switch legacy quando ArcGraph resta unica vista | ⏳ Pending |
+| v0.38o.10 | Autorizzare cancellazione fisica MapGrid solo dopo test Unity e zero dipendenze runtime | ⏳ Pending |
+
+Aggiornamento `v0.38o.01-v0.38o.04`:
+
+- ArcGraph non genera piu' fallback automatici per oggetti mancanti con path `MapGrid/Sprites/Objects/{defId}`;
+- `ObjectDef.ResolveArcGraphSpritePath()` restituisce solo `Visual.SpritePath`;
+- se una definizione oggetto non dichiara path visuale, ArcGraph produce sprite key vuota e il renderer la segnala come missing;
+- la preview placement ArcGraph non dipende piu' dal tipo concreto `MapGridRuntimeDevToolsOverlay`;
+- aggiunto contratto neutro `IArcGraphPlacementPreviewSource`;
+- il DevTools legacy implementa temporaneamente questo contratto, ma ArcGraph consuma solo l'interfaccia;
+- la preview placement legge il `World` tramite `ArcGraphRuntimeContextProvider`, non tramite `MapGridWorldProvider`;
+- `ArcGraphCameraViewportController` non chiama piu' `MapGridCameraController.ApplyExternalCameraOffset`;
+- `ArcGraphInteractionSceneAdapterWrapper` non chiama piu' `MapGridCameraController.ApplyExternalCameraOffset`;
+- `ArcGraphRuntimeSceneAutoInstaller` disabilita il `MapGridCameraController` legacy quando ArcGraph e' installato.
+
+Aggiornamento `v0.38o.05`:
+
+- aggiunto `ARCGRAPH_VISUAL_ASSET_POLICY.md` come policy root operativa per
+  cataloghi visuali ArcGraph;
+- confermato che `object_defs.json` resta il catalogo per oggetti fisici,
+  muri, porte, mobili, costruzioni e risorse concrete;
+- confermato che piante vive e vegetazione biosfera non devono essere infilate
+  in `object_defs.json`, salvo quando diventano oggetti raccolti o manipolabili;
+- definito il flusso biosfera:
+  `speciesKey/growthStage/healthBand/visualStateKey -> World -> ArcGraph -> SpriteKey`;
+- definito il catalogo futuro `ArcGraphEnvironmentVisualCatalog.json` per
+  `VegetationAreas` e `Plants`;
+- confermato che il resolver sprite ArcGraph puo' risolvere sprite singole e
+  sheet sliced tramite chiave `sheet#subSprite`, ma non deve leggere World o
+  generare fallback impliciti verso MapGrid;
+- dichiarata la migrazione futura NPC verso sheet per parte/animazione, lasciando
+  supportato il formato corrente a frame separati finche' gli asset sheet non
+  esistono.
+
+Audit residuo dopo `v0.38o.04`:
+
+| Area | Stato | Decisione |
+|---|---|---|
+| F3 / placement operativo | Il comando reale vive ancora nel DevTools legacy | serve `ArcGraphPlacementToolController` autonomo |
+| Path oggetti catalogo | `object_defs.json` dichiara ancora `Visual.SpritePath` verso asset MapGrid | non e' fallback, e' dato esplicito; migrare solo quando esistono asset ArcGraph oggetti; vedi `ARCGRAPH_VISUAL_ASSET_POLICY.md` |
+| Catalogo ambiente visuale | biosfera produce dati/chiavi semantiche ma manca catalogo ArcGraph finale | creare `ArcGraphEnvironmentVisualCatalog.json` con sezioni `VegetationAreas` e `Plants` |
+| Catalogo NPC visuale | `ArcGraphNpcVisualCatalog.json` usa ancora pattern frame separati | migrare gradualmente verso sheet per parte/animazione quando gli asset esistono |
+| Camera / pan / zoom | ArcGraph sposta direttamente la camera, ma l'installer cerca ancora il controller MapGrid solo per spegnerlo | rimuovere quando la scena non contiene piu' MapGrid |
+| Adapter/probe MapGrid | `ArcGraphTerrainRuntimeMapGridAdapter` e `ArcGraphDebugRuntimeMapGridAdapter` restano nel codice | congelare come legacy/probe o rimuovere dopo test |
+| View switcher | `ArcGraphViewModeSwitcher` conserva modalita' MapGrid | eliminare quando non serve piu' F12/switch legacy |
+| Root visuali legacy | l'installer spegne ancora root MapGrid noti | eliminare dopo scena ArcGraph autonoma |
+
+Decisione pan/zoom:
+
+```text
+Non riusare MapGridCameraController.
+Il sistema corretto e':
+ArcGraphViewConfig JSON -> ArcGraphViewController puro -> ArcGraphCameraViewportController Unity.
+Il wrapper Unity deve gestire solo:
+- input rotellina;
+- pan con rotellina premuta;
+- zoom-to-cursor;
+- clamp ai bordi;
+- eventuale smoothing locale;
+- aggiornamento diretto della camera.
+```
+
+La cancellazione fisica di MapGrid resta non autorizzata dopo questo step:
+
+```text
+MapGrid contiene ancora DevTools operativo, asset oggetti dichiarati dal catalogo,
+componenti legacy/probe e root/switch di scena. Prima bisogna sostituire questi
+blocchi uno alla volta e validarli in Unity.
+```
 
 Output atteso:
 
@@ -15657,6 +15797,7 @@ Criteri di chiusura:
 - interaction minima funzionante;
 - UI archetype foundation presente;
 - debug minimo presente;
+- FOV debug MapGrid assorbito o dichiarato esplicitamente bloccante per la rimozione fisica di MapGrid;
 - dipendenze MapGrid residue dichiarate;
 - nessuna mutazione simulativa dal renderer;
 - nessun accesso onnisciente introdotto;

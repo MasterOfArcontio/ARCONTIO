@@ -96,7 +96,7 @@ namespace Arcontio.View.ArcGraph
         /// La maschera e' ordinata come <c>N/W/S/E</c>, cioe' sopra, sinistra,
         /// sotto, destra in senso antiorario. La chiave finale usa la
         /// forma <c>sheet#subSprite</c>, per esempio
-        /// <c>MapGrid/Sprites/Objects/wall_stone#wall_stone_1010</c>. Questo
+        /// <c>ArcGraph/Objects/wall_stone#wall_stone_1010</c>. Questo
         /// permette a Unity di caricare una sola PNG sliced, alta 83 pixel e
         /// divisa in slot larghi 32 pixel, senza richiedere file separati.
         /// </para>

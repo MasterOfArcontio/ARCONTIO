@@ -1,4 +1,3 @@
-using Arcontio.View.MapGrid;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -38,7 +37,7 @@ namespace Arcontio.View.ArcGraph
     {
         [SerializeField] private bool controllerEnabled;
         [SerializeField] private bool processInUpdate;
-        [SerializeField] private bool useRightMousePan = true;
+        [SerializeField] private bool useRightMousePan;
         [SerializeField] private bool useMiddleMousePan = true;
         [SerializeField] private bool ignoreInputWhenPointerIsOverUi = true;
         [SerializeField] private Camera sceneCamera;
@@ -464,16 +463,6 @@ namespace Arcontio.View.ArcGraph
         {
             if (camera == null || offset.sqrMagnitude < 0.000001f)
                 return;
-
-            MapGridCameraController legacyCameraBridge =
-                camera.GetComponent<MapGridCameraController>()
-                ?? camera.GetComponentInParent<MapGridCameraController>();
-
-            if (legacyCameraBridge != null && legacyCameraBridge.enabled)
-            {
-                legacyCameraBridge.ApplyExternalCameraOffset(offset);
-                return;
-            }
 
             camera.transform.position += offset;
         }

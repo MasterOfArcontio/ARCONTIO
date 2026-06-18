@@ -27,7 +27,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>FillTerrainSnapshots</b>: converte <c>CellSurfaceLayer</c> in celle ArcGraph.</item>
     ///   <item><b>FillObjectSnapshots</b>: converte gli oggetti del World in snapshot visuali.</item>
     ///   <item><b>FillActorSnapshots</b>: converte gli NPC del World in snapshot actor e motion read-only.</item>
-    ///   <item><b>ResolveObjectSpriteKey</b>: replica solo la policy di fallback sprite corrente.</item>
+    ///   <item><b>ResolveObjectSpriteKey</b>: copia solo sprite path ArcGraph espliciti.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphWorldAdapter
@@ -35,7 +35,6 @@ namespace Arcontio.View.ArcGraph
         public const int CurrentRuntimeZLevel = ArcGraphZLevelPolicy.CurrentRuntimeZLevel;
 
         private readonly string _defaultNpcSpriteKey;
-        private readonly string _fallbackObjectSpritePrefix;
 
         // =============================================================================
         // ArcGraphWorldAdapter
@@ -45,31 +44,25 @@ namespace Arcontio.View.ArcGraph
         /// Costruisce un adapter con fallback visuali dichiarati.
         /// </para>
         ///
-        /// <para><b>Compatibilita' con renderer legacy</b></para>
+        /// <para><b>Compatibilita' controllata con cataloghi espliciti</b></para>
         /// <para>
-        /// Il default NPC usa la chiave del catalogo ArcGraph. Il fallback oggetti
-        /// resta temporaneo fino alla migrazione completa del catalogo visuale
-        /// oggetti, perche' alcuni <c>ObjectDef</c> puntano ancora ad asset legacy.
-        /// Questi valori non caricano asset: vengono solo copiati negli snapshot.
+        /// Il default NPC usa la chiave del catalogo ArcGraph. Gli oggetti non
+        /// ricevono piu' un fallback automatico verso MapGrid: devono dichiarare
+        /// esplicitamente il proprio path visuale nella sezione <c>Visual</c> del
+        /// catalogo oggetti.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>defaultNpcSpriteKey</b>: chiave sprite fallback per gli NPC.</item>
-        ///   <item><b>fallbackObjectSpritePrefix</b>: prefisso fallback per oggetti senza SpriteKey.</item>
         /// </list>
         /// </summary>
         public ArcGraphWorldAdapter(
-            string defaultNpcSpriteKey = "human_default",
-            string fallbackObjectSpritePrefix = "MapGrid/Sprites/Objects/")
+            string defaultNpcSpriteKey = "human_default")
         {
             _defaultNpcSpriteKey = string.IsNullOrWhiteSpace(defaultNpcSpriteKey)
                 ? "human_default"
                 : defaultNpcSpriteKey;
-
-            _fallbackObjectSpritePrefix = string.IsNullOrWhiteSpace(fallbackObjectSpritePrefix)
-                ? "MapGrid/Sprites/Objects/"
-                : fallbackObjectSpritePrefix;
         }
 
         // =============================================================================
@@ -365,14 +358,13 @@ namespace Arcontio.View.ArcGraph
         /// ArcGraph dichiarata in <c>object_defs.json</c>.
         /// </para>
         ///
-        /// <para><b>Riuso controllato della convenzione legacy</b></para>
+        /// <para><b>Nessun fallback implicito verso MapGrid</b></para>
         /// <para>
         /// Se la definizione oggetto contiene <c>Visual.SpritePath</c>, l'adapter
-        /// usa quello. Se manca, torna a <c>SpriteKey</c>, cioe' la convenzione
-        /// legacy ancora usata da MapGrid. In caso contrario produce il fallback
-        /// storico <c>MapGrid/Sprites/Objects/{defId}</c>. Non chiama
-        /// <c>Resources.Load</c>: la risoluzione asset resta responsabilita' del
-        /// renderer.
+        /// usa quello. Se manca, ritorna stringa vuota. Non chiama
+        /// <c>Resources.Load</c> e non inventa path legacy: la risoluzione asset
+        /// resta responsabilita' del renderer e i dati incompleti devono emergere
+        /// come missing sprite.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -381,7 +373,7 @@ namespace Arcontio.View.ArcGraph
         ///   <item><b>def</b>: definizione gia' risolta dal chiamante.</item>
         /// </list>
         /// </summary>
-        private string ResolveObjectSpriteKey(WorldObjectInstance instance, ObjectDef def)
+        private static string ResolveObjectSpriteKey(WorldObjectInstance instance, ObjectDef def)
         {
             if (instance == null || string.IsNullOrWhiteSpace(instance.DefId))
                 return string.Empty;
@@ -393,7 +385,7 @@ namespace Arcontio.View.ArcGraph
                     return visualSpritePath;
             }
 
-            return _fallbackObjectSpritePrefix + instance.DefId;
+            return string.Empty;
         }
     }
 }

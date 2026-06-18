@@ -80,7 +80,7 @@ namespace Arcontio.View.ArcGraph
     {
         private const int VerticalCenterObjectId = 102;
         private const int HorizontalCenterObjectId = 202;
-        private const string WallBaseSpriteKey = "MapGrid/Sprites/Objects/wall_stone";
+        private const string WallBaseSpriteKey = "ArcGraph/Objects/wall_stone";
 
         // =============================================================================
         // RunDefaultSmoke

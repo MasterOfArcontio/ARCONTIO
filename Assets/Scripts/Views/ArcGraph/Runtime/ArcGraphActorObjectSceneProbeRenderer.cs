@@ -21,7 +21,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>HasRuntimeAdapter</b>: adapter MapGrid -> ArcGraph assegnato.</item>
+    ///   <item><b>HasRuntimeAdapter</b>: provider runtime ArcGraph assegnato.</item>
     ///   <item><b>HasWorld</b>: context con World disponibile.</item>
     ///   <item><b>DidInitializeBootstrap</b>: bootstrap ArcGraph temporaneo riuscito.</item>
     ///   <item><b>HasActorLayer/HasObjectLayer</b>: layer necessari disponibili.</item>
@@ -97,7 +97,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: materializzazione temporanea della queue</b></para>
     /// <para>
     /// Il componente consuma il context read-only prodotto da
-    /// <c>ArcGraphTerrainRuntimeMapGridAdapter</c>, inizializza un
+    /// <c>ArcGraphRuntimeContextProvider</c>, inizializza un
     /// <c>ArcGraphBootstrapRuntime</c> temporaneo, costruisce
     /// <c>ArcGraphRenderQueue</c>, la converte in <c>ArcGraphActorObjectSceneRenderPlan</c>
     /// e crea <c>SpriteRenderer</c> solo sotto un root dedicato. Non legge globali,
@@ -116,7 +116,7 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphActorObjectSceneProbeRenderer : MonoBehaviour
     {
-        [SerializeField] private ArcGraphTerrainRuntimeMapGridAdapter runtimeMapAdapter;
+        [SerializeField] private ArcGraphRuntimeContextProvider runtimeContextProvider;
         [SerializeField] private MonoBehaviour spriteResolverBehaviour;
         [SerializeField] private bool renderProbeOnStart;
         [SerializeField] private bool clearBeforeRender = true;
@@ -195,8 +195,8 @@ namespace Arcontio.View.ArcGraph
             if (clearBeforeRender)
                 ClearProbe();
 
-            ArcGraphRuntimeContext context = runtimeMapAdapter != null
-                ? runtimeMapAdapter.BuildTerrainRuntimeContext()
+            ArcGraphRuntimeContext context = runtimeContextProvider != null
+                ? runtimeContextProvider.BuildTerrainRuntimeContext()
                 : ArcGraphRuntimeContext.Empty();
 
             var contract = ArcGraphActorObjectSceneRendererContract.CreateTemporaryProbeContract(
@@ -205,7 +205,7 @@ namespace Arcontio.View.ArcGraph
             IArcGraphSpriteResolver spriteResolver = ResolveSpriteResolver();
             bool hasSpriteResolver = spriteResolver != null;
 
-            if (runtimeMapAdapter == null || context == null || !context.HasWorld || !contract.IsTemporaryProbeSafe())
+            if (runtimeContextProvider == null || context == null || !context.HasWorld || !contract.IsTemporaryProbeSafe())
             {
                 _lastDiagnostics = BuildDiagnostics(
                     context,
@@ -602,7 +602,7 @@ namespace Arcontio.View.ArcGraph
             string reason)
         {
             return new ArcGraphActorObjectSceneProbeRendererDiagnostics(
-                runtimeMapAdapter != null,
+                runtimeContextProvider != null,
                 context != null && context.HasWorld,
                 didInitializeBootstrap,
                 hasActorLayer,

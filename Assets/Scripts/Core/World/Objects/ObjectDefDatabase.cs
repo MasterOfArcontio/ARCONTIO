@@ -128,15 +128,15 @@ namespace Arcontio.Core
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Restituisce il path sprite preferito per ArcGraph mantenendo compatibile
-        /// il vecchio campo <c>SpriteKey</c>.
+        /// Restituisce il path sprite esplicitamente dichiarato per ArcGraph.
         /// </para>
         ///
-        /// <para><b>Compatibilita' progressiva</b></para>
+        /// <para><b>Distacco dal fallback MapGrid</b></para>
         /// <para>
-        /// Se <c>Visual.SpritePath</c> e' compilato, ArcGraph usa quello. Se manca,
-        /// torna a <c>SpriteKey</c>, cosi' le definizioni esistenti continuano a
-        /// funzionare mentre migriamo gli asset da MapGrid ad ArcGraph.
+        /// ArcGraph non usa piu' <c>SpriteKey</c> come fallback implicito, perche'
+        /// quel campo appartiene al percorso legacy MapGrid. Se la sezione
+        /// <c>Visual.SpritePath</c> manca, il metodo ritorna stringa vuota e il
+        /// renderer puo' segnalare correttamente una definizione visuale incompleta.
         /// </para>
         /// </summary>
         public string ResolveArcGraphSpritePath()
@@ -144,7 +144,7 @@ namespace Arcontio.Core
             if (Visual != null && !string.IsNullOrWhiteSpace(Visual.SpritePath))
                 return Visual.SpritePath;
 
-            return SpriteKey ?? string.Empty;
+            return string.Empty;
         }
     }
 
