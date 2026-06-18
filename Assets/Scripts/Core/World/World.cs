@@ -413,6 +413,12 @@ namespace Arcontio.Core
         // Definizioni logiche degli oggetti (caricate da ObjectDatabaseLoader)
         public readonly Dictionary<string, ObjectDef> ObjectDefs = new();
 
+        // Definizioni logiche/visuali delle superfici cella.
+        // Il catalogo e' distinto dal layer CellSurfaces:
+        // - SurfaceDefs dice quali tipi di superficie esistono.
+        // - CellSurfaces dice quale tipo e' assegnato a ogni cella.
+        public readonly Dictionary<string, CellSurfaceDef> SurfaceDefs = new();
+
         // =====================================================================
         // COMPONENT STORES (NPC)
         // =====================================================================
@@ -5483,6 +5489,30 @@ if (!NpcAction.ContainsKey(id))
             def = null;
             if (string.IsNullOrWhiteSpace(defId)) return false;
             return ObjectDefs.TryGetValue(defId, out def) && def != null;
+        }
+
+        // =============================================================================
+        // TryGetSurfaceDef
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Recupera dal catalogo la definizione data-driven di una superficie.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: layer istanze separato dal catalogo</b></para>
+        /// <para>
+        /// <see cref="CellSurfaceLayer"/> conserva le assegnazioni cella per cella.
+        /// Questo metodo recupera invece il significato della chiave superficie:
+        /// macro categoria, costo movimento, compatibilita' vegetazione e chiavi
+        /// visuali. I consumer leggono quindi prima lo snapshot della cella e poi,
+        /// se serve, la relativa definizione di catalogo.
+        /// </para>
+        /// </summary>
+        public bool TryGetSurfaceDef(string surfaceKey, out CellSurfaceDef def)
+        {
+            def = null;
+            if (string.IsNullOrWhiteSpace(surfaceKey)) return false;
+            return SurfaceDefs.TryGetValue(surfaceKey, out def) && def != null;
         }
 
         public ObjectUseState GetUseStateOrDefault(int objId)

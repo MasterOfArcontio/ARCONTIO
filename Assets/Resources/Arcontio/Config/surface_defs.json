@@ -1,0 +1,94 @@
+{
+  "Surfaces": [
+    {
+      "Id": "grass",
+      "DisplayName": "Grass",
+      "MacroSurface": "Natural",
+      "MovementCost": 1.0,
+      "BlocksMovement": false,
+      "BlocksVision": false,
+      "CanHostNaturalVegetation": true,
+      "CanHostPhysicalPlant": true,
+      "BaseFertility01": 0.65,
+      "BaseMoisture01": 0.35,
+      "Visual": {
+        "VisualRuleKey": "grass",
+        "ArcGraphTileKey": "grass",
+        "AllowsWaterAnimation": false,
+        "UsesDeterministicVariants": true
+      }
+    },
+    {
+      "Id": "dirt",
+      "DisplayName": "Dirt",
+      "MacroSurface": "Natural",
+      "MovementCost": 1.0,
+      "BlocksMovement": false,
+      "BlocksVision": false,
+      "CanHostNaturalVegetation": true,
+      "CanHostPhysicalPlant": true,
+      "BaseFertility01": 0.45,
+      "BaseMoisture01": 0.25,
+      "Visual": {
+        "VisualRuleKey": "dirt",
+        "ArcGraphTileKey": "dirt",
+        "AllowsWaterAnimation": false,
+        "UsesDeterministicVariants": true
+      }
+    },
+    {
+      "Id": "stone_floor",
+      "DisplayName": "Stone Floor",
+      "MacroSurface": "Artificial",
+      "MovementCost": 0.9,
+      "BlocksMovement": false,
+      "BlocksVision": false,
+      "CanHostNaturalVegetation": false,
+      "CanHostPhysicalPlant": false,
+      "BaseFertility01": 0.0,
+      "BaseMoisture01": 0.05,
+      "Visual": {
+        "VisualRuleKey": "stone_floor",
+        "ArcGraphTileKey": "stone_floor",
+        "AllowsWaterAnimation": false,
+        "UsesDeterministicVariants": true
+      }
+    },
+    {
+      "Id": "shallow_water",
+      "DisplayName": "Shallow Water",
+      "MacroSurface": "Water",
+      "MovementCost": 3.0,
+      "BlocksMovement": true,
+      "BlocksVision": false,
+      "CanHostNaturalVegetation": false,
+      "CanHostPhysicalPlant": false,
+      "BaseFertility01": 0.0,
+      "BaseMoisture01": 1.0,
+      "Visual": {
+        "VisualRuleKey": "water",
+        "ArcGraphTileKey": "water",
+        "AllowsWaterAnimation": true,
+        "UsesDeterministicVariants": false
+      }
+    },
+    {
+      "Id": "deep_water",
+      "DisplayName": "Deep Water",
+      "MacroSurface": "Water",
+      "MovementCost": 99.0,
+      "BlocksMovement": true,
+      "BlocksVision": false,
+      "CanHostNaturalVegetation": false,
+      "CanHostPhysicalPlant": false,
+      "BaseFertility01": 0.0,
+      "BaseMoisture01": 1.0,
+      "Visual": {
+        "VisualRuleKey": "water",
+        "ArcGraphTileKey": "water",
+        "AllowsWaterAnimation": true,
+        "UsesDeterministicVariants": false
+      }
+    }
+  ]
+}

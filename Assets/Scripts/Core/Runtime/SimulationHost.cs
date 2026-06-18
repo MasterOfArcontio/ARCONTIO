@@ -1592,6 +1592,7 @@ namespace Arcontio.Core
                 return;
 
             ObjectDatabaseLoader.LoadIntoWorld(world);
+            CellSurfaceDatabaseLoader.LoadIntoWorld(world);
             NeedsConfigLoader.LoadIntoWorld(world);
             BeliefDecayConfigLoader.LoadIntoWorld(world);
             BeliefQueryConfigLoader.LoadIntoWorld(world);
