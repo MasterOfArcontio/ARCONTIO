@@ -12,5 +12,38 @@
     },
     "Patches": []
   },
+  "BiologicalAreas": [
+    {
+      "AreaId": 1,
+      "Key": "debug_grassland_meadow",
+      "BiomeKey": "grassland",
+      "VegetationKind": "Grass",
+      "SoilKind": "Grassland",
+      "CenterX": 32,
+      "CenterY": 32,
+      "RadiusCells": 14,
+      "Z": 0,
+      "Priority": 0,
+      "IsEnabled": true,
+      "Intensity01": 0.55,
+      "BaseFertility01": 0.7,
+      "CurrentFertility01": 0.7,
+      "GrowthPotential01": 0.65,
+      "Health01": 0.8,
+      "Recovery01": 0.45,
+      "SeedBank": [
+        {
+          "SpeciesKey": "wild_grass",
+          "Amount01": 0.9,
+          "Viability01": 0.85
+        },
+        {
+          "SpeciesKey": "oak_tree",
+          "Amount01": 0.22,
+          "Viability01": 0.45
+        }
+      ]
+    }
+  ],
   "InitialObjects": []
 }

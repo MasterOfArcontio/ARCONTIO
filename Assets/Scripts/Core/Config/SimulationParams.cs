@@ -102,6 +102,12 @@ namespace Arcontio.Core.Config
         // policy di scelta, per esempio rendendo i test runtime deterministici.
         public DecisionRuntimeParams decision = new DecisionRuntimeParams();
 
+        // ---------------- Biosphere Runtime (v0.53.1) ----------------
+        // Parametri di budget e cadenza della biosfera. Questa sezione non collega
+        // ancora direttamente la biosfera al SimulationHost: espone soltanto il
+        // contratto configurabile che lo scheduler data-only puo' consumare.
+        public BiosphereRuntimeParams biosphere = new BiosphereRuntimeParams();
+
         // ---------------- GVD-DIN (v0.03) ----------------
         // Sistema GVD dinamico condition-based + pruning.
         // Attivo quando gvd_din.enabled=true E hybrid_landmark.use_hybrid_extractor=false.
@@ -261,6 +267,34 @@ namespace Arcontio.Core.Config
             return Mathf.Max(1, decision?.decisionEveryTicks ?? DecisionRuntimeParams.DefaultDecisionEveryTicks);
         }
 
+        // =============================================================================
+        // ResolveBiosphereRuntimeParams
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce una copia normalizzata della configurazione runtime biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dominio biologico budgettizzabile</b></para>
+        /// <para>
+        /// La biosfera deve poter essere accesa, spenta e cadenzata senza introdurre
+        /// hardcode dentro <c>SimulationHost</c>. Il resolver concentra qui clamp e
+        /// fallback, cosi' i consumer futuri leggono una semantica stabile e non
+        /// dettagli sparsi del JSON.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Fallback</b>: se la sezione manca, usa default conservativi.</item>
+        ///   <item><b>Clamp</b>: le cadenze e i budget non positivi vengono normalizzati.</item>
+        ///   <item><b>Copia</b>: il chiamante riceve un DTO indipendente dal campo serializzato.</item>
+        /// </list>
+        /// </summary>
+        public BiosphereRuntimeParams ResolveBiosphereRuntimeParams()
+        {
+            return BiosphereRuntimeParams.WithFallbackDefaults(biosphere);
+        }
+
         public void ApplyRuntimeDiagnosticsLayout()
         {
             if (logging == null)
@@ -378,6 +412,132 @@ namespace Arcontio.Core.Config
         public float noise01 = 0.15f;
         public float impulsivityNoiseBonus = 0.35f;
         public float minimumWeight = 0.001f;
+    }
+
+    // =============================================================================
+    // BiosphereRuntimeParams
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile dei parametri runtime della biosfera.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: biosfera cadenzata dal tick globale</b></para>
+    /// <para>
+    /// La biosfera non possiede una timeline autonoma: usa il tick discreto globale
+    /// come clock di ingresso e decide soltanto quando eseguire un batch ecologico.
+    /// La frequenza, i budget e il debug fast-forward restano configurabili per
+    /// calibrare il peso runtime senza ricompilare codice.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>enabled</b>: gate generale del runtime biosfera.</item>
+    ///   <item><b>simulationTicksPerDailyUpdate</b>: numero di tick SimulationHost tra due update biologici giornalieri.</item>
+    ///   <item><b>updateMode</b>: chiave leggibile della modalita' di scheduling.</item>
+    ///   <item><b>maxPlantMutationsPerUpdate</b>: budget massimo mutazioni piante fisiche per batch.</item>
+    ///   <item><b>maxVegetationMutationsPerUpdate</b>: budget massimo mutazioni vegetazione decorativa per batch.</item>
+    ///   <item><b>spreadWorkAcrossTicks</b>: consente in futuro di distribuire lavoro arretrato su piu' tick.</item>
+    ///   <item><b>debugFastForwardEnabled</b>: abilita strumenti protetti di accelerazione test.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class BiosphereRuntimeParams
+    {
+        public const int DefaultSimulationTicksPerDailyUpdate = 1200;
+        public const int DefaultMaxPlantMutationsPerUpdate = 128;
+        public const int DefaultMaxVegetationMutationsPerUpdate = 256;
+        public const string DefaultUpdateMode = "DailyBatch";
+
+        public bool enabled = false;
+        public int simulationTicksPerDailyUpdate = DefaultSimulationTicksPerDailyUpdate;
+        public string updateMode = DefaultUpdateMode;
+        public int maxPlantMutationsPerUpdate = DefaultMaxPlantMutationsPerUpdate;
+        public int maxVegetationMutationsPerUpdate = DefaultMaxVegetationMutationsPerUpdate;
+        public bool spreadWorkAcrossTicks = false;
+        public bool debugFastForwardEnabled = false;
+
+        // =============================================================================
+        // ResolveSimulationTicksPerDailyUpdate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la cadenza tra due update giornalieri della biosfera.
+        /// </para>
+        /// </summary>
+        public int ResolveSimulationTicksPerDailyUpdate()
+        {
+            return Mathf.Max(1, simulationTicksPerDailyUpdate);
+        }
+
+        // =============================================================================
+        // ResolveMaxPlantMutationsPerUpdate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il budget massimo di mutazioni piante fisiche per update.
+        /// </para>
+        /// </summary>
+        public int ResolveMaxPlantMutationsPerUpdate()
+        {
+            return Mathf.Max(1, maxPlantMutationsPerUpdate);
+        }
+
+        // =============================================================================
+        // ResolveMaxVegetationMutationsPerUpdate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il budget massimo di mutazioni vegetazione decorativa per update.
+        /// </para>
+        /// </summary>
+        public int ResolveMaxVegetationMutationsPerUpdate()
+        {
+            return Mathf.Max(1, maxVegetationMutationsPerUpdate);
+        }
+
+        // =============================================================================
+        // ResolveUpdateMode
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce la modalita' di scheduling con fallback leggibile.
+        /// </para>
+        /// </summary>
+        public string ResolveUpdateMode()
+        {
+            return string.IsNullOrWhiteSpace(updateMode)
+                ? DefaultUpdateMode
+                : updateMode;
+        }
+
+        // =============================================================================
+        // WithFallbackDefaults
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una copia normalizzata dei parametri biosfera.
+        /// </para>
+        /// </summary>
+        public static BiosphereRuntimeParams WithFallbackDefaults(BiosphereRuntimeParams raw)
+        {
+            var source = raw ?? new BiosphereRuntimeParams();
+
+            // La copia evita che i resolver modifichino accidentalmente il DTO
+            // deserializzato da Unity, che deve restare una fotografia della config.
+            return new BiosphereRuntimeParams
+            {
+                enabled = source.enabled,
+                simulationTicksPerDailyUpdate = Mathf.Max(1, source.simulationTicksPerDailyUpdate),
+                updateMode = string.IsNullOrWhiteSpace(source.updateMode)
+                    ? DefaultUpdateMode
+                    : source.updateMode,
+                maxPlantMutationsPerUpdate = Mathf.Max(1, source.maxPlantMutationsPerUpdate),
+                maxVegetationMutationsPerUpdate = Mathf.Max(1, source.maxVegetationMutationsPerUpdate),
+                spreadWorkAcrossTicks = source.spreadWorkAcrossTicks,
+                debugFastForwardEnabled = source.debugFastForwardEnabled
+            };
+        }
     }
 
     // =============================================================================

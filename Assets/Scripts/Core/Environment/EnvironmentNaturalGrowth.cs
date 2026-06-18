@@ -131,8 +131,12 @@ namespace Arcontio.Core.Environment
     /// </summary>
     public sealed class EnvironmentNaturalGrowthResult
     {
+        private static readonly EnvironmentPhysicalPlantDelta[] EmptyPhysicalPlantDeltas =
+            new EnvironmentPhysicalPlantDelta[0];
+
         public EnvironmentState State { get; }
         public EnvironmentNaturalGrowthReport Report { get; }
+        public IReadOnlyList<EnvironmentPhysicalPlantDelta> PhysicalPlantDeltas { get; }
 
         // =============================================================================
         // EnvironmentNaturalGrowthResult
@@ -144,10 +148,12 @@ namespace Arcontio.Core.Environment
         /// </summary>
         public EnvironmentNaturalGrowthResult(
             EnvironmentState state,
-            EnvironmentNaturalGrowthReport report)
+            EnvironmentNaturalGrowthReport report,
+            IReadOnlyList<EnvironmentPhysicalPlantDelta> physicalPlantDeltas = null)
         {
             State = state ?? new EnvironmentState();
             Report = report;
+            PhysicalPlantDeltas = physicalPlantDeltas ?? EmptyPhysicalPlantDeltas;
         }
     }
 
@@ -220,6 +226,11 @@ namespace Arcontio.Core.Environment
                 climate,
                 transition,
                 safeConfig);
+            var nextSnapshot = nextState.CreateSnapshot();
+            var physicalPlantDeltas = EnvironmentPhysicalPlantDeltaProducer.DiffSnapshots(
+                snapshot,
+                nextSnapshot,
+                SafeMax(safeConfig.maxNewPlantsPerDay) + plantStats.ExistingPlantsVisited + plantStats.PlantInstancesRemoved);
 
             return new EnvironmentNaturalGrowthResult(
                 nextState,
@@ -230,7 +241,8 @@ namespace Arcontio.Core.Environment
                     plantStats.ExistingPlantsVisited,
                     plantStats.PlantInstancesUpdated,
                     areaStats.PlantInstancesCreated,
-                    plantStats.PlantInstancesRemoved));
+                    plantStats.PlantInstancesRemoved),
+                physicalPlantDeltas);
         }
 
         private readonly struct AreaGrowthStats

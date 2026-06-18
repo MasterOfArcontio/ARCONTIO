@@ -1,5 +1,195 @@
+using Arcontio.Core.Config;
+using System.Collections.Generic;
+
 namespace Arcontio.Core.Environment
 {
+    // =============================================================================
+    // EnvironmentRuntimeScheduleDecision
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Risultato data-only della valutazione di scheduling runtime della biosfera.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: scheduling osservabile prima della mutazione</b></para>
+    /// <para>
+    /// Il runtime deve poter sapere se la biosfera e' dovuta senza eseguire subito
+    /// side effect su <c>World</c>, celle, ArcGraph o NPC. Questa struttura descrive
+    /// la decisione temporale e lascia al chiamante futuro la scelta di avanzare lo
+    /// stato biologico, produrre delta o rimandare lavoro.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>IsEnabled</b>: copia del gate runtime normalizzato.</item>
+    ///   <item><b>ShouldAdvance</b>: indica se il tick corrente deve produrre update biosfera.</item>
+    ///   <item><b>DueUpdateCount</b>: numero di update giornalieri maturati nel salto temporale.</item>
+    ///   <item><b>PreviousEnvironmentTicks</b>: tick ambientale da cui partirebbe il resolver biologico.</item>
+    ///   <item><b>CurrentEnvironmentTicks</b>: tick ambientale fino a cui arriverebbe il resolver biologico.</item>
+    ///   <item><b>NextDueSimulationTick</b>: prossimo tick SimulationHost candidato.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct EnvironmentRuntimeScheduleDecision
+    {
+        public readonly bool IsEnabled;
+        public readonly bool ShouldAdvance;
+        public readonly int SimulationTicksPerDailyUpdate;
+        public readonly int DueUpdateCount;
+        public readonly long LastProcessedSimulationTick;
+        public readonly long CurrentSimulationTick;
+        public readonly long PreviousEnvironmentTicks;
+        public readonly long CurrentEnvironmentTicks;
+        public readonly long NextDueSimulationTick;
+        public readonly string UpdateMode;
+
+        // =============================================================================
+        // EnvironmentRuntimeScheduleDecision
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una decisione di scheduling biosfera gia' normalizzata.
+        /// </para>
+        /// </summary>
+        public EnvironmentRuntimeScheduleDecision(
+            bool isEnabled,
+            bool shouldAdvance,
+            int simulationTicksPerDailyUpdate,
+            int dueUpdateCount,
+            long lastProcessedSimulationTick,
+            long currentSimulationTick,
+            long previousEnvironmentTicks,
+            long currentEnvironmentTicks,
+            long nextDueSimulationTick,
+            string updateMode)
+        {
+            IsEnabled = isEnabled;
+            ShouldAdvance = shouldAdvance;
+            SimulationTicksPerDailyUpdate = simulationTicksPerDailyUpdate;
+            DueUpdateCount = dueUpdateCount;
+            LastProcessedSimulationTick = lastProcessedSimulationTick;
+            CurrentSimulationTick = currentSimulationTick;
+            PreviousEnvironmentTicks = previousEnvironmentTicks;
+            CurrentEnvironmentTicks = currentEnvironmentTicks;
+            NextDueSimulationTick = nextDueSimulationTick;
+            UpdateMode = updateMode ?? BiosphereRuntimeParams.DefaultUpdateMode;
+        }
+    }
+
+    // =============================================================================
+    // EnvironmentRuntimeScheduler
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Scheduler data-only della biosfera rispetto al tick globale di simulazione.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: SimulationHost come clock, non come logica biologica</b></para>
+    /// <para>
+    /// Il <c>SimulationHost</c> futuro dovra' soltanto fornire il tick corrente e
+    /// conservare il tick biosfera processato piu' recente. La decisione su cadenza,
+    /// update maturati e prossimo confine resta qui, in un modulo Core testabile e
+    /// privo di dipendenze da Unity scene, MapGrid o ArcGraph.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Evaluate</b>: calcola se un update e' dovuto.</item>
+    ///   <item><b>ResolveProcessedTickAfterDecision</b>: normalizza il nuovo ultimo tick processato.</item>
+    ///   <item><b>ClampNonNegative</b>: protegge input temporali invalidi.</item>
+    /// </list>
+    /// </summary>
+    public static class EnvironmentRuntimeScheduler
+    {
+        // =============================================================================
+        // Evaluate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Valuta se il tick corrente deve produrre un avanzamento biosfera.
+        /// </para>
+        /// </summary>
+        public static EnvironmentRuntimeScheduleDecision Evaluate(
+            BiosphereRuntimeParams runtimeParams,
+            long lastProcessedSimulationTick,
+            long currentSimulationTick)
+        {
+            var config = BiosphereRuntimeParams.WithFallbackDefaults(runtimeParams);
+            int cadenceTicks = config.ResolveSimulationTicksPerDailyUpdate();
+            long safeLastProcessedTick = ClampNonNegative(lastProcessedSimulationTick);
+            long safeCurrentTick = ClampNonNegative(currentSimulationTick);
+            long nextDueTick = safeLastProcessedTick + cadenceTicks;
+
+            if (!config.enabled)
+            {
+                return new EnvironmentRuntimeScheduleDecision(
+                    false,
+                    false,
+                    cadenceTicks,
+                    0,
+                    safeLastProcessedTick,
+                    safeCurrentTick,
+                    safeLastProcessedTick,
+                    safeLastProcessedTick,
+                    nextDueTick,
+                    config.ResolveUpdateMode());
+            }
+
+            long elapsedTicks = safeCurrentTick - safeLastProcessedTick;
+            bool shouldAdvance = elapsedTicks >= cadenceTicks;
+            int dueUpdateCount = shouldAdvance
+                ? (int)(elapsedTicks / cadenceTicks)
+                : 0;
+
+            // Per ora l'Environment Foundation usa la stessa unita' numerica del tick
+            // SimulationHost. Il ponte futuro potra' convertire qui se introdurremo
+            // scale temporali separate, senza cambiare resolver biologici.
+            long currentEnvironmentTicks = shouldAdvance
+                ? safeLastProcessedTick + ((long)dueUpdateCount * cadenceTicks)
+                : safeLastProcessedTick;
+
+            return new EnvironmentRuntimeScheduleDecision(
+                true,
+                shouldAdvance,
+                cadenceTicks,
+                dueUpdateCount,
+                safeLastProcessedTick,
+                safeCurrentTick,
+                safeLastProcessedTick,
+                currentEnvironmentTicks,
+                currentEnvironmentTicks + cadenceTicks,
+                config.ResolveUpdateMode());
+        }
+
+        // =============================================================================
+        // ResolveProcessedTickAfterDecision
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il tick biosfera da memorizzare dopo una decisione.
+        /// </para>
+        /// </summary>
+        public static long ResolveProcessedTickAfterDecision(
+            EnvironmentRuntimeScheduleDecision decision)
+        {
+            return decision.ShouldAdvance
+                ? decision.CurrentEnvironmentTicks
+                : decision.LastProcessedSimulationTick;
+        }
+
+        // =============================================================================
+        // ClampNonNegative
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza i tick negativi a zero per proteggere bootstrap e test.
+        /// </para>
+        /// </summary>
+        private static long ClampNonNegative(long tick)
+        {
+            return tick < 0 ? 0 : tick;
+        }
+    }
+
     // =============================================================================
     // EnvironmentAdvanceResult
     // =============================================================================
@@ -29,6 +219,11 @@ namespace Arcontio.Core.Environment
     /// </summary>
     public sealed class EnvironmentAdvanceResult
     {
+        private static readonly EnvironmentPhysicalPlantDelta[] EmptyPhysicalPlantDeltas =
+            new EnvironmentPhysicalPlantDelta[0];
+        private static readonly EnvironmentDiffuseVegetationDelta[] EmptyDiffuseVegetationDeltas =
+            new EnvironmentDiffuseVegetationDelta[0];
+
         public EnvironmentTemporalTransition Transition { get; }
         public EnvironmentGlobalClimateState Climate { get; }
         public EnvironmentSeasonProfile SeasonProfile { get; }
@@ -36,6 +231,8 @@ namespace Arcontio.Core.Environment
         public EnvironmentSnapshot Snapshot { get; }
         public EnvironmentSnapshotEvolutionReport EvolutionReport { get; }
         public EnvironmentSnapshotDiffResult SnapshotDiff { get; }
+        public IReadOnlyList<EnvironmentPhysicalPlantDelta> PhysicalPlantDeltas { get; }
+        public IReadOnlyList<EnvironmentDiffuseVegetationDelta> DiffuseVegetationDeltas { get; }
 
         // =============================================================================
         // EnvironmentAdvanceResult
@@ -52,7 +249,9 @@ namespace Arcontio.Core.Environment
             EnvironmentState state,
             EnvironmentSnapshot snapshot,
             EnvironmentSnapshotEvolutionReport evolutionReport,
-            EnvironmentSnapshotDiffResult snapshotDiff)
+            EnvironmentSnapshotDiffResult snapshotDiff,
+            IReadOnlyList<EnvironmentPhysicalPlantDelta> physicalPlantDeltas = null,
+            IReadOnlyList<EnvironmentDiffuseVegetationDelta> diffuseVegetationDeltas = null)
         {
             Transition = transition;
             Climate = climate;
@@ -63,6 +262,8 @@ namespace Arcontio.Core.Environment
             SnapshotDiff = snapshotDiff
                            ?? new EnvironmentSnapshotDiffResult(
                                new EnvironmentSnapshotAreaChange[0]);
+            PhysicalPlantDeltas = physicalPlantDeltas ?? EmptyPhysicalPlantDeltas;
+            DiffuseVegetationDeltas = diffuseVegetationDeltas ?? EmptyDiffuseVegetationDeltas;
         }
     }
 
@@ -128,6 +329,9 @@ namespace Arcontio.Core.Environment
             var diff = EnvironmentSnapshotDiffResolver.Diff(
                 sourceSnapshot,
                 snapshot);
+            var physicalPlantDeltas = EnvironmentPhysicalPlantDeltaProducer.DiffSnapshots(
+                sourceSnapshot,
+                snapshot);
 
             return new EnvironmentAdvanceResult(
                 transition,
@@ -136,7 +340,8 @@ namespace Arcontio.Core.Environment
                 evolution.State,
                 snapshot,
                 evolution.Report,
-                diff);
+                diff,
+                physicalPlantDeltas);
         }
 
         // =============================================================================

@@ -203,6 +203,9 @@ namespace Arcontio.Core.Environment
         public readonly EnvironmentAreaId AreaId;
         public readonly EnvironmentAreaKind Kind;
         public readonly EnvironmentAreaBounds Bounds;
+        public readonly int CenterX;
+        public readonly int CenterY;
+        public readonly int RadiusCells;
         public readonly int Priority;
         public readonly bool IsEnabled;
         public readonly string Key;
@@ -222,13 +225,55 @@ namespace Arcontio.Core.Environment
             int priority,
             bool isEnabled,
             string key)
+            : this(
+                areaId,
+                kind,
+                bounds,
+                (bounds.MinX + bounds.MaxX) / 2,
+                (bounds.MinY + bounds.MaxY) / 2,
+                0,
+                priority,
+                isEnabled,
+                key)
+        {
+        }
+
+        public EnvironmentAreaDefinition(
+            EnvironmentAreaId areaId,
+            EnvironmentAreaKind kind,
+            EnvironmentAreaBounds bounds,
+            int centerX,
+            int centerY,
+            int radiusCells,
+            int priority,
+            bool isEnabled,
+            string key)
         {
             AreaId = areaId;
             Kind = kind;
             Bounds = bounds;
+            CenterX = centerX;
+            CenterY = centerY;
+            RadiusCells = radiusCells < 0 ? 0 : radiusCells;
             Priority = priority;
             IsEnabled = isEnabled;
             Key = key ?? string.Empty;
+        }
+
+        public bool UsesCircularArea => RadiusCells > 0;
+
+        public bool ContainsCell(int x, int y, int z = 0)
+        {
+            if (z != Bounds.Z)
+                return false;
+
+            if (!UsesCircularArea)
+                return Bounds.Contains(new EnvironmentCellCoord(x, y, z));
+
+            int dx = x - CenterX;
+            int dy = y - CenterY;
+            int r = RadiusCells;
+            return (dx * dx) + (dy * dy) <= r * r;
         }
     }
 }

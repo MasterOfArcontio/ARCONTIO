@@ -1,5 +1,6 @@
 ﻿using Arcontio.Core.Config;
 using Arcontio.Core.DevTools;
+using Arcontio.Core.Environment;
 using Arcontio.Core.Logging;
 using System;
 using System.Collections.Generic;
@@ -217,6 +218,14 @@ namespace Arcontio.Core
         /// - La view può leggerlo in modo read-only tramite GetNpcLandmarkOverlayData.
         /// </summary>
         public LandmarkRegistry LandmarkRegistry { get; private set; }
+
+        public EnvironmentState EnvironmentState { get; private set; }
+        public EnvironmentAreaSetConfig InitialEnvironmentAreaSetConfig { get; private set; }
+        public IReadOnlyDictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> PhysicalPlants => _physicalPlants;
+
+        private readonly List<LandmarkRegistry.ManualLandmarkCandidate> _environmentLandmarkCandidates = new(64);
+        private readonly List<LandmarkRegistry.ManualLandmarkResolution> _environmentLandmarkResolutions = new(64);
+        private readonly Dictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> _physicalPlants = new();
 
         /// <summary>
         /// Debug token logs (Patch 0.01P2):
@@ -1030,6 +1039,8 @@ namespace Arcontio.Core
             // - La build vera e propria avviene dopo il seeding (SimulationHost), quando
             //   oggetti come muri/porte sono stati piazzati sulla griglia.
             LandmarkRegistry = new LandmarkRegistry();
+            EnvironmentState = new EnvironmentState();
+            InitialEnvironmentAreaSetConfig = new EnvironmentAreaSetConfig();
 
             // ============================================================
             // PATHFINDING STATE — inizializzazione
@@ -1246,7 +1257,383 @@ namespace Arcontio.Core
         /// </summary>
         public void RebuildLandmarksBootstrap()
         {
-            LandmarkRegistry?.RebuildFromWorld(this);
+            RebuildLandmarksWithEnvironmentAnchors();
+        }
+
+        // =============================================================================
+        // SetEnvironmentState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Installa lo stato biosfera posseduto dal <see cref="World"/> runtime.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: World source of truth, biosfera scatola chiusa</b></para>
+        /// <para>
+        /// Il <see cref="World"/> conserva il riferimento allo stato ambientale per
+        /// permettere rebuild e query coordinate, ma non duplica la logica biologica:
+        /// specie, seed bank, fertilita' e anchor biologici restano responsabilita'
+        /// dello stato Environment.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>state</b>: stato Environment gia' costruito dal bootstrap o dal restore.</item>
+        ///   <item><b>fallback</b>: stato vuoto quando il chiamante passa null.</item>
+        /// </list>
+        /// </summary>
+        public void SetEnvironmentState(EnvironmentState state)
+        {
+            EnvironmentState = state ?? new EnvironmentState();
+        }
+
+        // =============================================================================
+        // SetInitialEnvironmentAreaSetConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra il set di aree ambientali iniziali letto dal file mappa.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: la mappa descrive il dove, la biosfera decide il cosa vive</b></para>
+        /// <para>
+        /// Il file mappa puo' dichiarare centro, raggio, bioma e intensita' delle
+        /// aree biologiche. Il <see cref="World"/> conserva temporaneamente questo
+        /// DTO per il bootstrap Environment, senza trasformarlo in renderer, oggetti
+        /// fisici o logica biologica autonoma.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>areaSetConfig</b>: DTO Environment gia' normalizzato dal loader mappa.</item>
+        ///   <item><b>null</b>: area set vuoto, utile per snapshot o mappe senza biosfera dichiarata.</item>
+        /// </list>
+        /// </summary>
+        public void SetInitialEnvironmentAreaSetConfig(EnvironmentAreaSetConfig areaSetConfig)
+        {
+            InitialEnvironmentAreaSetConfig = areaSetConfig ?? new EnvironmentAreaSetConfig();
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentPhysicalPlantProjections
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sincronizza nel <see cref="World"/> la proiezione fisica minima delle
+        /// piante prodotte dalla biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: boundary fisico derivato, stato biologico autoritativo</b></para>
+        /// <para>
+        /// Il metodo non crea <see cref="WorldObjectInstance"/> e non assegna sprite.
+        /// Traduce soltanto le celle occupate da piante importanti in blocchi di
+        /// movimento/visione, cosi' pathfinding, FOV e ArcGraph potranno leggere il
+        /// risultato dal World senza duplicare la simulazione biologica.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Clear</b>: rimuove dalle cache le vecchie proiezioni biologiche.</item>
+        ///   <item><b>Filtro</b>: scarta plant id invalidi, celle fuori mappa o celle gia' occupate.</item>
+        ///   <item><b>Cache</b>: registra la pianta in <c>_physicalPlants</c> e nella cache occlusione.</item>
+        ///   <item><b>Dirty</b>: invalida la percezione degli NPC vicini alle celle modificate.</item>
+        /// </list>
+        /// </summary>
+        public int ApplyEnvironmentPhysicalPlantProjections()
+        {
+            // Ogni applicazione e' una sincronizzazione completa del boundary
+            // fisico: prima togliamo il vecchio derivato, poi rileggiamo la
+            // biosfera corrente.
+            ClearPhysicalPlantProjectionsFromWorldCaches();
+
+            if (EnvironmentState == null)
+                return 0;
+
+            int applied = 0;
+            var placements = EnvironmentState.PhysicalPlantPlacements;
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                var placement = placements[i];
+                var cell = placement.Cell;
+
+                // PlantId invalido significa "nessuna pianta fisica": il dato
+                // puo' comparire solo in caso di configurazioni parziali/debug.
+                if (!placement.PlantId.IsValid)
+                    continue;
+
+                // Il World resta l'authority fisica: bounds e occupazione reale
+                // vengono ricontrollati qui anche se la biosfera ha gia' filtrato.
+                if (!InBounds(cell.X, cell.Y) || HasAnyObjectAt(cell.X, cell.Y) || HasPhysicalPlantAt(cell.X, cell.Y))
+                    continue;
+
+                if (!TryCreatePhysicalPlantProjection(placement, out var projection))
+                    continue;
+
+                _physicalPlants[placement.PlantId] = projection;
+                ApplyPhysicalPlantProjectionToCache(projection);
+                applied++;
+            }
+
+            return applied;
+        }
+
+        // =============================================================================
+        // TryGetPhysicalPlant
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce la proiezione fisica World-side di una pianta biologica.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query read-only sul boundary</b></para>
+        /// <para>
+        /// I consumer possono verificare se una pianta esiste fisicamente nel World
+        /// senza accedere direttamente allo stato interno della biosfera.
+        /// </para>
+        /// </summary>
+        public bool TryGetPhysicalPlant(EnvironmentPlantId plantId, out WorldPhysicalPlantProjection plant)
+        {
+            if (!plantId.IsValid)
+            {
+                plant = default;
+                return false;
+            }
+
+            return _physicalPlants.TryGetValue(plantId, out plant);
+        }
+
+        // =============================================================================
+        // TryGetPhysicalPlantAt
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca una pianta fisica alla coordinata indicata.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: occupazione fisica senza oggetto catalogo</b></para>
+        /// <para>
+        /// Le piante fisiche occupano celle come muri/ostacoli, ma non entrano nel
+        /// catalogo oggetti finche' non esiste un job esplicito che le trasformi in
+        /// target interattivo.
+        /// </para>
+        /// </summary>
+        public bool TryGetPhysicalPlantAt(int x, int y, out WorldPhysicalPlantProjection plant)
+        {
+            foreach (var kv in _physicalPlants)
+            {
+                plant = kv.Value;
+                if (plant.Cell.X == x && plant.Cell.Y == y)
+                    return true;
+            }
+
+            plant = default;
+            return false;
+        }
+
+        // =============================================================================
+        // HasPhysicalPlantAt
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se una cella e' occupata da una pianta fisica della biosfera.
+        /// </para>
+        /// </summary>
+        public bool HasPhysicalPlantAt(int x, int y)
+        {
+            return TryGetPhysicalPlantAt(x, y, out _);
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentPhysicalPlantDeltas
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica una lista di delta pianta fisica prodotti dalla biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: aggiornamento incrementale a cadenza biosfera</b></para>
+        /// <para>
+        /// Il bootstrap puo' ancora usare <see cref="ApplyEnvironmentPhysicalPlantProjections"/>
+        /// per una sincronizzazione completa. Durante il runtime ordinario, invece,
+        /// la biosfera puo' consegnare solo le piante nate, morte o cambiate di
+        /// stadio, riducendo il costo e limitando la dirty propagation alle celle
+        /// realmente mutate.
+        /// </para>
+        /// </summary>
+        public int ApplyEnvironmentPhysicalPlantDeltas(IReadOnlyList<EnvironmentPhysicalPlantDelta> deltas)
+        {
+            if (deltas == null || deltas.Count == 0)
+                return 0;
+
+            int applied = 0;
+            for (int i = 0; i < deltas.Count; i++)
+            {
+                if (ApplyEnvironmentPhysicalPlantDelta(deltas[i]))
+                    applied++;
+            }
+
+            return applied;
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentPhysicalPlantDelta
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un singolo delta pianta fisica prodotto dalla biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: World applica fisica, non crescita biologica</b></para>
+        /// <para>
+        /// Il delta porta specie, coordinate, eta', salute e stadio. Il World usa
+        /// questi dati solo per aggiornare la proiezione consultabile e le cache di
+        /// movimento/visione. Non decide crescita, non sceglie sprite e non modifica
+        /// la PlantInstance dentro la biosfera.
+        /// </para>
+        /// </summary>
+        public bool ApplyEnvironmentPhysicalPlantDelta(EnvironmentPhysicalPlantDelta delta)
+        {
+            if (!delta.IsValid)
+                return false;
+
+            // Morte o stato non vivo significano rimozione fisica. La biosfera resta
+            // libera di conservare o meno la PlantInstance per storia/save futuri.
+            if (delta.Kind == EnvironmentPhysicalPlantDeltaKind.Died || !delta.IsAlive)
+                return RemovePhysicalPlantProjection(delta.PlantId);
+
+            int x = delta.Cell.X;
+            int y = delta.Cell.Y;
+            if (!InBounds(x, y) || HasAnyObjectAt(x, y))
+                return false;
+
+            if (TryGetPhysicalPlantAt(x, y, out var existing)
+                && !existing.PlantId.Equals(delta.PlantId))
+            {
+                return false;
+            }
+
+            // Prima rimuoviamo l'eventuale vecchia cella della stessa pianta, poi
+            // applichiamo il nuovo stato/cella. Questo copre sia stage update sia
+            // relocation senza duplicare occluder.
+            RemovePhysicalPlantProjection(delta.PlantId);
+
+            var projection = CreatePhysicalPlantProjectionFromDelta(delta);
+            _physicalPlants[delta.PlantId] = projection;
+            ApplyPhysicalPlantProjectionToCache(projection);
+            return true;
+        }
+
+        // =============================================================================
+        // RebuildLandmarksWithEnvironmentAnchors
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce il registry landmark includendo gli anchor biologici prodotti
+        /// dalla biosfera prima della fase comune di cap, indice ed edge.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: rebuild unica, input multipli</b></para>
+        /// <para>
+        /// Gli anchor biologici non vengono aggiunti dopo la rebuild: entrano nello
+        /// stesso passaggio che crea doorway, junction e area center, cosi' snapshot,
+        /// percezione landmark e debug overlay leggono una struttura stabile unica.
+        /// </para>
+        /// </summary>
+        private void RebuildLandmarksWithEnvironmentAnchors()
+        {
+            _environmentLandmarkCandidates.Clear();
+            _environmentLandmarkResolutions.Clear();
+
+            EnvironmentState?.BuildBiologicalLandmarkCandidates(this, _environmentLandmarkCandidates);
+            LandmarkRegistry?.RebuildFromWorld(this, _environmentLandmarkCandidates, _environmentLandmarkResolutions);
+            EnvironmentState?.ApplyBiologicalLandmarkResolutions(_environmentLandmarkResolutions);
+        }
+
+        // =============================================================================
+        // CollectEnvironmentNaturalCandidateCells
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Fornisce alla biosfera le celle naturali libere contenute in un'area
+        /// ambientale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: World decide disponibilita' spaziale, biosfera decide occupazione biologica</b></para>
+        /// <para>
+        /// La biosfera non deve duplicare la semantica fisica della cella. Questo
+        /// metodo filtra bounds, superfici, oggetti e movimento usando lo stato
+        /// autoritativo del <see cref="World"/>; il chiamante puo' poi scegliere quali
+        /// celle diventeranno landmark, vegetazione decorativa o piante fisiche.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>area</b>: area ambientale con bounds o raggio circolare.</item>
+        ///   <item><b>outCells</b>: lista riusabile popolata con celle candidate.</item>
+        ///   <item><b>requirePhysicalPlantHost</b>: richiede anche `CanHostPhysicalPlant` dalla superficie.</item>
+        ///   <item><b>return</b>: numero celle aggiunte.</item>
+        /// </list>
+        /// </summary>
+        public int CollectEnvironmentNaturalCandidateCells(
+            EnvironmentAreaDefinition area,
+            List<EnvironmentCellCoord> outCells,
+            bool requirePhysicalPlantHost = false)
+        {
+            if (outCells == null)
+                return 0;
+
+            int before = outCells.Count;
+            int radius = area.UsesCircularArea
+                ? area.RadiusCells
+                : System.Math.Max(area.Bounds.Width, area.Bounds.Height) / 2;
+
+            int minX = area.UsesCircularArea ? area.CenterX - radius : area.Bounds.MinX;
+            int maxX = area.UsesCircularArea ? area.CenterX + radius : area.Bounds.MaxX;
+            int minY = area.UsesCircularArea ? area.CenterY - radius : area.Bounds.MinY;
+            int maxY = area.UsesCircularArea ? area.CenterY + radius : area.Bounds.MaxY;
+
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                {
+                    if (!IsEnvironmentNaturalCandidateCell(area, x, y, requirePhysicalPlantHost))
+                        continue;
+
+                    outCells.Add(new EnvironmentCellCoord(x, y, area.Bounds.Z));
+                }
+            }
+
+            return outCells.Count - before;
+        }
+
+        private bool IsEnvironmentNaturalCandidateCell(
+            EnvironmentAreaDefinition area,
+            int x,
+            int y,
+            bool requirePhysicalPlantHost)
+        {
+            if (!InBounds(x, y))
+                return false;
+
+            if (!area.ContainsCell(x, y, area.Bounds.Z))
+                return false;
+
+            if (IsMovementBlocked(x, y) || HasAnyObjectAt(x, y))
+                return false;
+
+            if (CellSurfaces == null || !CellSurfaces.TryGetSurface(x, y, out var surface))
+                return false;
+
+            if (surface.MacroSurface != CellSurfaceMacro.Natural)
+                return false;
+
+            if (TryGetSurfaceDef(surface.SurfaceKey, out var def) && def != null)
+                return requirePhysicalPlantHost
+                    ? def.CanHostPhysicalPlant
+                    : def.CanHostNaturalVegetation;
+
+            return true;
         }
 
         // ============================================================
@@ -1284,7 +1671,7 @@ namespace Arcontio.Core
 
             // Landmark registry Ã¨ anch'esso derivato dalla geometria mappa.
             // Nota: questa chiamata Ã¨ safe se LandmarkRegistry Ã¨ null.
-            LandmarkRegistry?.RebuildFromWorld(this);
+            RebuildLandmarksWithEnvironmentAnchors();
         }
 
         /// <summary>
@@ -1347,6 +1734,12 @@ namespace Arcontio.Core
                 if (def.IsDoor && obj.IsOpen)
                     SetDoorOpen(objectId, true);
             }
+
+            // Le piante fisiche non sono WorldObjectInstance, quindi non vengono
+            // ricostruite dal ciclo Objects. Le riapplichiamo alla fine come layer
+            // derivato della biosfera sopra le stesse cache di movimento/visione.
+            foreach (var kv in _physicalPlants)
+                ApplyPhysicalPlantProjectionToCache(kv.Value);
         }
 
         // =============================================================================
@@ -4180,7 +4573,11 @@ namespace Arcontio.Core
                 if (!LandmarkRegistry.TryGetActiveNodeById(routePlan.NodeIds[i], out var n) || n == null)
                     continue;
 
-                string label = n.Kind == LandmarkRegistry.LandmarkKind.Doorway ? $"D#{n.Id}" : $"J#{n.Id}";
+                string label = n.Kind == LandmarkRegistry.LandmarkKind.Doorway
+                    ? $"D#{n.Id}"
+                    : n.Kind == LandmarkRegistry.LandmarkKind.BiologicalAnchor
+                        ? $"B#{n.Id}"
+                        : $"J#{n.Id}";
                 outRouteNodes?.Add(new LandmarkOverlayNode(cellX: n.CellX, cellY: n.CellY, kind: (int)n.Kind, nodeId: n.Id, label: label));
 
                 if (i <= 0)
@@ -4844,6 +5241,12 @@ if (!NpcAction.ContainsKey(id))
                 return -1;
             }
 
+            if (HasPhysicalPlantAt(x, y))
+            {
+                Debug.LogWarning($"[World] CreateObject failed: cell occupied by physical plant ({x},{y})");
+                return -1;
+            }
+
             int id = _nextObjectId++;
 
             var inst = new WorldObjectInstance
@@ -4959,6 +5362,12 @@ if (!NpcAction.ContainsKey(id))
             if (!isHeld && HasAnyObjectAt(x, y))
             {
                 error = $"World.TryRegisterLoadedObjectForSaveLoad: cella occupata ({x},{y}) per objectId {objectId}.";
+                return false;
+            }
+
+            if (!isHeld && HasPhysicalPlantAt(x, y))
+            {
+                error = $"World.TryRegisterLoadedObjectForSaveLoad: cella occupata da pianta fisica ({x},{y}) per objectId {objectId}.";
                 return false;
             }
 
@@ -5443,6 +5852,215 @@ if (!NpcAction.ContainsKey(id))
                 BlocksMovement = blocksMove,
                 VisionCost = def.VisionCost <= 0f ? 1f : def.VisionCost
             };	
+        }
+
+        // =============================================================================
+        // TryCreatePhysicalPlantProjection
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea la proiezione World-side arricchita partendo da un placement della
+        /// biosfera e dalla PlantInstance autoritativa.
+        /// </para>
+        /// </summary>
+        private bool TryCreatePhysicalPlantProjection(
+            EnvironmentPhysicalPlantPlacement placement,
+            out WorldPhysicalPlantProjection projection)
+        {
+            projection = default;
+
+            if (EnvironmentState == null
+                || !placement.PlantId.IsValid
+                || !EnvironmentState.TryGetPlantInstance(placement.PlantId, out var plant)
+                || !plant.IsAlive)
+            {
+                return false;
+            }
+
+            var areaId = placement.AreaId.IsValid
+                ? placement.AreaId
+                : plant.SourceAreaId;
+            string speciesKey = string.IsNullOrWhiteSpace(plant.SpeciesKey)
+                ? placement.SpeciesKey
+                : plant.SpeciesKey;
+
+            projection = new WorldPhysicalPlantProjection(
+                placement.PlantId,
+                areaId,
+                placement.Cell,
+                speciesKey,
+                plant.GrowthStageKey,
+                plant.HealthState,
+                plant.IsAlive,
+                blocksMovement: true,
+                blocksVision: true,
+                visionCost: 1f);
+            return true;
+        }
+
+        // =============================================================================
+        // CreatePhysicalPlantProjectionFromDelta
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce un delta biosfera in proiezione fisica World-side.
+        /// </para>
+        /// </summary>
+        private static WorldPhysicalPlantProjection CreatePhysicalPlantProjectionFromDelta(
+            EnvironmentPhysicalPlantDelta delta)
+        {
+            return new WorldPhysicalPlantProjection(
+                delta.PlantId,
+                delta.AreaId,
+                delta.Cell,
+                delta.SpeciesKey,
+                delta.GrowthStageKey,
+                delta.HealthState,
+                delta.IsAlive,
+                blocksMovement: true,
+                blocksVision: true,
+                visionCost: 1f);
+        }
+
+        // =============================================================================
+        // RemovePhysicalPlantProjection
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove una singola proiezione pianta fisica dal World e dalle cache.
+        /// </para>
+        /// </summary>
+        private bool RemovePhysicalPlantProjection(EnvironmentPlantId plantId)
+        {
+            if (!plantId.IsValid || !_physicalPlants.TryGetValue(plantId, out var projection))
+                return false;
+
+            ClearPhysicalPlantProjectionFromWorldCaches(projection);
+            _physicalPlants.Remove(plantId);
+            return true;
+        }
+
+        // =============================================================================
+        // ClearPhysicalPlantProjectionsFromWorldCaches
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove dalle cache World tutte le proiezioni fisiche delle piante.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: cache derivata rigenerabile</b></para>
+        /// <para>
+        /// Le proiezioni piante sono derivate dallo stato biosfera. Quando la
+        /// biosfera cambia, il World non prova a calcolare delta biologici: pulisce
+        /// il layer fisico precedente e lo ricostruisce da zero.
+        /// </para>
+        /// </summary>
+        private void ClearPhysicalPlantProjectionsFromWorldCaches()
+        {
+            foreach (var kv in _physicalPlants)
+                ClearPhysicalPlantProjectionFromWorldCaches(kv.Value);
+
+            _physicalPlants.Clear();
+        }
+
+        // =============================================================================
+        // ClearPhysicalPlantProjectionFromWorldCaches
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Pulisce dalle cache World una singola proiezione pianta fisica.
+        /// </para>
+        /// </summary>
+        private void ClearPhysicalPlantProjectionFromWorldCaches(WorldPhysicalPlantProjection projection)
+        {
+            int x = projection.Cell.X;
+            int y = projection.Cell.Y;
+
+            if (!InBounds(x, y))
+                return;
+
+            int idx = Idx(x, y);
+            int occluderId = EncodePhysicalPlantOccluderId(projection.PlantId);
+
+            // Puliamo solo se la cella contiene ancora la stessa proiezione
+            // biologica. Se nel frattempo un oggetto reale ha preso la cella,
+            // non lo cancelliamo accidentalmente.
+            if (_occlusion != null
+                && _occlusion.Length == MapWidth * MapHeight
+                && _occlusion[idx].OccluderObjectId == occluderId)
+            {
+                _occlusion[idx] = default;
+            }
+
+            // Le bool cache sono aggregate per cella: rimuoverle qui e'
+            // corretto per il layer piante, poi eventuali rebuild/oggetti reali
+            // le ripristinano tramite PlaceOccluderInCache.
+            if (_blocksVision != null && _blocksVision.Length == MapWidth * MapHeight)
+                _blocksVision[CellIndex(x, y)] = false;
+
+            if (_blocksMovement != null && _blocksMovement.Length == MapWidth * MapHeight)
+                _blocksMovement[CellIndex(x, y)] = false;
+
+            MarkNearbyNpcPerceptionDirty(x, y);
+        }
+
+        // =============================================================================
+        // ApplyPhysicalPlantProjectionToCache
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inserisce una singola pianta fisica nelle cache di movimento e visione.
+        /// </para>
+        /// </summary>
+        private void ApplyPhysicalPlantProjectionToCache(WorldPhysicalPlantProjection projection)
+        {
+            int x = projection.Cell.X;
+            int y = projection.Cell.Y;
+
+            if (!InBounds(x, y))
+                return;
+
+            int idx = Idx(x, y);
+            int occluderId = EncodePhysicalPlantOccluderId(projection.PlantId);
+
+            // ID negativo: distingue subito una proiezione biologica da un
+            // WorldObjectInstance, che usa id positivi.
+            if (_occlusion != null && _occlusion.Length == MapWidth * MapHeight)
+            {
+                if (_occlusion[idx].OccluderObjectId != 0 && _occlusion[idx].OccluderObjectId != occluderId)
+                    Debug.LogWarning($"[World] Physical plant occlusion overwrite at ({x},{y}). old={_occlusion[idx].OccluderObjectId} new={occluderId}");
+
+                _occlusion[idx] = new OcclusionCell
+                {
+                    OccluderObjectId = occluderId,
+                    BlocksVision = projection.BlocksVision,
+                    BlocksMovement = projection.BlocksMovement,
+                    VisionCost = projection.VisionCost <= 0f ? 1f : projection.VisionCost
+                };
+            }
+
+            if (_blocksVision != null && _blocksVision.Length == MapWidth * MapHeight)
+                _blocksVision[CellIndex(x, y)] = projection.BlocksVision;
+
+            if (_blocksMovement != null && _blocksMovement.Length == MapWidth * MapHeight)
+                _blocksMovement[CellIndex(x, y)] = projection.BlocksMovement;
+
+            MarkNearbyNpcPerceptionDirty(x, y);
+        }
+
+        // =============================================================================
+        // EncodePhysicalPlantOccluderId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte un id pianta biosfera in id occluder negativo World-side.
+        /// </para>
+        /// </summary>
+        private static int EncodePhysicalPlantOccluderId(EnvironmentPlantId plantId)
+        {
+            // Gli objectId reali sono positivi. Usare valori negativi evita collisioni
+            // senza introdurre un secondo tipo di OcclusionCell.
+            return plantId.IsValid ? -plantId.Value : 0;
         }
 
         private void ClearOccluderFromCache(int objectId, int x, int y)

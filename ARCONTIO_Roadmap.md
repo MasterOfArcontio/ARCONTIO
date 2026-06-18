@@ -57,6 +57,23 @@
 | v0.50 | Environment Read-Only Snapshots | Post-v0.49 | ✅ Completata foundation/data-only |
 | v0.51 | Save/Load Environment | Post-v0.50 | ✅ Completata foundation/data-only |
 | v0.52 | ArcGraph Environment Adapter | Post-v0.51 | ✅ Completata adapter passivo |
+| v0.53 | Biosphere Runtime Config & Scheduling | Post-v0.52 | ✅ Completata v0.53.1 config/scheduler data-only |
+| v0.54 | Core Cell Surface Layer | Integrata in base fec5435 | ✅ Completata da v0.38m.01-v0.38m.14 |
+| v0.55 | Biological Area Landmark Definition | Post-v0.54 | ✅ Core iniziale completato, harness pending |
+| v0.56 | Biosphere Surface Candidate Query | Post-v0.55 | ✅ Core iniziale completato, harness pending |
+| v0.57 | Biosphere / World Physical Mutation Boundary | Post-v0.56 | ✅ Core boundary iniziale completato, delta/save-load pending |
+| v0.58 | Physical Plant Placement | Post-v0.57 | ✅ Core iniziale completato, tuning placement pending |
+| v0.59 | Plant Physical Runtime Representation | Post-v0.58 | ✅ Core runtime representation iniziale completata |
+| v0.60 | Plant Lifecycle Delta Propagation | Post-v0.59 | ✅ Producer delta giornalieri data-only completato |
+| v0.61 | Decorative Vegetation Placement | Post-v0.60 | ✅ Contratto/delta vegetazione diffusa data-only completato, World projection pending |
+| v0.62 | Dirty Propagation / FOV & Perception | Post-v0.61 | ⏳ Pending |
+| v0.63 | ArcGraph Environment Runtime Feed | Post-v0.62 | ⏳ Pending |
+| v0.64 | Environment Event / Listener Boundary | Post-v0.63 | ⏳ Pending |
+| v0.65 | Biosphere Runtime Save/Load Integration | Post-v0.64 | ⏳ Pending |
+| v0.66 | NPC Environment Query Integration | Post-v0.65 | ⏳ Pending |
+| v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⏳ Pending |
+| v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ⏳ Pending |
+| v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ⏳ Pending |
 | v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Dopo observer prerequisites | ⏳ Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | 🎯 Target |
@@ -16229,6 +16246,180 @@ Closeout documentale:
 - ArcGraph resta consumer di snapshot/proiezioni;
 - integrazione runtime con tick ufficiale ancora da pianificare tramite boundary neutro;
 - nessuna attivazione automatica della biosfera nel runtime produttivo.
+
+---
+
+## Roadmap v0.53-v0.69 - Biosfera / World Physical Integration
+
+La roadmap `v0.53-v0.69` formalizza il passaggio dalla foundation data-only alla
+presenza fisica controllata della biosfera nel `World`.
+
+Principio architetturale:
+
+```text
+Biosfera = verita' biologica
+World = verita' spaziale/fisica
+ArcGraph = verita' visuale derivata
+NPC = consumer tramite query, memoria, landmark ed eventi
+```
+
+Regole di separazione:
+
+- la biosfera conserva specie, eta', salute, stadio, maturita', seed bank, fertilita',
+  acqua, clima e densita' vegetazione;
+- il `World` conserva celle, superfici, occupazione, blocco movimento, blocco vista,
+  coordinate fisiche e dirty propagation;
+- ArcGraph non legge la biosfera come authority, ma riceve snapshot/delta derivati;
+- la vegetazione decorativa pura sporca solo la vista;
+- le piante fisiche che bloccano movimento o vista sporcano `World`, FOV e percezione;
+- le piante non devono duplicare tutto lo stato biologico dentro `World`;
+- `World` puo' conservare solo il riferimento fisico minimo alla pianta biologica:
+  id biosfera, cella, blocchi fisici e visual key corrente.
+
+Base Core gia' disponibile da `fec5435`:
+
+| Elemento | Funzione | Stato |
+|---|---|---|
+| `surface_defs.json` | catalogo tipi superficie, con dati simulativi e visuali | ✅ Completato |
+| `world_map_default.json` | file mappa iniziale unico con dimensioni e layer pavimenti | ✅ Completato |
+| `World.CellSurfaces` / `CellSurfaceLayer` | stato per-cella della superficie presente | ✅ Completato |
+| `World.SurfaceDefs` | catalogo runtime delle definizioni superficie | ✅ Completato |
+| dimensioni mappa fuori da `game_params.json` | `World` prende dimensioni dal file mappa | ✅ Completato |
+
+Vincoli per la biosfera:
+
+- usare `World.CellSurfaces` come sorgente delle superfici per cella;
+- usare `World.SurfaceDefs` / `surface_defs.json` come catalogo dei tipi superficie;
+- non leggere `MapGridData`;
+- non leggere direttamente sprite o tile id per logica simulativa;
+- usare solo `MacroSurface`, `BaseFertility01`, `BaseMoisture01`,
+  `CanHostNaturalVegetation`, `CanHostPhysicalPlant`, `BlocksMovement`,
+  `BlocksVision` quando pertinenti.
+
+---
+
+### v0.53 - Biosphere Runtime Config & Scheduling
+
+**Stato:** ✅ Completata v0.53.1 - config e scheduler data-only
+
+Obiettivo:
+
+```text
+spostare cadenze, budget e peso runtime della biosfera in file di configurazione
+```
+
+Blocchi:
+
+| Blocco | Funzione | Stato |
+|---|---|---|
+| Config schema | sezione runtime biosfera in config produttiva | ✅ Completato v0.53.1 |
+| Daily update cadence | update ordinario una volta al giorno simulato | ✅ Completato v0.53.1 |
+| Tick bridge | mapping configurabile data-only tra `SimulationHost` tick e update biosfera | ✅ Completato v0.53.1 |
+| Debug acceleration | flag protetto per futuri test giorni/mesi simulati rapidi | ✅ Completato v0.53.1 |
+| Runtime budget | limiti mutazioni piante/vegetazione per update | ✅ Completato v0.53.1 |
+
+---
+
+### v0.54 - Core Cell Surface Layer
+
+**Stato:** ✅ Completata da base `fec5435`
+
+Nota:
+
+```text
+questo step non va reimplementato nella biosfera: e' gia' stato prodotto
+nel lavoro ArcGraph/Core v0.38m.01-v0.38m.14
+```
+
+---
+
+### v0.55 - Biological Area Landmark Definition
+
+**Stato:** ✅ Implementazione Core iniziale completata - pending harness dedicato
+
+Obiettivo:
+
+```text
+definire anchor landmark biologici a partire da area circolare, centro e raggio
+e comunicarli al sistema landmark come LM manuali stabili dentro la rebuild
+```
+
+Blocchi previsti:
+
+| Blocco | Funzione | Stato |
+|---|---|---|
+| Biological area center/radius | centro, raggio e containment circolare nell'area biologica | ✅ Implementato |
+| Perimeter anchor selection | selezione anchor su celle naturali libere del perimetro biologico | ✅ Implementato |
+| Landmark proposal DTO | payload Core leggero con posizione, kind enum, merge radius e owner area | ✅ Implementato |
+| LM system handoff | input manuale alla rebuild del LandmarkRegistry senza appesantire LandmarkNode | ✅ Implementato |
+| Area-to-LM reference | sidecar biosfera area biologica -> nodeIds risolti dal registry | ✅ Implementato |
+| Debug overlay kind/color | colore e tipo debug dedicato per LM biologici in MapGrid/ArcGraph debug | ✅ Implementato |
+| Harness | test senza MapGrid e senza ArcGraph | ⏳ Pending |
+
+Vincoli:
+
+- il landmark biologico non viene cercato tra LM esistenti: la biosfera produce candidati manuali e il registry li integra durante la rebuild;
+- il centro area viene definito prima di enumerare le celle candidate;
+- il raggio operativo dell'area biologica delimita le celle naturali libere interrogate tramite `World.CellSurfaces`;
+- i LM biologici restano nodi leggeri: il riferimento area -> nodeIds vive nello stato biosfera, non dentro `LandmarkNode`;
+- piu' anchor sul perimetro riducono il rischio che una foresta venga scoperta solo arrivando al centro occluso.
+
+---
+
+### v0.56 - Biosphere Surface Candidate Query
+
+**Stato:** ✅ Core iniziale completato - pending harness dedicato
+
+Obiettivo:
+
+```text
+usare centro/raggio dell'area biologica per chiedere al World quali celle
+sono candidate per landmark biologici, vegetazione naturale e piante fisiche
+```
+
+Blocchi previsti:
+
+| Blocco | Funzione | Stato |
+|---|---|---|
+| Surface read facade | lettura read-only di `World.CellSurfaces` e `World.SurfaceDefs` | ✅ Implementato |
+| Radius cell scan | enumerazione celle entro raggio dell'area biologica | ✅ Implementato |
+| Natural vegetation candidates | celle con superficie naturale e `CanHostNaturalVegetation=true` | ✅ Implementato |
+| Biological occupancy output | vegetazione decorativa e piante fisiche come stato biosfera data-only | ✅ Implementato |
+| Map biological areas | aree biologiche minime in `world_map_default.json` | ✅ Implementato |
+| Sprite independence | nessun path sprite o PNG dentro biosfera | ✅ Implementato |
+| Harness | test senza MapGrid e senza ArcGraph | ⏳ Pending |
+
+---
+
+### v0.57-v0.69 - Physical Biosphere Integration
+
+| Versione | Obiettivo | Stato |
+|---|---|---|
+| v0.57 | definire boundary Biosfera -> World per mutazioni fisiche | ✅ Core boundary iniziale completato, delta/save-load pending |
+| v0.58 | piazzare piante fisiche su celle candidate | ✅ Core iniziale completato, tuning placement pending |
+| v0.59 | salvare rappresentazione runtime minima delle piante fisiche | ✅ Core runtime representation iniziale completata |
+| v0.60 | propagare nascita/morte/cambio stadio pianta come delta | ✅ Producer delta giornalieri data-only completato |
+| v0.61 | piazzare vegetazione decorativa non oggetto | ✅ Contratto/delta vegetazione diffusa data-only completato, World projection pending |
+| v0.62 | sporcare FOV/percezione quando cambiano celle fisiche | ⏳ Pending |
+| v0.63 | produrre feed runtime derivato per ArcGraph | ⏳ Pending |
+| v0.64 | esporre eventi/listener ambiente per UI e sistemi | ⏳ Pending |
+| v0.65 | integrare save/load biosfera runtime | ⏳ Pending |
+| v0.66 | integrare query NPC verso aree/risorse biologiche | ⏳ Pending |
+| v0.67 | pannello debug/calibrazione runtime biosfera | ⏳ Pending |
+| v0.68 | budget e batch processing produttivo | ⏳ Pending |
+| v0.69 | QA closeout integrazione fisica biosfera | ⏳ Pending |
+
+Nota boundary piante fisiche:
+
+```text
+World riceve solo stato semantico compatto:
+PlantId, AreaId, Cell, SpeciesKey, GrowthStageKey, HealthState, IsAlive,
+BlocksMovement, BlocksVision, VisionCost.
+
+Non passano nel boundary World:
+AgeDays, Maturity01, Health01, IsHarvestable, plantVisualStateKey,
+path sprite, tile id, atlas id o riferimenti PNG.
+```
 
 ---
 

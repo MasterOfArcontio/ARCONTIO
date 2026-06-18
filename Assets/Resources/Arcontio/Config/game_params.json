@@ -155,6 +155,15 @@
     "impulsivityNoiseBonus": 0.0,
     "minimumWeight": 0.001
   },
+  "biosphere": {
+    "enabled": true,
+    "simulationTicksPerDailyUpdate": 1200,
+    "updateMode": "DailyBatch",
+    "maxPlantMutationsPerUpdate": 128,
+    "maxVegetationMutationsPerUpdate": 256,
+    "spreadWorkAcrossTicks": false,
+    "debugFastForwardEnabled": false
+  },
   "landmarks": {
     "enableLandmarkSystem": true,
     "maxLandmarksPerNpc": 64,

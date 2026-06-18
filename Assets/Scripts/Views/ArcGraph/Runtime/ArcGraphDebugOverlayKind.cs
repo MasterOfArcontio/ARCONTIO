@@ -38,6 +38,7 @@ namespace Arcontio.View.ArcGraph
         LandmarkKnownNode = 31,
         LandmarkRouteNode = 32,
         LandmarkGvdNode = 33,
+        LandmarkBiologicalNode = 34,
 
         LandmarkWorldEdge = 40,
         LandmarkKnownEdge = 41,

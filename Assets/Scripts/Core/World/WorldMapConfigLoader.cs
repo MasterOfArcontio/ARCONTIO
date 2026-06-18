@@ -1,4 +1,5 @@
 using System;
+using Arcontio.Core.Environment;
 using UnityEngine;
 
 namespace Arcontio.Core
@@ -79,6 +80,7 @@ namespace Arcontio.Core
             ApplyDimensions(world, map.Map);
             ApplySurfaceLayer(world, map.SurfaceLayer);
             ApplyInitialObjects(world, map.InitialObjects);
+            ApplyBiologicalAreas(world, map.BiologicalAreas);
             return true;
         }
 
@@ -221,6 +223,137 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // ApplyBiologicalAreas
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte le aree biologiche minime dichiarate dalla mappa nel DTO
+        /// Environment usato dal bootstrap biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: mappa come sorgente spaziale, biosfera come sorgente biologica</b></para>
+        /// <para>
+        /// Il file mappa dichiara dove esistono aree biologiche iniziali e con quale
+        /// intensita' di partenza. Il loader non crea piante, sprite, landmark o
+        /// oggetti: prepara solo il pacchetto dati che <see cref="SimulationHost"/>
+        /// consegnera' alla Environment Foundation.
+        /// </para>
+        /// </summary>
+        private static void ApplyBiologicalAreas(World world, WorldMapBiologicalAreaDto[] biologicalAreas)
+        {
+            if (world == null)
+                return;
+
+            if (biologicalAreas == null || biologicalAreas.Length == 0)
+            {
+                world.SetInitialEnvironmentAreaSetConfig(new EnvironmentAreaSetConfig());
+                return;
+            }
+
+            var areaConfigs = new EnvironmentAreaConfig[biologicalAreas.Length];
+            var fertilityConfigs = new EnvironmentFertilityAreaConfig[biologicalAreas.Length];
+            var vegetationConfigs = new EnvironmentVegetationAreaConfig[biologicalAreas.Length];
+            var seedBankConfigs = new EnvironmentSeedBankAreaConfig[biologicalAreas.Length];
+
+            for (int i = 0; i < biologicalAreas.Length; i++)
+            {
+                WorldMapBiologicalAreaDto area = biologicalAreas[i] ?? new WorldMapBiologicalAreaDto();
+                int areaId = area.AreaId > 0 ? area.AreaId : i + 1;
+                int radius = Math.Max(0, area.RadiusCells);
+                float intensity = Clamp01(area.Intensity01, 0.5f);
+                string biomeKey = ResolveNonEmpty(area.BiomeKey, "grassland");
+                string areaKey = ResolveNonEmpty(area.Key, biomeKey + "_" + areaId);
+
+                areaConfigs[i] = new EnvironmentAreaConfig
+                {
+                    areaId = areaId,
+                    kind = "Vegetation",
+                    minX = area.CenterX - radius,
+                    minY = area.CenterY - radius,
+                    maxX = area.CenterX + radius,
+                    maxY = area.CenterY + radius,
+                    z = area.Z,
+                    centerX = area.CenterX,
+                    centerY = area.CenterY,
+                    radiusCells = radius,
+                    priority = area.Priority,
+                    isEnabled = area.IsEnabled,
+                    key = areaKey
+                };
+
+                fertilityConfigs[i] = new EnvironmentFertilityAreaConfig
+                {
+                    areaId = areaId,
+                    soilKind = ResolveNonEmpty(area.SoilKind, biomeKey),
+                    baseFertility01 = Clamp01(area.BaseFertility01, intensity),
+                    currentFertility01 = Clamp01(area.CurrentFertility01, Clamp01(area.BaseFertility01, intensity)),
+                    growthModifier01 = intensity,
+                    exhaustion01 = 0f,
+                    recovery01 = Clamp01(area.Recovery01, 0.5f)
+                };
+
+                vegetationConfigs[i] = new EnvironmentVegetationAreaConfig
+                {
+                    areaId = areaId,
+                    vegetationKind = ResolveNonEmpty(area.VegetationKind, biomeKey),
+                    density01 = intensity,
+                    growthPotential01 = Clamp01(area.GrowthPotential01, intensity),
+                    health01 = Clamp01(area.Health01, 0.75f),
+                    fertilityInfluence01 = 0.5f,
+                    climateInfluence01 = 0.5f
+                };
+
+                seedBankConfigs[i] = new EnvironmentSeedBankAreaConfig
+                {
+                    areaId = areaId,
+                    entries = BuildSeedBankEntries(area, biomeKey, intensity)
+                };
+            }
+
+            world.SetInitialEnvironmentAreaSetConfig(new EnvironmentAreaSetConfig
+            {
+                areas = areaConfigs,
+                fertilityAreas = fertilityConfigs,
+                waterAreas = new EnvironmentWaterAreaConfig[0],
+                vegetationAreas = vegetationConfigs,
+                seedBankAreas = seedBankConfigs
+            });
+        }
+
+        private static EnvironmentSeedBankEntryConfig[] BuildSeedBankEntries(
+            WorldMapBiologicalAreaDto area,
+            string biomeKey,
+            float intensity)
+        {
+            if (area != null && area.SeedBank != null && area.SeedBank.Length > 0)
+            {
+                var configured = new EnvironmentSeedBankEntryConfig[area.SeedBank.Length];
+                for (int i = 0; i < area.SeedBank.Length; i++)
+                {
+                    WorldMapSeedBankEntryDto entry = area.SeedBank[i] ?? new WorldMapSeedBankEntryDto();
+                    configured[i] = new EnvironmentSeedBankEntryConfig
+                    {
+                        speciesKey = ResolveNonEmpty(entry.SpeciesKey, biomeKey),
+                        amount01 = Clamp01(entry.Amount01, intensity),
+                        viability01 = Clamp01(entry.Viability01, intensity)
+                    };
+                }
+
+                return configured;
+            }
+
+            return new[]
+            {
+                new EnvironmentSeedBankEntryConfig
+                {
+                    speciesKey = biomeKey,
+                    amount01 = intensity,
+                    viability01 = intensity
+                }
+            };
+        }
+
+        // =============================================================================
         // ResolveSurface
         // =============================================================================
         /// <summary>
@@ -273,12 +406,28 @@ namespace Arcontio.Core
             return OwnerKind.None;
         }
 
+        private static string ResolveNonEmpty(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value)
+                ? (fallback ?? string.Empty)
+                : value;
+        }
+
+        private static float Clamp01(float value, float fallback)
+        {
+            float resolved = float.IsNaN(value) ? fallback : value;
+            if (resolved < 0f) return 0f;
+            if (resolved > 1f) return 1f;
+            return resolved;
+        }
+
         [Serializable]
         private sealed class WorldMapDto
         {
             public WorldMapHeaderDto Map;
             public WorldMapSurfaceLayerDto SurfaceLayer;
             public WorldMapInitialObjectDto[] InitialObjects;
+            public WorldMapBiologicalAreaDto[] BiologicalAreas;
         }
 
         [Serializable]
@@ -324,6 +473,37 @@ namespace Arcontio.Core
             public string OwnerKind;
             public int OwnerId = -1;
             public int FoodUnits;
+        }
+
+        [Serializable]
+        private sealed class WorldMapBiologicalAreaDto
+        {
+            public int AreaId;
+            public string Key;
+            public string BiomeKey;
+            public string VegetationKind;
+            public string SoilKind;
+            public int CenterX;
+            public int CenterY;
+            public int RadiusCells;
+            public int Z;
+            public int Priority;
+            public bool IsEnabled = true;
+            public float Intensity01 = 0.5f;
+            public float BaseFertility01 = 0.5f;
+            public float CurrentFertility01 = 0.5f;
+            public float GrowthPotential01 = 0.5f;
+            public float Health01 = 0.75f;
+            public float Recovery01 = 0.5f;
+            public WorldMapSeedBankEntryDto[] SeedBank;
+        }
+
+        [Serializable]
+        private sealed class WorldMapSeedBankEntryDto
+        {
+            public string SpeciesKey;
+            public float Amount01 = 0.5f;
+            public float Viability01 = 0.5f;
         }
     }
 }

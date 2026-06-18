@@ -271,7 +271,7 @@ namespace Arcontio.View.ArcGraph
                 // z-level corrente e il kind ArcGraph assegnato dal chiamante.
                 target.AddNode(new ArcGraphDebugNodeOverlaySnapshot(
                     ArcGraphZLevelPolicy.CreateRuntimeCell(node.CellX, node.CellY),
-                    kind,
+                    ResolveNodeOverlayKind(kind, node),
                     node.NodeId,
                     node.Label,
                     scale01,
@@ -280,6 +280,16 @@ namespace Arcontio.View.ArcGraph
             }
 
             return nodes.Count;
+        }
+
+        private static ArcGraphDebugOverlayKind ResolveNodeOverlayKind(
+            ArcGraphDebugOverlayKind fallback,
+            LandmarkOverlayNode node)
+        {
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.BiologicalAnchor)
+                return ArcGraphDebugOverlayKind.LandmarkBiologicalNode;
+
+            return fallback;
         }
 
         private static int AppendEdges(

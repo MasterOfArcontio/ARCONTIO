@@ -719,7 +719,11 @@ namespace Arcontio.Core
                     if (!TryResolveNode(registry, nodeId, out int x, out int y, out int kind))
                         continue;
 
-                    string label = kind == (int)LandmarkRegistry.LandmarkKind.Doorway ? $"D#{nodeId}" : $"J#{nodeId}";
+                    string label = kind == (int)LandmarkRegistry.LandmarkKind.Doorway
+                        ? $"D#{nodeId}"
+                        : kind == (int)LandmarkRegistry.LandmarkKind.BiologicalAnchor
+                            ? $"B#{nodeId}"
+                            : $"J#{nodeId}";
                     outNodes.Add(new LandmarkOverlayNode(cellX: x, cellY: y, kind: kind, nodeId: nodeId, label: label));
                 }
             }

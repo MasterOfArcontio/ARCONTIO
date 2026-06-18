@@ -462,6 +462,9 @@ namespace Arcontio.View.ArcGraph
                 case "debug/gvd/edge":
                     color = new Color(0.70f, 0.10f, 1f, 1f);
                     break;
+                case "debug/landmark/biological-node":
+                    color = new Color(0.10f, 0.95f, 0.25f, 1f);
+                    break;
                 default:
                     color = new Color(1f, 1f, 1f, 0.65f);
                     break;

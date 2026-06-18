@@ -1,6 +1,7 @@
 // Assets/Scripts/Core/Runtime/SimulationHost.cs
 using Arcontio.Core.Diagnostics;
 using Arcontio.Core.Config;
+using Arcontio.Core.Environment;
 using Arcontio.Core.Logging;
 using Arcontio.Core.Save;
 using System.Collections.Generic;
@@ -1347,6 +1348,7 @@ namespace Arcontio.Core
             }
 
             SeedTestWorld();
+            ApplyEnvironmentFoundationBootstrap(_world);
 
             // ============================================================
             // (v0.02 Day2) LandmarkRegistry bootstrap
@@ -1486,8 +1488,56 @@ namespace Arcontio.Core
                 $"worldHash={loadedWorld.GetHashCode()} npcCount={CountNpcsForDiagnostics(loadedWorld)} " +
                 $"objectCount={CountObjectsForDiagnostics(loadedWorld)}");
 
+            ApplyEnvironmentFoundationBootstrap(loadedWorld);
             loadedWorld.RebuildLandmarksBootstrap();
             return true;
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentFoundationBootstrap
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Installa nel <see cref="World"/> lo stato iniziale della biosfera prima che
+        /// vengano ricostruite le cache derivate dei landmark.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: World possiede lo stato, Environment decide i dati biologici</b></para>
+        /// <para>
+        /// Il runtime non genera landmark biologici direttamente. Si limita a
+        /// materializzare la foundation ambientale e a consegnarla al <see cref="World"/>,
+        /// che durante la rebuild chiedera' alla biosfera quali anchor biologici
+        /// proporre al registry landmark.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Bootstrap</b>: usa la pipeline data-only EnvironmentFoundationBootstrap.</item>
+        ///   <item><b>Installazione</b>: passa solo EnvironmentState a World, senza esporre DTO config al registry.</item>
+        ///   <item><b>Diagnostica</b>: logga warning se la config default produce validazione sospetta.</item>
+        /// </list>
+        /// </summary>
+        private static void ApplyEnvironmentFoundationBootstrap(World world)
+        {
+            if (world == null)
+                return;
+
+            EnvironmentFoundationConfig config = EnvironmentFoundationBootstrap.CreateDefaultConfig();
+            config.areas = world.InitialEnvironmentAreaSetConfig ?? new EnvironmentAreaSetConfig();
+
+            EnvironmentFoundationBootstrapResult bootstrap =
+                EnvironmentFoundationBootstrap.Bootstrap(config);
+
+            world.SetEnvironmentState(bootstrap.Build.State);
+            world.EnvironmentState?.BuildInitialBiologicalOccupancy(world);
+            world.ApplyEnvironmentPhysicalPlantProjections();
+
+            if (bootstrap.Validation != null && !bootstrap.Validation.IsValid)
+            {
+                Debug.LogWarning(
+                    "[SimulationHost] Environment foundation bootstrap completed with validation issues. " +
+                    $"errors={bootstrap.Validation.ErrorCount} warnings={bootstrap.Validation.WarningCount}");
+            }
         }
 
         // =============================================================================

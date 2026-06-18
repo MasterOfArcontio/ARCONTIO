@@ -39,6 +39,91 @@ namespace Arcontio.Core
             Doorway    = 1,
             Junction   = 2,
             AreaCenter = 3, // Nuovo (v0.03): massimo locale DT in zona aperta
+            BiologicalAnchor = 4,
+        }
+
+        // =============================================================================
+        // ManualLandmarkCandidate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Candidato leggero per landmark prodotti da sistemi esterni alla topologia
+        /// automatica, come la biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: input manuale senza appesantire LandmarkNode</b></para>
+        /// <para>
+        /// Il registry riceve coordinate, tipo numerico e owner tecnico solo durante
+        /// la rebuild. Il nodo finale resta compatto e non conserva riferimenti a
+        /// foreste, seed bank o altri domini biologici.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>CellX/CellY</b>: cella proposta dal sistema chiamante.</item>
+        ///   <item><b>Kind</b>: enum numerico del tipo landmark da creare o mergiare.</item>
+        ///   <item><b>MergeRadius</b>: raggio locale usato dal registry per evitare duplicati.</item>
+        ///   <item><b>OwnerId</b>: id temporaneo del dominio chiamante, restituito solo nella resolution.</item>
+        /// </list>
+        /// </summary>
+        public readonly struct ManualLandmarkCandidate
+        {
+            public readonly int CellX;
+            public readonly int CellY;
+            public readonly LandmarkKind Kind;
+            public readonly float MergeRadius;
+            public readonly int OwnerId;
+
+            public ManualLandmarkCandidate(int cellX, int cellY, LandmarkKind kind, float mergeRadius, int ownerId)
+            {
+                CellX = cellX;
+                CellY = cellY;
+                Kind = kind;
+                MergeRadius = mergeRadius < 0f ? 0f : mergeRadius;
+                OwnerId = ownerId < 0 ? 0 : ownerId;
+            }
+        }
+
+        // =============================================================================
+        // ManualLandmarkResolution
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risultato leggero della trasformazione di un candidato manuale in nodo
+        /// effettivo del registry.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: sidecar domain mapping</b></para>
+        /// <para>
+        /// Il registry non conserva il legame semantico con il dominio esterno.
+        /// Restituisce invece una resolution al chiamante, che puo' salvare il mapping
+        /// nel proprio stato laterale senza contaminare il percorso caldo dei landmark.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>OwnerId</b>: id del dominio chiamante ricevuto dal candidate.</item>
+        ///   <item><b>NodeId</b>: id landmark attivo creato o riusato.</item>
+        ///   <item><b>CellX/CellY</b>: cella reale del nodo dopo eventuale merge.</item>
+        ///   <item><b>Kind</b>: tipo finale del nodo risolto.</item>
+        /// </list>
+        /// </summary>
+        public readonly struct ManualLandmarkResolution
+        {
+            public readonly int OwnerId;
+            public readonly int NodeId;
+            public readonly int CellX;
+            public readonly int CellY;
+            public readonly LandmarkKind Kind;
+
+            public ManualLandmarkResolution(int ownerId, int nodeId, int cellX, int cellY, LandmarkKind kind)
+            {
+                OwnerId = ownerId < 0 ? 0 : ownerId;
+                NodeId = nodeId < 0 ? 0 : nodeId;
+                CellX = cellX;
+                CellY = cellY;
+                Kind = kind;
+            }
         }
 
         [Serializable]
@@ -121,13 +206,17 @@ namespace Arcontio.Core
         ///   2) GVD-DIN (gvd_din.enabled=true) — sistema precedente, mantenuto per confronto
         ///   3) [RIMOSSO] Vecchio sistema Doorway/Junction eliminato in questa patch
         /// </summary>
-        public void RebuildFromWorld(World world)
+        public void RebuildFromWorld(
+            World world,
+            IReadOnlyList<ManualLandmarkCandidate> manualCandidates = null,
+            List<ManualLandmarkResolution> outManualResolutions = null)
         {
             if (world == null) return;
 
             _nodes.Clear();
             _edges.Clear();
             _activeNodeIdByCellIndex.Clear();
+            outManualResolutions?.Clear();
             _nextNodeId = 1;
             _mapWidthForCellIndex = world.MapWidth;
 
@@ -348,8 +437,11 @@ namespace Arcontio.Core
                 }
             }
 
+            AddManualCandidates(world, manualCandidates, outManualResolutions);
+
             // Passi comuni a tutti i branch
             ApplyGlobalCap(maxWorld);
+            FilterInactiveManualResolutions(outManualResolutions);
             RebuildActiveCellIndex(world);
             BuildMinimalEdges(world, maxEdgesPerLandmark);
         }
@@ -361,6 +453,63 @@ namespace Arcontio.Core
         // Erano usati solo dal vecchio sistema Doorway/Junction (eliminato).
         // Il rilevamento topologico è ora delegato a HybridLandmarkExtractor
         // (Bridge Detection) o a GvdDinComputer (Criteri A+B).
+
+        private void AddManualCandidates(
+            World world,
+            IReadOnlyList<ManualLandmarkCandidate> candidates,
+            List<ManualLandmarkResolution> outResolutions)
+        {
+            if (world == null || candidates == null || candidates.Count == 0)
+                return;
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                ManualLandmarkCandidate candidate = candidates[i];
+                if (!world.InBounds(candidate.CellX, candidate.CellY))
+                    continue;
+
+                LandmarkNode node = AddOrMergeNode(
+                    candidate.CellX,
+                    candidate.CellY,
+                    candidate.Kind,
+                    candidate.MergeRadius);
+
+                if (node == null || !node.IsActive)
+                    continue;
+
+                outResolutions?.Add(new ManualLandmarkResolution(
+                    candidate.OwnerId,
+                    node.Id,
+                    node.CellX,
+                    node.CellY,
+                    node.Kind));
+            }
+        }
+
+        private void FilterInactiveManualResolutions(List<ManualLandmarkResolution> resolutions)
+        {
+            if (resolutions == null || resolutions.Count == 0)
+                return;
+
+            for (int i = resolutions.Count - 1; i >= 0; i--)
+            {
+                ManualLandmarkResolution resolution = resolutions[i];
+                if (!IsNodeActive(resolution.NodeId))
+                    resolutions.RemoveAt(i);
+            }
+        }
+
+        private bool IsNodeActive(int nodeId)
+        {
+            for (int i = 0; i < _nodes.Count; i++)
+            {
+                LandmarkNode node = _nodes[i];
+                if (node != null && node.Id == nodeId)
+                    return node.IsActive;
+            }
+
+            return false;
+        }
 
         /// <summary>
         /// Percorre il segmento discreto (Bresenham) da (x0,y0) a (x1,y1)
@@ -463,8 +612,8 @@ namespace Arcontio.Core
 
             temp.Sort((a, b) =>
             {
-                int pa = a.Kind == LandmarkKind.Doorway ? 0 : 1;
-                int pb = b.Kind == LandmarkKind.Doorway ? 0 : 1;
+                int pa = GetCapPriority(a.Kind);
+                int pb = GetCapPriority(b.Kind);
                 int c = pa.CompareTo(pb);
                 if (c != 0) return c;
                 return a.Id.CompareTo(b.Id);
@@ -587,6 +736,20 @@ namespace Arcontio.Core
         {
             if (!map.TryGetValue(key, out int v)) v = 0;
             map[key] = v + 1;
+        }
+
+        private static int GetCapPriority(LandmarkKind kind)
+        {
+            if (kind == LandmarkKind.Doorway)
+                return 0;
+
+            if (kind == LandmarkKind.BiologicalAnchor)
+                return 1;
+
+            if (kind == LandmarkKind.Junction)
+                return 2;
+
+            return 3;
         }
 
         // ============================================================
@@ -860,7 +1023,9 @@ namespace Arcontio.Core
                         ? $"D#{n.Id}"
                         : n.Kind == LandmarkKind.AreaCenter
                             ? $"A#{n.Id}"
-                            : $"J#{n.Id}";
+                            : n.Kind == LandmarkKind.BiologicalAnchor
+                                ? $"B#{n.Id}"
+                                : $"J#{n.Id}";
                     outNodes.Add(new LandmarkOverlayNode(cellX: n.CellX, cellY: n.CellY, kind: (int)n.Kind, nodeId: n.Id, label: label));
                 }
             }

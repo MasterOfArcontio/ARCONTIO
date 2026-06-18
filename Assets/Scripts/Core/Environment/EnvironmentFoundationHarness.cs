@@ -1,3 +1,5 @@
+using Arcontio.Core.Config;
+
 namespace Arcontio.Core.Environment
 {
     // =============================================================================
@@ -39,6 +41,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>PersistenceOk</b>: verifica capture/restore data-only dello stato persistente.</item>
     ///   <item><b>VisualProjectionOk</b>: verifica proiezioni visuali neutrali senza ArcGraph.</item>
     ///   <item><b>ConsumerQueryOk</b>: verifica facade read-only per NPC/Decision futuri.</item>
+    ///   <item><b>RuntimeSchedulerOk</b>: verifica cadenza biosfera configurabile senza SimulationHost.</item>
     ///   <item><b>IsSuccessful</b>: esito aggregato dei controlli.</item>
     /// </list>
     /// </summary>
@@ -66,6 +69,7 @@ namespace Arcontio.Core.Environment
         public readonly bool PersistenceOk;
         public readonly bool VisualProjectionOk;
         public readonly bool ConsumerQueryOk;
+        public readonly bool RuntimeSchedulerOk;
 
         public bool IsSuccessful =>
             CalendarBaselineOk
@@ -89,7 +93,8 @@ namespace Arcontio.Core.Environment
             && ReadOnlySnapshotsOk
             && PersistenceOk
             && VisualProjectionOk
-            && ConsumerQueryOk;
+            && ConsumerQueryOk
+            && RuntimeSchedulerOk;
 
         // =============================================================================
         // EnvironmentFoundationHarnessResult
@@ -121,7 +126,8 @@ namespace Arcontio.Core.Environment
             bool readOnlySnapshotsOk,
             bool persistenceOk,
             bool visualProjectionOk,
-            bool consumerQueryOk)
+            bool consumerQueryOk,
+            bool runtimeSchedulerOk)
         {
             CalendarBaselineOk = calendarBaselineOk;
             SeasonBoundaryOk = seasonBoundaryOk;
@@ -145,6 +151,7 @@ namespace Arcontio.Core.Environment
             PersistenceOk = persistenceOk;
             VisualProjectionOk = visualProjectionOk;
             ConsumerQueryOk = consumerQueryOk;
+            RuntimeSchedulerOk = runtimeSchedulerOk;
         }
     }
 
@@ -188,6 +195,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>CheckPersistence</b>: controlla capture/restore dello stato persistente.</item>
     ///   <item><b>CheckVisualProjection</b>: controlla readiness adapter senza View types.</item>
     ///   <item><b>CheckConsumerQuery</b>: controlla facts read-only per consumer futuri.</item>
+    ///   <item><b>CheckRuntimeScheduler</b>: controlla scheduler biosfera data-only.</item>
     /// </list>
     /// </summary>
     public static class EnvironmentFoundationHarness
@@ -229,6 +237,7 @@ namespace Arcontio.Core.Environment
             bool persistenceOk = CheckPersistence();
             bool visualProjectionOk = CheckVisualProjection();
             bool consumerQueryOk = CheckConsumerQuery();
+            bool runtimeSchedulerOk = CheckRuntimeScheduler();
 
             return new EnvironmentFoundationHarnessResult(
                 calendarBaselineOk,
@@ -252,7 +261,8 @@ namespace Arcontio.Core.Environment
                 readOnlySnapshotsOk,
                 persistenceOk,
                 visualProjectionOk,
-                consumerQueryOk);
+                consumerQueryOk,
+                runtimeSchedulerOk);
         }
 
         private static bool CheckCalendarBaseline(EnvironmentCalendarConfig calendarConfig)
@@ -2267,6 +2277,51 @@ namespace Arcontio.Core.Environment
                    && nearby[0].IsAvailable
                    && nearby[0].ResourceOutputKey == "wood"
                    && far.Count == 0;
+        }
+
+        private static bool CheckRuntimeScheduler()
+        {
+            var disabled = new BiosphereRuntimeParams
+            {
+                enabled = false,
+                simulationTicksPerDailyUpdate = 1200
+            };
+            var enabled = new BiosphereRuntimeParams
+            {
+                enabled = true,
+                simulationTicksPerDailyUpdate = 1200,
+                maxPlantMutationsPerUpdate = 0,
+                maxVegetationMutationsPerUpdate = -2,
+                updateMode = string.Empty
+            };
+
+            var disabledDecision = EnvironmentRuntimeScheduler.Evaluate(disabled, 0, 1200);
+            var beforeBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 1199);
+            var onBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 1200);
+            var skippedDays = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 3600);
+            var afterDecisionTick = EnvironmentRuntimeScheduler.ResolveProcessedTickAfterDecision(onBoundary);
+            var normalized = BiosphereRuntimeParams.WithFallbackDefaults(enabled);
+
+            // Lo scheduler deve soltanto decidere quando la biosfera e' dovuta:
+            // niente World, niente ArcGraph e niente mutazioni reali in questo step.
+            return !disabledDecision.IsEnabled
+                   && !disabledDecision.ShouldAdvance
+                   && disabledDecision.NextDueSimulationTick == 1200
+                   && beforeBoundary.IsEnabled
+                   && !beforeBoundary.ShouldAdvance
+                   && beforeBoundary.NextDueSimulationTick == 1200
+                   && onBoundary.ShouldAdvance
+                   && onBoundary.DueUpdateCount == 1
+                   && onBoundary.PreviousEnvironmentTicks == 0
+                   && onBoundary.CurrentEnvironmentTicks == 1200
+                   && onBoundary.NextDueSimulationTick == 2400
+                   && skippedDays.ShouldAdvance
+                   && skippedDays.DueUpdateCount == 3
+                   && skippedDays.CurrentEnvironmentTicks == 3600
+                   && afterDecisionTick == 1200
+                   && normalized.ResolveMaxPlantMutationsPerUpdate() == 1
+                   && normalized.ResolveMaxVegetationMutationsPerUpdate() == 1
+                   && normalized.ResolveUpdateMode() == BiosphereRuntimeParams.DefaultUpdateMode;
         }
     }
 }

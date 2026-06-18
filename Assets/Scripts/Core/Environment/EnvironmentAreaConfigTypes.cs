@@ -155,6 +155,9 @@ namespace Arcontio.Core.Environment
         public int maxX;
         public int maxY;
         public int z;
+        public int centerX;
+        public int centerY;
+        public int radiusCells;
         public int priority;
         public bool isEnabled = true;
         public string key = string.Empty;
@@ -175,6 +178,9 @@ namespace Arcontio.Core.Environment
                 new EnvironmentAreaId(areaId),
                 EnvironmentAreaConfigParsing.ParseAreaKind(kind),
                 new EnvironmentAreaBounds(minX, minY, maxX, maxY, z),
+                radiusCells > 0 ? centerX : (minX + maxX) / 2,
+                radiusCells > 0 ? centerY : (minY + maxY) / 2,
+                radiusCells,
                 priority,
                 isEnabled,
                 key);

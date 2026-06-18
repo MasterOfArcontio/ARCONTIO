@@ -92,6 +92,7 @@ namespace Arcontio.View.MapGrid
         private static readonly Color JumpPathColor   = new Color(1.00f, 0.20f, 0.75f, 0.50f);
         private static readonly Color GvdNodeColor      = new Color(0.70f, 0.10f, 1.00f, 1f);
         private static readonly Color GvdRawColor       = new Color(0.00f, 1.00f, 1.00f, 0.60f);
+        private static readonly Color BiologicalNodeColor = new Color(0.10f, 0.95f, 0.25f, 1f);
         // v0.03.04.c-ComplexEdge_Creation: giallo — distinto da verde (known) e arancione (route)
         private static readonly Color ComplexEdgeColor  = new Color(1.00f, 1.00f, 0.00f, 1f);
 
@@ -324,9 +325,18 @@ namespace Arcontio.View.MapGrid
                 sr.gameObject.SetActive(true);
                 sr.transform.localPosition = new Vector3((n.CellX + 0.5f) * _tileSizeWorld, (n.CellY + 0.5f) * _tileSizeWorld, 0f);
                 sr.sprite = _nodeSprite;
+                sr.color = ResolveNodeColor(n.Kind, color);
             }
             for (int i = nodes.Count; i < pool.Count; i++)
                 pool[i].gameObject.SetActive(false);
+        }
+
+        private static Color ResolveNodeColor(int nodeKind, Color fallback)
+        {
+            if (nodeKind == (int)LandmarkRegistry.LandmarkKind.BiologicalAnchor)
+                return BiologicalNodeColor;
+
+            return fallback;
         }
 
         private void RenderEdges(List<LandmarkOverlayEdge> edges, List<LineRenderer> pool, Color color, float width)
