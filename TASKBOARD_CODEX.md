@@ -2345,6 +2345,17 @@ Aggiornamento operativo `v0.38m.15`:
 - `v0.38m.05` resta parziale perche' `Scene_MapGrid`, spegnimento root visuali MapGrid, `MapGridRuntimeDevToolsOverlay`, camera bridge e placement bridge sono ancora necessari;
 - `MapGridFovHeatmapOverlay` non va cancellato: prima bisogna copiare/assorbire il comportamento utile FOV current cone / FOV heatmap in un producer e consumer ArcGraph verificati.
 
+Aggiornamento operativo `v0.38n.01-v0.38n.03`:
+
+- assorbito il comportamento utile di `MapGridFovHeatmapOverlay.RenderCurrentCone(...)` dentro `ArcGraphFovDebugOverlayProducer`;
+- aggiunto consumer pooled `ArcGraphFovDebugOverlaySceneConsumer` per disegnare celle FOV in ArcGraph;
+- aggiunto controller `ArcGraphFovDebugOverlayRuntimeController`;
+- il pulsante `FOV` della `ViewModeBar` ArcGraph attiva/disattiva il cono FOV senza passare da `MapGridWorldView`;
+- resta obbligatorio il confronto Unity prima di cancellare fisicamente MapGrid;
+- cancellazione fisica MapGrid ancora vietata finche' l'audit `v0.38o` non conferma che non esistono piu' dipendenze runtime attive.
+- audit statico post-FOV: MapGrid resta ancora attivo come dipendenza tramite placement/DevTools, camera bridge, root visuali legacy, adapter legacy/probe, path sprite oggetti e view switcher;
+- prossimo step consigliato: `v0.38o.01 - MapGrid Active Runtime Bridge Audit`, poi rimozione o sostituzione un bridge alla volta.
+
 Confermato:
 
 - `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `df7f211`;

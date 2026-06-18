@@ -62,6 +62,8 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
+        private ArcGraphFovDebugOverlaySceneConsumer _fovOverlayConsumer;
+        private ArcGraphFovDebugOverlayRuntimeController _fovOverlayController;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
         private ArcGraphSerializedSpriteResolver _spriteResolver;
         private ArcGraphUiRuntimeRoot _uiRoot;
@@ -236,6 +238,8 @@ namespace Arcontio.View.ArcGraph
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
+            _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
+            _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
             _uiRoot = gameObject.AddComponent<ArcGraphUiRuntimeRoot>();
@@ -329,6 +333,15 @@ namespace Arcontio.View.ArcGraph
             _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
             _placementHighlightConsumer.SetSceneCamera(Camera.main);
+
+            // Il FOV debug ArcGraph usa la pipeline corretta:
+            // UI -> controller -> provider World -> producer snapshot -> consumer.
+            // Il bottone UI viene collegato in ConfigureUiRoot, non qui, per
+            // mantenere distinta la shell UGUI dal rendering world-space.
+            _fovOverlayController.SetRuntimeContextProvider(_contextProvider);
+            _fovOverlayController.SetOverlayConsumer(_fovOverlayConsumer);
+            _fovOverlayController.SetProcessInUpdate(true);
+            _fovOverlayController.SetOverlayEnabled(false);
         }
 
         // =============================================================================
@@ -355,6 +368,20 @@ namespace Arcontio.View.ArcGraph
 
             _uiRoot.BuildRuntimeUi();
             _uiRoot.SetUiEnabled(true);
+            _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
+        }
+
+        // =============================================================================
+        // ToggleFovDebugOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Callback UI autorizzata per attivare/disattivare il FOV debug ArcGraph.
+        /// </para>
+        /// </summary>
+        private void ToggleFovDebugOverlay()
+        {
+            _fovOverlayController?.ToggleOverlay();
         }
 
         // =============================================================================

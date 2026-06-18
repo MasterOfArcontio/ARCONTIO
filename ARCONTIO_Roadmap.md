@@ -15613,10 +15613,49 @@ Sotto-step FOV bloccante:
 
 | Step | Obiettivo | Stato |
 |---|---|---|
-| v0.38n.01 | Auditare `MapGridFovHeatmapOverlay` e separare calcolo dati FOV da resa visuale debug | ⏳ Pending |
-| v0.38n.02 | Creare producer/snapshot ArcGraph autorizzato per FOV current cone e/o heatmap | ⏳ Pending |
-| v0.38n.03 | Creare consumer overlay ArcGraph attivabile dalla ViewModeBar / icona visualizzazione | ⏳ Pending |
+| v0.38n.01 | Auditare `MapGridFovHeatmapOverlay` e separare calcolo dati FOV da resa visuale debug | ✅ Completato |
+| v0.38n.02 | Creare producer/snapshot ArcGraph autorizzato per FOV current cone e/o heatmap | ✅ Completato |
+| v0.38n.03 | Creare consumer overlay ArcGraph attivabile dalla ViewModeBar / icona visualizzazione | ✅ Completato |
 | v0.38n.04 | Confrontare visivamente ArcGraph FOV con MapGrid FOV prima di autorizzare rimozione legacy | ⏳ Pending |
+
+Aggiornamento `v0.38n.01-v0.38n.03`:
+
+- il metodo utile di `MapGridFovHeatmapOverlay.RenderCurrentCone(...)` e' stato assorbito come producer ArcGraph read-only;
+- il calcolo del cono usa ancora la geometria Core autorizzata: `FovUtils.Manhattan`, `FovUtils.IsInCone`, `FovUtils.IsInFront` e `World.HasLineOfSight`;
+- il producer non disegna, non muta il World, non marca dirty e non aggiorna telemetry;
+- ArcGraph possiede un consumer pooled world-space per celle FOV osservate e celle watched-margin;
+- la ViewModeBar collega il pulsante `FOV` a un controller ArcGraph, non a `MapGridWorldView`;
+- il comportamento resta da validare in Unity: selezione NPC, FOV ON/OFF, confronto visivo con MapGrid e costo runtime.
+
+Nota di pensionamento MapGrid:
+
+```text
+MapGrid non e' ancora cancellabile fisicamente solo perche' esiste il producer FOV.
+Prima della rimozione servono:
+1. compile Unity pulita;
+2. test Play Mode;
+3. conferma visiva ArcGraph FOV;
+4. audit finale delle dipendenze runtime ancora attive.
+```
+
+Audit statico residui MapGrid dopo assorbimento FOV:
+
+| Area | Stato | Decisione |
+|---|---|---|
+| `MapGridFovHeatmapOverlay` | metodo current cone assorbito in producer ArcGraph | non piu' blocco concettuale, ma serve confronto Unity |
+| `ArcGraphPlacementCellHighlightSceneConsumer` | usa ancora `MapGridRuntimeDevToolsOverlay` e `MapGridWorldProvider` | blocco attivo prima della cancellazione |
+| `ArcGraphRuntimeSceneAutoInstaller` | usa ancora `MapGridRuntimeDevToolsOverlay`, `MapGridCameraController` e root visuali legacy da spegnere | blocco attivo prima della cancellazione |
+| `ArcGraphCameraViewportController` / `ArcGraphInteractionSceneAdapterWrapper` | conservano bridge verso `MapGridCameraController` | blocco attivo prima della cancellazione |
+| `ArcGraphTerrainRuntimeMapGridAdapter` / `ArcGraphDebugRuntimeMapGridAdapter` | ancora presenti come legacy/probe | da marcare non-runtime o rimuovere dopo sostituti |
+| sprite oggetti | fallback ancora verso `MapGrid/Sprites/Objects` | da migrare su path/catalogo ArcGraph |
+| `ArcGraphViewModeSwitcher` | conserva enum/root MapGrid per transizione e diagnostica | da semplificare quando ArcGraph resta unica vista |
+
+Conclusione:
+
+```text
+Dopo v0.38n.03 MapGrid non e' ancora cancellabile fisicamente.
+Il prossimo passaggio deve essere v0.38o audit/fix dei bridge attivi, non delete.
+```
 
 Output atteso:
 

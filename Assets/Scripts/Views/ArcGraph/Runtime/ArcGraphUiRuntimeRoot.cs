@@ -1,6 +1,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Events;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem.UI;
 #endif
@@ -56,6 +57,7 @@ namespace Arcontio.View.ArcGraph
 
         private GameObject _canvasRoot;
         private GameObject _uiRoot;
+        private Button _fovViewModeButton;
 
         public GameObject RootGameObject => _uiRoot;
         public bool IsBuilt => _uiRoot != null;
@@ -140,6 +142,32 @@ namespace Arcontio.View.ArcGraph
                 _uiRoot.SetActive(enabled);
         }
 
+        // =============================================================================
+        // SetFovViewModeClicked
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega il pulsante FOV della barra visualizzazione a un controller esterno.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI senza accesso al World</b></para>
+        /// <para>
+        /// La UI non sa cosa sia il FOV, non legge il <c>World</c> e non disegna
+        /// overlay. Espone soltanto l'evento del pulsante a un controller autorizzato
+        /// creato dall'auto-installer ArcGraph.
+        /// </para>
+        /// </summary>
+        public void SetFovViewModeClicked(UnityAction action)
+        {
+            if (_fovViewModeButton == null)
+                return;
+
+            _fovViewModeButton.onClick.RemoveAllListeners();
+
+            if (action != null)
+                _fovViewModeButton.onClick.AddListener(action);
+        }
+
         private void CreateCanvasRoot()
         {
             _canvasRoot = new GameObject(CanvasName, typeof(RectTransform));
@@ -198,7 +226,7 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandHeight = true;
 
             CreateIconButton(panel, "Vista");
-            CreateIconButton(panel, "FOV");
+            _fovViewModeButton = CreateIconButton(panel, "FOV");
             CreateIconButton(panel, "Path");
             CreateIconButton(panel, "Celle");
             CreateIconButton(panel, "Mem");
@@ -493,10 +521,11 @@ namespace Arcontio.View.ArcGraph
             return rect;
         }
 
-        private static void CreateIconButton(RectTransform parent, string label)
+        private static Button CreateIconButton(RectTransform parent, string label)
         {
             RectTransform button = CreateButtonShell(parent, "ArcButton_ViewMode_" + label, 42f, 30f, false);
             CreateText(button, label, 10, FontStyles.Bold, TextAlignmentOptions.Center);
+            return button.GetComponent<Button>();
         }
 
         private static void CreateTopBarText(RectTransform parent, string label)
