@@ -15522,10 +15522,10 @@ Sotto-roadmap tecnica collegata al distacco MapGrid:
 | v0.38m.07 | Migrare preview/placement ArcGraph fuori da `MapGridWorldProvider` | ⏳ Pending |
 | v0.38m.08 | Migrare asset/path oggetti ArcGraph fuori da path `MapGrid/Sprites/Objects` | ⏳ Pending |
 | v0.38m.09 | Definire profilo visuale NPC Core/ViewModel invece del fallback renderer hardcoded | ⏳ Pending |
-| v0.38m.10 | Creare catalogo unico `surface_defs.json` con dati simulativi e visuali dei pavimenti | ⏳ Pending |
-| v0.38m.11 | Creare file mappa unico con metadati, layer pavimenti e oggetti iniziali | ⏳ Pending |
-| v0.38m.12 | Spostare dimensioni mappa fuori da `game_params.json` e rimuovere duplicati tipo `worldWidth/worldHeight` da sorgenti non autoritative | ⏳ Pending |
-| v0.38m.13 | Implementare loader mappa Core che inizializza dimensioni, `CellSurfaceLayer` e oggetti iniziali dal file mappa unico | ⏳ Pending |
+| v0.38m.10 | Creare catalogo unico `surface_defs.json` con dati simulativi e visuali dei pavimenti | ✅ Completato |
+| v0.38m.11 | Creare file mappa unico con metadati, layer pavimenti e oggetti iniziali | ✅ Completato |
+| v0.38m.12 | Spostare dimensioni mappa fuori da `game_params.json` e rimuovere duplicati tipo `worldWidth/worldHeight` da sorgenti non autoritative | ✅ Completato |
+| v0.38m.13 | Implementare loader mappa Core che inizializza dimensioni, `CellSurfaceLayer` e oggetti iniziali dal file mappa unico | ✅ Completato |
 | v0.38m.14 | Collassare i cataloghi terrain ArcGraph legacy dentro il catalogo superfici unico, mantenendo solo dati visuali strettamente renderer-side dove necessario | ⏳ Pending |
 | v0.38m.15 | Pensionare layout/config MapGrid dal percorso runtime ArcGraph dopo verifica del loader mappa unico | ⏳ Pending |
 

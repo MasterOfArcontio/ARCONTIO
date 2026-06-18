@@ -1,6 +1,4 @@
 {
-  "worldWidth": 64,
-  "worldHeight": 64,
   "tick": {
     "ticksPerSecond": 25,
     "baseWalkCellDurationTicks": 8,

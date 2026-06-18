@@ -156,7 +156,8 @@ namespace Arcontio.Core
 
         /// <summary>
         /// Larghezza della griglia in celle. Impostata da <c>InitMap</c>.
-        /// Leggibile da game_params.json tramite <c>WorldConfig.Sim.worldWidth</c>.
+        /// Nel bootstrap ordinario viene applicata dal file mappa unico, non da
+        /// <c>game_params.json</c>.
         /// </summary>
         public int MapWidth { get; private set; }
 
@@ -1019,7 +1020,7 @@ namespace Arcontio.Core
         public World(WorldConfig config)
         {
             Config = config;
-            InitMap(Config.Sim.worldWidth, Config.Sim.worldHeight);
+            InitMap(WorldConfig.BootstrapFallbackMapWidth, WorldConfig.BootstrapFallbackMapHeight);
 
             // ============================================================
             // LANDMARK REGISTRY (v0.02 Day2)
@@ -5889,9 +5890,14 @@ if (!NpcAction.ContainsKey(id))
     }
 }
 
-// Classe che contiene i parametri del simulatore letti da game_params.json
+// Classe che contiene i parametri del simulatore letti da game_params.json.
+// Le dimensioni mappa non appartengono piu' a questa configurazione: il bootstrap
+// ordinario le riceve dal file mappa unico caricato da WorldMapConfigLoader.
 public sealed class WorldConfig
 {
+    public const int BootstrapFallbackMapWidth = 64;
+    public const int BootstrapFallbackMapHeight = 64;
+
     public Arcontio.Core.Config.SimulationParams Sim { get; }
 
     public WorldConfig(Arcontio.Core.Config.SimulationParams sim)

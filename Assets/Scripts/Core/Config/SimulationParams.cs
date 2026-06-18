@@ -27,10 +27,6 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class SimulationParams
     {
-        // ---------------- Mappa ----------------
-        public int worldWidth = 64;
-        public int worldHeight = 64;
-
         // ---------------- Runtime tick canonico ----------------
         //
         // ARC-DEC-006 e ARC-DEC-020 stabiliscono che il tick discreto globale e'
