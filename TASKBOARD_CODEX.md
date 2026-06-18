@@ -2368,10 +2368,21 @@ Aggiornamento operativo `v0.38o.01-v0.38o.04`:
 - pan ArcGraph resta vincolato alla rotellina premuta per default; RMB non e' piu' attivo come pan ArcGraph;
 - scelta tecnica pan/zoom: non riusare `MapGridCameraController`; proseguire con `ArcGraphViewConfig JSON -> ArcGraphViewController -> ArcGraphCameraViewportController`.
 
+Aggiornamento operativo `v0.38o.05`:
+
+- aggiunto `ARCGRAPH_VISUAL_ASSET_POLICY.md` come policy root per cataloghi visuali ArcGraph;
+- confermato che `object_defs.json` resta il catalogo per oggetti fisici/manipolabili, muri, porte, mobili, costruzioni e risorse concrete;
+- confermato che piante vive e vegetazione biosfera devono passare da `visualStateKey` / `plantVisualStateKey` a un catalogo visuale ambiente ArcGraph, non da `object_defs.json`;
+- definito come catalogo futuro `ArcGraphEnvironmentVisualCatalog.json`, con sezioni minime `VegetationAreas` e `Plants`;
+- confermato che NPC dovranno migrare gradualmente da frame separati a sheet per parte/animazione, mantenendo compatibile il formato attuale fino alla disponibilita' asset;
+- confermato che il resolver sprite puo' risolvere sprite singole e sheet sliced tramite `sheet#subSprite`, ma non deve generare fallback impliciti verso MapGrid.
+
 Residui bloccanti prima della cancellazione fisica MapGrid:
 
 - il comando operativo F3/placement vive ancora nel DevTools legacy;
 - `object_defs.json` contiene ancora `Visual.SpritePath` espliciti verso asset `MapGrid/Sprites/Objects`; non sono fallback, sono dati catalogo da migrare solo quando esistono asset ArcGraph equivalenti;
+- manca `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e piante vive della biosfera;
+- `ArcGraphNpcVisualCatalog.json` usa ancora pattern frame separati e non ancora sheet per parte/animazione;
 - restano adapter/probe MapGrid legacy;
 - resta logica di root switch/visual root MapGrid;
 - resta da validare in Unity che camera, preview, muri e FOV funzionino senza regressioni.

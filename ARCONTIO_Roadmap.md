@@ -15681,11 +15681,12 @@ Compiti:
 | v0.38o.02 | Eliminare fallback sprite oggetti ArcGraph verso `MapGrid/Sprites/Objects/{defId}` | ✅ Completato |
 | v0.38o.03 | Separare preview placement/F3 da tipo concreto `MapGridRuntimeDevToolsOverlay` | ✅ Completato |
 | v0.38o.04 | Scollegare pan/zoom ArcGraph da offset camera MapGrid | ✅ Completato |
-| v0.38o.05 | Progettare e implementare controller placement/F3 autonomo ArcGraph | ⏳ Pending |
-| v0.38o.06 | Migrare path asset oggetti da `MapGrid/Sprites/Objects` a catalogo/path ArcGraph reali | ⏳ Pending |
-| v0.38o.07 | Eliminare o congelare adapter/probe MapGrid non-runtime | ⏳ Pending |
-| v0.38o.08 | Rimuovere `ArcGraphViewModeSwitcher`/root switch legacy quando ArcGraph resta unica vista | ⏳ Pending |
-| v0.38o.09 | Autorizzare cancellazione fisica MapGrid solo dopo test Unity e zero dipendenze runtime | ⏳ Pending |
+| v0.38o.05 | Formalizzare `ARCGRAPH_VISUAL_ASSET_POLICY.md` per oggetti, NPC, piante, vegetazione e resolver sprite | ✅ Completato |
+| v0.38o.06 | Progettare e implementare controller placement/F3 autonomo ArcGraph | ⏳ Pending |
+| v0.38o.07 | Migrare path asset oggetti da `MapGrid/Sprites/Objects` a catalogo/path ArcGraph reali | ⏳ Pending |
+| v0.38o.08 | Eliminare o congelare adapter/probe MapGrid non-runtime | ⏳ Pending |
+| v0.38o.09 | Rimuovere `ArcGraphViewModeSwitcher`/root switch legacy quando ArcGraph resta unica vista | ⏳ Pending |
+| v0.38o.10 | Autorizzare cancellazione fisica MapGrid solo dopo test Unity e zero dipendenze runtime | ⏳ Pending |
 
 Aggiornamento `v0.38o.01-v0.38o.04`:
 
@@ -15700,12 +15701,33 @@ Aggiornamento `v0.38o.01-v0.38o.04`:
 - `ArcGraphInteractionSceneAdapterWrapper` non chiama piu' `MapGridCameraController.ApplyExternalCameraOffset`;
 - `ArcGraphRuntimeSceneAutoInstaller` disabilita il `MapGridCameraController` legacy quando ArcGraph e' installato.
 
+Aggiornamento `v0.38o.05`:
+
+- aggiunto `ARCGRAPH_VISUAL_ASSET_POLICY.md` come policy root operativa per
+  cataloghi visuali ArcGraph;
+- confermato che `object_defs.json` resta il catalogo per oggetti fisici,
+  muri, porte, mobili, costruzioni e risorse concrete;
+- confermato che piante vive e vegetazione biosfera non devono essere infilate
+  in `object_defs.json`, salvo quando diventano oggetti raccolti o manipolabili;
+- definito il flusso biosfera:
+  `speciesKey/growthStage/healthBand/visualStateKey -> World -> ArcGraph -> SpriteKey`;
+- definito il catalogo futuro `ArcGraphEnvironmentVisualCatalog.json` per
+  `VegetationAreas` e `Plants`;
+- confermato che il resolver sprite ArcGraph puo' risolvere sprite singole e
+  sheet sliced tramite chiave `sheet#subSprite`, ma non deve leggere World o
+  generare fallback impliciti verso MapGrid;
+- dichiarata la migrazione futura NPC verso sheet per parte/animazione, lasciando
+  supportato il formato corrente a frame separati finche' gli asset sheet non
+  esistono.
+
 Audit residuo dopo `v0.38o.04`:
 
 | Area | Stato | Decisione |
 |---|---|---|
 | F3 / placement operativo | Il comando reale vive ancora nel DevTools legacy | serve `ArcGraphPlacementToolController` autonomo |
-| Path oggetti catalogo | `object_defs.json` dichiara ancora `Visual.SpritePath` verso asset MapGrid | non e' fallback, e' dato esplicito; migrare solo quando esistono asset ArcGraph oggetti |
+| Path oggetti catalogo | `object_defs.json` dichiara ancora `Visual.SpritePath` verso asset MapGrid | non e' fallback, e' dato esplicito; migrare solo quando esistono asset ArcGraph oggetti; vedi `ARCGRAPH_VISUAL_ASSET_POLICY.md` |
+| Catalogo ambiente visuale | biosfera produce dati/chiavi semantiche ma manca catalogo ArcGraph finale | creare `ArcGraphEnvironmentVisualCatalog.json` con sezioni `VegetationAreas` e `Plants` |
+| Catalogo NPC visuale | `ArcGraphNpcVisualCatalog.json` usa ancora pattern frame separati | migrare gradualmente verso sheet per parte/animazione quando gli asset esistono |
 | Camera / pan / zoom | ArcGraph sposta direttamente la camera, ma l'installer cerca ancora il controller MapGrid solo per spegnerlo | rimuovere quando la scena non contiene piu' MapGrid |
 | Adapter/probe MapGrid | `ArcGraphTerrainRuntimeMapGridAdapter` e `ArcGraphDebugRuntimeMapGridAdapter` restano nel codice | congelare come legacy/probe o rimuovere dopo test |
 | View switcher | `ArcGraphViewModeSwitcher` conserva modalita' MapGrid | eliminare quando non serve piu' F12/switch legacy |
