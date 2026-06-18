@@ -168,7 +168,7 @@ namespace Arcontio.View.ArcGraph
             yield return new ArcGraphActorVisualSnapshot(
                 1,
                 sharedCell,
-                "MapGrid/Sprites/NPC_Astro",
+                "human_default",
                 ArcGraphActorMotionSnapshot.None(sharedCell));
 
             var hiddenCell = new ArcGraphCellCoord(0, 0, 0);
@@ -185,7 +185,7 @@ namespace Arcontio.View.ArcGraph
                 10,
                 "crate",
                 new ArcGraphCellCoord(1, 1, 0),
-                "MapGrid/Sprites/Objects/crate",
+                "ArcGraph/Objects/crate",
                 isHeld: false,
                 holderActorId: 0,
                 foodStockUnits: -1);
@@ -194,7 +194,7 @@ namespace Arcontio.View.ArcGraph
                 13,
                 "back_wall",
                 new ArcGraphCellCoord(1, 3, 0),
-                "MapGrid/Sprites/Objects/wall_back",
+                "ArcGraph/Objects/wall_back",
                 isHeld: false,
                 holderActorId: 0,
                 foodStockUnits: -1);
@@ -203,7 +203,7 @@ namespace Arcontio.View.ArcGraph
                 11,
                 "apple",
                 new ArcGraphCellCoord(0, 0, 0),
-                "MapGrid/Sprites/Objects/apple",
+                "ArcGraph/Objects/apple",
                 isHeld: true,
                 holderActorId: 1,
                 foodStockUnits: 4);

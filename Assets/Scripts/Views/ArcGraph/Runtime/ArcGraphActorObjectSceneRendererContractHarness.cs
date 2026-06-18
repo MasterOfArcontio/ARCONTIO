@@ -200,7 +200,7 @@ namespace Arcontio.View.ArcGraph
             yield return new ArcGraphActorVisualSnapshot(
                 1,
                 from,
-                "MapGrid/Sprites/NPC_Astro",
+                "human_default",
                 ArcGraphActorMotionSnapshot.CreateMovement(
                     from,
                     to,
@@ -214,7 +214,7 @@ namespace Arcontio.View.ArcGraph
                 20,
                 "back_wall",
                 new ArcGraphCellCoord(1, 3, 0),
-                "MapGrid/Sprites/Objects/back_wall",
+                "ArcGraph/Objects/back_wall",
                 isHeld: false,
                 holderActorId: 0,
                 foodStockUnits: -1);
@@ -223,7 +223,7 @@ namespace Arcontio.View.ArcGraph
                 10,
                 "tall_crate",
                 new ArcGraphCellCoord(1, 1, 0),
-                "MapGrid/Sprites/Objects/crate",
+                "ArcGraph/Objects/crate",
                 isHeld: false,
                 holderActorId: 0,
                 foodStockUnits: -1,

@@ -523,16 +523,6 @@ namespace Arcontio.View.ArcGraph
             if (offset.sqrMagnitude < 0.000001f)
                 return;
 
-            var legacyCameraBridge =
-                camera.GetComponent<Arcontio.View.MapGrid.MapGridCameraController>()
-                ?? camera.GetComponentInParent<Arcontio.View.MapGrid.MapGridCameraController>();
-
-            if (legacyCameraBridge != null)
-            {
-                legacyCameraBridge.ApplyExternalCameraOffset(offset);
-                return;
-            }
-
             camera.transform.position += offset;
         }
 

@@ -1,5 +1,4 @@
 using Arcontio.Core;
-using Arcontio.View.MapGrid;
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -75,17 +74,17 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: ArcGraph mostra, DevTools comandano</b></para>
     /// <para>
     /// Il componente riceve un <c>ArcGraphInteractionFrame</c> gia' calcolato dal
-    /// boundary ArcGraph e legge solo un flag read-only del
-    /// <c>MapGridRuntimeDevToolsOverlay</c>. Non interpreta click, non piazza muri,
-    /// non modifica oggetti, non accoda comandi e non interroga il World. Serve solo
-    /// a rendere leggibile dove finira' l'inserimento quando il DevTool legacy e'
-    /// attivo.
+    /// boundary ArcGraph e legge solo un contratto read-only di placement. Non
+    /// interpreta click, non piazza muri, non modifica oggetti, non accoda comandi
+    /// e non interroga il World per decidere il tool attivo. Serve solo a rendere
+    /// leggibile dove finira' l'inserimento quando una sorgente placement
+    /// autorizzata e' attiva.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>ConsumeInteractionFrame</b>: accende/spegne l'highlight in base al frame.</item>
-    ///   <item><b>SetDevToolsOverlay</b>: riceve il riferimento legacy dall'installer.</item>
+    ///   <item><b>SetPlacementPreviewSource</b>: riceve la sorgente placement dall'installer.</item>
     ///   <item><b>EnsureHighlightRenderer</b>: crea una sola sprite runtime riusabile.</item>
     ///   <item><b>HideHighlight</b>: disattiva il visual senza distruggerlo.</item>
     /// </list>
@@ -93,7 +92,8 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphPlacementCellHighlightSceneConsumer : MonoBehaviour, IArcGraphInteractionFrameConsumer
     {
         [SerializeField] private bool highlightEnabled = true;
-        [SerializeField] private MapGridRuntimeDevToolsOverlay devToolsOverlay;
+        [SerializeField] private MonoBehaviour placementPreviewSourceBehaviour;
+        [SerializeField] private ArcGraphRuntimeContextProvider runtimeContextProvider;
         [SerializeField] private MonoBehaviour spriteResolverBehaviour;
         [SerializeField] private Camera sceneCamera;
         [SerializeField] private bool enableSceneCameraUpdateFallback = true;
@@ -116,6 +116,7 @@ namespace Arcontio.View.ArcGraph
         private Sprite _highlightSprite;
         private GameObject _previewObject;
         private SpriteRenderer _previewRenderer;
+        private IArcGraphPlacementPreviewSource _placementPreviewSource;
         private ArcGraphPlacementCellHighlightDiagnostics _lastDiagnostics =
             new ArcGraphPlacementCellHighlightDiagnostics(
                 false,
@@ -195,13 +196,14 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            if (devToolsOverlay == null)
+            IArcGraphPlacementPreviewSource placementSource = ResolvePlacementPreviewSource();
+            if (placementSource == null)
             {
                 HideAndStore(interactionFrame, false, "DevToolsOverlayMissing");
                 return;
             }
 
-            if (!devToolsOverlay.IsObjectPlacementPreviewActive)
+            if (!placementSource.IsObjectPlacementPreviewActive)
             {
                 HideAndStore(interactionFrame, false, "PlacementPreviewInactive");
                 return;
@@ -209,7 +211,7 @@ namespace Arcontio.View.ArcGraph
 
             if (!interactionFrame.HasValidCell
                 || interactionFrame.IsPointerOverUi
-                || devToolsOverlay.IsPointerOverDevToolsWindow)
+                || placementSource.IsPointerOverPlacementUi)
             {
                 HideAndStore(interactionFrame, false, "CellUnavailable");
                 return;
@@ -249,19 +251,20 @@ namespace Arcontio.View.ArcGraph
                 return false;
             }
 
-            if (devToolsOverlay == null)
+            IArcGraphPlacementPreviewSource placementSource = ResolvePlacementPreviewSource();
+            if (placementSource == null)
             {
                 reason = "DevToolsOverlayMissing";
                 return false;
             }
 
-            if (!devToolsOverlay.IsObjectPlacementPreviewActive)
+            if (!placementSource.IsObjectPlacementPreviewActive)
             {
                 reason = "PlacementPreviewInactive";
                 return false;
             }
 
-            if (!devToolsOverlay.TryGetObjectPlacementPreviewCell(out int x, out int y))
+            if (!placementSource.TryGetObjectPlacementPreviewCell(out int x, out int y))
             {
                 reason = "DevToolsPlacementCellUnavailable";
                 return false;
@@ -273,16 +276,30 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // SetDevToolsOverlay
+        // SetPlacementPreviewSource
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Assegna esplicitamente il DevTools legacy da osservare in sola lettura.
+        /// Assegna esplicitamente una sorgente placement da osservare in sola lettura.
         /// </para>
         /// </summary>
-        public void SetDevToolsOverlay(MapGridRuntimeDevToolsOverlay overlay)
+        public void SetPlacementPreviewSource(MonoBehaviour sourceBehaviour)
         {
-            devToolsOverlay = overlay;
+            placementPreviewSourceBehaviour = sourceBehaviour;
+            _placementPreviewSource = sourceBehaviour as IArcGraphPlacementPreviewSource;
+        }
+
+        // =============================================================================
+        // SetRuntimeContextProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il provider runtime ArcGraph da cui leggere il World.
+        /// </para>
+        /// </summary>
+        public void SetRuntimeContextProvider(ArcGraphRuntimeContextProvider provider)
+        {
+            runtimeContextProvider = provider;
         }
 
         // =============================================================================
@@ -516,15 +533,16 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private bool TryShowPlacementSpritePreview(ArcGraphCellCoord cell)
         {
-            if (devToolsOverlay == null
-                || !devToolsOverlay.TryGetActiveObjectPlacementPreviewDefId(out string defId)
+            IArcGraphPlacementPreviewSource placementSource = ResolvePlacementPreviewSource();
+            if (placementSource == null
+                || !placementSource.TryGetActiveObjectPlacementPreviewDefId(out string defId)
                 || string.IsNullOrWhiteSpace(defId))
             {
                 HidePreview();
                 return false;
             }
 
-            World world = MapGridWorldProvider.TryGetWorld();
+            World world = ResolveWorld();
             if (world == null || !world.TryGetObjectDef(defId, out ObjectDef def) || def == null)
             {
                 HidePreview();
@@ -597,19 +615,20 @@ namespace Arcontio.View.ArcGraph
                 return false;
             }
 
-            if (devToolsOverlay == null)
+            IArcGraphPlacementPreviewSource placementSource = ResolvePlacementPreviewSource();
+            if (placementSource == null)
             {
                 reason = "DevToolsOverlayMissing";
                 return false;
             }
 
-            if (!devToolsOverlay.IsObjectPlacementPreviewActive)
+            if (!placementSource.IsObjectPlacementPreviewActive)
             {
                 reason = "PlacementPreviewInactive";
                 return false;
             }
 
-            if (devToolsOverlay.IsPointerOverDevToolsWindow)
+            if (placementSource.IsPointerOverPlacementUi)
             {
                 reason = "PointerOverDevToolsWindow";
                 return false;
@@ -640,7 +659,7 @@ namespace Arcontio.View.ArcGraph
             int x = Mathf.FloorToInt((worldPosition.x - originOffset.x) / safeTileWorldSize);
             int y = Mathf.FloorToInt((worldPosition.y - originOffset.y) / safeTileWorldSize);
 
-            World world = MapGridWorldProvider.TryGetWorld();
+            World world = ResolveWorld();
             if (world != null
                 && (x < 0 || y < 0 || x >= world.MapWidth || y >= world.MapHeight))
             {
@@ -999,9 +1018,7 @@ namespace Arcontio.View.ArcGraph
             if (!string.IsNullOrWhiteSpace(spriteKey))
                 return spriteKey.Trim();
 
-            return string.IsNullOrWhiteSpace(def.Id)
-                ? string.Empty
-                : "MapGrid/Sprites/Objects/" + def.Id.Trim();
+            return string.Empty;
         }
 
         // =============================================================================
@@ -1145,11 +1162,12 @@ namespace Arcontio.View.ArcGraph
             bool didShowHighlight,
             string reason)
         {
-            bool placementActive = devToolsOverlay != null && devToolsOverlay.IsObjectPlacementPreviewActive;
+            IArcGraphPlacementPreviewSource placementSource = ResolvePlacementPreviewSource();
+            bool placementActive = placementSource != null && placementSource.IsObjectPlacementPreviewActive;
             _lastDiagnostics = new ArcGraphPlacementCellHighlightDiagnostics(
                 true,
                 highlightEnabled,
-                devToolsOverlay != null,
+                placementSource != null,
                 placementActive,
                 interactionFrame.HasValidCell,
                 didShowHighlight,
@@ -1167,6 +1185,47 @@ namespace Arcontio.View.ArcGraph
                 ", placement=" + _lastDiagnostics.PlacementPreviewActive +
                 ", cell=" + _lastDiagnostics.Cell +
                 ", shown=" + _lastDiagnostics.DidShowHighlight);
+        }
+
+        // =============================================================================
+        // ResolvePlacementPreviewSource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la sorgente placement tramite il contratto neutro ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Confine anti-MapGrid</b></para>
+        /// <para>
+        /// Il consumer non conosce il tipo concreto della sorgente. Oggi il
+        /// provider puo' ancora essere il DevTools legacy, domani puo' diventare un
+        /// controller placement ArcGraph autonomo senza cambiare questa classe.
+        /// </para>
+        /// </summary>
+        private IArcGraphPlacementPreviewSource ResolvePlacementPreviewSource()
+        {
+            if (_placementPreviewSource != null)
+                return _placementPreviewSource;
+
+            _placementPreviewSource = placementPreviewSourceBehaviour as IArcGraphPlacementPreviewSource;
+            return _placementPreviewSource;
+        }
+
+        // =============================================================================
+        // ResolveWorld
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il World tramite il context provider ArcGraph autorizzato.
+        /// </para>
+        /// </summary>
+        private World ResolveWorld()
+        {
+            ArcGraphRuntimeContext context = runtimeContextProvider != null
+                ? runtimeContextProvider.BuildTerrainRuntimeContext()
+                : null;
+
+            return context?.World;
         }
     }
 }

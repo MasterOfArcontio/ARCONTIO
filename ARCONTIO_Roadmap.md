@@ -15675,14 +15675,64 @@ capire cosa impedisce ancora di pensionare MapGrid
 
 Compiti:
 
-- elencare dipendenze residue da `MapGridBootstrap`;
-- elencare dipendenze residue da `MapGridWorldView`;
-- distinguere sorgenti dati provvisorie da rendering legacy;
-- decidere cosa migrare verso adapter neutri;
-- decidere cosa puo' restare congelato;
-- decidere cosa puo' essere rimosso solo dopo gate completi;
-- dichiarare `MapGridFovHeatmapOverlay` non eliminabile finche' il sostituto ArcGraph FOV non e' validato;
-- non cancellare fisicamente MapGrid senza piano approvato.
+| Step | Obiettivo | Stato |
+|---|---|---|
+| v0.38o.01 | Auditare bridge attivi MapGrid ancora usati da ArcGraph | ✅ Completato |
+| v0.38o.02 | Eliminare fallback sprite oggetti ArcGraph verso `MapGrid/Sprites/Objects/{defId}` | ✅ Completato |
+| v0.38o.03 | Separare preview placement/F3 da tipo concreto `MapGridRuntimeDevToolsOverlay` | ✅ Completato |
+| v0.38o.04 | Scollegare pan/zoom ArcGraph da offset camera MapGrid | ✅ Completato |
+| v0.38o.05 | Progettare e implementare controller placement/F3 autonomo ArcGraph | ⏳ Pending |
+| v0.38o.06 | Migrare path asset oggetti da `MapGrid/Sprites/Objects` a catalogo/path ArcGraph reali | ⏳ Pending |
+| v0.38o.07 | Eliminare o congelare adapter/probe MapGrid non-runtime | ⏳ Pending |
+| v0.38o.08 | Rimuovere `ArcGraphViewModeSwitcher`/root switch legacy quando ArcGraph resta unica vista | ⏳ Pending |
+| v0.38o.09 | Autorizzare cancellazione fisica MapGrid solo dopo test Unity e zero dipendenze runtime | ⏳ Pending |
+
+Aggiornamento `v0.38o.01-v0.38o.04`:
+
+- ArcGraph non genera piu' fallback automatici per oggetti mancanti con path `MapGrid/Sprites/Objects/{defId}`;
+- `ObjectDef.ResolveArcGraphSpritePath()` restituisce solo `Visual.SpritePath`;
+- se una definizione oggetto non dichiara path visuale, ArcGraph produce sprite key vuota e il renderer la segnala come missing;
+- la preview placement ArcGraph non dipende piu' dal tipo concreto `MapGridRuntimeDevToolsOverlay`;
+- aggiunto contratto neutro `IArcGraphPlacementPreviewSource`;
+- il DevTools legacy implementa temporaneamente questo contratto, ma ArcGraph consuma solo l'interfaccia;
+- la preview placement legge il `World` tramite `ArcGraphRuntimeContextProvider`, non tramite `MapGridWorldProvider`;
+- `ArcGraphCameraViewportController` non chiama piu' `MapGridCameraController.ApplyExternalCameraOffset`;
+- `ArcGraphInteractionSceneAdapterWrapper` non chiama piu' `MapGridCameraController.ApplyExternalCameraOffset`;
+- `ArcGraphRuntimeSceneAutoInstaller` disabilita il `MapGridCameraController` legacy quando ArcGraph e' installato.
+
+Audit residuo dopo `v0.38o.04`:
+
+| Area | Stato | Decisione |
+|---|---|---|
+| F3 / placement operativo | Il comando reale vive ancora nel DevTools legacy | serve `ArcGraphPlacementToolController` autonomo |
+| Path oggetti catalogo | `object_defs.json` dichiara ancora `Visual.SpritePath` verso asset MapGrid | non e' fallback, e' dato esplicito; migrare solo quando esistono asset ArcGraph oggetti |
+| Camera / pan / zoom | ArcGraph sposta direttamente la camera, ma l'installer cerca ancora il controller MapGrid solo per spegnerlo | rimuovere quando la scena non contiene piu' MapGrid |
+| Adapter/probe MapGrid | `ArcGraphTerrainRuntimeMapGridAdapter` e `ArcGraphDebugRuntimeMapGridAdapter` restano nel codice | congelare come legacy/probe o rimuovere dopo test |
+| View switcher | `ArcGraphViewModeSwitcher` conserva modalita' MapGrid | eliminare quando non serve piu' F12/switch legacy |
+| Root visuali legacy | l'installer spegne ancora root MapGrid noti | eliminare dopo scena ArcGraph autonoma |
+
+Decisione pan/zoom:
+
+```text
+Non riusare MapGridCameraController.
+Il sistema corretto e':
+ArcGraphViewConfig JSON -> ArcGraphViewController puro -> ArcGraphCameraViewportController Unity.
+Il wrapper Unity deve gestire solo:
+- input rotellina;
+- pan con rotellina premuta;
+- zoom-to-cursor;
+- clamp ai bordi;
+- eventuale smoothing locale;
+- aggiornamento diretto della camera.
+```
+
+La cancellazione fisica di MapGrid resta non autorizzata dopo questo step:
+
+```text
+MapGrid contiene ancora DevTools operativo, asset oggetti dichiarati dal catalogo,
+componenti legacy/probe e root/switch di scena. Prima bisogna sostituire questi
+blocchi uno alla volta e validarli in Unity.
+```
 
 Output atteso:
 

@@ -1,6 +1,7 @@
 // Assets/Scripts/Views/MapGrid/Runtime/MapGridRuntimeDevToolsOverlay.cs
 using Arcontio.Core;
 using Arcontio.Core.Commands.DevTools;
+using Arcontio.View.ArcGraph;
 using SocialViewer.UI;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -24,7 +25,7 @@ namespace Arcontio.View.MapGrid
     /// - NON modifica direttamente il World.
     /// - Enqueue di ICommand su SimulationHost (CommandBuffer view->core).
     /// </summary>
-    public sealed class MapGridRuntimeDevToolsOverlay : MonoBehaviour
+    public sealed class MapGridRuntimeDevToolsOverlay : MonoBehaviour, IArcGraphPlacementPreviewSource
     {
         private const string WallStoneDefId = "wall_stone";
 
@@ -213,6 +214,7 @@ namespace Arcontio.View.MapGrid
             && IsObjectPlacementPreviewTool(_tool);
 
         public bool IsPointerOverDevToolsWindow => _enabled && _isPointerOverUiWindow;
+        public bool IsPointerOverPlacementUi => IsPointerOverDevToolsWindow;
 
         // =============================================================================
         // TryGetActiveObjectPlacementPreviewDefId

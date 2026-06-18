@@ -331,6 +331,7 @@ namespace Arcontio.View.ArcGraph
             _interactionWrapper.SetSceneCameraZoomSyncEnabled(false);
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
+            _placementHighlightConsumer.SetRuntimeContextProvider(_contextProvider);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
             _placementHighlightConsumer.SetSceneCamera(Camera.main);
 
@@ -441,7 +442,8 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private void RefreshRuntimeSceneBindings()
         {
-            MapGridRuntimeDevToolsOverlay devToolsOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
+            MonoBehaviour placementPreviewSource =
+                FindSceneBehaviourImplementing<IArcGraphPlacementPreviewSource>();
             MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
             Arcontio.Core.SimulationHost simulationHost = Arcontio.Core.SimulationHost.Instance;
 
@@ -449,7 +451,7 @@ namespace Arcontio.View.ArcGraph
                 _contextProvider.SetSimulationHost(simulationHost);
 
             if (_placementHighlightConsumer != null)
-                _placementHighlightConsumer.SetDevToolsOverlay(devToolsOverlay);
+                _placementHighlightConsumer.SetPlacementPreviewSource(placementPreviewSource);
 
             if (_cameraViewportController != null)
                 _cameraViewportController.SetSceneCamera(Camera.main);
@@ -463,7 +465,7 @@ namespace Arcontio.View.ArcGraph
             if (_switcher != null && _visualRoot != null)
                 ConfigureSwitcher();
 
-            LogBindingStateIfChanged(simulationHost, devToolsOverlay);
+            LogBindingStateIfChanged(simulationHost, placementPreviewSource);
         }
 
         // =============================================================================
@@ -471,20 +473,18 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Configura il controller camera legacy MapGrid come bridge camera
-        /// provvisorio per la vista runtime ArcGraph.
+        /// Disabilita il controller camera legacy MapGrid quando ArcGraph controlla
+        /// la camera runtime.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: assorbimento parziale del legacy</b></para>
+        /// <para><b>Principio architetturale: una sola sorgente pan/zoom</b></para>
         /// <para>
         /// ArcGraph usa <c>ArcGraphViewConfig</c> e <c>ArcGraphViewState</c> per
         /// lavorare con livelli zoom discreti. Il vecchio
-        /// <c>MapGridCameraController</c> contiene pero' anche il pan fisico della
-        /// camera. Ora pero' il pan operativo e' stato assorbito nel controller
-        /// logico ArcGraph: il componente legacy resta acceso solo per ricevere
-        /// offset esterni e tenere allineato il proprio target interno. Spegniamo
-        /// quindi sia la rotellina sia la lettura diretta del pan legacy, evitando
-        /// due sorgenti concorrenti sullo stesso transform camera.
+        /// <c>MapGridCameraController</c> contiene pan fisico, zoom, target interno
+        /// e inerzia legacy. Quando ArcGraph diventa vista runtime, quel componente
+        /// viene spento per evitare due sorgenti concorrenti sullo stesso transform
+        /// camera.
         /// </para>
         /// </summary>
         private static void ConfigureLegacyMapGridCameraControllerForArcGraph(
@@ -493,11 +493,9 @@ namespace Arcontio.View.ArcGraph
             if (cameraController == null)
                 return;
 
-            if (!cameraController.enabled)
-                cameraController.enabled = true;
-
             cameraController.SetZoomInputEnabled(false);
             cameraController.SetPanInputEnabled(false);
+            cameraController.enabled = false;
         }
 
         // =============================================================================
@@ -616,6 +614,47 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // FindSceneBehaviourImplementing
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca un componente di scena che implementa una specifica interfaccia.
+        /// </para>
+        ///
+        /// <para><b>Contratto bridge neutro</b></para>
+        /// <para>
+        /// Unity non serializza direttamente le interfacce come campi Inspector.
+        /// Per questo l'installer scansiona i <c>MonoBehaviour</c> attivi e
+        /// inattivi della scena e restituisce il primo componente compatibile. Il
+        /// chiamante conserva il riferimento come <c>MonoBehaviour</c>, mentre il
+        /// consumer ArcGraph lo converte al contratto read-only richiesto.
+        /// </para>
+        /// </summary>
+        private static MonoBehaviour FindSceneBehaviourImplementing<TInterface>()
+            where TInterface : class
+        {
+            Scene scene = SceneManager.GetActiveScene();
+            if (!scene.IsValid())
+                return null;
+
+            GameObject[] rootObjects = scene.GetRootGameObjects();
+            for (int i = 0; i < rootObjects.Length; i++)
+            {
+                MonoBehaviour[] behaviours =
+                    rootObjects[i].GetComponentsInChildren<MonoBehaviour>(includeInactive: true);
+
+                for (int j = 0; j < behaviours.Length; j++)
+                {
+                    MonoBehaviour behaviour = behaviours[j];
+                    if (behaviour is TInterface)
+                        return behaviour;
+                }
+            }
+
+            return null;
+        }
+
+        // =============================================================================
         // FindSceneGameObjectByName
         // =============================================================================
         /// <summary>
@@ -707,12 +746,12 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private void LogBindingStateIfChanged(
             Arcontio.Core.SimulationHost simulationHost,
-            MapGridRuntimeDevToolsOverlay devToolsOverlay)
+            MonoBehaviour placementPreviewSource)
         {
             if (!logDiagnostics)
                 return;
 
-            bool hasDevToolsOverlay = devToolsOverlay != null;
+            bool hasDevToolsOverlay = placementPreviewSource != null;
             bool hasWorld = simulationHost != null && simulationHost.World != null;
             int rootCount = _configuredMapGridRootCount;
 

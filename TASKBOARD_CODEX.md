@@ -2356,6 +2356,26 @@ Aggiornamento operativo `v0.38n.01-v0.38n.03`:
 - audit statico post-FOV: MapGrid resta ancora attivo come dipendenza tramite placement/DevTools, camera bridge, root visuali legacy, adapter legacy/probe, path sprite oggetti e view switcher;
 - prossimo step consigliato: `v0.38o.01 - MapGrid Active Runtime Bridge Audit`, poi rimozione o sostituzione un bridge alla volta.
 
+Aggiornamento operativo `v0.38o.01-v0.38o.04`:
+
+- eliminato il fallback automatico ArcGraph `MapGrid/Sprites/Objects/{defId}` per oggetti privi di path visuale;
+- `ObjectDef.ResolveArcGraphSpritePath()` usa solo `Visual.SpritePath`; `SpriteKey` resta legacy MapGrid e non viene piu' usato come fallback ArcGraph;
+- la preview placement ArcGraph ora consuma `IArcGraphPlacementPreviewSource`, non il tipo concreto `MapGridRuntimeDevToolsOverlay`;
+- `MapGridRuntimeDevToolsOverlay` implementa temporaneamente il contratto neutro, in attesa di un controller placement/F3 ArcGraph autonomo;
+- la preview placement legge il `World` tramite `ArcGraphRuntimeContextProvider`, non tramite `MapGridWorldProvider`;
+- `ArcGraphCameraViewportController` e `ArcGraphInteractionSceneAdapterWrapper` non inviano piu' offset camera a `MapGridCameraController`;
+- `ArcGraphRuntimeSceneAutoInstaller` disabilita il `MapGridCameraController` legacy quando installa ArcGraph;
+- pan ArcGraph resta vincolato alla rotellina premuta per default; RMB non e' piu' attivo come pan ArcGraph;
+- scelta tecnica pan/zoom: non riusare `MapGridCameraController`; proseguire con `ArcGraphViewConfig JSON -> ArcGraphViewController -> ArcGraphCameraViewportController`.
+
+Residui bloccanti prima della cancellazione fisica MapGrid:
+
+- il comando operativo F3/placement vive ancora nel DevTools legacy;
+- `object_defs.json` contiene ancora `Visual.SpritePath` espliciti verso asset `MapGrid/Sprites/Objects`; non sono fallback, sono dati catalogo da migrare solo quando esistono asset ArcGraph equivalenti;
+- restano adapter/probe MapGrid legacy;
+- resta logica di root switch/visual root MapGrid;
+- resta da validare in Unity che camera, preview, muri e FOV funzionino senza regressioni.
+
 Confermato:
 
 - `ai/codex-main` locale allineato a `origin/ai/codex-main` sul commit `df7f211`;

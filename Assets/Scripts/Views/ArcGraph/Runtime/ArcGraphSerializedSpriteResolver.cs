@@ -216,7 +216,7 @@ namespace Arcontio.View.ArcGraph
             //
             // Per gli sprite sliced usiamo invece una convenzione esplicita:
             // sheet#subSprite. Esempio:
-            // MapGrid/Sprites/Objects/wall_stone#wall_stone_1010
+            // ArcGraph/Objects/wall_stone#wall_stone_1010
             // In quel caso si carica una volta la sheet con Resources.LoadAll e
             // poi si cerca il nome della sub-sprite dentro gli asset importati.
             if (_resourceSpritesByKey.TryGetValue(spriteKey, out sprite) && sprite != null)
