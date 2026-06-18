@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "configKey": "default_environment_foundation",
+  "initialEnvironmentTicks": 0,
+  "calendar": {
+    "hoursPerDay": 24,
+    "calendarTicksPerSimulatedHour": 50,
+    "daysPerMonth": 25,
+    "monthsPerYear": 12,
+    "monthsPerSeason": 3,
+    "seasonProfiles": [
+      {
+        "season": "Spring",
+        "daylightHours": 12.0,
+        "temperatureBias01": 0.55,
+        "rainfallBias01": 0.65,
+        "fertilityBias01": 0.75,
+        "vegetationGrowthBias01": 0.85
+      },
+      {
+        "season": "Summer",
+        "daylightHours": 16.0,
+        "temperatureBias01": 0.85,
+        "rainfallBias01": 0.30,
+        "fertilityBias01": 0.55,
+        "vegetationGrowthBias01": 0.70
+      },
+      {
+        "season": "Autumn",
+        "daylightHours": 12.0,
+        "temperatureBias01": 0.45,
+        "rainfallBias01": 0.75,
+        "fertilityBias01": 0.65,
+        "vegetationGrowthBias01": 0.45
+      },
+      {
+        "season": "Winter",
+        "daylightHours": 8.0,
+        "temperatureBias01": 0.15,
+        "rainfallBias01": 0.45,
+        "fertilityBias01": 0.30,
+        "vegetationGrowthBias01": 0.15
+      }
+    ]
+  },
+  "climate": {
+    "weatherPersistence01": 0.35,
+    "hourlyTemperatureVariation01": 0.10,
+    "seasonClimateProfiles": [
+      {
+        "season": "Spring",
+        "meanTemperature01": 0.55,
+        "temperatureVariation01": 0.15,
+        "rainProbability01": 0.65,
+        "snowProbability01": 0.05,
+        "windProbability01": 0.35,
+        "heatWaveProbability01": 0.05,
+        "baseHumidity01": 0.60,
+        "averageEventDurationHours": 5
+      },
+      {
+        "season": "Summer",
+        "meanTemperature01": 0.85,
+        "temperatureVariation01": 0.18,
+        "rainProbability01": 0.25,
+        "snowProbability01": 0.00,
+        "windProbability01": 0.25,
+        "heatWaveProbability01": 0.25,
+        "baseHumidity01": 0.35,
+        "averageEventDurationHours": 4
+      },
+      {
+        "season": "Autumn",
+        "meanTemperature01": 0.45,
+        "temperatureVariation01": 0.18,
+        "rainProbability01": 0.75,
+        "snowProbability01": 0.05,
+        "windProbability01": 0.60,
+        "heatWaveProbability01": 0.03,
+        "baseHumidity01": 0.70,
+        "averageEventDurationHours": 6
+      },
+      {
+        "season": "Winter",
+        "meanTemperature01": 0.15,
+        "temperatureVariation01": 0.16,
+        "rainProbability01": 0.35,
+        "snowProbability01": 0.45,
+        "windProbability01": 0.50,
+        "heatWaveProbability01": 0.00,
+        "baseHumidity01": 0.55,
+        "averageEventDurationHours": 6
+      }
+    ]
+  },
+  "areas": {
+    "areas": [],
+    "fertilityAreas": [],
+    "waterAreas": [],
+    "vegetationAreas": [],
+    "seedBankAreas": []
+  }
+}

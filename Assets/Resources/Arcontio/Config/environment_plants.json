@@ -1,0 +1,131 @@
+{
+  "species": [
+    {
+      "speciesKey": "wild_grass",
+      "category": "Grass",
+      "growthStages": [
+        { "stageKey": "sprout", "requiredAgeDays": 0, "maturity01": 0.15, "isHarvestable": false },
+        { "stageKey": "mature", "requiredAgeDays": 8, "maturity01": 1.0, "isHarvestable": true }
+      ],
+      "favorableSeasons": [ "Spring", "Summer", "Autumn" ],
+      "idealTemperature01": 0.55,
+      "idealHumidity01": 0.55,
+      "minimumFertility01": 0.20,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Perennial"
+    },
+    {
+      "speciesKey": "oak_tree",
+      "category": "Tree",
+      "growthStages": [
+        { "stageKey": "sapling", "requiredAgeDays": 0, "maturity01": 0.15, "isHarvestable": false },
+        { "stageKey": "young", "requiredAgeDays": 90, "maturity01": 0.45, "isHarvestable": false },
+        { "stageKey": "adult", "requiredAgeDays": 300, "maturity01": 1.0, "isHarvestable": true }
+      ],
+      "favorableSeasons": [ "Spring", "Summer" ],
+      "idealTemperature01": 0.50,
+      "idealHumidity01": 0.65,
+      "minimumFertility01": 0.55,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Deciduous"
+    },
+    {
+      "speciesKey": "berry_bush",
+      "category": "Shrub",
+      "growthStages": [
+        { "stageKey": "shoot", "requiredAgeDays": 0, "maturity01": 0.18, "isHarvestable": false },
+        { "stageKey": "fruiting", "requiredAgeDays": 45, "maturity01": 1.0, "isHarvestable": true }
+      ],
+      "favorableSeasons": [ "Spring", "Summer" ],
+      "idealTemperature01": 0.52,
+      "idealHumidity01": 0.62,
+      "minimumFertility01": 0.48,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Deciduous"
+    },
+    {
+      "speciesKey": "desert_shrub",
+      "category": "Shrub",
+      "growthStages": [
+        { "stageKey": "young", "requiredAgeDays": 0, "maturity01": 0.25, "isHarvestable": false },
+        { "stageKey": "hardy", "requiredAgeDays": 70, "maturity01": 1.0, "isHarvestable": false }
+      ],
+      "favorableSeasons": [ "Spring", "Autumn" ],
+      "idealTemperature01": 0.78,
+      "idealHumidity01": 0.18,
+      "minimumFertility01": 0.18,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Evergreen"
+    },
+    {
+      "speciesKey": "cactus",
+      "category": "Shrub",
+      "growthStages": [
+        { "stageKey": "small", "requiredAgeDays": 0, "maturity01": 0.20, "isHarvestable": false },
+        { "stageKey": "mature", "requiredAgeDays": 160, "maturity01": 1.0, "isHarvestable": true }
+      ],
+      "favorableSeasons": [ "Spring", "Summer", "Autumn" ],
+      "idealTemperature01": 0.86,
+      "idealHumidity01": 0.10,
+      "minimumFertility01": 0.12,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Evergreen"
+    },
+    {
+      "speciesKey": "jungle_fern",
+      "category": "Grass",
+      "growthStages": [
+        { "stageKey": "frond", "requiredAgeDays": 0, "maturity01": 0.30, "isHarvestable": false },
+        { "stageKey": "thick", "requiredAgeDays": 18, "maturity01": 1.0, "isHarvestable": false }
+      ],
+      "favorableSeasons": [ "Spring", "Summer", "Autumn", "Winter" ],
+      "idealTemperature01": 0.72,
+      "idealHumidity01": 0.90,
+      "minimumFertility01": 0.44,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Perennial"
+    },
+    {
+      "speciesKey": "jungle_tree",
+      "category": "Tree",
+      "growthStages": [
+        { "stageKey": "sapling", "requiredAgeDays": 0, "maturity01": 0.12, "isHarvestable": false },
+        { "stageKey": "canopy", "requiredAgeDays": 220, "maturity01": 1.0, "isHarvestable": true }
+      ],
+      "favorableSeasons": [ "Spring", "Summer", "Autumn", "Winter" ],
+      "idealTemperature01": 0.76,
+      "idealHumidity01": 0.88,
+      "minimumFertility01": 0.62,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Evergreen"
+    },
+    {
+      "speciesKey": "tundra_moss",
+      "category": "Grass",
+      "growthStages": [
+        { "stageKey": "patch", "requiredAgeDays": 0, "maturity01": 0.40, "isHarvestable": false },
+        { "stageKey": "mat", "requiredAgeDays": 40, "maturity01": 1.0, "isHarvestable": false }
+      ],
+      "favorableSeasons": [ "Summer" ],
+      "idealTemperature01": 0.22,
+      "idealHumidity01": 0.46,
+      "minimumFertility01": 0.16,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Perennial"
+    },
+    {
+      "speciesKey": "lichen",
+      "category": "Grass",
+      "growthStages": [
+        { "stageKey": "colony", "requiredAgeDays": 0, "maturity01": 0.35, "isHarvestable": false },
+        { "stageKey": "spread", "requiredAgeDays": 90, "maturity01": 1.0, "isHarvestable": false }
+      ],
+      "favorableSeasons": [ "Spring", "Summer", "Autumn" ],
+      "idealTemperature01": 0.18,
+      "idealHumidity01": 0.38,
+      "minimumFertility01": 0.10,
+      "resourceOutputKey": "",
+      "seasonalBehavior": "Perennial"
+    }
+  ]
+}

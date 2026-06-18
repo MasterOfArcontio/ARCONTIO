@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "configKey": "default_biosphere_placement_rules",
+  "biologicalLandmarks": {
+    "includeCenterAnchor": true,
+    "perimeterAnchorCount": 8,
+    "minimumPerimeterRadiusCells": 3,
+    "reserveLandmarkCellsAgainstPhysicalPlants": true,
+    "allowDiffuseVegetationOnLandmarkCells": true
+  },
+  "diffuseVegetation": {
+    "coverageToCandidateCellRatio": 1.0,
+    "minimumCoverageCellsPerArea": 0,
+    "preferHigherFertilitySurfaces": true,
+    "respectCanHostNaturalVegetation": true
+  },
+  "physicalPlants": {
+    "respectCanHostPhysicalPlant": true,
+    "respectBlocksMovement": true,
+    "respectBlocksVision": true,
+    "reserveOnePlantPerCell": true,
+    "reserveLandmarkCells": true,
+    "defaultBlocksMovement": true,
+    "defaultBlocksVision": true,
+    "defaultVisionCost": 1.0
+  }
+}

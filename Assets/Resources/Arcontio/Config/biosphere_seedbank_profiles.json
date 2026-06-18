@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "configKey": "default_biosphere_seedbank_profiles",
+  "profiles": [
+    {
+      "biomeKey": "temperate_grassland",
+      "entries": [
+        { "speciesKey": "wild_grass", "amount01": 0.90, "viability01": 0.85, "isPhysicalPlant": false },
+        { "speciesKey": "oak_tree", "amount01": 0.35, "viability01": 0.70, "isPhysicalPlant": true },
+        { "speciesKey": "berry_bush", "amount01": 0.45, "viability01": 0.68, "isPhysicalPlant": true }
+      ]
+    },
+    {
+      "biomeKey": "desert",
+      "entries": [
+        { "speciesKey": "desert_shrub", "amount01": 0.30, "viability01": 0.70, "isPhysicalPlant": true },
+        { "speciesKey": "cactus", "amount01": 0.22, "viability01": 0.68, "isPhysicalPlant": true }
+      ]
+    },
+    {
+      "biomeKey": "jungle",
+      "entries": [
+        { "speciesKey": "jungle_fern", "amount01": 0.70, "viability01": 0.82, "isPhysicalPlant": false },
+        { "speciesKey": "jungle_tree", "amount01": 0.55, "viability01": 0.76, "isPhysicalPlant": true }
+      ]
+    },
+    {
+      "biomeKey": "tundra",
+      "entries": [
+        { "speciesKey": "tundra_moss", "amount01": 0.42, "viability01": 0.62, "isPhysicalPlant": false },
+        { "speciesKey": "lichen", "amount01": 0.34, "viability01": 0.58, "isPhysicalPlant": false }
+      ]
+    }
+  ]
+}
