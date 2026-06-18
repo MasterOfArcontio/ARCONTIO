@@ -15561,6 +15561,7 @@ Connessioni MapGrid residue da eliminare esplicitamente:
 - `ArcGraphPlacementCellHighlightSceneConsumer`: legge ancora `MapGridWorldProvider`;
 - camera/viewport: esistono ancora bridge e configurazioni derivate dal vecchio percorso MapGrid;
 - object visual path: molti oggetti puntano ancora a sprite sotto `MapGrid/Sprites/Objects`;
+- `MapGridFovHeatmapOverlay`: contiene ancora il riferimento operativo per FOV current cone e FOV heatmap debug;
 - debug/probe storici: alcune classi restano utili come riferimento, ma non devono restare nel runtime definitivo.
 
 Regola di avanzamento:
@@ -15570,6 +15571,12 @@ Ogni dipendenza MapGrid rimasta deve diventare una delle tre cose:
 1. assorbita in un contratto ArcGraph/Core neutro;
 2. marcata legacy/probe e non usata nel runtime;
 3. rimossa quando il sostituto ArcGraph e' validato.
+
+Vincolo aggiuntivo:
+MapGridFovHeatmapOverlay non puo' essere cancellato fisicamente finche'
+ArcGraph non possiede un equivalente verificato per FOV current cone e FOV
+heatmap debug, attivabile come modalita' di visualizzazione e alimentato da
+snapshot/producer autorizzato.
 ```
 
 ---
@@ -15587,8 +15594,19 @@ Compiti:
 - non copiare `MapGridWorldView` come blocco unico;
 - distinguere debug temporaneo da UI definitiva;
 - migrare pointer, selection e pannelli informativi minimi;
+- assorbire il comportamento utile di `MapGridFovHeatmapOverlay` in un modulo ArcGraph dedicato, senza copiare il monolite `MapGridWorldView`;
+- attivare FOV current cone / FOV heatmap da icona visualizzazione, non da DevTools runtime;
 - mantenere DevTools e command tools fuori dal core ArcGraph;
 - preparare pannelli leggibili ma non onniscienti per il giocatore/operatore.
+
+Sotto-step FOV bloccante:
+
+| Step | Obiettivo | Stato |
+|---|---|---|
+| v0.38n.01 | Auditare `MapGridFovHeatmapOverlay` e separare calcolo dati FOV da resa visuale debug | ⏳ Pending |
+| v0.38n.02 | Creare producer/snapshot ArcGraph autorizzato per FOV current cone e/o heatmap | ⏳ Pending |
+| v0.38n.03 | Creare consumer overlay ArcGraph attivabile dalla ViewModeBar / icona visualizzazione | ⏳ Pending |
+| v0.38n.04 | Confrontare visivamente ArcGraph FOV con MapGrid FOV prima di autorizzare rimozione legacy | ⏳ Pending |
 
 Output atteso:
 
@@ -15614,6 +15632,7 @@ Compiti:
 - decidere cosa migrare verso adapter neutri;
 - decidere cosa puo' restare congelato;
 - decidere cosa puo' essere rimosso solo dopo gate completi;
+- dichiarare `MapGridFovHeatmapOverlay` non eliminabile finche' il sostituto ArcGraph FOV non e' validato;
 - non cancellare fisicamente MapGrid senza piano approvato.
 
 Output atteso:
@@ -15640,6 +15659,7 @@ Criteri di chiusura:
 - interaction minima funzionante;
 - UI archetype foundation presente;
 - debug minimo presente;
+- FOV debug MapGrid assorbito o dichiarato esplicitamente bloccante per la rimozione fisica di MapGrid;
 - dipendenze MapGrid residue dichiarate;
 - nessuna mutazione simulativa dal renderer;
 - nessun accesso onnisciente introdotto;

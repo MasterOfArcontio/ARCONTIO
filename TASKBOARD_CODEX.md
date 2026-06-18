@@ -243,6 +243,7 @@ Regola corrente:
   - il debug minimo assorbito in ArcGraph e' limitato a Landmark + GVD-DIN + DT heatmap;
   - la catena MapGridWorldView -> adapter -> wrapper -> coordinator -> feed -> queue -> probe renderer resta valida come ponte manuale read-only;
   - FOV current cone, FOV historical heatmap, pointer HUD, runtime cost HUD, label screen-space, summary cards, top bar, DevTools, click-to-move e selection restano fuori dal debug minimo;
+  - vincolo aggiunto: `MapGridFovHeatmapOverlay` non puo' essere cancellato fisicamente finche' ArcGraph non ha un equivalente verificato per FOV current cone / FOV heatmap debug;
   - questi elementi vanno auditati come strumenti interattivi/UI, non come semplice renderer.
 - audit `v0.38f` completato:
   - `MapGridWorldView` concentra ancora rendering, selection, click-to-move, FOV, summary overlay, pointer HUD, top bar, DevTools, audio feedback e rebind World;
@@ -293,6 +294,7 @@ Regola corrente:
   - summary card, movement panel e overlay NPC vanno dopo selection e frame interattivo stabile;
   - top bar, DevTools e click-to-move sono strumenti operativi, non renderer, e non devono essere posseduti da ArcGraph;
   - FOV current cone richiede un producer overlay dedicato e non appartiene al primo consumer;
+  - la migrazione FOV diventa gate esplicito prima della cancellazione fisica di MapGrid: copiare solo il comportamento utile, non `MapGridWorldView`;
   - ordine consigliato: Pointer HUD, selection, overlay NPC, side panel, top bar separata, DevTools command tool, FOV producer;
   - prossimo checkpoint: `v0.38f.06 - ArcGraph Pointer HUD Passive Contract`.
 - micro-step `v0.38f.06` completato:
