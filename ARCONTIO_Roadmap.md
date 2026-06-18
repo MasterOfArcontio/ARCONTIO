@@ -15701,9 +15701,32 @@ Compiti:
 | v0.38o.05 | Formalizzare `ARCGRAPH_VISUAL_ASSET_POLICY.md` per oggetti, NPC, piante, vegetazione e resolver sprite | ✅ Completato |
 | v0.38o.06 | Progettare e implementare controller placement/F3 autonomo ArcGraph | ⏳ Pending |
 | v0.38o.07 | Migrare path asset oggetti da `MapGrid/Sprites/Objects` a catalogo/path ArcGraph reali | ⏳ Pending |
-| v0.38o.08 | Eliminare o congelare adapter/probe MapGrid non-runtime | ⏳ Pending |
-| v0.38o.09 | Rimuovere `ArcGraphViewModeSwitcher`/root switch legacy quando ArcGraph resta unica vista | ⏳ Pending |
-| v0.38o.10 | Autorizzare cancellazione fisica MapGrid solo dopo test Unity e zero dipendenze runtime | ⏳ Pending |
+| v0.38o.08 | Introdurre `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e PlantInstance | ⏳ Pending |
+| v0.38o.09 | Collegare `plantVisualStateKey` / `visualStateKey` al catalogo ambiente ArcGraph | ⏳ Pending |
+| v0.38o.10 | Estendere `ArcGraphNpcVisualCatalog.json` per supportare sheet per parte/animazione | ⏳ Pending |
+| v0.38o.11 | Eliminare o congelare adapter/probe MapGrid non-runtime | ⏳ Pending |
+| v0.38o.12 | Rimuovere `ArcGraphViewModeSwitcher`/root switch legacy quando ArcGraph resta unica vista | ⏳ Pending |
+| v0.38o.13 | Autorizzare cancellazione fisica MapGrid solo dopo test Unity e zero dipendenze runtime | ⏳ Pending |
+
+Sotto-roadmap operativa derivata da `ARCGRAPH_VISUAL_ASSET_POLICY.md`:
+
+| Policy step | Obiettivo policy | Step operativo | Stato |
+|---|---|---|---|
+| 1 | Congelare la policy e usarla come vincolo per i prossimi step | `v0.38o.05` | ✅ Completato |
+| 2 | Migrare `object_defs.json` da path MapGrid a path ArcGraph reali solo dopo asset equivalenti | `v0.38o.07` | ⏳ Pending |
+| 3 | Estendere `ArcGraphNpcVisualCatalog.json` per supportare sheet per parte/animazione senza rompere il formato attuale | `v0.38o.10` | ⏳ Pending |
+| 4 | Introdurre `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e PlantInstance | `v0.38o.08` | ⏳ Pending |
+| 5 | Collegare `plantVisualStateKey` / `visualStateKey` al catalogo ambiente | `v0.38o.09` | ⏳ Pending |
+| 6 | Rimuovere o congelare i vecchi pattern frame-sciolti quando le sheet NPC sono realmente disponibili | dopo `v0.38o.10`, solo con asset sheet disponibili | ⏳ Pending |
+| 7 | Eliminare ogni path MapGrid residuo dai cataloghi ArcGraph prima della cancellazione fisica di MapGrid | `v0.38o.07` + gate finale `v0.38o.13` | ⏳ Pending |
+
+Nota di sequenza:
+
+```text
+Il prossimo step resta v0.38o.06, perche' il placement/F3 operativo dipende
+ancora dal DevTools legacy. La roadmap visual asset viene integrata subito dopo,
+ma non deve anticipare la sostituzione del controller operativo MapGrid.
+```
 
 Aggiornamento `v0.38o.01-v0.38o.04`:
 
