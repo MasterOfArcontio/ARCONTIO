@@ -14,8 +14,39 @@
       "Visual": {
         "VisualRuleKey": "grass",
         "ArcGraphTileKey": "grass",
+        "DefaultTileId": 0,
         "AllowsWaterAnimation": false,
-        "UsesDeterministicVariants": true
+        "UsesDeterministicVariants": true,
+        "Variants": [
+          { "TileId": 0, "Weight": 40 },
+          { "TileId": 1, "Weight": 5 },
+          { "TileId": 2, "Weight": 15 },
+          { "TileId": 3, "Weight": 15 },
+          { "TileId": 4, "Weight": 10 },
+          { "TileId": 5, "Weight": 5 },
+          { "TileId": 6, "Weight": 5 },
+          { "TileId": 7, "Weight": 3 },
+          { "TileId": 8, "Weight": 3 }
+        ],
+        "DualGridOverlay": {
+          "Priority": 100,
+          "Rules": [
+            { "Mask": "0001", "TileId": 200 },
+            { "Mask": "0010", "TileId": 201 },
+            { "Mask": "0011", "TileId": 202 },
+            { "Mask": "0100", "TileId": 203 },
+            { "Mask": "0101", "TileId": 204 },
+            { "Mask": "0110", "TileId": 205 },
+            { "Mask": "0111", "TileId": 206 },
+            { "Mask": "1000", "TileId": 207 },
+            { "Mask": "1001", "TileId": 208 },
+            { "Mask": "1010", "TileId": 209 },
+            { "Mask": "1011", "TileId": 210 },
+            { "Mask": "1100", "TileId": 211 },
+            { "Mask": "1101", "TileId": 212 },
+            { "Mask": "1110", "TileId": 213 }
+          ]
+        }
       }
     },
     {
@@ -32,8 +63,12 @@
       "Visual": {
         "VisualRuleKey": "dirt",
         "ArcGraphTileKey": "dirt",
+        "DefaultTileId": 0,
         "AllowsWaterAnimation": false,
-        "UsesDeterministicVariants": true
+        "UsesDeterministicVariants": true,
+        "Variants": [
+          { "TileId": 0, "Weight": 1 }
+        ]
       }
     },
     {
@@ -50,8 +85,61 @@
       "Visual": {
         "VisualRuleKey": "stone_floor",
         "ArcGraphTileKey": "stone_floor",
+        "DefaultTileId": 10,
         "AllowsWaterAnimation": false,
-        "UsesDeterministicVariants": true
+        "UsesDeterministicVariants": true,
+        "Variants": [
+          { "TileId": 10, "Weight": 1 },
+          { "TileId": 11, "Weight": 1 },
+          { "TileId": 12, "Weight": 1 }
+        ]
+      }
+    },
+    {
+      "Id": "tile_floor",
+      "DisplayName": "Tile Floor",
+      "MacroSurface": "Artificial",
+      "MovementCost": 0.9,
+      "BlocksMovement": false,
+      "BlocksVision": false,
+      "CanHostNaturalVegetation": false,
+      "CanHostPhysicalPlant": false,
+      "BaseFertility01": 0.0,
+      "BaseMoisture01": 0.05,
+      "Visual": {
+        "VisualRuleKey": "tile_floor",
+        "ArcGraphTileKey": "tile_floor",
+        "DefaultTileId": 40,
+        "AllowsWaterAnimation": false,
+        "UsesDeterministicVariants": true,
+        "Variants": [
+          { "TileId": 40, "Weight": 1 },
+          { "TileId": 41, "Weight": 1 },
+          { "TileId": 42, "Weight": 1 }
+        ]
+      }
+    },
+    {
+      "Id": "water",
+      "DisplayName": "Water",
+      "MacroSurface": "Water",
+      "MovementCost": 3.0,
+      "BlocksMovement": true,
+      "BlocksVision": false,
+      "CanHostNaturalVegetation": false,
+      "CanHostPhysicalPlant": false,
+      "BaseFertility01": 0.0,
+      "BaseMoisture01": 1.0,
+      "Visual": {
+        "VisualRuleKey": "water",
+        "ArcGraphTileKey": "water",
+        "DefaultTileId": 30,
+        "AllowsWaterAnimation": true,
+        "UsesDeterministicVariants": false,
+        "Animation": {
+          "FrameTileIds": [30, 31, 32, 33],
+          "FrameSeconds": 0.75
+        }
       }
     },
     {
@@ -68,8 +156,13 @@
       "Visual": {
         "VisualRuleKey": "water",
         "ArcGraphTileKey": "water",
+        "DefaultTileId": 30,
         "AllowsWaterAnimation": true,
-        "UsesDeterministicVariants": false
+        "UsesDeterministicVariants": false,
+        "Animation": {
+          "FrameTileIds": [30, 31, 32, 33],
+          "FrameSeconds": 0.75
+        }
       }
     },
     {
@@ -86,8 +179,13 @@
       "Visual": {
         "VisualRuleKey": "water",
         "ArcGraphTileKey": "water",
+        "DefaultTileId": 30,
         "AllowsWaterAnimation": true,
-        "UsesDeterministicVariants": false
+        "UsesDeterministicVariants": false,
+        "Animation": {
+          "FrameTileIds": [30, 31, 32, 33],
+          "FrameSeconds": 0.75
+        }
       }
     }
   ]

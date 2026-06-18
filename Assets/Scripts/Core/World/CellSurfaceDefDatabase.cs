@@ -33,8 +33,76 @@ namespace Arcontio.Core
     {
         public string VisualRuleKey;
         public string ArcGraphTileKey;
+        public int DefaultTileId;
         public bool AllowsWaterAnimation;
         public bool UsesDeterministicVariants;
+        public CellSurfaceVisualTileVariant[] Variants;
+        public CellSurfaceVisualAnimationDef Animation;
+        public int DetailChancePermille;
+        public CellSurfaceVisualTileVariant[] Details;
+        public CellSurfaceVisualDualGridOverlayDef DualGridOverlay;
+    }
+
+    // =============================================================================
+    // CellSurfaceVisualTileVariant
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Variante o dettaglio tile dichiarato nel catalogo superfici.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class CellSurfaceVisualTileVariant
+    {
+        public int TileId;
+        public int Weight = 1;
+    }
+
+    // =============================================================================
+    // CellSurfaceVisualAnimationDef
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Sequenza visuale opzionale per superfici animate, per esempio acqua.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class CellSurfaceVisualAnimationDef
+    {
+        public int[] FrameTileIds;
+        public float FrameSeconds = 0.25f;
+    }
+
+    // =============================================================================
+    // CellSurfaceVisualDualGridOverlayDef
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Regole renderer-side opzionali per overlay dual-grid legati a una superficie.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class CellSurfaceVisualDualGridOverlayDef
+    {
+        public int Priority;
+        public CellSurfaceVisualDualGridRuleDef[] Rules;
+    }
+
+    // =============================================================================
+    // CellSurfaceVisualDualGridRuleDef
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Regola maschera 2x2 -> tile id per overlay terrain.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class CellSurfaceVisualDualGridRuleDef
+    {
+        public string Mask;
+        public int TileId;
+        public int[] FrameTileIds;
+        public float FrameSeconds = 0.25f;
     }
 
     // =============================================================================

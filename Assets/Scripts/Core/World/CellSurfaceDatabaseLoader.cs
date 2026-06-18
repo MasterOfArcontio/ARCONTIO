@@ -100,6 +100,12 @@ namespace Arcontio.Core
 
             if (string.IsNullOrWhiteSpace(def.Visual.ArcGraphTileKey))
                 def.Visual.ArcGraphTileKey = def.Visual.VisualRuleKey;
+
+            if (def.Visual.Variants == null)
+                def.Visual.Variants = System.Array.Empty<CellSurfaceVisualTileVariant>();
+
+            if (def.Visual.Details == null)
+                def.Visual.Details = System.Array.Empty<CellSurfaceVisualTileVariant>();
         }
     }
 }

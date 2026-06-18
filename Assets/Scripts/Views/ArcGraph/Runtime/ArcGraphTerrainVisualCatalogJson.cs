@@ -1,4 +1,5 @@
 using System;
+using Arcontio.Core;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -29,7 +30,7 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public static class ArcGraphTerrainVisualCatalogJson
     {
-        public const string DefaultResourcePath = "ArcGraph/Config/ArcGraphTerrainVisualCatalog";
+        public const string DefaultResourcePath = "Arcontio/Config/surface_defs";
 
         // =============================================================================
         // ParseOrDefault
@@ -73,11 +74,18 @@ namespace Arcontio.View.ArcGraph
 
             try
             {
-                var dto = JsonUtility.FromJson<ArcGraphTerrainVisualCatalogDto>(json);
-                if (dto == null)
+                var legacyDto = JsonUtility.FromJson<ArcGraphTerrainVisualCatalogDto>(json);
+                if (legacyDto != null && legacyDto.HasAnyTerrainVisualData())
+                {
+                    catalog = legacyDto.ToRuntimeCatalog();
+                    return catalog != null;
+                }
+
+                var surfaceDto = JsonUtility.FromJson<CellSurfaceDefDatabase>(json);
+                if (surfaceDto == null || surfaceDto.Surfaces == null || surfaceDto.Surfaces.Count == 0)
                     return false;
 
-                catalog = dto.ToRuntimeCatalog();
+                catalog = BuildCatalogFromSurfaceDefs(surfaceDto);
                 return catalog != null;
             }
             catch
@@ -99,6 +107,170 @@ namespace Arcontio.View.ArcGraph
                         new ArcGraphTerrainVisualAnimation(null, 0f))
                 },
                 Array.Empty<ArcGraphTerrainVisualTransitionSet>());
+        }
+
+        // =============================================================================
+        // BuildCatalogFromSurfaceDefs
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il catalogo visuale ArcGraph partendo dal catalogo Core delle
+        /// superfici cella.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: Core autoritativo, View derivata</b></para>
+        /// <para>
+        /// ArcGraph non mantiene piu' un secondo catalogo semantico dei pavimenti:
+        /// legge le definizioni gia' autorizzate in <c>surface_defs.json</c> e le
+        /// converte nel formato runtime atteso dal renderer terrain. Il catalogo
+        /// ArcGraph resta quindi un prodotto derivato, non una nuova fonte di verita'.
+        /// </para>
+        /// </summary>
+        private static ArcGraphTerrainVisualCatalog BuildCatalogFromSurfaceDefs(CellSurfaceDefDatabase database)
+        {
+            var definitions = new System.Collections.Generic.List<ArcGraphTerrainVisualDefinition>();
+            var overlays = new System.Collections.Generic.List<ArcGraphTerrainVisualDualGridOverlay>();
+
+            for (int i = 0; i < database.Surfaces.Count; i++)
+            {
+                CellSurfaceDef surface = database.Surfaces[i];
+                if (surface == null || surface.Visual == null)
+                    continue;
+
+                string terrainId = surface.ResolveVisualRuleKey();
+                if (string.IsNullOrWhiteSpace(terrainId))
+                    continue;
+
+                definitions.Add(new ArcGraphTerrainVisualDefinition(
+                    terrainId,
+                    surface.Visual.DefaultTileId,
+                    BuildVariants(surface.Visual.Variants, surface.Visual.DefaultTileId),
+                    BuildAnimation(surface.Visual.Animation),
+                    BuildDetails(surface.Visual.Details, surface.Visual.DefaultTileId),
+                    surface.Visual.DetailChancePermille));
+
+                if (surface.Visual.DualGridOverlay != null)
+                {
+                    overlays.Add(new ArcGraphTerrainVisualDualGridOverlay(
+                        terrainId,
+                        surface.Visual.DualGridOverlay.Priority,
+                        BuildDualGridRules(surface.Visual.DualGridOverlay.Rules)));
+                }
+            }
+
+            return new ArcGraphTerrainVisualCatalog(
+                definitions.ToArray(),
+                Array.Empty<ArcGraphTerrainVisualTransitionSet>(),
+                overlays.ToArray());
+        }
+
+        // =============================================================================
+        // BuildVariants
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte le varianti dichiarate nel catalogo superfici nelle varianti
+        /// runtime usate dal resolver terrain.
+        /// </para>
+        /// </summary>
+        private static ArcGraphTerrainVisualVariant[] BuildVariants(
+            CellSurfaceVisualTileVariant[] variants,
+            int defaultTileId)
+        {
+            if (variants == null || variants.Length == 0)
+            {
+                return new[]
+                {
+                    new ArcGraphTerrainVisualVariant(defaultTileId, 1)
+                };
+            }
+
+            var result = new ArcGraphTerrainVisualVariant[variants.Length];
+            for (int i = 0; i < variants.Length; i++)
+            {
+                CellSurfaceVisualTileVariant variant = variants[i];
+                result[i] = variant != null
+                    ? new ArcGraphTerrainVisualVariant(variant.TileId, variant.Weight)
+                    : new ArcGraphTerrainVisualVariant(defaultTileId, 1);
+            }
+
+            return result;
+        }
+
+        // =============================================================================
+        // BuildDetails
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte i dettagli opzionali della superficie in dettagli visuali ArcGraph.
+        /// </para>
+        /// </summary>
+        private static ArcGraphTerrainVisualDetail[] BuildDetails(
+            CellSurfaceVisualTileVariant[] details,
+            int defaultTileId)
+        {
+            if (details == null || details.Length == 0)
+                return Array.Empty<ArcGraphTerrainVisualDetail>();
+
+            var result = new ArcGraphTerrainVisualDetail[details.Length];
+            for (int i = 0; i < details.Length; i++)
+            {
+                CellSurfaceVisualTileVariant detail = details[i];
+                result[i] = detail != null
+                    ? new ArcGraphTerrainVisualDetail(detail.TileId, detail.Weight)
+                    : new ArcGraphTerrainVisualDetail(defaultTileId, 1);
+            }
+
+            return result;
+        }
+
+        // =============================================================================
+        // BuildAnimation
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte la sezione animazione del catalogo superfici nella struttura
+        /// runtime usata dal clock visuale ArcGraph.
+        /// </para>
+        /// </summary>
+        private static ArcGraphTerrainVisualAnimation BuildAnimation(CellSurfaceVisualAnimationDef animation)
+        {
+            return animation != null
+                ? new ArcGraphTerrainVisualAnimation(animation.FrameTileIds, animation.FrameSeconds)
+                : new ArcGraphTerrainVisualAnimation(null, 0f);
+        }
+
+        // =============================================================================
+        // BuildDualGridRules
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte le regole dual-grid dichiarate nel catalogo superfici nelle
+        /// regole overlay usate dal renderer ArcGraph.
+        /// </para>
+        /// </summary>
+        private static ArcGraphTerrainVisualDualGridRule[] BuildDualGridRules(
+            CellSurfaceVisualDualGridRuleDef[] rules)
+        {
+            if (rules == null || rules.Length == 0)
+                return Array.Empty<ArcGraphTerrainVisualDualGridRule>();
+
+            var result = new ArcGraphTerrainVisualDualGridRule[rules.Length];
+            for (int i = 0; i < rules.Length; i++)
+            {
+                CellSurfaceVisualDualGridRuleDef rule = rules[i];
+                result[i] = rule != null
+                    ? new ArcGraphTerrainVisualDualGridRule(
+                        rule.Mask,
+                        rule.TileId,
+                        new ArcGraphTerrainVisualAnimation(rule.FrameTileIds, rule.FrameSeconds))
+                    : new ArcGraphTerrainVisualDualGridRule(
+                        "0000",
+                        0,
+                        new ArcGraphTerrainVisualAnimation(null, 0f));
+            }
+
+            return result;
         }
     }
 
@@ -130,6 +302,20 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphTerrainVisualDefinitionDto[] terrains;
         public ArcGraphTerrainVisualTransitionSetDto[] transitions;
         public ArcGraphTerrainVisualDualGridOverlayDto[] dualGridOverlays;
+
+        // =============================================================================
+        // HasAnyTerrainVisualData
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riconosce il vecchio formato dedicato ArcGraph senza confonderlo con il
+        /// nuovo catalogo unificato delle superfici.
+        /// </para>
+        /// </summary>
+        public bool HasAnyTerrainVisualData()
+        {
+            return terrains != null || transitions != null || dualGridOverlays != null;
+        }
 
         // =============================================================================
         // ToRuntimeCatalog

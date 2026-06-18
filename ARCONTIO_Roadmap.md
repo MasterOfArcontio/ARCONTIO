@@ -15526,7 +15526,7 @@ Sotto-roadmap tecnica collegata al distacco MapGrid:
 | v0.38m.11 | Creare file mappa unico con metadati, layer pavimenti e oggetti iniziali | ✅ Completato |
 | v0.38m.12 | Spostare dimensioni mappa fuori da `game_params.json` e rimuovere duplicati tipo `worldWidth/worldHeight` da sorgenti non autoritative | ✅ Completato |
 | v0.38m.13 | Implementare loader mappa Core che inizializza dimensioni, `CellSurfaceLayer` e oggetti iniziali dal file mappa unico | ✅ Completato |
-| v0.38m.14 | Collassare i cataloghi terrain ArcGraph legacy dentro il catalogo superfici unico, mantenendo solo dati visuali strettamente renderer-side dove necessario | ⏳ Pending |
+| v0.38m.14 | Collassare i cataloghi terrain ArcGraph legacy dentro il catalogo superfici unico, mantenendo solo dati visuali strettamente renderer-side dove necessario | ✅ Completato |
 | v0.38m.15 | Pensionare layout/config MapGrid dal percorso runtime ArcGraph dopo verifica del loader mappa unico | ⏳ Pending |
 
 Decisione tecnica `v0.38m`:

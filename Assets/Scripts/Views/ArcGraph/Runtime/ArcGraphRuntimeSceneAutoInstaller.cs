@@ -47,7 +47,7 @@ namespace Arcontio.View.ArcGraph
         private const string TerrainAtlasPath = "MapGrid/Atlas/TerrainAtlas";
         private const string ViewConfigPath = ArcGraphMapViewConfigJson.DefaultResourcePath;
         private const string TerrainCatalogPath = "ArcGraph/Config/ArcGraphTerrainCatalog";
-        private const string TerrainVisualCatalogPath = "ArcGraph/Config/ArcGraphTerrainVisualCatalog";
+        private const string TerrainVisualCatalogPath = ArcGraphTerrainVisualCatalogJson.DefaultResourcePath;
         private const string NpcVisualCatalogPath = "ArcGraph/Config/ArcGraphNpcVisualCatalog";
         private const int LateBindFrameBudget = 240;
 
