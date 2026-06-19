@@ -1,6 +1,4 @@
 {
-  "mapWidthCells": 250,
-  "mapHeightCells": 250,
   "defaultZoomLevel": 1,
   "mouseWheelStepsPerZoomLevel": 1,
   "panUsesMiddleMouseButton": true,
@@ -34,6 +32,15 @@
     },
     {
       "level": 4,
+      "visibleCellsX": 50,
+      "visibleCellsY": 50,
+      "allowsPan": true,
+      "allowsSpriteAnimation": true,
+      "allowsLayeredActorSprites": true,
+      "usesSimplifiedRepresentation": false
+    },
+	{
+      "level": 5,
       "visibleCellsX": 20,
       "visibleCellsY": 20,
       "allowsPan": true,

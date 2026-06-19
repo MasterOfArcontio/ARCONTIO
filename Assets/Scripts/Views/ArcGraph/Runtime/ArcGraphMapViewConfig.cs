@@ -106,6 +106,35 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // WithMapDimensions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una copia della configurazione usando nuove dimensioni mappa.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dimensione mappa dal runtime World</b></para>
+        /// <para>
+        /// Il profilo zoom resta configurazione visuale, mentre larghezza e altezza
+        /// della mappa arrivano dal <c>World</c> caricato. Questo metodo permette
+        /// all'auto-installer di sostituire solo la shape runtime senza duplicare
+        /// le dimensioni dentro il JSON ArcGraph.
+        /// </para>
+        /// </summary>
+        public ArcGraphMapViewConfig WithMapDimensions(
+            int mapWidthCells,
+            int mapHeightCells)
+        {
+            return new ArcGraphMapViewConfig(
+                mapWidthCells,
+                mapHeightCells,
+                _zoomLevels,
+                DefaultZoomLevel,
+                MouseWheelStepsPerZoomLevel,
+                PanUsesMiddleMouseButton);
+        }
+
+        // =============================================================================
         // ResolveZoomLevel
         // =============================================================================
         /// <summary>

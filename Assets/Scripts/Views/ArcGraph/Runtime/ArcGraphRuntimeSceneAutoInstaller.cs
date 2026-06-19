@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Arcontio.View.MapGrid;
 using UnityEngine;
@@ -44,7 +45,8 @@ namespace Arcontio.View.ArcGraph
         private const string MapGridSceneName = "Scene_MapGrid";
         private const string ControllerRootName = "ArcGraphRuntimeController_Auto";
         private const string VisualRootName = "ArcGraphRuntimeVisualRoot_Auto";
-        private const string TerrainAtlasPath = "MapGrid/Atlas/TerrainAtlas";
+        private const string GameParamsPath = "Arcontio/Config/game_params";
+        private const string DefaultTerrainAtlasPath = "ArcGraph/Atlas/TerrainAtlas";
         private const string ViewConfigPath = ArcGraphMapViewConfigJson.DefaultResourcePath;
         private const string TerrainCatalogPath = "ArcGraph/Config/ArcGraphTerrainCatalog";
         private const string TerrainVisualCatalogPath = ArcGraphTerrainVisualCatalogJson.DefaultResourcePath;
@@ -238,7 +240,7 @@ namespace Arcontio.View.ArcGraph
             _cameraViewportController = _visualRoot.AddComponent<ArcGraphCameraViewportController>();
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
-            _placementToolController = _visualRoot.AddComponent<ArcGraphPlacementToolController>();
+            _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
@@ -457,6 +459,8 @@ namespace Arcontio.View.ArcGraph
             if (_contextProvider != null)
                 _contextProvider.SetSimulationHost(simulationHost);
 
+            RefreshViewConfigFromRuntimeContext();
+
             if (_placementToolController != null)
             {
                 _placementToolController.SetRuntimeContextProvider(_contextProvider);
@@ -480,6 +484,61 @@ namespace Arcontio.View.ArcGraph
                 ConfigureSwitcher();
 
             LogBindingStateIfChanged(simulationHost, placementPreviewSource);
+        }
+
+        // =============================================================================
+        // RefreshViewConfigFromRuntimeContext
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riallinea la configurazione vista alle dimensioni reali del World.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: una sola fonte per la dimensione mappa</b></para>
+        /// <para>
+        /// <c>ArcGraphViewConfig.json</c> decide livelli zoom, pan e dettaglio
+        /// visuale, ma non deve piu' dichiarare la dimensione della mappa. Appena
+        /// il <c>SimulationHost</c> espone un <c>World</c>, l'installer copia
+        /// larghezza e altezza dal context runtime e propaga la config aggiornata a
+        /// wrapper, camera e interazione.
+        /// </para>
+        /// </summary>
+        private void RefreshViewConfigFromRuntimeContext()
+        {
+            if (_contextProvider == null || _viewConfig == null)
+                return;
+
+            ArcGraphRuntimeContext context = _contextProvider.BuildTerrainRuntimeContext();
+            if (context == null
+                || !context.HasWorld
+                || context.MapWidthCells <= 0
+                || context.MapHeightCells <= 0)
+            {
+                return;
+            }
+
+            if (_viewConfig.MapWidthCells == context.MapWidthCells
+                && _viewConfig.MapHeightCells == context.MapHeightCells)
+            {
+                return;
+            }
+
+            _viewConfig = _viewConfig.WithMapDimensions(
+                context.MapWidthCells,
+                context.MapHeightCells);
+
+            if (_wrapper != null)
+                _wrapper.SetViewConfig(_viewConfig);
+
+            if (_cameraViewportController != null)
+                _cameraViewportController.SetConfig(_viewConfig);
+
+            if (_interactionWrapper != null)
+            {
+                _interactionWrapper.SetConfig(_viewConfig);
+                if (_cameraViewportController != null)
+                    _interactionWrapper.SetViewState(_cameraViewportController.ViewState);
+            }
         }
 
         // =============================================================================
@@ -834,7 +893,8 @@ namespace Arcontio.View.ArcGraph
                 name = "ArcGraphTerrainRuntimeMaterial_Auto"
             };
 
-            Texture2D atlas = Resources.Load<Texture2D>(TerrainAtlasPath);
+            string terrainAtlasPath = ResolveTerrainAtlasPathFromGameParams();
+            Texture2D atlas = Resources.Load<Texture2D>(terrainAtlasPath);
             if (atlas != null)
             {
                 // L'atlas resta un asset Resources. Il materiale runtime conserva
@@ -845,10 +905,84 @@ namespace Arcontio.View.ArcGraph
             {
                 Debug.LogWarning(
                     "[ArcGraphRuntimeSceneAutoInstaller] Terrain atlas non trovato in Resources/" +
-                    TerrainAtlasPath + ".png");
+                    terrainAtlasPath + ".png");
             }
 
             return material;
+        }
+
+        // =============================================================================
+        // ResolveTerrainAtlasPathFromGameParams
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Legge da <c>game_params</c> il path Resources dell'atlas terrain.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: configurazione runtime centralizzata</b></para>
+        /// <para>
+        /// Il materiale terrain non deve conservare un riferimento hardcoded al
+        /// vecchio path MapGrid. La scelta dell'atlas resta dichiarativa dentro
+        /// <c>game_params.json</c>; se la sezione ArcGraph manca o contiene un path
+        /// vuoto, viene usato il default ArcGraph nativo.
+        /// </para>
+        /// </summary>
+        private static string ResolveTerrainAtlasPathFromGameParams()
+        {
+            TextAsset gameParams = Resources.Load<TextAsset>(GameParamsPath);
+            if (gameParams == null || string.IsNullOrWhiteSpace(gameParams.text))
+                return DefaultTerrainAtlasPath;
+
+            try
+            {
+                var dto = JsonUtility.FromJson<ArcGraphGameParamsDto>(gameParams.text);
+                string path = dto != null && dto.arcGraph != null
+                    ? dto.arcGraph.terrainAtlasResourcePath
+                    : null;
+
+                return string.IsNullOrWhiteSpace(path)
+                    ? DefaultTerrainAtlasPath
+                    : path.Trim();
+            }
+            catch
+            {
+                return DefaultTerrainAtlasPath;
+            }
+        }
+
+        // =============================================================================
+        // ArcGraphGameParamsDto
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// DTO minimale usato solo per leggere la sezione ArcGraph di game_params.
+        /// </para>
+        ///
+        /// <para><b>Confine JSON locale alla vista</b></para>
+        /// <para>
+        /// L'installer non ha bisogno di interpretare tutta la configurazione
+        /// simulativa. Questo DTO prende solo il sotto-blocco visuale autorizzato e
+        /// lascia invariati tutti gli altri campi letti dal Core.
+        /// </para>
+        /// </summary>
+        [Serializable]
+        private sealed class ArcGraphGameParamsDto
+        {
+            public ArcGraphGameParamsSectionDto arcGraph;
+        }
+
+        // =============================================================================
+        // ArcGraphGameParamsSectionDto
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sotto-blocco ArcGraph serializzabile dentro <c>game_params.json</c>.
+        /// </para>
+        /// </summary>
+        [Serializable]
+        private sealed class ArcGraphGameParamsSectionDto
+        {
+            public string terrainAtlasResourcePath;
         }
     }
 }

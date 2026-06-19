@@ -1,5 +1,5 @@
 {
-  "terrainAtlasResourcePath": "MapGrid/Atlas/TerrainAtlas",
+  "terrainAtlasResourcePath": "ArcGraph/Atlas/TerrainAtlas",
   "tilePixels": 32,
   "atlasWidthPixels": 512,
   "atlasHeightPixels": 512,

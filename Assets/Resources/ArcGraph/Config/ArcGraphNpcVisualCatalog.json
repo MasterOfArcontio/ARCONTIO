@@ -27,8 +27,8 @@
       ],
       "animationKey": "idle",
       "frameCount": 4,
-      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/{direction}_{animation}_{frame00}",
-      "durationTicks": 8,
+      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/idle#{direction}_{frame00}",
+      "durationTicks": 2,
       "sortingOffsets": [
         0,
         1,
@@ -51,8 +51,8 @@
         "west"
       ],
       "animationKey": "walk",
-      "frameCount": 8,
-      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/{direction}_{animation}_{frame00}",
+      "frameCount": 4,
+      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/idle#{direction}_{frame00}",
       "durationTicks": 4,
       "sortingOffsets": [
         0,

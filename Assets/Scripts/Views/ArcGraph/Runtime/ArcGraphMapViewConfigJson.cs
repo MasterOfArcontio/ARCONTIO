@@ -135,7 +135,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>mapWidthCells/mapHeightCells</b>: dimensione mappa in celle.</item>
+    ///   <item><b>mapWidthCells/mapHeightCells</b>: compatibilita' legacy opzionale, non source of truth.</item>
     ///   <item><b>defaultZoomLevel</b>: livello iniziale richiesto.</item>
     ///   <item><b>mouseWheelStepsPerZoomLevel</b>: scatti rotellina per livello.</item>
     ///   <item><b>panUsesMiddleMouseButton</b>: policy del futuro pan.</item>
@@ -145,8 +145,8 @@ namespace Arcontio.View.ArcGraph
     [Serializable]
     public sealed class ArcGraphMapViewConfigDto
     {
-        public int mapWidthCells = 250;
-        public int mapHeightCells = 250;
+        public int mapWidthCells;
+        public int mapHeightCells;
         public int defaultZoomLevel = 1;
         public int mouseWheelStepsPerZoomLevel = 1;
         public bool panUsesMiddleMouseButton = true;

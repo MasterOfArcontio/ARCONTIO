@@ -3,13 +3,13 @@
     {
       "Id": "bed_wood",
       "DisplayName": "Wood Bed",
-      "SpriteKey": "ArcGraph/Objects/furniture/bed_wood",
+      "SpriteKey": "ArcGraph/Objects/bed_wood",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": false,
       "IsInteractable": true,
       "Visual": {
-        "SpritePath": "ArcGraph/Objects/furniture/bed_wood",
+        "SpritePath": "ArcGraph/Objects/bed_wood",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -50,13 +50,13 @@
     {
       "Id": "chair_wood",
       "DisplayName": "Wood Chair",
-      "SpriteKey": "ArcGraph/Objects/furniture/chair_wood",
+      "SpriteKey": "ArcGraph/Objects/chair_wood",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": false,
       "IsInteractable": true,
       "Visual": {
-        "SpritePath": "ArcGraph/Objects/furniture/chair_wood",
+        "SpritePath": "ArcGraph/Objects/chair_wood",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -73,13 +73,13 @@
     {
       "Id": "food_stock",
       "DisplayName": "Food Stock",
-      "SpriteKey": "ArcGraph/Objects/food/food_stock",
+      "SpriteKey": "ArcGraph/Objects/food_stock",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": false,
       "IsInteractable": true,
       "Visual": {
-        "SpritePath": "ArcGraph/Objects/food/food_stock",
+        "SpritePath": "ArcGraph/Objects/food_stock",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -152,13 +152,13 @@
     {
       "Id": "wall_stone",
       "DisplayName": "Stone Wall",
-      "SpriteKey": "ArcGraph/Objects/walls/wall_stone",
+      "SpriteKey": "ArcGraph/Objects/wall_stone",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": true,
       "IsInteractable": false,
       "Visual": {
-        "SpritePath": "ArcGraph/Objects/walls/wall_stone",
+        "SpritePath": "ArcGraph/Objects/wall_stone",
         "VisualKind": "wall",
         "ResolverKey": "wall_stone_cardinal",
         "WidthPixels": 32,

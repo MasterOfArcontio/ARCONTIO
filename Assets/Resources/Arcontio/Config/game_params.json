@@ -4,6 +4,9 @@
     "baseWalkCellDurationTicks": 8,
     "enableJobRunningActionTraversal": true
   },
+  "arcGraph": {
+    "terrainAtlasResourcePath": "ArcGraph/Atlas/TerrainAtlas"
+  },
   "Language": "it",
   "logging": {
     "general": {
