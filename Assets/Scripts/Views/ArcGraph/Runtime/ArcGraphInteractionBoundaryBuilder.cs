@@ -193,7 +193,7 @@ namespace Arcontio.View.ArcGraph
             for (int i = 0; i < actors.Count; i++)
             {
                 ArcGraphActorRenderItem item = actors[i];
-                if (!item.IsVisible || !IsSameCell(item.DiscreteCell, cell))
+                if (!item.IsVisible || !IsActorHitCell(item.DiscreteCell, cell))
                     continue;
 
                 candidateCount++;
@@ -241,6 +241,33 @@ namespace Arcontio.View.ArcGraph
         private static bool IsSameCell(ArcGraphCellCoord left, ArcGraphCellCoord right)
         {
             return left.X == right.X && left.Y == right.Y && left.Z == right.Z;
+        }
+
+        // =============================================================================
+        // IsActorHitCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se la cella puntata ricade sulla base o sulla parte superiore
+        /// dello sprite actor.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: hitbox visuale, non collisione simulativa</b></para>
+        /// <para>
+        /// Gli NPC sono disegnati piu' alti di una singola cella. Questa tolleranza
+        /// serve solo alla selection view-side: non modifica occupazione, movimento,
+        /// pathfinding o stato fisico del World.
+        /// </para>
+        /// </summary>
+        private static bool IsActorHitCell(ArcGraphCellCoord actorCell, ArcGraphCellCoord pointerCell)
+        {
+            if (actorCell.Z != pointerCell.Z)
+                return false;
+
+            if (actorCell.X != pointerCell.X)
+                return false;
+
+            return pointerCell.Y >= actorCell.Y && pointerCell.Y <= actorCell.Y + 1;
         }
 
         private static ArcGraphInteractionTargetKind ResolveTargetKind(int actorId, int objectId)

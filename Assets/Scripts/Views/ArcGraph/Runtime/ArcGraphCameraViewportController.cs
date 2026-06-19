@@ -48,9 +48,13 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphViewState _viewState;
         private bool _didApplyInitialCameraState;
         private bool _isZoomTransitionActive;
+        private float _zoomTransitionStartOrthographicSize;
         private float _zoomTransitionTargetOrthographicSize;
+        private float _zoomTransitionElapsedSeconds;
         private Vector2 _zoomTransitionAnchorScreenPosition;
         private Vector3 _zoomTransitionAnchorWorldPoint;
+        private PixelPerfectCamera _zoomTransitionPixelPerfectCamera;
+        private bool _zoomTransitionPixelPerfectWasEnabled;
 
         public ArcGraphViewState ViewState => EnsureViewState();
         public bool ControllerEnabled => controllerEnabled;
@@ -370,7 +374,7 @@ namespace Arcontio.View.ArcGraph
             if (zoom.VisibleCellsY <= 0)
                 return;
 
-            ApplyPixelPerfectCameraZoomIfPresent(camera, zoom);
+            RestorePixelPerfectCameraAfterTransition(camera, zoom);
 
             float targetOrthographicSize = Mathf.Max(
                 minimumOrthographicSize,
@@ -392,11 +396,12 @@ namespace Arcontio.View.ArcGraph
             if (zoom.VisibleCellsY <= 0)
                 return;
 
-            ApplyPixelPerfectCameraZoomIfPresent(camera, zoom);
-
+            SuspendPixelPerfectCameraForTransition(camera);
+            _zoomTransitionStartOrthographicSize = camera.orthographicSize;
             _zoomTransitionTargetOrthographicSize = Mathf.Max(
                 minimumOrthographicSize,
                 zoom.VisibleCellsY * 0.5f);
+            _zoomTransitionElapsedSeconds = 0f;
             _zoomTransitionAnchorScreenPosition = pointerScreenPosition;
             _zoomTransitionAnchorWorldPoint = pointerWorldPoint;
             _isZoomTransitionActive = true;
@@ -404,6 +409,7 @@ namespace Arcontio.View.ArcGraph
             if (config.ZoomTransitionSeconds <= 0.0001f)
             {
                 ApplyZoomSizeAroundAnchor(camera, _zoomTransitionTargetOrthographicSize);
+                RestorePixelPerfectCameraAfterTransition(camera, zoom);
                 _isZoomTransitionActive = false;
             }
         }
@@ -418,26 +424,36 @@ namespace Arcontio.View.ArcGraph
             float targetSize = Mathf.Max(
                 minimumOrthographicSize,
                 _zoomTransitionTargetOrthographicSize);
-            float currentSize = camera.orthographicSize;
             float transitionSeconds = Mathf.Max(0f, config.ZoomTransitionSeconds);
+            ArcGraphViewZoomLevelDefinition zoom = EnsureViewState().CurrentZoom(config);
 
             if (transitionSeconds <= 0.0001f)
             {
                 ApplyZoomSizeAroundAnchor(camera, targetSize);
+                RestorePixelPerfectCameraAfterTransition(camera, zoom);
                 _isZoomTransitionActive = false;
                 return true;
             }
 
-            float transitionStep = 1f - Mathf.Exp(-Time.unscaledDeltaTime / transitionSeconds);
-            float nextSize = Mathf.Lerp(currentSize, targetSize, transitionStep);
+            _zoomTransitionElapsedSeconds += Time.unscaledDeltaTime;
+            float progress01 = Mathf.Clamp01(_zoomTransitionElapsedSeconds / transitionSeconds);
+            float easedProgress01 = SmoothStep01(progress01);
+            float nextSize = Mathf.Lerp(
+                _zoomTransitionStartOrthographicSize,
+                targetSize,
+                easedProgress01);
 
-            if (Mathf.Abs(nextSize - targetSize) < 0.001f)
+            if (progress01 >= 1f || Mathf.Abs(nextSize - targetSize) < 0.001f)
             {
                 nextSize = targetSize;
                 _isZoomTransitionActive = false;
             }
 
             ApplyZoomSizeAroundAnchor(camera, nextSize);
+
+            if (!_isZoomTransitionActive)
+                RestorePixelPerfectCameraAfterTransition(camera, zoom);
+
             return true;
         }
 
@@ -455,6 +471,68 @@ namespace Arcontio.View.ArcGraph
             pointerCompensation.z = 0f;
 
             MoveCameraByOffset(camera, pointerCompensation);
+        }
+
+        // =============================================================================
+        // SuspendPixelPerfectCameraForTransition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disattiva temporaneamente la PixelPerfectCamera mentre lo zoom interpola
+        /// fra due dimensioni ortografiche.
+        /// </para>
+        /// </summary>
+        private void SuspendPixelPerfectCameraForTransition(Camera camera)
+        {
+            if (camera == null)
+                return;
+
+            PixelPerfectCamera pixelPerfectCamera = camera.GetComponent<PixelPerfectCamera>();
+            if (pixelPerfectCamera == null)
+                return;
+
+            _zoomTransitionPixelPerfectCamera = pixelPerfectCamera;
+            _zoomTransitionPixelPerfectWasEnabled = pixelPerfectCamera.enabled;
+
+            if (pixelPerfectCamera.enabled)
+                pixelPerfectCamera.enabled = false;
+        }
+
+        // =============================================================================
+        // RestorePixelPerfectCameraAfterTransition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ripristina lo stato precedente della PixelPerfectCamera e applica il PPU
+        /// finale del livello zoom raggiunto.
+        /// </para>
+        /// </summary>
+        private void RestorePixelPerfectCameraAfterTransition(
+            Camera camera,
+            ArcGraphViewZoomLevelDefinition zoom)
+        {
+            if (_zoomTransitionPixelPerfectCamera != null)
+            {
+                _zoomTransitionPixelPerfectCamera.enabled = _zoomTransitionPixelPerfectWasEnabled;
+                _zoomTransitionPixelPerfectCamera = null;
+                _zoomTransitionPixelPerfectWasEnabled = false;
+            }
+
+            ApplyPixelPerfectCameraZoomIfPresent(camera, zoom);
+        }
+
+        // =============================================================================
+        // SmoothStep01
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte un progresso lineare in una curva morbida ease-in/ease-out.
+        /// </para>
+        /// </summary>
+        private static float SmoothStep01(float value)
+        {
+            float clamped = Mathf.Clamp01(value);
+            return clamped * clamped * (3f - (2f * clamped));
         }
 
         private void ApplyPixelPerfectCameraZoomIfPresent(

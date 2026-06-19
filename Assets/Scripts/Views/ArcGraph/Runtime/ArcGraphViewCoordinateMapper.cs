@@ -68,7 +68,11 @@ namespace Arcontio.View.ArcGraph
                 return ArcGraphViewCoordinateResult.Invalid(reason);
             }
 
-            var visibleRect = state.ResolveVisibleCellRect(config);
+            var visibleRect = ResolveViewportAwareVisibleCellRect(
+                config,
+                state,
+                viewportPixelWidth,
+                viewportPixelHeight);
             if (visibleRect.IsEmpty)
                 return ArcGraphViewCoordinateResult.Invalid("VisibleRectEmpty");
 
@@ -134,6 +138,55 @@ namespace Arcontio.View.ArcGraph
             normalizedY = viewportPointY / viewportPixelHeight;
             reason = "Ok";
             return true;
+        }
+
+        // =============================================================================
+        // ResolveViewportAwareVisibleCellRect
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce il rettangolo celle usato dal picking considerando il
+        /// rapporto reale della viewport camera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: picking coerente con la vista</b></para>
+        /// <para>
+        /// Lo zoom JSON definisce quante celle sono visibili in verticale. La camera
+        /// reale pero' puo' essere molto piu' larga della finestra logica, quindi il
+        /// picking deve estendere la larghezza in base all'aspect ratio senza leggere
+        /// il World e senza cambiare lo stato simulativo.
+        /// </para>
+        /// </summary>
+        private static ArcGraphViewCellRect ResolveViewportAwareVisibleCellRect(
+            ArcGraphMapViewConfig config,
+            ArcGraphViewState state,
+            int viewportPixelWidth,
+            int viewportPixelHeight)
+        {
+            var zoom = state.CurrentZoom(config);
+
+            if (viewportPixelWidth <= 0 || viewportPixelHeight <= 0)
+                return state.ResolveVisibleCellRect(config);
+
+            float aspect = viewportPixelWidth / (float)viewportPixelHeight;
+            int visibleWidth = Math.Min(
+                config.MapWidthCells,
+                Math.Max(1, (int)Math.Ceiling(zoom.VisibleCellsY * aspect)));
+            int visibleHeight = Math.Min(
+                config.MapHeightCells,
+                Math.Max(1, zoom.VisibleCellsY));
+
+            int minX = (int)Math.Floor(state.CenterCellX - (visibleWidth * 0.5f));
+            int minY = (int)Math.Floor(state.CenterCellY - (visibleHeight * 0.5f));
+
+            minX = ClampInt(minX, 0, config.MapWidthCells - visibleWidth);
+            minY = ClampInt(minY, 0, config.MapHeightCells - visibleHeight);
+
+            return new ArcGraphViewCellRect(
+                minX,
+                minY,
+                minX + visibleWidth,
+                minY + visibleHeight);
         }
 
         private static ArcGraphCellCoord ResolveCellInsideVisibleRect(
