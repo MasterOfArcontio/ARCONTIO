@@ -65,6 +65,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementToolController _placementToolController;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
+        private ArcGraphSelectionSceneConsumer _selectionConsumer;
         private ArcGraphFovDebugOverlaySceneConsumer _fovOverlayConsumer;
         private ArcGraphFovDebugOverlayRuntimeController _fovOverlayController;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
@@ -243,6 +244,7 @@ namespace Arcontio.View.ArcGraph
             _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
             _placementToolController.enabled = false;
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
+            _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
@@ -334,13 +336,15 @@ namespace Arcontio.View.ArcGraph
             _interactionWrapper.SetViewInputEnabled(false);
             _interactionWrapper.SetSceneCamera(Camera.main);
             _interactionWrapper.SetSceneCameraZoomSyncEnabled(false);
+            _interactionWrapper.SetDispatchToConsumer(true);
             _interactionRouter.SetRouterEnabled(true);
-            _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
+            _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer, _selectionConsumer);
             _placementToolController.SetRuntimeContextProvider(_contextProvider);
             _placementToolController.SetSceneCamera(Camera.main);
             _placementHighlightConsumer.SetRuntimeContextProvider(_contextProvider);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
             _placementHighlightConsumer.SetSceneCamera(Camera.main);
+            _selectionConsumer.SetSelectionEnabled(true);
 
             // Il FOV debug ArcGraph usa la pipeline corretta:
             // UI -> controller -> provider World -> producer snapshot -> consumer.

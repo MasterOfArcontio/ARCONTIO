@@ -192,6 +192,28 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetDispatchToConsumer
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita la consegna del frame interattivo al consumer
+        /// esterno configurato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dispatch esplicito</b></para>
+        /// <para>
+        /// Il wrapper puo' aggiornare soltanto pan/zoom/picking oppure puo' anche
+        /// consegnare il frame a moduli runtime come selection e placement preview.
+        /// Questo setter rende il passaggio dichiarato dall'auto-installer, senza
+        /// dipendere da un flag Inspector fragile.
+        /// </para>
+        /// </summary>
+        public void SetDispatchToConsumer(bool enabled)
+        {
+            dispatchToConsumer = enabled;
+        }
+
+        // =============================================================================
         // SetConfig
         // =============================================================================
         /// <summary>
