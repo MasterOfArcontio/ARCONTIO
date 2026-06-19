@@ -60,6 +60,31 @@
         2,
         3
       ]
+    },
+    {
+      "visualKey": "human_default",
+      "partKeys": [
+        "head",
+		"arms",
+        "body",
+        "legs"
+      ],
+      "directionKeys": [
+        "south",
+        "north",
+        "east",
+        "west"
+      ],
+      "animationKey": "idle_simplified",
+      "frameCount": 1,
+      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/idle_semplified#{direction}",
+      "durationTicks": 1,
+      "sortingOffsets": [
+        0,
+        1,
+        2,
+        3
+      ]
     }
   ]
 }

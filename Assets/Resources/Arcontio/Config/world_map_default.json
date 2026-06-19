@@ -1,49 +1,1870 @@
 {
-  "Map": {
-    "Id": "debug_arcgraph_base",
-    "Width": 64,
-    "Height": 64,
-    "ZLevel": 0
-  },
-  "SurfaceLayer": {
-    "Fill": {
-      "SurfaceKey": "grass",
-      "BiomeAreaKey": "debug_grassland"
-    },
-    "Patches": []
-  },
-  "BiologicalAreas": [
-    {
-      "AreaId": 1,
-      "Key": "debug_grassland_meadow",
-      "BiomeKey": "grassland",
-      "VegetationKind": "Grass",
-      "SoilKind": "Grassland",
-      "CenterX": 32,
-      "CenterY": 32,
-      "RadiusCells": 14,
-      "Z": 0,
-      "Priority": 0,
-      "IsEnabled": true,
-      "Intensity01": 0.55,
-      "BaseFertility01": 0.7,
-      "CurrentFertility01": 0.7,
-      "GrowthPotential01": 0.65,
-      "Health01": 0.8,
-      "Recovery01": 0.45,
-      "SeedBank": [
-        {
-          "SpeciesKey": "wild_grass",
-          "Amount01": 0.9,
-          "Viability01": 0.85
-        },
-        {
-          "SpeciesKey": "oak_tree",
-          "Amount01": 0.22,
-          "Viability01": 0.45
-        }
-      ]
-    }
-  ],
-  "InitialObjects": []
+    "Map":  {
+                "Id":  "debug_arcgraph_devmap_bootstrap",
+                "Width":  64,
+                "Height":  64,
+                "ZLevel":  0
+            },
+    "SurfaceLayer":  {
+                         "Fill":  {
+                                      "SurfaceKey":  "grass",
+                                      "BiomeAreaKey":  "debug_grassland"
+                                  },
+                         "Patches":  [
+                                         {
+                                             "X":  7,
+                                             "Y":  8,
+                                             "W":  3,
+                                             "H":  2,
+                                             "SurfaceKey":  "shallow_water",
+                                             "BiomeAreaKey":  "debug_water_pocket_west"
+                                         },
+                                         {
+                                             "X":  6,
+                                             "Y":  9,
+                                             "W":  1,
+                                             "H":  2,
+                                             "SurfaceKey":  "shallow_water",
+                                             "BiomeAreaKey":  "debug_water_pocket_west"
+                                         },
+                                         {
+                                             "X":  8,
+                                             "Y":  10,
+                                             "W":  4,
+                                             "H":  1,
+                                             "SurfaceKey":  "shallow_water",
+                                             "BiomeAreaKey":  "debug_water_pocket_west"
+                                         },
+                                         {
+                                             "X":  10,
+                                             "Y":  7,
+                                             "W":  2,
+                                             "H":  1,
+                                             "SurfaceKey":  "shallow_water",
+                                             "BiomeAreaKey":  "debug_water_pocket_west"
+                                         },
+                                         {
+                                             "X":  48,
+                                             "Y":  42,
+                                             "W":  4,
+                                             "H":  2,
+                                             "SurfaceKey":  "stone_floor",
+                                             "BiomeAreaKey":  "debug_stone_pocket_east"
+                                         },
+                                         {
+                                             "X":  47,
+                                             "Y":  44,
+                                             "W":  3,
+                                             "H":  1,
+                                             "SurfaceKey":  "stone_floor",
+                                             "BiomeAreaKey":  "debug_stone_pocket_east"
+                                         },
+                                         {
+                                             "X":  50,
+                                             "Y":  45,
+                                             "W":  2,
+                                             "H":  1,
+                                             "SurfaceKey":  "stone_floor",
+                                             "BiomeAreaKey":  "debug_stone_pocket_east"
+                                         },
+                                         {
+                                             "X":  51,
+                                             "Y":  41,
+                                             "W":  1,
+                                             "H":  1,
+                                             "SurfaceKey":  "stone_floor",
+                                             "BiomeAreaKey":  "debug_stone_pocket_east"
+                                         }
+                                     ]
+                     },
+    "BiologicalAreas":  [
+                            {
+                                "AreaId":  1,
+                                "Key":  "debug_grassland_meadow",
+                                "BiomeKey":  "grassland",
+                                "VegetationKind":  "Grass",
+                                "SoilKind":  "Grassland",
+                                "CenterX":  32,
+                                "CenterY":  32,
+                                "RadiusCells":  14,
+                                "Z":  0,
+                                "Priority":  0,
+                                "IsEnabled":  true,
+                                "Intensity01":  0.55,
+                                "BaseFertility01":  0.7,
+                                "CurrentFertility01":  0.7,
+                                "GrowthPotential01":  0.65,
+                                "Health01":  0.8,
+                                "Recovery01":  0.45,
+                                "SeedBank":  [
+                                                 {
+                                                     "SpeciesKey":  "wild_grass",
+                                                     "Amount01":  0.9,
+                                                     "Viability01":  0.85
+                                                 },
+                                                 {
+                                                     "SpeciesKey":  "oak_tree",
+                                                     "Amount01":  0.22,
+                                                     "Viability01":  0.45
+                                                 }
+                                             ]
+                            }
+                        ],
+    "InitialObjects":  [
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  30,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  31,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  32,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  33,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  35,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  36,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  34,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  33,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  32,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  31,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  30,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  29,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  36,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  35,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  33,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "door_wood",
+                               "X":  32,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  true,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  31,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  30,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  29,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  30,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  31,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  32,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  33,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  27,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  26,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  34,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  25,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "door_wood",
+                               "X":  24,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  true,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  23,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  22,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  21,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  29,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  30,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  31,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  32,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  33,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  34,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  27,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  26,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  26,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  21,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  23,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  22,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  21,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  25,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  24,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  22,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  23,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "door_wood",
+                               "X":  38,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  true,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  25,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  26,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  27,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  30,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  31,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "door_wood",
+                               "X":  32,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  true,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  33,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  35,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  36,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "door_wood",
+                               "X":  24,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  true,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  39,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  40,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  26,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  27,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  29,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  30,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  31,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  32,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  33,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  34,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  36,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  37,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  38,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  40,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  39,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  38,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  36,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  35,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  33,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  32,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  31,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  30,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  27,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  24,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  23,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  22,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  21,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  20,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  19,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  18,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  17,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  21,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  22,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  23,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  24,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  25,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  26,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  27,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  28,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  17,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  18,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  19,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  20,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "door_wood",
+                               "X":  29,
+                               "Y":  21,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  true,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  22,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  23,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  29,
+                               "Y":  24,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  30,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  31,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  32,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  33,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  17,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  18,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  19,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  20,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  21,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  22,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  23,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  34,
+                               "Y":  24,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  24,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  23,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  22,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  21,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  36,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  37,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  39,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  38,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  40,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  17,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  18,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  19,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  41,
+                               "Y":  20,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  35,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  25,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  24,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  23,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  22,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  21,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  20,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  19,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  18,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  17,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  39,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  38,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  37,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  36,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  35,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  34,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  33,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  32,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  31,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  30,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  29,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  28,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  17,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  26,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  17,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  18,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  25,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  24,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  23,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  22,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  21,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  20,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  19,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  16,
+                               "Y":  18,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "wall_stone",
+                               "X":  19,
+                               "Y":  16,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           },
+                           {
+                               "DefId":  "door_wood",
+                               "X":  16,
+                               "Y":  27,
+                               "OwnerKind":  "Community",
+                               "OwnerId":  0,
+                               "IsOpen":  false,
+                               "IsLocked":  false
+                           }
+                       ]
 }

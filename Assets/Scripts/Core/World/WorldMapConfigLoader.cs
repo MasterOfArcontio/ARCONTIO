@@ -205,8 +205,9 @@ namespace Arcontio.Core
                 if (entry == null || string.IsNullOrWhiteSpace(entry.DefId))
                     continue;
 
+                string defId = NormalizeInitialObjectDefId(entry.DefId);
                 OwnerKind ownerKind = ParseOwnerKind(entry.OwnerKind);
-                int objectId = world.CreateObject(entry.DefId, entry.X, entry.Y, ownerKind, entry.OwnerId);
+                int objectId = world.CreateObject(defId, entry.X, entry.Y, ownerKind, entry.OwnerId);
                 if (objectId < 0)
                     continue;
 
@@ -219,7 +220,64 @@ namespace Arcontio.Core
                         OwnerId = entry.OwnerId
                     });
                 }
+
+                ApplyInitialDoorState(world, objectId, entry);
             }
+        }
+
+        // =============================================================================
+        // NormalizeInitialObjectDefId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza defId storici presenti negli export DevMap verso il catalogo
+        /// oggetti Core attuale.
+        /// </para>
+        /// </summary>
+        private static string NormalizeInitialObjectDefId(string defId)
+        {
+            if (string.IsNullOrWhiteSpace(defId))
+                return string.Empty;
+
+            string key = defId.Trim();
+            return string.Equals(key, "door_wood_good", StringComparison.OrdinalIgnoreCase)
+                ? "door_wood"
+                : key;
+        }
+
+        // =============================================================================
+        // ApplyInitialDoorState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica stato aperta/chiusa e lock alle porte dichiarate dalla mappa
+        /// iniziale, usando <see cref="World.SetDoorOpen"/> per mantenere coerenti
+        /// le cache di movimento e visione.
+        /// </para>
+        /// </summary>
+        private static void ApplyInitialDoorState(
+            World world,
+            int objectId,
+            WorldMapInitialObjectDto entry)
+        {
+            if (world == null || entry == null || objectId < 0)
+                return;
+
+            if (!world.Objects.TryGetValue(objectId, out WorldObjectInstance instance)
+                || instance == null)
+            {
+                return;
+            }
+
+            if (!world.TryGetObjectDef(instance.DefId, out ObjectDef def)
+                || def == null
+                || !def.IsDoor)
+            {
+                return;
+            }
+
+            instance.IsLocked = def.IsLockable && entry.IsLocked;
+            world.SetDoorOpen(objectId, entry.IsOpen);
         }
 
         // =============================================================================
@@ -473,6 +531,8 @@ namespace Arcontio.Core
             public string OwnerKind;
             public int OwnerId = -1;
             public int FoodUnits;
+            public bool IsOpen;
+            public bool IsLocked;
         }
 
         [Serializable]

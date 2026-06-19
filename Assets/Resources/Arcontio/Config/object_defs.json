@@ -95,13 +95,13 @@
     {
       "Id": "door_wood",
       "DisplayName": "Wood Door",
-      "SpriteKey": "ArcGraph/Objects/doors/door_wood#vertical_closed",
+      "SpriteKey": "ArcGraph/Objects/Door_Wood_Good",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": true,
       "IsInteractable": false,
       "Visual": {
-        "SpritePath": "ArcGraph/Objects/doors/door_wood#vertical_closed",
+        "SpritePath": "ArcGraph/Objects/Door_Wood_Good",
         "VisualKind": "door",
         "ResolverKey": "door_wood_state",
         "WidthPixels": 32,
@@ -123,13 +123,13 @@
     {
       "Id": "door_wood_locked",
       "DisplayName": "Wood Door Locked",
-      "SpriteKey": "ArcGraph/Objects/doors/door_wood#vertical_closed",
+      "SpriteKey": "ArcGraph/Objects/Door_Wood_Good",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": true,
       "IsInteractable": false,
       "Visual": {
-        "SpritePath": "ArcGraph/Objects/doors/door_wood#vertical_closed",
+        "SpritePath": "ArcGraph/Objects/Door_Wood_Good",
         "VisualKind": "door",
         "ResolverKey": "door_wood_state",
         "WidthPixels": 32,

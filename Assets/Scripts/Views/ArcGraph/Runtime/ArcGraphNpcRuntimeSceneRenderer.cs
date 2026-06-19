@@ -33,6 +33,7 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphNpcRuntimeSceneRenderer : MonoBehaviour
     {
         private const string LegacyMapGridSpritePrefix = "MapGrid/Sprites/";
+        private const string SimplifiedIdleAnimationKey = "idle_simplified";
 
         [SerializeField] private ArcGraphMinimalRuntimeSceneWrapper runtimeWrapper;
         [SerializeField] private MonoBehaviour spriteResolverBehaviour;
@@ -638,7 +639,7 @@ namespace Arcontio.View.ArcGraph
             reusedPartRenderers = 0;
             missingCatalogFrames = 0;
 
-            if (!useLayeredActorCatalog || entry.SpriteRequest.UsesSimplifiedRepresentation)
+            if (!useLayeredActorCatalog)
                 return false;
 
             ArcGraphNpcVisualCatalog catalog = GetOrParseNpcVisualCatalog();
@@ -646,7 +647,9 @@ namespace Arcontio.View.ArcGraph
                 return false;
 
             string direction = ResolveDirection(handle, entry, contract);
-            string animation = entry.HasMotion ? "walk" : catalog.DefaultAnimationKey;
+            string animation = entry.SpriteRequest.UsesSimplifiedRepresentation
+                ? SimplifiedIdleAnimationKey
+                : entry.HasMotion ? "walk" : catalog.DefaultAnimationKey;
             bool appliedAnyPart = false;
 
             // Prima di applicare il frame modulare corrente spegniamo tutte le
@@ -666,20 +669,26 @@ namespace Arcontio.View.ArcGraph
                     animation,
                     entry);
 
-                if (!catalog.TryResolveFrame(
+                bool hasVisualFrame = catalog.TryResolveFrame(
                         catalog.DefaultVisualKey,
                         partKey,
                         direction,
                         animation,
                         frameIndex,
-                        out ArcGraphNpcVisualFrame visualFrame)
-                    && !catalog.TryResolveFrame(
+                        out ArcGraphNpcVisualFrame visualFrame);
+
+                if (!hasVisualFrame && !entry.SpriteRequest.UsesSimplifiedRepresentation)
+                {
+                    hasVisualFrame = catalog.TryResolveFrame(
                         catalog.DefaultVisualKey,
                         partKey,
                         direction,
                         catalog.DefaultAnimationKey,
                         0,
-                        out visualFrame))
+                        out visualFrame);
+                }
+
+                if (!hasVisualFrame)
                 {
                     missingCatalogFrames++;
                     continue;
@@ -690,7 +699,7 @@ namespace Arcontio.View.ArcGraph
                     entry.EntityId,
                     visualFrame.SpriteKey,
                     visualFrame.PartKey,
-                    usesSimplifiedRepresentation: false);
+                    entry.SpriteRequest.UsesSimplifiedRepresentation);
 
                 Sprite sprite = ResolveSprite(
                     request,

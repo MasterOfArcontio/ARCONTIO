@@ -241,6 +241,7 @@ namespace Arcontio.View.ArcGraph
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
             _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
+            _placementToolController.enabled = false;
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
@@ -448,12 +449,14 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private void RefreshRuntimeSceneBindings()
         {
-            MonoBehaviour placementPreviewSource =
-                _placementToolController != null
-                    ? _placementToolController
-                    : FindSceneBehaviourImplementing<IArcGraphPlacementPreviewSource>();
             MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
             MapGridRuntimeDevToolsOverlay legacyPlacementOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
+            MonoBehaviour placementPreviewSource =
+                legacyPlacementOverlay != null
+                    ? legacyPlacementOverlay
+                    : _placementToolController != null
+                        ? _placementToolController
+                        : FindSceneBehaviourImplementing<IArcGraphPlacementPreviewSource>();
             Arcontio.Core.SimulationHost simulationHost = Arcontio.Core.SimulationHost.Instance;
 
             if (_contextProvider != null)
@@ -576,17 +579,17 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Spegne il DevTools placement legacy MapGrid mentre ArcGraph possiede il
-        /// controller F3 runtime.
+        /// Riattiva temporaneamente il DevTools placement legacy MapGrid mentre
+        /// ArcGraph possiede la vista runtime.
         /// </para>
         ///
         /// <para><b>Principio architetturale: un solo lettore operativo di F3</b></para>
         /// <para>
-        /// Il vecchio overlay MapGrid resta nel progetto e potra' essere auditato o
-        /// rimosso piu' avanti, ma non deve piu' leggere F3 quando ArcGraph e' la
-        /// vista runtime principale. In caso contrario un singolo input potrebbe
-        /// aprire il pannello legacy e, nello stesso frame, attivare il placement
-        /// ArcGraph.
+        /// Il vecchio overlay MapGrid resta un debito da eliminare, ma in questo
+        /// gate viene riesumato come strumento debug per leggere/scrivere mappe,
+        /// piazzare food stock, porte e muri. La vista resta ArcGraph: il pannello
+        /// legacy invia comunque comandi al <c>SimulationHost</c> e viene usato
+        /// anche come sorgente preview tramite <c>IArcGraphPlacementPreviewSource</c>.
         /// </para>
         /// </summary>
         private static void ConfigureLegacyMapGridPlacementOverlayForArcGraph(
@@ -595,7 +598,7 @@ namespace Arcontio.View.ArcGraph
             if (legacyPlacementOverlay == null)
                 return;
 
-            legacyPlacementOverlay.enabled = false;
+            legacyPlacementOverlay.enabled = true;
         }
 
         // =============================================================================
