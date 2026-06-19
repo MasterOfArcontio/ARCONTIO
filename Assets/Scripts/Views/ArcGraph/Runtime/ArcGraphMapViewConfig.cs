@@ -63,7 +63,7 @@ namespace Arcontio.View.ArcGraph
             int defaultZoomLevel = 1,
             int mouseWheelStepsPerZoomLevel = 1,
             bool panUsesMiddleMouseButton = true,
-            float zoomTransitionSeconds = 0.12f)
+            float zoomTransitionSeconds = 0.30f)
         {
             MapWidthCells = mapWidthCells > 0 ? mapWidthCells : 1;
             MapHeightCells = mapHeightCells > 0 ? mapHeightCells : 1;
@@ -75,7 +75,7 @@ namespace Arcontio.View.ArcGraph
             PanUsesMiddleMouseButton = panUsesMiddleMouseButton;
             ZoomTransitionSeconds = zoomTransitionSeconds >= 0f
                 ? zoomTransitionSeconds
-                : 0.12f;
+                : 0.30f;
         }
 
         // =============================================================================
@@ -109,7 +109,7 @@ namespace Arcontio.View.ArcGraph
                 defaultZoomLevel: 1,
                 mouseWheelStepsPerZoomLevel: 1,
                 panUsesMiddleMouseButton: true,
-                zoomTransitionSeconds: 0.12f);
+                zoomTransitionSeconds: 0.30f);
         }
 
         // =============================================================================

@@ -32,7 +32,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>ArcUIRoot</b>: root full-screen dei blocchi definitivi.</item>
     ///   <item><b>ViewModeBar</b>: modalita' di osservazione, non azioni sul mondo.</item>
     ///   <item><b>TopBar</b>: stato globale simulazione, ancora non bindato a ViewModel.</item>
-    ///   <item><b>MapViewport</b>: rettangolo UI neutro che dichiara l'area mappa futura.</item>
+    ///   <item><b>MapViewport</b>: rettangolo UI che delimita la camera mappa ArcGraph.</item>
     ///   <item><b>RightInspector</b>: inspector tabbed pronto per target diversi.</item>
     ///   <item><b>BottomActionBar</b>: categorie operative principali.</item>
     ///   <item><b>ActionPanel</b>: pannello contestuale aperto dalla categoria attiva.</item>
@@ -49,7 +49,7 @@ namespace Arcontio.View.ArcGraph
         private const float RightInspectorWidth = 350f;
         private const float BottomActionBarHeight = 92f;
         private const float ActionPanelHeight = 210f;
-        private const float OuterMargin = 8f;
+        private const float OuterMargin = 0f;
 
         [SerializeField] private bool uiEnabled = true;
         [SerializeField] private bool buildOnStart;
@@ -57,6 +57,8 @@ namespace Arcontio.View.ArcGraph
 
         private GameObject _canvasRoot;
         private GameObject _uiRoot;
+        private RectTransform _mapViewport;
+        private readonly Vector3[] _mapViewportCorners = new Vector3[4];
         private Button _fovViewModeButton;
 
         public GameObject RootGameObject => _uiRoot;
@@ -168,6 +170,74 @@ namespace Arcontio.View.ArcGraph
                 _fovViewModeButton.onClick.AddListener(action);
         }
 
+        // =============================================================================
+        // TryApplyMapViewportToCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica alla camera Unity il rettangolo occupato dal blocco UI
+        /// <c>MapViewport</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: viewport UI come confine visuale</b></para>
+        /// <para>
+        /// La UI non decide cosa disegnare e non legge la simulazione. Espone pero'
+        /// il rettangolo visuale autorizzato per la mappa, cosi' camera, picking e
+        /// pannelli usano lo stesso confine e la vista ArcGraph non finisce sotto
+        /// TopBar, inspector o pannelli operativi.
+        /// </para>
+        /// </summary>
+        public bool TryApplyMapViewportToCamera(Camera camera)
+        {
+            if (camera == null ||
+                !TryResolveMapViewportScreenRect(out Rect screenRect) ||
+                Screen.width <= 0 ||
+                Screen.height <= 0)
+            {
+                return false;
+            }
+
+            Rect normalizedRect = new Rect(
+                screenRect.xMin / Screen.width,
+                screenRect.yMin / Screen.height,
+                screenRect.width / Screen.width,
+                screenRect.height / Screen.height);
+
+            camera.rect = normalizedRect;
+            return true;
+        }
+
+        // =============================================================================
+        // TryResolveMapViewportScreenRect
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il rettangolo pixel screen-space del viewport mappa.
+        /// </para>
+        /// </summary>
+        public bool TryResolveMapViewportScreenRect(out Rect screenRect)
+        {
+            screenRect = default;
+
+            if (_mapViewport == null)
+                return false;
+
+            _mapViewport.GetWorldCorners(_mapViewportCorners);
+            Vector2 bottomLeft = RectTransformUtility.WorldToScreenPoint(null, _mapViewportCorners[0]);
+            Vector2 topRight = RectTransformUtility.WorldToScreenPoint(null, _mapViewportCorners[2]);
+
+            float xMin = Mathf.Clamp(Mathf.Min(bottomLeft.x, topRight.x), 0f, Screen.width);
+            float xMax = Mathf.Clamp(Mathf.Max(bottomLeft.x, topRight.x), 0f, Screen.width);
+            float yMin = Mathf.Clamp(Mathf.Min(bottomLeft.y, topRight.y), 0f, Screen.height);
+            float yMax = Mathf.Clamp(Mathf.Max(bottomLeft.y, topRight.y), 0f, Screen.height);
+
+            if (xMax <= xMin || yMax <= yMin)
+                return false;
+
+            screenRect = Rect.MinMaxRect(xMin, yMin, xMax, yMax);
+            return true;
+        }
+
         private void CreateCanvasRoot()
         {
             _canvasRoot = new GameObject(CanvasName, typeof(RectTransform));
@@ -202,8 +272,9 @@ namespace Arcontio.View.ArcGraph
                 viewport,
                 Vector2.zero,
                 Vector2.one,
-                new Vector2(0f, BottomActionBarHeight),
+                new Vector2(0f, BottomActionBarHeight + ActionPanelHeight),
                 new Vector2(-RightInspectorWidth, -TopBarHeight));
+            _mapViewport = viewport;
         }
 
         private void BuildViewModeBar()
@@ -242,7 +313,7 @@ namespace Arcontio.View.ArcGraph
                 _uiRoot.transform,
                 new Vector2(0f, 1f),
                 new Vector2(1f, 1f),
-                new Vector2(ViewModeBarWidth + OuterMargin + 6f, -OuterMargin - TopBarHeight),
+                new Vector2(ViewModeBarWidth + OuterMargin, -OuterMargin - TopBarHeight),
                 new Vector2(-RightInspectorWidth - OuterMargin, -OuterMargin));
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
@@ -276,6 +347,7 @@ namespace Arcontio.View.ArcGraph
                 new Vector2(1f, 1f),
                 new Vector2(-RightInspectorWidth - OuterMargin, BottomActionBarHeight + OuterMargin),
                 new Vector2(-OuterMargin, -TopBarHeight - OuterMargin));
+            panel.gameObject.AddComponent<RectMask2D>();
 
             VerticalLayoutGroup layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
             layout.padding = new RectOffset(12, 12, 12, 12);
@@ -371,7 +443,7 @@ namespace Arcontio.View.ArcGraph
                 new Vector2(0f, 0f),
                 new Vector2(1f, 0f),
                 new Vector2(OuterMargin, BottomActionBarHeight + OuterMargin),
-                new Vector2(-RightInspectorWidth - OuterMargin - 6f, BottomActionBarHeight + OuterMargin + ActionPanelHeight));
+                new Vector2(-RightInspectorWidth - OuterMargin, BottomActionBarHeight + OuterMargin + ActionPanelHeight));
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(10, 10, 10, 10);
@@ -547,8 +619,8 @@ namespace Arcontio.View.ArcGraph
 
         private static void CreateTabButton(RectTransform parent, string label, bool active)
         {
-            RectTransform button = CreateButtonShell(parent, "ArcTabButton_" + SanitizeName(label), 70f, 30f, active);
-            CreateText(button, label, 11, FontStyles.Bold, TextAlignmentOptions.Center);
+            RectTransform button = CreateButtonShell(parent, "ArcTabButton_" + SanitizeName(label), 42f, 30f, active);
+            CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
         private static void CreateCategoryButton(RectTransform parent, string label, bool active)

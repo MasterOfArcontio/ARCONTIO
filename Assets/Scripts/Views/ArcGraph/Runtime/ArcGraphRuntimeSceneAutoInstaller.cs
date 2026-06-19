@@ -376,7 +376,33 @@ namespace Arcontio.View.ArcGraph
 
             _uiRoot.BuildRuntimeUi();
             _uiRoot.SetUiEnabled(true);
+            ApplyUiMapViewportToMainCamera();
             _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
+        }
+
+        // =============================================================================
+        // ApplyUiMapViewportToMainCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sincronizza la camera principale con il rettangolo <c>MapViewport</c>
+        /// costruito dalla shell UI ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: un solo rettangolo viewport</b></para>
+        /// <para>
+        /// La camera, il culling terrain e il picking devono lavorare dentro lo
+        /// stesso rettangolo che la UI lascia libero alla mappa. Questo metodo non
+        /// legge dati simulativi: collega solo due componenti view-side gia'
+        /// autorizzati, evitando che ArcGraph venga disegnato sotto i pannelli.
+        /// </para>
+        /// </summary>
+        private void ApplyUiMapViewportToMainCamera()
+        {
+            if (_uiRoot == null)
+                return;
+
+            _uiRoot.TryApplyMapViewportToCamera(Camera.main);
         }
 
         // =============================================================================
@@ -475,6 +501,8 @@ namespace Arcontio.View.ArcGraph
 
             if (_cameraViewportController != null)
                 _cameraViewportController.SetSceneCamera(Camera.main);
+
+            ApplyUiMapViewportToMainCamera();
 
             ConfigureLegacyMapGridCameraControllerForArcGraph(cameraController);
             ConfigureLegacyMapGridPlacementOverlayForArcGraph(legacyPlacementOverlay);
