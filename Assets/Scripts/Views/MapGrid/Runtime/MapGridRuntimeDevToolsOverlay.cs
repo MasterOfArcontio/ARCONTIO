@@ -718,7 +718,7 @@ namespace Arcontio.View.MapGrid
 
             if (_tool == Tool.PlaceDoor)
             {
-                defId = _doorWithLock ? "door_wood_locked" : "door_wood_good";
+                defId = _doorWithLock ? "door_wood_locked" : "door_wood";
                 return true;
             }
 
@@ -1106,7 +1106,7 @@ namespace Arcontio.View.MapGrid
         ///
         /// <para><b>Astrazione UI sopra ObjectDef tecnici</b></para>
         /// <para>
-        /// La distinzione tra <c>door_wood_good</c> e <c>door_wood_locked</c> resta un
+        /// La distinzione tra <c>door_wood</c> e <c>door_wood_locked</c> resta un
         /// dettaglio dati. La UI espone invece la domanda sistemica: "la porta supporta
         /// serratura?" e "qual e' il suo stato iniziale?".
         /// </para>
@@ -1524,7 +1524,7 @@ namespace Arcontio.View.MapGrid
         ///
         /// <para><b>Mappatura UI -> ObjectDef</b></para>
         /// <para>
-        /// La porta senza serratura usa <c>door_wood_good</c>; la porta con serratura
+        /// La porta senza serratura usa <c>door_wood</c>; la porta con serratura
         /// usa <c>door_wood_locked</c>. La possibilita' di lock reale viene comunque
         /// rivalidata da <c>DevPlaceObjectCommand</c> tramite la <c>ObjectDef</c>.
         /// </para>
@@ -1538,7 +1538,7 @@ namespace Arcontio.View.MapGrid
         /// </summary>
         private ICommand BuildDoorPlacementCommand(int cellX, int cellY)
         {
-            string defId = _doorWithLock ? "door_wood_locked" : "door_wood_good";
+            string defId = _doorWithLock ? "door_wood_locked" : "door_wood";
             bool isOpen = _doorPlacementState == DoorPlacementState.Open;
             bool isLocked = _doorWithLock && _doorPlacementState == DoorPlacementState.Locked;
 

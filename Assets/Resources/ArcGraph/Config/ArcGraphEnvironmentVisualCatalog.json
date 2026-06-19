@@ -1,0 +1,155 @@
+{
+  "visualEntries": [
+    {
+      "visualStateKey": "vegetation_grass",
+      "spriteKey": "ArcGraph/Environment/Vegetation/grass#medium_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "vegetation_underbrush",
+      "spriteKey": "ArcGraph/Environment/Vegetation/underbrush#medium_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "vegetation_shrubland",
+      "spriteKey": "ArcGraph/Environment/Vegetation/shrubland#medium_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "vegetation_forest",
+      "spriteKey": "ArcGraph/Environment/Vegetation/forest#medium_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "plant_oak_tree",
+      "spriteKey": "ArcGraph/Environment/Plants/oak_tree#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 2
+    },
+    {
+      "visualStateKey": "plant_berry_bush",
+      "spriteKey": "ArcGraph/Environment/Plants/berry_bush#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 1
+    },
+    {
+      "visualStateKey": "plant_cactus",
+      "spriteKey": "ArcGraph/Environment/Plants/cactus#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 1
+    },
+    {
+      "visualStateKey": "plant_jungle_tree",
+      "spriteKey": "ArcGraph/Environment/Plants/jungle_tree#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 2
+    }
+  ],
+  "physicalPlants": [
+    {
+      "visualStateKey": "plant_oak_tree_adult_healthy",
+      "speciesKey": "oak_tree",
+      "growthStageKey": "adult",
+      "healthStateKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Plants/oak_tree#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 2
+    },
+    {
+      "visualStateKey": "plant_berry_bush_adult_healthy",
+      "speciesKey": "berry_bush",
+      "growthStageKey": "adult",
+      "healthStateKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Plants/berry_bush#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 1
+    },
+    {
+      "visualStateKey": "plant_desert_shrub_adult_healthy",
+      "speciesKey": "desert_shrub",
+      "growthStageKey": "adult",
+      "healthStateKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Plants/desert_shrub#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 1
+    },
+    {
+      "visualStateKey": "plant_cactus_adult_healthy",
+      "speciesKey": "cactus",
+      "growthStageKey": "adult",
+      "healthStateKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Plants/cactus#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 1
+    },
+    {
+      "visualStateKey": "plant_jungle_tree_adult_healthy",
+      "speciesKey": "jungle_tree",
+      "growthStageKey": "adult",
+      "healthStateKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Plants/jungle_tree#adult_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 2
+    }
+  ],
+  "diffuseVegetation": [
+    {
+      "visualStateKey": "vegetation_grass_sparse_healthy",
+      "vegetationKindKey": "grass",
+      "coverageBandKey": "sparse",
+      "conditionBandKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Vegetation/grass#sparse_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "vegetation_grass_medium_healthy",
+      "vegetationKindKey": "grass",
+      "coverageBandKey": "medium",
+      "conditionBandKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Vegetation/grass#medium_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "vegetation_grass_dense_healthy",
+      "vegetationKindKey": "grass",
+      "coverageBandKey": "dense",
+      "conditionBandKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Vegetation/grass#dense_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "vegetation_underbrush_medium_healthy",
+      "vegetationKindKey": "underbrush",
+      "coverageBandKey": "medium",
+      "conditionBandKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Vegetation/underbrush#medium_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "vegetation_shrubland_medium_healthy",
+      "vegetationKindKey": "shrubland",
+      "coverageBandKey": "medium",
+      "conditionBandKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Vegetation/shrubland#medium_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    },
+    {
+      "visualStateKey": "vegetation_forest_medium_healthy",
+      "vegetationKindKey": "forest",
+      "coverageBandKey": "medium",
+      "conditionBandKey": "healthy",
+      "spriteKey": "ArcGraph/Environment/Vegetation/forest#medium_healthy",
+      "allowsAnimation": false,
+      "sortingOffset": 0
+    }
+  ]
+}

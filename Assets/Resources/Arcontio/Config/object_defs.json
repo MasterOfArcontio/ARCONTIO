@@ -1,15 +1,15 @@
 {
   "Objects": [
     {
-      "Id": "bed_wood_poor",
-      "DisplayName": "Wood Bed (Poor)",
-      "SpriteKey": "MapGrid/Sprites/Objects/bed_wood_poor",
+      "Id": "bed_wood",
+      "DisplayName": "Wood Bed",
+      "SpriteKey": "ArcGraph/Objects/furniture/bed_wood",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": false,
       "IsInteractable": true,
       "Visual": {
-        "SpritePath": "MapGrid/Sprites/Objects/bed_wood_poor",
+        "SpritePath": "ArcGraph/Objects/furniture/bed_wood",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -19,63 +19,21 @@
         "UseShadow": false
       },
       "Properties": [
-        {
-          "Key": "AllowsAction.Sleep",
-          "Value": 1.0
-        },
-        {
-          "Key": "SleepRegenMultiplier",
-          "Value": 1.10
-        },
-        {
-          "Key": "ComfortBonus",
-          "Value": 0.10
-        }
-      ]
-    },
-    {
-      "Id": "bed_wood_good",
-      "DisplayName": "Wood Bed (Good)",
-      "SpriteKey": "MapGrid/Sprites/Objects/bed_wood_good",
-      "FootprintWidth": 1,
-      "FootprintHeight": 1,
-      "IsOccluder": false,
-      "IsInteractable": true,
-      "Visual": {
-        "SpritePath": "MapGrid/Sprites/Objects/bed_wood_good",
-        "WidthPixels": 32,
-        "HeightPixels": 32,
-        "Pivot": "bottom_center",
-        "OffsetX": 0,
-        "OffsetY": 0,
-        "FadeWhenActorBehind": false,
-        "UseShadow": false
-      },
-      "Properties": [
-        {
-          "Key": "AllowsAction.Sleep",
-          "Value": 1.0
-        },
-        {
-          "Key": "SleepRegenMultiplier",
-          "Value": 1.35
-        },
-        {
-          "Key": "ComfortBonus",
-          "Value": 0.25
-        }
+        { "Key": "AllowsAction.Sleep", "Value": 1.0 },
+        { "Key": "SleepRegenMultiplier", "Value": 1.10 },
+        { "Key": "ComfortBonus", "Value": 0.10 }
       ]
     },
     {
       "Id": "workbench_basic",
-      "DisplayName": "Workbench (Basic)",
-      "SpriteKey": "MapGrid/Sprites/Objects/workbench_basic",
+      "DisplayName": "Workbench",
+      "SpriteKey": "ArcGraph/Objects/production/workbench_basic",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": false,
       "IsInteractable": true,
       "Visual": {
-        "SpritePath": "MapGrid/Sprites/Objects/workbench_basic",
+        "SpritePath": "ArcGraph/Objects/production/workbench_basic",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -85,26 +43,20 @@
         "UseShadow": false
       },
       "Properties": [
-        {
-          "Key": "AllowsAction.Work",
-          "Value": 1.0
-        },
-        {
-          "Key": "WorkSpeedMultiplier",
-          "Value": 1.15
-        }
+        { "Key": "AllowsAction.Work", "Value": 1.0 },
+        { "Key": "WorkSpeedMultiplier", "Value": 1.15 }
       ]
     },
     {
-      "Id": "chair_basic",
-      "DisplayName": "Chair (Basic)",
-      "SpriteKey": "MapGrid/Sprites/Objects/chair_basic",
+      "Id": "chair_wood",
+      "DisplayName": "Wood Chair",
+      "SpriteKey": "ArcGraph/Objects/furniture/chair_wood",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": false,
       "IsInteractable": true,
       "Visual": {
-        "SpritePath": "MapGrid/Sprites/Objects/chair_basic",
+        "SpritePath": "ArcGraph/Objects/furniture/chair_wood",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -114,26 +66,20 @@
         "UseShadow": false
       },
       "Properties": [
-        {
-          "Key": "AllowsAction.Sit",
-          "Value": 1.0
-        },
-        {
-          "Key": "ComfortBonus",
-          "Value": 0.08
-        }
+        { "Key": "AllowsAction.Sit", "Value": 1.0 },
+        { "Key": "ComfortBonus", "Value": 0.08 }
       ]
     },
     {
       "Id": "food_stock",
       "DisplayName": "Food Stock",
-      "SpriteKey": "MapGrid/Sprites/Objects/food_stock",
+      "SpriteKey": "ArcGraph/Objects/food/food_stock",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": false,
       "IsInteractable": true,
       "Visual": {
-        "SpritePath": "MapGrid/Sprites/Objects/food_stock",
+        "SpritePath": "ArcGraph/Objects/food/food_stock",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -143,22 +89,21 @@
         "UseShadow": false
       },
       "Properties": [
-        {
-          "Key": "FoodStock",
-          "Value": 1.0
-        }
+        { "Key": "FoodStock", "Value": 1.0 }
       ]
     },
     {
-      "Id": "door_wood_good",
-      "DisplayName": "Door Wood Good",
-      "SpriteKey": "MapGrid/Sprites/Objects/door_wood_good",
+      "Id": "door_wood",
+      "DisplayName": "Wood Door",
+      "SpriteKey": "ArcGraph/Objects/doors/door_wood#vertical_closed",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": true,
       "IsInteractable": false,
       "Visual": {
-        "SpritePath": "MapGrid/Sprites/Objects/Door_Wood_Good",
+        "SpritePath": "ArcGraph/Objects/doors/door_wood#vertical_closed",
+        "VisualKind": "door",
+        "ResolverKey": "door_wood_state",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -177,14 +122,16 @@
     },
     {
       "Id": "door_wood_locked",
-      "DisplayName": "Door Wood Locked",
-      "SpriteKey": "MapGrid/Sprites/Objects/door_wood_good",
+      "DisplayName": "Wood Door Locked",
+      "SpriteKey": "ArcGraph/Objects/doors/door_wood#vertical_closed",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": true,
       "IsInteractable": false,
       "Visual": {
-        "SpritePath": "MapGrid/Sprites/Objects/Door_Wood_Good",
+        "SpritePath": "ArcGraph/Objects/doors/door_wood#vertical_closed",
+        "VisualKind": "door",
+        "ResolverKey": "door_wood_state",
         "WidthPixels": 32,
         "HeightPixels": 32,
         "Pivot": "bottom_center",
@@ -205,13 +152,13 @@
     {
       "Id": "wall_stone",
       "DisplayName": "Stone Wall",
-      "SpriteKey": "MapGrid/Sprites/Objects/Wall_stone",
+      "SpriteKey": "ArcGraph/Objects/walls/wall_stone",
       "FootprintWidth": 1,
       "FootprintHeight": 1,
       "IsOccluder": true,
       "IsInteractable": false,
       "Visual": {
-        "SpritePath": "MapGrid/Sprites/Objects/wall_stone",
+        "SpritePath": "ArcGraph/Objects/walls/wall_stone",
         "VisualKind": "wall",
         "ResolverKey": "wall_stone_cardinal",
         "WidthPixels": 32,

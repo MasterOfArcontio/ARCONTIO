@@ -89,7 +89,7 @@ namespace Arcontio.Tests
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>Trace</b>: <c>ObjectSpotted</c> con <c>bed_wood_poor</c>.</item>
+        ///   <item><b>Trace</b>: <c>ObjectSpotted</c> con <c>bed_wood</c>.</item>
         ///   <item><b>Source</b>: <c>IsHeard</c> true diventa <c>BeliefSource.Heard</c>.</item>
         ///   <item><b>Assert</b>: categoria <c>Rest</c> e dati numerici copiati dalla trace.</item>
         /// </list>
@@ -100,7 +100,7 @@ namespace Arcontio.Tests
             // Arrange: la memoria e' sentita, non vista direttamente.
             var store = new BeliefStore();
             var updater = new BeliefUpdater();
-            var trace = MakeTrace(MemoryType.ObjectSpotted, 205, "bed_wood_poor", 5, 3, 0.65f, 0.75f, isHeard: true);
+            var trace = MakeTrace(MemoryType.ObjectSpotted, 205, "bed_wood", 5, 3, 0.65f, 0.75f, isHeard: true);
 
             // Act: nessuna query world/object database e' necessaria.
             bool updated = updater.UpdateFromTrace(trace, store, currentTick: 20);
@@ -204,7 +204,7 @@ namespace Arcontio.Tests
             var beliefStore = new BeliefStore();
             var updater = new BeliefUpdater();
             var strongFoodTrace = MakeTrace(MemoryType.ObjectSpotted, 301, "food_stock", 1, 1, 0.90f, 0.90f, isHeard: false);
-            var weakRestTrace = MakeTrace(MemoryType.ObjectSpotted, 302, "bed_wood_poor", 9, 9, 0.10f, 0.10f, isHeard: false);
+            var weakRestTrace = MakeTrace(MemoryType.ObjectSpotted, 302, "bed_wood", 9, 9, 0.10f, 0.10f, isHeard: false);
 
             // Act: simuliamo esplicitamente il gate usato da MemoryEncoding/TokenAssimilation.
             AddThroughMemoryGate(memoryStore, updater, beliefStore, strongFoodTrace, currentTick: 40);

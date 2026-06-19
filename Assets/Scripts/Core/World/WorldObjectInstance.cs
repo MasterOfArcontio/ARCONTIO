@@ -5,7 +5,7 @@ namespace Arcontio.Core
     /// Istanza nel mondo di un ObjectDef.
     ///
     /// Esempio:
-    /// - DefId = "bed_wood_poor"
+    /// - DefId = "bed_wood"
     /// - In cella (x,y)
     /// - owner = Npc 12
     /// - occupant = npc che sta dormendo (solo per letti)

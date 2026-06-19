@@ -31,10 +31,10 @@ CHECKPOINT CORRENTE:
 `v0.38o - MapGrid Dependency Audit Finale / ArcGraph Visual Asset Policy Alignment`
 
 STATUS:
-TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; F12 RUNTIME SWITCH GATE SUPERATO; FOV ARCGRAPH ASSORBITO COME MODALITA' VIEWMODE DA VALIDARE; FALLBACK SPRITE MAPGRID ELIMINATO; PAN/ZOOM SCOLLEGATI DA MAPGRID; POLICY VISUAL ASSET ARCGRAPH FORMALIZZATA; PROSSIMO BLOCCO: v0.38o.06 PLACEMENT/F3 AUTONOMO ARCGRAPH
+TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; F12 RUNTIME SWITCH GATE SUPERATO; FOV ARCGRAPH ASSORBITO COME MODALITA' VIEWMODE DA VALIDARE; FALLBACK SPRITE MAPGRID ELIMINATO; PAN/ZOOM SCOLLEGATI DA MAPGRID; POLICY VISUAL ASSET ARCGRAPH FORMALIZZATA; PLACEMENT/F3 ARCGRAPH AUTONOMO INTRODOTTO; OBJECT_DEFS MIGRATO A PATH ARCGRAPH; CATALOGO VISUALE AMBIENTE INTRODOTTO; PROSSIMO BLOCCO: v0.38o.09 COLLEGARE VISUALSTATEKEY/PLANTVISUALSTATEKEY AL CATALOGO AMBIENTE
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38o-policy-roadmap-alignment`
+`ai-task/v0.38o-placement-catalog-env`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
@@ -121,10 +121,10 @@ MICRO-ROADMAP OPERATIVA v0.38o:
 ✅ v0.38o.03 -> COMPLETATO - Separazione preview placement/F3 dal tipo concreto MapGridRuntimeDevToolsOverlay
 ✅ v0.38o.04 -> COMPLETATO - Scollegamento pan/zoom ArcGraph da offset camera MapGrid
 ✅ v0.38o.05 -> COMPLETATO - Policy visual asset ArcGraph per oggetti, NPC, piante, vegetazione e resolver sprite
-⏳ v0.38o.06 -> PROSSIMO - Controller placement/F3 autonomo ArcGraph, fuori dal DevTools legacy MapGrid
-⏳ v0.38o.07 -> PENDING - Migrazione object_defs.json da path MapGrid/Sprites/Objects a path ArcGraph reali, solo con asset equivalenti
-⏳ v0.38o.08 -> PENDING - Introduzione ArcGraphEnvironmentVisualCatalog.json per vegetazione diffusa e PlantInstance
-⏳ v0.38o.09 -> PENDING - Collegamento plantVisualStateKey / visualStateKey al catalogo ambiente ArcGraph
+✅ v0.38o.06 -> COMPLETATO - Controller placement/F3 autonomo ArcGraph, fuori dal DevTools legacy MapGrid
+✅ v0.38o.07 -> COMPLETATO - Migrazione object_defs.json da path MapGrid/Sprites/Objects a path ArcGraph reali, solo con asset equivalenti
+✅ v0.38o.08 -> COMPLETATO - Introduzione ArcGraphEnvironmentVisualCatalog.json per vegetazione diffusa e PlantInstance
+⏳ v0.38o.09 -> PROSSIMO - Collegamento plantVisualStateKey / visualStateKey al catalogo ambiente ArcGraph
 ⏳ v0.38o.10 -> PENDING - Estensione ArcGraphNpcVisualCatalog.json per sheet NPC per parte/animazione
 ⏳ v0.38o.11 -> PENDING - Eliminazione o congelamento adapter/probe MapGrid non-runtime
 ⏳ v0.38o.12 -> PENDING - Rimozione ArcGraphViewModeSwitcher/root switch legacy quando ArcGraph resta unica vista
@@ -135,9 +135,9 @@ ROADMAP POLICY VISUAL ASSET ARCGRAPH - STATO OPERATIVO:
 
 ```text
 ✅ Policy step 1 -> Congelare ARCGRAPH_VISUAL_ASSET_POLICY.md e usarlo come vincolo operativo: coperto da v0.38o.05
-⏳ Policy step 2 -> Migrare object_defs.json da path MapGrid a path ArcGraph reali: coperto da v0.38o.07
+✅ Policy step 2 -> Migrare object_defs.json da path MapGrid a path ArcGraph reali: coperto da v0.38o.07
 ⏳ Policy step 3 -> Estendere ArcGraphNpcVisualCatalog.json per sheet per parte/animazione: coperto da v0.38o.10
-⏳ Policy step 4 -> Introdurre ArcGraphEnvironmentVisualCatalog.json: coperto da v0.38o.08
+✅ Policy step 4 -> Introdurre ArcGraphEnvironmentVisualCatalog.json: coperto da v0.38o.08
 ⏳ Policy step 5 -> Collegare plantVisualStateKey / visualStateKey al catalogo ambiente: coperto da v0.38o.09
 ⏳ Policy step 6 -> Rimuovere o congelare pattern NPC a frame sciolti quando le sheet esistono: dopo v0.38o.10
 ⏳ Policy step 7 -> Eliminare path MapGrid residui dai cataloghi ArcGraph prima del delete fisico MapGrid: coperto da v0.38o.07 + v0.38o.13
@@ -2409,9 +2409,9 @@ Aggiornamento operativo `v0.38o.05`:
 
 Residui bloccanti prima della cancellazione fisica MapGrid:
 
-- il comando operativo F3/placement vive ancora nel DevTools legacy;
-- `object_defs.json` contiene ancora `Visual.SpritePath` espliciti verso asset `MapGrid/Sprites/Objects`; non sono fallback, sono dati catalogo da migrare solo quando esistono asset ArcGraph equivalenti;
-- manca `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e piante vive della biosfera;
+- il comando operativo F3/placement vive ora in `ArcGraphPlacementToolController`, ma va validato in Unity e poi collegato al pannello azione;
+- `object_defs.json` usa path ArcGraph reali; servono asset PNG/sheet equivalenti per evitare missing sprite finche' l'operatore non li produce;
+- `ArcGraphEnvironmentVisualCatalog.json` esiste, ma non e' ancora collegato al feed runtime `visualStateKey` / `plantVisualStateKey`;
 - `ArcGraphNpcVisualCatalog.json` usa ancora pattern frame separati e non ancora sheet per parte/animazione;
 - restano adapter/probe MapGrid legacy;
 - resta logica di root switch/visual root MapGrid;

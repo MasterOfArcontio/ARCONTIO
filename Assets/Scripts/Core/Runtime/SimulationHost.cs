@@ -1994,9 +1994,9 @@ namespace Arcontio.Core
             // - davanti (2,0) -> deve essere visto
             // - diagonale davanti (2,1) -> deve essere visto (cono)
             // - dietro ( -2,0 ) -> NON deve essere visto
-            _world.CreateObject(defId: "bed_wood_poor", x: 2, y: 0, ownerKind: OwnerKind.Npc, ownerId: npc);
+            _world.CreateObject(defId: "bed_wood", x: 2, y: 0, ownerKind: OwnerKind.Npc, ownerId: npc);
             _world.CreateObject(defId: "workbench_basic", x: 2, y: 1, ownerKind: OwnerKind.Community, ownerId: 0);
-            _world.CreateObject(defId: "chair_basic", x: -2, y: 0, ownerKind: OwnerKind.Community, ownerId: 0);
+            _world.CreateObject(defId: "chair_wood", x: -2, y: 0, ownerKind: OwnerKind.Community, ownerId: 0);
 
             ArcontioLogger.Debug(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "T8"),
@@ -2190,20 +2190,20 @@ namespace Arcontio.Core
             _world.SetFacing(npc3, CardinalDirection.West);
 
             // --- Oggetti: letti ---
-            int bedCommunity = _world.CreateObject(defId: "bed_wood_poor", x: 20, y: 23, ownerKind: OwnerKind.Community, ownerId: 0);
+            int bedCommunity = _world.CreateObject(defId: "bed_wood", x: 20, y: 23, ownerKind: OwnerKind.Community, ownerId: 0);
             _world.ObjectUse[bedCommunity] = ObjectUseState.Free();
 
             ArcontioLogger.Debug(new LogContext(0, "T9"),
                new LogBlock(LogLevel.Debug, "object.spawn")
-                  .AddField("obj", "bed_wood_poor")
+                  .AddField("obj", "bed_wood")
                   .AddField("units", 1));
 
-            int bedNpc2 = _world.CreateObject(defId: "bed_wood_good", x: 21, y: 23, ownerKind: OwnerKind.Npc, ownerId: npc2);
+            int bedNpc2 = _world.CreateObject(defId: "bed_wood", x: 21, y: 23, ownerKind: OwnerKind.Npc, ownerId: npc2);
             _world.ObjectUse[bedNpc2] = ObjectUseState.Free();
 
             ArcontioLogger.Debug(new LogContext(0, "T9"),
                new LogBlock(LogLevel.Debug, "object.spawn")
-                  .AddField("obj", "bed_wood_good")
+                  .AddField("obj", "bed_wood")
                   .AddField("units", 1));
 
             // --- Cibo: stock libero visibile (davanti a NPC1) ---
@@ -2443,7 +2443,7 @@ namespace Arcontio.Core
             //_world.CreateObject(defId: "wall_stone", x: 32, y: 23);
             _world.CreateObject(defId: "wall_stone", x: 34, y: 23);
 
-            _world.CreateObject(defId: "door_wood_good", x: 32, y: 24, ownerKind: OwnerKind.Community, ownerId: 0);
+            _world.CreateObject(defId: "door_wood", x: 32, y: 24, ownerKind: OwnerKind.Community, ownerId: 0);
 
             // 5 NPC: uno "low law" che tenderà a rubare, altri più legali.
             int npc1 = _world.CreateNpc(NpcDnaProfile.CreateDefault("T10_NPC1_Thief"),

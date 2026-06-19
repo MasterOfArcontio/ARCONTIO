@@ -61,6 +61,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphCameraViewportController _cameraViewportController;
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
+        private ArcGraphPlacementToolController _placementToolController;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphFovDebugOverlaySceneConsumer _fovOverlayConsumer;
         private ArcGraphFovDebugOverlayRuntimeController _fovOverlayController;
@@ -237,6 +238,7 @@ namespace Arcontio.View.ArcGraph
             _cameraViewportController = _visualRoot.AddComponent<ArcGraphCameraViewportController>();
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
+            _placementToolController = _visualRoot.AddComponent<ArcGraphPlacementToolController>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
@@ -331,6 +333,8 @@ namespace Arcontio.View.ArcGraph
             _interactionWrapper.SetSceneCameraZoomSyncEnabled(false);
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer);
+            _placementToolController.SetRuntimeContextProvider(_contextProvider);
+            _placementToolController.SetSceneCamera(Camera.main);
             _placementHighlightConsumer.SetRuntimeContextProvider(_contextProvider);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
             _placementHighlightConsumer.SetSceneCamera(Camera.main);
@@ -443,12 +447,21 @@ namespace Arcontio.View.ArcGraph
         private void RefreshRuntimeSceneBindings()
         {
             MonoBehaviour placementPreviewSource =
-                FindSceneBehaviourImplementing<IArcGraphPlacementPreviewSource>();
+                _placementToolController != null
+                    ? _placementToolController
+                    : FindSceneBehaviourImplementing<IArcGraphPlacementPreviewSource>();
             MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
+            MapGridRuntimeDevToolsOverlay legacyPlacementOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
             Arcontio.Core.SimulationHost simulationHost = Arcontio.Core.SimulationHost.Instance;
 
             if (_contextProvider != null)
                 _contextProvider.SetSimulationHost(simulationHost);
+
+            if (_placementToolController != null)
+            {
+                _placementToolController.SetRuntimeContextProvider(_contextProvider);
+                _placementToolController.SetSceneCamera(Camera.main);
+            }
 
             if (_placementHighlightConsumer != null)
                 _placementHighlightConsumer.SetPlacementPreviewSource(placementPreviewSource);
@@ -457,6 +470,7 @@ namespace Arcontio.View.ArcGraph
                 _cameraViewportController.SetSceneCamera(Camera.main);
 
             ConfigureLegacyMapGridCameraControllerForArcGraph(cameraController);
+            ConfigureLegacyMapGridPlacementOverlayForArcGraph(legacyPlacementOverlay);
 
             // Anche i root visuali MapGrid possono essere creati dal bootstrap
             // legacy dopo l'installazione ArcGraph. Ricablare il controller per
@@ -496,6 +510,33 @@ namespace Arcontio.View.ArcGraph
             cameraController.SetZoomInputEnabled(false);
             cameraController.SetPanInputEnabled(false);
             cameraController.enabled = false;
+        }
+
+        // =============================================================================
+        // ConfigureLegacyMapGridPlacementOverlayForArcGraph
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Spegne il DevTools placement legacy MapGrid mentre ArcGraph possiede il
+        /// controller F3 runtime.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: un solo lettore operativo di F3</b></para>
+        /// <para>
+        /// Il vecchio overlay MapGrid resta nel progetto e potra' essere auditato o
+        /// rimosso piu' avanti, ma non deve piu' leggere F3 quando ArcGraph e' la
+        /// vista runtime principale. In caso contrario un singolo input potrebbe
+        /// aprire il pannello legacy e, nello stesso frame, attivare il placement
+        /// ArcGraph.
+        /// </para>
+        /// </summary>
+        private static void ConfigureLegacyMapGridPlacementOverlayForArcGraph(
+            MapGridRuntimeDevToolsOverlay legacyPlacementOverlay)
+        {
+            if (legacyPlacementOverlay == null)
+                return;
+
+            legacyPlacementOverlay.enabled = false;
         }
 
         // =============================================================================
