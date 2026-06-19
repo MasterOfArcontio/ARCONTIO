@@ -151,7 +151,7 @@ namespace Arcontio.View.ArcGraph
         public int defaultZoomLevel = 1;
         public int mouseWheelStepsPerZoomLevel = 1;
         public bool panUsesMiddleMouseButton = true;
-        public float zoomTransitionSeconds = 0.30f;
+        public float zoomTransitionSeconds = 1.20f;
         public ArcGraphZoomLevelConfigDto[] zoomLevels;
 
         // =============================================================================

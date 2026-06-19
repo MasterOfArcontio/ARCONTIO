@@ -30,13 +30,13 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Canvas</b>: overlay UGUI screen-space con scaler 1920x1080.</item>
     ///   <item><b>ArcUIRoot</b>: root full-screen dei blocchi definitivi.</item>
-    ///   <item><b>ViewModeBar</b>: modalita' di osservazione, non azioni sul mondo.</item>
+    ///   <item><b>TopBar/BottomActionBar</b>: cornici fisse che delimitano la viewport mappa.</item>
     ///   <item><b>TopBar</b>: stato globale simulazione, ancora non bindato a ViewModel.</item>
     ///   <item><b>MapViewport</b>: rettangolo UI che delimita la camera mappa ArcGraph.</item>
     ///   <item><b>RightInspector</b>: inspector tabbed pronto per target diversi.</item>
     ///   <item><b>BottomActionBar</b>: categorie operative principali.</item>
     ///   <item><b>ActionPanel</b>: pannello contestuale aperto dalla categoria attiva.</item>
-    ///   <item><b>PointerHUD/OverlayRoot/DebugRoot</b>: root separati per HUD, overlay e debug.</item>
+    ///   <item><b>OverlayRoot/DebugRoot</b>: root separati per overlay e debug.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphUiRuntimeRoot : MonoBehaviour
@@ -45,7 +45,6 @@ namespace Arcontio.View.ArcGraph
         private const string RootName = "ArcUIRoot";
 
         private const float TopBarHeight = 44f;
-        private const float ViewModeBarWidth = 390f;
         private const float RightInspectorWidth = 350f;
         private const float BottomActionBarHeight = 92f;
         private const float ActionPanelHeight = 210f;
@@ -114,12 +113,10 @@ namespace Arcontio.View.ArcGraph
             CreateCanvasRoot();
             CreateUiRoot();
             BuildMapViewport();
-            BuildViewModeBar();
             BuildTopBar();
             BuildRightInspector();
             BuildActionPanel();
             BuildBottomActionBar();
-            BuildPointerHud();
             BuildOverlayRoots();
 
             _uiRoot.SetActive(uiEnabled);
@@ -272,38 +269,9 @@ namespace Arcontio.View.ArcGraph
                 viewport,
                 Vector2.zero,
                 Vector2.one,
-                new Vector2(0f, BottomActionBarHeight + ActionPanelHeight),
-                new Vector2(-RightInspectorWidth, -TopBarHeight));
+                new Vector2(0f, BottomActionBarHeight),
+                new Vector2(0f, -TopBarHeight));
             _mapViewport = viewport;
-        }
-
-        private void BuildViewModeBar()
-        {
-            RectTransform panel = CreatePanel(
-                "ViewModeBar",
-                _uiRoot.transform,
-                new Vector2(0f, 1f),
-                new Vector2(0f, 1f),
-                new Vector2(OuterMargin, -OuterMargin - TopBarHeight),
-                new Vector2(ViewModeBarWidth, -OuterMargin));
-
-            HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(8, 8, 6, 6);
-            layout.spacing = 6f;
-            layout.childAlignment = TextAnchor.MiddleLeft;
-            layout.childControlWidth = false;
-            layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = true;
-
-            CreateIconButton(panel, "Vista");
-            _fovViewModeButton = CreateIconButton(panel, "FOV");
-            CreateIconButton(panel, "Path");
-            CreateIconButton(panel, "Celle");
-            CreateIconButton(panel, "Mem");
-            CreateIconButton(panel, "Cred");
-            CreateIconButton(panel, "Eventi");
-            CreateIconButton(panel, "Debug");
         }
 
         private void BuildTopBar()
@@ -313,8 +281,8 @@ namespace Arcontio.View.ArcGraph
                 _uiRoot.transform,
                 new Vector2(0f, 1f),
                 new Vector2(1f, 1f),
-                new Vector2(ViewModeBarWidth + OuterMargin, -OuterMargin - TopBarHeight),
-                new Vector2(-RightInspectorWidth - OuterMargin, -OuterMargin));
+                new Vector2(0f, -TopBarHeight),
+                new Vector2(0f, 0f));
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(18, 18, 6, 6);
@@ -345,8 +313,8 @@ namespace Arcontio.View.ArcGraph
                 _uiRoot.transform,
                 new Vector2(1f, 0f),
                 new Vector2(1f, 1f),
-                new Vector2(-RightInspectorWidth - OuterMargin, BottomActionBarHeight + OuterMargin),
-                new Vector2(-OuterMargin, -TopBarHeight - OuterMargin));
+                new Vector2(-RightInspectorWidth, BottomActionBarHeight),
+                new Vector2(0f, -TopBarHeight));
             panel.gameObject.AddComponent<RectMask2D>();
 
             VerticalLayoutGroup layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();
@@ -360,6 +328,7 @@ namespace Arcontio.View.ArcGraph
             BuildInspectorHeader(panel);
             BuildInspectorTabs(panel);
             BuildInspectorContent(panel);
+            panel.gameObject.SetActive(false);
         }
 
         private void BuildInspectorHeader(RectTransform parent)
@@ -442,8 +411,8 @@ namespace Arcontio.View.ArcGraph
                 _uiRoot.transform,
                 new Vector2(0f, 0f),
                 new Vector2(1f, 0f),
-                new Vector2(OuterMargin, BottomActionBarHeight + OuterMargin),
-                new Vector2(-RightInspectorWidth - OuterMargin, BottomActionBarHeight + OuterMargin + ActionPanelHeight));
+                new Vector2(0f, BottomActionBarHeight),
+                new Vector2(0f, BottomActionBarHeight + ActionPanelHeight));
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(10, 10, 10, 10);
@@ -455,6 +424,7 @@ namespace Arcontio.View.ArcGraph
 
             BuildActionPanelTabs(panel);
             BuildOperationGrid(panel);
+            panel.gameObject.SetActive(false);
         }
 
         private void BuildActionPanelTabs(RectTransform parent)
@@ -511,8 +481,8 @@ namespace Arcontio.View.ArcGraph
                 _uiRoot.transform,
                 new Vector2(0f, 0f),
                 new Vector2(1f, 0f),
-                new Vector2(OuterMargin, OuterMargin),
-                new Vector2(-OuterMargin, BottomActionBarHeight));
+                new Vector2(0f, 0f),
+                new Vector2(0f, BottomActionBarHeight));
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(8, 8, 8, 8);
@@ -530,19 +500,6 @@ namespace Arcontio.View.ArcGraph
             CreateBottomActionButton(panel, "NPC", active: false);
             CreateBottomActionButton(panel, "Istituzioni", active: false);
             CreateBottomActionButton(panel, "Ricerca", active: false);
-        }
-
-        private void BuildPointerHud()
-        {
-            RectTransform panel = CreatePanel(
-                "PointerHUD",
-                _uiRoot.transform,
-                new Vector2(0f, 1f),
-                new Vector2(0f, 1f),
-                new Vector2(OuterMargin, -TopBarHeight - 70f),
-                new Vector2(260f, -TopBarHeight - 34f));
-
-            CreateText(panel, "Cella --, --", 12, FontStyles.Normal, TextAlignmentOptions.Center);
         }
 
         private void BuildOverlayRoots()
