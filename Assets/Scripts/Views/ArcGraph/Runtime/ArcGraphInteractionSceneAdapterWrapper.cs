@@ -367,7 +367,10 @@ namespace Arcontio.View.ArcGraph
         {
             Mouse mouse = Mouse.current;
             bool hasMouse = mouse != null;
-            ResolveViewport(out int viewportWidth, out int viewportHeight);
+            ResolveViewport(
+                out int viewportWidth,
+                out int viewportHeight,
+                out Vector2 viewportOriginPixels);
             bool hasValidViewport = viewportWidth > 0 && viewportHeight > 0;
 
             if (!adapterEnabled)
@@ -389,7 +392,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphViewState viewState = EnsureViewState();
             IArcGraphInteractionFrameConsumer consumer = ResolveConsumer();
 
-            ArcGraphViewInputFrame input = BuildInputFrame(mouse);
+            ArcGraphViewInputFrame input = BuildInputFrame(mouse, viewportOriginPixels);
             var sceneFrame = new ArcGraphInteractionSceneFrame(
                 input,
                 viewportWidth,
@@ -587,20 +590,51 @@ namespace Arcontio.View.ArcGraph
             return interactionConsumerBehaviour as IArcGraphInteractionFrameConsumer;
         }
 
-        private void ResolveViewport(out int viewportWidth, out int viewportHeight)
+        private void ResolveViewport(
+            out int viewportWidth,
+            out int viewportHeight,
+            out Vector2 viewportOriginPixels)
         {
+            if (TryResolveSceneCameraPixelViewport(out Rect cameraViewport))
+            {
+                viewportWidth = Mathf.RoundToInt(cameraViewport.width);
+                viewportHeight = Mathf.RoundToInt(cameraViewport.height);
+                viewportOriginPixels = cameraViewport.position;
+                return;
+            }
+
             if (useScreenAsViewport)
             {
                 viewportWidth = Screen.width;
                 viewportHeight = Screen.height;
+                viewportOriginPixels = Vector2.zero;
                 return;
             }
 
             viewportWidth = manualViewportPixelWidth;
             viewportHeight = manualViewportPixelHeight;
+            viewportOriginPixels = manualViewportOriginPixels;
         }
 
-        private ArcGraphViewInputFrame BuildInputFrame(Mouse mouse)
+        private bool TryResolveSceneCameraPixelViewport(out Rect viewport)
+        {
+            viewport = default;
+
+            Camera camera = ResolveSceneCamera();
+            if (camera == null)
+                return false;
+
+            Rect pixelRect = camera.pixelRect;
+            if (pixelRect.width <= 0f || pixelRect.height <= 0f)
+                return false;
+
+            viewport = pixelRect;
+            return true;
+        }
+
+        private ArcGraphViewInputFrame BuildInputFrame(
+            Mouse mouse,
+            Vector2 viewportOriginPixels)
         {
             if (mouse == null)
                 return ArcGraphViewInputFrame.Empty();
@@ -618,9 +652,7 @@ namespace Arcontio.View.ArcGraph
                 (mouse.middleButton.isPressed ||
                  mouse.rightButton.isPressed);
 
-            Vector2 viewportPoint = useScreenAsViewport
-                ? position
-                : position - manualViewportOriginPixels;
+            Vector2 viewportPoint = position - viewportOriginPixels;
 
             int wheelStepDelta = viewInputEnabled
                 ? ResolveWheelStep(mouse.scroll.ReadValue().y)

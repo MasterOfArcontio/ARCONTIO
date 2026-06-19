@@ -233,6 +233,7 @@ namespace Arcontio.View.ArcGraph
             Mouse mouse = Mouse.current;
             bool canConsumeInput =
                 mouse != null &&
+                IsPointerInsideCameraViewport(camera, mouse.position.ReadValue()) &&
                 (!ignoreInputWhenPointerIsOverUi || !IsPointerOverUi());
 
             bool didChangeCamera = false;
@@ -350,7 +351,7 @@ namespace Arcontio.View.ArcGraph
             if (deltaPixels.sqrMagnitude < 0.0001f)
                 return false;
 
-            float worldPerPixel = (2f * camera.orthographicSize) / Mathf.Max(1, Screen.height);
+            float worldPerPixel = (2f * camera.orthographicSize) / Mathf.Max(1, camera.pixelHeight);
             Vector3 deltaWorld = new Vector3(
                 -deltaPixels.x * worldPerPixel,
                 -deltaPixels.y * worldPerPixel,
@@ -464,7 +465,11 @@ namespace Arcontio.View.ArcGraph
             if (pixelPerfectCamera == null || !pixelPerfectCamera.enabled)
                 return;
 
-            int viewportHeight = Screen.height > 0 ? Screen.height : 1080;
+            int viewportHeight = camera.pixelHeight > 0
+                ? camera.pixelHeight
+                : Screen.height > 0
+                    ? Screen.height
+                    : 1080;
             int targetAssetsPpu = Mathf.Max(
                 1,
                 Mathf.RoundToInt(viewportHeight / (float)zoom.VisibleCellsY));
@@ -592,6 +597,19 @@ namespace Arcontio.View.ArcGraph
         private static bool IsPointerOverUi()
         {
             return EventSystem.current != null && EventSystem.current.IsPointerOverGameObject();
+        }
+
+        private static bool IsPointerInsideCameraViewport(
+            Camera camera,
+            Vector2 pointerScreenPosition)
+        {
+            if (camera == null)
+                return false;
+
+            Rect pixelRect = camera.pixelRect;
+            return pixelRect.width > 0f &&
+                   pixelRect.height > 0f &&
+                   pixelRect.Contains(pointerScreenPosition);
         }
 
         private static int ClampInt(int value, int min, int max)
