@@ -707,7 +707,7 @@ namespace Arcontio.View.ArcGraph
 
             // La dimensione mappa arriva dal context runtime neutrale,
             // ma il comportamento dello zoom deve restare quello della config
-            // ArcGraph. Questo preserva i quattro livelli decisi nel JSON evitando
+            // ArcGraph. Questo preserva i livelli decisi nel JSON evitando
             // che il campo serializzato legacy <c>zoomLevel</c> diventi una seconda
             // fonte di verita'.
             return new ArcGraphMapViewConfig(
@@ -716,7 +716,8 @@ namespace Arcontio.View.ArcGraph
                 template.ZoomLevels,
                 template.DefaultZoomLevel,
                 template.MouseWheelStepsPerZoomLevel,
-                template.PanUsesMiddleMouseButton);
+                template.PanUsesMiddleMouseButton,
+                template.ZoomTransitionSeconds);
         }
 
         private ArcGraphMinimalRuntimeSceneWrapperDiagnostics CreateDiagnostics(

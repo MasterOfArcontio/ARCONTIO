@@ -262,6 +262,8 @@ namespace Arcontio.View.ArcGraph
         public string spriteKey;
         public int durationTicks = 8;
         public int sortingOffset;
+        public int frameWidthPixels;
+        public int frameHeightPixels;
 
         // =============================================================================
         // ToRuntimeFrame
@@ -283,7 +285,9 @@ namespace Arcontio.View.ArcGraph
                 frameIndex,
                 spriteKey,
                 durationTicks,
-                sortingOffset);
+                sortingOffset,
+                frameWidthPixels,
+                frameHeightPixels);
         }
     }
 
@@ -314,6 +318,8 @@ namespace Arcontio.View.ArcGraph
         public string spriteKeyPattern;
         public int durationTicks = 8;
         public int[] sortingOffsets;
+        public int frameWidthPixels;
+        public int frameHeightPixels;
 
         // =============================================================================
         // AppendRuntimeFrames
@@ -369,7 +375,9 @@ namespace Arcontio.View.ArcGraph
                                 resolvedAnimationKey,
                                 frameIndex),
                             durationTicks,
-                            sortingOffset));
+                            sortingOffset,
+                            frameWidthPixels,
+                            frameHeightPixels));
                     }
                 }
             }

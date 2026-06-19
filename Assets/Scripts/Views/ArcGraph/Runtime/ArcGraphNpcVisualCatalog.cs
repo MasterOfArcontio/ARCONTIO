@@ -27,6 +27,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>SpriteKey</b>: chiave asset risolvibile dal lato scena.</item>
     ///   <item><b>DurationTicks</b>: durata logica del frame per animazione leggera.</item>
     ///   <item><b>SortingOffset</b>: offset sorting rispetto al root actor.</item>
+    ///   <item><b>FrameWidthPixels/FrameHeightPixels</b>: dimensione logica del frame, utile per sprite LOD semplificati.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphNpcVisualFrame
@@ -39,6 +40,8 @@ namespace Arcontio.View.ArcGraph
         public readonly string SpriteKey;
         public readonly int DurationTicks;
         public readonly int SortingOffset;
+        public readonly int FrameWidthPixels;
+        public readonly int FrameHeightPixels;
 
         // =============================================================================
         // ArcGraphNpcVisualFrame
@@ -56,7 +59,9 @@ namespace Arcontio.View.ArcGraph
             int frameIndex,
             string spriteKey,
             int durationTicks,
-            int sortingOffset)
+            int sortingOffset,
+            int frameWidthPixels = 32,
+            int frameHeightPixels = 48)
         {
             VisualKey = NormalizeKey(visualKey, "human_default");
             PartKey = NormalizeKey(partKey, "body");
@@ -66,6 +71,8 @@ namespace Arcontio.View.ArcGraph
             SpriteKey = spriteKey ?? string.Empty;
             DurationTicks = durationTicks > 0 ? durationTicks : 1;
             SortingOffset = sortingOffset;
+            FrameWidthPixels = frameWidthPixels > 0 ? frameWidthPixels : 32;
+            FrameHeightPixels = frameHeightPixels > 0 ? frameHeightPixels : 48;
         }
 
         internal static string NormalizeDirection(string value)

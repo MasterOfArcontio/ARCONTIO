@@ -808,7 +808,7 @@ namespace Arcontio.View.ArcGraph
             handle.GameObject.transform.localScale = Vector3.one * contract.ActorScale;
 
             partRenderer.transform.localPosition = layeredActorSpriteLocalOffset;
-            partRenderer.transform.localScale = ResolveLayeredSpriteScale(sprite, catalog);
+            partRenderer.transform.localScale = ResolveLayeredSpriteScale(sprite, visualFrame, catalog);
             partRenderer.sprite = sprite;
             partRenderer.sortingOrder = entry.SortingOrder + visualFrame.SortingOffset;
             partRenderer.enabled = true;
@@ -835,6 +835,7 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private static Vector3 ResolveLayeredSpriteScale(
             Sprite sprite,
+            ArcGraphNpcVisualFrame visualFrame,
             ArcGraphNpcVisualCatalog catalog)
         {
             if (sprite == null || catalog == null)
@@ -847,8 +848,27 @@ namespace Arcontio.View.ArcGraph
                 ? sprite.pixelsPerUnit
                 : desiredPixelsPerUnit;
 
-            float scale = actualPixelsPerUnit / desiredPixelsPerUnit;
-            return Vector3.one * scale;
+            float expectedWidthPixels = visualFrame.FrameWidthPixels > 0
+                ? visualFrame.FrameWidthPixels
+                : catalog.FrameWidthPixels;
+            float expectedHeightPixels = visualFrame.FrameHeightPixels > 0
+                ? visualFrame.FrameHeightPixels
+                : catalog.FrameHeightPixels;
+            float actualWidthPixels = sprite.rect.width > 0f
+                ? sprite.rect.width
+                : expectedWidthPixels;
+            float actualHeightPixels = sprite.rect.height > 0f
+                ? sprite.rect.height
+                : expectedHeightPixels;
+
+            // Il catalogo dichiara la dimensione logica del frame. Se Unity importa
+            // lo sprite con PPU o slicing non perfettamente allineati, la scala
+            // corregge solo la resa locale della parte, senza toccare asset o meta.
+            float scaleX = (expectedWidthPixels / desiredPixelsPerUnit)
+                           / (actualWidthPixels / actualPixelsPerUnit);
+            float scaleY = (expectedHeightPixels / desiredPixelsPerUnit)
+                           / (actualHeightPixels / actualPixelsPerUnit);
+            return new Vector3(scaleX, scaleY, 1f);
         }
 
         private void ApplyActorShadow(

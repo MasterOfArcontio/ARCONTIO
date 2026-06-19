@@ -79,6 +79,8 @@
       "frameCount": 1,
       "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/idle_semplified#{direction}",
       "durationTicks": 1,
+      "frameWidthPixels": 16,
+      "frameHeightPixels": 16,
       "sortingOffsets": [
         0,
         1,

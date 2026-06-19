@@ -2,6 +2,7 @@
   "defaultZoomLevel": 1,
   "mouseWheelStepsPerZoomLevel": 1,
   "panUsesMiddleMouseButton": true,
+  "zoomTransitionSeconds": 0.12,
   "zoomLevels": [
     {
       "level": 1,

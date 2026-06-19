@@ -25,6 +25,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>DefaultZoomLevel</b>: livello iniziale richiesto.</item>
     ///   <item><b>MouseWheelStepsPerZoomLevel</b>: scatti rotellina per cambiare livello.</item>
     ///   <item><b>PanUsesMiddleMouseButton</b>: policy input per pan futuro.</item>
+    ///   <item><b>ZoomTransitionSeconds</b>: durata della transizione morbida fra livelli zoom.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphMapViewConfig
@@ -36,6 +37,7 @@ namespace Arcontio.View.ArcGraph
         public int DefaultZoomLevel { get; }
         public int MouseWheelStepsPerZoomLevel { get; }
         public bool PanUsesMiddleMouseButton { get; }
+        public float ZoomTransitionSeconds { get; }
         public int ZoomLevelCount => _zoomLevels.Length;
         public ArcGraphViewZoomLevelDefinition[] ZoomLevels => CopyZoomLevels();
 
@@ -60,7 +62,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphViewZoomLevelDefinition[] zoomLevels,
             int defaultZoomLevel = 1,
             int mouseWheelStepsPerZoomLevel = 1,
-            bool panUsesMiddleMouseButton = true)
+            bool panUsesMiddleMouseButton = true,
+            float zoomTransitionSeconds = 0.12f)
         {
             MapWidthCells = mapWidthCells > 0 ? mapWidthCells : 1;
             MapHeightCells = mapHeightCells > 0 ? mapHeightCells : 1;
@@ -70,6 +73,9 @@ namespace Arcontio.View.ArcGraph
                 ? mouseWheelStepsPerZoomLevel
                 : 1;
             PanUsesMiddleMouseButton = panUsesMiddleMouseButton;
+            ZoomTransitionSeconds = zoomTransitionSeconds >= 0f
+                ? zoomTransitionSeconds
+                : 0.12f;
         }
 
         // =============================================================================
@@ -102,7 +108,8 @@ namespace Arcontio.View.ArcGraph
                 },
                 defaultZoomLevel: 1,
                 mouseWheelStepsPerZoomLevel: 1,
-                panUsesMiddleMouseButton: true);
+                panUsesMiddleMouseButton: true,
+                zoomTransitionSeconds: 0.12f);
         }
 
         // =============================================================================
@@ -131,7 +138,8 @@ namespace Arcontio.View.ArcGraph
                 _zoomLevels,
                 DefaultZoomLevel,
                 MouseWheelStepsPerZoomLevel,
-                PanUsesMiddleMouseButton);
+                PanUsesMiddleMouseButton,
+                ZoomTransitionSeconds);
         }
 
         // =============================================================================

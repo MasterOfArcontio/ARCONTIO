@@ -139,6 +139,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>defaultZoomLevel</b>: livello iniziale richiesto.</item>
     ///   <item><b>mouseWheelStepsPerZoomLevel</b>: scatti rotellina per livello.</item>
     ///   <item><b>panUsesMiddleMouseButton</b>: policy del futuro pan.</item>
+    ///   <item><b>zoomTransitionSeconds</b>: tempo di ammorbidimento fra due livelli zoom.</item>
     ///   <item><b>zoomLevels</b>: profilo zoom serializzato.</item>
     /// </list>
     /// </summary>
@@ -150,6 +151,7 @@ namespace Arcontio.View.ArcGraph
         public int defaultZoomLevel = 1;
         public int mouseWheelStepsPerZoomLevel = 1;
         public bool panUsesMiddleMouseButton = true;
+        public float zoomTransitionSeconds = 0.12f;
         public ArcGraphZoomLevelConfigDto[] zoomLevels;
 
         // =============================================================================
@@ -180,7 +182,10 @@ namespace Arcontio.View.ArcGraph
                 mouseWheelStepsPerZoomLevel > 0
                     ? mouseWheelStepsPerZoomLevel
                     : defaults.MouseWheelStepsPerZoomLevel,
-                panUsesMiddleMouseButton);
+                panUsesMiddleMouseButton,
+                zoomTransitionSeconds >= 0f
+                    ? zoomTransitionSeconds
+                    : defaults.ZoomTransitionSeconds);
         }
 
         private ArcGraphViewZoomLevelDefinition[] BuildRuntimeZoomLevels(

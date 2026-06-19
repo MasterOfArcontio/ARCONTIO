@@ -47,6 +47,10 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphMapViewConfig _config;
         private ArcGraphViewState _viewState;
         private bool _didApplyInitialCameraState;
+        private bool _isZoomTransitionActive;
+        private float _zoomTransitionTargetOrthographicSize;
+        private Vector2 _zoomTransitionAnchorScreenPosition;
+        private Vector3 _zoomTransitionAnchorWorldPoint;
 
         public ArcGraphViewState ViewState => EnsureViewState();
         public bool ControllerEnabled => controllerEnabled;
@@ -238,6 +242,7 @@ namespace Arcontio.View.ArcGraph
                 didChangeCamera |= TryApplyDragPan(camera, config, mouse);
             }
 
+            didChangeCamera |= ApplyPendingZoomTransition(camera, config);
             ClampCameraToMap(camera, config);
             SyncViewStateFromCamera(camera, config, viewState);
             return didChangeCamera;
@@ -314,19 +319,14 @@ namespace Arcontio.View.ArcGraph
                 return false;
 
             int beforeLevel = viewState.ActiveZoomLevel;
-            Vector3 beforePointerWorld = ResolvePointerWorldPoint(camera, mouse.position.ReadValue());
+            Vector2 pointerScreenPosition = mouse.position.ReadValue();
+            Vector3 beforePointerWorld = ResolvePointerWorldPoint(camera, pointerScreenPosition);
 
             viewState.ApplyWheelZoom(wheelStep, config);
             if (viewState.ActiveZoomLevel == beforeLevel)
                 return false;
 
-            ApplyCameraZoomForViewState(camera, config, viewState);
-
-            Vector3 afterPointerWorld = ResolvePointerWorldPoint(camera, mouse.position.ReadValue());
-            Vector3 pointerCompensation = beforePointerWorld - afterPointerWorld;
-            pointerCompensation.z = 0f;
-
-            MoveCameraByOffset(camera, pointerCompensation);
+            BeginZoomTransition(camera, config, viewState, pointerScreenPosition, beforePointerWorld);
             return true;
         }
 
@@ -377,6 +377,83 @@ namespace Arcontio.View.ArcGraph
 
             camera.orthographic = true;
             camera.orthographicSize = targetOrthographicSize;
+            _isZoomTransitionActive = false;
+        }
+
+        private void BeginZoomTransition(
+            Camera camera,
+            ArcGraphMapViewConfig config,
+            ArcGraphViewState viewState,
+            Vector2 pointerScreenPosition,
+            Vector3 pointerWorldPoint)
+        {
+            ArcGraphViewZoomLevelDefinition zoom = viewState.CurrentZoom(config);
+            if (zoom.VisibleCellsY <= 0)
+                return;
+
+            ApplyPixelPerfectCameraZoomIfPresent(camera, zoom);
+
+            _zoomTransitionTargetOrthographicSize = Mathf.Max(
+                minimumOrthographicSize,
+                zoom.VisibleCellsY * 0.5f);
+            _zoomTransitionAnchorScreenPosition = pointerScreenPosition;
+            _zoomTransitionAnchorWorldPoint = pointerWorldPoint;
+            _isZoomTransitionActive = true;
+
+            if (config.ZoomTransitionSeconds <= 0.0001f)
+            {
+                ApplyZoomSizeAroundAnchor(camera, _zoomTransitionTargetOrthographicSize);
+                _isZoomTransitionActive = false;
+            }
+        }
+
+        private bool ApplyPendingZoomTransition(
+            Camera camera,
+            ArcGraphMapViewConfig config)
+        {
+            if (!_isZoomTransitionActive)
+                return false;
+
+            float targetSize = Mathf.Max(
+                minimumOrthographicSize,
+                _zoomTransitionTargetOrthographicSize);
+            float currentSize = camera.orthographicSize;
+            float transitionSeconds = Mathf.Max(0f, config.ZoomTransitionSeconds);
+
+            if (transitionSeconds <= 0.0001f)
+            {
+                ApplyZoomSizeAroundAnchor(camera, targetSize);
+                _isZoomTransitionActive = false;
+                return true;
+            }
+
+            float transitionStep = 1f - Mathf.Exp(-Time.unscaledDeltaTime / transitionSeconds);
+            float nextSize = Mathf.Lerp(currentSize, targetSize, transitionStep);
+
+            if (Mathf.Abs(nextSize - targetSize) < 0.001f)
+            {
+                nextSize = targetSize;
+                _isZoomTransitionActive = false;
+            }
+
+            ApplyZoomSizeAroundAnchor(camera, nextSize);
+            return true;
+        }
+
+        private void ApplyZoomSizeAroundAnchor(
+            Camera camera,
+            float orthographicSize)
+        {
+            camera.orthographic = true;
+            camera.orthographicSize = Mathf.Max(minimumOrthographicSize, orthographicSize);
+
+            Vector3 anchorAfterZoom = ResolvePointerWorldPoint(
+                camera,
+                _zoomTransitionAnchorScreenPosition);
+            Vector3 pointerCompensation = _zoomTransitionAnchorWorldPoint - anchorAfterZoom;
+            pointerCompensation.z = 0f;
+
+            MoveCameraByOffset(camera, pointerCompensation);
         }
 
         private void ApplyPixelPerfectCameraZoomIfPresent(
