@@ -24,7 +24,6 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>HasLocalSource</b>: indica se la cella contiene una sorgente locale gia' risolta.</item>
     ///   <item><b>AllowsGlobalOverlay</b>: contratto consente tinta globale compositiva.</item>
     ///   <item><b>AllowsLocalTint</b>: contratto consente tinta locale per cella.</item>
-    ///   <item><b>UsesSimplifiedRepresentation</b>: LOD semplificato attivo.</item>
     ///   <item><b>IsVisible/HiddenReason</b>: decisione visuale del builder.</item>
     ///   <item><b>SortKey</b>: ordinamento deterministico.</item>
     /// </list>
@@ -37,7 +36,6 @@ namespace Arcontio.View.ArcGraph
         public readonly bool HasLocalSource;
         public readonly bool AllowsGlobalOverlay;
         public readonly bool AllowsLocalTint;
-        public readonly bool UsesSimplifiedRepresentation;
         public readonly bool IsVisible;
         public readonly string HiddenReason;
         public readonly ArcGraphRenderSortKey SortKey;
@@ -63,7 +61,6 @@ namespace Arcontio.View.ArcGraph
             bool hasLocalSource,
             bool allowsGlobalOverlay,
             bool allowsLocalTint,
-            bool usesSimplifiedRepresentation,
             bool isVisible,
             string hiddenReason,
             ArcGraphRenderSortKey sortKey)
@@ -74,7 +71,6 @@ namespace Arcontio.View.ArcGraph
             HasLocalSource = hasLocalSource;
             AllowsGlobalOverlay = allowsGlobalOverlay;
             AllowsLocalTint = allowsLocalTint;
-            UsesSimplifiedRepresentation = usesSimplifiedRepresentation;
             IsVisible = isVisible;
             HiddenReason = string.IsNullOrWhiteSpace(hiddenReason) ? "None" : hiddenReason;
             SortKey = sortKey;

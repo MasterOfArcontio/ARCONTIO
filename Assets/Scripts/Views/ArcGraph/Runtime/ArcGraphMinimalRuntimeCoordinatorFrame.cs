@@ -12,8 +12,8 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: orchestrazione dichiarata, non ricerca scena</b></para>
     /// <para>
     /// Il frame contiene decisioni gia' prese dal chiamante: context runtime,
-    /// abilitazione del coordinator, richiesta di refresh snapshot, richiesta di
-    /// costruzione della queue actor/object e livello zoom. Il coordinator non deve
+    /// abilitazione del coordinator, richiesta di refresh snapshot e richiesta di
+    /// costruzione della queue actor/object. Il coordinator non deve
     /// cercare <c>MapGridBootstrap</c>, non deve leggere <c>SimulationHost</c> e non
     /// deve decidere da solo quali tool accendere.
     /// </para>
@@ -24,7 +24,6 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>IsCoordinatorEnabled</b>: gate principale del coordinator.</item>
     ///   <item><b>ShouldRefreshSnapshots</b>: richiede ricopia degli snapshot.</item>
     ///   <item><b>ShouldBuildActorObjectQueue</b>: richiede queue actor/object.</item>
-    ///   <item><b>ZoomLevel</b>: livello zoom usato per risolvere LOD.</item>
     ///   <item><b>SourceTick</b>: tick opzionale usato solo in diagnostica.</item>
     /// </list>
     /// </summary>
@@ -34,7 +33,6 @@ namespace Arcontio.View.ArcGraph
         public bool IsCoordinatorEnabled { get; }
         public bool ShouldRefreshSnapshots { get; }
         public bool ShouldBuildActorObjectQueue { get; }
-        public int ZoomLevel { get; }
         public long SourceTick { get; }
 
         public bool HasContext => Context != null;
@@ -53,8 +51,7 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Normalizzazione minima</b></para>
         /// <para>
-        /// Il livello zoom viene riportato almeno a 1. Il context null resta null:
-        /// in questo modo la diagnostica puo' distinguere un coordinator spento da
+        /// Il context null resta null: in questo modo la diagnostica puo' distinguere un coordinator spento da
         /// un coordinator acceso ma privo di sorgenti.
         /// </para>
         /// </summary>
@@ -63,14 +60,12 @@ namespace Arcontio.View.ArcGraph
             bool isCoordinatorEnabled,
             bool shouldRefreshSnapshots,
             bool shouldBuildActorObjectQueue,
-            int zoomLevel,
             long sourceTick = -1)
         {
             Context = context;
             IsCoordinatorEnabled = isCoordinatorEnabled;
             ShouldRefreshSnapshots = shouldRefreshSnapshots;
             ShouldBuildActorObjectQueue = shouldBuildActorObjectQueue;
-            ZoomLevel = zoomLevel > 0 ? zoomLevel : 1;
             SourceTick = sourceTick;
         }
 
@@ -88,8 +83,7 @@ namespace Arcontio.View.ArcGraph
                 context: null,
                 isCoordinatorEnabled: false,
                 shouldRefreshSnapshots: false,
-                shouldBuildActorObjectQueue: false,
-                zoomLevel: 1);
+                shouldBuildActorObjectQueue: false);
         }
     }
 }

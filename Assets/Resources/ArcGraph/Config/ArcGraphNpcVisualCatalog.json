@@ -52,35 +52,8 @@
       ],
       "animationKey": "walk",
       "frameCount": 4,
-      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/idle#{direction}_{frame00}",
+      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/walk#{direction}_{frame00}",
       "durationTicks": 4,
-      "sortingOffsets": [
-        0,
-        1,
-        2,
-        3
-      ]
-    },
-    {
-      "visualKey": "human_default",
-      "partKeys": [
-        "head",
-		"arms",
-        "body",
-        "legs"
-      ],
-      "directionKeys": [
-        "south",
-        "north",
-        "east",
-        "west"
-      ],
-      "animationKey": "idle_simplified",
-      "frameCount": 1,
-      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/idle_simplified#{direction}_00",
-      "durationTicks": 1,
-      "frameWidthPixels": 32,
-      "frameHeightPixels": 48,
       "sortingOffsets": [
         0,
         1,

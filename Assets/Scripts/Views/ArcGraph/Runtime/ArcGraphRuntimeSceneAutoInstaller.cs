@@ -531,9 +531,9 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Principio architetturale: una sola fonte per la dimensione mappa</b></para>
         /// <para>
-        /// <c>ArcGraphViewConfig.json</c> decide livelli zoom, pan e dettaglio
-        /// visuale, ma non deve piu' dichiarare la dimensione della mappa. Appena
-        /// il <c>SimulationHost</c> espone un <c>World</c>, l'installer copia
+        /// <c>ArcGraphViewConfig.json</c> decide solo i parametri continui della
+        /// camera e del pan, ma non deve piu' dichiarare la dimensione della mappa.
+        /// Appena il <c>SimulationHost</c> espone un <c>World</c>, l'installer copia
         /// larghezza e altezza dal context runtime e propaga la config aggiornata a
         /// wrapper, camera e interazione.
         /// </para>
@@ -587,12 +587,11 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Principio architetturale: una sola sorgente pan/zoom</b></para>
         /// <para>
-        /// ArcGraph usa <c>ArcGraphViewConfig</c> e <c>ArcGraphViewState</c> per
-        /// lavorare con livelli zoom discreti. Il vecchio
-        /// <c>MapGridCameraController</c> contiene pan fisico, zoom, target interno
-        /// e inerzia legacy. Quando ArcGraph diventa vista runtime, quel componente
-        /// viene spento per evitare due sorgenti concorrenti sullo stesso transform
-        /// camera.
+        /// ArcGraph usa il proprio controller camera ortografico continuo. Il
+        /// vecchio <c>MapGridCameraController</c> contiene pan fisico, zoom, target
+        /// interno e inerzia legacy. Quando ArcGraph diventa vista runtime, quel
+        /// componente viene spento per evitare due sorgenti concorrenti sullo stesso
+        /// transform camera.
         /// </para>
         /// </summary>
         private static void ConfigureLegacyMapGridCameraControllerForArcGraph(

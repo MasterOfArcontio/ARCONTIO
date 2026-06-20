@@ -111,7 +111,7 @@ namespace Arcontio.View.ArcGraph
             objectLayer.ReplaceSnapshots(CreateWallSnapshots(), renderState);
 
             var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            var lodProfile = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(4));
+            var lodProfile = ArcGraphZoomLodPolicy.ResolveFullDetail();
             var queue = new ArcGraphRenderQueue();
             var builder = new ArcGraphObjectRenderQueueBuilder();
             ArcGraphRenderQueueDiagnostics diagnostics = builder.Build(

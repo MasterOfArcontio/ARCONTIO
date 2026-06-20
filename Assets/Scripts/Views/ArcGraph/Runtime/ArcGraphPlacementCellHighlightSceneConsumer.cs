@@ -567,8 +567,7 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphRenderItemKind.Object,
                 -1,
                 spriteKey,
-                def.Id,
-                false);
+                def.Id);
 
             if (!spriteResolver.TryResolveSprite(request, out Sprite sprite) || sprite == null)
             {

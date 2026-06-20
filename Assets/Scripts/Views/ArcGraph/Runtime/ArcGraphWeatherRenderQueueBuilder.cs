@@ -206,7 +206,6 @@ namespace Arcontio.View.ArcGraph
                 overlayKey,
                 allowsAnimation,
                 contract.AllowsGlobalOverlay,
-                lodProfile.UsesSimplifiedRepresentation,
                 isVisible,
                 hiddenReason,
                 sortKey);
@@ -217,9 +216,6 @@ namespace Arcontio.View.ArcGraph
             ArcGraphZoomLodProfile lodProfile)
         {
             string weather = SanitizeKeyPart(snapshot.WeatherKey);
-
-            if (lodProfile.UsesSimplifiedRepresentation)
-                return "ArcGraph/Weather/Simple/" + weather;
 
             return "ArcGraph/Weather/" + weather;
         }

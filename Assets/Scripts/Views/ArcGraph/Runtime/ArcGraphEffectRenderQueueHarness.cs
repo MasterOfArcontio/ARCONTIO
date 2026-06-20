@@ -22,10 +22,8 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Passed</b>: esito complessivo.</item>
     ///   <item><b>Reason</b>: motivo sintetico.</item>
-    ///   <item><b>Zoom1VisibleCount</b>: item visibili a zoom lontano.</item>
-    ///   <item><b>Zoom1AnimatedCount</b>: item animabili a zoom lontano.</item>
-    ///   <item><b>Zoom4VisibleCount</b>: item visibili a zoom vicino.</item>
-    ///   <item><b>Zoom4AnimatedCount</b>: item animabili a zoom vicino.</item>
+    ///   <item><b>VisibleCount</b>: item visibili nel profilo full-detail.</item>
+    ///   <item><b>AnimatedCount</b>: item animabili nel profilo full-detail.</item>
     ///   <item><b>StaticSignalCount</b>: item ridotti a segnale statico.</item>
     ///   <item><b>HiddenCount</b>: item nascosti per snapshot non validi.</item>
     /// </list>
@@ -34,29 +32,23 @@ namespace Arcontio.View.ArcGraph
     {
         public readonly bool Passed;
         public readonly string Reason;
-        public readonly int Zoom1VisibleCount;
-        public readonly int Zoom1AnimatedCount;
-        public readonly int Zoom4VisibleCount;
-        public readonly int Zoom4AnimatedCount;
+        public readonly int VisibleCount;
+        public readonly int AnimatedCount;
         public readonly int StaticSignalCount;
         public readonly int HiddenCount;
 
         public ArcGraphEffectRenderQueueHarnessResult(
             bool passed,
             string reason,
-            int zoom1VisibleCount,
-            int zoom1AnimatedCount,
-            int zoom4VisibleCount,
-            int zoom4AnimatedCount,
+            int visibleCount,
+            int animatedCount,
             int staticSignalCount,
             int hiddenCount)
         {
             Passed = passed;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
-            Zoom1VisibleCount = zoom1VisibleCount;
-            Zoom1AnimatedCount = zoom1AnimatedCount;
-            Zoom4VisibleCount = zoom4VisibleCount;
-            Zoom4AnimatedCount = zoom4AnimatedCount;
+            VisibleCount = visibleCount;
+            AnimatedCount = animatedCount;
             StaticSignalCount = staticSignalCount;
             HiddenCount = hiddenCount;
         }
@@ -79,7 +71,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>RunDefaultSmoke</b>: scenario minimo con zoom 1 e zoom 4.</item>
+    ///   <item><b>RunDefaultSmoke</b>: scenario minimo con profilo full-detail.</item>
     ///   <item><b>CreateEffectSnapshots</b>: effetti visibili e snapshot nascosti.</item>
     /// </list>
     /// </summary>
@@ -96,8 +88,8 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Scenario minimo</b></para>
         /// <para>
         /// Lo scenario contiene una fiamma intensa, fumo debole e due snapshot non
-        /// renderizzabili. A zoom 1 tutto viene ridotto a segnale statico; a zoom 4
-        /// gli effetti visibili possono usare animazione frame-based ArcGraph.
+        /// renderizzabili. Il profilo visuale full-detail permette animazione
+        /// frame-based ArcGraph quando lo snapshot e il contratto la consentono.
         /// </para>
         /// </summary>
         public static ArcGraphEffectRenderQueueHarnessResult RunDefaultSmoke()
@@ -111,48 +103,32 @@ namespace Arcontio.View.ArcGraph
             layer.Initialize(renderState);
             layer.ReplaceSnapshots(CreateEffectSnapshots(), renderState);
 
-            var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            var zoom1 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(1));
-            var zoom4 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(4));
+            ArcGraphZoomLodProfile profile = ArcGraphZoomLodPolicy.ResolveFullDetail();
 
             var builder = new ArcGraphEffectRenderQueueBuilder();
-            var zoom1Items = new List<ArcGraphEffectRenderItem>();
-            ArcGraphEffectRenderQueueDiagnostics zoom1Diagnostics = builder.Build(
+            var items = new List<ArcGraphEffectRenderItem>();
+            ArcGraphEffectRenderQueueDiagnostics diagnostics = builder.Build(
                 layer,
-                zoom1,
-                zoom1Items);
+                profile,
+                items);
 
-            var zoom4Items = new List<ArcGraphEffectRenderItem>();
-            ArcGraphEffectRenderQueueDiagnostics zoom4Diagnostics = builder.Build(
-                layer,
-                zoom4,
-                zoom4Items);
-
-            bool zoom1StaticSignals = zoom1Items.Count == 2
-                                      && zoom1Diagnostics.StaticSignalCount == 2
-                                      && zoom1Diagnostics.AnimatedItemCount == 0;
-
-            bool zoom4AnimationExpected = zoom4Items.Count == 2
-                                          && zoom4Diagnostics.AnimatedItemCount == 2;
+            bool fullDetailAnimationExpected = items.Count == 2
+                                               && diagnostics.AnimatedItemCount == 2
+                                               && diagnostics.StaticSignalCount == 0;
 
             bool passed = layer.EffectCount == 4
-                          && zoom1Diagnostics.SnapshotCount == 4
-                          && zoom1Diagnostics.VisibleItemCount == 2
-                          && zoom1Diagnostics.HiddenItemCount == 2
-                          && zoom4Diagnostics.VisibleItemCount == 2
-                          && zoom4Diagnostics.HiddenItemCount == 2
-                          && zoom1StaticSignals
-                          && zoom4AnimationExpected;
+                          && diagnostics.SnapshotCount == 4
+                          && diagnostics.VisibleItemCount == 2
+                          && diagnostics.HiddenItemCount == 2
+                          && fullDetailAnimationExpected;
 
             return new ArcGraphEffectRenderQueueHarnessResult(
                 passed,
                 passed ? "EffectRenderQueueSmokePassed" : "EffectRenderQueueSmokeFailed",
-                zoom1Diagnostics.VisibleItemCount,
-                zoom1Diagnostics.AnimatedItemCount,
-                zoom4Diagnostics.VisibleItemCount,
-                zoom4Diagnostics.AnimatedItemCount,
-                zoom1Diagnostics.StaticSignalCount,
-                zoom4Diagnostics.HiddenItemCount);
+                diagnostics.VisibleItemCount,
+                diagnostics.AnimatedItemCount,
+                diagnostics.StaticSignalCount,
+                diagnostics.HiddenItemCount);
         }
 
         private static IEnumerable<ArcGraphEffectVisualSnapshot> CreateEffectSnapshots()

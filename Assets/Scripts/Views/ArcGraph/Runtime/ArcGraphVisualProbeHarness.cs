@@ -184,7 +184,7 @@ namespace Arcontio.View.ArcGraph
             PopulateEnvironment(vegetationLayer, waterLayer, lightLayer, renderState);
 
             var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            var lodProfile = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(4));
+            var lodProfile = ArcGraphZoomLodPolicy.ResolveFullDetail();
 
             var builder = new ArcGraphVisualProbeBuilder();
             return builder.Build(

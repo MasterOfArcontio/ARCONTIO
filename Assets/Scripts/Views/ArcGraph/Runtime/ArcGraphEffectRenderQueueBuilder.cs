@@ -30,7 +30,6 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphEffectRenderQueueBuilder
     {
         private const int EffectVisualLayerOrder = 80;
-        private const float MajorEffectIntensityThreshold = 0.5f;
         private readonly List<ArcGraphEffectVisualSnapshot> _snapshotBuffer = new();
 
         // =============================================================================
@@ -212,7 +211,6 @@ namespace Arcontio.View.ArcGraph
                 resolvedMode,
                 allowsAnimation,
                 contract.AllowsLocalTint,
-                lodProfile.UsesSimplifiedRepresentation,
                 isVisible,
                 hiddenReason,
                 sortKey);
@@ -222,12 +220,6 @@ namespace Arcontio.View.ArcGraph
             ArcGraphEffectVisualSnapshot snapshot,
             ArcGraphZoomLodProfile lodProfile)
         {
-            if (lodProfile.EffectMode == ArcGraphEffectLodMode.AnimatedMajorEffects
-                && snapshot.Intensity01 < MajorEffectIntensityThreshold)
-            {
-                return ArcGraphEffectLodMode.SimplifiedStaticEffect;
-            }
-
             return lodProfile.EffectMode;
         }
 
@@ -255,9 +247,6 @@ namespace Arcontio.View.ArcGraph
 
             if (resolvedMode == ArcGraphEffectLodMode.StaticSignalOnly)
                 return "ArcGraph/Effect/Signal/" + effect;
-
-            if (resolvedMode == ArcGraphEffectLodMode.SimplifiedStaticEffect)
-                return "ArcGraph/Effect/Simple/" + effect;
 
             if (resolvedMode == ArcGraphEffectLodMode.AnimatedMajorEffects)
                 return "ArcGraph/Effect/AnimatedMajor/" + effect;

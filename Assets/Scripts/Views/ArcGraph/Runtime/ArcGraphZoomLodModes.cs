@@ -5,22 +5,21 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Modalita' di rappresentazione actor in funzione dello zoom.
+    /// Modalita' di rappresentazione actor disponibili per profili visuali futuri.
     /// </para>
     ///
     /// <para><b>Principio architetturale: actor visivo scalabile</b></para>
     /// <para>
-    /// La simulazione dell'actor non cambia con lo zoom. Cambia solo il modo in cui
-    /// il renderer futuro lo mostra: marker strategico, sagoma semplificata, sprite
-    /// completo singolo o composizione a layer.
+    /// La simulazione dell'actor non cambia con la camera. Il renderer puo'
+    /// scegliere, in futuro, fra marker diagnostico, sprite completo singolo o
+    /// composizione a layer, ma la scelta non arriva piu' da livelli zoom.
     /// </para>
     /// </summary>
     public enum ArcGraphActorLodMode
     {
         StrategicMarker = 0,
-        SimplifiedStaticSprite = 1,
-        FullFlatSprite = 2,
-        LayeredSprite = 3
+        FullFlatSprite = 1,
+        LayeredSprite = 2
     }
 
     // =============================================================================
@@ -28,22 +27,21 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Modalita' di rappresentazione vegetazione in funzione dello zoom.
+    /// Modalita' di rappresentazione vegetazione disponibili per profili futuri.
     /// </para>
     ///
     /// <para><b>Principio architetturale: aggregazione quando il dettaglio non serve</b></para>
     /// <para>
-    /// Le singole piante non devono necessariamente essere disegnate a tutti gli
-    /// zoom. Ai livelli lontani conviene rappresentare masse o aree, riducendo il
-    /// costo visuale e migliorando leggibilita'.
+    /// Le singole piante potranno essere aggregate o disegnate singolarmente da
+    /// una policy ambientale esplicita. Questa scelta non e' piu' collegata alla
+    /// rotellina della camera.
     /// </para>
     /// </summary>
     public enum ArcGraphVegetationLodMode
     {
         AreaAggregate = 0,
-        SimplifiedStaticSprite = 1,
-        IndividualStaticSprite = 2,
-        IndividualAnimatedSprite = 3
+        IndividualStaticSprite = 1,
+        IndividualAnimatedSprite = 2
     }
 
     // =============================================================================
@@ -51,22 +49,20 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Modalita' di rappresentazione oggetti e item in funzione dello zoom.
+    /// Modalita' di rappresentazione oggetti e item disponibili per profili futuri.
     /// </para>
     ///
     /// <para><b>Principio architetturale: filtrare il rumore visuale</b></para>
     /// <para>
-    /// Gli oggetti minori possono essere nascosti agli zoom lontani. Le strutture o
-    /// gli oggetti importanti restano invece leggibili con rappresentazioni piu'
-    /// semplici.
+    /// Gli oggetti minori potranno essere nascosti o mostrati da una policy
+    /// esplicita di leggibilita'. Questa enum non pilota asset alternativi.
     /// </para>
     /// </summary>
     public enum ArcGraphObjectLodMode
     {
         HideMinorObjects = 0,
-        SimplifiedImportantObjects = 1,
-        StaticSprites = 2,
-        DetailedSprites = 3
+        StaticSprites = 1,
+        DetailedSprites = 2
     }
 
     // =============================================================================
@@ -74,21 +70,20 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Modalita' di rappresentazione effetti locali in funzione dello zoom.
+    /// Modalita' di rappresentazione effetti locali disponibili per profili futuri.
     /// </para>
     ///
     /// <para><b>Principio architetturale: effetti proporzionati alla scala</b></para>
     /// <para>
-    /// Un incendio visto da lontano puo' essere un indicatore statico; visto da
-    /// vicino puo' diventare fiamma animata con fumo. Questa enum rende esplicita
-    /// la scelta senza anticipare il renderer effetti.
+    /// Un effetto locale puo' essere segnale statico, animazione principale o
+    /// effetto completo. La scelta resta visuale e dichiarata, non deriva da
+    /// livelli zoom configurati.
     /// </para>
     /// </summary>
     public enum ArcGraphEffectLodMode
     {
         StaticSignalOnly = 0,
-        SimplifiedStaticEffect = 1,
-        AnimatedMajorEffects = 2,
-        FullLocalEffects = 3
+        AnimatedMajorEffects = 1,
+        FullLocalEffects = 2
     }
 }

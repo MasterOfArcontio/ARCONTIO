@@ -190,7 +190,6 @@ namespace Arcontio.View.ArcGraph
                 snapshot.DepthLevel,
                 spriteKey,
                 allowsAnimation,
-                lodProfile.UsesSimplifiedRepresentation,
                 isVisible,
                 hiddenReason,
                 sortKey);
@@ -202,9 +201,6 @@ namespace Arcontio.View.ArcGraph
         {
             if (!string.IsNullOrWhiteSpace(snapshot.SpriteKey))
                 return snapshot.SpriteKey.Trim();
-
-            if (lodProfile.UsesSimplifiedRepresentation)
-                return "ArcGraph/Water/Simple/depth_" + snapshot.DepthLevel;
 
             return "ArcGraph/Water/depth_" + snapshot.DepthLevel;
         }

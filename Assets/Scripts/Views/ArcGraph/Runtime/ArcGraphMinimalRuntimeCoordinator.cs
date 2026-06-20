@@ -114,7 +114,7 @@ namespace Arcontio.View.ArcGraph
                     return StoreDiagnostics(frame, true, recreatedRuntime, refreshed, hasTerrainLayer, hasActorLayer, hasObjectLayer, "ActorObjectLayersMissing");
                 }
 
-                BuildActorObjectQueue(actorLayer, objectLayer, frame.ZoomLevel);
+                BuildActorObjectQueue(actorLayer, objectLayer);
                 builtQueue = true;
             }
             else
@@ -175,16 +175,9 @@ namespace Arcontio.View.ArcGraph
 
         private void BuildActorObjectQueue(
             ArcGraphActorLayer actorLayer,
-            ArcGraphObjectLayer objectLayer,
-            int zoomLevel)
+            ArcGraphObjectLayer objectLayer)
         {
-            // La LOD viene risolta dal profilo ArcGraph gia' deciso in v0.33. Il
-            // coordinator non inventa regole proprie su quando mostrare actor o
-            // oggetti: passa il profilo ai builder gia' esistenti.
-            ArcGraphMapViewConfig config = ArcGraphMapViewConfig.CreateDefaultV033();
-            ArcGraphZoomLodProfile lodProfile = ArcGraphZoomLodPolicy.ResolveFromZoom(
-                config.ResolveZoomLevel(zoomLevel));
-
+            ArcGraphZoomLodProfile lodProfile = ArcGraphZoomLodPolicy.ResolveFullDetail();
             _queueBuilder.Build(actorLayer, objectLayer, lodProfile, _renderQueue);
         }
 
@@ -236,7 +229,7 @@ namespace Arcontio.View.ArcGraph
                 _renderQueue.ActorItems.Count,
                 _renderQueue.ObjectItems.Count,
                 _renderQueue.Entries.Count,
-                frame != null ? frame.ZoomLevel : 1,
+                0,
                 frame != null ? frame.SourceTick : -1,
                 reason);
 

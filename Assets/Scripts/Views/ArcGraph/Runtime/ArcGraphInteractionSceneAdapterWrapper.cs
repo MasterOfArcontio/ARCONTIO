@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
-using UnityEngine.U2D;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -223,12 +222,6 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void SetConfig(ArcGraphMapViewConfig config)
         {
-            ArcGraphMapViewConfig previousConfig = ResolveConfig();
-            int previousDefaultZoomLevel = previousConfig.DefaultZoomLevel;
-            bool shouldMoveDefaultViewState =
-                _viewState != null &&
-                _viewState.ActiveZoomLevel == previousDefaultZoomLevel;
-
             _config = config;
             ArcGraphMapViewConfig currentConfig = ResolveConfig();
 
@@ -238,16 +231,10 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            // Quando un producer sostituisce la configurazione provvisoria con una
-            // configurazione runtime piu' specifica, lo stato vista puo' essere
-            // ancora fermo sul vecchio default. In quel solo caso lo riallineiamo
-            // al nuovo default; se invece l'utente ha gia' zoomato o pannato, non
-            // sovrascriviamo la sua scelta a ogni frame.
-            if (shouldMoveDefaultViewState &&
-                previousDefaultZoomLevel != currentConfig.DefaultZoomLevel)
-            {
-                _viewState.SetZoomLevel(currentConfig.DefaultZoomLevel, currentConfig);
-            }
+            _viewState.SetCenterCell(
+                _viewState.CenterCellX,
+                _viewState.CenterCellY,
+                currentConfig);
         }
 
         // =============================================================================
@@ -294,16 +281,15 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Assegna la camera Unity da sincronizzare con lo stato zoom ArcGraph.
+        /// Assegna la camera Unity osservata dal wrapper interattivo.
         /// </para>
         ///
         /// <para><b>Principio architetturale: camera come uscita visuale, non input simulativo</b></para>
         /// <para>
-        /// Lo stato di zoom nasce da <c>ArcGraphViewConfig</c> e
-        /// <c>ArcGraphViewState</c>. La camera Unity e' solo il terminale visivo
-        /// che rende percepibile quel livello. Questo setter evita ricerche scena
-        /// diffuse e permette all'auto-installer di dichiarare esplicitamente quale
-        /// camera deve seguire ArcGraph.
+        /// Lo zoom fisico e' posseduto dal controller camera ArcGraph. Questo
+        /// setter evita ricerche scena diffuse e permette all'auto-installer di
+        /// dichiarare esplicitamente quale camera viene usata per picking e
+        /// sincronizzazione confinata.
         /// </para>
         /// </summary>
         public void SetSceneCamera(Camera camera)
@@ -316,17 +302,15 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Abilita o disabilita la sincronizzazione dello zoom fisico della camera
-        /// con il livello zoom ArcGraph corrente.
+        /// Abilita o disabilita la sincronizzazione difensiva della camera.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: zoom ArcGraph discreto</b></para>
+        /// <para><b>Principio architetturale: zoom fisico continuo</b></para>
         /// <para>
-        /// La rotellina viene ancora letta da questo wrapper, ma produce solo uno
-        /// scatto logico dentro <c>ArcGraphViewState</c>. Quando questo gate e'
-        /// acceso, il wrapper applica poi alla camera una dimensione coerente con
-        /// il livello risolto dal JSON. In questo modo non esistono piu' livelli
-        /// intermedi generati dal vecchio controller MapGrid.
+        /// La rotellina non produce piu' livelli logici dentro
+        /// <c>ArcGraphViewState</c>. Questo gate resta solo come ponte difensivo
+        /// per portare la camera su un valore base continuo quando un chiamante lo
+        /// abilita esplicitamente.
         /// </para>
         /// </summary>
         public void SetSceneCameraZoomSyncEnabled(bool enabled)
@@ -453,16 +437,15 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Applica alla camera Unity il livello zoom discreto risolto da ArcGraph.
+        /// Applica alla camera Unity il valore ortografico base ArcGraph.
         /// </para>
         ///
         /// <para><b>Principio architetturale: ponte temporaneo view-state -> camera</b></para>
         /// <para>
-        /// ArcGraph possiede gia' il contratto logico dello zoom e del centro
-        /// vista. Questa funzione e' un ponte piccolo e confinato: legge solo config
-        /// e stato view, calcola la dimensione ortografica coerente con le celle
-        /// visibili e porta la camera sul centro dichiarato dallo stato. Non legge
-        /// il World, non sposta NPC e non modifica dati simulativi.
+        /// Questa funzione e' un ponte piccolo e confinato: legge solo config e
+        /// stato view, applica la dimensione ortografica base e porta la camera sul
+        /// centro dichiarato dallo stato. Non legge il World, non sposta NPC e non
+        /// modifica dati simulativi.
         /// </para>
         /// </summary>
         private void ApplySceneCameraZoomIfEnabled(
@@ -477,18 +460,9 @@ namespace Arcontio.View.ArcGraph
             if (camera == null)
                 return;
 
-            ArcGraphViewZoomLevelDefinition zoom = viewState.CurrentZoom(config);
-            if (zoom.VisibleCellsY <= 0)
-                return;
-
             float targetOrthographicSize = Mathf.Max(
                 minimumSceneCameraOrthographicSize,
-                zoom.VisibleCellsY * 0.5f);
-
-            ApplyPixelPerfectCameraZoomIfPresent(
-                camera,
-                zoom,
-                viewportPixelHeight);
+                config.DefaultOrthographicSize);
 
             bool didChangeOrthographicSize =
                 !Mathf.Approximately(camera.orthographicSize, targetOrthographicSize);
@@ -549,48 +523,6 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             camera.transform.position += offset;
-        }
-
-        // =============================================================================
-        // ApplyPixelPerfectCameraZoomIfPresent
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Sincronizza la PixelPerfectCamera con il livello zoom ArcGraph corrente.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: zoom fisico derivato dal JSON</b></para>
-        /// <para>
-        /// Il valore non nasce dalla rotellina legacy e non e' continuo. Viene
-        /// derivato dalle celle visibili dichiarate dalla configurazione ArcGraph,
-        /// cosi' ogni livello zoom resta discreto e governato dal file JSON.
-        /// </para>
-        /// </summary>
-        private bool ApplyPixelPerfectCameraZoomIfPresent(
-            Camera camera,
-            ArcGraphViewZoomLevelDefinition zoom,
-            int viewportPixelHeight)
-        {
-            PixelPerfectCamera pixelPerfectCamera = camera.GetComponent<PixelPerfectCamera>();
-            if (pixelPerfectCamera == null || !pixelPerfectCamera.enabled)
-                return false;
-
-            int height = viewportPixelHeight > 0
-                ? viewportPixelHeight
-                : Screen.height;
-
-            if (height <= 0)
-                return false;
-
-            int targetAssetsPpu = Mathf.Max(
-                1,
-                Mathf.RoundToInt(height / (float)zoom.VisibleCellsY));
-
-            if (pixelPerfectCamera.assetsPPU == targetAssetsPpu)
-                return false;
-
-            pixelPerfectCamera.assetsPPU = targetAssetsPpu;
-            return true;
         }
 
         private ArcGraphMapViewConfig ResolveConfig()

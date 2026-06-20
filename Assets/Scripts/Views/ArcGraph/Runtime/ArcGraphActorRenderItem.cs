@@ -38,7 +38,6 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphActorLodMode ActorMode;
         public readonly bool AllowsSpriteAnimation;
         public readonly bool AllowsLayeredActorSprites;
-        public readonly bool UsesSimplifiedRepresentation;
         public readonly bool HasMotion;
         public readonly float MotionProgress01;
         public readonly bool IsVisible;
@@ -70,7 +69,6 @@ namespace Arcontio.View.ArcGraph
             ArcGraphActorLodMode actorMode,
             bool allowsSpriteAnimation,
             bool allowsLayeredActorSprites,
-            bool usesSimplifiedRepresentation,
             bool hasMotion,
             float motionProgress01,
             bool isVisible,
@@ -86,7 +84,6 @@ namespace Arcontio.View.ArcGraph
             ActorMode = actorMode;
             AllowsSpriteAnimation = allowsSpriteAnimation;
             AllowsLayeredActorSprites = allowsLayeredActorSprites;
-            UsesSimplifiedRepresentation = usesSimplifiedRepresentation;
             HasMotion = hasMotion;
             MotionProgress01 = Clamp01(motionProgress01);
             IsVisible = isVisible;

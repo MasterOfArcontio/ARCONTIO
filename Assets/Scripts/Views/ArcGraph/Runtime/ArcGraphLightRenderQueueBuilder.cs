@@ -198,7 +198,6 @@ namespace Arcontio.View.ArcGraph
                 snapshot.HasLocalSource,
                 contract.AllowsGlobalOverlay,
                 contract.AllowsLocalTint,
-                lodProfile.UsesSimplifiedRepresentation,
                 isVisible,
                 hiddenReason,
                 sortKey);
@@ -212,25 +211,13 @@ namespace Arcontio.View.ArcGraph
                 return snapshot.TintKey.Trim();
 
             if (snapshot.HasLocalSource)
-            {
-                return lodProfile.UsesSimplifiedRepresentation
-                    ? "ArcGraph/Light/Simple/local"
-                    : "ArcGraph/Light/local";
-            }
+                return "ArcGraph/Light/local";
 
             if (snapshot.Intensity01 <= DarkCellThreshold)
-            {
-                return lodProfile.UsesSimplifiedRepresentation
-                    ? "ArcGraph/Light/Simple/dark"
-                    : "ArcGraph/Light/dark";
-            }
+                return "ArcGraph/Light/dark";
 
             if (snapshot.Intensity01 < NeutralIntensity)
-            {
-                return lodProfile.UsesSimplifiedRepresentation
-                    ? "ArcGraph/Light/Simple/dim"
-                    : "ArcGraph/Light/dim";
-            }
+                return "ArcGraph/Light/dim";
 
             return string.Empty;
         }

@@ -161,8 +161,7 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphRenderItemKind.Actor,
                 item.ActorId,
                 item.SpriteKey,
-                string.Empty,
-                item.UsesSimplifiedRepresentation);
+                string.Empty);
 
             entry = new ArcGraphActorObjectSceneRenderEntry(
                 ArcGraphRenderItemKind.Actor,
@@ -203,8 +202,7 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphRenderItemKind.Object,
                 item.ObjectId,
                 item.SpriteKey,
-                item.DefId,
-                item.UsesSimplifiedRepresentation);
+                item.DefId);
 
             entry = new ArcGraphActorObjectSceneRenderEntry(
                 ArcGraphRenderItemKind.Object,

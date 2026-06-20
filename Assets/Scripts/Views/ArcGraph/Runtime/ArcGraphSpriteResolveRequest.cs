@@ -23,7 +23,6 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>EntityId</b>: id runtime utile a diagnostica e cache.</item>
     ///   <item><b>SpriteKey</b>: chiave asset prodotta da snapshot/render item.</item>
     ///   <item><b>DefId</b>: definizione oggetto, vuota per actor.</item>
-    ///   <item><b>UsesSimplifiedRepresentation</b>: LOD semplificato richiesto.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphSpriteResolveRequest
@@ -32,7 +31,6 @@ namespace Arcontio.View.ArcGraph
         public readonly int EntityId;
         public readonly string SpriteKey;
         public readonly string DefId;
-        public readonly bool UsesSimplifiedRepresentation;
 
         // =============================================================================
         // ArcGraphSpriteResolveRequest
@@ -53,14 +51,12 @@ namespace Arcontio.View.ArcGraph
             ArcGraphRenderItemKind kind,
             int entityId,
             string spriteKey,
-            string defId,
-            bool usesSimplifiedRepresentation)
+            string defId)
         {
             Kind = kind;
             EntityId = entityId;
             SpriteKey = spriteKey ?? string.Empty;
             DefId = defId ?? string.Empty;
-            UsesSimplifiedRepresentation = usesSimplifiedRepresentation;
         }
     }
 }

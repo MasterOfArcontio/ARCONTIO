@@ -27,7 +27,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>SpriteKey</b>: chiave asset risolvibile dal lato scena.</item>
     ///   <item><b>DurationTicks</b>: durata logica del frame per animazione leggera.</item>
     ///   <item><b>SortingOffset</b>: offset sorting rispetto al root actor.</item>
-    ///   <item><b>FrameWidthPixels/FrameHeightPixels</b>: dimensione logica del frame, utile per sprite LOD semplificati.</item>
+    ///   <item><b>FrameWidthPixels/FrameHeightPixels</b>: dimensione logica del frame nel catalogo asset.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphNpcVisualFrame

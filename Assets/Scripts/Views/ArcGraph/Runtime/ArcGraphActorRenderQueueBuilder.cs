@@ -150,7 +150,6 @@ namespace Arcontio.View.ArcGraph
                 lodProfile.ActorMode,
                 lodProfile.AllowsSpriteAnimation,
                 lodProfile.AllowsLayeredActorSprites,
-                lodProfile.UsesSimplifiedRepresentation,
                 pose.HasMotion,
                 pose.Progress01,
                 isVisible,

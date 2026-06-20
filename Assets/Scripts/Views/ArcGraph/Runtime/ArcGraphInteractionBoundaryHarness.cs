@@ -61,7 +61,6 @@ namespace Arcontio.View.ArcGraph
         {
             var config = ArcGraphMapViewConfig.CreateDefaultV033();
             var state = ArcGraphViewState.CreateDefault(config);
-            state.SetZoomLevel(4, config);
 
             var actorItems = new List<ArcGraphActorRenderItem>
             {
@@ -146,7 +145,6 @@ namespace Arcontio.View.ArcGraph
                 true,
                 true,
                 false,
-                false,
                 0f,
                 true,
                 "None",
@@ -162,7 +160,6 @@ namespace Arcontio.View.ArcGraph
                 cell,
                 "harness/object",
                 ArcGraphObjectLodMode.StaticSprites,
-                false,
                 true,
                 false,
                 -1,

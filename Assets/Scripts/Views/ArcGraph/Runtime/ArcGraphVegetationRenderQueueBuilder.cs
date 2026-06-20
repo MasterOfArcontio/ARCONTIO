@@ -193,7 +193,6 @@ namespace Arcontio.View.ArcGraph
                 snapshot.Density01,
                 spriteKey,
                 lodProfile.VegetationMode,
-                lodProfile.UsesSimplifiedRepresentation,
                 allowsAnimation,
                 isAreaAggregate,
                 isVisible,
@@ -209,9 +208,6 @@ namespace Arcontio.View.ArcGraph
 
             if (vegetationMode == ArcGraphVegetationLodMode.AreaAggregate)
                 return "ArcGraph/Vegetation/Area/" + species;
-
-            if (vegetationMode == ArcGraphVegetationLodMode.SimplifiedStaticSprite)
-                return "ArcGraph/Vegetation/Simple/" + species;
 
             return "ArcGraph/Vegetation/" + species + "/stage_" + snapshot.GrowthStage;
         }

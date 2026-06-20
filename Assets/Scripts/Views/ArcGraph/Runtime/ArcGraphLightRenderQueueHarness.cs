@@ -107,22 +107,20 @@ namespace Arcontio.View.ArcGraph
             layer.Initialize(renderState);
             layer.ReplaceSnapshots(CreateLightSnapshots(), renderState);
 
-            var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            var zoom1 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(1));
+            ArcGraphZoomLodProfile profile = ArcGraphZoomLodPolicy.ResolveFullDetail();
 
             var builder = new ArcGraphLightRenderQueueBuilder();
             var items = new List<ArcGraphLightRenderItem>();
             ArcGraphLightRenderQueueDiagnostics diagnostics = builder.Build(
                 layer,
-                zoom1,
+                profile,
                 items);
 
             bool firstItemIsDark = items.Count == 2
-                                   && items[0].TintKey == "ArcGraph/Light/Simple/dark"
-                                   && items[0].UsesSimplifiedRepresentation;
+                                   && items[0].TintKey == "ArcGraph/Light/dark";
 
             bool secondItemIsLocalSource = items.Count == 2
-                                           && items[1].TintKey == "ArcGraph/Light/Simple/local"
+                                           && items[1].TintKey == "ArcGraph/Light/local"
                                            && items[1].HasLocalSource
                                            && items[1].AllowsLocalTint
                                            && items[1].AllowsGlobalOverlay;

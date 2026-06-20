@@ -25,7 +25,6 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>OverlayKey</b>: chiave overlay/atlas futura, non asset caricato.</item>
     ///   <item><b>IsAnimated</b>: indica se ArcGraph puo' scegliere frame meteo.</item>
     ///   <item><b>UsesGlobalOverlay</b>: indica che il renderer futuro lavora sopra la scena.</item>
-    ///   <item><b>UsesSimplifiedRepresentation</b>: LOD semplificato attivo.</item>
     ///   <item><b>IsVisible/HiddenReason</b>: decisione visuale del builder.</item>
     ///   <item><b>SortKey</b>: ordinamento deterministico dell'overlay.</item>
     /// </list>
@@ -38,7 +37,6 @@ namespace Arcontio.View.ArcGraph
         public readonly string OverlayKey;
         public readonly bool IsAnimated;
         public readonly bool UsesGlobalOverlay;
-        public readonly bool UsesSimplifiedRepresentation;
         public readonly bool IsVisible;
         public readonly string HiddenReason;
         public readonly ArcGraphRenderSortKey SortKey;
@@ -65,7 +63,6 @@ namespace Arcontio.View.ArcGraph
             string overlayKey,
             bool isAnimated,
             bool usesGlobalOverlay,
-            bool usesSimplifiedRepresentation,
             bool isVisible,
             string hiddenReason,
             ArcGraphRenderSortKey sortKey)
@@ -76,7 +73,6 @@ namespace Arcontio.View.ArcGraph
             OverlayKey = overlayKey ?? string.Empty;
             IsAnimated = isAnimated;
             UsesGlobalOverlay = usesGlobalOverlay;
-            UsesSimplifiedRepresentation = usesSimplifiedRepresentation;
             IsVisible = isVisible;
             HiddenReason = string.IsNullOrWhiteSpace(hiddenReason) ? "None" : hiddenReason;
             SortKey = sortKey;

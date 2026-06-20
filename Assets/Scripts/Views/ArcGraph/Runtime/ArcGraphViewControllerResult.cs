@@ -10,20 +10,19 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Principio architetturale: input spiegabile, non effetto nascosto</b></para>
     /// <para>
-    /// Il controller pan/zoom non deve modificare la view in modo opaco. Questo
-    /// risultato rende leggibile cosa e' successo nel frame grafico: zoom applicato,
-    /// pan applicato, input ignorato per UI, pan vietato dal livello zoom o
-    /// viewport non valido.
+    /// Il controller view non deve modificare la view in modo opaco. Questo
+    /// risultato rende leggibile cosa e' successo nel frame grafico: pan applicato,
+    /// input ignorato per UI o viewport non valido. Il campo zoom resta solo per
+    /// compatibilita' diagnostica e oggi resta sempre falso.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>DidChangeZoom</b>: il livello zoom e' cambiato.</item>
+    ///   <item><b>DidChangeZoom</b>: compatibilita diagnostica, oggi sempre falso.</item>
     ///   <item><b>DidApplyPan</b>: il centro vista e' stato spostato.</item>
     ///   <item><b>IgnoredBecausePointerOverUi</b>: input bloccato dalla UI.</item>
-    ///   <item><b>IgnoredPanBecauseZoomDisallowsPan</b>: zoom corrente senza pan.</item>
+    ///   <item><b>IgnoredPanBecauseZoomDisallowsPan</b>: compatibilita legacy, oggi sempre falso.</item>
     ///   <item><b>IgnoredPanBecauseViewportInvalid</b>: impossibile convertire pixel in celle.</item>
-    ///   <item><b>ActiveZoomLevel</b>: livello zoom finale.</item>
     ///   <item><b>CenterCellX/Y</b>: centro vista finale.</item>
     /// </list>
     /// </summary>
@@ -34,7 +33,6 @@ namespace Arcontio.View.ArcGraph
         public readonly bool IgnoredBecausePointerOverUi;
         public readonly bool IgnoredPanBecauseZoomDisallowsPan;
         public readonly bool IgnoredPanBecauseViewportInvalid;
-        public readonly int ActiveZoomLevel;
         public readonly float CenterCellX;
         public readonly float CenterCellY;
 
@@ -58,7 +56,6 @@ namespace Arcontio.View.ArcGraph
             bool ignoredBecausePointerOverUi,
             bool ignoredPanBecauseZoomDisallowsPan,
             bool ignoredPanBecauseViewportInvalid,
-            int activeZoomLevel,
             float centerCellX,
             float centerCellY)
         {
@@ -67,7 +64,6 @@ namespace Arcontio.View.ArcGraph
             IgnoredBecausePointerOverUi = ignoredBecausePointerOverUi;
             IgnoredPanBecauseZoomDisallowsPan = ignoredPanBecauseZoomDisallowsPan;
             IgnoredPanBecauseViewportInvalid = ignoredPanBecauseViewportInvalid;
-            ActiveZoomLevel = activeZoomLevel;
             CenterCellX = centerCellX;
             CenterCellY = centerCellY;
         }

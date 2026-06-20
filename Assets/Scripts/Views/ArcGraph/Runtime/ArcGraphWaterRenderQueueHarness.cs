@@ -22,10 +22,8 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Passed</b>: esito complessivo.</item>
     ///   <item><b>Reason</b>: motivo sintetico.</item>
-    ///   <item><b>Zoom1VisibleCount</b>: item visibili a zoom lontano.</item>
-    ///   <item><b>Zoom1AnimatedCount</b>: item animabili a zoom lontano.</item>
-    ///   <item><b>Zoom4VisibleCount</b>: item visibili a zoom vicino.</item>
-    ///   <item><b>Zoom4AnimatedCount</b>: item animabili a zoom vicino.</item>
+    ///   <item><b>VisibleCount</b>: item visibili nel profilo full-detail.</item>
+    ///   <item><b>AnimatedCount</b>: item animabili nel profilo full-detail.</item>
     ///   <item><b>MaxDepthLevel</b>: profondita' visuale massima.</item>
     ///   <item><b>HiddenCount</b>: item nascosti per snapshot non validi.</item>
     /// </list>
@@ -34,29 +32,23 @@ namespace Arcontio.View.ArcGraph
     {
         public readonly bool Passed;
         public readonly string Reason;
-        public readonly int Zoom1VisibleCount;
-        public readonly int Zoom1AnimatedCount;
-        public readonly int Zoom4VisibleCount;
-        public readonly int Zoom4AnimatedCount;
+        public readonly int VisibleCount;
+        public readonly int AnimatedCount;
         public readonly int MaxDepthLevel;
         public readonly int HiddenCount;
 
         public ArcGraphWaterRenderQueueHarnessResult(
             bool passed,
             string reason,
-            int zoom1VisibleCount,
-            int zoom1AnimatedCount,
-            int zoom4VisibleCount,
-            int zoom4AnimatedCount,
+            int visibleCount,
+            int animatedCount,
             int maxDepthLevel,
             int hiddenCount)
         {
             Passed = passed;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
-            Zoom1VisibleCount = zoom1VisibleCount;
-            Zoom1AnimatedCount = zoom1AnimatedCount;
-            Zoom4VisibleCount = zoom4VisibleCount;
-            Zoom4AnimatedCount = zoom4AnimatedCount;
+            VisibleCount = visibleCount;
+            AnimatedCount = animatedCount;
             MaxDepthLevel = maxDepthLevel;
             HiddenCount = hiddenCount;
         }
@@ -79,7 +71,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>RunDefaultSmoke</b>: scenario minimo con zoom 1 e zoom 4.</item>
+    ///   <item><b>RunDefaultSmoke</b>: scenario minimo con profilo full-detail.</item>
     ///   <item><b>CreateWaterSnapshots</b>: due snapshot visibili e uno nascosto.</item>
     /// </list>
     /// </summary>
@@ -96,9 +88,9 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Scenario minimo</b></para>
         /// <para>
         /// Lo scenario contiene acqua bassa animabile, acqua profonda statica e una
-        /// cella con profondita' zero che deve restare nascosta. A zoom 1 le
-        /// animazioni sono disabilitate dal LOD; a zoom 4 resta animabile solo la
-        /// cella che lo dichiarava nello snapshot.
+        /// cella con profondita' zero che deve restare nascosta. Nel profilo
+        /// full-detail resta animabile solo la cella che lo dichiarava nello
+        /// snapshot.
         /// </para>
         /// </summary>
         public static ArcGraphWaterRenderQueueHarnessResult RunDefaultSmoke()
@@ -112,53 +104,34 @@ namespace Arcontio.View.ArcGraph
             layer.Initialize(renderState);
             layer.ReplaceSnapshots(CreateWaterSnapshots(), renderState);
 
-            var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            var zoom1 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(1));
-            var zoom4 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(4));
+            ArcGraphZoomLodProfile profile = ArcGraphZoomLodPolicy.ResolveFullDetail();
 
             var builder = new ArcGraphWaterRenderQueueBuilder();
-            var zoom1Items = new List<ArcGraphWaterRenderItem>();
-            ArcGraphWaterRenderQueueDiagnostics zoom1Diagnostics = builder.Build(
+            var items = new List<ArcGraphWaterRenderItem>();
+            ArcGraphWaterRenderQueueDiagnostics diagnostics = builder.Build(
                 layer,
-                zoom1,
-                zoom1Items);
+                profile,
+                items);
 
-            var zoom4Items = new List<ArcGraphWaterRenderItem>();
-            ArcGraphWaterRenderQueueDiagnostics zoom4Diagnostics = builder.Build(
-                layer,
-                zoom4,
-                zoom4Items);
-
-            bool zoom1UsesSimplified = zoom1Items.Count == 2
-                                       && zoom1Items[0].UsesSimplifiedRepresentation
-                                       && zoom1Items[1].UsesSimplifiedRepresentation;
-
-            bool zoom4AnimationExpected = zoom4Diagnostics.AnimatedItemCount == 1
-                                          && zoom4Items.Count == 2
-                                          && zoom4Items[0].IsAnimated;
+            bool animationExpected = diagnostics.AnimatedItemCount == 1
+                                     && items.Count == 2
+                                     && items[0].IsAnimated;
 
             bool passed = layer.CellCount == 3
-                          && zoom1Diagnostics.SnapshotCount == 3
-                          && zoom1Diagnostics.VisibleItemCount == 2
-                          && zoom1Diagnostics.HiddenItemCount == 1
-                          && zoom1Diagnostics.AnimatedItemCount == 0
-                          && zoom1Diagnostics.MaxDepthLevel == 3
-                          && zoom4Diagnostics.VisibleItemCount == 2
-                          && zoom4Diagnostics.HiddenItemCount == 1
-                          && zoom4Diagnostics.AnimatedItemCount == 1
-                          && zoom4Diagnostics.MaxDepthLevel == 3
-                          && zoom1UsesSimplified
-                          && zoom4AnimationExpected;
+                          && diagnostics.SnapshotCount == 3
+                          && diagnostics.VisibleItemCount == 2
+                          && diagnostics.HiddenItemCount == 1
+                          && diagnostics.AnimatedItemCount == 1
+                          && diagnostics.MaxDepthLevel == 3
+                          && animationExpected;
 
             return new ArcGraphWaterRenderQueueHarnessResult(
                 passed,
                 passed ? "WaterRenderQueueSmokePassed" : "WaterRenderQueueSmokeFailed",
-                zoom1Diagnostics.VisibleItemCount,
-                zoom1Diagnostics.AnimatedItemCount,
-                zoom4Diagnostics.VisibleItemCount,
-                zoom4Diagnostics.AnimatedItemCount,
-                zoom4Diagnostics.MaxDepthLevel,
-                zoom4Diagnostics.HiddenItemCount);
+                diagnostics.VisibleItemCount,
+                diagnostics.AnimatedItemCount,
+                diagnostics.MaxDepthLevel,
+                diagnostics.HiddenItemCount);
         }
 
         private static IEnumerable<ArcGraphWaterVisualSnapshot> CreateWaterSnapshots()

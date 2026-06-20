@@ -174,8 +174,7 @@ namespace Arcontio.View.ArcGraph
                     ArcGraphRenderItemKind.Actor,
                     sampleEntityId,
                     frame.SpriteKey,
-                    frame.PartKey,
-                    usesSimplifiedRepresentation: false);
+                    frame.PartKey);
 
                 if (resolver.TryResolveSprite(request, out Sprite sprite) && sprite != null)
                 {

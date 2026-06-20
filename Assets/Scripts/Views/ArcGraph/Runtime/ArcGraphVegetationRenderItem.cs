@@ -38,7 +38,6 @@ namespace Arcontio.View.ArcGraph
         public readonly float Density01;
         public readonly string SpriteKey;
         public readonly ArcGraphVegetationLodMode VegetationMode;
-        public readonly bool UsesSimplifiedRepresentation;
         public readonly bool AllowsSpriteAnimation;
         public readonly bool IsAreaAggregate;
         public readonly bool IsVisible;
@@ -67,7 +66,6 @@ namespace Arcontio.View.ArcGraph
             float density01,
             string spriteKey,
             ArcGraphVegetationLodMode vegetationMode,
-            bool usesSimplifiedRepresentation,
             bool allowsSpriteAnimation,
             bool isAreaAggregate,
             bool isVisible,
@@ -80,7 +78,6 @@ namespace Arcontio.View.ArcGraph
             Density01 = Clamp01(density01);
             SpriteKey = spriteKey ?? string.Empty;
             VegetationMode = vegetationMode;
-            UsesSimplifiedRepresentation = usesSimplifiedRepresentation;
             AllowsSpriteAnimation = allowsSpriteAnimation;
             IsAreaAggregate = isAreaAggregate;
             IsVisible = isVisible;

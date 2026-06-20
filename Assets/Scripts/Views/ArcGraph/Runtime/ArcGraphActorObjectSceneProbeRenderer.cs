@@ -547,7 +547,7 @@ namespace Arcontio.View.ArcGraph
         {
             var config = ArcGraphMapViewConfig.CreateDefaultV033();
             int safeZoom = zoomLevel < 1 ? 1 : zoomLevel;
-            return ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(safeZoom));
+            return ArcGraphZoomLodPolicy.ResolveFullDetail();
         }
 
         private static float ResolveTileWorldSize(

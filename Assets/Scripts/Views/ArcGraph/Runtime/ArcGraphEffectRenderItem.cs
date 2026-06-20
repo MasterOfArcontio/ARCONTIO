@@ -26,7 +26,6 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>EffectMode</b>: modalita' LOD effetto risolta.</item>
     ///   <item><b>IsAnimated</b>: indica se ArcGraph puo' scegliere frame effetto.</item>
     ///   <item><b>UsesLocalTint</b>: indica se il renderer futuro puo' applicare tinta locale.</item>
-    ///   <item><b>UsesSimplifiedRepresentation</b>: LOD semplificato attivo.</item>
     ///   <item><b>IsVisible/HiddenReason</b>: decisione visuale del builder.</item>
     ///   <item><b>SortKey</b>: ordinamento deterministico.</item>
     /// </list>
@@ -41,7 +40,6 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphEffectLodMode EffectMode;
         public readonly bool IsAnimated;
         public readonly bool UsesLocalTint;
-        public readonly bool UsesSimplifiedRepresentation;
         public readonly bool IsVisible;
         public readonly string HiddenReason;
         public readonly ArcGraphRenderSortKey SortKey;
@@ -70,7 +68,6 @@ namespace Arcontio.View.ArcGraph
             ArcGraphEffectLodMode effectMode,
             bool isAnimated,
             bool usesLocalTint,
-            bool usesSimplifiedRepresentation,
             bool isVisible,
             string hiddenReason,
             ArcGraphRenderSortKey sortKey)
@@ -83,7 +80,6 @@ namespace Arcontio.View.ArcGraph
             EffectMode = effectMode;
             IsAnimated = isAnimated;
             UsesLocalTint = usesLocalTint;
-            UsesSimplifiedRepresentation = usesSimplifiedRepresentation;
             IsVisible = isVisible;
             HiddenReason = string.IsNullOrWhiteSpace(hiddenReason) ? "None" : hiddenReason;
             SortKey = sortKey;

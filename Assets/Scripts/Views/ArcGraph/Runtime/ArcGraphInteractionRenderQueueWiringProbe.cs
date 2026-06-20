@@ -246,7 +246,7 @@ namespace Arcontio.View.ArcGraph
         {
             ArcGraphMapViewConfig config = ArcGraphMapViewConfig.CreateDefaultV033();
             int safeZoom = zoomLevel < 1 ? 1 : zoomLevel;
-            return ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(safeZoom));
+            return ArcGraphZoomLodPolicy.ResolveFullDetail();
         }
 
         private ArcGraphInteractionRenderQueueWiringProbeDiagnostics BuildDiagnostics(

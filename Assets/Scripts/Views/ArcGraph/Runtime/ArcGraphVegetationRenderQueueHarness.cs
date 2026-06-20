@@ -22,10 +22,9 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Passed</b>: esito complessivo.</item>
     ///   <item><b>Reason</b>: motivo sintetico.</item>
-    ///   <item><b>Zoom1VisibleCount</b>: item visibili a zoom lontano.</item>
-    ///   <item><b>Zoom1AggregatedCount</b>: item aggregati a zoom lontano.</item>
-    ///   <item><b>Zoom4VisibleCount</b>: item visibili a zoom vicino.</item>
-    ///   <item><b>Zoom4AnimatedCount</b>: item animabili a zoom vicino.</item>
+    ///   <item><b>VisibleCount</b>: item visibili nel profilo full-detail.</item>
+    ///   <item><b>AggregatedCount</b>: item aggregati nel profilo full-detail.</item>
+    ///   <item><b>AnimatedCount</b>: item animabili nel profilo full-detail.</item>
     ///   <item><b>HiddenCount</b>: item nascosti per snapshot non validi.</item>
     /// </list>
     /// </summary>
@@ -33,27 +32,24 @@ namespace Arcontio.View.ArcGraph
     {
         public readonly bool Passed;
         public readonly string Reason;
-        public readonly int Zoom1VisibleCount;
-        public readonly int Zoom1AggregatedCount;
-        public readonly int Zoom4VisibleCount;
-        public readonly int Zoom4AnimatedCount;
+        public readonly int VisibleCount;
+        public readonly int AggregatedCount;
+        public readonly int AnimatedCount;
         public readonly int HiddenCount;
 
         public ArcGraphVegetationRenderQueueHarnessResult(
             bool passed,
             string reason,
-            int zoom1VisibleCount,
-            int zoom1AggregatedCount,
-            int zoom4VisibleCount,
-            int zoom4AnimatedCount,
+            int visibleCount,
+            int aggregatedCount,
+            int animatedCount,
             int hiddenCount)
         {
             Passed = passed;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
-            Zoom1VisibleCount = zoom1VisibleCount;
-            Zoom1AggregatedCount = zoom1AggregatedCount;
-            Zoom4VisibleCount = zoom4VisibleCount;
-            Zoom4AnimatedCount = zoom4AnimatedCount;
+            VisibleCount = visibleCount;
+            AggregatedCount = aggregatedCount;
+            AnimatedCount = animatedCount;
             HiddenCount = hiddenCount;
         }
     }
@@ -75,7 +71,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>RunDefaultSmoke</b>: scenario minimo con zoom 1 e zoom 4.</item>
+    ///   <item><b>RunDefaultSmoke</b>: scenario minimo con profilo full-detail.</item>
     ///   <item><b>CreateVegetationSnapshots</b>: due snapshot validi e uno nascosto.</item>
     /// </list>
     /// </summary>
@@ -92,8 +88,8 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Scenario minimo</b></para>
         /// <para>
         /// Lo scenario contiene erba e arbusto validi, piu' uno snapshot senza
-        /// species key che deve restare nascosto. A zoom 1 gli item visibili sono
-        /// aggregati; a zoom 4 gli stessi item possono essere animati da ArcGraph.
+        /// species key che deve restare nascosto. Nel profilo full-detail gli item
+        /// visibili possono essere animati da ArcGraph.
         /// </para>
         /// </summary>
         public static ArcGraphVegetationRenderQueueHarnessResult RunDefaultSmoke()
@@ -107,50 +103,34 @@ namespace Arcontio.View.ArcGraph
             layer.Initialize(renderState);
             layer.ReplaceSnapshots(CreateVegetationSnapshots(), renderState);
 
-            var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            var zoom1 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(1));
-            var zoom4 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(4));
+            ArcGraphZoomLodProfile profile = ArcGraphZoomLodPolicy.ResolveFullDetail();
 
             var builder = new ArcGraphVegetationRenderQueueBuilder();
-            var zoom1Items = new List<ArcGraphVegetationRenderItem>();
-            ArcGraphVegetationRenderQueueDiagnostics zoom1Diagnostics = builder.Build(
+            var items = new List<ArcGraphVegetationRenderItem>();
+            ArcGraphVegetationRenderQueueDiagnostics diagnostics = builder.Build(
                 layer,
-                zoom1,
-                zoom1Items);
+                profile,
+                items);
 
-            var zoom4Items = new List<ArcGraphVegetationRenderItem>();
-            ArcGraphVegetationRenderQueueDiagnostics zoom4Diagnostics = builder.Build(
-                layer,
-                zoom4,
-                zoom4Items);
-
-            bool allZoom1Aggregated = zoom1Items.Count == 2
-                                      && zoom1Items[0].IsAreaAggregate
-                                      && zoom1Items[1].IsAreaAggregate;
-
-            bool allZoom4Animated = zoom4Items.Count == 2
-                                    && zoom4Items[0].AllowsSpriteAnimation
-                                    && zoom4Items[1].AllowsSpriteAnimation;
+            bool allAnimated = items.Count == 2
+                               && items[0].AllowsSpriteAnimation
+                               && items[1].AllowsSpriteAnimation;
 
             bool passed = layer.CellCount == 3
-                          && zoom1Diagnostics.SnapshotCount == 3
-                          && zoom1Diagnostics.VisibleItemCount == 2
-                          && zoom1Diagnostics.HiddenItemCount == 1
-                          && zoom1Diagnostics.AggregatedItemCount == 2
-                          && zoom4Diagnostics.VisibleItemCount == 2
-                          && zoom4Diagnostics.HiddenItemCount == 1
-                          && zoom4Diagnostics.AnimatedItemCount == 2
-                          && allZoom1Aggregated
-                          && allZoom4Animated;
+                          && diagnostics.SnapshotCount == 3
+                          && diagnostics.VisibleItemCount == 2
+                          && diagnostics.HiddenItemCount == 1
+                          && diagnostics.AggregatedItemCount == 0
+                          && diagnostics.AnimatedItemCount == 2
+                          && allAnimated;
 
             return new ArcGraphVegetationRenderQueueHarnessResult(
                 passed,
                 passed ? "VegetationRenderQueueSmokePassed" : "VegetationRenderQueueSmokeFailed",
-                zoom1Diagnostics.VisibleItemCount,
-                zoom1Diagnostics.AggregatedItemCount,
-                zoom4Diagnostics.VisibleItemCount,
-                zoom4Diagnostics.AnimatedItemCount,
-                zoom4Diagnostics.HiddenItemCount);
+                diagnostics.VisibleItemCount,
+                diagnostics.AggregatedItemCount,
+                diagnostics.AnimatedItemCount,
+                diagnostics.HiddenItemCount);
         }
 
         private static IEnumerable<ArcGraphVegetationVisualSnapshot> CreateVegetationSnapshots()

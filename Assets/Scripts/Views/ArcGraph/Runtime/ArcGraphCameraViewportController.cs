@@ -10,28 +10,16 @@ namespace Arcontio.View.ArcGraph
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Controller Unity dedicato alla camera e al viewport della vista ArcGraph.
+    /// Controller Unity dedicato alla camera ortografica ArcGraph.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: un solo proprietario della camera ArcGraph</b></para>
+    /// <para><b>Principio architetturale: zoom fisico semplice</b></para>
     /// <para>
-    /// Questo componente concentra zoom, pan, clamp ai bordi mappa e calcolo della
-    /// finestra visibile. Non legge <c>World</c>, non modifica NPC, non invia
-    /// comandi e non decide contenuti simulativi. La sua responsabilita' e' solo
-    /// visuale: trasformare input fisico Unity in posizione camera e poi aggiornare
-    /// lo <c>ArcGraphViewState</c> condiviso con renderer e interaction boundary.
+    /// Il controller non usa piu' livelli zoom discreti. La rotellina modifica un
+    /// target continuo di <c>Camera.orthographicSize</c>, lo smoothing viene
+    /// applicato direttamente alla camera e lo stato condiviso conserva solo il
+    /// centro vista. Lo zoom non decide sprite, LOD o animazioni.
     /// </para>
-    ///
-    /// <para><b>Struttura interna:</b></para>
-    /// <list type="bullet">
-    ///   <item><b>controllerEnabled</b>: gate principale del controller camera.</item>
-    ///   <item><b>processInUpdate</b>: polling automatico opzionale, spento dal runtime wrapper.</item>
-    ///   <item><b>sceneCamera</b>: camera ortografica esplicita da controllare.</item>
-    ///   <item><b>_config</b>: profilo zoom e dimensione mappa derivati dal JSON ArcGraph.</item>
-    ///   <item><b>_viewState</b>: stato condiviso con renderer e interaction wrapper.</item>
-    ///   <item><b>ProcessCurrentFrame</b>: legge mouse, applica zoom/pan e riallinea stato.</item>
-    ///   <item><b>ResolveVisibleCellRect</b>: restituisce il rettangolo terrain realmente visto dalla camera.</item>
-    /// </list>
     /// </summary>
     public sealed class ArcGraphCameraViewportController : MonoBehaviour
     {
@@ -41,40 +29,20 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool useMiddleMousePan = true;
         [SerializeField] private bool ignoreInputWhenPointerIsOverUi = true;
         [SerializeField] private Camera sceneCamera;
-        [SerializeField] private float minimumOrthographicSize = 0.5f;
         [SerializeField] private int visibleRectPaddingCells = 2;
 
         private ArcGraphMapViewConfig _config;
         private ArcGraphViewState _viewState;
         private bool _didApplyInitialCameraState;
-        private bool _isZoomTransitionActive;
-        private float _zoomTransitionStartOrthographicSize;
-        private float _zoomTransitionTargetOrthographicSize;
-        private float _zoomTransitionElapsedSeconds;
-        private Vector2 _zoomTransitionAnchorScreenPosition;
-        private Vector3 _zoomTransitionAnchorWorldPoint;
-        private PixelPerfectCamera _zoomTransitionPixelPerfectCamera;
-        private bool _zoomTransitionPixelPerfectWasEnabled;
+        private bool _hasZoomTarget;
+        private float _targetOrthographicSize;
+        private float _zoomVelocity;
+        private Vector2 _zoomAnchorScreenPosition;
+        private Vector3 _zoomAnchorWorldPoint;
 
         public ArcGraphViewState ViewState => EnsureViewState();
         public bool ControllerEnabled => controllerEnabled;
 
-        // =============================================================================
-        // Update
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Processa opzionalmente input camera in automatico.
-        /// </para>
-        ///
-        /// <para><b>Default controllato dal wrapper</b></para>
-        /// <para>
-        /// Nel cablaggio runtime automatico questo flag resta spento e
-        /// <c>ArcGraphMinimalRuntimeSceneWrapper</c> chiama il controller prima del
-        /// rendering terrain. In questo modo la camera viene aggiornata prima del
-        /// culling, senza dipendere dall'ordine globale degli <c>Update</c> Unity.
-        /// </para>
-        /// </summary>
         private void Update()
         {
             if (!processInUpdate)
@@ -83,56 +51,18 @@ namespace Arcontio.View.ArcGraph
             ProcessCurrentFrame();
         }
 
-        // =============================================================================
-        // SetControllerEnabled
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Abilita o disabilita il controllo camera ArcGraph.
-        /// </para>
-        /// </summary>
         public void SetControllerEnabled(bool enabled)
         {
             controllerEnabled = enabled;
         }
 
-        // =============================================================================
-        // SetProcessInUpdate
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Decide se il controller deve processare input nel proprio <c>Update</c>.
-        /// </para>
-        /// </summary>
         public void SetProcessInUpdate(bool enabled)
         {
             processInUpdate = enabled;
         }
 
-        // =============================================================================
-        // SetConfig
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Imposta la configurazione ArcGraph usata per zoom e clamp viewport.
-        /// </para>
-        ///
-        /// <para><b>JSON come fonte della policy zoom</b></para>
-        /// <para>
-        /// Il controller non decide quanti zoom esistono. Riceve una config gia'
-        /// materializzata: se il JSON dichiara uno, cinque o dieci livelli, il
-        /// controller si limita a risolvere il prossimo livello tramite
-        /// <c>ArcGraphMapViewConfig</c>.
-        /// </para>
-        /// </summary>
         public void SetConfig(ArcGraphMapViewConfig config)
         {
-            ArcGraphMapViewConfig previousConfig = ResolveConfig();
-            int previousDefaultZoomLevel = previousConfig.DefaultZoomLevel;
-            bool shouldMoveDefaultViewState =
-                _viewState != null &&
-                _viewState.ActiveZoomLevel == previousDefaultZoomLevel;
-
             _config = config;
             ArcGraphMapViewConfig currentConfig = ResolveConfig();
 
@@ -143,29 +73,15 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            if (shouldMoveDefaultViewState &&
-                previousDefaultZoomLevel != currentConfig.DefaultZoomLevel)
-            {
-                _viewState.SetZoomLevel(currentConfig.DefaultZoomLevel, currentConfig);
-                _didApplyInitialCameraState = false;
-            }
-            else
-            {
-                _viewState.SetCenterCell(
-                    _viewState.CenterCellX,
-                    _viewState.CenterCellY,
-                    currentConfig);
-            }
+            _viewState.SetCenterCell(
+                _viewState.CenterCellX,
+                _viewState.CenterCellY,
+                currentConfig);
+            _targetOrthographicSize = ClampOrthographicSize(
+                _hasZoomTarget ? _targetOrthographicSize : currentConfig.DefaultOrthographicSize,
+                currentConfig);
         }
 
-        // =============================================================================
-        // SetSceneCamera
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Assegna la camera Unity controllata dal viewport ArcGraph.
-        /// </para>
-        /// </summary>
         public void SetSceneCamera(Camera camera)
         {
             if (sceneCamera == camera)
@@ -175,52 +91,18 @@ namespace Arcontio.View.ArcGraph
             _didApplyInitialCameraState = false;
         }
 
-        // =============================================================================
-        // SetViewState
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Permette a un bootstrap esterno di condividere uno stato vista gia'
-        /// creato.
-        /// </para>
-        /// </summary>
         public void SetViewState(ArcGraphViewState viewState)
         {
             _viewState = viewState;
             _didApplyInitialCameraState = false;
         }
 
-        // =============================================================================
-        // ProcessCurrentFrameFromInspector
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Entry point manuale da Inspector per test camera controllati.
-        /// </para>
-        /// </summary>
         [ContextMenu("ArcGraph/Process Camera Viewport Frame")]
         public void ProcessCurrentFrameFromInspector()
         {
             ProcessCurrentFrame();
         }
 
-        // =============================================================================
-        // ProcessCurrentFrame
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Legge input camera, applica zoom/pan e aggiorna lo stato viewport.
-        /// </para>
-        ///
-        /// <para><b>Sequenza intenzionale</b></para>
-        /// <para>
-        /// Prima la camera viene inizializzata dal livello zoom corrente. Poi, se il
-        /// puntatore non e' sopra UI, vengono applicati zoom discreto e pan fisico.
-        /// Alla fine la camera viene clampata sui bounds mappa e lo
-        /// <c>ArcGraphViewState</c> viene riallineato alla posizione reale della
-        /// camera. Renderer e picker leggono quindi la stessa fonte.
-        /// </para>
-        /// </summary>
         public bool ProcessCurrentFrame()
         {
             if (!controllerEnabled)
@@ -243,33 +125,16 @@ namespace Arcontio.View.ArcGraph
             bool didChangeCamera = false;
             if (canConsumeInput)
             {
-                didChangeCamera |= TryApplyWheelZoom(camera, config, viewState, mouse);
+                didChangeCamera |= TryApplyWheelZoom(camera, config, mouse);
                 didChangeCamera |= TryApplyDragPan(camera, config, mouse);
             }
 
-            didChangeCamera |= ApplyPendingZoomTransition(camera, config);
+            didChangeCamera |= ApplyZoomSmoothing(camera, config);
             ClampCameraToMap(camera, config);
             SyncViewStateFromCamera(camera, config, viewState);
             return didChangeCamera;
         }
 
-        // =============================================================================
-        // ResolveVisibleCellRect
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Calcola il rettangolo celle realmente coperto dalla camera ortografica.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: culling coerente con la camera reale</b></para>
-        /// <para>
-        /// Il profilo zoom JSON descrive il livello logico, ma la camera puo' vedere
-        /// piu' celle orizzontali su viewport widescreen. Se il terrain usasse solo
-        /// il rettangolo quadrato dello zoom, ai lati apparirebbero buchi blu
-        /// durante pan o zoom. Questo metodo usa quindi <c>orthographicSize</c> e
-        /// <c>aspect</c> reali della camera, aggiungendo un piccolo padding.
-        /// </para>
-        /// </summary>
         public ArcGraphViewCellRect ResolveVisibleCellRect()
         {
             ArcGraphMapViewConfig config = ResolveConfig();
@@ -306,7 +171,11 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             camera.orthographic = true;
-            ApplyCameraZoomForViewState(camera, config, viewState);
+            DisablePixelPerfectCameraIfPresent(camera);
+            _targetOrthographicSize = ClampOrthographicSize(config.DefaultOrthographicSize, config);
+            _hasZoomTarget = true;
+            _zoomVelocity = 0f;
+            camera.orthographicSize = _targetOrthographicSize;
             MoveCameraCenterTo(camera, viewState.CenterCellX, viewState.CenterCellY);
             ClampCameraToMap(camera, config);
             SyncViewStateFromCamera(camera, config, viewState);
@@ -316,28 +185,22 @@ namespace Arcontio.View.ArcGraph
         private bool TryApplyWheelZoom(
             Camera camera,
             ArcGraphMapViewConfig config,
-            ArcGraphViewState viewState,
             Mouse mouse)
         {
             int wheelStep = ResolveWheelStep(mouse.scroll.ReadValue().y);
             if (wheelStep == 0)
                 return false;
 
-            if (_isZoomTransitionActive)
-                return false;
+            DisablePixelPerfectCameraIfPresent(camera);
+            _zoomAnchorScreenPosition = mouse.position.ReadValue();
+            _zoomAnchorWorldPoint = ResolvePointerWorldPoint(camera, _zoomAnchorScreenPosition);
 
-            int beforeLevel = viewState.ActiveZoomLevel;
-            Vector2 pointerScreenPosition = mouse.position.ReadValue();
-            Vector3 beforePointerWorld = ResolvePointerWorldPoint(camera, pointerScreenPosition);
-            ArcGraphViewZoomLevelDefinition targetZoom = config.ResolveZoomLevelFromWheel(
-                beforeLevel,
-                wheelStep);
-
-            if (targetZoom.Level == beforeLevel)
-                return false;
-
-            viewState.SetZoomLevel(targetZoom.Level, config);
-            BeginZoomTransition(camera, config, targetZoom, pointerScreenPosition, beforePointerWorld);
+            float currentTarget = _hasZoomTarget
+                ? _targetOrthographicSize
+                : camera.orthographicSize;
+            float nextTarget = currentTarget - (wheelStep * config.ZoomStep);
+            _targetOrthographicSize = ClampOrthographicSize(nextTarget, config);
+            _hasZoomTarget = true;
             return true;
         }
 
@@ -346,10 +209,6 @@ namespace Arcontio.View.ArcGraph
             ArcGraphMapViewConfig config,
             Mouse mouse)
         {
-            ArcGraphViewZoomLevelDefinition zoom = EnsureViewState().CurrentZoom(config);
-            if (!zoom.AllowsPan)
-                return false;
-
             bool isPanHeld =
                 (useRightMousePan && mouse.rightButton.isPressed) ||
                 (useMiddleMousePan && mouse.middleButton.isPressed);
@@ -371,210 +230,56 @@ namespace Arcontio.View.ArcGraph
             return true;
         }
 
-        private void ApplyCameraZoomForViewState(
-            Camera camera,
-            ArcGraphMapViewConfig config,
-            ArcGraphViewState viewState)
-        {
-            ArcGraphViewZoomLevelDefinition zoom = viewState.CurrentZoom(config);
-            if (zoom.VisibleCellsY <= 0)
-                return;
-
-            DisablePixelPerfectCameraIfPresent(camera);
-
-            float targetOrthographicSize = Mathf.Max(
-                minimumOrthographicSize,
-                zoom.VisibleCellsY * 0.5f);
-
-            camera.orthographic = true;
-            camera.orthographicSize = targetOrthographicSize;
-            _isZoomTransitionActive = false;
-        }
-
-        private void BeginZoomTransition(
-            Camera camera,
-            ArcGraphMapViewConfig config,
-            ArcGraphViewZoomLevelDefinition targetZoom,
-            Vector2 pointerScreenPosition,
-            Vector3 pointerWorldPoint)
-        {
-            if (targetZoom.VisibleCellsY <= 0)
-                return;
-
-            SuspendPixelPerfectCameraForTransition(camera);
-            _zoomTransitionStartOrthographicSize = camera.orthographicSize;
-            _zoomTransitionTargetOrthographicSize = Mathf.Max(
-                minimumOrthographicSize,
-                targetZoom.VisibleCellsY * 0.5f);
-            _zoomTransitionElapsedSeconds = 0f;
-            _zoomTransitionAnchorScreenPosition = pointerScreenPosition;
-            _zoomTransitionAnchorWorldPoint = pointerWorldPoint;
-            _isZoomTransitionActive = true;
-
-            if (config.ZoomTransitionSeconds <= 0.0001f)
-            {
-                ApplyZoomSizeAroundAnchor(camera, _zoomTransitionTargetOrthographicSize);
-                ReleasePixelPerfectCameraAfterTransition();
-                _isZoomTransitionActive = false;
-            }
-        }
-
-        private bool ApplyPendingZoomTransition(
+        private bool ApplyZoomSmoothing(
             Camera camera,
             ArcGraphMapViewConfig config)
         {
-            if (!_isZoomTransitionActive)
+            if (!_hasZoomTarget)
                 return false;
 
-            float targetSize = Mathf.Max(
-                minimumOrthographicSize,
-                _zoomTransitionTargetOrthographicSize);
-            float transitionSeconds = Mathf.Max(0f, config.ZoomTransitionSeconds);
-
-            if (transitionSeconds <= 0.0001f)
+            float target = ClampOrthographicSize(_targetOrthographicSize, config);
+            if (Mathf.Abs(camera.orthographicSize - target) <= 0.001f)
             {
-                ApplyZoomSizeAroundAnchor(camera, targetSize);
-                ReleasePixelPerfectCameraAfterTransition();
-                _isZoomTransitionActive = false;
-                return true;
+                camera.orthographicSize = target;
+                return false;
             }
 
-            _zoomTransitionElapsedSeconds += Time.unscaledDeltaTime;
-            float progress01 = Mathf.Clamp01(_zoomTransitionElapsedSeconds / transitionSeconds);
-            float easedProgress01 = SmoothStep01(progress01);
-            float nextSize = Mathf.Lerp(
-                _zoomTransitionStartOrthographicSize,
-                targetSize,
-                easedProgress01);
+            Vector3 anchorBefore = _zoomAnchorWorldPoint;
+            float smoothTime = Mathf.Max(0f, config.ZoomSmoothTime);
+            camera.orthographicSize = smoothTime <= 0.0001f
+                ? target
+                : Mathf.SmoothDamp(
+                    camera.orthographicSize,
+                    target,
+                    ref _zoomVelocity,
+                    smoothTime,
+                    Mathf.Infinity,
+                    Time.unscaledDeltaTime);
 
-            if (progress01 >= 1f || Mathf.Abs(nextSize - targetSize) < 0.001f)
-            {
-                nextSize = targetSize;
-                _isZoomTransitionActive = false;
-            }
-
-            ApplyZoomSizeAroundAnchor(camera, nextSize);
-
-            if (!_isZoomTransitionActive)
-            {
-                ReleasePixelPerfectCameraAfterTransition();
-            }
-
+            Vector3 anchorAfter = ResolvePointerWorldPoint(camera, _zoomAnchorScreenPosition);
+            Vector3 compensation = anchorBefore - anchorAfter;
+            compensation.z = 0f;
+            MoveCameraByOffset(camera, compensation);
             return true;
         }
 
-        private void ApplyZoomSizeAroundAnchor(
-            Camera camera,
-            float orthographicSize)
+        private static float ClampOrthographicSize(
+            float value,
+            ArcGraphMapViewConfig config)
         {
-            camera.orthographic = true;
-            camera.orthographicSize = Mathf.Max(minimumOrthographicSize, orthographicSize);
-
-            Vector3 anchorAfterZoom = ResolvePointerWorldPoint(
-                camera,
-                _zoomTransitionAnchorScreenPosition);
-            Vector3 pointerCompensation = _zoomTransitionAnchorWorldPoint - anchorAfterZoom;
-            pointerCompensation.z = 0f;
-
-            MoveCameraByOffset(camera, pointerCompensation);
+            return Mathf.Clamp(
+                value,
+                Mathf.Max(0.01f, config.MinOrthographicSize),
+                Mathf.Max(config.MinOrthographicSize, config.MaxOrthographicSize));
         }
 
-        // =============================================================================
-        // SuspendPixelPerfectCameraForTransition
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Disattiva temporaneamente la PixelPerfectCamera mentre lo zoom interpola
-        /// fra due dimensioni ortografiche.
-        /// </para>
-        /// </summary>
-        private void SuspendPixelPerfectCameraForTransition(Camera camera)
-        {
-            if (camera == null)
-                return;
-
-            PixelPerfectCamera pixelPerfectCamera = camera.GetComponent<PixelPerfectCamera>();
-            if (pixelPerfectCamera == null)
-                return;
-
-            _zoomTransitionPixelPerfectCamera = pixelPerfectCamera;
-            _zoomTransitionPixelPerfectWasEnabled = pixelPerfectCamera.enabled;
-
-            if (pixelPerfectCamera.enabled)
-                pixelPerfectCamera.enabled = false;
-        }
-
-        // =============================================================================
-        // DisablePixelPerfectCameraIfPresent
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Disattiva la <c>PixelPerfectCamera</c> quando ArcGraph prende possesso
-        /// diretto dello zoom tramite <c>Camera.orthographicSize</c>.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: un solo proprietario della scala</b></para>
-        /// <para>
-        /// La camera pixel-perfect ricalcola la scala in modo quantizzato. Questo e'
-        /// utile per una resa rigidamente pixel-perfect, ma entra in conflitto con
-        /// la transizione morbida tra livelli zoom decisa dal JSON ArcGraph. Per il
-        /// runtime ArcGraph attuale la scala viene quindi posseduta dal controller
-        /// viewport e la PixelPerfectCamera resta spenta.
-        /// </para>
-        /// </summary>
         private void DisablePixelPerfectCameraIfPresent(Camera camera)
         {
-            if (_zoomTransitionPixelPerfectCamera != null)
-            {
-                _zoomTransitionPixelPerfectCamera.enabled = false;
-                _zoomTransitionPixelPerfectCamera = null;
-                _zoomTransitionPixelPerfectWasEnabled = false;
-            }
-
             PixelPerfectCamera pixelPerfectCamera = camera != null
                 ? camera.GetComponent<PixelPerfectCamera>()
                 : null;
             if (pixelPerfectCamera != null && pixelPerfectCamera.enabled)
                 pixelPerfectCamera.enabled = false;
-        }
-
-        // =============================================================================
-        // ReleasePixelPerfectCameraAfterTransition
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Chiude la transizione zoom rilasciando il riferimento alla
-        /// <c>PixelPerfectCamera</c> eventualmente sospesa.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: chiusura senza secondo writer</b></para>
-        /// <para>
-        /// Il vecchio comportamento ripristinava la PixelPerfectCamera alla fine
-        /// della transizione. Questo poteva rimettere in gioco un secondo sistema
-        /// capace di cambiare la scala della camera. Ora la chiusura mantiene la
-        /// scelta ArcGraph: zoom e pan restano governati solo dal viewport
-        /// controller.
-        /// </para>
-        /// </summary>
-        private void ReleasePixelPerfectCameraAfterTransition()
-        {
-            DisablePixelPerfectCameraIfPresent(sceneCamera);
-            _zoomTransitionPixelPerfectCamera = null;
-            _zoomTransitionPixelPerfectWasEnabled = false;
-        }
-
-        // =============================================================================
-        // SmoothStep01
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Converte un progresso lineare in una curva morbida ease-in/ease-out.
-        /// </para>
-        /// </summary>
-        private static float SmoothStep01(float value)
-        {
-            float clamped = Mathf.Clamp01(value);
-            return clamped * clamped * (3f - (2f * clamped));
         }
 
         private void ClampCameraToMap(
@@ -638,7 +343,7 @@ namespace Arcontio.View.ArcGraph
             MoveCameraByOffset(camera, offset);
         }
 
-        private void MoveCameraByOffset(
+        private static void MoveCameraByOffset(
             Camera camera,
             Vector3 offset)
         {

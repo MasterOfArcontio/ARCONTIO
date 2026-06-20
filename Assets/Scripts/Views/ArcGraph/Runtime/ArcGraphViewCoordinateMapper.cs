@@ -163,18 +163,17 @@ namespace Arcontio.View.ArcGraph
             int viewportPixelWidth,
             int viewportPixelHeight)
         {
-            var zoom = state.CurrentZoom(config);
-
             if (viewportPixelWidth <= 0 || viewportPixelHeight <= 0)
                 return state.ResolveVisibleCellRect(config);
 
             float aspect = viewportPixelWidth / (float)viewportPixelHeight;
+            float visibleCellsYRaw = config.DefaultOrthographicSize * 2f;
             int visibleWidth = Math.Min(
                 config.MapWidthCells,
-                Math.Max(1, (int)Math.Ceiling(zoom.VisibleCellsY * aspect)));
+                Math.Max(1, (int)Math.Ceiling(visibleCellsYRaw * aspect)));
             int visibleHeight = Math.Min(
                 config.MapHeightCells,
-                Math.Max(1, zoom.VisibleCellsY));
+                Math.Max(1, (int)Math.Ceiling(visibleCellsYRaw)));
 
             int minX = (int)Math.Floor(state.CenterCellX - (visibleWidth * 0.5f));
             int minY = (int)Math.Floor(state.CenterCellY - (visibleHeight * 0.5f));

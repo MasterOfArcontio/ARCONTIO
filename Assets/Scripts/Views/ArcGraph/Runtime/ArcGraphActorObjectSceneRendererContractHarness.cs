@@ -133,7 +133,7 @@ namespace Arcontio.View.ArcGraph
             objectLayer.ReplaceSnapshots(CreateObjects(), renderState);
 
             var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            var lodProfile = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(4));
+            var lodProfile = ArcGraphZoomLodPolicy.ResolveFullDetail();
             var queue = new ArcGraphRenderQueue();
             var queueBuilder = new ArcGraphRenderQueueBuilder();
             queueBuilder.Build(actorLayer, objectLayer, lodProfile, queue);

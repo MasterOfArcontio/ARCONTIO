@@ -22,7 +22,6 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>DepthLevel</b>: profondita' grafica astratta ricevuta dallo snapshot.</item>
     ///   <item><b>SpriteKey</b>: chiave sprite/atlas futura, non asset caricato.</item>
     ///   <item><b>IsAnimated</b>: indica se ArcGraph puo' scegliere frame acqua.</item>
-    ///   <item><b>UsesSimplifiedRepresentation</b>: LOD semplificato attivo.</item>
     ///   <item><b>IsVisible/HiddenReason</b>: decisione visuale del builder.</item>
     ///   <item><b>SortKey</b>: ordinamento deterministico.</item>
     /// </list>
@@ -33,7 +32,6 @@ namespace Arcontio.View.ArcGraph
         public readonly int DepthLevel;
         public readonly string SpriteKey;
         public readonly bool IsAnimated;
-        public readonly bool UsesSimplifiedRepresentation;
         public readonly bool IsVisible;
         public readonly string HiddenReason;
         public readonly ArcGraphRenderSortKey SortKey;
@@ -57,7 +55,6 @@ namespace Arcontio.View.ArcGraph
             int depthLevel,
             string spriteKey,
             bool isAnimated,
-            bool usesSimplifiedRepresentation,
             bool isVisible,
             string hiddenReason,
             ArcGraphRenderSortKey sortKey)
@@ -66,7 +63,6 @@ namespace Arcontio.View.ArcGraph
             DepthLevel = depthLevel < 0 ? 0 : depthLevel;
             SpriteKey = spriteKey ?? string.Empty;
             IsAnimated = isAnimated;
-            UsesSimplifiedRepresentation = usesSimplifiedRepresentation;
             IsVisible = isVisible;
             HiddenReason = string.IsNullOrWhiteSpace(hiddenReason) ? "None" : hiddenReason;
             SortKey = sortKey;

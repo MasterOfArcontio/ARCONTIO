@@ -54,7 +54,6 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool pushQueueToInteractionWrapper;
         [SerializeField] private bool enableInteractionWrapperAfterPush;
         [SerializeField] private bool logDiagnostics;
-        [SerializeField] private int zoomLevel = 4;
         [SerializeField] private float actorObjectRefreshSeconds = 0.1f;
 
         private readonly ArcGraphMinimalRuntimeCoordinator _coordinator = new();
@@ -479,7 +478,6 @@ namespace Arcontio.View.ArcGraph
                 isCoordinatorEnabled: true,
                 shouldRefreshSnapshots: refreshSnapshots && shouldRefreshActorObjectFrame,
                 shouldBuildActorObjectQueue: buildActorObjectQueue && shouldRefreshActorObjectFrame,
-                zoomLevel: ResolveEffectiveZoomLevel(),
                 sourceTick: _sourceFrameIndex++);
 
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics =
@@ -670,19 +668,6 @@ namespace Arcontio.View.ArcGraph
             terrainRenderer.SetVisibleCellRect(viewState.ResolveVisibleCellRect(viewConfig));
         }
 
-        private int ResolveEffectiveZoomLevel()
-        {
-            ArcGraphViewState viewState = cameraViewportController != null
-                ? cameraViewportController.ViewState
-                : interactionWrapper != null
-                ? interactionWrapper.ViewState
-                : null;
-
-            return viewState != null
-                ? viewState.ActiveZoomLevel
-                : zoomLevel;
-        }
-
         private void ProcessCameraViewportFrame()
         {
             if (cameraViewportController == null)
@@ -705,19 +690,15 @@ namespace Arcontio.View.ArcGraph
                 ? context.MapHeightCells
                 : template.MapHeightCells;
 
-            // La dimensione mappa arriva dal context runtime neutrale,
-            // ma il comportamento dello zoom deve restare quello della config
-            // ArcGraph. Questo preserva i livelli decisi nel JSON evitando
-            // che il campo serializzato legacy <c>zoomLevel</c> diventi una seconda
-            // fonte di verita'.
             return new ArcGraphMapViewConfig(
                 width,
                 height,
-                template.ZoomLevels,
-                template.DefaultZoomLevel,
-                template.MouseWheelStepsPerZoomLevel,
-                template.PanUsesMiddleMouseButton,
-                template.ZoomTransitionSeconds);
+                template.DefaultOrthographicSize,
+                template.MinOrthographicSize,
+                template.MaxOrthographicSize,
+                template.ZoomStep,
+                template.ZoomSmoothTime,
+                template.PanUsesMiddleMouseButton);
         }
 
         private ArcGraphMinimalRuntimeSceneWrapperDiagnostics CreateDiagnostics(

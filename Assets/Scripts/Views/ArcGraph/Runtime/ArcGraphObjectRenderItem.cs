@@ -41,7 +41,6 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphCellCoord Cell;
         public readonly string SpriteKey;
         public readonly ArcGraphObjectLodMode ObjectMode;
-        public readonly bool UsesSimplifiedRepresentation;
         public readonly bool ShowMinorItems;
         public readonly bool IsHeld;
         public readonly int HolderActorId;
@@ -86,7 +85,6 @@ namespace Arcontio.View.ArcGraph
             ArcGraphCellCoord cell,
             string spriteKey,
             ArcGraphObjectLodMode objectMode,
-            bool usesSimplifiedRepresentation,
             bool showMinorItems,
             bool isHeld,
             int holderActorId,
@@ -100,7 +98,6 @@ namespace Arcontio.View.ArcGraph
                 cell,
                 spriteKey,
                 objectMode,
-                usesSimplifiedRepresentation,
                 showMinorItems,
                 isHeld,
                 holderActorId,
@@ -148,7 +145,6 @@ namespace Arcontio.View.ArcGraph
             ArcGraphCellCoord cell,
             string spriteKey,
             ArcGraphObjectLodMode objectMode,
-            bool usesSimplifiedRepresentation,
             bool showMinorItems,
             bool isHeld,
             int holderActorId,
@@ -170,7 +166,6 @@ namespace Arcontio.View.ArcGraph
                 cell,
                 spriteKey,
                 objectMode,
-                usesSimplifiedRepresentation,
                 showMinorItems,
                 isHeld,
                 holderActorId,
@@ -210,7 +205,6 @@ namespace Arcontio.View.ArcGraph
             ArcGraphCellCoord cell,
             string spriteKey,
             ArcGraphObjectLodMode objectMode,
-            bool usesSimplifiedRepresentation,
             bool showMinorItems,
             bool isHeld,
             int holderActorId,
@@ -238,7 +232,6 @@ namespace Arcontio.View.ArcGraph
             Cell = cell;
             SpriteKey = spriteKey ?? string.Empty;
             ObjectMode = objectMode;
-            UsesSimplifiedRepresentation = usesSimplifiedRepresentation;
             ShowMinorItems = showMinorItems;
             IsHeld = isHeld;
             HolderActorId = holderActorId;

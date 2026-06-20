@@ -22,10 +22,8 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Passed</b>: esito complessivo.</item>
     ///   <item><b>Reason</b>: motivo sintetico.</item>
-    ///   <item><b>Zoom1VisibleCount</b>: overlay visibili a zoom lontano.</item>
-    ///   <item><b>Zoom1AnimatedCount</b>: overlay animabili a zoom lontano.</item>
-    ///   <item><b>Zoom4VisibleCount</b>: overlay visibili a zoom vicino.</item>
-    ///   <item><b>Zoom4AnimatedCount</b>: overlay animabili a zoom vicino.</item>
+    ///   <item><b>VisibleCount</b>: overlay visibili nel profilo full-detail.</item>
+    ///   <item><b>AnimatedCount</b>: overlay animabili nel profilo full-detail.</item>
     ///   <item><b>InactiveHiddenCount</b>: overlay nascosti per meteo inattivo.</item>
     ///   <item><b>WrongZHiddenCount</b>: overlay nascosti per livello Z non visibile.</item>
     /// </list>
@@ -34,29 +32,23 @@ namespace Arcontio.View.ArcGraph
     {
         public readonly bool Passed;
         public readonly string Reason;
-        public readonly int Zoom1VisibleCount;
-        public readonly int Zoom1AnimatedCount;
-        public readonly int Zoom4VisibleCount;
-        public readonly int Zoom4AnimatedCount;
+        public readonly int VisibleCount;
+        public readonly int AnimatedCount;
         public readonly int InactiveHiddenCount;
         public readonly int WrongZHiddenCount;
 
         public ArcGraphWeatherRenderQueueHarnessResult(
             bool passed,
             string reason,
-            int zoom1VisibleCount,
-            int zoom1AnimatedCount,
-            int zoom4VisibleCount,
-            int zoom4AnimatedCount,
+            int visibleCount,
+            int animatedCount,
             int inactiveHiddenCount,
             int wrongZHiddenCount)
         {
             Passed = passed;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
-            Zoom1VisibleCount = zoom1VisibleCount;
-            Zoom1AnimatedCount = zoom1AnimatedCount;
-            Zoom4VisibleCount = zoom4VisibleCount;
-            Zoom4AnimatedCount = zoom4AnimatedCount;
+            VisibleCount = visibleCount;
+            AnimatedCount = animatedCount;
             InactiveHiddenCount = inactiveHiddenCount;
             WrongZHiddenCount = wrongZHiddenCount;
         }
@@ -79,7 +71,7 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>RunDefaultSmoke</b>: scenario minimo con zoom 1 e zoom 4.</item>
+    ///   <item><b>RunDefaultSmoke</b>: scenario minimo con profilo full-detail.</item>
     ///   <item><b>CreateRainSnapshot</b>: snapshot meteo attivo.</item>
     /// </list>
     /// </summary>
@@ -96,37 +88,29 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Scenario minimo</b></para>
         /// <para>
         /// Lo scenario contiene pioggia attiva sul livello visibile, meteo inattivo
-        /// e neve attiva su un livello Z diverso. A zoom 1 l'overlay e' visibile ma
-        /// non animato; a zoom 4 lo stesso overlay puo' essere animato da ArcGraph.
+        /// e neve attiva su un livello Z diverso. Nel profilo full-detail
+        /// l'overlay visibile puo' essere animato da ArcGraph.
         /// </para>
         /// </summary>
         public static ArcGraphWeatherRenderQueueHarnessResult RunDefaultSmoke()
         {
             var layer = new ArcGraphWeatherLayer();
-            var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            var zoom1 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(1));
-            var zoom4 = ArcGraphZoomLodPolicy.ResolveFromZoom(config.ResolveZoomLevel(4));
+            ArcGraphZoomLodProfile profile = ArcGraphZoomLodPolicy.ResolveFullDetail();
             var builder = new ArcGraphWeatherRenderQueueBuilder();
 
             layer.ReplaceSnapshot(CreateRainSnapshot());
 
-            var zoom1Items = new List<ArcGraphWeatherRenderItem>();
-            ArcGraphWeatherRenderQueueDiagnostics zoom1Diagnostics = builder.Build(
+            var items = new List<ArcGraphWeatherRenderItem>();
+            ArcGraphWeatherRenderQueueDiagnostics diagnostics = builder.Build(
                 layer,
-                zoom1,
-                zoom1Items);
-
-            var zoom4Items = new List<ArcGraphWeatherRenderItem>();
-            ArcGraphWeatherRenderQueueDiagnostics zoom4Diagnostics = builder.Build(
-                layer,
-                zoom4,
-                zoom4Items);
+                profile,
+                items);
 
             layer.ReplaceSnapshot(ArcGraphWeatherVisualSnapshot.None());
             var inactiveItems = new List<ArcGraphWeatherRenderItem>();
             ArcGraphWeatherRenderQueueDiagnostics inactiveDiagnostics = builder.Build(
                 layer,
-                zoom4,
+                profile,
                 inactiveItems,
                 includeHiddenItems: true);
 
@@ -139,21 +123,16 @@ namespace Arcontio.View.ArcGraph
             var wrongZItems = new List<ArcGraphWeatherRenderItem>();
             ArcGraphWeatherRenderQueueDiagnostics wrongZDiagnostics = builder.Build(
                 layer,
-                zoom4,
+                profile,
                 wrongZItems,
                 visibleZLevel: ArcGraphZLevelPolicy.DefaultVisibleZLevel,
                 includeHiddenItems: true);
 
-            bool passed = zoom1Diagnostics.HasSnapshot
-                          && zoom1Diagnostics.ActiveSnapshotCount == 1
-                          && zoom1Diagnostics.VisibleItemCount == 1
-                          && zoom1Diagnostics.AnimatedItemCount == 0
-                          && zoom1Items.Count == 1
-                          && zoom1Items[0].UsesSimplifiedRepresentation
-                          && zoom4Diagnostics.VisibleItemCount == 1
-                          && zoom4Diagnostics.AnimatedItemCount == 1
-                          && zoom4Items.Count == 1
-                          && !zoom4Items[0].UsesSimplifiedRepresentation
+            bool passed = diagnostics.HasSnapshot
+                          && diagnostics.ActiveSnapshotCount == 1
+                          && diagnostics.VisibleItemCount == 1
+                          && diagnostics.AnimatedItemCount == 1
+                          && items.Count == 1
                           && inactiveDiagnostics.HiddenItemCount == 1
                           && inactiveItems.Count == 1
                           && inactiveItems[0].HiddenReason == "WeatherInactive"
@@ -164,10 +143,8 @@ namespace Arcontio.View.ArcGraph
             return new ArcGraphWeatherRenderQueueHarnessResult(
                 passed,
                 passed ? "WeatherRenderQueueSmokePassed" : "WeatherRenderQueueSmokeFailed",
-                zoom1Diagnostics.VisibleItemCount,
-                zoom1Diagnostics.AnimatedItemCount,
-                zoom4Diagnostics.VisibleItemCount,
-                zoom4Diagnostics.AnimatedItemCount,
+                diagnostics.VisibleItemCount,
+                diagnostics.AnimatedItemCount,
                 inactiveDiagnostics.HiddenItemCount,
                 wrongZDiagnostics.HiddenItemCount);
         }

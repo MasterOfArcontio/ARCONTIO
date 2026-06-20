@@ -158,7 +158,6 @@ namespace Arcontio.View.ArcGraph
                 snapshot.Cell,
                 spriteKey,
                 lodProfile.ObjectMode,
-                lodProfile.UsesSimplifiedRepresentation,
                 lodProfile.ShowMinorItems,
                 snapshot.IsHeld,
                 snapshot.HolderActorId,
