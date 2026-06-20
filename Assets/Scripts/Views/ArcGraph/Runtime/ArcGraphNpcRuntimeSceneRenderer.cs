@@ -56,7 +56,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private Vector3 selectionMarkerLocalOffset = new Vector3(0f, -0.16f, 0f);
         [SerializeField] private Vector2 selectionMarkerLocalScale = Vector2.one;
         [SerializeField] private Color selectionMarkerTint = new Color(0.2f, 0.75f, 1f, 0.75f);
-        [SerializeField] private int selectionMarkerSortingOffset = -1;
+        [SerializeField] private int selectionMarkerSortingOffset = 3;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float actorZOffset = -0.02f;
@@ -112,7 +112,44 @@ namespace Arcontio.View.ArcGraph
             public SpriteRenderer SelectionMarkerRenderer;
             public readonly Dictionary<string, SpriteRenderer> PartRenderers = new();
             public string LastDirection = "south";
+            public int LastSortingOrder;
             public bool WasTouchedThisFrame;
+        }
+
+        // =============================================================================
+        // OnEnable
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega il renderer al servizio view-side di selezione NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: feedback immediato senza refresh simulativo</b></para>
+        /// <para>
+        /// La selezione non e' un dato del <c>World</c> e non deve forzare una
+        /// ricostruzione della queue actor/object. Quando <c>NPCSelection</c>
+        /// cambia, aggiorniamo soltanto i marker grafici degli handle gia'
+        /// materializzati in scena.
+        /// </para>
+        /// </summary>
+        private void OnEnable()
+        {
+            NPCSelection.OnSelectionChanged += HandleNpcSelectionChanged;
+            RefreshSelectionMarkersForActiveHandles();
+        }
+
+        // =============================================================================
+        // OnDisable
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scollega il renderer dal servizio di selezione quando il componente non
+        /// e' attivo.
+        /// </para>
+        /// </summary>
+        private void OnDisable()
+        {
+            NPCSelection.OnSelectionChanged -= HandleNpcSelectionChanged;
         }
 
         // =============================================================================
@@ -632,9 +669,10 @@ namespace Arcontio.View.ArcGraph
             handle.Renderer.sprite = sprite;
             handle.Renderer.sortingOrder = entry.SortingOrder;
             handle.Renderer.enabled = true;
+            handle.LastSortingOrder = entry.SortingOrder;
             SetPartRenderersEnabled(handle, false);
             ApplyActorShadow(handle, entry, contract, spriteResolver);
-            ApplySelectionMarker(handle, entry);
+            ApplySelectionMarker(handle);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
         }
@@ -749,7 +787,8 @@ namespace Arcontio.View.ArcGraph
                 return false;
 
             ApplyActorShadow(handle, entry, contract, spriteResolver);
-            ApplySelectionMarker(handle, entry);
+            handle.LastSortingOrder = entry.SortingOrder;
+            ApplySelectionMarker(handle);
             handle.Renderer.enabled = false;
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
@@ -984,8 +1023,7 @@ namespace Arcontio.View.ArcGraph
         /// </para>
         /// </summary>
         private void ApplySelectionMarker(
-            ActorHandle handle,
-            ArcGraphActorObjectSceneRenderEntry entry)
+            ActorHandle handle)
         {
             if (handle == null)
                 return;
@@ -1011,8 +1049,50 @@ namespace Arcontio.View.ArcGraph
                 1f);
             markerRenderer.sprite = GetOrCreateSelectionMarkerSprite();
             markerRenderer.color = selectionMarkerTint;
-            markerRenderer.sortingOrder = entry.SortingOrder + selectionMarkerSortingOffset;
+            markerRenderer.sortingOrder = handle.LastSortingOrder + selectionMarkerSortingOffset;
             markerRenderer.enabled = true;
+        }
+
+        // =============================================================================
+        // HandleNpcSelectionChanged
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Reagisce alla selezione view-side aggiornando solo i marker gia' esistenti.
+        /// </para>
+        /// </summary>
+        private void HandleNpcSelectionChanged(int selectedNpcId)
+        {
+            RefreshSelectionMarkersForActiveHandles();
+        }
+
+        // =============================================================================
+        // RefreshSelectionMarkersForActiveHandles
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna il marker di selezione per tutti gli NPC attualmente presenti
+        /// nel pool scena.
+        /// </para>
+        ///
+        /// <para><b>Nessun costo actor/object extra</b></para>
+        /// <para>
+        /// Il metodo non rilegge il <c>World</c>, non ricostruisce snapshot e non
+        /// risolve sprite NPC. Lavora solo sugli handle gia' renderizzati, quindi
+        /// rende visibile la selezione anche se il refresh actor/object e'
+        /// temporizzato per ragioni prestazionali.
+        /// </para>
+        /// </summary>
+        private void RefreshSelectionMarkersForActiveHandles()
+        {
+            foreach (var pair in _actorPool)
+            {
+                ActorHandle handle = pair.Value;
+                if (handle == null || handle.GameObject == null)
+                    continue;
+
+                ApplySelectionMarker(handle);
+            }
         }
 
         private SpriteRenderer GetOrCreateSelectionMarkerRenderer(ActorHandle handle)

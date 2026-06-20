@@ -53,8 +53,6 @@ namespace Arcontio.View.ArcGraph
         private float _zoomTransitionElapsedSeconds;
         private Vector2 _zoomTransitionAnchorScreenPosition;
         private Vector3 _zoomTransitionAnchorWorldPoint;
-        private int _zoomTransitionPendingZoomLevel;
-        private bool _hasZoomTransitionPendingZoomLevel;
         private PixelPerfectCamera _zoomTransitionPixelPerfectCamera;
         private bool _zoomTransitionPixelPerfectWasEnabled;
 
@@ -338,6 +336,7 @@ namespace Arcontio.View.ArcGraph
             if (targetZoom.Level == beforeLevel)
                 return false;
 
+            viewState.SetZoomLevel(targetZoom.Level, config);
             BeginZoomTransition(camera, config, targetZoom, pointerScreenPosition, beforePointerWorld);
             return true;
         }
@@ -381,7 +380,7 @@ namespace Arcontio.View.ArcGraph
             if (zoom.VisibleCellsY <= 0)
                 return;
 
-            RestorePixelPerfectCameraAfterTransition(camera, zoom);
+            DisablePixelPerfectCameraIfPresent(camera);
 
             float targetOrthographicSize = Mathf.Max(
                 minimumOrthographicSize,
@@ -410,14 +409,11 @@ namespace Arcontio.View.ArcGraph
             _zoomTransitionElapsedSeconds = 0f;
             _zoomTransitionAnchorScreenPosition = pointerScreenPosition;
             _zoomTransitionAnchorWorldPoint = pointerWorldPoint;
-            _zoomTransitionPendingZoomLevel = targetZoom.Level;
-            _hasZoomTransitionPendingZoomLevel = true;
             _isZoomTransitionActive = true;
 
             if (config.ZoomTransitionSeconds <= 0.0001f)
             {
                 ApplyZoomSizeAroundAnchor(camera, _zoomTransitionTargetOrthographicSize);
-                CommitPendingZoomLevel(config);
                 ReleasePixelPerfectCameraAfterTransition();
                 _isZoomTransitionActive = false;
             }
@@ -438,7 +434,6 @@ namespace Arcontio.View.ArcGraph
             if (transitionSeconds <= 0.0001f)
             {
                 ApplyZoomSizeAroundAnchor(camera, targetSize);
-                CommitPendingZoomLevel(config);
                 ReleasePixelPerfectCameraAfterTransition();
                 _isZoomTransitionActive = false;
                 return true;
@@ -462,38 +457,10 @@ namespace Arcontio.View.ArcGraph
 
             if (!_isZoomTransitionActive)
             {
-                CommitPendingZoomLevel(config);
                 ReleasePixelPerfectCameraAfterTransition();
             }
 
             return true;
-        }
-
-        // =============================================================================
-        // CommitPendingZoomLevel
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Applica allo stato logico ArcGraph il livello zoom raggiunto dalla camera.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: niente doppio proprietario dello zoom</b></para>
-        /// <para>
-        /// Durante la transizione la camera fisica interpola verso il target, ma il
-        /// livello logico resta fermo. In questo modo renderer, LOD e picking non
-        /// saltano subito al livello finale mentre la camera sta ancora animando.
-        /// Solo quando la camera arriva davvero a destinazione aggiorniamo
-        /// <c>ArcGraphViewState</c>.
-        /// </para>
-        /// </summary>
-        private void CommitPendingZoomLevel(ArcGraphMapViewConfig config)
-        {
-            if (!_hasZoomTransitionPendingZoomLevel)
-                return;
-
-            EnsureViewState().SetZoomLevel(_zoomTransitionPendingZoomLevel, config);
-            _hasZoomTransitionPendingZoomLevel = false;
-            _zoomTransitionPendingZoomLevel = 0;
         }
 
         private void ApplyZoomSizeAroundAnchor(
@@ -538,26 +505,37 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // RestorePixelPerfectCameraAfterTransition
+        // DisablePixelPerfectCameraIfPresent
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Ripristina lo stato precedente della PixelPerfectCamera e applica il PPU
-        /// finale del livello zoom raggiunto.
+        /// Disattiva la <c>PixelPerfectCamera</c> quando ArcGraph prende possesso
+        /// diretto dello zoom tramite <c>Camera.orthographicSize</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: un solo proprietario della scala</b></para>
+        /// <para>
+        /// La camera pixel-perfect ricalcola la scala in modo quantizzato. Questo e'
+        /// utile per una resa rigidamente pixel-perfect, ma entra in conflitto con
+        /// la transizione morbida tra livelli zoom decisa dal JSON ArcGraph. Per il
+        /// runtime ArcGraph attuale la scala viene quindi posseduta dal controller
+        /// viewport e la PixelPerfectCamera resta spenta.
         /// </para>
         /// </summary>
-        private void RestorePixelPerfectCameraAfterTransition(
-            Camera camera,
-            ArcGraphViewZoomLevelDefinition zoom)
+        private void DisablePixelPerfectCameraIfPresent(Camera camera)
         {
             if (_zoomTransitionPixelPerfectCamera != null)
             {
-                _zoomTransitionPixelPerfectCamera.enabled = _zoomTransitionPixelPerfectWasEnabled;
+                _zoomTransitionPixelPerfectCamera.enabled = false;
                 _zoomTransitionPixelPerfectCamera = null;
                 _zoomTransitionPixelPerfectWasEnabled = false;
             }
 
-            ApplyPixelPerfectCameraZoomIfPresent(camera, zoom);
+            PixelPerfectCamera pixelPerfectCamera = camera != null
+                ? camera.GetComponent<PixelPerfectCamera>()
+                : null;
+            if (pixelPerfectCamera != null && pixelPerfectCamera.enabled)
+                pixelPerfectCamera.enabled = false;
         }
 
         // =============================================================================
@@ -565,20 +543,22 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Rilascia il riferimento alla <c>PixelPerfectCamera</c> sospesa senza
-        /// riattivarla automaticamente.
+        /// Chiude la transizione zoom rilasciando il riferimento alla
+        /// <c>PixelPerfectCamera</c> eventualmente sospesa.
         /// </para>
         ///
-        /// <para><b>Zoom morbido contro quantizzazione pixel-perfect</b></para>
+        /// <para><b>Principio architetturale: chiusura senza secondo writer</b></para>
         /// <para>
-        /// La camera pixel-perfect e una transizione ortografica continua spingono
-        /// in direzioni opposte: la prima quantizza, la seconda interpola. Per il
-        /// gate ArcGraph attuale privilegiamo lo zoom morbido e lasciamo la
-        /// PixelPerfectCamera spenta dopo il primo zoom gestito da ArcGraph.
+        /// Il vecchio comportamento ripristinava la PixelPerfectCamera alla fine
+        /// della transizione. Questo poteva rimettere in gioco un secondo sistema
+        /// capace di cambiare la scala della camera. Ora la chiusura mantiene la
+        /// scelta ArcGraph: zoom e pan restano governati solo dal viewport
+        /// controller.
         /// </para>
         /// </summary>
         private void ReleasePixelPerfectCameraAfterTransition()
         {
+            DisablePixelPerfectCameraIfPresent(sceneCamera);
             _zoomTransitionPixelPerfectCamera = null;
             _zoomTransitionPixelPerfectWasEnabled = false;
         }
@@ -595,27 +575,6 @@ namespace Arcontio.View.ArcGraph
         {
             float clamped = Mathf.Clamp01(value);
             return clamped * clamped * (3f - (2f * clamped));
-        }
-
-        private void ApplyPixelPerfectCameraZoomIfPresent(
-            Camera camera,
-            ArcGraphViewZoomLevelDefinition zoom)
-        {
-            PixelPerfectCamera pixelPerfectCamera = camera.GetComponent<PixelPerfectCamera>();
-            if (pixelPerfectCamera == null || !pixelPerfectCamera.enabled)
-                return;
-
-            int viewportHeight = camera.pixelHeight > 0
-                ? camera.pixelHeight
-                : Screen.height > 0
-                    ? Screen.height
-                    : 1080;
-            int targetAssetsPpu = Mathf.Max(
-                1,
-                Mathf.RoundToInt(viewportHeight / (float)zoom.VisibleCellsY));
-
-            if (pixelPerfectCamera.assetsPPU != targetAssetsPpu)
-                pixelPerfectCamera.assetsPPU = targetAssetsPpu;
         }
 
         private void ClampCameraToMap(
