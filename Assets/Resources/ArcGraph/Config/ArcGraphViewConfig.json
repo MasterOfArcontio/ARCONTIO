@@ -4,5 +4,9 @@
   "minOrthographicSize": 8,
   "maxOrthographicSize": 150,
   "zoomStep": 8,
-  "zoomSmoothTime": 0.20
+  "zoomSmoothTime": 0.20,
+  "panInertiaEnabled": true,
+  "panInertiaDamping": 7.5,
+  "panInertiaStopThreshold": 0.05,
+  "panVelocityMultiplier": 0.75
 }

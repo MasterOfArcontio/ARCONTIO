@@ -698,7 +698,11 @@ namespace Arcontio.View.ArcGraph
                 template.MaxOrthographicSize,
                 template.ZoomStep,
                 template.ZoomSmoothTime,
-                template.PanUsesMiddleMouseButton);
+                template.PanUsesMiddleMouseButton,
+                template.PanInertiaEnabled,
+                template.PanInertiaDamping,
+                template.PanInertiaStopThreshold,
+                template.PanVelocityMultiplier);
         }
 
         private ArcGraphMinimalRuntimeSceneWrapperDiagnostics CreateDiagnostics(

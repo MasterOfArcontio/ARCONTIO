@@ -39,6 +39,7 @@ namespace Arcontio.View.ArcGraph
         private float _zoomVelocity;
         private Vector2 _zoomAnchorScreenPosition;
         private Vector3 _zoomAnchorWorldPoint;
+        private Vector3 _panVelocityWorld;
 
         public ArcGraphViewState ViewState => EnsureViewState();
         public bool ControllerEnabled => controllerEnabled;
@@ -129,8 +130,10 @@ namespace Arcontio.View.ArcGraph
                 didChangeCamera |= TryApplyDragPan(camera, config, mouse);
             }
 
+            didChangeCamera |= ApplyPanInertia(camera, config, mouse);
             didChangeCamera |= ApplyZoomSmoothing(camera, config);
-            ClampCameraToMap(camera, config);
+            Vector3 clampOffset = ClampCameraToMap(camera, config);
+            ResolvePanVelocityAfterClamp(clampOffset);
             SyncViewStateFromCamera(camera, config, viewState);
             return didChangeCamera;
         }
@@ -175,6 +178,7 @@ namespace Arcontio.View.ArcGraph
             _targetOrthographicSize = ClampOrthographicSize(config.DefaultOrthographicSize, config);
             _hasZoomTarget = true;
             _zoomVelocity = 0f;
+            _panVelocityWorld = Vector3.zero;
             camera.orthographicSize = _targetOrthographicSize;
             MoveCameraCenterTo(camera, viewState.CenterCellX, viewState.CenterCellY);
             ClampCameraToMap(camera, config);
@@ -209,16 +213,15 @@ namespace Arcontio.View.ArcGraph
             ArcGraphMapViewConfig config,
             Mouse mouse)
         {
-            bool isPanHeld =
-                (useRightMousePan && mouse.rightButton.isPressed) ||
-                (useMiddleMousePan && mouse.middleButton.isPressed);
-
-            if (!isPanHeld)
+            if (!IsPanHeld(mouse))
                 return false;
 
             Vector2 deltaPixels = mouse.delta.ReadValue();
             if (deltaPixels.sqrMagnitude < 0.0001f)
+            {
+                _panVelocityWorld = Vector3.zero;
                 return false;
+            }
 
             float worldPerPixel = (2f * camera.orthographicSize) / Mathf.Max(1, camera.pixelHeight);
             Vector3 deltaWorld = new Vector3(
@@ -227,7 +230,77 @@ namespace Arcontio.View.ArcGraph
                 0f);
 
             MoveCameraByOffset(camera, deltaWorld);
+            StorePanVelocity(deltaWorld, config);
             return true;
+        }
+
+        // =============================================================================
+        // ApplyPanInertia
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica il trascinamento residuo dopo il rilascio del tasto pan.
+        /// </para>
+        ///
+        /// <para>
+        /// Il drag diretto resta identico al comportamento precedente: mentre il
+        /// tasto e' premuto la camera segue il delta del mouse. Quando il tasto viene
+        /// lasciato, questa funzione usa l'ultima velocita' mondo misurata e la
+        /// riduce progressivamente fino allo stop. Non modifica il World, non cambia
+        /// zoom e non introduce un secondo sistema camera.
+        /// </para>
+        /// </summary>
+        private bool ApplyPanInertia(
+            Camera camera,
+            ArcGraphMapViewConfig config,
+            Mouse mouse)
+        {
+            if (IsPanHeld(mouse))
+                return false;
+
+            if (!config.PanInertiaEnabled)
+            {
+                _panVelocityWorld = Vector3.zero;
+                return false;
+            }
+
+            float deltaTime = Mathf.Max(0f, Time.unscaledDeltaTime);
+            if (deltaTime <= 0.000001f)
+                return false;
+
+            float stopThreshold = Mathf.Max(0.0001f, config.PanInertiaStopThreshold);
+            if (_panVelocityWorld.sqrMagnitude <= stopThreshold * stopThreshold)
+            {
+                _panVelocityWorld = Vector3.zero;
+                return false;
+            }
+
+            Vector3 offset = _panVelocityWorld * deltaTime;
+            MoveCameraByOffset(camera, offset);
+
+            float damping = Mathf.Max(0.0001f, config.PanInertiaDamping);
+            float decay = Mathf.Exp(-damping * deltaTime);
+            _panVelocityWorld *= decay;
+            return true;
+        }
+
+        private void StorePanVelocity(
+            Vector3 deltaWorld,
+            ArcGraphMapViewConfig config)
+        {
+            float deltaTime = Mathf.Max(0.000001f, Time.unscaledDeltaTime);
+            float multiplier = Mathf.Max(0f, config.PanVelocityMultiplier);
+            _panVelocityWorld = (deltaWorld / deltaTime) * multiplier;
+            _panVelocityWorld.z = 0f;
+        }
+
+        private bool IsPanHeld(Mouse mouse)
+        {
+            if (mouse == null)
+                return false;
+
+            return (useRightMousePan && mouse.rightButton.isPressed) ||
+                   (useMiddleMousePan && mouse.middleButton.isPressed);
         }
 
         private bool ApplyZoomSmoothing(
@@ -282,7 +355,7 @@ namespace Arcontio.View.ArcGraph
                 pixelPerfectCamera.enabled = false;
         }
 
-        private void ClampCameraToMap(
+        private Vector3 ClampCameraToMap(
             Camera camera,
             ArcGraphMapViewConfig config)
         {
@@ -291,6 +364,19 @@ namespace Arcontio.View.ArcGraph
             Vector3 offset = clamped - current;
             offset.z = 0f;
             MoveCameraByOffset(camera, offset);
+            return offset;
+        }
+
+        private void ResolvePanVelocityAfterClamp(Vector3 clampOffset)
+        {
+            if (clampOffset.sqrMagnitude < 0.000001f)
+                return;
+
+            if (Mathf.Abs(clampOffset.x) > 0.000001f)
+                _panVelocityWorld.x = 0f;
+
+            if (Mathf.Abs(clampOffset.y) > 0.000001f)
+                _panVelocityWorld.y = 0f;
         }
 
         private Vector3 ClampCameraCenter(

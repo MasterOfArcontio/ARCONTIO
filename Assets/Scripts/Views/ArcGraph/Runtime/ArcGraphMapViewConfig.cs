@@ -24,6 +24,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>ZoomStep</b>: variazione per scatto rotellina.</item>
     ///   <item><b>ZoomSmoothTime</b>: tempo di smoothing continuo della camera.</item>
     ///   <item><b>PanUsesMiddleMouseButton</b>: policy input per il pan.</item>
+    ///   <item><b>PanInertia*</b>: parametri del trascinamento morbido dopo rilascio.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphMapViewConfig
@@ -36,6 +37,10 @@ namespace Arcontio.View.ArcGraph
         public float ZoomStep { get; }
         public float ZoomSmoothTime { get; }
         public bool PanUsesMiddleMouseButton { get; }
+        public bool PanInertiaEnabled { get; }
+        public float PanInertiaDamping { get; }
+        public float PanInertiaStopThreshold { get; }
+        public float PanVelocityMultiplier { get; }
 
         // =============================================================================
         // ArcGraphMapViewConfig
@@ -53,7 +58,11 @@ namespace Arcontio.View.ArcGraph
             float maxOrthographicSize = 150f,
             float zoomStep = 8f,
             float zoomSmoothTime = 0.20f,
-            bool panUsesMiddleMouseButton = true)
+            bool panUsesMiddleMouseButton = true,
+            bool panInertiaEnabled = true,
+            float panInertiaDamping = 7.5f,
+            float panInertiaStopThreshold = 0.05f,
+            float panVelocityMultiplier = 0.75f)
         {
             MapWidthCells = mapWidthCells > 0 ? mapWidthCells : 1;
             MapHeightCells = mapHeightCells > 0 ? mapHeightCells : 1;
@@ -68,6 +77,10 @@ namespace Arcontio.View.ArcGraph
             ZoomStep = zoomStep > 0f ? zoomStep : 1f;
             ZoomSmoothTime = zoomSmoothTime >= 0f ? zoomSmoothTime : 0.20f;
             PanUsesMiddleMouseButton = panUsesMiddleMouseButton;
+            PanInertiaEnabled = panInertiaEnabled;
+            PanInertiaDamping = panInertiaDamping > 0f ? panInertiaDamping : 7.5f;
+            PanInertiaStopThreshold = panInertiaStopThreshold > 0f ? panInertiaStopThreshold : 0.05f;
+            PanVelocityMultiplier = panVelocityMultiplier > 0f ? panVelocityMultiplier : 0.75f;
         }
 
         // =============================================================================
@@ -88,7 +101,11 @@ namespace Arcontio.View.ArcGraph
                 maxOrthographicSize: 150f,
                 zoomStep: 8f,
                 zoomSmoothTime: 0.20f,
-                panUsesMiddleMouseButton: true);
+                panUsesMiddleMouseButton: true,
+                panInertiaEnabled: true,
+                panInertiaDamping: 7.5f,
+                panInertiaStopThreshold: 0.05f,
+                panVelocityMultiplier: 0.75f);
         }
 
         // =============================================================================
@@ -111,7 +128,11 @@ namespace Arcontio.View.ArcGraph
                 MaxOrthographicSize,
                 ZoomStep,
                 ZoomSmoothTime,
-                PanUsesMiddleMouseButton);
+                PanUsesMiddleMouseButton,
+                PanInertiaEnabled,
+                PanInertiaDamping,
+                PanInertiaStopThreshold,
+                PanVelocityMultiplier);
         }
 
         private static float Clamp(float value, float min, float max)

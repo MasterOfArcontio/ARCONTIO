@@ -78,6 +78,10 @@ namespace Arcontio.View.ArcGraph
         public float zoomStep = 8f;
         public float zoomSmoothTime = 0.20f;
         public bool panUsesMiddleMouseButton = true;
+        public bool panInertiaEnabled = true;
+        public float panInertiaDamping = 7.5f;
+        public float panInertiaStopThreshold = 0.05f;
+        public float panVelocityMultiplier = 0.75f;
 
         public ArcGraphMapViewConfig ToRuntimeConfig()
         {
@@ -97,7 +101,13 @@ namespace Arcontio.View.ArcGraph
                     : defaults.MaxOrthographicSize,
                 zoomStep > 0f ? zoomStep : defaults.ZoomStep,
                 zoomSmoothTime >= 0f ? zoomSmoothTime : defaults.ZoomSmoothTime,
-                panUsesMiddleMouseButton);
+                panUsesMiddleMouseButton,
+                panInertiaEnabled,
+                panInertiaDamping > 0f ? panInertiaDamping : defaults.PanInertiaDamping,
+                panInertiaStopThreshold > 0f
+                    ? panInertiaStopThreshold
+                    : defaults.PanInertiaStopThreshold,
+                panVelocityMultiplier > 0f ? panVelocityMultiplier : defaults.PanVelocityMultiplier);
         }
     }
 }
