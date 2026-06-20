@@ -122,7 +122,6 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool clearBeforeRender = true;
         [SerializeField] private bool logDiagnostics = true;
         [SerializeField] private bool allowGeneratedFallbackSprites = true;
-        [SerializeField] private int zoomLevel = 4;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float actorScale = 0.85f;
         [SerializeField] private float objectScale = 0.75f;
@@ -545,8 +544,6 @@ namespace Arcontio.View.ArcGraph
 
         private ArcGraphZoomLodProfile ResolveLodProfile()
         {
-            var config = ArcGraphMapViewConfig.CreateDefaultV033();
-            int safeZoom = zoomLevel < 1 ? 1 : zoomLevel;
             return ArcGraphZoomLodPolicy.ResolveFullDetail();
         }
 

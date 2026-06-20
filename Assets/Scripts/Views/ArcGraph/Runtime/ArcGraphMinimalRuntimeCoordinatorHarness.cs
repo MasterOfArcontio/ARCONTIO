@@ -63,8 +63,7 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphRuntimeContext.Empty(),
                 isCoordinatorEnabled: true,
                 shouldRefreshSnapshots: true,
-                shouldBuildActorObjectQueue: true,
-                zoomLevel: 4);
+                shouldBuildActorObjectQueue: true);
 
             ArcGraphMinimalRuntimeCoordinatorDiagnostics diagnostics = coordinator.Process(frame);
             bool ok = diagnostics.Reason == "RuntimeContextEmpty"
@@ -83,8 +82,7 @@ namespace Arcontio.View.ArcGraph
                 context,
                 isCoordinatorEnabled: true,
                 shouldRefreshSnapshots: true,
-                shouldBuildActorObjectQueue: false,
-                zoomLevel: 1);
+                shouldBuildActorObjectQueue: false);
 
             ArcGraphMinimalRuntimeCoordinatorDiagnostics diagnostics = coordinator.Process(frame);
             bool ok = diagnostics.DidInitializeRuntime

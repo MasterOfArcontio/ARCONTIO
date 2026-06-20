@@ -229,7 +229,6 @@ namespace Arcontio.View.ArcGraph
                 _renderQueue.ActorItems.Count,
                 _renderQueue.ObjectItems.Count,
                 _renderQueue.Entries.Count,
-                0,
                 frame != null ? frame.SourceTick : -1,
                 reason);
 

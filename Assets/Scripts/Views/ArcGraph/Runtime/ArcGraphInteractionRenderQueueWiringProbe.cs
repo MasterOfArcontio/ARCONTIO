@@ -108,7 +108,6 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool pushOnStart;
         [SerializeField] private bool enableWrapperAfterPush;
         [SerializeField] private bool logDiagnostics = true;
-        [SerializeField] private int zoomLevel = 4;
 
         private ArcGraphInteractionRenderQueueWiringProbeDiagnostics _lastDiagnostics;
         private ArcGraphRenderQueue _lastQueue;
@@ -244,8 +243,6 @@ namespace Arcontio.View.ArcGraph
 
         private ArcGraphZoomLodProfile ResolveLodProfile()
         {
-            ArcGraphMapViewConfig config = ArcGraphMapViewConfig.CreateDefaultV033();
-            int safeZoom = zoomLevel < 1 ? 1 : zoomLevel;
             return ArcGraphZoomLodPolicy.ResolveFullDetail();
         }
 

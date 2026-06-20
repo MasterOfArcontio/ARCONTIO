@@ -47,7 +47,6 @@ namespace Arcontio.View.ArcGraph
         public readonly int QueueActorCount;
         public readonly int QueueObjectCount;
         public readonly int QueueEntryCount;
-        public readonly int ZoomLevel;
         public readonly long SourceTick;
         public readonly string Reason;
 
@@ -70,7 +69,6 @@ namespace Arcontio.View.ArcGraph
             int queueActorCount,
             int queueObjectCount,
             int queueEntryCount,
-            int zoomLevel,
             long sourceTick,
             string reason)
         {
@@ -92,7 +90,6 @@ namespace Arcontio.View.ArcGraph
             QueueActorCount = NormalizeCount(queueActorCount);
             QueueObjectCount = NormalizeCount(queueObjectCount);
             QueueEntryCount = NormalizeCount(queueEntryCount);
-            ZoomLevel = zoomLevel > 0 ? zoomLevel : 1;
             SourceTick = sourceTick;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
         }
