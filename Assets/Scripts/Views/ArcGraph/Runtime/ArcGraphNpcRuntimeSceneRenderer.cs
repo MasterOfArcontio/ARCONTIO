@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SocialViewer.UI;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -51,6 +52,11 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private Vector2 actorShadowLocalScale = Vector2.one;
         [SerializeField] private Color actorShadowTint = new Color(0f, 0f, 0f, 0.35f);
         [SerializeField] private int actorShadowSortingOffset = -2;
+        [SerializeField] private bool renderSelectionMarker = true;
+        [SerializeField] private Vector3 selectionMarkerLocalOffset = new Vector3(0f, -0.16f, 0f);
+        [SerializeField] private Vector2 selectionMarkerLocalScale = Vector2.one;
+        [SerializeField] private Color selectionMarkerTint = new Color(0.2f, 0.75f, 1f, 0.75f);
+        [SerializeField] private int selectionMarkerSortingOffset = -1;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float actorZOffset = -0.02f;
@@ -64,6 +70,7 @@ namespace Arcontio.View.ArcGraph
         private Transform _root;
         private Sprite _generatedFallbackSprite;
         private Sprite _generatedShadowSprite;
+        private Sprite _generatedSelectionMarkerSprite;
         private ArcGraphNpcVisualCatalog _npcVisualCatalog;
         private string _npcVisualCatalogSourceText;
         private ArcGraphNpcRuntimeSceneRendererDiagnostics _lastDiagnostics;
@@ -102,6 +109,7 @@ namespace Arcontio.View.ArcGraph
             public GameObject GameObject;
             public SpriteRenderer Renderer;
             public SpriteRenderer ShadowRenderer;
+            public SpriteRenderer SelectionMarkerRenderer;
             public readonly Dictionary<string, SpriteRenderer> PartRenderers = new();
             public string LastDirection = "south";
             public bool WasTouchedThisFrame;
@@ -384,6 +392,14 @@ namespace Arcontio.View.ArcGraph
                 DestroyUnityObject(texture);
                 _generatedShadowSprite = null;
             }
+
+            if (_generatedSelectionMarkerSprite != null)
+            {
+                Texture2D texture = _generatedSelectionMarkerSprite.texture;
+                DestroyUnityObject(_generatedSelectionMarkerSprite);
+                DestroyUnityObject(texture);
+                _generatedSelectionMarkerSprite = null;
+            }
         }
 
         // =============================================================================
@@ -618,6 +634,7 @@ namespace Arcontio.View.ArcGraph
             handle.Renderer.enabled = true;
             SetPartRenderersEnabled(handle, false);
             ApplyActorShadow(handle, entry, contract, spriteResolver);
+            ApplySelectionMarker(handle, entry);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
         }
@@ -732,6 +749,7 @@ namespace Arcontio.View.ArcGraph
                 return false;
 
             ApplyActorShadow(handle, entry, contract, spriteResolver);
+            ApplySelectionMarker(handle, entry);
             handle.Renderer.enabled = false;
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
@@ -948,6 +966,66 @@ namespace Arcontio.View.ArcGraph
             return handle.ShadowRenderer;
         }
 
+        // =============================================================================
+        // ApplySelectionMarker
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mostra o nasconde il marker locale dell'NPC selezionato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: feedback view-side, non simulazione</b></para>
+        /// <para>
+        /// La selezione vive nel servizio condiviso <c>NPCSelection</c>. Il renderer
+        /// NPC non decide quale NPC sia selezionato e non modifica il World: legge
+        /// solo l'id view-side e disegna un piccolo marker sotto l'actor gia'
+        /// presente in scena. Questo rende verificabile il click ArcGraph senza
+        /// riattivare overlay MapGrid o pannelli debug legacy.
+        /// </para>
+        /// </summary>
+        private void ApplySelectionMarker(
+            ActorHandle handle,
+            ArcGraphActorObjectSceneRenderEntry entry)
+        {
+            if (handle == null)
+                return;
+
+            bool isSelected =
+                renderSelectionMarker &&
+                handle.ActorId > 0 &&
+                NPCSelection.SelectedNpcId == handle.ActorId;
+
+            if (!isSelected)
+            {
+                if (handle.SelectionMarkerRenderer != null)
+                    handle.SelectionMarkerRenderer.enabled = false;
+
+                return;
+            }
+
+            SpriteRenderer markerRenderer = GetOrCreateSelectionMarkerRenderer(handle);
+            markerRenderer.transform.localPosition = selectionMarkerLocalOffset;
+            markerRenderer.transform.localScale = new Vector3(
+                selectionMarkerLocalScale.x,
+                selectionMarkerLocalScale.y,
+                1f);
+            markerRenderer.sprite = GetOrCreateSelectionMarkerSprite();
+            markerRenderer.color = selectionMarkerTint;
+            markerRenderer.sortingOrder = entry.SortingOrder + selectionMarkerSortingOffset;
+            markerRenderer.enabled = true;
+        }
+
+        private SpriteRenderer GetOrCreateSelectionMarkerRenderer(ActorHandle handle)
+        {
+            if (handle.SelectionMarkerRenderer != null)
+                return handle.SelectionMarkerRenderer;
+
+            var go = new GameObject("ArcGraphNpcSelectionMarker_" + handle.ActorId);
+            go.transform.SetParent(handle.GameObject.transform, false);
+            handle.SelectionMarkerRenderer = go.AddComponent<SpriteRenderer>();
+            return handle.SelectionMarkerRenderer;
+        }
+
         private void SetPartRenderersEnabled(
             ActorHandle handle,
             bool enabled)
@@ -1060,6 +1138,51 @@ namespace Arcontio.View.ArcGraph
                 pixelsPerUnit: 32f);
             _generatedShadowSprite.name = "ArcGraphNpcGeneratedShadowSprite";
             return _generatedShadowSprite;
+        }
+
+        private Sprite GetOrCreateSelectionMarkerSprite()
+        {
+            if (_generatedSelectionMarkerSprite != null)
+                return _generatedSelectionMarkerSprite;
+
+            const int width = 32;
+            const int height = 18;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, mipChain: false)
+            {
+                name = "ArcGraphNpcSelectionMarkerTexture",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            // Marker ellittico leggero: pieno quasi trasparente e bordo piu'
+            // evidente. Viene generato una volta sola dal renderer e non richiede
+            // asset PNG dedicati durante il gate di selezione.
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    float nx = ((x + 0.5f) / width * 2f) - 1f;
+                    float ny = ((y + 0.5f) / height * 2f) - 1f;
+                    float distance = (nx * nx) + (ny * ny);
+                    float alpha = distance <= 1f && distance >= 0.62f
+                        ? 1f
+                        : distance < 0.62f
+                            ? 0.18f
+                            : 0f;
+
+                    texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+                }
+            }
+
+            texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+
+            _generatedSelectionMarkerSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, width, height),
+                new Vector2(0.5f, 0.5f),
+                pixelsPerUnit: 32f);
+            _generatedSelectionMarkerSprite.name = "ArcGraphNpcSelectionMarkerSprite";
+            return _generatedSelectionMarkerSprite;
         }
 
         private ArcGraphNpcRuntimeSceneRendererDiagnostics StoreAndLogDiagnostics(

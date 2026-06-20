@@ -77,10 +77,10 @@
       ],
       "animationKey": "idle_simplified",
       "frameCount": 1,
-      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/idle_simplified#{direction}",
+      "spriteKeyPattern": "ArcGraph/NPC/{visual}/{part}/idle_simplified#{direction}_00",
       "durationTicks": 1,
-      "frameWidthPixels": 16,
-      "frameHeightPixels": 16,
+      "frameWidthPixels": 32,
+      "frameHeightPixels": 48,
       "sortingOffsets": [
         0,
         1,
