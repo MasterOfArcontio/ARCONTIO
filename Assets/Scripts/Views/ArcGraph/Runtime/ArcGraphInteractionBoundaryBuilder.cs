@@ -263,6 +263,23 @@ namespace Arcontio.View.ArcGraph
             if (item.Cell.Z != pointerCell.Z)
                 return false;
 
+            return IsObjectLogicalFootprintHit(item, pointerCell)
+                   || IsObjectVisualHeightHit(item, pointerCell);
+        }
+
+        // =============================================================================
+        // IsObjectLogicalFootprintHit
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se la cella puntata ricade nel footprint logico dichiarato
+        /// dall'oggetto.
+        /// </para>
+        /// </summary>
+        private static bool IsObjectLogicalFootprintHit(
+            ArcGraphObjectRenderItem item,
+            ArcGraphCellCoord pointerCell)
+        {
             int width = item.FootprintWidth <= 0 ? 1 : item.FootprintWidth;
             int height = item.FootprintHeight <= 0 ? 1 : item.FootprintHeight;
 
@@ -270,6 +287,66 @@ namespace Arcontio.View.ArcGraph
                    pointerCell.X < item.Cell.X + width &&
                    pointerCell.Y >= item.Cell.Y &&
                    pointerCell.Y < item.Cell.Y + height;
+        }
+
+        // =============================================================================
+        // IsObjectVisualHeightHit
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se la cella puntata ricade nella colonna visuale di uno sprite
+        /// piu' alto del suo footprint logico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: click su cio' che il player vede</b></para>
+        /// <para>
+        /// Alcuni oggetti, in particolare i muri 32x83 con pivot
+        /// <c>bottom_center</c>, sono molto piu' alti della singola cella logica.
+        /// Se il boundary usasse solo il footprint, un click sulla parte alta del
+        /// muro verrebbe classificato come cella vuota. Questa hitbox visuale resta
+        /// comunque read-only: usa solo metadati gia' presenti nella render queue e
+        /// non consulta il <c>World</c>.
+        /// </para>
+        /// </summary>
+        private static bool IsObjectVisualHeightHit(
+            ArcGraphObjectRenderItem item,
+            ArcGraphCellCoord pointerCell)
+        {
+            int logicalWidth = item.FootprintWidth <= 0 ? 1 : item.FootprintWidth;
+            int logicalHeight = item.FootprintHeight <= 0 ? 1 : item.FootprintHeight;
+            int visualHeightCells = ResolveVisualHeightCells(item, logicalHeight);
+
+            if (visualHeightCells <= logicalHeight)
+                return false;
+
+            return pointerCell.X >= item.Cell.X &&
+                   pointerCell.X < item.Cell.X + logicalWidth &&
+                   pointerCell.Y >= item.Cell.Y &&
+                   pointerCell.Y < item.Cell.Y + visualHeightCells;
+        }
+
+        // =============================================================================
+        // ResolveVisualHeightCells
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte l'altezza pixel dello sprite in un numero intero di celle
+        /// selezionabili lungo l'asse Y.
+        /// </para>
+        /// </summary>
+        private static int ResolveVisualHeightCells(
+            ArcGraphObjectRenderItem item,
+            int logicalHeight)
+        {
+            int safeLogicalHeight = logicalHeight <= 0 ? 1 : logicalHeight;
+            int visualHeightPixels = item.VisualHeightPixels > 0 ? item.VisualHeightPixels : 0;
+            int baseHeightPixels = item.VisualBaseHeightPixels > 0 ? item.VisualBaseHeightPixels : 32;
+
+            if (visualHeightPixels <= baseHeightPixels)
+                return safeLogicalHeight;
+
+            int visualCells = (visualHeightPixels + baseHeightPixels - 1) / baseHeightPixels;
+            return visualCells > safeLogicalHeight ? visualCells : safeLogicalHeight;
         }
 
         // =============================================================================
