@@ -729,6 +729,7 @@ namespace Arcontio.View.ArcGraph
             label.enableWordWrapping = false;
             label.overflowMode = TextOverflowModes.Ellipsis;
             label.color = ColorFromHex("#DDE6EE", 1f);
+            ArcGraphUiFontProvider.ApplyOfficialFont(label);
 
             return label;
         }

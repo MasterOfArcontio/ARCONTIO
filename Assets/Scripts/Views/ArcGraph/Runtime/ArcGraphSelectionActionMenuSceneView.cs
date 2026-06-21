@@ -26,6 +26,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Width/Height</b>: dimensione compatta del menu.</item>
     ///   <item><b>WorldOffsetY</b>: distanza verticale sopra actor o oggetto.</item>
+    ///   <item><b>ScreenOffsetY</b>: rialzo finale in pixel UI indipendente dallo zoom camera.</item>
     ///   <item><b>PanelAlpha</b>: trasparenza generale del blocco.</item>
     ///   <item><b>Colori</b>: palette acciaio/grigio-blu coerente con ArcGraph.</item>
     /// </list>
@@ -36,6 +37,7 @@ namespace Arcontio.View.ArcGraph
         public float Width;
         public float Height;
         public float WorldOffsetY;
+        public float ScreenOffsetY;
         public float PanelAlpha;
         public Color PanelColor;
         public Color TextColor;
@@ -62,6 +64,7 @@ namespace Arcontio.View.ArcGraph
                 Width = 46f,
                 Height = 11f,
                 WorldOffsetY = 1.45f,
+                ScreenOffsetY = 6f,
                 PanelAlpha = 0.86f,
                 PanelColor = ColorFromHex("#101922", 0.84f),
                 TextColor = ColorFromHex("#DDE6EE", 1f),
@@ -89,6 +92,7 @@ namespace Arcontio.View.ArcGraph
             normalized.Width = Width > 20f ? Width : 46f;
             normalized.Height = Height > 8f ? Height : 11f;
             normalized.WorldOffsetY = Mathf.Abs(WorldOffsetY) > 0.001f ? WorldOffsetY : 1.45f;
+            normalized.ScreenOffsetY = Mathf.Abs(ScreenOffsetY) > 0.001f ? ScreenOffsetY : 6f;
             normalized.PanelAlpha = Mathf.Clamp01(PanelAlpha <= 0f ? 0.86f : PanelAlpha);
             return normalized;
         }
@@ -658,6 +662,11 @@ namespace Arcontio.View.ArcGraph
                 screenPoint,
                 null,
                 out Vector2 localPoint);
+
+            // Il rialzo in pixel viene applicato dopo la conversione world->UI:
+            // in questo modo il pannellino sale sempre di pochi pixel reali e non
+            // cambia distanza apparente quando l'operatore zooma o fa pan.
+            localPoint.y += preset.Normalize().ScreenOffsetY;
             _menuRoot.anchoredPosition = localPoint;
         }
 
@@ -798,17 +807,9 @@ namespace Arcontio.View.ArcGraph
 
         private static string CreateCompactTitle(ArcGraphSelectionActionMenuViewModel viewModel)
         {
-            string title = string.IsNullOrWhiteSpace(viewModel.Title)
+            return string.IsNullOrWhiteSpace(viewModel.Title)
                 ? "Sel."
                 : viewModel.Title.Trim();
-
-            if (title.StartsWith("NPC ", StringComparison.OrdinalIgnoreCase))
-                return "N";
-
-            if (title.StartsWith("Muro", StringComparison.OrdinalIgnoreCase))
-                return "W";
-
-            return "O";
         }
 
         private static TextMeshProUGUI CreateText(
@@ -832,6 +833,7 @@ namespace Arcontio.View.ArcGraph
             label.alignment = alignment;
             label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Ellipsis;
+            ArcGraphUiFontProvider.ApplyOfficialFont(label);
             return label;
         }
 

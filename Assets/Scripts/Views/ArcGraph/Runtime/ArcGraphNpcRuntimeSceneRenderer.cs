@@ -45,7 +45,10 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private int idleFrameStep = 12;
         [SerializeField] private bool renderActorShadow = true;
         [SerializeField] private string actorShadowSpriteKey = "ArcGraph/NPC/common/shadow/soft_ellipse_32x16";
-        [SerializeField] private Vector3 actorShadowLocalOffset = new Vector3(0f, -0.75f, 0f);
+        // L'ombra segue la stessa correzione visuale applicata allo sprite NPC:
+        // il root resta sulla cella logica, ma la base grafica dell'attore e la
+        // sua ombra non devono piu' scendere nella riga sottostante.
+        [SerializeField] private Vector3 actorShadowLocalOffset = new Vector3(0f, -0.25f, 0f);
         [SerializeField] private Vector2 actorShadowLocalScale = new Vector2(1.25f, 0.45f);
         [SerializeField] private Color actorShadowTint = new Color(0f, 0f, 0f, 0.28f);
         [SerializeField] private int actorShadowSortingOffset = -2;
