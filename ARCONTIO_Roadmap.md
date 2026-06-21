@@ -74,6 +74,7 @@
 | v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⏳ Pending |
 | v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ⏳ Pending |
 | v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ⏳ Pending |
+| v0.70 | ArcGraph Runtime UI Architecture | Post-v0.69 / track UI dedicata | 🔄 Pianificata |
 | v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Dopo observer prerequisites | ⏳ Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | 🎯 Target |
@@ -16610,6 +16611,461 @@ path sprite, tile id, atlas id o riferimenti PNG.
 
 ---
 
+## Roadmap v0.70 - ArcGraph Runtime UI Architecture
+
+La versione `v0.70` introduce la nuova architettura UI runtime di ArcGraph.
+
+Questa fase non deve trasformare ArcGraph in un pannello debug monolitico e non
+deve copiare `MapGridRuntimeDevToolsOverlay`. L'obiettivo e' costruire una UI
+runtime modulare, basata su UGUI, prefab riutilizzabili, ViewModel/snapshot e
+controller autorizzati.
+
+Principio architetturale:
+
+```text
+Simulation / World
+-> Snapshot / ViewModel
+-> UI
+-> Controller autorizzato
+-> Command Gateway
+-> Simulation / World
+```
+
+Divieti permanenti della fase `v0.70`:
+
+- la UI non legge direttamente `World`;
+- la UI non modifica direttamente NPC, oggetti, muri, celle o job runtime;
+- `Button.onClick` non deve contenere mutazioni del mondo;
+- i pannelli runtime non devono usare scorciatoie debug come comportamento produttivo;
+- MapGrid resta legacy e non deve essere copiato come nuovo monolite;
+- il vecchio F3 resta disponibile finche' il nuovo ponte non e' pronto, ma viene migrato una funzione alla volta.
+
+Layout target:
+
+```text
+ArcUIRoot
+├─ TopBar
+├─ MapViewport
+├─ RightInspector
+├─ BottomActionBar
+├─ ActionPanel
+├─ OverlayRoot
+└─ DebugRoot
+```
+
+Regole layout:
+
+- `TopBar` e `BottomActionBar` sono larghe tutto lo schermo;
+- `MapViewport` sta tra TopBar e BottomActionBar;
+- `RightInspector` e `ActionPanel` sono overlay sopra la viewport;
+- i pannelli non ridimensionano la simulazione salvo decisione futura esplicita;
+- `ViewModeBar` e `PointerHUD` non diventano root permanenti separati in questa fase.
+
+Componenti UI riutilizzabili da prevedere:
+
+| Componente | Scopo |
+|---|---|
+| `ArcButton` | base comune per pulsanti runtime |
+| `ArcButton_Primary` | azione positiva o principale |
+| `ArcButton_Secondary` | azione ordinaria secondaria |
+| `ArcButton_Danger` | azione distruttiva o urgente |
+| `ArcButton_Icon` | comando compatto con icona |
+| `ArcButton_Tab` | tab selezionabile |
+| `ArcPanelFrame` | cornice comune dei pannelli |
+| `ArcActionPanel` | contenitore operazioni |
+| `ArcOperationGrid` | griglia operazioni disponibili |
+| `ArcOperationButton` | bottone legato a una operation definition |
+| `ArcInfoRow` | riga etichetta/valore |
+| `ArcDataTable` | tabella dati read-only |
+| `ArcTooltip` | tooltip runtime |
+| `ArcStatusBadge` | badge stato sintetico |
+| `ArcProgressBar` | barra progresso compatta |
+| `ArcToggle` | toggle binario |
+| `ArcSlider` | valore numerico continuo |
+| `ArcDropdown` | scelta da insieme finito |
+| `ArcRightInspector` | contenitore inspector a tab |
+| `ArcTopBar` | barra stato e simulazione |
+| `ArcBottomActionBar` | barra categorie/azioni |
+| `ArcPlacementConfigPanel` | pannello configurazione placement |
+
+Roadmap operativa:
+
+| Versione | Nome | Stato |
+|---|---|---|
+| v0.70.01 | Foundation dati UI | 🔄 Primo branch operativo |
+| v0.70.02 | Operation catalog minimo | ⏳ Pending |
+| v0.70.03 | Ponte placement | ⏳ Pending |
+| v0.70.04 | Selezione e hover | ⏳ Pending |
+| v0.70.05 | Inspector ViewModel/tab | ⏳ Pending |
+| v0.70.06 | Simulation control | ⏳ Pending |
+| v0.70.07 | View modes | ⏳ Pending |
+| v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
+
+---
+
+### v0.70.01 - Foundation dati UI
+
+Obiettivo:
+
+```text
+creare i contratti minimi della UI runtime ArcGraph senza cambiare il comportamento
+runtime e senza collegare ancora pulsanti produttivi
+```
+
+Scopo:
+
+- introdurre tipi dati piccoli, serializzabili o facilmente ispezionabili;
+- definire il vocabolario condiviso tra UI, controller e futuri adapter;
+- evitare accessi diretti a `World`;
+- preparare controller shell senza logica invasiva;
+- lasciare F3 legacy e runtime corrente invariati.
+
+Contratti minimi previsti:
+
+| Contratto | Responsabilita' | Note |
+|---|---|---|
+| `ArcOperationDefinition` | descrive una operazione UI disponibile | Non esegue comandi |
+| `ArcSelectionTarget` | descrive cosa e' sotto puntatore o selezionato | Non contiene riferimenti mutabili |
+| `ArcInspectorViewModel` | dati read-only per inspector | UI visualizza soltanto |
+| `ArcPlacementRequest` | intenzione di placement configurata | Non e' ancora comando Core |
+| `ArcViewModeDefinition` | descrive un modo di visualizzazione | Non modifica il mondo |
+
+Dettaglio `ArcOperationDefinition`:
+
+- `operationKey`: chiave stabile, esempio `build_wall_stone`;
+- `label`: testo UI;
+- `iconKey`: chiave icona, non riferimento diretto a sprite;
+- `category`: categoria primaria, esempio `Costruisci`, `Inserisci`, `NPC`;
+- `subcategory`: categoria secondaria, esempio `Strutture`, `Oggetti`, `Umani`;
+- `targetKind`: tipo di target operativo;
+- `requiresPreview`: indica se serve preview su cella;
+- `requiresConfigurationPanel`: indica se serve pannello di configurazione;
+- `controllerKey`: controller autorizzato responsabile;
+- `commandRequestType`: tipo di richiesta futura;
+- `enabledInRuntime`: visibile/usabile in runtime ordinario;
+- `debugOnly`: visibile solo in sviluppo/debug.
+
+Dettaglio `ArcSelectionTarget`:
+
+- `kind`: `Npc`, `Object`, `Wall`, `Cell`, `Plant`, `Zone`, `Debug`;
+- `id`: identificatore stabile quando disponibile;
+- `cellX`, `cellY`, `cellZ`: coordinate target;
+- `displayName`: nome mostrabile;
+- `sourceView`: origine autorizzata del target;
+- `optionalDebugInfo`: testo diagnostico opzionale.
+
+Dettaglio `ArcInspectorViewModel`:
+
+- header principale;
+- target selezionato;
+- lista tab disponibili;
+- tab attiva;
+- righe read-only;
+- sezioni read-only;
+- flag debug/development quando serve.
+
+Dettaglio `ArcPlacementRequest`:
+
+- operation key;
+- cella target;
+- target definition id opzionale;
+- payload configurazione opzionale;
+- stato preview richiesto;
+- nessun riferimento diretto a `World`;
+- nessuna mutazione diretta.
+
+Dettaglio `ArcViewModeDefinition`:
+
+- `viewModeKey`;
+- `label`;
+- `iconKey`;
+- `isDebugOnly`;
+- `requiresSelectedNpc`;
+- `overlayType`;
+- `enabled`.
+
+Controller shell previsti:
+
+| Controller | Ruolo iniziale |
+|---|---|
+| `ArcSelectionController` | accetta/espone selection target senza interrogare World |
+| `ArcPlacementController` | conserva intenzione placement corrente senza eseguire comandi |
+| `ArcInspectionController` | riceve target e richiede ViewModel futuro |
+| `ArcSimulationControlController` | shell per pause/play/speed future |
+| `ArcViewModeController` | conserva view mode corrente |
+| `ArcCommandRequestFactory` | placeholder per costruzione richieste autorizzate future |
+
+Output atteso:
+
+- file C# piccoli e isolati sotto area ArcGraph Runtime/UI o area equivalente approvata;
+- nessun prefab nuovo obbligatorio in questo step;
+- nessun cambio a scena o runtime installer salvo necessita' minima;
+- nessun accesso diretto a `SimulationHost.Instance.World` dai nuovi tipi UI;
+- nessun comando inviato al gateway;
+- nessuna sostituzione del vecchio F3.
+
+Criteri di accettazione:
+
+- il progetto compila;
+- i contratti sono leggibili e commentati;
+- non ci sono mutazioni runtime;
+- MapGrid legacy non viene toccato;
+- il vecchio F3 continua a essere il comportamento operativo esistente;
+- la foundation puo' essere usata dagli step successivi senza refactor grande.
+
+---
+
+### v0.70.02 - Operation catalog minimo
+
+Obiettivo:
+
+```text
+definire il primo catalogo operazioni UI senza collegarlo ancora a tutte le azioni runtime
+```
+
+Operazioni minime:
+
+| Operation key | Categoria | Target | Note |
+|---|---|---|---|
+| `build_wall_stone` | Costruisci / Strutture | Wall | Usa preview cella |
+| `place_door_wood` | Costruisci / Strutture | Object/Door | Usa preview cella |
+| `place_bed_wood` | Inserisci / Oggetto | Object | Da object catalog |
+| `place_food_stock` | Inserisci / Oggetto | Object | Da object catalog |
+| `spawn_npc_human` | NPC | Npc | Richiede configurazione futura |
+
+Attivita':
+
+- creare catalogo statico o loader minimo;
+- separare operation catalog da `object_defs.json`;
+- mantenere `object_defs.json` come catalogo oggetti, non come catalogo azioni UI;
+- aggiungere validazioni leggere su chiavi duplicate;
+- esporre elenco filtrabile per categoria/subcategoria.
+
+Criteri di accettazione:
+
+- le operation esistono come dati;
+- nessuna operation modifica il mondo;
+- il catalogo puo' alimentare una futura griglia UI;
+- debug-only e runtime-enabled sono distinguibili.
+
+---
+
+### v0.70.03 - Ponte placement
+
+Obiettivo:
+
+```text
+tradurre una operation selezionata in una PlacementRequest e poi, solo tramite ponte autorizzato, nel comando esistente
+```
+
+Flussi iniziali:
+
+```text
+OperationDefinition
+-> ArcPlacementController
+-> ArcPlacementRequest
+-> ArcCommandRequestFactory
+-> comando autorizzato temporaneo
+-> SimulationHost / gateway esistente
+```
+
+Attivita':
+
+- collegare muri, porte e oggetti al placement controller;
+- mantenere preview cella esistente;
+- non introdurre accesso diretto a `World` dalla UI;
+- usare temporaneamente `DevPlaceObjectCommand` solo come bridge dichiarato;
+- isolare la conversione in un punto solo.
+
+Criteri di accettazione:
+
+- una operation puo' diventare request;
+- il click cella produce una richiesta chiara;
+- il comando finale passa da boundary autorizzato;
+- il vecchio F3 resta disponibile come fallback.
+
+---
+
+### v0.70.04 - Selezione e hover
+
+Obiettivo:
+
+```text
+introdurre SelectionTarget come contratto unico per hover, click e selezione singola
+```
+
+Target previsti:
+
+- NPC;
+- oggetti;
+- muri;
+- celle;
+- piante future;
+- zone future;
+- elementi debug futuri.
+
+Attivita':
+
+- mappare il risultato di hit test ArcGraph in `ArcSelectionTarget`;
+- introdurre stato selezione singola;
+- separare hover da selezione confermata;
+- non far leggere l'inspector direttamente al mondo;
+- mantenere compatibilita' temporanea con `NPCSelection`.
+
+Criteri di accettazione:
+
+- hover produce target candidato;
+- click produce target selezionato;
+- selezione singola chiara;
+- RightInspector puo' ricevere un target astratto.
+
+---
+
+### v0.70.05 - Inspector ViewModel/tab
+
+Obiettivo:
+
+```text
+costruire RightInspector come contenitore a tab alimentato da ViewModel read-only
+```
+
+Tab iniziali:
+
+| Target | Tab |
+|---|---|
+| NPC | Info, Job, Memory Trace, Belief, Decision, Debug |
+| Object | Info, Stato, Uso, Storage, Debug |
+| Wall | Info, Materiale, Connessioni, Stato, Debug |
+| Cell | Info superficie, Coordinate, Occupazione, Debug FOV/percezione |
+
+Attivita':
+
+- creare `InspectorViewModelFactory`;
+- creare primi ViewModel read-only;
+- introdurre tab descriptors;
+- usare `ArcInfoRow` e `ArcDataTable`, non righe hardcoded nel pannello;
+- nascondere tab debug fuori dallo sviluppo.
+
+Criteri di accettazione:
+
+- inspector cambia contenuto in base a target;
+- nessun accesso diretto a strutture runtime mutabili;
+- dati mancanti vengono mostrati come assenti, non generano scorciatoie nel World.
+
+---
+
+### v0.70.06 - Simulation control
+
+Obiettivo:
+
+```text
+spostare pausa, play e velocita' simulazione dentro un controller autorizzato
+```
+
+TopBar deve mostrare:
+
+- giorno;
+- mese;
+- anno;
+- stagione;
+- ora;
+- temperatura;
+- umidita';
+- meteo;
+- play / pausa;
+- velocita' simulazione.
+
+Richieste previste:
+
+- `PauseSimulationRequest`;
+- `ResumeSimulationRequest`;
+- `SetSimulationSpeedRequest`.
+
+Attivita':
+
+- creare shell request/control;
+- sostituire accessi diretti UI -> `SimulationHost.TogglePause()` dove possibile;
+- mantenere compatibilita' con runtime attuale;
+- distinguere step debug da controlli produttivi.
+
+Criteri di accettazione:
+
+- TopBar non muta direttamente la simulazione;
+- il controller e' l'unico punto UI autorizzato;
+- stato temporale mostrato via ViewModel/snapshot.
+
+---
+
+### v0.70.07 - View modes
+
+Obiettivo:
+
+```text
+separare modi di osservazione da azioni operative sul mondo
+```
+
+View mode previste:
+
+- normale;
+- POV NPC;
+- FOV;
+- pathfinding;
+- occupazione celle;
+- percezione debug;
+- belief overlay;
+- memory overlay.
+
+Attivita':
+
+- introdurre catalogo `ViewModeDefinition`;
+- introdurre `ArcViewModeController`;
+- collegare overlay root;
+- richiedere NPC selezionato quando serve;
+- separare debug-only da runtime ordinario.
+
+Criteri di accettazione:
+
+- cambiare view mode non modifica il mondo;
+- overlay si aggiorna da snapshot/view state;
+- view mode e operation sono due sistemi distinti.
+
+---
+
+### v0.70.08 - Migrazione progressiva F3
+
+Obiettivo:
+
+```text
+assorbire le funzioni utili del vecchio F3 dentro la nuova architettura senza copiare il monolite MapGrid
+```
+
+Strategia:
+
+- mantenere F3 legacy finche' il nuovo flusso non copre la funzione equivalente;
+- migrare una funzione alla volta;
+- ogni funzione migrata deve passare da operation/request/controller;
+- cancellare o spegnere il legacy solo dopo test manuale e verifica dipendenze.
+
+Ordine consigliato:
+
+1. placement muro;
+2. placement porta;
+3. placement oggetti base;
+4. spawn NPC default;
+5. spawn NPC configurato;
+6. erase/debug solo se autorizzato;
+7. strumenti save/load solo come debug separato;
+8. chiusura F3 legacy.
+
+Criteri di accettazione:
+
+- nessuna perdita di funzionalita' runtime utile;
+- nessuna nuova dipendenza UI -> World;
+- MapGrid non e' piu' necessario per le operazioni migrate;
+- vecchi strumenti debug restano separati dalla UI produttiva.
+
+---
+
 #### v0.170 - Conseguenze Sociali Emergenti
 
 ## Stato
@@ -16722,6 +17178,6 @@ Questi aspetti verranno introdotti solo dopo la chiusura della nuova fase `v0.15
 
 ---
 
-*ARCONTIO Development Roadmap — documento vivo full fidelity — aggiornato Maggio 2026*
+*ARCONTIO Development Roadmap — documento vivo full fidelity — aggiornato Giugno 2026*
 
 
