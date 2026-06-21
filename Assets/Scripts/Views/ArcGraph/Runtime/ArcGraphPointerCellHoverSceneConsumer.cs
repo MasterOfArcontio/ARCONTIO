@@ -74,14 +74,14 @@ namespace Arcontio.View.ArcGraph
     /// Consumer scena che evidenzia sempre la cella ArcGraph sotto il puntatore.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: boundary interattivo come unica fonte</b></para>
+    /// <para><b>Principio architetturale: boundary interattivo piu' camera visuale</b></para>
     /// <para>
     /// Il componente riceve un <c>ArcGraphInteractionFrame</c> gia' prodotto dal
-    /// boundary ArcGraph. Non legge mouse, non usa camera per fare picking, non
-    /// interroga il mondo, non seleziona target e non invia comandi. La sua unica
-    /// responsabilita' e' rendere visibile la cella risolta dal boundary, cosi'
-    /// selection, placement e futuri menu hover possano essere testati sopra la
-    /// stessa coordinata view-side.
+    /// boundary ArcGraph e usa la camera scena solo per convertire il punto
+    /// viewport in coordinate world-space quando lo zoom fisico e' attivo. Non legge
+    /// mouse, non interroga il mondo, non seleziona target e non invia comandi. La
+    /// sua unica responsabilita' e' rendere visibile la cella realmente sotto il
+    /// puntatore nella vista renderizzata.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -96,6 +96,8 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphPointerCellHoverSceneConsumer : MonoBehaviour, IArcGraphInteractionFrameConsumer
     {
         [SerializeField] private bool hoverEnabled = true;
+        [SerializeField] private Camera sceneCamera;
+        [SerializeField] private bool preferSceneCameraCell = true;
         [SerializeField] private Color hoverColor = new Color(1f, 1f, 1f, 0.18f);
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float zOffset = -0.02f;
@@ -155,12 +157,34 @@ namespace Arcontio.View.ArcGraph
 
             if (!interactionFrame.HasValidCell)
             {
+                if (preferSceneCameraCell &&
+                    TryResolveCellFromSceneCamera(interactionFrame, out ArcGraphCellCoord cameraOnlyCell, out string cameraOnlyReason))
+                {
+                    ShowHoverAtCell(cameraOnlyCell);
+                    StoreDiagnostics(interactionFrame, cameraOnlyCell, true, true, cameraOnlyReason);
+                    return;
+                }
+
                 HideAndStore(interactionFrame, false, "CellUnavailable");
                 return;
             }
 
-            ShowHoverAtCell(interactionFrame.Cell);
-            StoreDiagnostics(interactionFrame, true, "CellHoverShown");
+            ArcGraphCellCoord cell = interactionFrame.Cell;
+            string reason = "CellHoverShown";
+
+            // Il frame interattivo storico usa un mapper logico basato sulla view.
+            // Durante lo zoom fisico della camera quel mapper puo' non coincidere
+            // con il pixel realmente renderizzato. Per l'hover visuale preferiamo
+            // quindi la camera scena, che e' la stessa usata per mostrare la mappa.
+            if (preferSceneCameraCell &&
+                TryResolveCellFromSceneCamera(interactionFrame, out ArcGraphCellCoord cameraCell, out string cameraReason))
+            {
+                cell = cameraCell;
+                reason = cameraReason;
+            }
+
+            ShowHoverAtCell(cell);
+            StoreDiagnostics(interactionFrame, cell, true, true, reason);
         }
 
         // =============================================================================
@@ -179,6 +203,26 @@ namespace Arcontio.View.ArcGraph
             // resta in scena una cella evidenziata appartenente a un frame vecchio.
             if (!enabled)
                 HideHover();
+        }
+
+        // =============================================================================
+        // SetSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna la camera usata per convertire puntatore viewport in cella mondo.
+        /// </para>
+        ///
+        /// <para><b>Coerenza con zoom e pan fisici</b></para>
+        /// <para>
+        /// Il consumer non usa la camera per interrogare la simulazione. La usa solo
+        /// come trasformazione visuale, cosi' l'highlight resta agganciato alla
+        /// stessa immagine che l'utente vede dopo zoom e pan.
+        /// </para>
+        /// </summary>
+        public void SetSceneCamera(Camera camera)
+        {
+            sceneCamera = camera;
         }
 
         // =============================================================================
@@ -313,6 +357,112 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // TryResolveCellFromSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte il punto puntatore del frame nella cella realmente vista dalla
+        /// camera Unity.
+        /// </para>
+        ///
+        /// <para><b>Correzione zoom/pan</b></para>
+        /// <para>
+        /// Il frame input contiene coordinate relative al viewport camera. Per usare
+        /// <c>ScreenToWorldPoint</c> le riportiamo nello spazio screen assoluto
+        /// sommando l'origine del <c>pixelRect</c>. La conversione finale usa solo
+        /// matematica view-side: non legge oggetti, NPC o World.
+        /// </para>
+        /// </summary>
+        private bool TryResolveCellFromSceneCamera(
+            ArcGraphInteractionFrame interactionFrame,
+            out ArcGraphCellCoord cell,
+            out string reason)
+        {
+            cell = interactionFrame.Cell;
+            reason = "SceneCameraCellUnavailable";
+
+            if (!interactionFrame.Input.HasPointerScreenPosition)
+            {
+                reason = "PointerMissing";
+                return false;
+            }
+
+            Camera camera = ResolveSceneCamera();
+            if (camera == null)
+            {
+                reason = "SceneCameraMissing";
+                return false;
+            }
+
+            Rect pixelRect = camera.pixelRect;
+            if (pixelRect.width <= 0f || pixelRect.height <= 0f)
+            {
+                reason = "SceneCameraViewportInvalid";
+                return false;
+            }
+
+            Vector2 absoluteScreenPoint = new Vector2(
+                interactionFrame.Input.PointerScreenX + pixelRect.x,
+                interactionFrame.Input.PointerScreenY + pixelRect.y);
+
+            if (!pixelRect.Contains(absoluteScreenPoint))
+            {
+                reason = "PointerOutsideSceneCamera";
+                return false;
+            }
+
+            float safeTileWorldSize = tileWorldSize > 0.0001f ? tileWorldSize : 1f;
+            float worldPlaneDistance = ResolveWorldPlaneDistance(camera);
+            Vector3 worldPoint = camera.ScreenToWorldPoint(new Vector3(
+                absoluteScreenPoint.x,
+                absoluteScreenPoint.y,
+                worldPlaneDistance));
+
+            int cellX = Mathf.FloorToInt((worldPoint.x - originOffset.x) / safeTileWorldSize);
+            int cellY = Mathf.FloorToInt((worldPoint.y - originOffset.y) / safeTileWorldSize);
+            int cellZ = interactionFrame.HasValidCell ? interactionFrame.Cell.Z : 0;
+
+            cell = new ArcGraphCellCoord(cellX, cellY, cellZ);
+            reason = "SceneCameraCellHoverShown";
+            return true;
+        }
+
+        // =============================================================================
+        // ResolveSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce la camera esplicita o, in fallback, <c>Camera.main</c>.
+        /// </para>
+        /// </summary>
+        private Camera ResolveSceneCamera()
+        {
+            if (sceneCamera != null)
+                return sceneCamera;
+
+            return Camera.main;
+        }
+
+        // =============================================================================
+        // ResolveWorldPlaneDistance
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola la distanza dal piano world-space usato dalla mappa ArcGraph.
+        /// </para>
+        /// </summary>
+        private float ResolveWorldPlaneDistance(Camera camera)
+        {
+            if (camera == null)
+                return 0f;
+
+            float distance = originOffset.z - camera.transform.position.z;
+            return Mathf.Abs(distance) > 0.001f
+                ? Mathf.Abs(distance)
+                : Mathf.Max(0.001f, camera.nearClipPlane);
+        }
+
+        // =============================================================================
         // ResolveWorldPosition
         // =============================================================================
         /// <summary>
@@ -342,7 +492,12 @@ namespace Arcontio.View.ArcGraph
             string reason)
         {
             HideHover();
-            StoreDiagnostics(interactionFrame, didShowHover, reason);
+            StoreDiagnostics(
+                interactionFrame,
+                interactionFrame.Cell,
+                interactionFrame.HasValidCell,
+                didShowHover,
+                reason);
         }
 
         // =============================================================================
@@ -369,6 +524,8 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private void StoreDiagnostics(
             ArcGraphInteractionFrame interactionFrame,
+            ArcGraphCellCoord cell,
+            bool hasValidCell,
             bool didShowHover,
             string reason)
         {
@@ -376,9 +533,9 @@ namespace Arcontio.View.ArcGraph
                 true,
                 hoverEnabled,
                 interactionFrame.IsPointerOverUi,
-                interactionFrame.HasValidCell,
+                hasValidCell,
                 didShowHover,
-                interactionFrame.Cell,
+                cell,
                 reason);
 
             if (!logDiagnostics)

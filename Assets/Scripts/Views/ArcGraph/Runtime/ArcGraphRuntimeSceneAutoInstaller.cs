@@ -346,6 +346,7 @@ namespace Arcontio.View.ArcGraph
                 _selectionConsumer);
             _placementToolController.SetRuntimeContextProvider(_contextProvider);
             _placementToolController.SetSceneCamera(Camera.main);
+            _pointerCellHoverConsumer.SetSceneCamera(Camera.main);
             _placementHighlightConsumer.SetRuntimeContextProvider(_contextProvider);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
             _placementHighlightConsumer.SetSceneCamera(Camera.main);
