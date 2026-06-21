@@ -104,7 +104,6 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private int sortingOrder = 210;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private string hoverObjectName = "ArcGraphPointerCellHover";
-        [SerializeField] private bool logDiagnostics;
 
         private GameObject _hoverObject;
         private SpriteRenderer _hoverRenderer;
@@ -251,27 +250,6 @@ namespace Arcontio.View.ArcGraph
         public void DisableHoverFromInspector()
         {
             SetHoverEnabled(false);
-        }
-
-        // =============================================================================
-        // LogPointerCellHoverDiagnosticsFromInspector
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Stampa in Console l'ultima diagnostica dell'hover cella.
-        /// </para>
-        /// </summary>
-        [ContextMenu("ArcGraph/Log Pointer Cell Hover Diagnostics")]
-        public void LogPointerCellHoverDiagnosticsFromInspector()
-        {
-            Debug.Log(
-                "[ArcGraphPointerCellHoverSceneConsumer] " +
-                _lastDiagnostics.Reason +
-                ", enabled=" + _lastDiagnostics.HoverEnabled +
-                ", pointerOverUi=" + _lastDiagnostics.WasPointerOverUi +
-                ", validCell=" + _lastDiagnostics.HasValidCell +
-                ", cell=" + _lastDiagnostics.Cell +
-                ", shown=" + _lastDiagnostics.DidShowHover);
         }
 
         // =============================================================================
@@ -519,7 +497,7 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Salva l'esito dell'ultimo frame e opzionalmente lo scrive in Console.
+        /// Salva l'esito dell'ultimo frame per letture diagnostiche interne.
         /// </para>
         /// </summary>
         private void StoreDiagnostics(
@@ -538,17 +516,6 @@ namespace Arcontio.View.ArcGraph
                 cell,
                 reason);
 
-            if (!logDiagnostics)
-                return;
-
-            Debug.Log(
-                "[ArcGraphPointerCellHoverSceneConsumer] " +
-                _lastDiagnostics.Reason +
-                ", enabled=" + _lastDiagnostics.HoverEnabled +
-                ", pointerOverUi=" + _lastDiagnostics.WasPointerOverUi +
-                ", validCell=" + _lastDiagnostics.HasValidCell +
-                ", cell=" + _lastDiagnostics.Cell +
-                ", shown=" + _lastDiagnostics.DidShowHover);
         }
     }
 }

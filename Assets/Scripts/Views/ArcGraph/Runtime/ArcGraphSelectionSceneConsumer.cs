@@ -91,7 +91,6 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphSelectionSceneConsumer : MonoBehaviour, IArcGraphInteractionFrameConsumer
     {
         [SerializeField] private bool selectionEnabled;
-        [SerializeField] private bool logSelectionEvents;
 
         private ArcGraphSelectionSceneConsumerDiagnostics _lastDiagnostics =
             new ArcGraphSelectionSceneConsumerDiagnostics(
@@ -154,14 +153,6 @@ namespace Arcontio.View.ArcGraph
 
             NPCSelection.Select(interactionFrame.ActorId);
             StoreDiagnostics(interactionFrame, true, "ActorSelected");
-
-            if (logSelectionEvents)
-            {
-                Debug.Log(
-                    "[ArcGraphSelectionSceneConsumer] selectedNpc=" +
-                    interactionFrame.ActorId +
-                    ", reason=" + _lastDiagnostics.Reason);
-            }
         }
 
         // =============================================================================

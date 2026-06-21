@@ -33,13 +33,19 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphPointerDebugPanelSceneConsumer : MonoBehaviour, IArcGraphInteractionFrameConsumer
     {
         [SerializeField] private bool panelEnabled = true;
-        [SerializeField] private Vector2 panelSize = new Vector2(410f, 64f);
+        [SerializeField] private Vector2 panelSize = new Vector2(520f, 142f);
         [SerializeField] private Vector2 panelOffset = new Vector2(12f, -56f);
 
         private ArcGraphUiRuntimeRoot _uiRoot;
+        private ArcGraphRenderQueue _renderQueue;
         private RectTransform _panel;
         private TextMeshProUGUI _viewportText;
         private TextMeshProUGUI _cellText;
+        private TextMeshProUGUI _clickCellText;
+        private TextMeshProUGUI _npcText;
+        private TextMeshProUGUI _objectText;
+        private ArcGraphCellCoord _lastClickCell;
+        private bool _hasLastClickCell;
 
         // =============================================================================
         // SetUiRoot
@@ -54,6 +60,26 @@ namespace Arcontio.View.ArcGraph
             _uiRoot = uiRoot;
             BuildPanelIfPossible();
             ApplyPanelVisibility();
+        }
+
+        // =============================================================================
+        // SetRenderQueue
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna la render queue ArcGraph letta dal pannello solo per diagnostica.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: lettura view-side, non World</b></para>
+        /// <para>
+        /// La queue contiene gli item visuali gia' preparati da ArcGraph. Il pannello
+        /// la scorre per mostrare cosa vede la pipeline grafica nella cella puntata,
+        /// senza interrogare direttamente il mondo simulativo.
+        /// </para>
+        /// </summary>
+        public void SetRenderQueue(ArcGraphRenderQueue renderQueue)
+        {
+            _renderQueue = renderQueue;
         }
 
         // =============================================================================
@@ -96,8 +122,18 @@ namespace Arcontio.View.ArcGraph
             if (_viewportText == null || _cellText == null)
                 return;
 
+            if (interactionFrame.Input.IsPrimaryPointerPressedThisFrame &&
+                interactionFrame.HasValidCell)
+            {
+                _lastClickCell = interactionFrame.Cell;
+                _hasLastClickCell = true;
+            }
+
             _viewportText.text = FormatViewportLine(interactionFrame);
             _cellText.text = FormatCellLine(interactionFrame, diagnostics);
+            _clickCellText.text = FormatClickCellLine(_hasLastClickCell, _lastClickCell);
+            _npcText.text = FormatNpcLine(interactionFrame, _renderQueue);
+            _objectText.text = FormatObjectLine(interactionFrame, _renderQueue);
         }
 
         private void BuildPanelIfPossible()
@@ -130,6 +166,9 @@ namespace Arcontio.View.ArcGraph
 
             _viewportText = CreateLine("ViewportLine", _panel, "Viewport px: --");
             _cellText = CreateLine("CellLine", _panel, "Griglia: colonna -- | riga --");
+            _clickCellText = CreateLine("ClickCellLine", _panel, "Click: colonna -- | riga --");
+            _npcText = CreateLine("NpcLine", _panel, "NPC cella: NULL");
+            _objectText = CreateLine("ObjectLine", _panel, "Oggetto cella: NULL");
         }
 
         private void ApplyPanelVisibility()
@@ -167,6 +206,124 @@ namespace Arcontio.View.ArcGraph
                    interactionFrame.Cell.Y +
                    " | z=" +
                    interactionFrame.Cell.Z;
+        }
+
+        private static string FormatClickCellLine(
+            bool hasLastClickCell,
+            ArcGraphCellCoord lastClickCell)
+        {
+            if (!hasLastClickCell)
+                return "Click: colonna -- | riga --";
+
+            return "Click: colonna=" +
+                   lastClickCell.X +
+                   " | riga=" +
+                   lastClickCell.Y +
+                   " | z=" +
+                   lastClickCell.Z;
+        }
+
+        private static string FormatNpcLine(
+            ArcGraphInteractionFrame interactionFrame,
+            ArcGraphRenderQueue renderQueue)
+        {
+            if (!interactionFrame.HasValidCell)
+                return "NPC cella: NULL";
+
+            if (!TryFindActorInCell(renderQueue, interactionFrame.Cell, out ArcGraphActorRenderItem actor))
+                return "NPC cella: NULL";
+
+            return "NPC cella: id=" +
+                   actor.ActorId +
+                   " | cella=(" +
+                   actor.DiscreteCell.X +
+                   "," +
+                   actor.DiscreteCell.Y +
+                   "," +
+                   actor.DiscreteCell.Z +
+                   ")";
+        }
+
+        private static string FormatObjectLine(
+            ArcGraphInteractionFrame interactionFrame,
+            ArcGraphRenderQueue renderQueue)
+        {
+            if (!interactionFrame.HasValidCell)
+                return "Oggetto cella: NULL";
+
+            if (!TryFindObjectInCell(renderQueue, interactionFrame.Cell, out ArcGraphObjectRenderItem obj))
+                return "Oggetto cella: NULL";
+
+            string defId = string.IsNullOrWhiteSpace(obj.DefId) ? "unknown" : obj.DefId.Trim();
+            return "Oggetto cella: id=" +
+                   obj.ObjectId +
+                   " | def=" +
+                   defId +
+                   " | cella=(" +
+                   obj.Cell.X +
+                   "," +
+                   obj.Cell.Y +
+                   "," +
+                   obj.Cell.Z +
+                   ")";
+        }
+
+        private static bool TryFindActorInCell(
+            ArcGraphRenderQueue renderQueue,
+            ArcGraphCellCoord cell,
+            out ArcGraphActorRenderItem selected)
+        {
+            selected = default;
+
+            if (renderQueue == null || renderQueue.ActorItems == null)
+                return false;
+
+            for (int i = 0; i < renderQueue.ActorItems.Count; i++)
+            {
+                ArcGraphActorRenderItem item = renderQueue.ActorItems[i];
+                if (!item.IsVisible)
+                    continue;
+
+                if (item.DiscreteCell.Z == cell.Z &&
+                    item.DiscreteCell.X == cell.X &&
+                    item.DiscreteCell.Y == cell.Y)
+                {
+                    selected = item;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryFindObjectInCell(
+            ArcGraphRenderQueue renderQueue,
+            ArcGraphCellCoord cell,
+            out ArcGraphObjectRenderItem selected)
+        {
+            selected = default;
+
+            if (renderQueue == null || renderQueue.ObjectItems == null)
+                return false;
+
+            for (int i = 0; i < renderQueue.ObjectItems.Count; i++)
+            {
+                ArcGraphObjectRenderItem item = renderQueue.ObjectItems[i];
+                if (!item.IsVisible || item.IsHeld)
+                    continue;
+
+                if (item.Cell.Z == cell.Z &&
+                    cell.X >= item.Cell.X &&
+                    cell.X < item.Cell.X + item.FootprintWidth &&
+                    cell.Y >= item.Cell.Y &&
+                    cell.Y < item.Cell.Y + item.FootprintHeight)
+                {
+                    selected = item;
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private static TextMeshProUGUI CreateLine(

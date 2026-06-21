@@ -88,7 +88,6 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphInteractionConsumerRouter : MonoBehaviour, IArcGraphInteractionFrameConsumer
     {
         [SerializeField] private bool routerEnabled;
-        [SerializeField] private bool logDispatch;
         [SerializeField] private MonoBehaviour[] consumerBehaviours;
 
         private IArcGraphInteractionFrameConsumer[] _runtimeConsumers;
@@ -140,18 +139,6 @@ namespace Arcontio.View.ArcGraph
 
             string reason = dispatchedCount > 0 ? "FrameDispatched" : "NoConsumerDispatched";
             StoreDiagnostics(interactionFrame, candidateCount, dispatchedCount, skippedCount, reason);
-
-            if (logDispatch)
-            {
-                Debug.Log(
-                    "[ArcGraphInteractionConsumerRouter] " +
-                    reason +
-                    ", candidates=" + candidateCount +
-                    ", dispatched=" + dispatchedCount +
-                    ", skipped=" + skippedCount +
-                    ", target=" + interactionFrame.TargetKind +
-                    ", actor=" + interactionFrame.ActorId);
-            }
         }
 
         // =============================================================================

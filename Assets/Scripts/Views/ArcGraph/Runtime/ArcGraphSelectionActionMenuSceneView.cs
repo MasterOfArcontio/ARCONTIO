@@ -228,7 +228,6 @@ namespace Arcontio.View.ArcGraph
     {
         [SerializeField] private bool menuEnabled = true;
         [SerializeField] private Camera sceneCamera;
-        [SerializeField] private bool logRequests;
         [SerializeField] private ArcGraphSelectionActionMenuPreset preset = ArcGraphSelectionActionMenuPreset.Default();
 
         private ArcGraphUiRuntimeRoot _uiRoot;
@@ -403,103 +402,6 @@ namespace Arcontio.View.ArcGraph
 
             if (_menuRoot != null)
                 ApplyPresetToBuiltUi();
-        }
-
-        // =============================================================================
-        // LogLastRequestFromInspector
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Stampa in Console l'ultima richiesta diagnostica generata dai pulsanti.
-        /// </para>
-        /// </summary>
-        [ContextMenu("ArcGraph/Log Selection Action Menu Request")]
-        public void LogLastRequestFromInspector()
-        {
-            Debug.Log(
-                "[ArcGraphSelectionActionMenuSceneView] lastOperation=" +
-                _lastRequestedOperationKey +
-                ", targetKind=" +
-                _lastRequestedTarget.Kind +
-                ", targetId=" +
-                _lastRequestedTarget.Id);
-        }
-
-        // =============================================================================
-        // LogVisibilityDiagnosticsFromInspector
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Stampa in Console lo stato essenziale usato per capire perche' il menu e'
-        /// visibile o nascosto.
-        /// </para>
-        /// </summary>
-        [ContextMenu("ArcGraph/Log Selection Action Menu Visibility")]
-        public void LogVisibilityDiagnosticsFromInspector()
-        {
-            ArcUiSelectionTarget target = _selectionConsumer != null
-                ? _selectionConsumer.CurrentSelection
-                : ArcUiSelectionTarget.None("ArcGraphSelectionActionMenuSceneView");
-            ArcGraphUiSelectionSceneConsumerDiagnostics selectionDiagnostics =
-                _selectionConsumer != null
-                    ? _selectionConsumer.LastDiagnostics
-                    : default;
-            ArcGraphUiSelectionSceneConsumerDiagnostics clickDiagnostics =
-                _selectionConsumer != null
-                    ? _selectionConsumer.LastClickDiagnostics
-                    : default;
-
-            Debug.Log(
-                "[ArcGraphSelectionActionMenuSceneView] visibleReason=" +
-                _lastVisibilityReason +
-                ", enabled=" +
-                menuEnabled +
-                ", hasSelectionConsumer=" +
-                (_selectionConsumer != null) +
-                ", hasUiRoot=" +
-                (_uiRoot != null) +
-                ", hasOverlayRoot=" +
-                (_overlayRoot != null) +
-                ", hasRenderQueue=" +
-                (_renderQueue != null) +
-                ", targetKind=" +
-                target.Kind +
-                ", targetId=" +
-                target.Id +
-                ", targetCell=" +
-                target.Cell +
-                ", selectionReason=" +
-                selectionDiagnostics.Reason +
-                ", selectionClick=" +
-                selectionDiagnostics.WasPrimaryClick +
-                ", selectionPointerOverUi=" +
-                selectionDiagnostics.WasPointerOverUi +
-                ", selectionFrameTarget=" +
-                selectionDiagnostics.FrameTargetKind +
-                ", selectionFrameActorId=" +
-                selectionDiagnostics.FrameActorId +
-                ", selectionFrameObjectId=" +
-                selectionDiagnostics.FrameObjectId +
-                ", selectionFrameCell=" +
-                selectionDiagnostics.HasFrameCell +
-                ", selectionCell=" +
-                selectionDiagnostics.Cell +
-                ", selectionDidSelect=" +
-                selectionDiagnostics.DidSelectTarget +
-                ", lastClickReason=" +
-                clickDiagnostics.Reason +
-                ", lastClickFrameTarget=" +
-                clickDiagnostics.FrameTargetKind +
-                ", lastClickActorId=" +
-                clickDiagnostics.FrameActorId +
-                ", lastClickObjectId=" +
-                clickDiagnostics.FrameObjectId +
-                ", lastClickFrameCell=" +
-                clickDiagnostics.HasFrameCell +
-                ", lastClickCell=" +
-                clickDiagnostics.Cell +
-                ", lastClickDidSelect=" +
-                clickDiagnostics.DidSelectTarget);
         }
 
         private bool EnsureBuilt()
@@ -833,9 +735,6 @@ namespace Arcontio.View.ArcGraph
 
             _lastRequestedOperationKey = operationKey;
             _lastRequestedTarget = target;
-
-            if (logRequests)
-                LogLastRequestFromInspector();
         }
 
         private bool TryFindActor(

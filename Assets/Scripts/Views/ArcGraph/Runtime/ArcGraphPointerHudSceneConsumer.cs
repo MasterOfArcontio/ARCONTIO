@@ -33,7 +33,6 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool hudEnabled;
         [SerializeField] private bool drawInOnGui = true;
         [SerializeField] private bool consumeWhenHudDisabled = true;
-        [SerializeField] private bool logConsumedFrames;
         [SerializeField] private Rect hudRect = new Rect(150f, 62f, 420f, 30f);
         [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0.60f);
         [SerializeField] private Color textColor = Color.white;
@@ -77,15 +76,6 @@ namespace Arcontio.View.ArcGraph
             // temporanea rimangono allineati.
             _lastSnapshot = _builder.BuildWithAdapterDiagnostics(interactionFrame, diagnostics);
             _lastDiagnostics = _builder.LastDiagnostics;
-
-            if (logConsumedFrames)
-            {
-                Debug.Log(
-                    "[ArcGraphPointerHudSceneConsumer] " +
-                    _lastSnapshot.DisplayText +
-                    ", target=" + _lastSnapshot.TargetKind +
-                    ", reason=" + _lastSnapshot.InteractionReason);
-            }
         }
 
         // =============================================================================

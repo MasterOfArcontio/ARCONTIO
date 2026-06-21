@@ -113,7 +113,6 @@ namespace Arcontio.View.ArcGraph
     {
         [SerializeField] private bool selectionEnabled = true;
         [SerializeField] private bool mirrorNpcSelectionToLegacyService = true;
-        [SerializeField] private bool logSelectionEvents;
 
         private readonly ArcUiSelectionController _selectionController = new();
         private ArcGraphRenderQueue _renderQueue;
@@ -253,38 +252,6 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // LogSelectionDiagnosticsFromInspector
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Stampa in Console l'ultima diagnostica della selezione UI.
-        /// </para>
-        /// </summary>
-        [ContextMenu("ArcGraph/Log UI Selection Diagnostics")]
-        public void LogSelectionDiagnosticsFromInspector()
-        {
-            Debug.Log(
-                "[ArcGraphUiSelectionSceneConsumer] " +
-                _lastDiagnostics.Reason +
-                ", enabled=" + _lastDiagnostics.SelectionEnabled +
-                ", click=" + _lastDiagnostics.WasPrimaryClick +
-                ", pointerOverUi=" + _lastDiagnostics.WasPointerOverUi +
-                ", frameTarget=" + _lastDiagnostics.FrameTargetKind +
-                ", frameActorId=" + _lastDiagnostics.FrameActorId +
-                ", frameObjectId=" + _lastDiagnostics.FrameObjectId +
-                ", frameCell=" + _lastDiagnostics.HasFrameCell +
-                ", cell=" + _lastDiagnostics.Cell +
-                ", selected=" + _lastDiagnostics.DidSelectTarget +
-                ", targetKind=" + _lastDiagnostics.SelectedTarget.Kind +
-                ", targetId=" + _lastDiagnostics.SelectedTarget.Id +
-                ", lastClickReason=" + _lastClickDiagnostics.Reason +
-                ", lastClickFrameTarget=" + _lastClickDiagnostics.FrameTargetKind +
-                ", lastClickActorId=" + _lastClickDiagnostics.FrameActorId +
-                ", lastClickObjectId=" + _lastClickDiagnostics.FrameObjectId +
-                ", lastClickSelected=" + _lastClickDiagnostics.DidSelectTarget);
-        }
-
-        // =============================================================================
         // TrySelectFromInteractionFrame
         // =============================================================================
         /// <summary>
@@ -326,6 +293,20 @@ namespace Arcontio.View.ArcGraph
                 else
                     SelectObjectId(interactionFrame.ObjectId, interactionFrame.Cell);
 
+                return true;
+            }
+
+            if (interactionFrame.HasValidCell &&
+                TryFindActorByCell(queue, interactionFrame.Cell, out ArcGraphActorRenderItem actorInCell))
+            {
+                SelectActor(actorInCell);
+                return true;
+            }
+
+            if (interactionFrame.HasValidCell &&
+                TryFindObjectByCell(queue, interactionFrame.Cell, out ArcGraphObjectRenderItem objectInCell))
+            {
+                SelectObject(objectInCell, interactionFrame.Cell);
                 return true;
             }
 
@@ -395,6 +376,88 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // TryFindActorByCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca un NPC visibile nella cella gia' risolta dal frame interattivo.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: fallback diagnostico sul boundary cella</b></para>
+        /// <para>
+        /// Il pannello debug ha confermato che <c>interactionFrame.Cell</c> e' la
+        /// cella corretta sotto il puntatore. Se il target prioritario non arriva
+        /// gia' come <c>Actor</c>, il controller puo' usare la stessa cella per
+        /// interrogare la render queue view-side, senza leggere il <c>World</c>.
+        /// </para>
+        /// </summary>
+        private static bool TryFindActorByCell(
+            ArcGraphRenderQueue queue,
+            ArcGraphCellCoord cell,
+            out ArcGraphActorRenderItem selected)
+        {
+            selected = default;
+
+            if (queue == null || queue.ActorItems == null)
+                return false;
+
+            for (int i = 0; i < queue.ActorItems.Count; i++)
+            {
+                ArcGraphActorRenderItem item = queue.ActorItems[i];
+                if (!item.IsVisible)
+                    continue;
+
+                if (item.DiscreteCell.Z == cell.Z &&
+                    item.DiscreteCell.X == cell.X &&
+                    item.DiscreteCell.Y == cell.Y)
+                {
+                    selected = item;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryFindObjectByCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca un oggetto visibile nella cella gia' risolta dal frame interattivo.
+        /// </para>
+        /// </summary>
+        private static bool TryFindObjectByCell(
+            ArcGraphRenderQueue queue,
+            ArcGraphCellCoord cell,
+            out ArcGraphObjectRenderItem selected)
+        {
+            selected = default;
+
+            if (queue == null || queue.ObjectItems == null)
+                return false;
+
+            for (int i = 0; i < queue.ObjectItems.Count; i++)
+            {
+                ArcGraphObjectRenderItem item = queue.ObjectItems[i];
+                if (!item.IsVisible || item.IsHeld)
+                    continue;
+
+                if (item.Cell.Z == cell.Z &&
+                    cell.X >= item.Cell.X &&
+                    cell.X < item.Cell.X + item.FootprintWidth &&
+                    cell.Y >= item.Cell.Y &&
+                    cell.Y < item.Cell.Y + item.FootprintHeight)
+                {
+                    selected = item;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // =============================================================================
         // SelectActor
         // =============================================================================
         /// <summary>
@@ -416,7 +479,6 @@ namespace Arcontio.View.ArcGraph
             if (mirrorNpcSelectionToLegacyService)
                 NPCSelection.Select(actor.ActorId);
 
-            LogSelectionIfEnabled("ActorSelected", target);
         }
 
         // =============================================================================
@@ -444,7 +506,6 @@ namespace Arcontio.View.ArcGraph
             if (mirrorNpcSelectionToLegacyService)
                 NPCSelection.Select(actorId);
 
-            LogSelectionIfEnabled("ActorFrameSelected", target);
         }
 
         // =============================================================================
@@ -475,7 +536,6 @@ namespace Arcontio.View.ArcGraph
                 "ArcGraphUiSelectionSceneConsumer");
 
             _selectionController.Select(target);
-            LogSelectionIfEnabled("ObjectSelected", target);
         }
 
         // =============================================================================
@@ -499,7 +559,6 @@ namespace Arcontio.View.ArcGraph
                 "ArcGraphUiSelectionSceneConsumer");
 
             _selectionController.Select(target);
-            LogSelectionIfEnabled("ObjectFrameSelected", target);
         }
 
         private ArcGraphRenderQueue ResolveRenderQueue()
@@ -538,19 +597,5 @@ namespace Arcontio.View.ArcGraph
                 _lastClickDiagnostics = nextDiagnostics;
         }
 
-        private void LogSelectionIfEnabled(
-            string reason,
-            ArcUiSelectionTarget target)
-        {
-            if (!logSelectionEvents)
-                return;
-
-            Debug.Log(
-                "[ArcGraphUiSelectionSceneConsumer] " +
-                reason +
-                ", targetKind=" + target.Kind +
-                ", targetId=" + target.Id +
-                ", cell=" + target.Cell);
-        }
     }
 }

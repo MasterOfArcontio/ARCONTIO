@@ -107,7 +107,6 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool adapterEnabled;
         [SerializeField] private bool processInUpdate;
         [SerializeField] private bool dispatchToConsumer;
-        [SerializeField] private bool logDiagnostics;
         [SerializeField] private bool viewInputEnabled = true;
         [SerializeField] private bool useScreenAsViewport = true;
         [SerializeField] private int manualViewportPixelWidth = 1920;
@@ -390,7 +389,6 @@ namespace Arcontio.View.ArcGraph
                     default,
                     "AdapterDisabled");
 
-                LogLastDiagnostics();
                 return _lastWrapperDiagnostics;
             }
 
@@ -434,7 +432,6 @@ namespace Arcontio.View.ArcGraph
                 contractDiagnostics,
                 contractDiagnostics.Reason);
 
-            LogLastDiagnostics();
             return _lastWrapperDiagnostics;
         }
 
@@ -750,22 +747,5 @@ namespace Arcontio.View.ArcGraph
                 reason);
         }
 
-        private void LogLastDiagnostics()
-        {
-            if (!logDiagnostics)
-                return;
-
-            Debug.Log(
-                "[ArcGraphInteractionSceneAdapterWrapper] " + _lastWrapperDiagnostics.Reason +
-                ", enabled=" + _lastWrapperDiagnostics.IsAdapterEnabled +
-                ", mouse=" + _lastWrapperDiagnostics.HasMouse +
-                ", viewport=" + _lastWrapperDiagnostics.HasValidViewport +
-                ", queue=" + _lastWrapperDiagnostics.HasRenderQueue +
-                ", consumer=" + _lastWrapperDiagnostics.HasConsumer +
-                ", processed=" + _lastWrapperDiagnostics.DidProcessContract +
-                ", target=" + _lastWrapperDiagnostics.ContractDiagnostics.TargetKind +
-                ", actor=" + _lastWrapperDiagnostics.ContractDiagnostics.ActorId +
-                ", object=" + _lastWrapperDiagnostics.ContractDiagnostics.ObjectId);
-        }
     }
 }

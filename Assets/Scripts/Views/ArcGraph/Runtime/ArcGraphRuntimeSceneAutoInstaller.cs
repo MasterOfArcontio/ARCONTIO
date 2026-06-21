@@ -409,6 +409,7 @@ namespace Arcontio.View.ArcGraph
             if (_pointerDebugPanelConsumer != null)
             {
                 _pointerDebugPanelConsumer.SetUiRoot(_uiRoot);
+                _pointerDebugPanelConsumer.SetRenderQueue(_wrapper.RenderQueue);
                 _pointerDebugPanelConsumer.SetPanelEnabled(true);
             }
         }
