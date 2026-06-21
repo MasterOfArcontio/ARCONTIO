@@ -15694,31 +15694,32 @@ Compiti:
 
 | Step | Obiettivo | Stato |
 |---|---|---|
-| v0.38o.01 | Auditare bridge attivi MapGrid ancora usati da ArcGraph | ✅ Completato |
-| v0.38o.02 | Eliminare fallback sprite oggetti ArcGraph verso `MapGrid/Sprites/Objects/{defId}` | ✅ Completato |
-| v0.38o.03 | Separare preview placement/F3 da tipo concreto `MapGridRuntimeDevToolsOverlay` | ✅ Completato |
-| v0.38o.04 | Scollegare pan/zoom ArcGraph da offset camera MapGrid | ✅ Completato |
-| v0.38o.05 | Formalizzare `ARCGRAPH_VISUAL_ASSET_POLICY.md` per oggetti, NPC, piante, vegetazione e resolver sprite | ✅ Completato |
-| v0.38o.06 | Progettare e implementare controller placement/F3 autonomo ArcGraph | ✅ Completato |
-| v0.38o.07 | Migrare path asset oggetti da `MapGrid/Sprites/Objects` a catalogo/path ArcGraph reali | ✅ Completato |
-| v0.38o.08 | Introdurre `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e PlantInstance | ✅ Completato |
-| v0.38o.09 | Collegare `plantVisualStateKey` / `visualStateKey` al catalogo ambiente ArcGraph | ⏳ Pending |
-| v0.38o.10 | Estendere `ArcGraphNpcVisualCatalog.json` per supportare sheet per parte/animazione | ⏳ Pending |
-| v0.38o.11 | Eliminare o congelare adapter/probe MapGrid non-runtime | ⏳ Pending |
-| v0.38o.12 | Rimuovere `ArcGraphViewModeSwitcher`/root switch legacy quando ArcGraph resta unica vista | ⏳ Pending |
-| v0.38o.13 | Autorizzare cancellazione fisica MapGrid solo dopo test Unity e zero dipendenze runtime | ⏳ Pending |
+| v0.38o.01 | Auditare bridge attivi MapGrid ancora usati da ArcGraph | ✅ |
+| v0.38o.02 | Eliminare fallback sprite oggetti ArcGraph verso `MapGrid/Sprites/Objects/{defId}` | ✅ |
+| v0.38o.03 | Separare preview placement/F3 da tipo concreto `MapGridRuntimeDevToolsOverlay` | ✅ |
+| v0.38o.04 | Scollegare pan/zoom ArcGraph da offset camera MapGrid | ✅ |
+| v0.38o.05 | Formalizzare `ARCGRAPH_VISUAL_ASSET_POLICY.md` per oggetti, NPC, piante, vegetazione e resolver sprite | ✅ |
+| v0.38o.06 | Progettare e implementare controller placement/F3 autonomo ArcGraph | ✅ |
+| v0.38o.07 | Migrare path asset oggetti da `MapGrid/Sprites/Objects` a catalogo/path ArcGraph reali | ✅ |
+| v0.38o.08 | Introdurre `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e PlantInstance | ✅ |
+| v0.38o.09 | Collegare `plantVisualStateKey` / `visualStateKey` al catalogo ambiente ArcGraph | ⏳ |
+| v0.38o.10 | Estendere `ArcGraphNpcVisualCatalog.json` per supportare sheet per parte/animazione | ⏳ |
+| v0.38o.10a | Introdurre importer Aseprite NPC per generare sheet PNG sliced per parte corpo e direzione | ✅ |
+| v0.38o.11 | Eliminare o congelare adapter/probe MapGrid non-runtime | ⏳ |
+| v0.38o.12 | Rimuovere `ArcGraphViewModeSwitcher`/root switch legacy quando ArcGraph resta unica vista | ⏳ |
+| v0.38o.13 | Autorizzare cancellazione fisica MapGrid solo dopo test Unity e zero dipendenze runtime | ⏳ |
 
 Sotto-roadmap operativa derivata da `ARCGRAPH_VISUAL_ASSET_POLICY.md`:
 
 | Policy step | Obiettivo policy | Step operativo | Stato |
 |---|---|---|---|
-| 1 | Congelare la policy e usarla come vincolo per i prossimi step | `v0.38o.05` | ✅ Completato |
-| 2 | Migrare `object_defs.json` da path MapGrid a path ArcGraph reali solo dopo asset equivalenti | `v0.38o.07` | ✅ Completato |
-| 3 | Estendere `ArcGraphNpcVisualCatalog.json` per supportare sheet per parte/animazione senza rompere il formato attuale | `v0.38o.10` | ⏳ Pending |
-| 4 | Introdurre `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e PlantInstance | `v0.38o.08` | ✅ Completato |
-| 5 | Collegare `plantVisualStateKey` / `visualStateKey` al catalogo ambiente | `v0.38o.09` | ⏳ Pending |
-| 6 | Rimuovere o congelare i vecchi pattern frame-sciolti quando le sheet NPC sono realmente disponibili | dopo `v0.38o.10`, solo con asset sheet disponibili | ⏳ Pending |
-| 7 | Eliminare ogni path MapGrid residuo dai cataloghi ArcGraph prima della cancellazione fisica di MapGrid | `v0.38o.07` + gate finale `v0.38o.13` | ⏳ Pending |
+| 1 | Congelare la policy e usarla come vincolo per i prossimi step | `v0.38o.05` | ✅ |
+| 2 | Migrare `object_defs.json` da path MapGrid a path ArcGraph reali solo dopo asset equivalenti | `v0.38o.07` | ✅ |
+| 3 | Estendere `ArcGraphNpcVisualCatalog.json` per supportare sheet per parte/animazione senza rompere il formato attuale | `v0.38o.10` + `v0.38o.10a` | ⏳ |
+| 4 | Introdurre `ArcGraphEnvironmentVisualCatalog.json` per vegetazione diffusa e PlantInstance | `v0.38o.08` | ✅ |
+| 5 | Collegare `plantVisualStateKey` / `visualStateKey` al catalogo ambiente | `v0.38o.09` | ⏳ |
+| 6 | Rimuovere o congelare i vecchi pattern frame-sciolti quando le sheet NPC sono realmente disponibili | dopo `v0.38o.10`, solo con asset sheet disponibili | ⏳ |
+| 7 | Eliminare ogni path MapGrid residuo dai cataloghi ArcGraph prima della cancellazione fisica di MapGrid | `v0.38o.07` + gate finale `v0.38o.13` | ⏳ |
 
 Nota di sequenza:
 
@@ -15761,6 +15762,26 @@ Aggiornamento `v0.38o.05`:
 - dichiarata la migrazione futura NPC verso sheet per parte/animazione, lasciando
   supportato il formato corrente a frame separati finche' gli asset sheet non
   esistono.
+
+Aggiornamento `v0.38o.10a`:
+
+- introdotto `ArcGraphAsepriteNpcSheetImporter` come componente GameObject
+  attivabile manualmente da Inspector/context menu;
+- introdotto `ArcGraphAsepriteNpcSheetImporterEditorService` come servizio
+  Editor-only confinato sotto `Assets/Scripts/Editor`;
+- l'importer legge file `.aseprite` / `.ase` con 12 layer sorgente
+  `south_*`, `north_*`, `west_*`;
+- genera quattro PNG sheet per parte corpo: `legs`, `body`, `arms`, `head`;
+- ogni sheet produce slice `south_00`, `east_00`, `north_00`, `west_00`
+  per ogni frame disponibile;
+- la direzione `east` viene derivata dalla finestra laterale `west` tramite
+  ribaltamento orizzontale;
+- lo slicing usa `sliceWidthPixels` e `sliceHeightPixels`, con layout sorgente
+  orizzontale in tre finestre: south, north, laterale;
+- il componente non modifica runtime simulativo, non parte in automatico e non
+  aggancia ancora `ArcGraphNpcVisualCatalog.json`;
+- `v0.38o.10` resta aperta per l'estensione effettiva del catalogo NPC e per
+  l'eventuale passaggio runtime dai pattern frame-sciolti alle sheet.
 
 Audit residuo dopo `v0.38o.04`:
 

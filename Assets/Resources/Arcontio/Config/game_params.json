@@ -1,6 +1,6 @@
 {
   "tick": {
-    "ticksPerSecond": 25,
+    "ticksPerSecond": 15,
     "baseWalkCellDurationTicks": 8,
     "enableJobRunningActionTraversal": true
   },

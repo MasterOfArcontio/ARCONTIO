@@ -1,0 +1,28 @@
+{
+    "activeFile": "",
+    "expandedProjectPaths": [
+        "."
+    ],
+    "fileStates": {
+        "": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        },
+        "#wall_stone": {
+            "scaleInDock": 1,
+            "scaleInEditor": 1
+        }
+    },
+    "last.imagePath": "C:/Users/oldkn/Documents/Unity projects/ARCONTIO/Assets/Resources/MapGrid/Sprites/Objects",
+    "map.orientation": "1",
+    "openFiles": [
+    ],
+    "project": "Arcontio-project.tiled-project",
+    "recentFiles": [
+    ],
+    "tileset.embedInMap": true,
+    "tileset.tileSize": {
+        "height": 83,
+        "width": 32
+    }
+}

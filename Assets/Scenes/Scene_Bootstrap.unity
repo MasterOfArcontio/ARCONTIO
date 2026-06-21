@@ -207,6 +207,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   atomViewerSceneName: Scene_AtomViewer
   mapGridName: Scene_MapGrid
+  loadMapGridOnStart: 1
 --- !u!114 &1110507249
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -219,12 +220,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bf07004ad7000ce488cf39bd1ef897a6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Arcontio.Core.SimulationHost
+  enableLegacyDebugScenarioBootstrap: 0
   debugScenario: 99
+  enableWorldSnapshotBootstrap: 0
+  worldSnapshotSlotName: default
+  enableFoodJobVerticalSlice: 1
   day8LogEveryTicks: 10
   startPaused: 1
   togglePauseAction: {fileID: 432641650}
   stepOneTickAction: {fileID: 474828863}
   stepTenTicksAction: {fileID: 1642290482}
+  directKeyboardTickControlEnabled: 1
+  directTogglePauseKey: 30
+  directStepOneTickKey: 29
+  directStepTenTicksKey: 23
 --- !u!114 &1642290482
 MonoBehaviour:
   m_ObjectHideFlags: 0

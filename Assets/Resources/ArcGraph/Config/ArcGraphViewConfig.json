@@ -1,8 +1,8 @@
 {
   "panUsesMiddleMouseButton": true,
-  "defaultOrthographicSize": 75,
-  "minOrthographicSize": 8,
-  "maxOrthographicSize": 150,
+  "defaultOrthographicSize": 15,
+  "minOrthographicSize": 5,
+  "maxOrthographicSize": 30,
   "zoomStep": 8,
   "zoomSmoothTime": 0.20,
   "panInertiaEnabled": true,
