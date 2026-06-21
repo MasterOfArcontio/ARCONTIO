@@ -9,14 +9,14 @@ namespace Arcontio.View.ArcGraph
     /// <summary>
     /// <para>
     /// Diagnostica sintetica della selezione UI ArcGraph basata su frame
-    /// interattivo, camera e render queue.
+    /// interattivo e render queue.
     /// </para>
     ///
     /// <para><b>Principio architetturale: selezione view-side senza World</b></para>
     /// <para>
     /// La diagnostica rende visibile se il consumer ha ricevuto un frame, se il
-    /// click primario era presente, se la cella camera-aligned e' stata risolta e
-    /// quale target UI e' stato selezionato. Non contiene riferimenti mutabili a NPC,
+    /// click primario era presente, se il frame contiene una cella valida e quale
+    /// target UI e' stato selezionato. Non contiene riferimenti mutabili a NPC,
     /// oggetti, job o world runtime.
     /// </para>
     ///
@@ -25,7 +25,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>DidReceiveFrame</b>: il consumer ha ricevuto un frame interattivo.</item>
     ///   <item><b>SelectionEnabled</b>: gate locale del consumer.</item>
     ///   <item><b>WasPrimaryClick</b>: click sinistro nel frame corrente.</item>
-    ///   <item><b>HasCameraCell</b>: cella risolta dalla camera reale.</item>
+    ///   <item><b>HasFrameCell</b>: cella gia' risolta dal boundary interattivo.</item>
     ///   <item><b>DidSelectTarget</b>: selezione UI aggiornata.</item>
     ///   <item><b>SelectedTarget</b>: target selezionato in formato ArcUiSelectionTarget.</item>
     ///   <item><b>Reason</b>: motivo sintetico dell'esito.</item>
@@ -37,7 +37,7 @@ namespace Arcontio.View.ArcGraph
         public readonly bool SelectionEnabled;
         public readonly bool WasPrimaryClick;
         public readonly bool WasPointerOverUi;
-        public readonly bool HasCameraCell;
+        public readonly bool HasFrameCell;
         public readonly bool DidSelectTarget;
         public readonly ArcGraphCellCoord Cell;
         public readonly ArcGraphInteractionTargetKind FrameTargetKind;
@@ -59,7 +59,7 @@ namespace Arcontio.View.ArcGraph
             bool selectionEnabled,
             bool wasPrimaryClick,
             bool wasPointerOverUi,
-            bool hasCameraCell,
+            bool hasFrameCell,
             bool didSelectTarget,
             ArcGraphCellCoord cell,
             ArcGraphInteractionTargetKind frameTargetKind,
@@ -72,7 +72,7 @@ namespace Arcontio.View.ArcGraph
             SelectionEnabled = selectionEnabled;
             WasPrimaryClick = wasPrimaryClick;
             WasPointerOverUi = wasPointerOverUi;
-            HasCameraCell = hasCameraCell;
+            HasFrameCell = hasFrameCell;
             DidSelectTarget = didSelectTarget;
             Cell = cell;
             FrameTargetKind = frameTargetKind;
@@ -94,29 +94,25 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Principio architetturale: UI selection da snapshot visuale</b></para>
     /// <para>
-    /// Il componente riceve un frame interattivo gia' normalizzato, risolve la cella
-    /// reale sotto il puntatore tramite la camera e cerca nella render queue ArcGraph
-    /// il target visibile piu' adatto. Non legge il <c>World</c>, non modifica NPC,
-    /// non modifica oggetti, non invia comandi e non apre inspector. Conserva solo
-    /// una selezione UI read-only tramite <see cref="ArcUiSelectionController"/>.
+    /// Il componente riceve un frame interattivo gia' normalizzato dal boundary
+    /// ArcGraph e trasforma il target actor/object contenuto nel frame in una
+    /// selezione UI. Non ricalcola coordinate dalla camera, non fa un secondo
+    /// picking, non legge il <c>World</c>, non modifica NPC, non modifica oggetti,
+    /// non invia comandi e non apre inspector. Conserva solo una selezione UI
+    /// read-only tramite <see cref="ArcUiSelectionController"/>.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>ConsumeInteractionFrame</b>: seleziona solo su click primario valido.</item>
-    ///   <item><b>SetRuntimeWrapper</b>: riceve la render queue gia' costruita da ArcGraph.</item>
-    ///   <item><b>SetSceneCamera</b>: riceve la camera reale per evitare sfasamenti da zoom/pan.</item>
-    ///   <item><b>TryPickActor</b>: priorita' agli NPC visibili.</item>
-    ///   <item><b>TryPickObject</b>: fallback su oggetti, muri e porte visibili.</item>
+    ///   <item><b>TrySelectFromInteractionFrame</b>: usa il target gia' risolto dal boundary.</item>
+    ///   <item><b>SetRenderQueue</b>: riceve la queue solo per arricchire label e kind del target.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphUiSelectionSceneConsumer : MonoBehaviour, IArcGraphInteractionFrameConsumer
     {
         [SerializeField] private bool selectionEnabled = true;
-        [SerializeField] private Camera sceneCamera;
         [SerializeField] private bool mirrorNpcSelectionToLegacyService = true;
-        [SerializeField] private float tileWorldSize = 1f;
-        [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private bool logSelectionEvents;
 
         private readonly ArcUiSelectionController _selectionController = new();
@@ -190,33 +186,12 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            if (!TryResolveCellFromSceneCamera(interactionFrame, out ArcGraphCellCoord cell, out string cellReason))
-            {
-                StoreDiagnostics(interactionFrame, false, false, interactionFrame.Cell, cellReason);
-                return;
-            }
-
-            if (queue == null)
-            {
-                StoreDiagnostics(interactionFrame, true, false, cell, "RenderQueueMissing");
-                return;
-            }
-
-            if (TryPickActor(queue, cell, out ArcGraphActorRenderItem actor))
-            {
-                SelectActor(actor);
-                StoreDiagnostics(interactionFrame, true, true, cell, "ActorSelected");
-                return;
-            }
-
-            if (TryPickObject(queue, cell, out ArcGraphObjectRenderItem obj))
-            {
-                SelectObject(obj, cell);
-                StoreDiagnostics(interactionFrame, true, true, cell, "ObjectSelected");
-                return;
-            }
-
-            StoreDiagnostics(interactionFrame, true, false, cell, "ClickWithoutSelectableTarget");
+            StoreDiagnostics(
+                interactionFrame,
+                interactionFrame.HasValidCell,
+                false,
+                interactionFrame.Cell,
+                "ClickWithoutSelectableFrameTarget");
         }
 
         // =============================================================================
@@ -230,19 +205,6 @@ namespace Arcontio.View.ArcGraph
         public void SetSelectionEnabled(bool enabled)
         {
             selectionEnabled = enabled;
-        }
-
-        // =============================================================================
-        // SetSceneCamera
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Assegna la camera usata per convertire il puntatore in cella reale.
-        /// </para>
-        /// </summary>
-        public void SetSceneCamera(Camera camera)
-        {
-            sceneCamera = camera;
         }
 
         // =============================================================================
@@ -295,87 +257,11 @@ namespace Arcontio.View.ArcGraph
                 ", frameTarget=" + _lastDiagnostics.FrameTargetKind +
                 ", frameActorId=" + _lastDiagnostics.FrameActorId +
                 ", frameObjectId=" + _lastDiagnostics.FrameObjectId +
-                ", cameraCell=" + _lastDiagnostics.HasCameraCell +
+                ", frameCell=" + _lastDiagnostics.HasFrameCell +
                 ", cell=" + _lastDiagnostics.Cell +
                 ", selected=" + _lastDiagnostics.DidSelectTarget +
                 ", targetKind=" + _lastDiagnostics.SelectedTarget.Kind +
                 ", targetId=" + _lastDiagnostics.SelectedTarget.Id);
-        }
-
-        // =============================================================================
-        // TryPickActor
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Cerca l'actor visibile piu' alto in sorting sulla cella puntata.
-        /// </para>
-        /// </summary>
-        private static bool TryPickActor(
-            ArcGraphRenderQueue queue,
-            ArcGraphCellCoord cell,
-            out ArcGraphActorRenderItem selected)
-        {
-            selected = default;
-
-            if (queue == null || queue.ActorItems == null || queue.ActorItems.Count == 0)
-                return false;
-
-            bool hasSelected = false;
-            ArcGraphRenderSortKey selectedSortKey = default;
-
-            for (int i = 0; i < queue.ActorItems.Count; i++)
-            {
-                ArcGraphActorRenderItem item = queue.ActorItems[i];
-                if (!item.IsVisible || !IsActorHitCell(item.DiscreteCell, cell))
-                    continue;
-
-                if (!hasSelected || item.SortKey.CompareTo(selectedSortKey) >= 0)
-                {
-                    selected = item;
-                    selectedSortKey = item.SortKey;
-                    hasSelected = true;
-                }
-            }
-
-            return hasSelected;
-        }
-
-        // =============================================================================
-        // TryPickObject
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Cerca l'oggetto visibile piu' alto in sorting sulla cella puntata.
-        /// </para>
-        /// </summary>
-        private static bool TryPickObject(
-            ArcGraphRenderQueue queue,
-            ArcGraphCellCoord cell,
-            out ArcGraphObjectRenderItem selected)
-        {
-            selected = default;
-
-            if (queue == null || queue.ObjectItems == null || queue.ObjectItems.Count == 0)
-                return false;
-
-            bool hasSelected = false;
-            ArcGraphRenderSortKey selectedSortKey = default;
-
-            for (int i = 0; i < queue.ObjectItems.Count; i++)
-            {
-                ArcGraphObjectRenderItem item = queue.ObjectItems[i];
-                if (!item.IsVisible || item.IsHeld || !IsObjectHitCell(item, cell))
-                    continue;
-
-                if (!hasSelected || item.SortKey.CompareTo(selectedSortKey) >= 0)
-                {
-                    selected = item;
-                    selectedSortKey = item.SortKey;
-                    hasSelected = true;
-                }
-            }
-
-            return hasSelected;
         }
 
         // =============================================================================
@@ -601,108 +487,6 @@ namespace Arcontio.View.ArcGraph
             return _renderQueue;
         }
 
-        private bool TryResolveCellFromSceneCamera(
-            ArcGraphInteractionFrame interactionFrame,
-            out ArcGraphCellCoord cell,
-            out string reason)
-        {
-            cell = interactionFrame.Cell;
-            reason = "SceneCameraCellUnavailable";
-
-            if (!interactionFrame.Input.HasPointerScreenPosition)
-            {
-                reason = "PointerMissing";
-                return false;
-            }
-
-            Camera camera = ResolveSceneCamera();
-            if (camera == null)
-            {
-                reason = "SceneCameraMissing";
-                return false;
-            }
-
-            Rect pixelRect = camera.pixelRect;
-            if (pixelRect.width <= 0f || pixelRect.height <= 0f)
-            {
-                reason = "SceneCameraViewportInvalid";
-                return false;
-            }
-
-            Vector2 absoluteScreenPoint = new Vector2(
-                interactionFrame.Input.PointerScreenX + pixelRect.x,
-                interactionFrame.Input.PointerScreenY + pixelRect.y);
-
-            if (!pixelRect.Contains(absoluteScreenPoint))
-            {
-                reason = "PointerOutsideSceneCamera";
-                return false;
-            }
-
-            float safeTileWorldSize = tileWorldSize > 0.0001f ? tileWorldSize : 1f;
-            float worldPlaneDistance = ResolveWorldPlaneDistance(camera);
-            Vector3 worldPoint = camera.ScreenToWorldPoint(new Vector3(
-                absoluteScreenPoint.x,
-                absoluteScreenPoint.y,
-                worldPlaneDistance));
-
-            int cellX = Mathf.FloorToInt((worldPoint.x - originOffset.x) / safeTileWorldSize);
-            int cellY = Mathf.FloorToInt((worldPoint.y - originOffset.y) / safeTileWorldSize);
-            int cellZ = interactionFrame.HasValidCell ? interactionFrame.Cell.Z : 0;
-
-            cell = new ArcGraphCellCoord(cellX, cellY, cellZ);
-            reason = "SceneCameraCellResolved";
-            return true;
-        }
-
-        private Camera ResolveSceneCamera()
-        {
-            if (sceneCamera != null)
-                return sceneCamera;
-
-            return Camera.main;
-        }
-
-        private float ResolveWorldPlaneDistance(Camera camera)
-        {
-            if (camera == null)
-                return 0f;
-
-            float distance = originOffset.z - camera.transform.position.z;
-            return Mathf.Abs(distance) > 0.001f
-                ? Mathf.Abs(distance)
-                : Mathf.Max(0.001f, camera.nearClipPlane);
-        }
-
-        private static bool IsActorHitCell(
-            ArcGraphCellCoord actorCell,
-            ArcGraphCellCoord pointerCell)
-        {
-            if (actorCell.Z != pointerCell.Z)
-                return false;
-
-            if (actorCell.X != pointerCell.X)
-                return false;
-
-            return pointerCell.Y >= actorCell.Y && pointerCell.Y <= actorCell.Y + 1;
-        }
-
-        private static bool IsObjectHitCell(
-            ArcGraphObjectRenderItem item,
-            ArcGraphCellCoord pointerCell)
-        {
-            if (item.Cell.Z != pointerCell.Z)
-                return false;
-
-            int width = item.FootprintWidth <= 0 ? 1 : item.FootprintWidth;
-            int height = item.FootprintHeight <= 0 ? 1 : item.FootprintHeight;
-
-            return pointerCell.X >= item.Cell.X &&
-                   pointerCell.X < item.Cell.X + width &&
-                   pointerCell.Y >= item.Cell.Y &&
-                   pointerCell.Y < item.Cell.Y + height;
-        }
-
         private static bool IsWall(ArcGraphObjectRenderItem item)
         {
             return string.Equals(item.VisualKind, "wall", System.StringComparison.OrdinalIgnoreCase);
@@ -710,7 +494,7 @@ namespace Arcontio.View.ArcGraph
 
         private void StoreDiagnostics(
             ArcGraphInteractionFrame interactionFrame,
-            bool hasCameraCell,
+            bool hasFrameCell,
             bool didSelectTarget,
             ArcGraphCellCoord cell,
             string reason)
@@ -720,7 +504,7 @@ namespace Arcontio.View.ArcGraph
                 selectionEnabled,
                 interactionFrame.Input.IsPrimaryPointerPressedThisFrame,
                 interactionFrame.IsPointerOverUi,
-                hasCameraCell,
+                hasFrameCell,
                 didSelectTarget,
                 cell,
                 interactionFrame.TargetKind,
