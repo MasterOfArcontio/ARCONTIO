@@ -248,11 +248,13 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphSelectionActionMenuViewModel _currentViewModel =
             ArcGraphSelectionActionMenuViewModel.Hidden();
         private string _lastRequestedOperationKey = string.Empty;
+        private string _lastVisibilityReason = "NotInitialized";
         private ArcUiSelectionTarget _lastRequestedTarget =
             ArcUiSelectionTarget.None("ArcGraphSelectionActionMenuSceneView");
 
         public ArcGraphSelectionActionMenuViewModel CurrentViewModel => _currentViewModel;
         public string LastRequestedOperationKey => _lastRequestedOperationKey;
+        public string LastVisibilityReason => _lastVisibilityReason;
         public ArcUiSelectionTarget LastRequestedTarget => _lastRequestedTarget;
 
         // =============================================================================
@@ -269,26 +271,26 @@ namespace Arcontio.View.ArcGraph
             // non esiste una selezione valida, il piccolo pannello resta nascosto.
             if (!menuEnabled || _selectionConsumer == null)
             {
-                HideMenu();
+                HideMenu(!menuEnabled ? "MenuDisabled" : "SelectionConsumerMissing");
                 return;
             }
 
             ArcUiSelectionTarget target = _selectionConsumer.CurrentSelection;
             if (!target.IsValid || !EnsureBuilt())
             {
-                HideMenu();
+                HideMenu(!target.IsValid ? "SelectionTargetMissing" : "OverlayRootMissing");
                 return;
             }
 
             if (!TryResolveTargetAnchor(target, out Vector3 anchorWorldPosition, out ArcGraphSelectionActionMenuViewModel viewModel))
             {
-                HideMenu();
+                HideMenu("TargetAnchorMissing");
                 return;
             }
 
             ApplyViewModel(viewModel);
             ApplyScreenPosition(anchorWorldPosition);
-            ShowMenu();
+            ShowMenu("Visible");
         }
 
         // =============================================================================
@@ -357,7 +359,7 @@ namespace Arcontio.View.ArcGraph
             menuEnabled = enabled;
 
             if (!enabled)
-                HideMenu();
+                HideMenu("MenuDisabled");
         }
 
         // =============================================================================
@@ -396,6 +398,43 @@ namespace Arcontio.View.ArcGraph
                 _lastRequestedTarget.Id);
         }
 
+        // =============================================================================
+        // LogVisibilityDiagnosticsFromInspector
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Stampa in Console lo stato essenziale usato per capire perche' il menu e'
+        /// visibile o nascosto.
+        /// </para>
+        /// </summary>
+        [ContextMenu("ArcGraph/Log Selection Action Menu Visibility")]
+        public void LogVisibilityDiagnosticsFromInspector()
+        {
+            ArcUiSelectionTarget target = _selectionConsumer != null
+                ? _selectionConsumer.CurrentSelection
+                : ArcUiSelectionTarget.None("ArcGraphSelectionActionMenuSceneView");
+
+            Debug.Log(
+                "[ArcGraphSelectionActionMenuSceneView] visibleReason=" +
+                _lastVisibilityReason +
+                ", enabled=" +
+                menuEnabled +
+                ", hasSelectionConsumer=" +
+                (_selectionConsumer != null) +
+                ", hasUiRoot=" +
+                (_uiRoot != null) +
+                ", hasOverlayRoot=" +
+                (_overlayRoot != null) +
+                ", hasRenderQueue=" +
+                (_renderQueue != null) +
+                ", targetKind=" +
+                target.Kind +
+                ", targetId=" +
+                target.Id +
+                ", targetCell=" +
+                target.Cell);
+        }
+
         private bool EnsureBuilt()
         {
             if (_menuRoot != null)
@@ -406,6 +445,7 @@ namespace Arcontio.View.ArcGraph
 
             _overlayRoot = resolvedOverlayRoot;
             _menuRoot = CreateRect("ArcSelectionActionMenu", _overlayRoot);
+            _menuRoot.SetAsLastSibling();
             _menuRoot.anchorMin = new Vector2(0.5f, 0.5f);
             _menuRoot.anchorMax = new Vector2(0.5f, 0.5f);
             _menuRoot.pivot = new Vector2(0.5f, 0f);
@@ -429,7 +469,7 @@ namespace Arcontio.View.ArcGraph
             BuildHungerBar();
             BuildButtonRow();
             ApplyPresetToBuiltUi();
-            HideMenu();
+            HideMenu("BuiltHidden");
             return true;
         }
 
@@ -540,10 +580,13 @@ namespace Arcontio.View.ArcGraph
             anchorWorldPosition = default;
             viewModel = ArcGraphSelectionActionMenuViewModel.Hidden();
 
-            if (_renderQueue == null)
-                return false;
-
-            if (target.Kind == ArcUiSelectionTargetKind.Npc &&
+            // La render queue resta la sorgente preferita per seguire target mobili.
+            // Se pero' la queue non e' ancora disponibile, o il target non viene
+            // ritrovato per un frame, usiamo la cella copiata nel SelectionTarget:
+            // cosi' il menu compare comunque e rende diagnosticabile il problema
+            // senza introdurre accessi diretti al World.
+            if (_renderQueue != null &&
+                target.Kind == ArcUiSelectionTargetKind.Npc &&
                 TryParseTargetId(target, out int actorId) &&
                 TryFindActor(actorId, out ArcGraphActorRenderItem actor))
             {
@@ -552,7 +595,8 @@ namespace Arcontio.View.ArcGraph
                 return true;
             }
 
-            if ((target.Kind == ArcUiSelectionTargetKind.Object || target.Kind == ArcUiSelectionTargetKind.Wall) &&
+            if (_renderQueue != null &&
+                (target.Kind == ArcUiSelectionTargetKind.Object || target.Kind == ArcUiSelectionTargetKind.Wall) &&
                 TryParseTargetId(target, out int objectId) &&
                 TryFindObject(objectId, out ArcGraphObjectRenderItem obj))
             {
@@ -563,6 +607,18 @@ namespace Arcontio.View.ArcGraph
                     obj.Cell.Y + height + 0.18f,
                     obj.Cell.Z);
                 viewModel = CreateObjectViewModel(target, obj);
+                return true;
+            }
+
+            if (target.Kind == ArcUiSelectionTargetKind.Npc ||
+                target.Kind == ArcUiSelectionTargetKind.Object ||
+                target.Kind == ArcUiSelectionTargetKind.Wall)
+            {
+                anchorWorldPosition = new Vector3(
+                    target.Cell.X + 0.5f,
+                    target.Cell.Y + preset.Normalize().WorldOffsetY,
+                    target.Cell.Z);
+                viewModel = CreateFallbackViewModel(target);
                 return true;
             }
 
@@ -602,6 +658,30 @@ namespace Arcontio.View.ArcGraph
                 0f,
                 target.Kind == ArcUiSelectionTargetKind.Wall ? "edit_selected_wall" : "edit_selected_object",
                 target.Kind == ArcUiSelectionTargetKind.Wall ? "delete_selected_wall" : "delete_selected_object");
+        }
+
+        private ArcGraphSelectionActionMenuViewModel CreateFallbackViewModel(ArcUiSelectionTarget target)
+        {
+            if (target.Kind == ArcUiSelectionTargetKind.Npc)
+                return CreateNpcViewModel(target);
+
+            string editOperationKey = target.Kind == ArcUiSelectionTargetKind.Wall
+                ? "edit_selected_wall"
+                : "edit_selected_object";
+            string deleteOperationKey = target.Kind == ArcUiSelectionTargetKind.Wall
+                ? "delete_selected_wall"
+                : "delete_selected_object";
+
+            return new ArcGraphSelectionActionMenuViewModel(
+                true,
+                target,
+                string.IsNullOrWhiteSpace(target.DisplayName) ? "Selezione " + target.Id : target.DisplayName,
+                target.Kind == ArcUiSelectionTargetKind.Wall ? "Muro" : "Oggetto",
+                false,
+                false,
+                0f,
+                editOperationKey,
+                deleteOperationKey);
         }
 
         private void ApplyViewModel(ArcGraphSelectionActionMenuViewModel viewModel)
@@ -650,14 +730,17 @@ namespace Arcontio.View.ArcGraph
             _menuRoot.anchoredPosition = localPoint;
         }
 
-        private void ShowMenu()
+        private void ShowMenu(string reason)
         {
+            _lastVisibilityReason = string.IsNullOrWhiteSpace(reason) ? "Visible" : reason;
+
             if (_menuRoot != null && !_menuRoot.gameObject.activeSelf)
                 _menuRoot.gameObject.SetActive(true);
         }
 
-        private void HideMenu()
+        private void HideMenu(string reason)
         {
+            _lastVisibilityReason = string.IsNullOrWhiteSpace(reason) ? "Hidden" : reason;
             _currentViewModel = ArcGraphSelectionActionMenuViewModel.Hidden();
 
             if (_menuRoot != null && _menuRoot.gameObject.activeSelf)
@@ -783,7 +866,7 @@ namespace Arcontio.View.ArcGraph
             label.fontSize = fontSize;
             label.fontStyle = fontStyle;
             label.alignment = alignment;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Ellipsis;
             return label;
         }
