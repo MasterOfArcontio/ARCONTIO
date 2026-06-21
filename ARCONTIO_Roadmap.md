@@ -16958,6 +16958,14 @@ Obiettivo:
 introdurre SelectionTarget come contratto unico per hover, click e selezione singola
 ```
 
+Sottostep operativi:
+
+| Versione | Nome | Stato |
+|---|---|---|
+| v0.70.04.01 | Hover cella sotto mouse | Fatto su branch `ai-task/v0.70.04.01-arcgraph-pointer-cell-hover` |
+| v0.70.04.02 | Selezione NPC/Oggetto | Confermato, pending |
+| v0.70.04.03 | Hover menu Modifica/Elimina | Pending |
+
 Target previsti:
 
 - NPC;

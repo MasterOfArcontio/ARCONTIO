@@ -64,6 +64,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementToolController _placementToolController;
+        private ArcGraphPointerCellHoverSceneConsumer _pointerCellHoverConsumer;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphSelectionSceneConsumer _selectionConsumer;
         private ArcGraphFovDebugOverlaySceneConsumer _fovOverlayConsumer;
@@ -243,6 +244,7 @@ namespace Arcontio.View.ArcGraph
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
             _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
             _placementToolController.enabled = false;
+            _pointerCellHoverConsumer = _visualRoot.AddComponent<ArcGraphPointerCellHoverSceneConsumer>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
@@ -338,7 +340,10 @@ namespace Arcontio.View.ArcGraph
             _interactionWrapper.SetSceneCameraZoomSyncEnabled(false);
             _interactionWrapper.SetDispatchToConsumer(true);
             _interactionRouter.SetRouterEnabled(true);
-            _interactionRouter.SetRuntimeConsumers(_placementHighlightConsumer, _selectionConsumer);
+            _interactionRouter.SetRuntimeConsumers(
+                _pointerCellHoverConsumer,
+                _placementHighlightConsumer,
+                _selectionConsumer);
             _placementToolController.SetRuntimeContextProvider(_contextProvider);
             _placementToolController.SetSceneCamera(Camera.main);
             _placementHighlightConsumer.SetRuntimeContextProvider(_contextProvider);
