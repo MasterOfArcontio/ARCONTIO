@@ -65,6 +65,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementToolController _placementToolController;
         private ArcGraphPointerCellHoverSceneConsumer _pointerCellHoverConsumer;
+        private ArcGraphPointerDebugPanelSceneConsumer _pointerDebugPanelConsumer;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphUiSelectionSceneConsumer _uiSelectionConsumer;
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
@@ -247,6 +248,7 @@ namespace Arcontio.View.ArcGraph
             _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
             _placementToolController.enabled = false;
             _pointerCellHoverConsumer = _visualRoot.AddComponent<ArcGraphPointerCellHoverSceneConsumer>();
+            _pointerDebugPanelConsumer = _visualRoot.AddComponent<ArcGraphPointerDebugPanelSceneConsumer>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _uiSelectionConsumer = _visualRoot.AddComponent<ArcGraphUiSelectionSceneConsumer>();
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
@@ -346,6 +348,7 @@ namespace Arcontio.View.ArcGraph
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(
                 _pointerCellHoverConsumer,
+                _pointerDebugPanelConsumer,
                 _placementHighlightConsumer,
                 _uiSelectionConsumer);
             _placementToolController.SetRuntimeContextProvider(_contextProvider);
@@ -402,6 +405,12 @@ namespace Arcontio.View.ArcGraph
 
             if (_selectionActionMenu != null)
                 _selectionActionMenu.BuildHiddenMenuForRuntimeDiagnostics();
+
+            if (_pointerDebugPanelConsumer != null)
+            {
+                _pointerDebugPanelConsumer.SetUiRoot(_uiRoot);
+                _pointerDebugPanelConsumer.SetPanelEnabled(true);
+            }
         }
 
         // =============================================================================
