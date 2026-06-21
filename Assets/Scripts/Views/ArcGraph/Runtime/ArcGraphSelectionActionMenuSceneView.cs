@@ -363,6 +363,33 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // BuildHiddenMenuForRuntimeDiagnostics
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce subito il GameObject UGUI del menu e lo lascia nascosto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: diagnostica visibile senza mutazione</b></para>
+        /// <para>
+        /// Il menu resta guidato dalla selezione e non interroga il mondo. Questo
+        /// metodo serve solo a rendere presente in Hierarchy il nodo
+        /// <c>ArcSelectionActionMenu</c> anche prima di una selezione valida, cosi'
+        /// l'operatore puo' verificare cablaggio, OverlayRoot e diagnostica runtime
+        /// senza aspettare che il picking produca un target.
+        /// </para>
+        /// </summary>
+        public bool BuildHiddenMenuForRuntimeDiagnostics()
+        {
+            bool built = EnsureBuilt();
+
+            if (built)
+                HideMenu("SelectionTargetMissing");
+
+            return built;
+        }
+
+        // =============================================================================
         // ApplyPreset
         // =============================================================================
         /// <summary>

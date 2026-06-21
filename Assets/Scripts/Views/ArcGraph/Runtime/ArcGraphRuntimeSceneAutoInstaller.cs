@@ -400,6 +400,9 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetUiEnabled(true);
             ApplyUiMapViewportToMainCamera();
             _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
+
+            if (_selectionActionMenu != null)
+                _selectionActionMenu.BuildHiddenMenuForRuntimeDiagnostics();
         }
 
         // =============================================================================
