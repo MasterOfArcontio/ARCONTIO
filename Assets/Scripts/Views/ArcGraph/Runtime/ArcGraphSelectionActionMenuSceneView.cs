@@ -59,8 +59,8 @@ namespace Arcontio.View.ArcGraph
         {
             return new ArcGraphSelectionActionMenuPreset
             {
-                Width = 178f,
-                Height = 70f,
+                Width = 46f,
+                Height = 18f,
                 WorldOffsetY = 1.45f,
                 PanelAlpha = 0.86f,
                 PanelColor = ColorFromHex("#101922", 0.84f),
@@ -86,8 +86,8 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphSelectionActionMenuPreset Normalize()
         {
             ArcGraphSelectionActionMenuPreset normalized = this;
-            normalized.Width = Width > 20f ? Width : 178f;
-            normalized.Height = Height > 20f ? Height : 70f;
+            normalized.Width = Width > 20f ? Width : 46f;
+            normalized.Height = Height > 12f ? Height : 18f;
             normalized.WorldOffsetY = Mathf.Abs(WorldOffsetY) > 0.001f ? WorldOffsetY : 1.45f;
             normalized.PanelAlpha = Mathf.Clamp01(PanelAlpha <= 0f ? 0.86f : PanelAlpha);
             return normalized;
@@ -426,17 +426,15 @@ namespace Arcontio.View.ArcGraph
             _canvasGroup.interactable = true;
             _canvasGroup.blocksRaycasts = true;
 
-            VerticalLayoutGroup layout = _menuRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.padding = new RectOffset(8, 8, 6, 6);
-            layout.spacing = 4f;
+            HorizontalLayoutGroup layout = _menuRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(1, 1, 1, 1);
+            layout.spacing = 1f;
             layout.childControlWidth = true;
-            layout.childControlHeight = false;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = true;
 
-            BuildHeader();
-            BuildHungerBar();
-            BuildButtonRow();
+            BuildCompactActionMenu();
             ApplyPresetToBuiltUi();
             HideMenu("BuiltHidden");
             return true;
@@ -454,61 +452,25 @@ namespace Arcontio.View.ArcGraph
             return _uiRoot.TryGetOverlayRoot(out resolvedOverlayRoot);
         }
 
-        private void BuildHeader()
+        private void BuildCompactActionMenu()
         {
-            RectTransform headerRoot = CreateRect("Header", _menuRoot);
-            LayoutElement headerLayout = headerRoot.gameObject.AddComponent<LayoutElement>();
-            headerLayout.preferredHeight = 26f;
-
-            VerticalLayoutGroup headerGroup = headerRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            headerGroup.spacing = 0f;
-            headerGroup.childControlWidth = true;
-            headerGroup.childControlHeight = false;
-            headerGroup.childForceExpandWidth = true;
-            headerGroup.childForceExpandHeight = false;
-
-            _titleText = CreateText(headerRoot, "Selezione", 12, FontStyles.Bold, TextAlignmentOptions.Left);
-            _subtitleText = CreateText(headerRoot, string.Empty, 10, FontStyles.Normal, TextAlignmentOptions.Left);
-        }
-
-        private void BuildHungerBar()
-        {
-            _hungerRoot = CreateRect("HungerBar", _menuRoot);
-            LayoutElement hungerLayout = _hungerRoot.gameObject.AddComponent<LayoutElement>();
-            hungerLayout.preferredHeight = 12f;
-
-            Image background = _hungerRoot.gameObject.AddComponent<Image>();
-            background.raycastTarget = false;
-
-            RectTransform fillRoot = CreateRect("Fill", _hungerRoot);
-            fillRoot.anchorMin = Vector2.zero;
-            fillRoot.anchorMax = new Vector2(0f, 1f);
-            fillRoot.pivot = new Vector2(0f, 0.5f);
-            fillRoot.offsetMin = Vector2.zero;
-            fillRoot.offsetMax = Vector2.zero;
-            _hungerFill = fillRoot.gameObject.AddComponent<Image>();
-            _hungerFill.raycastTarget = false;
-
-            _hungerText = CreateText(_hungerRoot, "Fame n/d", 9, FontStyles.Bold, TextAlignmentOptions.Center);
-            _hungerText.raycastTarget = false;
-        }
-
-        private void BuildButtonRow()
-        {
-            RectTransform row = CreateRect("Actions", _menuRoot);
-            LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
-            rowLayout.preferredHeight = 24f;
-
-            HorizontalLayoutGroup group = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-            group.spacing = 4f;
-            group.childControlWidth = true;
-            group.childControlHeight = true;
-            group.childForceExpandWidth = true;
-            group.childForceExpandHeight = true;
-
-            _editButton = CreateButton(row, "Edit", "M");
-            _deleteButton = CreateButton(row, "Delete", "X");
+            _editButton = CreateButton(_menuRoot, "Edit", "M");
+            ConfigureCompactButton(_editButton);
             _editButton.onClick.AddListener(OnEditClicked);
+
+            RectTransform titleRoot = CreateRect("Title", _menuRoot);
+            LayoutElement titleLayout = titleRoot.gameObject.AddComponent<LayoutElement>();
+            titleLayout.minWidth = 6f;
+            titleLayout.flexibleWidth = 1f;
+
+            _titleText = CreateText(titleRoot, "Sel.", 7, FontStyles.Bold, TextAlignmentOptions.Center);
+            _subtitleText = null;
+            _hungerRoot = null;
+            _hungerFill = null;
+            _hungerText = null;
+
+            _deleteButton = CreateButton(_menuRoot, "Delete", "X");
+            ConfigureCompactButton(_deleteButton);
             _deleteButton.onClick.AddListener(OnDeleteClicked);
         }
 
@@ -658,7 +620,7 @@ namespace Arcontio.View.ArcGraph
             _currentViewModel = viewModel;
 
             if (_titleText != null)
-                _titleText.text = viewModel.Title;
+                _titleText.text = CreateCompactTitle(viewModel);
 
             if (_subtitleText != null)
                 _subtitleText.text = viewModel.Subtitle;
@@ -809,8 +771,44 @@ namespace Arcontio.View.ArcGraph
             button.targetGraphic = image;
             button.transition = Selectable.Transition.ColorTint;
 
-            CreateText(rect, label, 11, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(rect, label, 8, FontStyles.Bold, TextAlignmentOptions.Center);
             return button;
+        }
+
+        private static void ConfigureCompactButton(Button button)
+        {
+            if (button == null)
+                return;
+
+            var rect = button.transform as RectTransform;
+            if (rect == null)
+                return;
+
+            LayoutElement layout = rect.gameObject.GetComponent<LayoutElement>();
+            if (layout == null)
+                layout = rect.gameObject.AddComponent<LayoutElement>();
+
+            layout.minWidth = 16f;
+            layout.preferredWidth = 16f;
+            layout.minHeight = 16f;
+            layout.preferredHeight = 16f;
+            layout.flexibleWidth = 0f;
+            layout.flexibleHeight = 0f;
+        }
+
+        private static string CreateCompactTitle(ArcGraphSelectionActionMenuViewModel viewModel)
+        {
+            string title = string.IsNullOrWhiteSpace(viewModel.Title)
+                ? "Sel."
+                : viewModel.Title.Trim();
+
+            if (title.StartsWith("NPC ", StringComparison.OrdinalIgnoreCase))
+                return "N";
+
+            if (title.StartsWith("Muro", StringComparison.OrdinalIgnoreCase))
+                return "W";
+
+            return "O";
         }
 
         private static TextMeshProUGUI CreateText(
