@@ -119,7 +119,13 @@ namespace Arcontio.View.ArcGraph
             }
             else
             {
-                _renderQueue.Clear();
+                // Non puliamo la queue quando il frame e' valido ma il chiamante
+                // decide di non ricostruirla in questo passaggio. Nel runtime scena
+                // actor/oggetti vengono refreshati a intervalli per evitare lavoro
+                // inutile ogni frame; se qui svuotassimo il buffer, input, hover e
+                // selection leggerebbero una queue vuota tra un refresh e il
+                // successivo pur vedendo ancora sprite materializzati in scena.
+                // La pulizia resta confinata ai gate invalidi sopra e a Dispose().
             }
 
             string reason = ResolveSuccessReason(frame, refreshed, builtQueue);
