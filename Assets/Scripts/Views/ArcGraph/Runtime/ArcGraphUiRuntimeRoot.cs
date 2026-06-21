@@ -57,6 +57,7 @@ namespace Arcontio.View.ArcGraph
         private GameObject _canvasRoot;
         private GameObject _uiRoot;
         private RectTransform _mapViewport;
+        private RectTransform _overlayRoot;
         private readonly Vector3[] _mapViewportCorners = new Vector3[4];
         private Button _fovViewModeButton;
 
@@ -165,6 +166,28 @@ namespace Arcontio.View.ArcGraph
 
             if (action != null)
                 _fovViewModeButton.onClick.AddListener(action);
+        }
+
+        // =============================================================================
+        // TryGetOverlayRoot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il root UGUI dedicato agli overlay runtime ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: overlay UI senza accesso alla simulazione</b></para>
+        /// <para>
+        /// I consumer visuali, come menu contestuali, tooltip e highlight UI, devono
+        /// potersi ancorare a una radice comune senza conoscere la gerarchia interna
+        /// della shell. Il metodo espone solo un <c>RectTransform</c> view-side:
+        /// non trasporta dati world, non crea comandi e non autorizza mutazioni.
+        /// </para>
+        /// </summary>
+        public bool TryGetOverlayRoot(out RectTransform overlayRoot)
+        {
+            overlayRoot = _overlayRoot;
+            return overlayRoot != null;
         }
 
         // =============================================================================
@@ -504,8 +527,8 @@ namespace Arcontio.View.ArcGraph
 
         private void BuildOverlayRoots()
         {
-            RectTransform overlayRoot = CreateRect("OverlayRoot", _uiRoot.transform);
-            StretchFull(overlayRoot);
+            _overlayRoot = CreateRect("OverlayRoot", _uiRoot.transform);
+            StretchFull(_overlayRoot);
 
             RectTransform debugRoot = CreateRect("DebugRoot", _uiRoot.transform);
             StretchFull(debugRoot);
