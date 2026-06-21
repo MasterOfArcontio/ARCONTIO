@@ -60,7 +60,7 @@ namespace Arcontio.View.ArcGraph
             return new ArcGraphSelectionActionMenuPreset
             {
                 Width = 46f,
-                Height = 14f,
+                Height = 11f,
                 WorldOffsetY = 1.45f,
                 PanelAlpha = 0.86f,
                 PanelColor = ColorFromHex("#101922", 0.84f),
@@ -87,7 +87,7 @@ namespace Arcontio.View.ArcGraph
         {
             ArcGraphSelectionActionMenuPreset normalized = this;
             normalized.Width = Width > 20f ? Width : 46f;
-            normalized.Height = Height > 10f ? Height : 14f;
+            normalized.Height = Height > 8f ? Height : 11f;
             normalized.WorldOffsetY = Mathf.Abs(WorldOffsetY) > 0.001f ? WorldOffsetY : 1.45f;
             normalized.PanelAlpha = Mathf.Clamp01(PanelAlpha <= 0f ? 0.86f : PanelAlpha);
             return normalized;
@@ -771,7 +771,7 @@ namespace Arcontio.View.ArcGraph
             button.targetGraphic = image;
             button.transition = Selectable.Transition.ColorTint;
 
-            CreateText(rect, label, 7, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(rect, label, 6, FontStyles.Bold, TextAlignmentOptions.Center);
             return button;
         }
 
@@ -788,10 +788,10 @@ namespace Arcontio.View.ArcGraph
             if (layout == null)
                 layout = rect.gameObject.AddComponent<LayoutElement>();
 
-            layout.minWidth = 12f;
-            layout.preferredWidth = 12f;
-            layout.minHeight = 12f;
-            layout.preferredHeight = 12f;
+            layout.minWidth = 9f;
+            layout.preferredWidth = 9f;
+            layout.minHeight = 9f;
+            layout.preferredHeight = 9f;
             layout.flexibleWidth = 0f;
             layout.flexibleHeight = 0f;
         }

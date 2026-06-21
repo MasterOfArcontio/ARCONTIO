@@ -58,7 +58,12 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float actorZOffset = -0.02f;
         [SerializeField] private float actorScale = 1f;
-        [SerializeField] private Vector3 layeredActorSpriteLocalOffset = new Vector3(0f, -0.25f, 0f);
+        // Gli sprite NPC modulari sono 32x48 px con PPU 32 e pivot centrale: alti
+        // 1.5 celle. Il root actor resta al centro della cella logica (x+0.5,y+0.5);
+        // questo offset alza solo le parti visuali di 0.25 celle, cosi' la base
+        // dello sprite appoggia sulla cella logica invece di scendere nella riga
+        // precedente. Non modifica GridPos, pathfinding o selezione simulativa.
+        [SerializeField] private Vector3 layeredActorSpriteLocalOffset = new Vector3(0f, 0.25f, 0f);
         [SerializeField] private string runtimeRootName = "ArcGraphNpcRuntimeRoot";
 
         private readonly Dictionary<int, ActorHandle> _actorPool = new();
