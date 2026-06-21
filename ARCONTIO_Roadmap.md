@@ -16692,8 +16692,8 @@ Roadmap operativa:
 
 | Versione | Nome | Stato |
 |---|---|---|
-| v0.70.01 | Foundation dati UI | 🔄 Primo branch operativo |
-| v0.70.02 | Operation catalog minimo | ⏳ Pending |
+| v0.70.01 | Foundation dati UI | Fatto su branch `ai-task/v0.70.01-arcgraph-ui-foundation-data` |
+| v0.70.02 | Operation catalog minimo e gerarchia ActionPanel | Fatto su branch `ai-task/v0.70.02-arcgraph-ui-operation-catalog` |
 | v0.70.03 | Ponte placement | ⏳ Pending |
 | v0.70.04 | Selezione e hover | ⏳ Pending |
 | v0.70.05 | Inspector ViewModel/tab | ⏳ Pending |
@@ -16815,13 +16815,37 @@ Criteri di accettazione:
 
 ---
 
-### v0.70.02 - Operation catalog minimo
+### v0.70.02 - Operation catalog minimo e gerarchia ActionPanel
 
 Obiettivo:
 
 ```text
 definire il primo catalogo operazioni UI senza collegarlo ancora a tutte le azioni runtime
 ```
+
+Decisione layout ActionPanel:
+
+```text
+BottomActionBar action button
+-> macrogruppo sinistro del pannello
+-> icona operazione concreta a destra
+```
+
+Esempio:
+
+```text
+Costruisci
+-> Strutture
+-> Muro di pietra / Porta di legno / Finestra
+```
+
+Principio:
+
+- i pulsanti della bottom bar non sono comandi diretti;
+- il macrogruppo sinistro filtra le operation;
+- le icone operative devono rappresentare varianti concrete, non famiglie astratte;
+- una operation come `place_bed_wood` e' distinta da un eventuale futuro `place_bed_metal`;
+- `object_defs.json` resta catalogo oggetti, mentre il catalogo UI descrive cosa la UI puo' proporre.
 
 Operazioni minime:
 
@@ -16832,6 +16856,38 @@ Operazioni minime:
 | `place_bed_wood` | Inserisci / Oggetto | Object | Da object catalog |
 | `place_food_stock` | Inserisci / Oggetto | Object | Da object catalog |
 | `spawn_npc_human` | NPC | Npc | Richiede configurazione futura |
+| `edit_selected_npc` | NPC / Selezione | Npc | Apre configurazione parametri quando il target lo consente |
+| `delete_selected_npc` | NPC / Selezione | Npc | Richiesta eliminazione su target selezionato |
+| `edit_selected_object` | Oggetti / Selezione | Object | Attiva solo per oggetti con parametri modificabili |
+| `delete_selected_object` | Oggetti / Selezione | Object | Richiesta eliminazione su target selezionato |
+| `edit_selected_wall` | Costruisci / Strutture | Wall | Modifica futura di parametri o sostituzione controllata |
+| `delete_selected_wall` | Costruisci / Strutture | Wall | Richiesta eliminazione su target selezionato |
+
+Tipi di operation previsti:
+
+| Tipo | Uso |
+|---|---|
+| `Insert` | inserire muro, porta, oggetto, NPC |
+| `Edit` | modificare target gia' selezionato tramite pannello autorizzato |
+| `Delete` | eliminare target gia' selezionato |
+| `SetState` | scegliere uno stato discreto, ad esempio velocita' 2x/3x/4x nello step Simulation Control |
+| `ToggleView` | accendere/spegnere visualizzazioni, ad esempio landmark o linee di vista |
+| `ToolMode` | cambiare modo strumento, ad esempio single/brush |
+
+Decisione su single/brush:
+
+- `single` e `brush` non devono generare due operation diverse;
+- sono una modalita' dello strumento di placement;
+- la stessa operation, ad esempio `build_wall_stone`, puo' essere usata con click singolo o brush se `SupportsBrush` lo consente;
+- il bridge placement dovra' bloccare brush per operation che non lo supportano.
+
+Decisione su configurazione e modificabilita':
+
+- alcune operation richiedono una pagina di conferma/configurazione nel RightInspector o in un pannello configurazione dedicato;
+- NPC: la configurazione iniziale e la modifica futura possono includere parametri DNA e altri valori autorizzati;
+- food stock: puo' richiedere un parametro quantita', ad esempio 1-10;
+- altri oggetti, come una sedia semplice, possono non essere modificabili;
+- la presenza della operation `Edit` non significa che ogni istanza sia modificabile: la disponibilita' reale verra' decisa da ViewModel/controller autorizzati.
 
 Attivita':
 
@@ -16840,6 +16896,9 @@ Attivita':
 - mantenere `object_defs.json` come catalogo oggetti, non come catalogo azioni UI;
 - aggiungere validazioni leggere su chiavi duplicate;
 - esporre elenco filtrabile per categoria/subcategoria.
+- introdurre il vocabolario `ActionKey`, `GroupKey`, `OperationKey`;
+- introdurre flag `DebugOnly` su action, gruppi e operation;
+- predisporre, senza collegarla, la distinzione tra inserimento, modifica, eliminazione, stato, visualizzazione e modo strumento.
 
 Criteri di accettazione:
 
@@ -16847,6 +16906,8 @@ Criteri di accettazione:
 - nessuna operation modifica il mondo;
 - il catalogo puo' alimentare una futura griglia UI;
 - debug-only e runtime-enabled sono distinguibili.
+- il catalogo non legge cataloghi Core e non conosce `World`;
+- i dati possono rappresentare varianti concrete come muro di pietra, porta di legno, letto di legno.
 
 ---
 
@@ -16873,6 +16934,9 @@ Attivita':
 
 - collegare muri, porte e oggetti al placement controller;
 - mantenere preview cella esistente;
+- gestire modalita' `single` e `brush` come stato strumento;
+- impedire brush quando la operation selezionata non lo supporta;
+- aprire o preparare il pannello configurazione prima del click finale quando `RequiresConfiguration` e' attivo;
 - non introdurre accesso diretto a `World` dalla UI;
 - usare temporaneamente `DevPlaceObjectCommand` solo come bridge dichiarato;
 - isolare la conversione in un punto solo.
@@ -16907,8 +16971,12 @@ Target previsti:
 Attivita':
 
 - mappare il risultato di hit test ArcGraph in `ArcSelectionTarget`;
+- mantenere un hover cella sempre disponibile sotto il puntatore;
+- disegnare highlight cella con una illuminazione visiva leggera, ad esempio brightening circa 20%;
 - introdurre stato selezione singola;
 - separare hover da selezione confermata;
+- predisporre una hover label sopra NPC/oggetto/muro selezionabile con informazioni sintetiche;
+- predisporre azioni rapide edit/delete nella hover label, ma sempre tramite controller autorizzati;
 - non far leggere l'inspector direttamente al mondo;
 - mantenere compatibilita' temporanea con `NPCSelection`.
 
@@ -16937,6 +17005,15 @@ Tab iniziali:
 | Object | Info, Stato, Uso, Storage, Debug |
 | Wall | Info, Materiale, Connessioni, Stato, Debug |
 | Cell | Info superficie, Coordinate, Occupazione, Debug FOV/percezione |
+
+Configurazione e modifica parametri:
+
+- il RightInspector deve poter mostrare pagine di conferma/configurazione per operation di inserimento e modifica;
+- NPC: campi autorizzati per DNA e altri valori esposti da snapshot/ViewModel, non scrittura diretta su NPC runtime;
+- oggetti: solo alcuni oggetti avranno campi modificabili, ad esempio quantita' food stock;
+- muri e porte: eventuali modifiche devono passare da varianti o parametri autorizzati, non da sostituzioni dirette del World;
+- un target non modificabile deve esporre chiaramente `canEdit = false` nel ViewModel futuro;
+- le azioni rapide della hover label possono aprire edit/delete, ma non devono eseguire mutazioni dirette.
 
 Attivita':
 

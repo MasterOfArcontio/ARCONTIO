@@ -74,6 +74,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>_pending</b>: richiesta placement in preparazione.</item>
     ///   <item><b>Begin</b>: inizia una richiesta senza cella.</item>
+    ///   <item><b>SetMode</b>: cambia tra placement singolo e brush.</item>
     ///   <item><b>SetTargetCell</b>: aggiunge la cella scelta.</item>
     ///   <item><b>Cancel</b>: annulla lo stato locale.</item>
     /// </list>
@@ -94,9 +95,58 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void Begin(ArcUiOperationDefinition operation, string targetDefId)
         {
+            Begin(operation, targetDefId, ArcUiPlacementMode.Single);
+        }
+
+        // =============================================================================
+        // Begin
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inizia una intenzione di placement indicando anche la modalita' strumento.
+        /// </para>
+        ///
+        /// <para><b>Separazione tra catalogo e gesto utente</b></para>
+        /// <para>
+        /// La operation descrive cosa piazzare. La modalita' descrive come l'utente
+        /// vuole raccogliere le celle, quindi puo' cambiare senza creare una seconda
+        /// operation key.
+        /// </para>
+        /// </summary>
+        public void Begin(
+            ArcUiOperationDefinition operation,
+            string targetDefId,
+            ArcUiPlacementMode mode)
+        {
             _pending = operation.IsValid
-                ? ArcUiPlacementRequest.WithoutCell(operation.OperationKey, targetDefId)
+                ? ArcUiPlacementRequest.WithoutCell(
+                    operation.OperationKey,
+                    string.IsNullOrWhiteSpace(targetDefId) ? operation.TargetDefId : targetDefId,
+                    mode)
                 : default;
+        }
+
+        // =============================================================================
+        // SetMode
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna la modalita' della richiesta placement corrente.
+        /// </para>
+        /// </summary>
+        public void SetMode(ArcUiPlacementMode mode)
+        {
+            if (!_pending.IsValid)
+            {
+                return;
+            }
+
+            _pending = new ArcUiPlacementRequest(
+                _pending.OperationKey,
+                _pending.TargetCell,
+                _pending.TargetDefId,
+                mode == ArcUiPlacementMode.None ? ArcUiPlacementMode.Single : mode,
+                _pending.HasTargetCell);
         }
 
         // =============================================================================
@@ -118,6 +168,7 @@ namespace Arcontio.View.ArcGraph
                 _pending.OperationKey,
                 cell,
                 _pending.TargetDefId,
+                _pending.Mode,
                 true);
         }
 
