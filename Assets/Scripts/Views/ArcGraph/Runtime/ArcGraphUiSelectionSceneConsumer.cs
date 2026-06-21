@@ -131,9 +131,24 @@ namespace Arcontio.View.ArcGraph
                 -1,
                 ArcUiSelectionTarget.None("arcgraph_ui_selection"),
                 "NotInitialized");
+        private ArcGraphUiSelectionSceneConsumerDiagnostics _lastClickDiagnostics =
+            new ArcGraphUiSelectionSceneConsumerDiagnostics(
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                new ArcGraphCellCoord(0, 0, 0),
+                ArcGraphInteractionTargetKind.None,
+                -1,
+                -1,
+                ArcUiSelectionTarget.None("arcgraph_ui_selection"),
+                "NoClickCaptured");
 
         public ArcUiSelectionTarget CurrentSelection => _selectionController.Current;
         public ArcGraphUiSelectionSceneConsumerDiagnostics LastDiagnostics => _lastDiagnostics;
+        public ArcGraphUiSelectionSceneConsumerDiagnostics LastClickDiagnostics => _lastClickDiagnostics;
         public bool SelectionEnabled => selectionEnabled;
 
         // =============================================================================
@@ -261,7 +276,12 @@ namespace Arcontio.View.ArcGraph
                 ", cell=" + _lastDiagnostics.Cell +
                 ", selected=" + _lastDiagnostics.DidSelectTarget +
                 ", targetKind=" + _lastDiagnostics.SelectedTarget.Kind +
-                ", targetId=" + _lastDiagnostics.SelectedTarget.Id);
+                ", targetId=" + _lastDiagnostics.SelectedTarget.Id +
+                ", lastClickReason=" + _lastClickDiagnostics.Reason +
+                ", lastClickFrameTarget=" + _lastClickDiagnostics.FrameTargetKind +
+                ", lastClickActorId=" + _lastClickDiagnostics.FrameActorId +
+                ", lastClickObjectId=" + _lastClickDiagnostics.FrameObjectId +
+                ", lastClickSelected=" + _lastClickDiagnostics.DidSelectTarget);
         }
 
         // =============================================================================
@@ -499,7 +519,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphCellCoord cell,
             string reason)
         {
-            _lastDiagnostics = new ArcGraphUiSelectionSceneConsumerDiagnostics(
+            var nextDiagnostics = new ArcGraphUiSelectionSceneConsumerDiagnostics(
                 true,
                 selectionEnabled,
                 interactionFrame.Input.IsPrimaryPointerPressedThisFrame,
@@ -512,6 +532,10 @@ namespace Arcontio.View.ArcGraph
                 interactionFrame.ObjectId,
                 _selectionController.Current,
                 reason);
+            _lastDiagnostics = nextDiagnostics;
+
+            if (nextDiagnostics.WasPrimaryClick)
+                _lastClickDiagnostics = nextDiagnostics;
         }
 
         private void LogSelectionIfEnabled(

@@ -444,6 +444,10 @@ namespace Arcontio.View.ArcGraph
                 _selectionConsumer != null
                     ? _selectionConsumer.LastDiagnostics
                     : default;
+            ArcGraphUiSelectionSceneConsumerDiagnostics clickDiagnostics =
+                _selectionConsumer != null
+                    ? _selectionConsumer.LastClickDiagnostics
+                    : default;
 
             Debug.Log(
                 "[ArcGraphSelectionActionMenuSceneView] visibleReason=" +
@@ -481,7 +485,21 @@ namespace Arcontio.View.ArcGraph
                 ", selectionCell=" +
                 selectionDiagnostics.Cell +
                 ", selectionDidSelect=" +
-                selectionDiagnostics.DidSelectTarget);
+                selectionDiagnostics.DidSelectTarget +
+                ", lastClickReason=" +
+                clickDiagnostics.Reason +
+                ", lastClickFrameTarget=" +
+                clickDiagnostics.FrameTargetKind +
+                ", lastClickActorId=" +
+                clickDiagnostics.FrameActorId +
+                ", lastClickObjectId=" +
+                clickDiagnostics.FrameObjectId +
+                ", lastClickFrameCell=" +
+                clickDiagnostics.HasFrameCell +
+                ", lastClickCell=" +
+                clickDiagnostics.Cell +
+                ", lastClickDidSelect=" +
+                clickDiagnostics.DidSelectTarget);
         }
 
         private bool EnsureBuilt()
