@@ -33,7 +33,7 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphPointerDebugPanelSceneConsumer : MonoBehaviour, IArcGraphInteractionFrameConsumer
     {
         [SerializeField] private bool panelEnabled = true;
-        [SerializeField] private Vector2 panelSize = new Vector2(520f, 142f);
+        [SerializeField] private Vector2 panelSize = new Vector2(760f, 190f);
         [SerializeField] private Vector2 panelOffset = new Vector2(12f, -56f);
 
         private ArcGraphUiRuntimeRoot _uiRoot;
@@ -44,6 +44,8 @@ namespace Arcontio.View.ArcGraph
         private TextMeshProUGUI _clickCellText;
         private TextMeshProUGUI _npcText;
         private TextMeshProUGUI _objectText;
+        private TextMeshProUGUI _actorItemsText;
+        private TextMeshProUGUI _objectItemsText;
         private ArcGraphCellCoord _lastClickCell;
         private bool _hasLastClickCell;
 
@@ -119,8 +121,16 @@ namespace Arcontio.View.ArcGraph
             BuildPanelIfPossible();
             ApplyPanelVisibility();
 
-            if (_viewportText == null || _cellText == null)
+            if (_viewportText == null ||
+                _cellText == null ||
+                _clickCellText == null ||
+                _npcText == null ||
+                _objectText == null ||
+                _actorItemsText == null ||
+                _objectItemsText == null)
+            {
                 return;
+            }
 
             if (interactionFrame.Input.IsPrimaryPointerPressedThisFrame &&
                 interactionFrame.HasValidCell)
@@ -134,6 +144,8 @@ namespace Arcontio.View.ArcGraph
             _clickCellText.text = FormatClickCellLine(_hasLastClickCell, _lastClickCell);
             _npcText.text = FormatNpcLine(interactionFrame, _renderQueue);
             _objectText.text = FormatObjectLine(interactionFrame, _renderQueue);
+            _actorItemsText.text = FormatActorItemsLine(_renderQueue);
+            _objectItemsText.text = FormatObjectItemsLine(_renderQueue);
         }
 
         private void BuildPanelIfPossible()
@@ -169,6 +181,8 @@ namespace Arcontio.View.ArcGraph
             _clickCellText = CreateLine("ClickCellLine", _panel, "Click: colonna -- | riga --");
             _npcText = CreateLine("NpcLine", _panel, "NPC cella: NULL");
             _objectText = CreateLine("ObjectLine", _panel, "Oggetto cella: NULL");
+            _actorItemsText = CreateLine("ActorItemsLine", _panel, "ActorItems: --");
+            _objectItemsText = CreateLine("ObjectItemsLine", _panel, "ObjectItems: --");
         }
 
         private void ApplyPanelVisibility()
@@ -266,6 +280,117 @@ namespace Arcontio.View.ArcGraph
                    "," +
                    obj.Cell.Z +
                    ")";
+        }
+
+        // =============================================================================
+        // FormatActorItemsLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce una riga diagnostica compatta con il contenuto grezzo della lista
+        /// <c>ActorItems</c> letta dalla render queue.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ispezione del buffer, non query World</b></para>
+        /// <para>
+        /// Questa riga serve a capire se il problema si trova prima o dopo la
+        /// costruzione della queue. Mostra solo id, cella e visibilita' dei primi
+        /// item disponibili, senza creare indici, senza allocare strutture runtime
+        /// permanenti e senza interrogare il mondo simulativo.
+        /// </para>
+        /// </summary>
+        private static string FormatActorItemsLine(ArcGraphRenderQueue renderQueue)
+        {
+            if (renderQueue == null)
+                return "ActorItems: queue NULL";
+
+            if (renderQueue.ActorItems == null)
+                return "ActorItems: lista NULL";
+
+            int count = renderQueue.ActorItems.Count;
+            if (count <= 0)
+                return "ActorItems: count=0";
+
+            string line = "ActorItems: count=" + count + " | ";
+            int limit = Mathf.Min(count, 4);
+            for (int i = 0; i < limit; i++)
+            {
+                ArcGraphActorRenderItem item = renderQueue.ActorItems[i];
+                if (i > 0)
+                    line += " ; ";
+
+                line += "#" +
+                        item.ActorId +
+                        "@(" +
+                        item.DiscreteCell.X +
+                        "," +
+                        item.DiscreteCell.Y +
+                        "," +
+                        item.DiscreteCell.Z +
+                        ") vis=" +
+                        item.IsVisible;
+            }
+
+            if (count > limit)
+                line += " ; ...";
+
+            return line;
+        }
+
+        // =============================================================================
+        // FormatObjectItemsLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce una riga diagnostica compatta con il contenuto grezzo della lista
+        /// <c>ObjectItems</c> letta dalla render queue.
+        /// </para>
+        /// </summary>
+        private static string FormatObjectItemsLine(ArcGraphRenderQueue renderQueue)
+        {
+            if (renderQueue == null)
+                return "ObjectItems: queue NULL";
+
+            if (renderQueue.ObjectItems == null)
+                return "ObjectItems: lista NULL";
+
+            int count = renderQueue.ObjectItems.Count;
+            if (count <= 0)
+                return "ObjectItems: count=0";
+
+            string line = "ObjectItems: count=" + count + " | ";
+            int limit = Mathf.Min(count, 4);
+            for (int i = 0; i < limit; i++)
+            {
+                ArcGraphObjectRenderItem item = renderQueue.ObjectItems[i];
+                string defId = string.IsNullOrWhiteSpace(item.DefId) ? "unknown" : item.DefId.Trim();
+                if (i > 0)
+                    line += " ; ";
+
+                line += "#" +
+                        item.ObjectId +
+                        ":" +
+                        defId +
+                        "@(" +
+                        item.Cell.X +
+                        "," +
+                        item.Cell.Y +
+                        "," +
+                        item.Cell.Z +
+                        ") fp=" +
+                        item.FootprintWidth +
+                        "x" +
+                        item.FootprintHeight +
+                        " vis=" +
+                        item.IsVisible +
+                        " held=" +
+                        item.IsHeld;
+            }
+
+            if (count > limit)
+                line += " ; ...";
+
+            return line;
         }
 
         private static bool TryFindActorInCell(
