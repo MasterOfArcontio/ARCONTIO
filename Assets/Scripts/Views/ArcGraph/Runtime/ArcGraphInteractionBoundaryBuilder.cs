@@ -24,7 +24,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Build</b>: produce frame e diagnostica da input/view/queue.</item>
     ///   <item><b>TryPickActor</b>: cerca actor visibili sulla cella risolta.</item>
-    ///   <item><b>TryPickObject</b>: cerca oggetti visibili sulla cella risolta.</item>
+    ///   <item><b>TryPickObject</b>: cerca oggetti visibili sulla cella risolta usando il footprint.</item>
     ///   <item><b>CreateFrame</b>: normalizza priorita' e reason finale.</item>
     /// </list>
     /// </summary>
@@ -223,7 +223,7 @@ namespace Arcontio.View.ArcGraph
             for (int i = 0; i < objects.Count; i++)
             {
                 ArcGraphObjectRenderItem item = objects[i];
-                if (!item.IsVisible || !IsSameCell(item.Cell, cell))
+                if (!item.IsVisible || item.IsHeld || !IsObjectHitCell(item, cell))
                     continue;
 
                 candidateCount++;
@@ -238,9 +238,38 @@ namespace Arcontio.View.ArcGraph
             return new PickResult(selectedObjectId, candidateCount);
         }
 
-        private static bool IsSameCell(ArcGraphCellCoord left, ArcGraphCellCoord right)
+        // =============================================================================
+        // IsObjectHitCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se la cella puntata ricade dentro il footprint visuale/logico
+        /// dell'oggetto ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: picking centralizzato nel boundary</b></para>
+        /// <para>
+        /// Muri, porte e oggetti estesi possono occupare piu' di una cella. Il
+        /// boundary deve quindi usare il footprint gia' preparato nella render
+        /// queue, invece di confrontare solo la cella origine. Questo mantiene la
+        /// selezione UI come consumer passivo e impedisce la ricomparsa di un
+        /// secondo hit test nei pannelli.
+        /// </para>
+        /// </summary>
+        private static bool IsObjectHitCell(
+            ArcGraphObjectRenderItem item,
+            ArcGraphCellCoord pointerCell)
         {
-            return left.X == right.X && left.Y == right.Y && left.Z == right.Z;
+            if (item.Cell.Z != pointerCell.Z)
+                return false;
+
+            int width = item.FootprintWidth <= 0 ? 1 : item.FootprintWidth;
+            int height = item.FootprintHeight <= 0 ? 1 : item.FootprintHeight;
+
+            return pointerCell.X >= item.Cell.X &&
+                   pointerCell.X < item.Cell.X + width &&
+                   pointerCell.Y >= item.Cell.Y &&
+                   pointerCell.Y < item.Cell.Y + height;
         }
 
         // =============================================================================
