@@ -399,12 +399,18 @@ namespace Arcontio.View.ArcGraph
             IArcGraphInteractionFrameConsumer consumer = ResolveConsumer();
 
             ArcGraphViewInputFrame input = BuildInputFrame(mouse, viewportOriginPixels);
+            bool hasSceneResolvedCell = TryResolveSceneCameraCell(
+                config,
+                input,
+                out ArcGraphCellCoord sceneResolvedCell);
             var sceneFrame = new ArcGraphInteractionSceneFrame(
                 input,
                 viewportWidth,
                 viewportHeight,
                 dispatchToConsumer,
-                _sourceFrameIndex++);
+                _sourceFrameIndex++,
+                hasSceneResolvedCell,
+                sceneResolvedCell);
 
             ArcGraphInteractionSceneAdapterDiagnostics contractDiagnostics =
                 _contract.ProcessFrame(
@@ -622,6 +628,91 @@ namespace Arcontio.View.ArcGraph
                 true,
                 isPointerOverUi,
                 mouse.leftButton.wasPressedThisFrame);
+        }
+
+        // =============================================================================
+        // TryResolveSceneCameraCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte il puntatore del frame nella cella realmente osservata dalla
+        /// camera Unity corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: coordinate runtime unificate</b></para>
+        /// <para>
+        /// Il controller camera ArcGraph applica pan e zoom direttamente alla camera
+        /// ortografica. Per questo il picking produttivo deve usare la stessa camera
+        /// che disegna la mappa, invece di ricostruire una finestra logica parallela.
+        /// Il wrapper resta il solo punto autorizzato a leggere la camera; al
+        /// contratto passivo viene consegnata solo una cella value-type.
+        /// </para>
+        /// </summary>
+        private bool TryResolveSceneCameraCell(
+            ArcGraphMapViewConfig config,
+            ArcGraphViewInputFrame input,
+            out ArcGraphCellCoord cell)
+        {
+            cell = new ArcGraphCellCoord(0, 0, 0);
+
+            if (!input.HasPointerScreenPosition || input.IsPointerOverUi)
+                return false;
+
+            Camera camera = ResolveSceneCamera();
+            if (camera == null)
+                return false;
+
+            Rect pixelRect = camera.pixelRect;
+            if (pixelRect.width <= 0f || pixelRect.height <= 0f)
+                return false;
+
+            Vector2 absoluteScreenPoint = new Vector2(
+                input.PointerScreenX + pixelRect.x,
+                input.PointerScreenY + pixelRect.y);
+
+            if (!pixelRect.Contains(absoluteScreenPoint))
+                return false;
+
+            float worldPlaneDistance = ResolveWorldPlaneDistance(camera);
+            Vector3 worldPoint = camera.ScreenToWorldPoint(new Vector3(
+                absoluteScreenPoint.x,
+                absoluteScreenPoint.y,
+                worldPlaneDistance));
+
+            int cellX = Mathf.FloorToInt(worldPoint.x);
+            int cellY = Mathf.FloorToInt(worldPoint.y);
+            int cellZ = ArcGraphZLevelPolicy.CurrentRuntimeZLevel;
+
+            ArcGraphMapViewConfig safeConfig = config ?? ArcGraphMapViewConfig.CreateDefaultV033();
+            if (cellX < 0 ||
+                cellY < 0 ||
+                cellX >= safeConfig.MapWidthCells ||
+                cellY >= safeConfig.MapHeightCells)
+            {
+                return false;
+            }
+
+            cell = new ArcGraphCellCoord(cellX, cellY, cellZ);
+            return true;
+        }
+
+        // =============================================================================
+        // ResolveWorldPlaneDistance
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola la distanza dal piano world-space usato da ArcGraph.
+        /// </para>
+        /// </summary>
+        private static float ResolveWorldPlaneDistance(Camera camera)
+        {
+            if (camera == null)
+                return 0f;
+
+            float distance = 0f - camera.transform.position.z;
+            return Mathf.Abs(distance) > 0.001f
+                ? Mathf.Abs(distance)
+                : Mathf.Max(0.001f, camera.nearClipPlane);
         }
 
         private static int ResolveWheelStep(float scrollY)

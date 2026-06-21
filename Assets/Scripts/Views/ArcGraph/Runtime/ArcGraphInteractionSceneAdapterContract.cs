@@ -140,16 +140,27 @@ namespace Arcontio.View.ArcGraph
                 sceneFrame.ViewportPixelWidth,
                 sceneFrame.ViewportPixelHeight);
 
-            // Dopo aver aggiornato la vista, il boundary usa lo stato finale per
-            // risolvere la cella e i target visuali sotto il puntatore.
-            LastInteractionFrame = _boundaryBuilder.Build(
-                config,
-                viewState,
-                sceneFrame.Input,
-                sceneFrame.ViewportPixelWidth,
-                sceneFrame.ViewportPixelHeight,
-                actorItems,
-                objectItems);
+            // Dopo aver aggiornato la vista, il boundary usa la cella scene-side se
+            // il wrapper l'ha gia' risolta dalla camera reale. Questo mantiene
+            // allineati hover cella, selection e picking dopo pan/zoom fisico.
+            LastInteractionFrame = sceneFrame.HasSceneResolvedCell
+                ? _boundaryBuilder.BuildFromResolvedCell(
+                    config,
+                    viewState,
+                    sceneFrame.Input,
+                    sceneFrame.ViewportPixelWidth,
+                    sceneFrame.ViewportPixelHeight,
+                    actorItems,
+                    objectItems,
+                    sceneFrame.SceneResolvedCell)
+                : _boundaryBuilder.Build(
+                    config,
+                    viewState,
+                    sceneFrame.Input,
+                    sceneFrame.ViewportPixelWidth,
+                    sceneFrame.ViewportPixelHeight,
+                    actorItems,
+                    objectItems);
 
             bool shouldDispatch = sceneFrame.ShouldDispatchToConsumer && consumer != null;
             LastDiagnostics = CreateDiagnostics(

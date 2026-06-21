@@ -111,6 +111,77 @@ namespace Arcontio.View.ArcGraph
             if (!coordinate.IsValid)
                 return StoreAndReturn(CreateInvalidCoordinateFrame(input, coordinate));
 
+            return BuildFromCoordinate(
+                input,
+                coordinate,
+                actorItems,
+                objectItems);
+        }
+
+        // =============================================================================
+        // BuildFromResolvedCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un frame interazione usando una cella gia' risolta dal wrapper
+        /// scena.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: runtime camera come sorgente coordinate</b></para>
+        /// <para>
+        /// Il mapper normalizzato resta utile per harness e fallback, ma nel runtime
+        /// ArcGraph la camera puo' essere stata spostata o zoomata fisicamente. In
+        /// quel caso la cella autorevole e' quella ottenuta dal wrapper Unity tramite
+        /// camera reale; il boundary continua comunque a essere il solo punto che
+        /// decide actor/object/cella.
+        /// </para>
+        /// </summary>
+        public ArcGraphInteractionFrame BuildFromResolvedCell(
+            ArcGraphMapViewConfig config,
+            ArcGraphViewState viewState,
+            ArcGraphViewInputFrame input,
+            int viewportPixelWidth,
+            int viewportPixelHeight,
+            IReadOnlyList<ArcGraphActorRenderItem> actorItems,
+            IReadOnlyList<ArcGraphObjectRenderItem> objectItems,
+            ArcGraphCellCoord resolvedCell)
+        {
+            if (input.IsPointerOverUi)
+                return StoreAndReturn(CreateUiBlockedFrame(input));
+
+            if (!input.HasPointerScreenPosition)
+                return StoreAndReturn(ArcGraphInteractionFrame.Empty("PointerMissing"));
+
+            ArcGraphViewCoordinateResult coordinate =
+                ArcGraphViewCoordinateMapper.ResolveCellFromViewportPoint(
+                    config,
+                    viewState,
+                    input.PointerScreenX,
+                    input.PointerScreenY,
+                    viewportPixelWidth,
+                    viewportPixelHeight);
+
+            ArcGraphViewCoordinateResult resolvedCoordinate = new ArcGraphViewCoordinateResult(
+                true,
+                resolvedCell,
+                coordinate.IsValid ? coordinate.NormalizedX : 0f,
+                coordinate.IsValid ? coordinate.NormalizedY : 0f,
+                coordinate.IsValid ? coordinate.VisibleRect : new ArcGraphViewCellRect(0, 0, 0, 0),
+                "SceneCameraCell");
+
+            return BuildFromCoordinate(
+                input,
+                resolvedCoordinate,
+                actorItems,
+                objectItems);
+        }
+
+        private ArcGraphInteractionFrame BuildFromCoordinate(
+            ArcGraphViewInputFrame input,
+            ArcGraphViewCoordinateResult coordinate,
+            IReadOnlyList<ArcGraphActorRenderItem> actorItems,
+            IReadOnlyList<ArcGraphObjectRenderItem> objectItems)
+        {
             PickResult actorPick = TryPickActor(actorItems, coordinate.Cell);
             PickResult objectPick = TryPickObject(objectItems, coordinate.Cell);
 

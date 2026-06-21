@@ -23,6 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Input</b>: input view gia' normalizzato.</item>
     ///   <item><b>ViewportPixelWidth/Height</b>: dimensioni del viewport ArcGraph.</item>
     ///   <item><b>ShouldDispatchToConsumer</b>: autorizza la consegna a consumer esterni.</item>
+    ///   <item><b>SceneResolvedCell</b>: cella gia' risolta dal wrapper Unity quando la camera e' disponibile.</item>
     ///   <item><b>SourceFrameIndex</b>: indice diagnostico opzionale del frame sorgente.</item>
     /// </list>
     /// </summary>
@@ -33,6 +34,8 @@ namespace Arcontio.View.ArcGraph
         public readonly int ViewportPixelHeight;
         public readonly bool ShouldDispatchToConsumer;
         public readonly long SourceFrameIndex;
+        public readonly bool HasSceneResolvedCell;
+        public readonly ArcGraphCellCoord SceneResolvedCell;
 
         public bool HasValidViewport => ViewportPixelWidth > 0 && ViewportPixelHeight > 0;
 
@@ -50,12 +53,49 @@ namespace Arcontio.View.ArcGraph
             int viewportPixelHeight,
             bool shouldDispatchToConsumer,
             long sourceFrameIndex = -1)
+            : this(
+                input,
+                viewportPixelWidth,
+                viewportPixelHeight,
+                shouldDispatchToConsumer,
+                sourceFrameIndex,
+                false,
+                new ArcGraphCellCoord(0, 0, 0))
+        {
+        }
+
+        // =============================================================================
+        // ArcGraphInteractionSceneFrame
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un frame scena con una cella gia' risolta dal wrapper Unity.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: una sola cella autorevole per hover e selection</b></para>
+        /// <para>
+        /// Quando la scena dispone di una camera ortografica reale, il wrapper puo'
+        /// convertire il puntatore in world-space prima di chiamare il contratto
+        /// passivo. Il contratto resta comunque testabile: riceve solo una cella
+        /// value-type, non un riferimento alla camera Unity.
+        /// </para>
+        /// </summary>
+        public ArcGraphInteractionSceneFrame(
+            ArcGraphViewInputFrame input,
+            int viewportPixelWidth,
+            int viewportPixelHeight,
+            bool shouldDispatchToConsumer,
+            long sourceFrameIndex,
+            bool hasSceneResolvedCell,
+            ArcGraphCellCoord sceneResolvedCell)
         {
             Input = input;
             ViewportPixelWidth = viewportPixelWidth;
             ViewportPixelHeight = viewportPixelHeight;
             ShouldDispatchToConsumer = shouldDispatchToConsumer;
             SourceFrameIndex = sourceFrameIndex;
+            HasSceneResolvedCell = hasSceneResolvedCell;
+            SceneResolvedCell = sceneResolvedCell;
         }
 
         // =============================================================================
