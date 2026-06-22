@@ -119,9 +119,9 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Principio architetturale: UI legge dati preparati, non runtime mutabile</b></para>
     /// <para>
-    /// Il ViewModel contiene testo, stato barra fame e operation key diagnostiche
-    /// derivate dal target selezionato e dalla render queue ArcGraph. Non contiene
-    /// riferimenti a NPC, oggetti, componenti Unity world-side o strutture mutabili.
+    /// Il ViewModel contiene testo e stato barra fame derivati dal target
+    /// selezionato e dalla render queue ArcGraph. Non contiene riferimenti a NPC,
+    /// oggetti, componenti Unity world-side o strutture mutabili.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -130,7 +130,6 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Title/Subtitle</b>: testo minimale visualizzato.</item>
     ///   <item><b>HasHungerBar</b>: abilita la barretta fame per NPC.</item>
     ///   <item><b>HungerLevel01</b>: valore normalizzato quando disponibile.</item>
-    ///   <item><b>Edit/DeleteOperationKey</b>: chiavi diagnostiche, non comandi eseguiti.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphSelectionActionMenuViewModel
@@ -142,8 +141,6 @@ namespace Arcontio.View.ArcGraph
         public readonly bool HasHungerBar;
         public readonly bool HasHungerValue;
         public readonly float HungerLevel01;
-        public readonly string EditOperationKey;
-        public readonly string DeleteOperationKey;
 
         // =============================================================================
         // ArcGraphSelectionActionMenuViewModel
@@ -160,9 +157,7 @@ namespace Arcontio.View.ArcGraph
             string subtitle,
             bool hasHungerBar,
             bool hasHungerValue,
-            float hungerLevel01,
-            string editOperationKey,
-            string deleteOperationKey)
+            float hungerLevel01)
         {
             HasTarget = hasTarget;
             Target = target;
@@ -171,12 +166,6 @@ namespace Arcontio.View.ArcGraph
             HasHungerBar = hasHungerBar;
             HasHungerValue = hasHungerValue;
             HungerLevel01 = Mathf.Clamp01(hungerLevel01);
-            EditOperationKey = string.IsNullOrWhiteSpace(editOperationKey)
-                ? string.Empty
-                : editOperationKey.Trim();
-            DeleteOperationKey = string.IsNullOrWhiteSpace(deleteOperationKey)
-                ? string.Empty
-                : deleteOperationKey.Trim();
         }
 
         // =============================================================================
@@ -196,9 +185,7 @@ namespace Arcontio.View.ArcGraph
                 string.Empty,
                 false,
                 false,
-                0f,
-                string.Empty,
-                string.Empty);
+                0f);
         }
     }
 
@@ -216,8 +203,9 @@ namespace Arcontio.View.ArcGraph
     /// la selezione prodotta da <see cref="ArcGraphUiSelectionSceneConsumer"/> e
     /// usa la <see cref="ArcGraphRenderQueue"/> gia' preparata per posizionarsi
     /// sopra l'NPC, l'oggetto o il muro selezionato. I pulsanti Modifica/Elimina
-    /// per ora registrano una richiesta diagnostica: non modificano il mondo, non
-    /// cancellano oggetti e non chiamano controller simulativi.
+    /// sono presenti nella struttura visuale ma non modificano il mondo: il
+    /// collegamento ai controller autorizzati verra' aggiunto nello step
+    /// successivo della roadmap.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -225,7 +213,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>EnsureBuilt</b>: crea il piccolo prefab runtime dentro OverlayRoot.</item>
     ///   <item><b>Update</b>: ricostruisce ViewModel e posizione ogni frame.</item>
     ///   <item><b>TryResolveTargetAnchor</b>: ritrova il target nella render queue corrente.</item>
-    ///   <item><b>OnEditClicked/OnDeleteClicked</b>: registrano operation key diagnostiche.</item>
+    ///   <item><b>OnEditClicked/OnDeleteClicked</b>: punti di aggancio per i futuri controller.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphSelectionActionMenuSceneView : MonoBehaviour
@@ -263,15 +251,8 @@ namespace Arcontio.View.ArcGraph
         private Button _deleteButton;
         private ArcGraphSelectionActionMenuViewModel _currentViewModel =
             ArcGraphSelectionActionMenuViewModel.Hidden();
-        private string _lastRequestedOperationKey = string.Empty;
-        private string _lastVisibilityReason = "NotInitialized";
-        private ArcUiSelectionTarget _lastRequestedTarget =
-            ArcUiSelectionTarget.None("ArcGraphSelectionActionMenuSceneView");
 
         public ArcGraphSelectionActionMenuViewModel CurrentViewModel => _currentViewModel;
-        public string LastRequestedOperationKey => _lastRequestedOperationKey;
-        public string LastVisibilityReason => _lastVisibilityReason;
-        public ArcUiSelectionTarget LastRequestedTarget => _lastRequestedTarget;
 
         // =============================================================================
         // Update
@@ -287,26 +268,26 @@ namespace Arcontio.View.ArcGraph
             // non esiste una selezione valida, il piccolo pannello resta nascosto.
             if (!menuEnabled || _selectionConsumer == null)
             {
-                HideMenu(!menuEnabled ? "MenuDisabled" : "SelectionConsumerMissing");
+                HideMenu();
                 return;
             }
 
             ArcUiSelectionTarget target = _selectionConsumer.CurrentSelection;
             if (!target.IsValid || !EnsureBuilt())
             {
-                HideMenu(!target.IsValid ? "SelectionTargetMissing" : "OverlayRootMissing");
+                HideMenu();
                 return;
             }
 
             if (!TryResolveTargetAnchor(target, out Vector3 anchorWorldPosition, out ArcGraphSelectionActionMenuViewModel viewModel))
             {
-                HideMenu("TargetAnchorMissing");
+                HideMenu();
                 return;
             }
 
             ApplyViewModel(viewModel);
             ApplyScreenPosition(anchorWorldPosition);
-            ShowMenu("Visible");
+            ShowMenu();
         }
 
         // =============================================================================
@@ -375,34 +356,7 @@ namespace Arcontio.View.ArcGraph
             menuEnabled = enabled;
 
             if (!enabled)
-                HideMenu("MenuDisabled");
-        }
-
-        // =============================================================================
-        // BuildHiddenMenuForRuntimeDiagnostics
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce subito il GameObject UGUI del menu e lo lascia nascosto.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: diagnostica visibile senza mutazione</b></para>
-        /// <para>
-        /// Il menu resta guidato dalla selezione e non interroga il mondo. Questo
-        /// metodo serve solo a rendere presente in Hierarchy il nodo
-        /// <c>ArcSelectionActionMenu</c> anche prima di una selezione valida, cosi'
-        /// l'operatore puo' verificare cablaggio, OverlayRoot e diagnostica runtime
-        /// senza aspettare che il picking produca un target.
-        /// </para>
-        /// </summary>
-        public bool BuildHiddenMenuForRuntimeDiagnostics()
-        {
-            bool built = EnsureBuilt();
-
-            if (built)
-                HideMenu("SelectionTargetMissing");
-
-            return built;
+                HideMenu();
         }
 
         // =============================================================================
@@ -453,7 +407,7 @@ namespace Arcontio.View.ArcGraph
 
             BuildCompactActionMenu();
             ApplyPresetToBuiltUi();
-            HideMenu("BuiltHidden");
+            HideMenu();
             return true;
         }
 
@@ -587,8 +541,8 @@ namespace Arcontio.View.ArcGraph
             // La render queue resta la sorgente preferita per seguire target mobili.
             // Se pero' la queue non e' ancora disponibile, o il target non viene
             // ritrovato per un frame, usiamo la cella copiata nel SelectionTarget:
-            // cosi' il menu compare comunque e rende diagnosticabile il problema
-            // senza introdurre accessi diretti al World.
+            // cosi' il menu resta ancorato ai dati gia' copiati senza introdurre
+            // accessi diretti al World.
             if (_renderQueue != null &&
                 target.Kind == ArcUiSelectionTargetKind.Npc &&
                 TryParseTargetId(target, out int actorId) &&
@@ -643,9 +597,7 @@ namespace Arcontio.View.ArcGraph
                 actor.HasHungerValue ? "Fame " + Mathf.RoundToInt(actor.Hunger01 * 100f) + "%" : "Fame n/d",
                 true,
                 actor.HasHungerValue,
-                actor.Hunger01,
-                "edit_selected_npc",
-                "delete_selected_npc");
+                actor.Hunger01);
         }
 
         private ArcGraphSelectionActionMenuViewModel CreateObjectViewModel(
@@ -664,9 +616,7 @@ namespace Arcontio.View.ArcGraph
                 target.Kind == ArcUiSelectionTargetKind.Wall ? "Muro" : "Oggetto",
                 false,
                 false,
-                0f,
-                target.Kind == ArcUiSelectionTargetKind.Wall ? "edit_selected_wall" : "edit_selected_object",
-                target.Kind == ArcUiSelectionTargetKind.Wall ? "delete_selected_wall" : "delete_selected_object");
+                0f);
         }
 
         private ArcGraphSelectionActionMenuViewModel CreateFallbackViewModel(ArcUiSelectionTarget target)
@@ -679,16 +629,7 @@ namespace Arcontio.View.ArcGraph
                     "Fame n/d",
                     true,
                     false,
-                    0f,
-                    "edit_selected_npc",
-                    "delete_selected_npc");
-
-            string editOperationKey = target.Kind == ArcUiSelectionTargetKind.Wall
-                ? "edit_selected_wall"
-                : "edit_selected_object";
-            string deleteOperationKey = target.Kind == ArcUiSelectionTargetKind.Wall
-                ? "delete_selected_wall"
-                : "delete_selected_object";
+                    0f);
 
             return new ArcGraphSelectionActionMenuViewModel(
                 true,
@@ -697,9 +638,7 @@ namespace Arcontio.View.ArcGraph
                 target.Kind == ArcUiSelectionTargetKind.Wall ? "Muro" : "Oggetto",
                 false,
                 false,
-                0f,
-                editOperationKey,
-                deleteOperationKey);
+                0f);
         }
 
         private void ApplyViewModel(ArcGraphSelectionActionMenuViewModel viewModel)
@@ -766,17 +705,14 @@ namespace Arcontio.View.ArcGraph
             _menuRoot.anchoredPosition = localPoint;
         }
 
-        private void ShowMenu(string reason)
+        private void ShowMenu()
         {
-            _lastVisibilityReason = string.IsNullOrWhiteSpace(reason) ? "Visible" : reason;
-
             if (_menuRoot != null && !_menuRoot.gameObject.activeSelf)
                 _menuRoot.gameObject.SetActive(true);
         }
 
-        private void HideMenu(string reason)
+        private void HideMenu()
         {
-            _lastVisibilityReason = string.IsNullOrWhiteSpace(reason) ? "Hidden" : reason;
             _currentViewModel = ArcGraphSelectionActionMenuViewModel.Hidden();
 
             if (_menuRoot != null && _menuRoot.gameObject.activeSelf)
@@ -785,23 +721,10 @@ namespace Arcontio.View.ArcGraph
 
         private void OnEditClicked()
         {
-            StoreDiagnosticRequest(_currentViewModel.EditOperationKey, _currentViewModel.Target);
         }
 
         private void OnDeleteClicked()
         {
-            StoreDiagnosticRequest(_currentViewModel.DeleteOperationKey, _currentViewModel.Target);
-        }
-
-        private void StoreDiagnosticRequest(
-            string operationKey,
-            ArcUiSelectionTarget target)
-        {
-            if (string.IsNullOrWhiteSpace(operationKey) || !target.IsValid)
-                return;
-
-            _lastRequestedOperationKey = operationKey;
-            _lastRequestedTarget = target;
         }
 
         private bool TryFindActor(

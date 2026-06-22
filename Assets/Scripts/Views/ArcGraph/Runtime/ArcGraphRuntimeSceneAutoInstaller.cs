@@ -53,8 +53,6 @@ namespace Arcontio.View.ArcGraph
         private const string NpcVisualCatalogPath = "ArcGraph/Config/ArcGraphNpcVisualCatalog";
         private const int LateBindFrameBudget = 240;
 
-        [SerializeField] private bool logDiagnostics;
-
         private ArcGraphRuntimeWorldAdapter _contextProvider;
         private ArcGraphMinimalRuntimeSceneWrapper _wrapper;
         private ArcGraphTerrainRuntimeSceneRenderer _terrainRenderer;
@@ -65,7 +63,6 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementToolController _placementToolController;
         private ArcGraphPointerCellHoverSceneConsumer _pointerCellHoverConsumer;
-        private ArcGraphPointerDebugPanelSceneConsumer _pointerDebugPanelConsumer;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphUiSelectionSceneConsumer _uiSelectionConsumer;
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
@@ -81,9 +78,6 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphMapViewConfig _viewConfig;
         private int _lateBindFramesLeft;
         private int _configuredMapGridRootCount;
-        private int _lastMapGridRootCount = -1;
-        private bool _lastHadDevToolsOverlay;
-        private bool _lastHadWorld;
         private bool _installed;
 
         // =============================================================================
@@ -248,7 +242,6 @@ namespace Arcontio.View.ArcGraph
             _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
             _placementToolController.enabled = false;
             _pointerCellHoverConsumer = _visualRoot.AddComponent<ArcGraphPointerCellHoverSceneConsumer>();
-            _pointerDebugPanelConsumer = _visualRoot.AddComponent<ArcGraphPointerDebugPanelSceneConsumer>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _uiSelectionConsumer = _visualRoot.AddComponent<ArcGraphUiSelectionSceneConsumer>();
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
@@ -271,12 +264,6 @@ namespace Arcontio.View.ArcGraph
             _lateBindFramesLeft = LateBindFrameBudget;
             _installed = true;
 
-            if (logDiagnostics)
-            {
-                Debug.Log(
-                    "[ArcGraphRuntimeSceneAutoInstaller] Installed runtime ArcGraph wiring. " +
-                    "ArcGraph e' la vista runtime iniziale; toggle F12 disattivato.");
-            }
         }
 
         // =============================================================================
@@ -348,7 +335,6 @@ namespace Arcontio.View.ArcGraph
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(
                 _pointerCellHoverConsumer,
-                _pointerDebugPanelConsumer,
                 _placementHighlightConsumer,
                 _uiSelectionConsumer);
             _placementToolController.SetRuntimeContextProvider(_contextProvider);
@@ -402,16 +388,6 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetUiEnabled(true);
             ApplyUiMapViewportToMainCamera();
             _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
-
-            if (_selectionActionMenu != null)
-                _selectionActionMenu.BuildHiddenMenuForRuntimeDiagnostics();
-
-            if (_pointerDebugPanelConsumer != null)
-            {
-                _pointerDebugPanelConsumer.SetUiRoot(_uiRoot);
-                _pointerDebugPanelConsumer.SetRenderQueue(_wrapper.RenderQueue);
-                _pointerDebugPanelConsumer.SetPanelEnabled(true);
-            }
         }
 
         // =============================================================================
@@ -551,7 +527,6 @@ namespace Arcontio.View.ArcGraph
             if (_switcher != null && _visualRoot != null)
                 ConfigureSwitcher();
 
-            LogBindingStateIfChanged(simulationHost, placementPreviewSource);
         }
 
         // =============================================================================
@@ -901,44 +876,6 @@ namespace Arcontio.View.ArcGraph
 
             for (int i = 0; i < root.childCount; i++)
                 AddGameObjectsByNameRecursive(root.GetChild(i), objectName, results);
-        }
-
-        // =============================================================================
-        // LogBindingStateIfChanged
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Scrive diagnostica di binding solo quando cambia qualcosa di rilevante.
-        /// </para>
-        /// </summary>
-        private void LogBindingStateIfChanged(
-            Arcontio.Core.SimulationHost simulationHost,
-            MonoBehaviour placementPreviewSource)
-        {
-            if (!logDiagnostics)
-                return;
-
-            bool hasDevToolsOverlay = placementPreviewSource != null;
-            bool hasWorld = simulationHost != null && simulationHost.World != null;
-            int rootCount = _configuredMapGridRootCount;
-
-            if (_lastMapGridRootCount == rootCount
-                && _lastHadDevToolsOverlay == hasDevToolsOverlay
-                && _lastHadWorld == hasWorld)
-            {
-                return;
-            }
-
-            _lastMapGridRootCount = rootCount;
-            _lastHadDevToolsOverlay = hasDevToolsOverlay;
-            _lastHadWorld = hasWorld;
-
-            Debug.Log(
-                "[ArcGraphRuntimeSceneAutoInstaller] BindingState " +
-                "mapGridRoots=" + rootCount +
-                ", world=" + hasWorld +
-                ", devToolsOverlay=" + hasDevToolsOverlay +
-                ", visualRoot=" + (_visualRoot != null));
         }
 
         // =============================================================================

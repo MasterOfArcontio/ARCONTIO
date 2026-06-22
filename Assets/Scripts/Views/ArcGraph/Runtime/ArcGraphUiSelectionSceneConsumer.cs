@@ -4,86 +4,6 @@ using UnityEngine;
 namespace Arcontio.View.ArcGraph
 {
     // =============================================================================
-    // ArcGraphUiSelectionSceneConsumerDiagnostics
-    // =============================================================================
-    /// <summary>
-    /// <para>
-    /// Diagnostica sintetica della selezione UI ArcGraph basata su frame
-    /// interattivo e render queue.
-    /// </para>
-    ///
-    /// <para><b>Principio architetturale: selezione view-side senza World</b></para>
-    /// <para>
-    /// La diagnostica rende visibile se il consumer ha ricevuto un frame, se il
-    /// click primario era presente, se il frame contiene una cella valida e quale
-    /// target UI e' stato selezionato. Non contiene riferimenti mutabili a NPC,
-    /// oggetti, job o world runtime.
-    /// </para>
-    ///
-    /// <para><b>Struttura interna:</b></para>
-    /// <list type="bullet">
-    ///   <item><b>DidReceiveFrame</b>: il consumer ha ricevuto un frame interattivo.</item>
-    ///   <item><b>SelectionEnabled</b>: gate locale del consumer.</item>
-    ///   <item><b>WasPrimaryClick</b>: click sinistro nel frame corrente.</item>
-    ///   <item><b>HasFrameCell</b>: cella gia' risolta dal boundary interattivo.</item>
-    ///   <item><b>DidSelectTarget</b>: selezione UI aggiornata.</item>
-    ///   <item><b>SelectedTarget</b>: target selezionato in formato ArcUiSelectionTarget.</item>
-    ///   <item><b>Reason</b>: motivo sintetico dell'esito.</item>
-    /// </list>
-    /// </summary>
-    public readonly struct ArcGraphUiSelectionSceneConsumerDiagnostics
-    {
-        public readonly bool DidReceiveFrame;
-        public readonly bool SelectionEnabled;
-        public readonly bool WasPrimaryClick;
-        public readonly bool WasPointerOverUi;
-        public readonly bool HasFrameCell;
-        public readonly bool DidSelectTarget;
-        public readonly ArcGraphCellCoord Cell;
-        public readonly ArcGraphInteractionTargetKind FrameTargetKind;
-        public readonly int FrameActorId;
-        public readonly int FrameObjectId;
-        public readonly ArcUiSelectionTarget SelectedTarget;
-        public readonly string Reason;
-
-        // =============================================================================
-        // ArcGraphUiSelectionSceneConsumerDiagnostics
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Costruisce una diagnostica immutabile per l'ultimo frame di selezione.
-        /// </para>
-        /// </summary>
-        public ArcGraphUiSelectionSceneConsumerDiagnostics(
-            bool didReceiveFrame,
-            bool selectionEnabled,
-            bool wasPrimaryClick,
-            bool wasPointerOverUi,
-            bool hasFrameCell,
-            bool didSelectTarget,
-            ArcGraphCellCoord cell,
-            ArcGraphInteractionTargetKind frameTargetKind,
-            int frameActorId,
-            int frameObjectId,
-            ArcUiSelectionTarget selectedTarget,
-            string reason)
-        {
-            DidReceiveFrame = didReceiveFrame;
-            SelectionEnabled = selectionEnabled;
-            WasPrimaryClick = wasPrimaryClick;
-            WasPointerOverUi = wasPointerOverUi;
-            HasFrameCell = hasFrameCell;
-            DidSelectTarget = didSelectTarget;
-            Cell = cell;
-            FrameTargetKind = frameTargetKind;
-            FrameActorId = frameActorId;
-            FrameObjectId = frameObjectId;
-            SelectedTarget = selectedTarget;
-            Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
-        }
-    }
-
-    // =============================================================================
     // ArcGraphUiSelectionSceneConsumer
     // =============================================================================
     /// <summary>
@@ -116,38 +36,8 @@ namespace Arcontio.View.ArcGraph
 
         private readonly ArcUiSelectionController _selectionController = new();
         private ArcGraphRenderQueue _renderQueue;
-        private ArcGraphUiSelectionSceneConsumerDiagnostics _lastDiagnostics =
-            new ArcGraphUiSelectionSceneConsumerDiagnostics(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                new ArcGraphCellCoord(0, 0, 0),
-                ArcGraphInteractionTargetKind.None,
-                -1,
-                -1,
-                ArcUiSelectionTarget.None("arcgraph_ui_selection"),
-                "NotInitialized");
-        private ArcGraphUiSelectionSceneConsumerDiagnostics _lastClickDiagnostics =
-            new ArcGraphUiSelectionSceneConsumerDiagnostics(
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                new ArcGraphCellCoord(0, 0, 0),
-                ArcGraphInteractionTargetKind.None,
-                -1,
-                -1,
-                ArcUiSelectionTarget.None("arcgraph_ui_selection"),
-                "NoClickCaptured");
 
         public ArcUiSelectionTarget CurrentSelection => _selectionController.Current;
-        public ArcGraphUiSelectionSceneConsumerDiagnostics LastDiagnostics => _lastDiagnostics;
-        public ArcGraphUiSelectionSceneConsumerDiagnostics LastClickDiagnostics => _lastClickDiagnostics;
         public bool SelectionEnabled => selectionEnabled;
 
         // =============================================================================
@@ -171,41 +61,16 @@ namespace Arcontio.View.ArcGraph
             ArcGraphInteractionSceneAdapterDiagnostics diagnostics)
         {
             if (!selectionEnabled)
-            {
-                StoreDiagnostics(interactionFrame, false, false, interactionFrame.Cell, "SelectionDisabled");
                 return;
-            }
 
             if (interactionFrame.IsPointerOverUi)
-            {
-                StoreDiagnostics(interactionFrame, false, false, interactionFrame.Cell, "PointerOverUi");
                 return;
-            }
 
             if (!interactionFrame.Input.IsPrimaryPointerPressedThisFrame)
-            {
-                StoreDiagnostics(interactionFrame, false, false, interactionFrame.Cell, "WaitingForPrimaryClick");
                 return;
-            }
 
             ArcGraphRenderQueue queue = ResolveRenderQueue();
-            if (TrySelectFromInteractionFrame(interactionFrame, queue))
-            {
-                StoreDiagnostics(
-                    interactionFrame,
-                    interactionFrame.HasValidCell,
-                    true,
-                    interactionFrame.Cell,
-                    "InteractionFrameTargetSelected");
-                return;
-            }
-
-            StoreDiagnostics(
-                interactionFrame,
-                interactionFrame.HasValidCell,
-                false,
-                interactionFrame.Cell,
-                "ClickWithoutSelectableFrameTarget");
+            TrySelectFromInteractionFrame(interactionFrame, queue);
         }
 
         // =============================================================================
@@ -383,12 +248,12 @@ namespace Arcontio.View.ArcGraph
         /// Cerca un NPC visibile nella cella gia' risolta dal frame interattivo.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: fallback diagnostico sul boundary cella</b></para>
+        /// <para><b>Principio architetturale: fallback sul boundary cella</b></para>
         /// <para>
-        /// Il pannello debug ha confermato che <c>interactionFrame.Cell</c> e' la
-        /// cella corretta sotto il puntatore. Se il target prioritario non arriva
-        /// gia' come <c>Actor</c>, il controller puo' usare la stessa cella per
-        /// interrogare la render queue view-side, senza leggere il <c>World</c>.
+        /// La pipeline interattiva ArcGraph produce <c>interactionFrame.Cell</c>
+        /// come cella autorevole sotto il puntatore. Se il target prioritario non
+        /// arriva gia' come <c>Actor</c>, il controller puo' usare la stessa cella
+        /// per interrogare la render queue view-side, senza leggere il <c>World</c>.
         /// </para>
         /// </summary>
         private static bool TryFindActorByCell(
@@ -569,32 +434,6 @@ namespace Arcontio.View.ArcGraph
         private static bool IsWall(ArcGraphObjectRenderItem item)
         {
             return string.Equals(item.VisualKind, "wall", System.StringComparison.OrdinalIgnoreCase);
-        }
-
-        private void StoreDiagnostics(
-            ArcGraphInteractionFrame interactionFrame,
-            bool hasFrameCell,
-            bool didSelectTarget,
-            ArcGraphCellCoord cell,
-            string reason)
-        {
-            var nextDiagnostics = new ArcGraphUiSelectionSceneConsumerDiagnostics(
-                true,
-                selectionEnabled,
-                interactionFrame.Input.IsPrimaryPointerPressedThisFrame,
-                interactionFrame.IsPointerOverUi,
-                hasFrameCell,
-                didSelectTarget,
-                cell,
-                interactionFrame.TargetKind,
-                interactionFrame.ActorId,
-                interactionFrame.ObjectId,
-                _selectionController.Current,
-                reason);
-            _lastDiagnostics = nextDiagnostics;
-
-            if (nextDiagnostics.WasPrimaryClick)
-                _lastClickDiagnostics = nextDiagnostics;
         }
 
     }
