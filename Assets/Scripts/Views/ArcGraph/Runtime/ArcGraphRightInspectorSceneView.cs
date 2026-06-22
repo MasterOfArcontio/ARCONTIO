@@ -57,8 +57,8 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Update</b>: risolve selezione o richiesta pending e aggiorna il pannello.</item>
     ///   <item><b>EnsureBuilt</b>: riusa il nodo RightInspector creato dalla shell UI.</item>
-    ///   <item><b>BuildTabsForTarget</b>: mostra tab diverse in base al target e alla modalita'.</item>
-    ///   <item><b>BuildRowsForContext</b>: mostra righe minime read-only.</item>
+    ///   <item><b>ArcUiInspectorViewModelFactory</b>: prepara tab e righe senza accesso al World.</item>
+    ///   <item><b>RenderViewModel</b>: disegna il ViewModel ricevuto dalla factory.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphRightInspectorSceneView : MonoBehaviour
@@ -69,6 +69,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphUiSelectionSceneConsumer _selectionConsumer;
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiInspectionController _inspectionController;
+        private readonly ArcUiInspectorViewModelFactory _viewModelFactory = new();
         private RectTransform _panelRoot;
         private RectTransform _headerRoot;
         private RectTransform _tabRoot;
@@ -275,15 +276,28 @@ namespace Arcontio.View.ArcGraph
             ArcUiSelectionTarget target,
             ArcUiSelectionActionRequest actionRequest)
         {
-            BuildHeader(mode, target);
-            BuildTabsForTarget(mode, target);
-            BuildRowsForContext(mode, target, actionRequest);
-            PushViewModel(mode, target, actionRequest);
+            ArcUiInspectorViewModel viewModel = actionRequest.IsValid
+                ? _viewModelFactory.BuildForAction(actionRequest)
+                : _viewModelFactory.BuildForSelection(target);
+
+            RenderViewModel(mode, viewModel);
+
+            if (_inspectionController != null)
+                _inspectionController.Set(viewModel);
+        }
+
+        private void RenderViewModel(
+            ArcGraphRightInspectorMode mode,
+            ArcUiInspectorViewModel viewModel)
+        {
+            BuildHeader(mode, viewModel);
+            BuildTabs(viewModel);
+            BuildRows(viewModel);
         }
 
         private void BuildHeader(
             ArcGraphRightInspectorMode mode,
-            ArcUiSelectionTarget target)
+            ArcUiInspectorViewModel viewModel)
         {
             ClearChildren(_headerRoot);
 
@@ -297,7 +311,7 @@ namespace Arcontio.View.ArcGraph
 
             _titleText = CreateText(
                 _headerRoot,
-                ResolveTitle(target),
+                string.IsNullOrWhiteSpace(viewModel.Title) ? "Selezione" : viewModel.Title,
                 17,
                 FontStyles.Bold,
                 TextAlignmentOptions.Left);
@@ -309,69 +323,31 @@ namespace Arcontio.View.ArcGraph
                 TextAlignmentOptions.Left);
             CreateText(
                 _headerRoot,
-                ResolveTargetKindLabel(target.Kind),
+                ResolveTargetKindLabel(viewModel.Target.Kind),
                 12,
                 FontStyles.Normal,
                 TextAlignmentOptions.Left);
         }
 
-        private void BuildTabsForTarget(
-            ArcGraphRightInspectorMode mode,
-            ArcUiSelectionTarget target)
+        private void BuildTabs(ArcUiInspectorViewModel viewModel)
         {
             ClearChildren(_tabRoot);
 
-            if (mode == ArcGraphRightInspectorMode.EditRequested)
-            {
-                CreateTabButton(_tabRoot, "Modifica", true);
-                CreateTabButton(_tabRoot, "Dati", false);
+            if (!viewModel.HasTabs)
                 return;
-            }
 
-            if (mode == ArcGraphRightInspectorMode.DeleteRequested)
+            for (int i = 0; i < viewModel.Tabs.Length; i++)
             {
-                CreateTabButton(_tabRoot, "Conferma", true);
-                CreateTabButton(_tabRoot, "Dati", false);
-                return;
-            }
-
-            switch (target.Kind)
-            {
-                case ArcUiSelectionTargetKind.Npc:
-                    CreateTabButton(_tabRoot, "Info", true);
-                    CreateTabButton(_tabRoot, "DNA", false);
-                    CreateTabButton(_tabRoot, "Memoria", false);
-                    CreateTabButton(_tabRoot, "Belief", false);
-                    CreateTabButton(_tabRoot, "Decision", false);
-                    CreateTabButton(_tabRoot, "Job", false);
-                    CreateTabButton(_tabRoot, "Path", false);
-                    CreateTabButton(_tabRoot, "Debug", false);
-                    break;
-                case ArcUiSelectionTargetKind.Object:
-                    CreateTabButton(_tabRoot, "Info", true);
-                    CreateTabButton(_tabRoot, "Stato", false);
-                    CreateTabButton(_tabRoot, "Uso", false);
-                    CreateTabButton(_tabRoot, "Storage", false);
-                    CreateTabButton(_tabRoot, "Debug", false);
-                    break;
-                case ArcUiSelectionTargetKind.Wall:
-                    CreateTabButton(_tabRoot, "Info", true);
-                    CreateTabButton(_tabRoot, "Materiale", false);
-                    CreateTabButton(_tabRoot, "Connessioni", false);
-                    CreateTabButton(_tabRoot, "Stato", false);
-                    CreateTabButton(_tabRoot, "Debug", false);
-                    break;
-                default:
-                    CreateTabButton(_tabRoot, "Info", true);
-                    CreateTabButton(_tabRoot, "Debug", false);
-                    break;
+                ArcUiInspectorTab tab = viewModel.Tabs[i];
+                bool active = string.Equals(
+                    tab.TabKey,
+                    viewModel.ActiveTabKey,
+                    System.StringComparison.Ordinal);
+                CreateTabButton(_tabRoot, tab.Label, active);
             }
         }
 
-        private void BuildRowsForContext(
-            ArcGraphRightInspectorMode mode,
-            ArcUiSelectionTarget target,
-            ArcUiSelectionActionRequest actionRequest)
+        private void BuildRows(ArcUiInspectorViewModel viewModel)
         {
             ClearChildren(_contentRoot);
 
@@ -383,52 +359,39 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
-            CreateSectionTitle(_contentRoot, ResolveSectionTitle(mode));
-            CreateInfoRow(_contentRoot, "Modalita'", ResolveModeLabel(mode));
-            CreateInfoRow(_contentRoot, "Tipo", ResolveTargetKindLabel(target.Kind));
-            CreateInfoRow(_contentRoot, "Id", string.IsNullOrWhiteSpace(target.Id) ? "--" : target.Id);
-            CreateInfoRow(_contentRoot, "Nome", string.IsNullOrWhiteSpace(target.DisplayName) ? "--" : target.DisplayName);
-            CreateInfoRow(_contentRoot, "Cella", FormatCell(target.Cell));
-            CreateInfoRow(_contentRoot, "Sorgente", string.IsNullOrWhiteSpace(target.SourceView) ? "--" : target.SourceView);
+            if (!TryResolveActiveTab(viewModel, out ArcUiInspectorTab activeTab))
+                return;
 
-            if (mode == ArcGraphRightInspectorMode.EditRequested)
+            CreateSectionTitle(_contentRoot, string.IsNullOrWhiteSpace(activeTab.Label) ? "INFO" : activeTab.Label.ToUpperInvariant());
+
+            for (int i = 0; i < activeTab.Rows.Length; i++)
             {
-                CreateSectionTitle(_contentRoot, "MODIFICA");
-                CreateInfoRow(_contentRoot, "Stato", "Richiesta ricevuta");
-                CreateInfoRow(_contentRoot, "Effetto", "Nessuna modifica applicata");
-                CreateInfoRow(_contentRoot, "Prossimo ponte", "Edit ViewModel autorizzato");
-            }
-            else if (mode == ArcGraphRightInspectorMode.DeleteRequested)
-            {
-                CreateSectionTitle(_contentRoot, "ELIMINA");
-                CreateInfoRow(_contentRoot, "Stato", "Richiesta ricevuta");
-                CreateInfoRow(_contentRoot, "Effetto", "Nessuna eliminazione applicata");
-                CreateInfoRow(_contentRoot, "Prossimo ponte", "Conferma + Command Gateway");
+                ArcUiInspectorRow row = activeTab.Rows[i];
+                CreateInfoRow(_contentRoot, row.Label, row.Value);
             }
         }
 
-        private void PushViewModel(
-            ArcGraphRightInspectorMode mode,
-            ArcUiSelectionTarget target,
-            ArcUiSelectionActionRequest actionRequest)
+        private static bool TryResolveActiveTab(
+            ArcUiInspectorViewModel viewModel,
+            out ArcUiInspectorTab activeTab)
         {
-            if (_inspectionController == null)
-                return;
+            activeTab = default;
 
-            var rows = new[]
+            if (!viewModel.HasTabs)
+                return false;
+
+            for (int i = 0; i < viewModel.Tabs.Length; i++)
             {
-                new ArcUiInspectorRow("Modalita'", ResolveModeLabel(mode)),
-                new ArcUiInspectorRow("Tipo", ResolveTargetKindLabel(target.Kind)),
-                new ArcUiInspectorRow("Id", target.Id),
-                new ArcUiInspectorRow("Cella", FormatCell(target.Cell))
-            };
-            var tab = new ArcUiInspectorTab("info", "Info", rows);
-            var viewModel = new ArcUiInspectorViewModel(
-                ResolveTitle(target),
-                target,
-                new[] { tab },
-                "info");
-            _inspectionController.Set(viewModel);
+                ArcUiInspectorTab tab = viewModel.Tabs[i];
+                if (string.Equals(tab.TabKey, viewModel.ActiveTabKey, System.StringComparison.Ordinal))
+                {
+                    activeTab = tab;
+                    return true;
+                }
+            }
+
+            activeTab = viewModel.Tabs[0];
+            return activeTab.IsValid;
         }
 
         private void HideInspector()
@@ -452,17 +415,6 @@ namespace Arcontio.View.ArcGraph
                    left.Cell.Z == right.Cell.Z;
         }
 
-        private static string ResolveTitle(ArcUiSelectionTarget target)
-        {
-            if (!string.IsNullOrWhiteSpace(target.DisplayName))
-                return target.DisplayName;
-
-            if (!string.IsNullOrWhiteSpace(target.Id))
-                return ResolveTargetKindLabel(target.Kind) + " " + target.Id;
-
-            return ResolveTargetKindLabel(target.Kind);
-        }
-
         private static string ResolveModeLabel(ArcGraphRightInspectorMode mode)
         {
             return mode switch
@@ -471,16 +423,6 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphRightInspectorMode.DeleteRequested => "Eliminazione richiesta",
                 ArcGraphRightInspectorMode.View => "Ispezione",
                 _ => "Nascosto"
-            };
-        }
-
-        private static string ResolveSectionTitle(ArcGraphRightInspectorMode mode)
-        {
-            return mode switch
-            {
-                ArcGraphRightInspectorMode.EditRequested => "RICHIESTA MODIFICA",
-                ArcGraphRightInspectorMode.DeleteRequested => "RICHIESTA ELIMINAZIONE",
-                _ => "INFORMAZIONI"
             };
         }
 
@@ -497,11 +439,6 @@ namespace Arcontio.View.ArcGraph
                 ArcUiSelectionTargetKind.Debug => "Debug",
                 _ => "Nessun target"
             };
-        }
-
-        private static string FormatCell(ArcGraphCellCoord cell)
-        {
-            return "col " + cell.X + " | riga " + cell.Y + " | z " + cell.Z;
         }
 
         private static void ClearChildren(RectTransform root)
