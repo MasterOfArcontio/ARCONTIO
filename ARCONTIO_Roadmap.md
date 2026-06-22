@@ -16695,7 +16695,7 @@ Roadmap operativa:
 | v0.70.01 | Foundation dati UI | Fatto su branch `ai-task/v0.70.01-arcgraph-ui-foundation-data` |
 | v0.70.02 | Operation catalog minimo e gerarchia ActionPanel | Fatto su branch `ai-task/v0.70.02-arcgraph-ui-operation-catalog` |
 | v0.70.03 | Ponte placement | ⏳ Pending |
-| v0.70.04 | Selezione e hover | ⏳ Pending |
+| v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
 | v0.70.05 | Inspector ViewModel/tab | ⏳ Pending |
 | v0.70.06 | Simulation control | ⏳ Pending |
 | v0.70.07 | View modes | ⏳ Pending |
@@ -16964,7 +16964,8 @@ Sottostep operativi:
 |---|---|---|
 | v0.70.04.01 | Hover cella sotto mouse | Fatto su branch `ai-task/v0.70.04.01-arcgraph-pointer-cell-hover` |
 | v0.70.04.02 | Selezione NPC/Oggetto | Fatto su branch `ai-task/v0.70.04.02-arcgraph-ui-selection` |
-| v0.70.04.03 | Hover menu Modifica/Elimina | Pending |
+| v0.70.04.03 | Hover menu Modifica/Elimina | Fatto su branch `ai-task/v0.70.04.03-arcgraph-selection-action-menu` |
+| v0.70.04.04 | Selection Action Bridge | Fatto su branch `ai-task/v0.70.04.04-selection-action-bridge` |
 
 Target previsti:
 
@@ -16994,6 +16995,7 @@ Criteri di accettazione:
 - click produce target selezionato;
 - selezione singola chiara;
 - RightInspector puo' ricevere un target astratto.
+- i pulsanti rapidi Modifica/Elimina producono una richiesta UI pending non distruttiva.
 
 ---
 
@@ -17004,6 +17006,16 @@ Obiettivo:
 ```text
 costruire RightInspector come contenitore a tab alimentato da ViewModel read-only
 ```
+
+Sottostep operativi previsti:
+
+| Versione | Nome | Stato |
+|---|---|---|
+| v0.70.05.01 | RightInspector shell e consumer richiesta selezione | Prossimo |
+| v0.70.05.02 | Inspector ViewModelFactory minima per NPC/Object/Wall/Cell | Pending |
+| v0.70.05.03 | Tab read-only iniziali | Pending |
+| v0.70.05.04 | Edit shell da SelectionActionRequest | Pending |
+| v0.70.05.05 | Delete confirmation shell non distruttiva | Pending |
 
 Tab iniziali:
 
