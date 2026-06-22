@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -81,6 +82,7 @@ namespace Arcontio.View.ArcGraph
         private RectTransform _headerRoot;
         private RectTransform _tabRoot;
         private RectTransform _contentRoot;
+        private RectTransform _contentScrollContent;
         private LayoutElement _tabLayout;
         private TextMeshProUGUI _titleText;
         private TextMeshProUGUI _subtitleText;
@@ -89,6 +91,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphRightInspectorMode _lastMode = ArcGraphRightInspectorMode.Hidden;
         private ArcUiSelectionTarget _lastTarget = ArcUiSelectionTarget.None("right_inspector");
         private float _lastRuntimeRefreshTime = -999f;
+        private readonly Dictionary<string, bool> _expandedRows = new();
 
         // =============================================================================
         // Update
@@ -301,6 +304,7 @@ namespace Arcontio.View.ArcGraph
             tabGroup.constraintCount = TabColumnsPerRow;
 
             _contentRoot = CreatePanelBlock(_panelRoot, "ContentRoot", 560f);
+            BuildContentScroll(_contentRoot);
             _panelRoot.gameObject.SetActive(false);
             return true;
         }
@@ -462,9 +466,13 @@ namespace Arcontio.View.ArcGraph
 
         private void BuildRows(ArcUiInspectorViewModel viewModel)
         {
-            ClearChildren(_contentRoot);
+            RectTransform rowsRoot = _contentScrollContent != null
+                ? _contentScrollContent
+                : _contentRoot;
 
-            VerticalLayoutGroup layout = GetOrAddVerticalLayout(_contentRoot);
+            ClearChildren(rowsRoot);
+
+            VerticalLayoutGroup layout = GetOrAddVerticalLayout(rowsRoot);
             layout.padding = new RectOffset(10, 10, 10, 10);
             layout.spacing = 7f;
             layout.childControlWidth = true;
@@ -475,12 +483,12 @@ namespace Arcontio.View.ArcGraph
             if (!TryResolveActiveTab(viewModel, _activeTabKey, out ArcUiInspectorTab activeTab))
                 return;
 
-            CreateSectionTitle(_contentRoot, string.IsNullOrWhiteSpace(activeTab.Label) ? "INFO" : activeTab.Label.ToUpperInvariant());
+            CreateSectionTitle(rowsRoot, string.IsNullOrWhiteSpace(activeTab.Label) ? "INFO" : activeTab.Label.ToUpperInvariant());
 
             for (int i = 0; i < activeTab.Rows.Length; i++)
             {
                 ArcUiInspectorRow row = activeTab.Rows[i];
-                CreateInfoRow(_contentRoot, row.Label, row.Value);
+                CreateInspectorRow(rowsRoot, row);
             }
         }
 
@@ -664,6 +672,46 @@ namespace Arcontio.View.ArcGraph
             return layout;
         }
 
+        private void BuildContentScroll(RectTransform root)
+        {
+            // Il RightInspector deve poter ospitare liste Memory/Belief/Job senza
+            // uscire dal pannello. Lo scroll vive dentro ContentRoot e non cambia
+            // il contratto dei dati: le righe restano gia' preparate dal ViewModel.
+            ScrollRect scroll = root.gameObject.AddComponent<ScrollRect>();
+            scroll.horizontal = false;
+            scroll.vertical = true;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 24f;
+
+            RectTransform viewport = CreateRect("Viewport", root);
+            StretchFull(viewport, new Vector2(0f, 0f), new Vector2(0f, 0f));
+            Image viewportImage = viewport.gameObject.AddComponent<Image>();
+            viewportImage.raycastTarget = true;
+            viewportImage.color = ColorFromHex("#000000", 0.01f);
+            viewport.gameObject.AddComponent<RectMask2D>();
+
+            _contentScrollContent = CreateRect("Content", viewport);
+            _contentScrollContent.anchorMin = new Vector2(0f, 1f);
+            _contentScrollContent.anchorMax = new Vector2(1f, 1f);
+            _contentScrollContent.pivot = new Vector2(0.5f, 1f);
+            _contentScrollContent.offsetMin = Vector2.zero;
+            _contentScrollContent.offsetMax = Vector2.zero;
+
+            VerticalLayoutGroup layout = _contentScrollContent.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            layout.spacing = 7f;
+            layout.padding = new RectOffset(10, 10, 10, 18);
+
+            ContentSizeFitter fitter = _contentScrollContent.gameObject.AddComponent<ContentSizeFitter>();
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            scroll.viewport = viewport;
+            scroll.content = _contentScrollContent;
+        }
+
         private static RectTransform CreatePanelBlock(
             RectTransform parent,
             string name,
@@ -737,6 +785,387 @@ namespace Arcontio.View.ArcGraph
             LayoutElement layout = title.gameObject.AddComponent<LayoutElement>();
             layout.preferredHeight = 24f;
             CreateText(title, label, 12, FontStyles.Bold, TextAlignmentOptions.Left);
+        }
+
+        private void CreateInspectorRow(
+            RectTransform parent,
+            ArcUiInspectorRow row)
+        {
+            // Il renderer sceglie solo il widget UGUI in base al tipo gia'
+            // dichiarato nel ViewModel. Non deduce dati dalla simulazione e non
+            // modifica il contenuto ricevuto.
+            switch (row.Kind)
+            {
+                case ArcUiInspectorRowKind.Section:
+                    CreateSectionTitle(parent, row.Label);
+                    break;
+
+                case ArcUiInspectorRowKind.Bar:
+                    CreateBarRow(parent, row);
+                    break;
+
+                case ArcUiInspectorRowKind.IconMetrics:
+                    CreateIconMetricsRow(parent, row);
+                    break;
+
+                case ArcUiInspectorRowKind.Expandable:
+                    CreateExpandableRow(parent, row);
+                    break;
+
+                case ArcUiInspectorRowKind.Timeline:
+                    CreateTimelineRow(parent, row);
+                    break;
+
+                default:
+                    CreateInfoRow(parent, row.Label, row.Value);
+                    break;
+            }
+        }
+
+        private static void CreateBarRow(
+            RectTransform parent,
+            ArcUiInspectorRow row)
+        {
+            RectTransform root = CreateRect("ArcBarRow_" + SanitizeName(row.RowKey), parent);
+            LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
+            rootLayout.preferredHeight = 40f;
+
+            VerticalLayoutGroup layout = root.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 3f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            RectTransform header = CreateRect("Header", root);
+            LayoutElement headerLayout = header.gameObject.AddComponent<LayoutElement>();
+            headerLayout.preferredHeight = 18f;
+
+            HorizontalLayoutGroup headerGroup = header.gameObject.AddComponent<HorizontalLayoutGroup>();
+            headerGroup.childControlWidth = true;
+            headerGroup.childControlHeight = true;
+            headerGroup.childForceExpandWidth = true;
+            headerGroup.childForceExpandHeight = true;
+
+            RectTransform labelRoot = CreateRect("Label", header);
+            LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
+            labelLayout.flexibleWidth = 1f;
+            CreateText(labelRoot, row.Label, 11, FontStyles.Normal, TextAlignmentOptions.Left);
+
+            RectTransform valueRoot = CreateRect("Value", header);
+            LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
+            valueLayout.preferredWidth = 68f;
+            TextMeshProUGUI value = CreateText(valueRoot, row.Value, 11, FontStyles.Bold, TextAlignmentOptions.Right);
+            value.color = ColorForSeverity(row.Severity, 1f);
+
+            RectTransform barRoot = CreateRect("Bar", root);
+            LayoutElement barLayout = barRoot.gameObject.AddComponent<LayoutElement>();
+            barLayout.preferredHeight = 10f;
+            Image barBackground = barRoot.gameObject.AddComponent<Image>();
+            barBackground.raycastTarget = false;
+            barBackground.color = ColorFromHex("#0B1118", 0.95f);
+
+            RectTransform fill = CreateRect("Fill", barRoot);
+            fill.anchorMin = Vector2.zero;
+            fill.anchorMax = new Vector2(Mathf.Clamp01(row.NumericValue01), 1f);
+            fill.offsetMin = Vector2.zero;
+            fill.offsetMax = Vector2.zero;
+            Image fillImage = fill.gameObject.AddComponent<Image>();
+            fillImage.raycastTarget = false;
+            fillImage.color = ColorForSeverity(row.Severity, 0.94f);
+
+            CreateBarMarker(barRoot, row.AlertMarker01, "#D6A33A");
+            CreateBarMarker(barRoot, row.CriticalMarker01, "#D85D5D");
+        }
+
+        private static void CreateBarMarker(
+            RectTransform parent,
+            float marker01,
+            string colorHex)
+        {
+            if (marker01 < 0f)
+                return;
+
+            RectTransform marker = CreateRect("Marker", parent);
+            marker.anchorMin = new Vector2(Mathf.Clamp01(marker01), 0f);
+            marker.anchorMax = new Vector2(Mathf.Clamp01(marker01), 1f);
+            marker.pivot = new Vector2(0.5f, 0.5f);
+            marker.sizeDelta = new Vector2(2f, 0f);
+            marker.anchoredPosition = Vector2.zero;
+
+            Image image = marker.gameObject.AddComponent<Image>();
+            image.raycastTarget = false;
+            image.color = ColorFromHex(colorHex, 1f);
+        }
+
+        private static void CreateIconMetricsRow(
+            RectTransform parent,
+            ArcUiInspectorRow row)
+        {
+            RectTransform root = CreateRect("ArcIconMetricsRow_" + SanitizeName(row.RowKey), parent);
+            LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
+            rootLayout.preferredHeight = 54f;
+
+            VerticalLayoutGroup rootGroup = root.gameObject.AddComponent<VerticalLayoutGroup>();
+            rootGroup.spacing = 4f;
+            rootGroup.childControlWidth = true;
+            rootGroup.childControlHeight = true;
+            rootGroup.childForceExpandWidth = true;
+            rootGroup.childForceExpandHeight = false;
+
+            RectTransform title = CreateRect("Title", root);
+            LayoutElement titleLayout = title.gameObject.AddComponent<LayoutElement>();
+            titleLayout.preferredHeight = 16f;
+            TextMeshProUGUI titleText = CreateText(title, row.Label, 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            titleText.color = ColorFromHex("#A9B8C4", 1f);
+
+            RectTransform metricsRoot = CreateRect("Metrics", root);
+            LayoutElement metricsLayout = metricsRoot.gameObject.AddComponent<LayoutElement>();
+            metricsLayout.preferredHeight = 30f;
+
+            HorizontalLayoutGroup metricsGroup = metricsRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
+            metricsGroup.spacing = 6f;
+            metricsGroup.childControlWidth = true;
+            metricsGroup.childControlHeight = true;
+            metricsGroup.childForceExpandWidth = true;
+            metricsGroup.childForceExpandHeight = true;
+
+            for (int i = 0; i < row.Metrics.Length; i++)
+                CreateMetricCell(metricsRoot, row.Metrics[i]);
+        }
+
+        private static void CreateMetricCell(
+            RectTransform parent,
+            ArcUiInspectorMetric metric)
+        {
+            RectTransform cell = CreateRect("Metric_" + SanitizeName(metric.Label), parent);
+            Image background = cell.gameObject.AddComponent<Image>();
+            background.raycastTarget = false;
+            background.color = ColorFromHex("#111A23", 0.92f);
+
+            LayoutElement cellLayout = cell.gameObject.AddComponent<LayoutElement>();
+            cellLayout.flexibleWidth = 1f;
+
+            HorizontalLayoutGroup group = cell.gameObject.AddComponent<HorizontalLayoutGroup>();
+            group.padding = new RectOffset(4, 5, 3, 3);
+            group.spacing = 4f;
+            group.childControlWidth = true;
+            group.childControlHeight = true;
+            group.childForceExpandWidth = false;
+            group.childForceExpandHeight = true;
+
+            RectTransform iconRoot = CreateRect("Icon", cell);
+            LayoutElement iconLayout = iconRoot.gameObject.AddComponent<LayoutElement>();
+            iconLayout.preferredWidth = 18f;
+            Image iconBackground = iconRoot.gameObject.AddComponent<Image>();
+            iconBackground.raycastTarget = false;
+            iconBackground.color = ColorForSeverity(metric.Severity, 0.28f);
+
+            string iconText = string.IsNullOrEmpty(metric.IconKey) ? "*" : metric.IconKey.Substring(0, 1).ToUpperInvariant();
+            TextMeshProUGUI iconLabel = CreateText(iconRoot, iconText, 9, FontStyles.Bold, TextAlignmentOptions.Center);
+            iconLabel.color = ColorForSeverity(metric.Severity, 1f);
+
+            RectTransform valueRoot = CreateRect("Value", cell);
+            LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
+            valueLayout.flexibleWidth = 1f;
+            string valueText = string.IsNullOrEmpty(metric.Label)
+                ? metric.Value
+                : metric.Label + " " + metric.Value;
+            TextMeshProUGUI value = CreateText(valueRoot, valueText, 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            value.color = ColorForSeverity(metric.Severity, 1f);
+        }
+
+        private void CreateExpandableRow(
+            RectTransform parent,
+            ArcUiInspectorRow row)
+        {
+            bool expanded = IsRowExpanded(row);
+
+            RectTransform root = CreateRect("ArcExpandableRow_" + SanitizeName(row.RowKey), parent);
+            LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
+            rootLayout.preferredHeight = expanded
+                ? 32f + EstimateRowsHeight(row.Details)
+                : 30f;
+
+            VerticalLayoutGroup rootGroup = root.gameObject.AddComponent<VerticalLayoutGroup>();
+            rootGroup.spacing = 4f;
+            rootGroup.childControlWidth = true;
+            rootGroup.childControlHeight = true;
+            rootGroup.childForceExpandWidth = true;
+            rootGroup.childForceExpandHeight = false;
+
+            RectTransform header = CreateRect("Header", root);
+            LayoutElement headerLayout = header.gameObject.AddComponent<LayoutElement>();
+            headerLayout.preferredHeight = 28f;
+            Image headerImage = header.gameObject.AddComponent<Image>();
+            headerImage.raycastTarget = true;
+            headerImage.color = row.IsSelected
+                ? ColorFromHex("#1E4A37", 0.9f)
+                : ColorFromHex("#111A23", 0.92f);
+
+            HorizontalLayoutGroup headerGroup = header.gameObject.AddComponent<HorizontalLayoutGroup>();
+            headerGroup.padding = new RectOffset(4, 6, 3, 3);
+            headerGroup.spacing = 5f;
+            headerGroup.childControlWidth = true;
+            headerGroup.childControlHeight = true;
+            headerGroup.childForceExpandWidth = false;
+            headerGroup.childForceExpandHeight = true;
+
+            Button toggleButton = CreateSmallButton(header, expanded ? "-" : "+");
+            string rowKey = row.RowKey;
+            toggleButton.onClick.AddListener(() => ToggleRowExpanded(rowKey));
+
+            RectTransform labelRoot = CreateRect("Label", header);
+            LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
+            labelLayout.flexibleWidth = 1f;
+            TextMeshProUGUI label = CreateText(labelRoot, row.Label, 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            label.color = row.IsSelected ? ColorFromHex("#9FE0B8", 1f) : ColorFromHex("#DDE6EE", 1f);
+
+            RectTransform valueRoot = CreateRect("Value", header);
+            LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
+            valueLayout.preferredWidth = 88f;
+            TextMeshProUGUI value = CreateText(valueRoot, row.Value, 10, FontStyles.Bold, TextAlignmentOptions.Right);
+            value.color = ColorForSeverity(row.Severity, 1f);
+
+            if (!expanded)
+                return;
+
+            CreateDetailRows(root, row.Details);
+        }
+
+        private static Button CreateSmallButton(
+            RectTransform parent,
+            string label)
+        {
+            RectTransform button = CreateRect("SmallButton_" + SanitizeName(label), parent);
+            LayoutElement layout = button.gameObject.AddComponent<LayoutElement>();
+            layout.preferredWidth = 22f;
+            layout.preferredHeight = 22f;
+
+            Image image = button.gameObject.AddComponent<Image>();
+            image.raycastTarget = true;
+            image.color = ColorFromHex("#22313D", 0.96f);
+
+            Button buttonComponent = button.gameObject.AddComponent<Button>();
+            CreateText(button, label, 12, FontStyles.Bold, TextAlignmentOptions.Center);
+            return buttonComponent;
+        }
+
+        private void CreateDetailRows(
+            RectTransform parent,
+            ArcUiInspectorRow[] rows)
+        {
+            RectTransform detailsRoot = CreateRect("Details", parent);
+            LayoutElement detailsLayout = detailsRoot.gameObject.AddComponent<LayoutElement>();
+            detailsLayout.preferredHeight = EstimateRowsHeight(rows);
+
+            VerticalLayoutGroup detailsGroup = detailsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            detailsGroup.padding = new RectOffset(24, 0, 0, 0);
+            detailsGroup.spacing = 3f;
+            detailsGroup.childControlWidth = true;
+            detailsGroup.childControlHeight = false;
+            detailsGroup.childForceExpandWidth = true;
+            detailsGroup.childForceExpandHeight = false;
+
+            if (rows.Length == 0)
+            {
+                CreateInfoRow(detailsRoot, "Dettagli", "--");
+                return;
+            }
+
+            for (int i = 0; i < rows.Length; i++)
+                CreateInspectorRow(detailsRoot, rows[i]);
+        }
+
+        private static float EstimateRowsHeight(ArcUiInspectorRow[] rows)
+        {
+            if (rows == null || rows.Length == 0)
+                return 26f;
+
+            float height = 0f;
+            for (int i = 0; i < rows.Length; i++)
+                height += EstimateRowHeight(rows[i]) + 3f;
+
+            return Mathf.Max(26f, height);
+        }
+
+        private static float EstimateRowHeight(ArcUiInspectorRow row)
+        {
+            return row.Kind switch
+            {
+                ArcUiInspectorRowKind.Section => 24f,
+                ArcUiInspectorRowKind.Bar => 40f,
+                ArcUiInspectorRowKind.IconMetrics => 54f,
+                ArcUiInspectorRowKind.Expandable => 30f + (row.Details.Length > 0 ? EstimateRowsHeight(row.Details) : 0f),
+                ArcUiInspectorRowKind.Timeline => 24f,
+                _ => 26f
+            };
+        }
+
+        private static void CreateTimelineRow(
+            RectTransform parent,
+            ArcUiInspectorRow row)
+        {
+            RectTransform root = CreateRect("ArcTimelineRow_" + SanitizeName(row.RowKey), parent);
+            LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
+            rootLayout.preferredHeight = 24f;
+
+            Image image = root.gameObject.AddComponent<Image>();
+            image.raycastTarget = false;
+            image.color = ColorFromHex("#0F1821", 0.72f);
+
+            HorizontalLayoutGroup layout = root.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.padding = new RectOffset(5, 6, 2, 2);
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = true;
+
+            RectTransform labelRoot = CreateRect("Label", root);
+            LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
+            labelLayout.preferredWidth = 76f;
+            TextMeshProUGUI label = CreateText(labelRoot, row.Label, 10, FontStyles.Normal, TextAlignmentOptions.Left);
+            label.color = ColorForSeverity(row.Severity, 1f);
+
+            RectTransform valueRoot = CreateRect("Value", root);
+            LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
+            valueLayout.flexibleWidth = 1f;
+            CreateText(valueRoot, row.Value, 10, FontStyles.Normal, TextAlignmentOptions.Left);
+        }
+
+        private void ToggleRowExpanded(string rowKey)
+        {
+            if (string.IsNullOrWhiteSpace(rowKey))
+                return;
+
+            _expandedRows.TryGetValue(rowKey, out bool expanded);
+            _expandedRows[rowKey] = !expanded;
+            BuildRows(_currentViewModel);
+        }
+
+        private bool IsRowExpanded(ArcUiInspectorRow row)
+        {
+            if (string.IsNullOrWhiteSpace(row.RowKey))
+                return false;
+
+            return _expandedRows.TryGetValue(row.RowKey, out bool expanded) && expanded;
+        }
+
+        private static Color ColorForSeverity(
+            ArcUiInspectorSeverity severity,
+            float alpha)
+        {
+            string hex = severity switch
+            {
+                ArcUiInspectorSeverity.Good => "#64B486",
+                ArcUiInspectorSeverity.Warning => "#D6A33A",
+                ArcUiInspectorSeverity.Danger => "#D85D5D",
+                ArcUiInspectorSeverity.Info => "#6EA8C8",
+                ArcUiInspectorSeverity.Muted => "#80909C",
+                _ => "#DDE6EE"
+            };
+
+            return ColorFromHex(hex, alpha);
         }
 
         private static void CreateInfoRow(
