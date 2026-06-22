@@ -314,17 +314,17 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica se la cella puntata ricade dentro il footprint visuale/logico
+        /// Verifica se la cella puntata ricade dentro il footprint logico/base
         /// dell'oggetto ArcGraph.
         /// </para>
         ///
         /// <para><b>Principio architetturale: picking centralizzato nel boundary</b></para>
         /// <para>
-        /// Muri, porte e oggetti estesi possono occupare piu' di una cella. Il
-        /// boundary deve quindi usare il footprint gia' preparato nella render
-        /// queue, invece di confrontare solo la cella origine. Questo mantiene la
-        /// selezione UI come consumer passivo e impedisce la ricomparsa di un
-        /// secondo hit test nei pannelli.
+        /// Muri, porte e oggetti estesi possono occupare piu' di una cella logica.
+        /// Il boundary deve quindi usare soltanto il footprint/base gia' preparato
+        /// nella render queue, invece della dimensione verticale dello sprite. La
+        /// parte alta visuale di un muro non deve impedire la selezione di un
+        /// oggetto posizionato nella cella dietro/sopra quel muro.
         /// </para>
         /// </summary>
         private static bool IsObjectHitCell(
@@ -334,8 +334,7 @@ namespace Arcontio.View.ArcGraph
             if (item.Cell.Z != pointerCell.Z)
                 return false;
 
-            return IsObjectLogicalFootprintHit(item, pointerCell)
-                   || IsObjectVisualHeightHit(item, pointerCell);
+            return IsObjectLogicalFootprintHit(item, pointerCell);
         }
 
         // =============================================================================
@@ -358,66 +357,6 @@ namespace Arcontio.View.ArcGraph
                    pointerCell.X < item.Cell.X + width &&
                    pointerCell.Y >= item.Cell.Y &&
                    pointerCell.Y < item.Cell.Y + height;
-        }
-
-        // =============================================================================
-        // IsObjectVisualHeightHit
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Verifica se la cella puntata ricade nella colonna visuale di uno sprite
-        /// piu' alto del suo footprint logico.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: click su cio' che il player vede</b></para>
-        /// <para>
-        /// Alcuni oggetti, in particolare i muri 32x83 con pivot
-        /// <c>bottom_center</c>, sono molto piu' alti della singola cella logica.
-        /// Se il boundary usasse solo il footprint, un click sulla parte alta del
-        /// muro verrebbe classificato come cella vuota. Questa hitbox visuale resta
-        /// comunque read-only: usa solo metadati gia' presenti nella render queue e
-        /// non consulta il <c>World</c>.
-        /// </para>
-        /// </summary>
-        private static bool IsObjectVisualHeightHit(
-            ArcGraphObjectRenderItem item,
-            ArcGraphCellCoord pointerCell)
-        {
-            int logicalWidth = item.FootprintWidth <= 0 ? 1 : item.FootprintWidth;
-            int logicalHeight = item.FootprintHeight <= 0 ? 1 : item.FootprintHeight;
-            int visualHeightCells = ResolveVisualHeightCells(item, logicalHeight);
-
-            if (visualHeightCells <= logicalHeight)
-                return false;
-
-            return pointerCell.X >= item.Cell.X &&
-                   pointerCell.X < item.Cell.X + logicalWidth &&
-                   pointerCell.Y >= item.Cell.Y &&
-                   pointerCell.Y < item.Cell.Y + visualHeightCells;
-        }
-
-        // =============================================================================
-        // ResolveVisualHeightCells
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Converte l'altezza pixel dello sprite in un numero intero di celle
-        /// selezionabili lungo l'asse Y.
-        /// </para>
-        /// </summary>
-        private static int ResolveVisualHeightCells(
-            ArcGraphObjectRenderItem item,
-            int logicalHeight)
-        {
-            int safeLogicalHeight = logicalHeight <= 0 ? 1 : logicalHeight;
-            int visualHeightPixels = item.VisualHeightPixels > 0 ? item.VisualHeightPixels : 0;
-            int baseHeightPixels = item.VisualBaseHeightPixels > 0 ? item.VisualBaseHeightPixels : 32;
-
-            if (visualHeightPixels <= baseHeightPixels)
-                return safeLogicalHeight;
-
-            int visualCells = (visualHeightPixels + baseHeightPixels - 1) / baseHeightPixels;
-            return visualCells > safeLogicalHeight ? visualCells : safeLogicalHeight;
         }
 
         // =============================================================================

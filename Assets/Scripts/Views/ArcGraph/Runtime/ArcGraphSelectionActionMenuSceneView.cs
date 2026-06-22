@@ -234,7 +234,7 @@ namespace Arcontio.View.ArcGraph
         private const float CompactButtonFontSize = 7f;
         private const float CompactTitleFontSize = 8f;
         private const float CompactTitleHorizontalPadding = 8f;
-        private const float CompactOuterHorizontalPadding = 2f;
+        private const float CompactOuterHorizontalPadding = 4f;
         private const float CompactInterItemSpacing = 2f;
 
         [SerializeField] private bool menuEnabled = true;
@@ -439,8 +439,8 @@ namespace Arcontio.View.ArcGraph
             _canvasGroup.blocksRaycasts = true;
 
             HorizontalLayoutGroup layout = _menuRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(1, 1, 1, 1);
-            layout.spacing = 1f;
+            layout.padding = new RectOffset(2, 2, 1, 1);
+            layout.spacing = CompactInterItemSpacing;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = false;
@@ -475,7 +475,7 @@ namespace Arcontio.View.ArcGraph
             _titleLayout.minWidth = 8f;
             _titleLayout.flexibleWidth = 0f;
 
-            _titleText = CreateText(titleRoot, "Sel.", CompactTitleFontSize, FontStyles.Bold, TextAlignmentOptions.Center);
+            _titleText = CreateText(titleRoot, "Sel.", CompactTitleFontSize, FontStyles.Normal, TextAlignmentOptions.Center);
             _subtitleText = null;
             _hungerRoot = null;
             _hungerFill = null;
@@ -536,7 +536,10 @@ namespace Arcontio.View.ArcGraph
                 TryParseTargetId(target, out int actorId) &&
                 TryFindActor(actorId, out ArcGraphActorRenderItem actor))
             {
-                anchorWorldPosition = new Vector3(actor.VisualX, actor.VisualY + preset.Normalize().WorldOffsetY, actor.VisualZ);
+                anchorWorldPosition = new Vector3(
+                    actor.DiscreteCell.X + 0.5f,
+                    actor.VisualY + preset.Normalize().WorldOffsetY,
+                    actor.VisualZ);
                 viewModel = CreateNpcViewModel(target);
                 return true;
             }
@@ -635,7 +638,11 @@ namespace Arcontio.View.ArcGraph
             _currentViewModel = viewModel;
 
             if (_titleText != null)
+            {
                 _titleText.text = CreateCompactTitle(viewModel);
+                _titleText.enabled = true;
+                _titleText.color = preset.Normalize().TextColor;
+            }
 
             ApplyDynamicMenuWidth();
 
@@ -862,6 +869,7 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             ArcGraphSelectionActionMenuPreset safePreset = preset.Normalize();
+            _titleText.ForceMeshUpdate(true, true);
             float titleWidth = Mathf.Ceil(_titleText.GetPreferredValues(_titleText.text).x);
             float safeTitleWidth = Mathf.Max(8f, titleWidth + CompactTitleHorizontalPadding);
 
@@ -877,11 +885,19 @@ namespace Arcontio.View.ArcGraph
                 CompactButtonSize +
                 CompactInterItemSpacing +
                 safeTitleWidth +
+                CompactInterItemSpacing +
                 CompactButtonSize;
 
             _menuRoot.sizeDelta = new Vector2(
                 Mathf.Max(safePreset.Width, contentWidth),
                 safePreset.Height);
+
+            // Dopo il cambio di preferredWidth il LayoutGroup aggiorna davvero i
+            // figli solo nel ciclo UI successivo. Forziamo il rebuild qui perche'
+            // il pannellino deve mostrare subito il nome, nello stesso frame in cui
+            // la selezione produce il ViewModel.
+            LayoutRebuilder.ForceRebuildLayoutImmediate(_menuRoot);
+            _titleText.ForceMeshUpdate(true, true);
         }
 
         private static string CreateCompactTitle(ArcGraphSelectionActionMenuViewModel viewModel)
@@ -911,7 +927,8 @@ namespace Arcontio.View.ArcGraph
             label.fontStyle = fontStyle;
             label.alignment = alignment;
             label.textWrappingMode = TextWrappingModes.NoWrap;
-            label.overflowMode = TextOverflowModes.Ellipsis;
+            label.overflowMode = TextOverflowModes.Overflow;
+            label.enableWordWrapping = false;
             ArcGraphUiFontProvider.ApplyOfficialFont(label);
             return label;
         }
