@@ -67,6 +67,7 @@ namespace Arcontio.View.ArcGraph
         private const float TabCellHeight = 30f;
         private const float TabSpacing = 4f;
         private const int TabColumnsPerRow = 4;
+        private const float RuntimeRefreshIntervalSeconds = 0.5f;
 
         [SerializeField] private bool inspectorEnabled = true;
 
@@ -75,6 +76,7 @@ namespace Arcontio.View.ArcGraph
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiInspectionController _inspectionController;
         private readonly ArcUiInspectorViewModelFactory _viewModelFactory = new();
+        private readonly ArcUiInspectorRuntimeSnapshotProvider _runtimeSnapshotProvider = new();
         private RectTransform _panelRoot;
         private RectTransform _headerRoot;
         private RectTransform _tabRoot;
@@ -86,6 +88,7 @@ namespace Arcontio.View.ArcGraph
         private string _activeTabKey = string.Empty;
         private ArcGraphRightInspectorMode _lastMode = ArcGraphRightInspectorMode.Hidden;
         private ArcUiSelectionTarget _lastTarget = ArcUiSelectionTarget.None("right_inspector");
+        private float _lastRuntimeRefreshTime = -999f;
 
         // =============================================================================
         // Update
@@ -122,12 +125,19 @@ namespace Arcontio.View.ArcGraph
                 if (!_panelRoot.gameObject.activeSelf)
                     _panelRoot.gameObject.SetActive(true);
 
+                if (ShouldRefreshRuntimeInspector(target))
+                {
+                    ApplyContext(mode, target, actionRequest, true);
+                    _lastRuntimeRefreshTime = Time.unscaledTime;
+                }
+
                 return;
             }
 
             _lastMode = mode;
             _lastTarget = target;
             ApplyContext(mode, target, actionRequest);
+            _lastRuntimeRefreshTime = Time.unscaledTime;
             _panelRoot.gameObject.SetActive(true);
         }
 
@@ -169,6 +179,21 @@ namespace Arcontio.View.ArcGraph
         public void SetSelectionActionController(ArcUiSelectionActionController controller)
         {
             _selectionActionController = controller;
+        }
+
+        // =============================================================================
+        // SetRuntimeContextProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il provider runtime autorizzato usato dalla factory per creare
+        /// snapshot read-only dell'inspector.
+        /// </para>
+        /// </summary>
+        public void SetRuntimeContextProvider(ArcGraphRuntimeContextProvider provider)
+        {
+            _runtimeSnapshotProvider.SetRuntimeContextProvider(provider);
+            _viewModelFactory.SetRuntimeSnapshotProvider(_runtimeSnapshotProvider);
         }
 
         // =============================================================================
@@ -263,7 +288,7 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
-            _headerRoot = CreatePanelBlock(_panelRoot, "Header", 82f);
+            _headerRoot = CreatePanelBlock(_panelRoot, "Header", 112f);
             _tabRoot = CreateRect("TabBar", _panelRoot);
             _tabLayout = _tabRoot.gameObject.AddComponent<LayoutElement>();
             _tabLayout.preferredHeight = TabCellHeight;
@@ -283,14 +308,17 @@ namespace Arcontio.View.ArcGraph
         private void ApplyContext(
             ArcGraphRightInspectorMode mode,
             ArcUiSelectionTarget target,
-            ArcUiSelectionActionRequest actionRequest)
+            ArcUiSelectionActionRequest actionRequest,
+            bool preserveActiveTab = false)
         {
             ArcUiInspectorViewModel viewModel = actionRequest.IsValid
                 ? _viewModelFactory.BuildForAction(actionRequest)
                 : _viewModelFactory.BuildForSelection(target);
 
             _currentViewModel = viewModel;
-            _activeTabKey = ResolveInitialActiveTabKey(viewModel);
+            _activeTabKey = preserveActiveTab && ContainsTab(viewModel, _activeTabKey)
+                ? _activeTabKey
+                : ResolveInitialActiveTabKey(viewModel);
             RenderViewModel(mode, viewModel);
 
             if (_inspectionController != null)
@@ -311,6 +339,12 @@ namespace Arcontio.View.ArcGraph
             ArcUiInspectorViewModel viewModel)
         {
             ClearChildren(_headerRoot);
+
+            if (viewModel.Target.Kind == ArcUiSelectionTargetKind.Npc)
+            {
+                BuildNpcHeader(mode, viewModel);
+                return;
+            }
 
             VerticalLayoutGroup layout = GetOrAddVerticalLayout(_headerRoot);
             layout.padding = new RectOffset(10, 10, 8, 8);
@@ -336,6 +370,70 @@ namespace Arcontio.View.ArcGraph
                 _headerRoot,
                 ResolveTargetKindLabel(viewModel.Target.Kind),
                 12,
+                FontStyles.Normal,
+                TextAlignmentOptions.Left);
+        }
+
+        private void BuildNpcHeader(
+            ArcGraphRightInspectorMode mode,
+            ArcUiInspectorViewModel viewModel)
+        {
+            VerticalLayoutGroup rootLayout = GetOrAddVerticalLayout(_headerRoot);
+            rootLayout.padding = new RectOffset(10, 10, 8, 8);
+            rootLayout.spacing = 0f;
+            rootLayout.childControlWidth = true;
+            rootLayout.childControlHeight = true;
+            rootLayout.childForceExpandWidth = true;
+            rootLayout.childForceExpandHeight = true;
+
+            RectTransform row = CreateRect("NpcHeaderRow", _headerRoot);
+            LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
+            rowLayout.preferredHeight = 92f;
+
+            HorizontalLayoutGroup horizontal = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            horizontal.padding = new RectOffset(0, 0, 0, 0);
+            horizontal.spacing = 10f;
+            horizontal.childControlWidth = true;
+            horizontal.childControlHeight = true;
+            horizontal.childForceExpandWidth = false;
+            horizontal.childForceExpandHeight = true;
+
+            CreateNpcPortraitSlot(row);
+
+            RectTransform details = CreateRect("NpcHeaderDetails", row);
+            LayoutElement detailsLayout = details.gameObject.AddComponent<LayoutElement>();
+            detailsLayout.flexibleWidth = 1f;
+
+            VerticalLayoutGroup detailsGroup = details.gameObject.AddComponent<VerticalLayoutGroup>();
+            detailsGroup.padding = new RectOffset(0, 0, 0, 0);
+            detailsGroup.spacing = 1f;
+            detailsGroup.childControlWidth = true;
+            detailsGroup.childControlHeight = false;
+            detailsGroup.childForceExpandWidth = true;
+            detailsGroup.childForceExpandHeight = false;
+
+            _titleText = CreateText(
+                details,
+                string.IsNullOrWhiteSpace(viewModel.Title) ? "NPC" : viewModel.Title,
+                17,
+                FontStyles.Bold,
+                TextAlignmentOptions.Left);
+            _subtitleText = CreateText(
+                details,
+                ResolveModeLabel(mode),
+                12,
+                FontStyles.Normal,
+                TextAlignmentOptions.Left);
+            CreateText(
+                details,
+                "NPC",
+                12,
+                FontStyles.Normal,
+                TextAlignmentOptions.Left);
+            CreateText(
+                details,
+                "Scheda read-only",
+                11,
                 FontStyles.Normal,
                 TextAlignmentOptions.Left);
         }
@@ -414,10 +512,23 @@ namespace Arcontio.View.ArcGraph
         {
             _lastMode = ArcGraphRightInspectorMode.Hidden;
             _lastTarget = ArcUiSelectionTarget.None("right_inspector");
+            _lastRuntimeRefreshTime = -999f;
             _inspectionController?.Clear();
 
             if (_panelRoot != null && _panelRoot.gameObject.activeSelf)
                 _panelRoot.gameObject.SetActive(false);
+        }
+
+        private bool ShouldRefreshRuntimeInspector(ArcUiSelectionTarget target)
+        {
+            // Per ora solo la scheda NPC legge dati runtime che cambiano nel tempo
+            // mentre la selezione resta la stessa: bisogni, azione corrente, job ed
+            // explainability. Oggetti e muri restano statici finche' non colleghiamo
+            // i rispettivi snapshot nello step successivo.
+            if (target.Kind != ArcUiSelectionTargetKind.Npc)
+                return false;
+
+            return Time.unscaledTime - _lastRuntimeRefreshTime >= RuntimeRefreshIntervalSeconds;
         }
 
         // =============================================================================
@@ -566,6 +677,33 @@ namespace Arcontio.View.ArcGraph
             LayoutElement layout = rect.gameObject.AddComponent<LayoutElement>();
             layout.preferredHeight = preferredHeight;
             return rect;
+        }
+
+        private static void CreateNpcPortraitSlot(RectTransform parent)
+        {
+            // Lo slot e' volutamente solo un riquadro UGUI. Quando arriveranno le
+            // foto segnaletiche o gli sprite portrait, potremo sostituire il testo
+            // interno con un'immagine senza cambiare il contratto ViewModel.
+            RectTransform portrait = CreateRect("NpcPortraitSlot", parent);
+            LayoutElement layout = portrait.gameObject.AddComponent<LayoutElement>();
+            layout.preferredWidth = 64f;
+            layout.preferredHeight = 84f;
+
+            Image image = portrait.gameObject.AddComponent<Image>();
+            image.raycastTarget = false;
+            image.color = ColorFromHex("#0D151D", 0.96f);
+
+            Outline outline = portrait.gameObject.AddComponent<Outline>();
+            outline.effectColor = ColorFromHex("#405566", 0.92f);
+            outline.effectDistance = new Vector2(1f, -1f);
+
+            TextMeshProUGUI label = CreateText(
+                portrait,
+                "PORTRAIT",
+                8,
+                FontStyles.Normal,
+                TextAlignmentOptions.Center);
+            label.color = ColorFromHex("#7E91A0", 1f);
         }
 
         private static Button CreateTabButton(

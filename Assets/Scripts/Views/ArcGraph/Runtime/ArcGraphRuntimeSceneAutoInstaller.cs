@@ -360,6 +360,7 @@ namespace Arcontio.View.ArcGraph
             _rightInspectorView.SetUiRoot(_uiRoot);
             _rightInspectorView.SetSelectionConsumer(_uiSelectionConsumer);
             _rightInspectorView.SetSelectionActionController(_selectionActionController);
+            _rightInspectorView.SetRuntimeContextProvider(_contextProvider);
             _rightInspectorView.SetInspectionController(_inspectionController);
             _rightInspectorView.SetInspectorEnabled(true);
             _selectionConsumer.SetSelectionEnabled(false);

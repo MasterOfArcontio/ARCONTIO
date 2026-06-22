@@ -33,6 +33,29 @@ namespace Arcontio.View.ArcGraph
         private const string EditTabKey = "edit";
         private const string DeleteTabKey = "delete";
 
+        private ArcUiInspectorRuntimeSnapshotProvider _runtimeSnapshotProvider;
+
+        // =============================================================================
+        // SetRuntimeSnapshotProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il provider opzionale che puo' produrre snapshot runtime
+        /// read-only gia' formattati per l'inspector.
+        /// </para>
+        ///
+        /// <para><b>Boundary separato dalla view</b></para>
+        /// <para>
+        /// La factory continua a ricevere contratti UI. Quando esiste un provider
+        /// autorizzato, delega a lui la costruzione del ViewModel specifico invece
+        /// di far leggere al pannello UGUI strutture runtime mutabili.
+        /// </para>
+        /// </summary>
+        public void SetRuntimeSnapshotProvider(ArcUiInspectorRuntimeSnapshotProvider provider)
+        {
+            _runtimeSnapshotProvider = provider;
+        }
+
         // =============================================================================
         // BuildForSelection
         // =============================================================================
@@ -52,6 +75,13 @@ namespace Arcontio.View.ArcGraph
         {
             if (!target.IsValid)
                 return ArcUiInspectorViewModel.Empty();
+
+            if (target.Kind == ArcUiSelectionTargetKind.Npc
+                && _runtimeSnapshotProvider != null
+                && _runtimeSnapshotProvider.TryBuildNpcViewModel(target, out ArcUiInspectorViewModel npcViewModel))
+            {
+                return npcViewModel;
+            }
 
             ArcUiInspectorTab[] tabs = target.Kind switch
             {
