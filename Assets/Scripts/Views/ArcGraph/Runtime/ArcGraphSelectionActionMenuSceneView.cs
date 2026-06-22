@@ -718,7 +718,11 @@ namespace Arcontio.View.ArcGraph
 
             if (_hungerFill != null)
             {
-                float fill01 = viewModel.HasHungerValue ? viewModel.HungerLevel01 : 0f;
+                // HungerLevel01 rappresenta la fame crescente: 0 significa nessuna
+                // fame, 1 significa fame massima. La barra richiesta deve invece
+                // comportarsi come una riserva che si svuota, quindi visualizziamo
+                // il valore inverso.
+                float fill01 = viewModel.HasHungerValue ? 1f - viewModel.HungerLevel01 : 0f;
                 RectTransform fillTransform = (RectTransform)_hungerFill.transform;
                 fillTransform.anchorMin = Vector2.zero;
                 fillTransform.anchorMax = new Vector2(fill01, 1f);

@@ -56,7 +56,10 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private Vector3 selectionMarkerLocalOffset = new Vector3(0f, -0.16f, 0f);
         [SerializeField] private Vector2 selectionMarkerLocalScale = Vector2.one;
         [SerializeField] private Color selectionMarkerTint = new Color(0.2f, 0.75f, 1f, 0.75f);
-        [SerializeField] private int selectionMarkerSortingOffset = 3;
+        // Il marker di selezione deve restare sotto tutto l'NPC layered. L'ombra
+        // usa -2, quindi -1 lascia il marker sopra l'ombra ma dietro gambe, corpo,
+        // braccia e testa, evitando che attraversi alcuni layer anatomici.
+        [SerializeField] private int selectionMarkerSortingOffset = -1;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float actorZOffset = -0.02f;
@@ -1012,8 +1015,41 @@ namespace Arcontio.View.ArcGraph
                 1f);
             markerRenderer.sprite = GetOrCreateSelectionMarkerSprite();
             markerRenderer.color = selectionMarkerTint;
-            markerRenderer.sortingOrder = handle.LastSortingOrder + selectionMarkerSortingOffset;
+            markerRenderer.sortingOrder = handle.LastSortingOrder + ResolveSelectionMarkerSortingOffset();
             markerRenderer.enabled = true;
+        }
+
+        // =============================================================================
+        // ResolveSelectionMarkerSortingOffset
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce un offset sorting sicuro per il marker di selezione NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: fallback runtime contro serializzazione vecchia</b></para>
+        /// <para>
+        /// Il campo resta configurabile da Inspector, ma la vista impedisce che un
+        /// vecchio valore positivo gia' serializzato faccia passare il marker sopra
+        /// una parte dell'NPC layered. La correzione resta confinata al rendering e
+        /// non modifica dati simulativi o selection state.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Offset negativo</b>: valore valido, usato cosi' com'e'.</item>
+        ///   <item><b>Offset zero/positivo</b>: fallback a <c>-1</c>, dietro l'NPC.</item>
+        /// </list>
+        /// </summary>
+        private int ResolveSelectionMarkerSortingOffset()
+        {
+            // Alcune scene possono avere gia' serializzato il vecchio valore +3.
+            // In quel caso il default dello script non basta: forziamo comunque
+            // il marker sotto l'NPC, lasciando validi solo offset negativi scelti
+            // esplicitamente per stare dietro alle parti anatomiche.
+            return selectionMarkerSortingOffset < 0
+                ? selectionMarkerSortingOffset
+                : -1;
         }
 
         // =============================================================================
