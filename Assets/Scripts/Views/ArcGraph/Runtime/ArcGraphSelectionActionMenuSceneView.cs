@@ -61,8 +61,8 @@ namespace Arcontio.View.ArcGraph
         {
             return new ArcGraphSelectionActionMenuPreset
             {
-                Width = 46f,
-                Height = 11f,
+                Width = 53f,
+                Height = 13f,
                 WorldOffsetY = 1.45f,
                 ScreenOffsetY = 6f,
                 PanelAlpha = 0.86f,
@@ -89,8 +89,8 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphSelectionActionMenuPreset Normalize()
         {
             ArcGraphSelectionActionMenuPreset normalized = this;
-            normalized.Width = Width > 20f ? Width : 46f;
-            normalized.Height = Height > 8f ? Height : 11f;
+            normalized.Width = Width > 20f ? Width : 53f;
+            normalized.Height = Height > 8f ? Height : 13f;
             normalized.WorldOffsetY = Mathf.Abs(WorldOffsetY) > 0.001f ? WorldOffsetY : 1.45f;
             normalized.ScreenOffsetY = Mathf.Abs(ScreenOffsetY) > 0.001f ? ScreenOffsetY : 6f;
             normalized.PanelAlpha = Mathf.Clamp01(PanelAlpha <= 0f ? 0.86f : PanelAlpha);
@@ -230,6 +230,13 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphSelectionActionMenuSceneView : MonoBehaviour
     {
+        private const float CompactButtonSize = 10.35f;
+        private const float CompactButtonFontSize = 7f;
+        private const float CompactTitleFontSize = 8f;
+        private const float CompactTitleHorizontalPadding = 8f;
+        private const float CompactOuterHorizontalPadding = 2f;
+        private const float CompactInterItemSpacing = 2f;
+
         [SerializeField] private bool menuEnabled = true;
         [SerializeField] private Camera sceneCamera;
         [SerializeField] private ArcGraphSelectionActionMenuPreset preset = ArcGraphSelectionActionMenuPreset.Default();
@@ -242,6 +249,7 @@ namespace Arcontio.View.ArcGraph
         private CanvasGroup _canvasGroup;
         private Image _panelImage;
         private TextMeshProUGUI _titleText;
+        private LayoutElement _titleLayout;
         private TextMeshProUGUI _subtitleText;
         private RectTransform _hungerRoot;
         private Image _hungerFill;
@@ -463,11 +471,11 @@ namespace Arcontio.View.ArcGraph
             _editButton.onClick.AddListener(OnEditClicked);
 
             RectTransform titleRoot = CreateRect("Title", _menuRoot);
-            LayoutElement titleLayout = titleRoot.gameObject.AddComponent<LayoutElement>();
-            titleLayout.minWidth = 6f;
-            titleLayout.flexibleWidth = 1f;
+            _titleLayout = titleRoot.gameObject.AddComponent<LayoutElement>();
+            _titleLayout.minWidth = 8f;
+            _titleLayout.flexibleWidth = 0f;
 
-            _titleText = CreateText(titleRoot, "Sel.", 7, FontStyles.Bold, TextAlignmentOptions.Center);
+            _titleText = CreateText(titleRoot, "Sel.", CompactTitleFontSize, FontStyles.Bold, TextAlignmentOptions.Center);
             _subtitleText = null;
             _hungerRoot = null;
             _hungerFill = null;
@@ -485,6 +493,9 @@ namespace Arcontio.View.ArcGraph
 
             if (_menuRoot != null)
                 _menuRoot.sizeDelta = new Vector2(safePreset.Width, safePreset.Height);
+
+            ApplyCompactButtonSize(_editButton, CompactButtonSize);
+            ApplyCompactButtonSize(_deleteButton, CompactButtonSize);
 
             if (_canvasGroup != null)
                 _canvasGroup.alpha = safePreset.PanelAlpha;
@@ -625,6 +636,8 @@ namespace Arcontio.View.ArcGraph
 
             if (_titleText != null)
                 _titleText.text = CreateCompactTitle(viewModel);
+
+            ApplyDynamicMenuWidth();
 
             if (_subtitleText != null)
                 _subtitleText.text = viewModel.Subtitle;
@@ -780,11 +793,27 @@ namespace Arcontio.View.ArcGraph
             button.targetGraphic = image;
             button.transition = Selectable.Transition.ColorTint;
 
-            CreateText(rect, label, 6, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(rect, label, CompactButtonFontSize, FontStyles.Bold, TextAlignmentOptions.Center);
             return button;
         }
 
         private static void ConfigureCompactButton(Button button)
+        {
+            if (button == null)
+                return;
+
+            ApplyCompactButtonSize(button, CompactButtonSize);
+        }
+
+        // =============================================================================
+        // ApplyCompactButtonSize
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica dimensione quadrata stabile ai pulsanti Modifica/Elimina.
+        /// </para>
+        /// </summary>
+        private static void ApplyCompactButtonSize(Button button, float size)
         {
             if (button == null)
                 return;
@@ -797,12 +826,62 @@ namespace Arcontio.View.ArcGraph
             if (layout == null)
                 layout = rect.gameObject.AddComponent<LayoutElement>();
 
-            layout.minWidth = 9f;
-            layout.preferredWidth = 9f;
-            layout.minHeight = 9f;
-            layout.preferredHeight = 9f;
+            layout.minWidth = size;
+            layout.preferredWidth = size;
+            layout.minHeight = size;
+            layout.preferredHeight = size;
             layout.flexibleWidth = 0f;
             layout.flexibleHeight = 0f;
+        }
+
+        // =============================================================================
+        // ApplyDynamicMenuWidth
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Adatta la larghezza del pannellino al nome reale del target selezionato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: contenuto UI derivato da ViewModel</b></para>
+        /// <para>
+        /// La misura viene calcolata dal testo gia' presente nella label, quindi il
+        /// pannello non interroga NPC, oggetti, muri o World. La UI resta consumer
+        /// passivo del ViewModel e modifica soltanto la propria geometria UGUI.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>titleWidth</b>: larghezza preferita TextMeshPro del nome.</item>
+        ///   <item><b>_titleLayout</b>: layout centrale espanso al contenuto.</item>
+        ///   <item><b>_menuRoot.sizeDelta</b>: larghezza finale centrata sul target.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyDynamicMenuWidth()
+        {
+            if (_menuRoot == null || _titleText == null || _titleLayout == null)
+                return;
+
+            ArcGraphSelectionActionMenuPreset safePreset = preset.Normalize();
+            float titleWidth = Mathf.Ceil(_titleText.GetPreferredValues(_titleText.text).x);
+            float safeTitleWidth = Mathf.Max(8f, titleWidth + CompactTitleHorizontalPadding);
+
+            // La larghezza finale resta centrata sul pivot del pannello. In questo
+            // modo, anche quando il nome e' lungo, l'asse X del pannellino rimane
+            // esattamente sopra l'asse X del target selezionato.
+            _titleLayout.minWidth = safeTitleWidth;
+            _titleLayout.preferredWidth = safeTitleWidth;
+            _titleLayout.flexibleWidth = 0f;
+
+            float contentWidth =
+                CompactOuterHorizontalPadding +
+                CompactButtonSize +
+                CompactInterItemSpacing +
+                safeTitleWidth +
+                CompactButtonSize;
+
+            _menuRoot.sizeDelta = new Vector2(
+                Mathf.Max(safePreset.Width, contentWidth),
+                safePreset.Height);
         }
 
         private static string CreateCompactTitle(ArcGraphSelectionActionMenuViewModel viewModel)
@@ -815,7 +894,7 @@ namespace Arcontio.View.ArcGraph
         private static TextMeshProUGUI CreateText(
             RectTransform parent,
             string text,
-            int fontSize,
+            float fontSize,
             FontStyles fontStyle,
             TextAlignmentOptions alignment)
         {
