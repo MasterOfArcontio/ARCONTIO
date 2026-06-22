@@ -24,6 +24,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>VisualX/Y/Z</b>: posizione grafica frazionaria.</item>
     ///   <item><b>SpriteKey</b>: chiave sprite provvisoria.</item>
     ///   <item><b>ActorMode</b>: LOD actor risolto.</item>
+    ///   <item><b>Hunger01</b>: valore fame read-only copiato dallo snapshot actor.</item>
     ///   <item><b>SortKey</b>: ordinamento deterministico.</item>
     /// </list>
     /// </summary>
@@ -40,6 +41,8 @@ namespace Arcontio.View.ArcGraph
         public readonly bool AllowsLayeredActorSprites;
         public readonly bool HasMotion;
         public readonly float MotionProgress01;
+        public readonly bool HasHungerValue;
+        public readonly float Hunger01;
         public readonly bool IsVisible;
         public readonly string HiddenReason;
         public readonly ArcGraphRenderSortKey SortKey;
@@ -73,7 +76,9 @@ namespace Arcontio.View.ArcGraph
             float motionProgress01,
             bool isVisible,
             string hiddenReason,
-            ArcGraphRenderSortKey sortKey)
+            ArcGraphRenderSortKey sortKey,
+            bool hasHungerValue = false,
+            float hunger01 = 0f)
         {
             ActorId = actorId;
             DiscreteCell = discreteCell;
@@ -86,6 +91,8 @@ namespace Arcontio.View.ArcGraph
             AllowsLayeredActorSprites = allowsLayeredActorSprites;
             HasMotion = hasMotion;
             MotionProgress01 = Clamp01(motionProgress01);
+            HasHungerValue = hasHungerValue;
+            Hunger01 = Clamp01(hunger01);
             IsVisible = isVisible;
             HiddenReason = string.IsNullOrWhiteSpace(hiddenReason) ? "None" : hiddenReason;
             SortKey = sortKey;

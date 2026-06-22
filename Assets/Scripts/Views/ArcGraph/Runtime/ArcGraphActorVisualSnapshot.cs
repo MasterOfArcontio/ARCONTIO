@@ -22,6 +22,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Cell</b>: cella discreta attuale nota alla simulazione.</item>
     ///   <item><b>BaseSpriteKey</b>: chiave Resources o catalogo sprite futuro.</item>
     ///   <item><b>Motion</b>: progresso visuale facoltativo tra due celle.</item>
+    ///   <item><b>Hunger01</b>: valore fame copiato dal componente Needs.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphActorVisualSnapshot
@@ -30,6 +31,8 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphCellCoord Cell;
         public readonly string BaseSpriteKey;
         public readonly ArcGraphActorMotionSnapshot Motion;
+        public readonly bool HasHungerValue;
+        public readonly float Hunger01;
 
         public bool HasMotion => Motion.IsActive;
 
@@ -59,12 +62,16 @@ namespace Arcontio.View.ArcGraph
             int actorId,
             ArcGraphCellCoord cell,
             string baseSpriteKey,
-            ArcGraphActorMotionSnapshot motion)
+            ArcGraphActorMotionSnapshot motion,
+            bool hasHungerValue = false,
+            float hunger01 = 0f)
         {
             ActorId = actorId;
             Cell = cell;
             BaseSpriteKey = baseSpriteKey ?? string.Empty;
             Motion = motion;
+            HasHungerValue = hasHungerValue;
+            Hunger01 = Clamp01(hunger01);
         }
 
         // =============================================================================
@@ -94,6 +101,17 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphActorVisualPoseSnapshot ResolvePose()
         {
             return ArcGraphActorVisualPoseSnapshot.FromActorSnapshot(this);
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value <= 0f)
+                return 0f;
+
+            if (value >= 1f)
+                return 1f;
+
+            return value;
         }
     }
 

@@ -236,6 +236,10 @@ namespace Arcontio.View.ArcGraph
         private const float CompactTitleHorizontalPadding = 8f;
         private const float CompactOuterHorizontalPadding = 4f;
         private const float CompactInterItemSpacing = 2f;
+        private const float CompactTopRowHeight = 13f;
+        private const float CompactHungerBarHeight = 3f;
+        private const float CompactHungerBarGap = 1f;
+        private const float CompactVerticalPadding = 3f;
 
         [SerializeField] private bool menuEnabled = true;
         [SerializeField] private Camera sceneCamera;
@@ -246,6 +250,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphRenderQueue _renderQueue;
         private RectTransform _overlayRoot;
         private RectTransform _menuRoot;
+        private RectTransform _topRowRoot;
         private CanvasGroup _canvasGroup;
         private Image _panelImage;
         private TextMeshProUGUI _titleText;
@@ -438,13 +443,13 @@ namespace Arcontio.View.ArcGraph
             _canvasGroup.interactable = true;
             _canvasGroup.blocksRaycasts = true;
 
-            HorizontalLayoutGroup layout = _menuRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(2, 2, 1, 1);
-            layout.spacing = CompactInterItemSpacing;
+            VerticalLayoutGroup layout = _menuRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(2, 2, 1, 2);
+            layout.spacing = CompactHungerBarGap;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
-            layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
 
             BuildCompactActionMenu();
             ApplyPresetToBuiltUi();
@@ -466,24 +471,77 @@ namespace Arcontio.View.ArcGraph
 
         private void BuildCompactActionMenu()
         {
-            _editButton = CreateButton(_menuRoot, "Edit", "M");
+            _topRowRoot = CreateRect("TopRow", _menuRoot);
+            LayoutElement topRowLayout = _topRowRoot.gameObject.AddComponent<LayoutElement>();
+            topRowLayout.minHeight = CompactTopRowHeight;
+            topRowLayout.preferredHeight = CompactTopRowHeight;
+
+            HorizontalLayoutGroup topRow = _topRowRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
+            topRow.padding = new RectOffset(0, 0, 0, 0);
+            topRow.spacing = CompactInterItemSpacing;
+            topRow.childControlWidth = true;
+            topRow.childControlHeight = true;
+            topRow.childForceExpandWidth = false;
+            topRow.childForceExpandHeight = true;
+
+            _editButton = CreateButton(_topRowRoot, "Edit", "M");
             ConfigureCompactButton(_editButton);
             _editButton.onClick.AddListener(OnEditClicked);
 
-            RectTransform titleRoot = CreateRect("Title", _menuRoot);
+            RectTransform titleRoot = CreateRect("Title", _topRowRoot);
             _titleLayout = titleRoot.gameObject.AddComponent<LayoutElement>();
             _titleLayout.minWidth = 8f;
             _titleLayout.flexibleWidth = 0f;
 
             _titleText = CreateText(titleRoot, "Sel.", CompactTitleFontSize, FontStyles.Normal, TextAlignmentOptions.Center);
             _subtitleText = null;
-            _hungerRoot = null;
-            _hungerFill = null;
+            BuildHungerBar();
             _hungerText = null;
 
-            _deleteButton = CreateButton(_menuRoot, "Delete", "X");
+            _deleteButton = CreateButton(_topRowRoot, "Delete", "X");
             ConfigureCompactButton(_deleteButton);
             _deleteButton.onClick.AddListener(OnDeleteClicked);
+        }
+
+        // =============================================================================
+        // BuildHungerBar
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la barra fame compatta sotto la riga nome/pulsanti.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: indicatore UI da ViewModel</b></para>
+        /// <para>
+        /// La barra e' solo una proiezione visuale del valore <c>HungerLevel01</c>
+        /// gia' presente nel ViewModel. Non legge il <c>World</c>, non conosce
+        /// <c>NpcNeeds</c> e non modifica alcun dato simulativo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>_hungerRoot</b>: track orizzontale larga quanto il pannello.</item>
+        ///   <item><b>_hungerFill</b>: fill ancorato a sinistra e scalato su X.</item>
+        /// </list>
+        /// </summary>
+        private void BuildHungerBar()
+        {
+            _hungerRoot = CreateRect("HungerBar", _menuRoot);
+            LayoutElement hungerLayout = _hungerRoot.gameObject.AddComponent<LayoutElement>();
+            hungerLayout.minHeight = CompactHungerBarHeight;
+            hungerLayout.preferredHeight = CompactHungerBarHeight;
+
+            Image background = _hungerRoot.gameObject.AddComponent<Image>();
+            background.raycastTarget = false;
+
+            RectTransform fillRoot = CreateRect("Fill", _hungerRoot);
+            fillRoot.anchorMin = Vector2.zero;
+            fillRoot.anchorMax = Vector2.one;
+            fillRoot.offsetMin = Vector2.zero;
+            fillRoot.offsetMax = Vector2.zero;
+
+            _hungerFill = fillRoot.gameObject.AddComponent<Image>();
+            _hungerFill.raycastTarget = false;
         }
 
         private void ApplyPresetToBuiltUi()
@@ -540,7 +598,7 @@ namespace Arcontio.View.ArcGraph
                     actor.DiscreteCell.X + 0.5f,
                     actor.VisualY + preset.Normalize().WorldOffsetY,
                     actor.VisualZ);
-                viewModel = CreateNpcViewModel(target);
+                viewModel = CreateNpcViewModel(target, actor);
                 return true;
             }
 
@@ -574,16 +632,18 @@ namespace Arcontio.View.ArcGraph
             return false;
         }
 
-        private ArcGraphSelectionActionMenuViewModel CreateNpcViewModel(ArcUiSelectionTarget target)
+        private ArcGraphSelectionActionMenuViewModel CreateNpcViewModel(
+            ArcUiSelectionTarget target,
+            ArcGraphActorRenderItem actor)
         {
             return new ArcGraphSelectionActionMenuViewModel(
                 true,
                 target,
                 string.IsNullOrWhiteSpace(target.DisplayName) ? "NPC " + target.Id : target.DisplayName,
-                "Fame n/d",
+                actor.HasHungerValue ? "Fame " + Mathf.RoundToInt(actor.Hunger01 * 100f) + "%" : "Fame n/d",
                 true,
-                false,
-                0f,
+                actor.HasHungerValue,
+                actor.Hunger01,
                 "edit_selected_npc",
                 "delete_selected_npc");
         }
@@ -612,7 +672,16 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphSelectionActionMenuViewModel CreateFallbackViewModel(ArcUiSelectionTarget target)
         {
             if (target.Kind == ArcUiSelectionTargetKind.Npc)
-                return CreateNpcViewModel(target);
+                return new ArcGraphSelectionActionMenuViewModel(
+                    true,
+                    target,
+                    string.IsNullOrWhiteSpace(target.DisplayName) ? "NPC " + target.Id : target.DisplayName,
+                    "Fame n/d",
+                    true,
+                    false,
+                    0f,
+                    "edit_selected_npc",
+                    "delete_selected_npc");
 
             string editOperationKey = target.Kind == ArcUiSelectionTargetKind.Wall
                 ? "edit_selected_wall"
@@ -644,11 +713,6 @@ namespace Arcontio.View.ArcGraph
                 _titleText.color = preset.Normalize().TextColor;
             }
 
-            ApplyDynamicMenuWidth();
-
-            if (_subtitleText != null)
-                _subtitleText.text = viewModel.Subtitle;
-
             if (_hungerRoot != null)
                 _hungerRoot.gameObject.SetActive(viewModel.HasHungerBar);
 
@@ -656,7 +720,10 @@ namespace Arcontio.View.ArcGraph
             {
                 float fill01 = viewModel.HasHungerValue ? viewModel.HungerLevel01 : 0f;
                 RectTransform fillTransform = (RectTransform)_hungerFill.transform;
+                fillTransform.anchorMin = Vector2.zero;
                 fillTransform.anchorMax = new Vector2(fill01, 1f);
+                fillTransform.offsetMin = Vector2.zero;
+                fillTransform.offsetMax = Vector2.zero;
             }
 
             if (_hungerText != null)
@@ -665,6 +732,11 @@ namespace Arcontio.View.ArcGraph
                     ? "Fame " + Mathf.RoundToInt(viewModel.HungerLevel01 * 100f) + "%"
                     : "Fame n/d";
             }
+
+            ApplyDynamicMenuWidth();
+
+            if (_subtitleText != null)
+                _subtitleText.text = viewModel.Subtitle;
         }
 
         private void ApplyScreenPosition(Vector3 anchorWorldPosition)
@@ -887,10 +959,14 @@ namespace Arcontio.View.ArcGraph
                 safeTitleWidth +
                 CompactInterItemSpacing +
                 CompactButtonSize;
+            float contentHeight = CompactTopRowHeight + CompactVerticalPadding;
+
+            if (_currentViewModel.HasHungerBar)
+                contentHeight += CompactHungerBarGap + CompactHungerBarHeight;
 
             _menuRoot.sizeDelta = new Vector2(
                 Mathf.Max(safePreset.Width, contentWidth),
-                safePreset.Height);
+                Mathf.Max(safePreset.Height, contentHeight));
 
             // Dopo il cambio di preferredWidth il LayoutGroup aggiorna davvero i
             // figli solo nel ciclo UI successivo. Forziamo il rebuild qui perche'

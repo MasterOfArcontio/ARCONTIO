@@ -154,7 +154,9 @@ namespace Arcontio.View.ArcGraph
                 pose.Progress01,
                 isVisible,
                 hiddenReason,
-                sortKey);
+                sortKey,
+                snapshot.HasHungerValue,
+                snapshot.Hunger01);
         }
 
         private static void Sort(IList<ArcGraphActorRenderItem> target)

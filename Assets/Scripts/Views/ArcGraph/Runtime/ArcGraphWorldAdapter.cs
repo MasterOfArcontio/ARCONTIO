@@ -248,13 +248,52 @@ namespace Arcontio.View.ArcGraph
                 var position = pair.Value;
                 var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(position.X, position.Y);
                 var motion = ResolveActorMotion(world, actorId, cell);
+                bool hasHungerValue = TryResolveActorHunger(world, actorId, out float hunger01);
 
                 target.Add(new ArcGraphActorVisualSnapshot(
                     actorId,
                     cell,
                     _defaultNpcSpriteKey,
-                    motion));
+                    motion,
+                    hasHungerValue,
+                    hunger01));
             }
+        }
+
+        // =============================================================================
+        // TryResolveActorHunger
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia il valore fame dell'NPC dal componente Needs del World.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: snapshot read-only per UI</b></para>
+        /// <para>
+        /// L'adapter e' il punto autorizzato che legge lo stato simulativo e lo
+        /// trasforma in payload visuale. La UI non riceve il dizionario
+        /// <c>world.Needs</c>, ma solo un float gia' copiato e normalizzato nella
+        /// pipeline ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>actorId</b>: NPC per cui leggere il bisogno Hunger.</item>
+        ///   <item><b>hunger01</b>: valore normalizzato 0-1 restituito alla snapshot.</item>
+        /// </list>
+        /// </summary>
+        private static bool TryResolveActorHunger(
+            World world,
+            int actorId,
+            out float hunger01)
+        {
+            hunger01 = 0f;
+
+            if (world == null || !world.Needs.TryGetValue(actorId, out NpcNeeds needs))
+                return false;
+
+            hunger01 = Clamp01(needs.GetValue(NeedKind.Hunger));
+            return true;
         }
 
         // =============================================================================
@@ -347,6 +386,25 @@ namespace Arcontio.View.ArcGraph
         private static int ResolveNonNegative(int value)
         {
             return value < 0 ? 0 : value;
+        }
+
+        // =============================================================================
+        // Clamp01
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riporta un valore float nel range normalizzato usato dai ViewModel.
+        /// </para>
+        /// </summary>
+        private static float Clamp01(float value)
+        {
+            if (value <= 0f)
+                return 0f;
+
+            if (value >= 1f)
+                return 1f;
+
+            return value;
         }
 
         // =============================================================================
