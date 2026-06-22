@@ -726,7 +726,54 @@ namespace Arcontio.View.ArcGraph
             // in questo modo il pannellino sale sempre di pochi pixel reali e non
             // cambia distanza apparente quando l'operatore zooma o fa pan.
             localPoint.y += preset.Normalize().ScreenOffsetY;
-            _menuRoot.anchoredPosition = localPoint;
+            _menuRoot.anchoredPosition = ClampMenuInsideMapViewport(localPoint);
+        }
+
+        private Vector2 ClampMenuInsideMapViewport(Vector2 localPoint)
+        {
+            if (_uiRoot == null ||
+                _overlayRoot == null ||
+                _menuRoot == null ||
+                !_uiRoot.TryResolveMapViewportScreenRect(out Rect viewportScreenRect))
+            {
+                return localPoint;
+            }
+
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _overlayRoot,
+                new Vector2(viewportScreenRect.xMin, viewportScreenRect.yMin),
+                null,
+                out Vector2 viewportMin);
+            RectTransformUtility.ScreenPointToLocalPointInRectangle(
+                _overlayRoot,
+                new Vector2(viewportScreenRect.xMax, viewportScreenRect.yMax),
+                null,
+                out Vector2 viewportMax);
+
+            float left = Mathf.Min(viewportMin.x, viewportMax.x);
+            float right = Mathf.Max(viewportMin.x, viewportMax.x);
+            float bottom = Mathf.Min(viewportMin.y, viewportMax.y);
+            float top = Mathf.Max(viewportMin.y, viewportMax.y);
+
+            ArcGraphSelectionActionMenuPreset safePreset = preset.Normalize();
+            float width = _menuRoot.rect.width > 1f ? _menuRoot.rect.width : safePreset.Width;
+            float height = _menuRoot.rect.height > 1f ? _menuRoot.rect.height : safePreset.Height;
+            float minX = left + width * 0.5f;
+            float maxX = right - width * 0.5f;
+            float minY = bottom;
+            float maxY = top - height;
+
+            if (maxX < minX)
+                localPoint.x = (left + right) * 0.5f;
+            else
+                localPoint.x = Mathf.Clamp(localPoint.x, minX, maxX);
+
+            if (maxY < minY)
+                localPoint.y = (bottom + top) * 0.5f;
+            else
+                localPoint.y = Mathf.Clamp(localPoint.y, minY, maxY);
+
+            return localPoint;
         }
 
         private void ShowMenu()

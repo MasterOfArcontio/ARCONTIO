@@ -490,6 +490,65 @@ namespace Arcontio.View.ArcGraph
                 ArcUiInspectorRow row = activeTab.Rows[i];
                 CreateInspectorRow(rowsRoot, row);
             }
+
+            FinalizeScrollContentLayout(rowsRoot);
+        }
+
+        private void FinalizeScrollContentLayout(RectTransform rowsRoot)
+        {
+            if (rowsRoot == null)
+                return;
+
+            // Lo ScrollRect di Unity puo' lasciare il Content a zero altezza se
+            // aspettiamo soltanto il ContentSizeFitter. Qui rendiamo esplicita
+            // l'altezza preferita prodotta dalle righe appena create, cosi' il
+            // RectMask2D della viewport non taglia tutto il contenuto.
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rowsRoot);
+
+            float preferredHeight = LayoutUtility.GetPreferredHeight(rowsRoot);
+            if (preferredHeight <= 1f)
+                preferredHeight = EstimateChildrenPreferredHeight(rowsRoot);
+
+            rowsRoot.SetSizeWithCurrentAnchors(
+                RectTransform.Axis.Vertical,
+                Mathf.Max(1f, preferredHeight));
+            rowsRoot.anchoredPosition = Vector2.zero;
+
+            LayoutRebuilder.ForceRebuildLayoutImmediate(rowsRoot);
+        }
+
+        private static float EstimateChildrenPreferredHeight(RectTransform root)
+        {
+            VerticalLayoutGroup layout = root != null ? root.GetComponent<VerticalLayoutGroup>() : null;
+            float height = layout != null ? layout.padding.top + layout.padding.bottom : 0f;
+            int visibleChildren = 0;
+
+            if (root == null)
+                return height;
+
+            for (int i = 0; i < root.childCount; i++)
+            {
+                RectTransform child = root.GetChild(i) as RectTransform;
+                if (child == null || !child.gameObject.activeSelf)
+                    continue;
+
+                float childHeight = LayoutUtility.GetPreferredHeight(child);
+                if (childHeight <= 0f)
+                {
+                    LayoutElement element = child.GetComponent<LayoutElement>();
+                    childHeight = element != null && element.preferredHeight > 0f
+                        ? element.preferredHeight
+                        : Mathf.Max(1f, child.rect.height);
+                }
+
+                height += childHeight;
+                visibleChildren++;
+            }
+
+            if (layout != null && visibleChildren > 1)
+                height += layout.spacing * (visibleChildren - 1);
+
+            return height;
         }
 
         private static bool TryResolveActiveTab(
