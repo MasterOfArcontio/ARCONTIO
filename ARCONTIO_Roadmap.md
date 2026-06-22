@@ -16696,7 +16696,7 @@ Roadmap operativa:
 | v0.70.02 | Operation catalog minimo e gerarchia ActionPanel | Fatto su branch `ai-task/v0.70.02-arcgraph-ui-operation-catalog` |
 | v0.70.03 | Ponte placement | ⏳ Pending |
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
-| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.01 completato |
+| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.02 completato |
 | v0.70.06 | Simulation control | ⏳ Pending |
 | v0.70.07 | View modes | ⏳ Pending |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
@@ -17012,8 +17012,8 @@ Sottostep operativi previsti:
 | Versione | Nome | Stato |
 |---|---|---|
 | v0.70.05.01 | RightInspector shell e consumer richiesta selezione | Fatto su branch `ai-task/v0.70.05.01-right-inspector-shell` |
-| v0.70.05.02 | Inspector ViewModelFactory minima per NPC/Object/Wall/Cell | Prossimo |
-| v0.70.05.03 | Tab read-only iniziali | Pending |
+| v0.70.05.02 | Inspector ViewModelFactory minima per NPC/Object/Wall/Cell | Fatto su branch `ai-task/v0.70.05.02-inspector-viewmodel-factory` |
+| v0.70.05.03 | Tab read-only iniziali | Prossimo |
 | v0.70.05.04 | Edit shell da SelectionActionRequest | Pending |
 | v0.70.05.05 | Delete confirmation shell non distruttiva | Pending |
 
