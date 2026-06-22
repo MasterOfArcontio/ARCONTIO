@@ -57,6 +57,7 @@ namespace Arcontio.View.ArcGraph
         private GameObject _canvasRoot;
         private GameObject _uiRoot;
         private RectTransform _mapViewport;
+        private RectTransform _rightInspector;
         private RectTransform _overlayRoot;
         private readonly Vector3[] _mapViewportCorners = new Vector3[4];
         private Button _fovViewModeButton;
@@ -188,6 +189,28 @@ namespace Arcontio.View.ArcGraph
         {
             overlayRoot = _overlayRoot;
             return overlayRoot != null;
+        }
+
+        // =============================================================================
+        // TryGetRightInspectorRoot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il pannello UGUI dedicato al RightInspector ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: contenitore esposto, contenuto delegato</b></para>
+        /// <para>
+        /// La shell UI crea la geometria stabile del pannello, ma non decide quali
+        /// dati mostrare. Il contenuto viene popolato da controller/view dedicate,
+        /// cosi' il root layout resta responsabile solo di posizione, dimensione e
+        /// blocco input sopra la viewport.
+        /// </para>
+        /// </summary>
+        public bool TryGetRightInspectorRoot(out RectTransform rightInspector)
+        {
+            rightInspector = _rightInspector;
+            return rightInspector != null;
         }
 
         // =============================================================================
@@ -338,6 +361,7 @@ namespace Arcontio.View.ArcGraph
                 new Vector2(1f, 1f),
                 new Vector2(-RightInspectorWidth, BottomActionBarHeight),
                 new Vector2(0f, -TopBarHeight));
+            _rightInspector = panel;
             panel.gameObject.AddComponent<RectMask2D>();
 
             VerticalLayoutGroup layout = panel.gameObject.AddComponent<VerticalLayoutGroup>();

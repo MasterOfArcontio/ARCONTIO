@@ -67,6 +67,8 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphUiSelectionSceneConsumer _uiSelectionConsumer;
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
         private ArcUiSelectionActionController _selectionActionController;
+        private ArcGraphRightInspectorSceneView _rightInspectorView;
+        private ArcUiInspectionController _inspectionController;
         private ArcGraphSelectionSceneConsumer _selectionConsumer;
         private ArcGraphFovDebugOverlaySceneConsumer _fovOverlayConsumer;
         private ArcGraphFovDebugOverlayRuntimeController _fovOverlayController;
@@ -247,6 +249,8 @@ namespace Arcontio.View.ArcGraph
             _uiSelectionConsumer = _visualRoot.AddComponent<ArcGraphUiSelectionSceneConsumer>();
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
             _selectionActionController = new ArcUiSelectionActionController();
+            _rightInspectorView = _visualRoot.AddComponent<ArcGraphRightInspectorSceneView>();
+            _inspectionController = new ArcUiInspectionController();
             _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
@@ -353,6 +357,11 @@ namespace Arcontio.View.ArcGraph
             _selectionActionMenu.SetRenderQueue(_wrapper.RenderQueue);
             _selectionActionMenu.SetSceneCamera(Camera.main);
             _selectionActionMenu.SetMenuEnabled(true);
+            _rightInspectorView.SetUiRoot(_uiRoot);
+            _rightInspectorView.SetSelectionConsumer(_uiSelectionConsumer);
+            _rightInspectorView.SetSelectionActionController(_selectionActionController);
+            _rightInspectorView.SetInspectionController(_inspectionController);
+            _rightInspectorView.SetInspectorEnabled(true);
             _selectionConsumer.SetSelectionEnabled(false);
 
             // Il FOV debug ArcGraph usa la pipeline corretta:
