@@ -63,6 +63,11 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphRightInspectorSceneView : MonoBehaviour
     {
+        private const float TabCellWidth = 74f;
+        private const float TabCellHeight = 30f;
+        private const float TabSpacing = 4f;
+        private const int TabColumnsPerRow = 4;
+
         [SerializeField] private bool inspectorEnabled = true;
 
         private ArcGraphUiRuntimeRoot _uiRoot;
@@ -74,8 +79,11 @@ namespace Arcontio.View.ArcGraph
         private RectTransform _headerRoot;
         private RectTransform _tabRoot;
         private RectTransform _contentRoot;
+        private LayoutElement _tabLayout;
         private TextMeshProUGUI _titleText;
         private TextMeshProUGUI _subtitleText;
+        private ArcUiInspectorViewModel _currentViewModel = ArcUiInspectorViewModel.Empty();
+        private string _activeTabKey = string.Empty;
         private ArcGraphRightInspectorMode _lastMode = ArcGraphRightInspectorMode.Hidden;
         private ArcUiSelectionTarget _lastTarget = ArcUiSelectionTarget.None("right_inspector");
 
@@ -257,14 +265,15 @@ namespace Arcontio.View.ArcGraph
 
             _headerRoot = CreatePanelBlock(_panelRoot, "Header", 82f);
             _tabRoot = CreateRect("TabBar", _panelRoot);
-            LayoutElement tabLayout = _tabRoot.gameObject.AddComponent<LayoutElement>();
-            tabLayout.preferredHeight = 34f;
-            HorizontalLayoutGroup tabGroup = _tabRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
-            tabGroup.spacing = 4f;
-            tabGroup.childControlWidth = false;
-            tabGroup.childControlHeight = true;
-            tabGroup.childForceExpandWidth = false;
-            tabGroup.childForceExpandHeight = true;
+            _tabLayout = _tabRoot.gameObject.AddComponent<LayoutElement>();
+            _tabLayout.preferredHeight = TabCellHeight;
+
+            GridLayoutGroup tabGroup = _tabRoot.gameObject.AddComponent<GridLayoutGroup>();
+            tabGroup.cellSize = new Vector2(TabCellWidth, TabCellHeight);
+            tabGroup.spacing = new Vector2(TabSpacing, TabSpacing);
+            tabGroup.childAlignment = TextAnchor.UpperLeft;
+            tabGroup.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+            tabGroup.constraintCount = TabColumnsPerRow;
 
             _contentRoot = CreatePanelBlock(_panelRoot, "ContentRoot", 560f);
             _panelRoot.gameObject.SetActive(false);
@@ -280,6 +289,8 @@ namespace Arcontio.View.ArcGraph
                 ? _viewModelFactory.BuildForAction(actionRequest)
                 : _viewModelFactory.BuildForSelection(target);
 
+            _currentViewModel = viewModel;
+            _activeTabKey = ResolveInitialActiveTabKey(viewModel);
             RenderViewModel(mode, viewModel);
 
             if (_inspectionController != null)
@@ -332,6 +343,7 @@ namespace Arcontio.View.ArcGraph
         private void BuildTabs(ArcUiInspectorViewModel viewModel)
         {
             ClearChildren(_tabRoot);
+            ApplyTabLayoutHeight(viewModel.HasTabs ? viewModel.Tabs.Length : 0);
 
             if (!viewModel.HasTabs)
                 return;
@@ -341,9 +353,12 @@ namespace Arcontio.View.ArcGraph
                 ArcUiInspectorTab tab = viewModel.Tabs[i];
                 bool active = string.Equals(
                     tab.TabKey,
-                    viewModel.ActiveTabKey,
+                    _activeTabKey,
                     System.StringComparison.Ordinal);
-                CreateTabButton(_tabRoot, tab.Label, active);
+
+                string tabKey = tab.TabKey;
+                Button button = CreateTabButton(_tabRoot, tab.Label, active);
+                button.onClick.AddListener(() => SelectTab(tabKey));
             }
         }
 
@@ -359,7 +374,7 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
-            if (!TryResolveActiveTab(viewModel, out ArcUiInspectorTab activeTab))
+            if (!TryResolveActiveTab(viewModel, _activeTabKey, out ArcUiInspectorTab activeTab))
                 return;
 
             CreateSectionTitle(_contentRoot, string.IsNullOrWhiteSpace(activeTab.Label) ? "INFO" : activeTab.Label.ToUpperInvariant());
@@ -373,6 +388,7 @@ namespace Arcontio.View.ArcGraph
 
         private static bool TryResolveActiveTab(
             ArcUiInspectorViewModel viewModel,
+            string activeTabKey,
             out ArcUiInspectorTab activeTab)
         {
             activeTab = default;
@@ -383,7 +399,7 @@ namespace Arcontio.View.ArcGraph
             for (int i = 0; i < viewModel.Tabs.Length; i++)
             {
                 ArcUiInspectorTab tab = viewModel.Tabs[i];
-                if (string.Equals(tab.TabKey, viewModel.ActiveTabKey, System.StringComparison.Ordinal))
+                if (string.Equals(tab.TabKey, activeTabKey, System.StringComparison.Ordinal))
                 {
                     activeTab = tab;
                     return true;
@@ -404,6 +420,38 @@ namespace Arcontio.View.ArcGraph
                 _panelRoot.gameObject.SetActive(false);
         }
 
+        // =============================================================================
+        // SelectTab
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cambia la tab visualizzata senza interrogare la simulazione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: tab switching locale</b></para>
+        /// <para>
+        /// Il click su una tab opera solo sul ViewModel gia' consegnato
+        /// all'inspector. Non rilegge il World, non ricostruisce target e non
+        /// produce comandi: aggiorna soltanto la sezione read-only visibile.
+        /// </para>
+        /// </summary>
+        private void SelectTab(string tabKey)
+        {
+            if (!_currentViewModel.HasTabs || !ContainsTab(_currentViewModel, tabKey))
+                return;
+
+            _activeTabKey = tabKey;
+            _currentViewModel = new ArcUiInspectorViewModel(
+                _currentViewModel.Title,
+                _currentViewModel.Target,
+                _currentViewModel.Tabs,
+                _activeTabKey);
+
+            BuildTabs(_currentViewModel);
+            BuildRows(_currentViewModel);
+            _inspectionController?.Set(_currentViewModel);
+        }
+
         private static bool SameTarget(
             ArcUiSelectionTarget left,
             ArcUiSelectionTarget right)
@@ -413,6 +461,52 @@ namespace Arcontio.View.ArcGraph
                    left.Cell.X == right.Cell.X &&
                    left.Cell.Y == right.Cell.Y &&
                    left.Cell.Z == right.Cell.Z;
+        }
+
+        private static string ResolveInitialActiveTabKey(ArcUiInspectorViewModel viewModel)
+        {
+            // Se la factory ha indicato una tab iniziale valida la rispettiamo.
+            // In caso contrario usiamo la prima tab disponibile, cosi' il
+            // pannello resta robusto anche con ViewModel incompleti o provvisori.
+            if (!viewModel.HasTabs)
+                return string.Empty;
+
+            if (ContainsTab(viewModel, viewModel.ActiveTabKey))
+                return viewModel.ActiveTabKey;
+
+            return viewModel.Tabs[0].TabKey;
+        }
+
+        private static bool ContainsTab(
+            ArcUiInspectorViewModel viewModel,
+            string tabKey)
+        {
+            // Il controllo resta locale all'array del ViewModel corrente: non
+            // cerchiamo tab in registry globali e non chiediamo dati aggiuntivi
+            // alla simulazione.
+            if (string.IsNullOrWhiteSpace(tabKey) || !viewModel.HasTabs)
+                return false;
+
+            for (int i = 0; i < viewModel.Tabs.Length; i++)
+            {
+                if (string.Equals(viewModel.Tabs[i].TabKey, tabKey, System.StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void ApplyTabLayoutHeight(int tabCount)
+        {
+            if (_tabLayout == null)
+                return;
+
+            // Il pannello usa due righe al massimo per questa fase. In futuro,
+            // se le tab diventeranno molte, potremo introdurre scroll orizzontale
+            // o gruppi secondari senza cambiare il contratto ViewModel.
+            int rowCount = Mathf.Max(1, Mathf.CeilToInt(tabCount / (float)TabColumnsPerRow));
+            rowCount = Mathf.Min(2, rowCount);
+            _tabLayout.preferredHeight = rowCount * TabCellHeight + (rowCount - 1) * TabSpacing;
         }
 
         private static string ResolveModeLabel(ArcGraphRightInspectorMode mode)
@@ -474,11 +568,14 @@ namespace Arcontio.View.ArcGraph
             return rect;
         }
 
-        private static void CreateTabButton(
+        private static Button CreateTabButton(
             RectTransform parent,
             string label,
             bool active)
         {
+            // Il bottone e' creato come componente UGUI standard. Non contiene
+            // logica propria: il listener viene assegnato dal chiamante, che
+            // conosce la chiave stabile della tab.
             RectTransform button = CreateRect("ArcTabButton_" + SanitizeName(label), parent);
             Image image = button.gameObject.AddComponent<Image>();
             image.raycastTarget = true;
@@ -486,11 +583,12 @@ namespace Arcontio.View.ArcGraph
                 ? ColorFromHex("#324557", 0.94f)
                 : ColorFromHex("#17212B", 0.92f);
 
-            button.gameObject.AddComponent<Button>();
+            Button buttonComponent = button.gameObject.AddComponent<Button>();
             LayoutElement layout = button.gameObject.AddComponent<LayoutElement>();
-            layout.preferredWidth = Mathf.Max(44f, label.Length * 8f);
-            layout.preferredHeight = 30f;
-            CreateText(button, label, 10, FontStyles.Bold, TextAlignmentOptions.Center);
+            layout.preferredWidth = TabCellWidth;
+            layout.preferredHeight = TabCellHeight;
+            CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
+            return buttonComponent;
         }
 
         private static void CreateSectionTitle(
