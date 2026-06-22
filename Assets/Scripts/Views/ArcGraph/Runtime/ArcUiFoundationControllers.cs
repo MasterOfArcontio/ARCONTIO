@@ -56,6 +56,101 @@ namespace Arcontio.View.ArcGraph
     }
 
     // =============================================================================
+    // ArcUiSelectionActionController
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Controller shell per le azioni rapide sul target selezionato.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: ponte intenzionale prima del comando</b></para>
+    /// <para>
+    /// Il controller riceve richieste come Modifica o Elimina dalla UI e le conserva
+    /// come intenzioni pending. Non apre pannelli, non invia comandi, non cancella
+    /// entita', non modifica NPC/oggetti/muri e non legge il <c>World</c>. Serve a
+    /// chiudere il passaggio tra pulsanti del menu hover e futuri controller
+    /// autorizzati, mantenendo il flusso verificabile ma non distruttivo.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>_pending</b>: ultima richiesta valida ricevuta.</item>
+    ///   <item><b>RequestEdit</b>: registra una intenzione di modifica.</item>
+    ///   <item><b>RequestDelete</b>: registra una intenzione di eliminazione.</item>
+    ///   <item><b>Clear</b>: rimuove la richiesta pending senza effetti runtime.</item>
+    /// </list>
+    /// </summary>
+    public sealed class ArcUiSelectionActionController
+    {
+        private ArcUiSelectionActionRequest _pending;
+
+        public ArcUiSelectionActionRequest Pending => _pending;
+        public bool HasPending => _pending.IsValid;
+
+        // =============================================================================
+        // RequestEdit
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra una richiesta di modifica sul target selezionato.
+        /// </para>
+        ///
+        /// <para><b>Boundary UI</b></para>
+        /// <para>
+        /// Il metodo accetta solo un <see cref="ArcUiSelectionTarget"/> gia' risolto
+        /// dal layer di selezione. Non tenta di ritrovare il target in mappa e non
+        /// interroga la simulazione.
+        /// </para>
+        /// </summary>
+        public void RequestEdit(
+            ArcUiSelectionTarget target,
+            string source)
+        {
+            SetPending(ArcUiSelectionActionRequest.Edit(target, source));
+        }
+
+        // =============================================================================
+        // RequestDelete
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra una richiesta di eliminazione sul target selezionato.
+        /// </para>
+        ///
+        /// <para><b>Richiesta non distruttiva</b></para>
+        /// <para>
+        /// Il nome Delete descrive l'intenzione utente, non un effetto immediato.
+        /// La cancellazione reale dovra' passare da conferme, controller
+        /// autorizzati e gateway comando negli step successivi.
+        /// </para>
+        /// </summary>
+        public void RequestDelete(
+            ArcUiSelectionTarget target,
+            string source)
+        {
+            SetPending(ArcUiSelectionActionRequest.Delete(target, source));
+        }
+
+        // =============================================================================
+        // Clear
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cancella la richiesta pending senza cambiare la selezione corrente.
+        /// </para>
+        /// </summary>
+        public void Clear()
+        {
+            _pending = default;
+        }
+
+        private void SetPending(ArcUiSelectionActionRequest request)
+        {
+            _pending = request.IsValid ? request : default;
+        }
+    }
+
+    // =============================================================================
     // ArcUiPlacementController
     // =============================================================================
     /// <summary>

@@ -66,6 +66,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphUiSelectionSceneConsumer _uiSelectionConsumer;
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
+        private ArcUiSelectionActionController _selectionActionController;
         private ArcGraphSelectionSceneConsumer _selectionConsumer;
         private ArcGraphFovDebugOverlaySceneConsumer _fovOverlayConsumer;
         private ArcGraphFovDebugOverlayRuntimeController _fovOverlayController;
@@ -245,6 +246,7 @@ namespace Arcontio.View.ArcGraph
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _uiSelectionConsumer = _visualRoot.AddComponent<ArcGraphUiSelectionSceneConsumer>();
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
+            _selectionActionController = new ArcUiSelectionActionController();
             _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
@@ -347,6 +349,7 @@ namespace Arcontio.View.ArcGraph
             _uiSelectionConsumer.SetSelectionEnabled(true);
             _selectionActionMenu.SetUiRoot(_uiRoot);
             _selectionActionMenu.SetSelectionConsumer(_uiSelectionConsumer);
+            _selectionActionMenu.SetSelectionActionController(_selectionActionController);
             _selectionActionMenu.SetRenderQueue(_wrapper.RenderQueue);
             _selectionActionMenu.SetSceneCamera(Camera.main);
             _selectionActionMenu.SetMenuEnabled(true);

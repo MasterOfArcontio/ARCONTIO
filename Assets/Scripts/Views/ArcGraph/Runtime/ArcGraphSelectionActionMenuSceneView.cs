@@ -203,9 +203,9 @@ namespace Arcontio.View.ArcGraph
     /// la selezione prodotta da <see cref="ArcGraphUiSelectionSceneConsumer"/> e
     /// usa la <see cref="ArcGraphRenderQueue"/> gia' preparata per posizionarsi
     /// sopra l'NPC, l'oggetto o il muro selezionato. I pulsanti Modifica/Elimina
-    /// sono presenti nella struttura visuale ma non modificano il mondo: il
-    /// collegamento ai controller autorizzati verra' aggiunto nello step
-    /// successivo della roadmap.
+    /// non modificano il mondo: producono una richiesta UI pending dentro
+    /// <see cref="ArcUiSelectionActionController"/>. Lo step inspector o command
+    /// gateway decidera' in futuro come consumarla.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -213,7 +213,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>EnsureBuilt</b>: crea il piccolo prefab runtime dentro OverlayRoot.</item>
     ///   <item><b>Update</b>: ricostruisce ViewModel e posizione ogni frame.</item>
     ///   <item><b>TryResolveTargetAnchor</b>: ritrova il target nella render queue corrente.</item>
-    ///   <item><b>OnEditClicked/OnDeleteClicked</b>: punti di aggancio per i futuri controller.</item>
+    ///   <item><b>OnEditClicked/OnDeleteClicked</b>: inoltrano richieste non distruttive al controller.</item>
     /// </list>
     /// </summary>
     public sealed class ArcGraphSelectionActionMenuSceneView : MonoBehaviour
@@ -235,6 +235,7 @@ namespace Arcontio.View.ArcGraph
 
         private ArcGraphUiRuntimeRoot _uiRoot;
         private ArcGraphUiSelectionSceneConsumer _selectionConsumer;
+        private ArcUiSelectionActionController _selectionActionController;
         private ArcGraphRenderQueue _renderQueue;
         private RectTransform _overlayRoot;
         private RectTransform _menuRoot;
@@ -253,6 +254,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphSelectionActionMenuViewModel.Hidden();
 
         public ArcGraphSelectionActionMenuViewModel CurrentViewModel => _currentViewModel;
+        public ArcUiSelectionActionRequest PendingSelectionActionRequest =>
+            _selectionActionController != null ? _selectionActionController.Pending : default;
 
         // =============================================================================
         // Update
@@ -315,6 +318,27 @@ namespace Arcontio.View.ArcGraph
         public void SetSelectionConsumer(ArcGraphUiSelectionSceneConsumer selectionConsumer)
         {
             _selectionConsumer = selectionConsumer;
+        }
+
+        // =============================================================================
+        // SetSelectionActionController
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il controller autorizzato a ricevere le azioni rapide del menu.
+        /// </para>
+        ///
+        /// <para><b>Separazione view/controller</b></para>
+        /// <para>
+        /// La view UGUI sa solo che esiste una richiesta di Modifica o Elimina sul
+        /// target corrente. Non conosce inspector, gateway comandi o world runtime.
+        /// Questo mantiene il pannellino hover come sorgente di intenzioni UI, non
+        /// come esecutore di mutazioni.
+        /// </para>
+        /// </summary>
+        public void SetSelectionActionController(ArcUiSelectionActionController controller)
+        {
+            _selectionActionController = controller;
         }
 
         // =============================================================================
@@ -721,10 +745,22 @@ namespace Arcontio.View.ArcGraph
 
         private void OnEditClicked()
         {
+            if (_selectionActionController == null || !_currentViewModel.HasTarget)
+                return;
+
+            _selectionActionController.RequestEdit(
+                _currentViewModel.Target,
+                "ArcSelectionActionMenu");
         }
 
         private void OnDeleteClicked()
         {
+            if (_selectionActionController == null || !_currentViewModel.HasTarget)
+                return;
+
+            _selectionActionController.RequestDelete(
+                _currentViewModel.Target,
+                "ArcSelectionActionMenu");
         }
 
         private bool TryFindActor(
