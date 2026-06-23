@@ -100,6 +100,65 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // TryBuildNpcEditViewModel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la prima shell di modifica NPC per il RightInspector.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: modifica preparata, non applicata</b></para>
+        /// <para>
+        /// Questo metodo risponde a una <see cref="ArcUiSelectionActionRequest"/> di
+        /// tipo Modifica e produce soltanto un ViewModel. Legge lo snapshot runtime
+        /// necessario a mostrare DNA e inventario, ma non cambia valori, non crea
+        /// slider operativi, non scrive sul <c>World</c> e non invia comandi.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>DNA</b>: visualizza le barre DNA che diventeranno tuning autorizzato.</item>
+        ///   <item><b>Inventario</b>: visualizza le metriche cibo gia' usate nell'Info tab.</item>
+        ///   <item><b>Conferma</b>: documenta il ponte futuro verso controller e gateway.</item>
+        /// </list>
+        /// </summary>
+        public bool TryBuildNpcEditViewModel(
+            ArcUiSelectionActionRequest request,
+            out ArcUiInspectorViewModel viewModel)
+        {
+            viewModel = ArcUiInspectorViewModel.Empty();
+
+            if (!request.IsEdit
+                || request.Target.Kind != ArcUiSelectionTargetKind.Npc
+                || !TryParseNpcId(request.Target, out int npcId))
+            {
+                return false;
+            }
+
+            if (!TryGetWorld(out World world) || !world.NpcDna.TryGetValue(npcId, out NpcDnaProfile dna) || dna == null)
+                return false;
+
+            world.NpcProfiles.TryGetValue(npcId, out NpcProfile profile);
+            world.GridPos.TryGetValue(npcId, out GridPosition position);
+
+            string title = "Modifica " + ResolveNpcTitle(request.Target, dna, npcId);
+            var tabs = new[]
+            {
+                new ArcUiInspectorTab("edit_dna", "DNA", BuildNpcEditDnaRows(request, npcId, dna, profile, position)),
+                new ArcUiInspectorTab("edit_inventory", "Inventario", BuildNpcEditInventoryRows(world, npcId)),
+                new ArcUiInspectorTab("edit_confirm", "Conferma", BuildNpcEditConfirmRows(request, npcId))
+            };
+
+            viewModel = new ArcUiInspectorViewModel(
+                title,
+                request.Target,
+                tabs,
+                "edit_dna");
+
+            return true;
+        }
+
+        // =============================================================================
         // TryBuildObjectViewModel
         // =============================================================================
         /// <summary>
@@ -183,6 +242,125 @@ namespace Arcontio.View.ArcGraph
             AddFoodMetrics(world, npcId, rows);
             rows.Add(new ArcUiInspectorRow("Sorgente", ReadString(target.SourceView, EmptyValue)));
             return rows.ToArray();
+        }
+
+        // =============================================================================
+        // BuildNpcEditDnaRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe della tab DNA usata dalla shell di modifica NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: valori modificabili solo come snapshot</b></para>
+        /// <para>
+        /// Le barre DNA qui prodotte rappresentano i valori che in futuro potranno
+        /// essere collegati a controlli autorizzati. In questo step restano valori
+        /// visuali read-only, cosi' la UI non introduce una mutazione diretta del
+        /// profilo NPC.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Shell modifica</b>: stato del workflow provvisorio.</item>
+        ///   <item><b>Target</b>: id, nome e cella logica dell'NPC.</item>
+        ///   <item><b>Valori DNA</b>: barre gia' condivise con l'inspector read-only.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildNpcEditDnaRows(
+            ArcUiSelectionActionRequest request,
+            int npcId,
+            NpcDnaProfile dna,
+            NpcProfile profile,
+            GridPosition position)
+        {
+            var rows = new List<ArcUiInspectorRow>(32)
+            {
+                ArcUiInspectorRow.Section("Shell modifica"),
+                new ArcUiInspectorRow("Stato", "Modifica provvisoria"),
+                new ArcUiInspectorRow("Effetto", "Nessuna scrittura sul World"),
+                new ArcUiInspectorRow("NPC", npcId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Nome", ResolveNpcTitle(request.Target, dna, npcId)),
+                new ArcUiInspectorRow("Cella logica", FormatCell(position.X, position.Y, 0)),
+                ArcUiInspectorRow.Section("Valori DNA")
+            };
+
+            rows.AddRange(BuildDnaRows(dna, profile));
+            return rows.ToArray();
+        }
+
+        // =============================================================================
+        // BuildNpcEditInventoryRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe inventario della shell di modifica NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: inventario letto, non scritto</b></para>
+        /// <para>
+        /// La funzione riusa le metriche cibo gia' autorizzate per l'Info tab e non
+        /// espone alcun controllo operativo. La futura modifica inventario dovra'
+        /// passare da richiesta dedicata, controller e command gateway.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Inventario shell</b>: stato esplicito del workflow non operativo.</item>
+        ///   <item><b>Cibo</b>: metriche compatte del cibo privato e comunitario.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildNpcEditInventoryRows(
+            World world,
+            int npcId)
+        {
+            var rows = new List<ArcUiInspectorRow>(12)
+            {
+                ArcUiInspectorRow.Section("Inventario shell"),
+                new ArcUiInspectorRow("Stato", "Modifica inventario non ancora operativa"),
+                new ArcUiInspectorRow("Effetto", "Nessuna modifica applicata"),
+                ArcUiInspectorRow.Section("Cibo")
+            };
+
+            AddFoodMetrics(world, npcId, rows);
+            return rows.ToArray();
+        }
+
+        // =============================================================================
+        // BuildNpcEditConfirmRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la tab di conferma futura per la shell di modifica NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: conferma prima del comando</b></para>
+        /// <para>
+        /// La tab non contiene ancora un bottone di conferma reale. Serve a rendere
+        /// visibile il punto in cui, negli step successivi, la UI consegnera' una
+        /// richiesta validata al controller autorizzato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Stato</b>: richiesta di modifica ricevuta.</item>
+        ///   <item><b>Target</b>: NPC oggetto della modifica.</item>
+        ///   <item><b>Prossimo ponte</b>: controller autorizzato e command gateway.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildNpcEditConfirmRows(
+            ArcUiSelectionActionRequest request,
+            int npcId)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Conferma futura"),
+                new ArcUiInspectorRow("Stato", "Richiesta modifica pronta"),
+                new ArcUiInspectorRow("Target", "NPC " + npcId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Sorgente", ReadString(request.Source, EmptyValue)),
+                new ArcUiInspectorRow("Effetto attuale", "Nessuna mutazione"),
+                new ArcUiInspectorRow("Prossimo ponte", "Controller autorizzato + Command Gateway")
+            };
         }
 
         private static ArcUiInspectorTab[] BuildObjectTabs(
