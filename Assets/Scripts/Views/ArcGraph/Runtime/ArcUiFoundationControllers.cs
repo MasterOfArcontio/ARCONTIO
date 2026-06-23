@@ -1,3 +1,5 @@
+using Arcontio.Core;
+
 namespace Arcontio.View.ArcGraph
 {
     // =============================================================================
@@ -391,6 +393,182 @@ namespace Arcontio.View.ArcGraph
         public void Clear()
         {
             _current = default;
+        }
+    }
+
+    // =============================================================================
+    // ArcUiSimulationControlController
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Controller autorizzato minimo per la TopBar di controllo simulazione.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: TopBar -> Controller -> SimulationHost</b></para>
+    /// <para>
+    /// La TopBar non riceve direttamente il <c>SimulationHost</c> e non chiama i
+    /// suoi metodi. Questo controller riceve richieste UI tipizzate, applica solo
+    /// le operazioni gia' esposte pubblicamente dal runtime e conserva lo stato
+    /// richiesto per le parti non ancora supportate dal core, come il moltiplicatore
+    /// velocita' runtime.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>_simulationHost</b>: host runtime esplicitamente assegnato dall'installer.</item>
+    ///   <item><b>_lastRequest</b>: ultima intenzione UI ricevuta.</item>
+    ///   <item><b>_speedMultiplier</b>: velocita' richiesta dalla UI, per ora non applicata al tick core.</item>
+    ///   <item><b>Request*</b>: metodi invocabili dai pulsanti TopBar.</item>
+    ///   <item><b>BuildStateSnapshot</b>: snapshot letto dalla view.</item>
+    /// </list>
+    /// </summary>
+    public sealed class ArcUiSimulationControlController
+    {
+        private SimulationHost _simulationHost;
+        private ArcUiSimulationControlRequest _lastRequest;
+        private int _speedMultiplier = 1;
+
+        public bool HasRuntimeHost => _simulationHost != null;
+        public ArcUiSimulationControlRequest LastRequest => _lastRequest;
+        public int RequestedSpeedMultiplier => _speedMultiplier;
+
+        // =============================================================================
+        // SetSimulationHost
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna l'host runtime autorizzato usato per pausa e ripresa.
+        /// </para>
+        ///
+        /// <para><b>Binding esplicito</b></para>
+        /// <para>
+        /// Il riferimento arriva dall'auto-installer ArcGraph, che gia' possiede il
+        /// compito di collegare i componenti runtime. Il controller non cerca
+        /// GameObject in scena e non usa fallback nascosti.
+        /// </para>
+        /// </summary>
+        public void SetSimulationHost(SimulationHost host)
+        {
+            _simulationHost = host;
+        }
+
+        // =============================================================================
+        // RequestPause
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra e applica una richiesta di pausa.
+        /// </para>
+        /// </summary>
+        public void RequestPause(string source)
+        {
+            Apply(ArcUiSimulationControlRequest.Pause(source));
+        }
+
+        // =============================================================================
+        // RequestResume
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra e applica una richiesta di ripresa.
+        /// </para>
+        /// </summary>
+        public void RequestResume(string source)
+        {
+            Apply(ArcUiSimulationControlRequest.Resume(source));
+        }
+
+        // =============================================================================
+        // RequestSpeed
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra una richiesta di velocita' simulativa.
+        /// </para>
+        ///
+        /// <para><b>Velocita' preparata, non ancora applicata al tick core</b></para>
+        /// <para>
+        /// Il <c>SimulationHost</c> attuale espone pausa, ripresa e step, ma non un
+        /// moltiplicatore runtime pubblico. Per evitare una mutazione fragile del
+        /// loop temporale, questo metodo salva la richiesta e aggiorna lo snapshot
+        /// UI. L'applicazione reale del fattore verra' introdotta in uno step core
+        /// dedicato.
+        /// </para>
+        /// </summary>
+        public void RequestSpeed(
+            int speedMultiplier,
+            string source)
+        {
+            Apply(ArcUiSimulationControlRequest.SetSpeed(speedMultiplier, source));
+        }
+
+        // =============================================================================
+        // CycleSpeed
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Avanza ciclicamente tra i fattori x1, x2, x3 e x4.
+        /// </para>
+        /// </summary>
+        public void CycleSpeed(string source)
+        {
+            int next = _speedMultiplier >= 4 ? 1 : _speedMultiplier + 1;
+            RequestSpeed(next, source);
+        }
+
+        // =============================================================================
+        // BuildStateSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce lo snapshot corrente leggibile dalla TopBar.
+        /// </para>
+        /// </summary>
+        public ArcUiSimulationControlState BuildStateSnapshot()
+        {
+            bool hasHost = _simulationHost != null;
+            bool isPaused = hasHost && _simulationHost.IsPaused;
+            long tickIndex = hasHost ? _simulationHost.TickIndex : 0L;
+
+            return new ArcUiSimulationControlState(
+                hasHost,
+                isPaused,
+                _speedMultiplier,
+                tickIndex);
+        }
+
+        // =============================================================================
+        // Apply
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica la richiesta UI solo se il runtime espone gia' un metodo sicuro.
+        /// </para>
+        /// </summary>
+        private void Apply(ArcUiSimulationControlRequest request)
+        {
+            if (!request.IsValid)
+                return;
+
+            _lastRequest = request;
+
+            if (request.IsSetSpeed)
+            {
+                _speedMultiplier = request.SpeedMultiplier;
+                return;
+            }
+
+            if (_simulationHost == null)
+                return;
+
+            if (request.IsPause)
+            {
+                _simulationHost.SetPaused(true);
+                return;
+            }
+
+            if (request.IsResume)
+                _simulationHost.SetPaused(false);
         }
     }
 }

@@ -61,6 +61,11 @@ namespace Arcontio.View.ArcGraph
         private RectTransform _overlayRoot;
         private readonly Vector3[] _mapViewportCorners = new Vector3[4];
         private Button _fovViewModeButton;
+        private Button _pauseSimulationButton;
+        private Button _resumeSimulationButton;
+        private Button _speedSimulationButton;
+        private TextMeshProUGUI _speedSimulationLabel;
+        private ArcUiSimulationControlController _simulationControlController;
 
         public GameObject RootGameObject => _uiRoot;
         public bool IsBuilt => _uiRoot != null;
@@ -84,6 +89,28 @@ namespace Arcontio.View.ArcGraph
         {
             if (buildOnStart)
                 BuildRuntimeUi();
+        }
+
+        // =============================================================================
+        // Update
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mantiene aggiornata la TopBar rispetto allo snapshot del controller.
+        /// </para>
+        ///
+        /// <para><b>Refresh visuale, non polling del World</b></para>
+        /// <para>
+        /// La pausa puo' cambiare anche tramite input globale del
+        /// <c>SimulationHost</c>. La UI non legge l'host: aggiorna solo le etichette
+        /// e gli stati dei pulsanti a partire dallo snapshot gia' filtrato dal
+        /// controller.
+        /// </para>
+        /// </summary>
+        private void Update()
+        {
+            if (_simulationControlController != null)
+                RefreshSimulationControlTopBar();
         }
 
         // =============================================================================
@@ -167,6 +194,53 @@ namespace Arcontio.View.ArcGraph
 
             if (action != null)
                 _fovViewModeButton.onClick.AddListener(action);
+        }
+
+        // =============================================================================
+        // SetSimulationControlController
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega la TopBar al controller autorizzato di controllo simulazione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI senza SimulationHost diretto</b></para>
+        /// <para>
+        /// Il componente UI riceve solo il controller. Non conosce
+        /// <c>SimulationHost</c>, non legge tick e non decide come applicare pausa o
+        /// velocita'. I pulsanti producono intenzioni verso il controller.
+        /// </para>
+        /// </summary>
+        public void SetSimulationControlController(ArcUiSimulationControlController controller)
+        {
+            _simulationControlController = controller;
+            WireSimulationControlButtons();
+            RefreshSimulationControlTopBar();
+        }
+
+        // =============================================================================
+        // RefreshSimulationControlTopBar
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna lo stato visuale minimo dei pulsanti pausa/play/velocita'.
+        /// </para>
+        /// </summary>
+        public void RefreshSimulationControlTopBar()
+        {
+            if (_simulationControlController == null)
+                return;
+
+            ArcUiSimulationControlState state = _simulationControlController.BuildStateSnapshot();
+
+            if (_pauseSimulationButton != null)
+                _pauseSimulationButton.interactable = !state.HasRuntimeHost || !state.IsPaused;
+
+            if (_resumeSimulationButton != null)
+                _resumeSimulationButton.interactable = !state.HasRuntimeHost || state.IsPaused;
+
+            if (_speedSimulationLabel != null)
+                _speedSimulationLabel.text = "x" + state.SpeedMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         // =============================================================================
@@ -347,9 +421,14 @@ namespace Arcontio.View.ArcGraph
             CreateTopBarText(panel, "-- C");
             CreateTopBarText(panel, "-- %");
             CreateTopBarText(panel, "Meteo --");
-            CreateTopBarButton(panel, "Pausa");
-            CreateTopBarButton(panel, "Play");
-            CreateTopBarButton(panel, "x1");
+            _pauseSimulationButton = CreateTopBarButton(panel, "Pausa");
+            _resumeSimulationButton = CreateTopBarButton(panel, "Play");
+            _speedSimulationButton = CreateTopBarButton(panel, "x1");
+            _speedSimulationLabel = _speedSimulationButton != null
+                ? _speedSimulationButton.GetComponentInChildren<TextMeshProUGUI>()
+                : null;
+            WireSimulationControlButtons();
+            RefreshSimulationControlTopBar();
         }
 
         private void BuildRightInspector()
@@ -616,10 +695,85 @@ namespace Arcontio.View.ArcGraph
             CreateText(textRoot, label, 14, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
-        private static void CreateTopBarButton(RectTransform parent, string label)
+        // =============================================================================
+        // WireSimulationControlButtons
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega i pulsanti TopBar agli handler locali che parlano col controller.
+        /// </para>
+        /// </summary>
+        private void WireSimulationControlButtons()
+        {
+            if (_pauseSimulationButton != null)
+            {
+                _pauseSimulationButton.onClick.RemoveAllListeners();
+                if (_simulationControlController != null)
+                    _pauseSimulationButton.onClick.AddListener(OnPauseSimulationClicked);
+            }
+
+            if (_resumeSimulationButton != null)
+            {
+                _resumeSimulationButton.onClick.RemoveAllListeners();
+                if (_simulationControlController != null)
+                    _resumeSimulationButton.onClick.AddListener(OnResumeSimulationClicked);
+            }
+
+            if (_speedSimulationButton != null)
+            {
+                _speedSimulationButton.onClick.RemoveAllListeners();
+                if (_simulationControlController != null)
+                    _speedSimulationButton.onClick.AddListener(OnSpeedSimulationClicked);
+            }
+        }
+
+        // =============================================================================
+        // OnPauseSimulationClicked
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inoltra al controller la richiesta di pausa prodotta dalla TopBar.
+        /// </para>
+        /// </summary>
+        private void OnPauseSimulationClicked()
+        {
+            _simulationControlController?.RequestPause("ArcTopBar");
+            RefreshSimulationControlTopBar();
+        }
+
+        // =============================================================================
+        // OnResumeSimulationClicked
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inoltra al controller la richiesta di ripresa prodotta dalla TopBar.
+        /// </para>
+        /// </summary>
+        private void OnResumeSimulationClicked()
+        {
+            _simulationControlController?.RequestResume("ArcTopBar");
+            RefreshSimulationControlTopBar();
+        }
+
+        // =============================================================================
+        // OnSpeedSimulationClicked
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inoltra al controller la richiesta di ciclo velocita' prodotta dalla TopBar.
+        /// </para>
+        /// </summary>
+        private void OnSpeedSimulationClicked()
+        {
+            _simulationControlController?.CycleSpeed("ArcTopBar");
+            RefreshSimulationControlTopBar();
+        }
+
+        private static Button CreateTopBarButton(RectTransform parent, string label)
         {
             RectTransform button = CreateButtonShell(parent, "ArcButton_Top_" + SanitizeName(label), 70f, 30f, false);
             CreateText(button, label, 12, FontStyles.Bold, TextAlignmentOptions.Center);
+            return button.GetComponent<Button>();
         }
 
         private static void CreateTabButton(RectTransform parent, string label, bool active)
