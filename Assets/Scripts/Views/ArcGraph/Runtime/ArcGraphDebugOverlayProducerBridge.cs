@@ -132,6 +132,8 @@ namespace Arcontio.View.ArcGraph
             bool clearTarget = false,
             bool isEnabled = true,
             bool includeLandmarkGraph = true,
+            bool includeLandmarkGraphEdges = true,
+            bool includeKnownLandmarkGraph = true,
             bool includeLandmarkRoute = true,
             bool includeLandmarkPaths = true)
         {
@@ -151,10 +153,15 @@ namespace Arcontio.View.ArcGraph
             if (includeLandmarkGraph)
             {
                 addedNodes += AppendNodes(target, worldNodes, ArcGraphDebugOverlayKind.LandmarkWorldNode, WorldNodeScale, isEnabled);
-                addedEdges += AppendEdges(target, worldEdges, ArcGraphDebugOverlayKind.LandmarkWorldEdge, isEnabled);
+                if (includeLandmarkGraphEdges)
+                    addedEdges += AppendEdges(target, worldEdges, ArcGraphDebugOverlayKind.LandmarkWorldEdge, isEnabled);
 
-                addedNodes += AppendNodes(target, knownNodes, ArcGraphDebugOverlayKind.LandmarkKnownNode, KnownNodeScale, isEnabled);
-                addedEdges += AppendEdges(target, knownEdges, ArcGraphDebugOverlayKind.LandmarkKnownEdge, isEnabled);
+                if (includeKnownLandmarkGraph)
+                {
+                    addedNodes += AppendNodes(target, knownNodes, ArcGraphDebugOverlayKind.LandmarkKnownNode, KnownNodeScale, isEnabled);
+                    if (includeLandmarkGraphEdges)
+                        addedEdges += AppendEdges(target, knownEdges, ArcGraphDebugOverlayKind.LandmarkKnownEdge, isEnabled);
+                }
             }
 
             if (includeLandmarkRoute)
@@ -289,7 +296,7 @@ namespace Arcontio.View.ArcGraph
                     node.NodeId,
                     node.Label,
                     scale01,
-                    null,
+                    ResolveNodeColorKey(kind, node),
                     isEnabled));
             }
 
@@ -304,6 +311,28 @@ namespace Arcontio.View.ArcGraph
                 return ArcGraphDebugOverlayKind.LandmarkBiologicalNode;
 
             return fallback;
+        }
+
+        private static string ResolveNodeColorKey(
+            ArcGraphDebugOverlayKind fallback,
+            LandmarkOverlayNode node)
+        {
+            if (fallback != ArcGraphDebugOverlayKind.LandmarkWorldNode)
+                return null;
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.Doorway)
+                return "debug/landmark/doorway";
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.Junction)
+                return "debug/landmark/junction";
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.AreaCenter)
+                return "debug/landmark/area-center";
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.BiologicalAnchor)
+                return "debug/landmark/biological-anchor";
+
+            return null;
         }
 
         private static int AppendEdges(

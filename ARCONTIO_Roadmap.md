@@ -16698,7 +16698,7 @@ Roadmap operativa:
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
-| v0.70.07 | Visual overlay toggles | Fatto - LM/LOS/PATH collegati e stabilizzati |
+| v0.70.07 | Visual overlay toggles | Fatto - LM/LOS/PATH collegati, stabilizzati e separati semanticamente |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
 
 ---
@@ -17175,6 +17175,7 @@ Sottostep:
 | v0.70.07.04 | Landmark on/off tramite overlay esistente/adattato | Fatto su branch `ai-task/v0.70.07.04-landmark-overlay-toggle-runtime` |
 | v0.70.07.05 | Pathfinding/debug overlay on/off | Fatto su branch `ai-task/v0.70.07.05-pathfinding-overlay-toggle-runtime` |
 | v0.70.07.06 | Stabilizzazione overlay: LM/PATH throttled, facing NPC da snapshot, TopBar compatta | Fatto su branch `ai-task/v0.70.07.06-overlay-facing-layout-stabilization` |
+| v0.70.07.08 | Split semantico overlay: LM mostra solo landmark globali con label/colori per tipo, PATH resta sul percorso dell'NPC selezionato | Fatto su branch `ai-task/v0.70.07.08-overlay-semantic-split` |
 
 Criteri di accettazione:
 

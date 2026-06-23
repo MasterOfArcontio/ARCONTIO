@@ -4330,15 +4330,15 @@ namespace Arcontio.Core
             if (!TryGetNpcMacroRouteDebugReport(npcId, out routeReport))
                 routeReport = default;
 
-            if (!NpcDna.ContainsKey(npcId))
-                return;
-
             // Nota (v0.03.02.a): microTestDummyGraph rimosso — scaffolding Day1 non più necessario.
 
             // ============================================================
             // WORLD GRAPH
             // ============================================================
             LandmarkRegistry?.FillOverlayData(outWorldNodes, outWorldEdges);
+
+            if (!NpcDna.ContainsKey(npcId))
+                return;
 
             // ============================================================
             // KNOWN GRAPH

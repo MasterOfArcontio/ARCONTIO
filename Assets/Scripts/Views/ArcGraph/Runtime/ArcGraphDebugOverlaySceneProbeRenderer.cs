@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Arcontio.Core;
+using TMPro;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -49,6 +50,7 @@ namespace Arcontio.View.ArcGraph
         private const int CellSortingOrder = 180;
         private const int EdgeSortingOrder = 190;
         private const int NodeSortingOrder = 200;
+        private const int LabelSortingOrder = 210;
 
         private Transform _root;
         private Sprite _debugSprite;
@@ -151,8 +153,9 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Renderer consumer-only</b></para>
         /// <para>
         /// Il metodo non costruisce DTO e non interroga sistemi esterni. Traduce solo
-        /// item visibili in primitive Unity temporanee. Le label screen-space vengono
-        /// ignorate in questo primo probe per non introdurre Canvas o HUD.
+        /// item visibili in primitive Unity temporanee. Le label dei nodi landmark
+        /// vengono disegnate come testo world-space leggero; le label HUD restano
+        /// fuori da questo probe per non introdurre Canvas o pannelli debug.
         /// </para>
         /// </summary>
         public void RenderQueue(ArcGraphDebugOverlayQueue queue)
@@ -183,7 +186,7 @@ namespace Arcontio.View.ArcGraph
                     "cells=" + diagnostics.CellItemCount +
                     ", nodes=" + diagnostics.NodeItemCount +
                     ", edges=" + diagnostics.EdgeItemCount +
-                    ", labelsIgnored=" + diagnostics.LabelItemCount +
+                    ", hudLabelsIgnored=" + diagnostics.LabelItemCount +
                     ", visible=" + diagnostics.VisibleItemCount);
             }
         }
@@ -248,6 +251,12 @@ namespace Arcontio.View.ArcGraph
                     Mathf.Max(0.08f, nodeScale * Mathf.Max(0.25f, item.Scale01)),
                     ResolveColor(item.ColorKey, 1f),
                     NodeSortingOrder);
+
+                if (!string.IsNullOrWhiteSpace(item.Label))
+                    CreateWorldLabel(
+                        "DebugNodeLabel_" + item.NodeId + "_" + i,
+                        CellCenter(item.Cell) + new Vector3(0.28f, 0.28f, 0f),
+                        item.Label);
             }
         }
 
@@ -321,6 +330,33 @@ namespace Arcontio.View.ArcGraph
             line.SetPosition(1, ResolveWorldPosition(localTo));
 
             return line;
+        }
+
+        private TextMeshPro CreateWorldLabel(
+            string name,
+            Vector3 localCellPosition,
+            string label)
+        {
+            EnsureRoot();
+
+            var go = new GameObject(name);
+            go.transform.SetParent(_root, false);
+            go.transform.position = ResolveWorldPosition(localCellPosition);
+            go.transform.localScale = Vector3.one * Mathf.Max(0.05f, 0.12f * tileWorldSize);
+
+            var text = go.AddComponent<TextMeshPro>();
+            text.text = label ?? string.Empty;
+            text.fontSize = 2.25f;
+            text.enableWordWrapping = false;
+            text.alignment = TextAlignmentOptions.Left;
+            text.color = new Color(0.88f, 0.94f, 1f, 0.92f);
+            text.rectTransform.sizeDelta = new Vector2(5f, 0.8f);
+
+            Renderer renderer = text.renderer;
+            if (renderer != null)
+                renderer.sortingOrder = LabelSortingOrder;
+
+            return text;
         }
 
         private ArcGraphDebugOverlayQueue CreateDefaultDebugOverlayQueue()
@@ -488,6 +524,18 @@ namespace Arcontio.View.ArcGraph
                 case "debug/landmark/world-node":
                 case "debug/landmark/world-edge":
                     color = new Color(1f, 1f, 1f, 0.85f);
+                    break;
+                case "debug/landmark/doorway":
+                    color = new Color(0.35f, 0.68f, 1f, 1f);
+                    break;
+                case "debug/landmark/junction":
+                    color = new Color(1f, 0.82f, 0.25f, 1f);
+                    break;
+                case "debug/landmark/area-center":
+                    color = new Color(0.55f, 0.95f, 1f, 1f);
+                    break;
+                case "debug/landmark/biological-anchor":
+                    color = new Color(0.10f, 0.95f, 0.25f, 1f);
                     break;
                 case "debug/landmark/known-node":
                 case "debug/landmark/known-edge":

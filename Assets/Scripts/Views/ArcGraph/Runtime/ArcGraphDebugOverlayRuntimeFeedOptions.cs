@@ -19,7 +19,9 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>IncludeLandmark</b>: abilita dati landmark/pathfinding per NPC attivo.</item>
-    ///   <item><b>IncludeLandmarkGraph</b>: abilita nodi/edge landmark generali.</item>
+    ///   <item><b>IncludeLandmarkGraph</b>: abilita nodi landmark generali.</item>
+    ///   <item><b>IncludeLandmarkGraphEdges</b>: abilita edge del grafo landmark generale.</item>
+    ///   <item><b>IncludeKnownLandmarkGraph</b>: abilita nodi/edge landmark conosciuti dall'NPC.</item>
     ///   <item><b>IncludeLandmarkRoute</b>: abilita route corrente dell'NPC.</item>
     ///   <item><b>IncludeLandmarkPaths</b>: abilita edge pathfinding/collegamento.</item>
     ///   <item><b>IncludeGvdDin</b>: abilita dati GVD-DIN globali.</item>
@@ -33,6 +35,8 @@ namespace Arcontio.View.ArcGraph
     {
         public bool IncludeLandmark { get; set; } = true;
         public bool IncludeLandmarkGraph { get; set; } = true;
+        public bool IncludeLandmarkGraphEdges { get; set; } = true;
+        public bool IncludeKnownLandmarkGraph { get; set; } = true;
         public bool IncludeLandmarkRoute { get; set; } = true;
         public bool IncludeLandmarkPaths { get; set; } = true;
         public bool IncludeGvdDin { get; set; } = true;

@@ -25,7 +25,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>runtimeContextProvider</b>: sorgente autorizzata del context ArcGraph.</item>
     ///   <item><b>overlayConsumer</b>: renderer world-space della queue debug.</item>
-    ///   <item><b>landmarkOverlayEnabled</b>: mostra nodi/edge landmark generali.</item>
+    ///   <item><b>landmarkOverlayEnabled</b>: mostra solo nodi landmark globali con label.</item>
     ///   <item><b>pathfindingOverlayEnabled</b>: mostra route/path dell'NPC selezionato.</item>
     ///   <item><b>_feed/_options</b>: costruzione dati filtrata, senza duplicare producer Core.</item>
     /// </list>
@@ -44,6 +44,8 @@ namespace Arcontio.View.ArcGraph
         {
             IncludeLandmark = true,
             IncludeLandmarkGraph = true,
+            IncludeLandmarkGraphEdges = false,
+            IncludeKnownLandmarkGraph = false,
             IncludeLandmarkRoute = false,
             IncludeLandmarkPaths = false,
             IncludeGvdDin = false,
@@ -184,12 +186,12 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            int activeNpcId = ResolveActiveNpcId(world);
-            if (activeNpcId <= 0)
+            int activeNpcId = ResolveSelectedNpcId(world);
+            if (pathfindingOverlayEnabled && activeNpcId <= 0 && !landmarkOverlayEnabled)
             {
                 overlayConsumer.ClearProbe();
                 ResetRenderMarkers();
-                Log("ActiveNpcMissing");
+                Log("SelectedNpcMissing");
                 return;
             }
 
@@ -252,6 +254,8 @@ namespace Arcontio.View.ArcGraph
             // La separazione avviene qui, tramite opzioni, prima del rendering.
             _options.IncludeLandmark = hasAny;
             _options.IncludeLandmarkGraph = landmarkOverlayEnabled;
+            _options.IncludeLandmarkGraphEdges = false;
+            _options.IncludeKnownLandmarkGraph = false;
             _options.IncludeLandmarkRoute = pathfindingOverlayEnabled;
             _options.IncludeLandmarkPaths = pathfindingOverlayEnabled;
             _options.IncludeGvdDin = false;
@@ -265,7 +269,7 @@ namespace Arcontio.View.ArcGraph
             return landmarkOverlayEnabled || pathfindingOverlayEnabled;
         }
 
-        private static int ResolveActiveNpcId(World world)
+        private static int ResolveSelectedNpcId(World world)
         {
             if (world == null)
                 return -1;
@@ -273,12 +277,6 @@ namespace Arcontio.View.ArcGraph
             int selectedNpcId = NPCSelection.SelectedNpcId;
             if (selectedNpcId > 0 && world.ExistsNpc(selectedNpcId))
                 return selectedNpcId;
-
-            foreach (var pair in world.GridPos)
-            {
-                if (pair.Key > 0 && world.ExistsNpc(pair.Key))
-                    return pair.Key;
-            }
 
             return -1;
         }

@@ -102,7 +102,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphDebugOverlayProducerBridgeDiagnostics landmarkDiagnostics = default;
             ArcGraphDebugOverlayProducerBridgeDiagnostics gvdDiagnostics = default;
 
-            if (options.IncludeLandmark && activeNpcId > 0)
+            if (options.IncludeLandmark && (activeNpcId > 0 || options.IncludeLandmarkGraph))
             {
                 // Il World riempie liste gia' possedute dal feed. Le liste vengono
                 // riusate tra frame e vengono pulite dal producer stesso.
@@ -136,6 +136,8 @@ namespace Arcontio.View.ArcGraph
                     false,
                     true,
                     options.IncludeLandmarkGraph,
+                    options.IncludeLandmarkGraphEdges,
+                    options.IncludeKnownLandmarkGraph,
                     options.IncludeLandmarkRoute,
                     options.IncludeLandmarkPaths);
             }
@@ -225,6 +227,8 @@ namespace Arcontio.View.ArcGraph
                     false,
                     true,
                     options.IncludeLandmarkGraph,
+                    options.IncludeLandmarkGraphEdges,
+                    options.IncludeKnownLandmarkGraph,
                     options.IncludeLandmarkRoute,
                     options.IncludeLandmarkPaths);
             }
