@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -70,6 +69,18 @@ namespace Arcontio.View.ArcGraph
         private const float TabSpacing = 4f;
         private const int TabColumnsPerRow = 4;
         private const float RuntimeRefreshIntervalSeconds = 0.5f;
+        private const float CompactRowSpacing = 2f;
+        private const float CompactTextRowHeight = 18f;
+        private const float CompactSectionHeight = 18f;
+        private const float CompactBarRowHeight = 28f;
+        private const float CompactBarHeaderHeight = 14f;
+        private const float CompactBarHeight = 6f;
+        private const float CompactMetricRowHeight = 36f;
+        private const float CompactMetricTitleHeight = 12f;
+        private const float CompactMetricBodyHeight = 20f;
+        private const float CompactExpandableHeight = 22f;
+        private const float CompactTimelineHeight = 18f;
+        private const float CompactDetailIndent = 14f;
 
         [SerializeField] private bool inspectorEnabled = true;
 
@@ -84,18 +95,16 @@ namespace Arcontio.View.ArcGraph
         private RectTransform _tabRoot;
         private RectTransform _contentRoot;
         private RectTransform _contentScrollContent;
+        private ScrollRect _contentScrollRect;
         private LayoutElement _tabLayout;
         private TextMeshProUGUI _titleText;
         private TextMeshProUGUI _subtitleText;
-        private RectTransform _diagnosticsRoot;
-        private TextMeshProUGUI _diagnosticsText;
         private ArcUiInspectorViewModel _currentViewModel = ArcUiInspectorViewModel.Empty();
         private string _activeTabKey = string.Empty;
         private ArcGraphRightInspectorMode _lastMode = ArcGraphRightInspectorMode.Hidden;
         private ArcUiSelectionTarget _lastTarget = ArcUiSelectionTarget.None("right_inspector");
         private float _lastRuntimeRefreshTime = -999f;
         private readonly Dictionary<string, bool> _expandedRows = new();
-        private readonly StringBuilder _diagnosticsBuilder = new(2048);
 
         // =============================================================================
         // Update
@@ -110,10 +119,6 @@ namespace Arcontio.View.ArcGraph
             if (!inspectorEnabled)
             {
                 HideInspector();
-                UpdateDiagnosticsPanel(
-                    ArcGraphRightInspectorMode.Hidden,
-                    ArcUiSelectionTarget.None("right_inspector_disabled"),
-                    default);
                 return;
             }
 
@@ -125,15 +130,11 @@ namespace Arcontio.View.ArcGraph
             if (mode == ArcGraphRightInspectorMode.Hidden || !target.IsValid)
             {
                 HideInspector();
-                UpdateDiagnosticsPanel(mode, target, actionRequest);
                 return;
             }
 
             if (!EnsureBuilt())
-            {
-                UpdateDiagnosticsPanel(mode, target, actionRequest);
                 return;
-            }
 
             if (mode == _lastMode && SameTarget(target, _lastTarget))
             {
@@ -142,11 +143,10 @@ namespace Arcontio.View.ArcGraph
 
                 if (ShouldRefreshRuntimeInspector(target))
                 {
-                    ApplyContext(mode, target, actionRequest, true);
+                    ApplyContext(mode, target, actionRequest, true, false);
                     _lastRuntimeRefreshTime = Time.unscaledTime;
                 }
 
-                UpdateDiagnosticsPanel(mode, target, actionRequest);
                 return;
             }
 
@@ -155,7 +155,6 @@ namespace Arcontio.View.ArcGraph
             ApplyContext(mode, target, actionRequest);
             _lastRuntimeRefreshTime = Time.unscaledTime;
             _panelRoot.gameObject.SetActive(true);
-            UpdateDiagnosticsPanel(mode, target, actionRequest);
         }
 
         // =============================================================================
@@ -242,130 +241,6 @@ namespace Arcontio.View.ArcGraph
                 HideInspector();
         }
 
-        private void UpdateDiagnosticsPanel(
-            ArcGraphRightInspectorMode mode,
-            ArcUiSelectionTarget target,
-            ArcUiSelectionActionRequest actionRequest)
-        {
-            if (!EnsureDiagnosticsPanel())
-                return;
-
-            _diagnosticsBuilder.Clear();
-            _diagnosticsBuilder.AppendLine("RIGHT INSPECTOR DEBUG");
-            _diagnosticsBuilder.Append("mode=").Append(mode)
-                .Append(" inspectorEnabled=").Append(inspectorEnabled)
-                .Append(" actionValid=").Append(actionRequest.IsValid)
-                .AppendLine();
-
-            _diagnosticsBuilder.Append("target valid=").Append(target.IsValid)
-                .Append(" kind=").Append(target.Kind)
-                .Append(" id=").Append(string.IsNullOrWhiteSpace(target.Id) ? "--" : target.Id)
-                .Append(" name=").Append(string.IsNullOrWhiteSpace(target.DisplayName) ? "--" : target.DisplayName)
-                .Append(" cell=(").Append(target.Cell.X).Append(',').Append(target.Cell.Y).Append(',').Append(target.Cell.Z).Append(')')
-                .AppendLine();
-
-            _diagnosticsBuilder.Append("panel built=").Append(_panelRoot != null)
-                .Append(" active=").Append(_panelRoot != null && _panelRoot.gameObject.activeSelf)
-                .Append(" header=").Append(_headerRoot != null)
-                .Append(" tabsRoot=").Append(_tabRoot != null)
-                .Append(" contentRoot=").Append(_contentRoot != null)
-                .AppendLine();
-
-            _diagnosticsBuilder.Append("vm target=").Append(_currentViewModel.HasTarget)
-                .Append(" title=").Append(string.IsNullOrWhiteSpace(_currentViewModel.Title) ? "--" : _currentViewModel.Title)
-                .Append(" tabs=").Append(_currentViewModel.Tabs.Length)
-                .Append(" activeTab=").Append(string.IsNullOrWhiteSpace(_activeTabKey) ? "--" : _activeTabKey)
-                .AppendLine();
-
-            AppendActiveTabDiagnostics();
-            AppendLayoutDiagnostics();
-            _diagnosticsText.text = _diagnosticsBuilder.ToString();
-        }
-
-        private bool EnsureDiagnosticsPanel()
-        {
-            if (_diagnosticsRoot != null && _diagnosticsText != null)
-                return true;
-
-            if (_uiRoot == null || !_uiRoot.TryGetDebugRoot(out RectTransform debugRoot))
-                return false;
-
-            debugRoot.gameObject.SetActive(true);
-
-            _diagnosticsRoot = CreateRect("ArcRightInspectorDebugPanel", debugRoot);
-            _diagnosticsRoot.anchorMin = new Vector2(0f, 1f);
-            _diagnosticsRoot.anchorMax = new Vector2(0f, 1f);
-            _diagnosticsRoot.pivot = new Vector2(0f, 1f);
-            _diagnosticsRoot.anchoredPosition = new Vector2(10f, -54f);
-            _diagnosticsRoot.sizeDelta = new Vector2(560f, 250f);
-
-            Image image = _diagnosticsRoot.gameObject.AddComponent<Image>();
-            image.raycastTarget = false;
-            image.color = ColorFromHex("#050B10", 0.78f);
-
-            RectTransform textRoot = CreateRect("DebugText", _diagnosticsRoot);
-            StretchFull(textRoot, new Vector2(8f, 7f), new Vector2(-8f, -7f));
-
-            _diagnosticsText = textRoot.gameObject.AddComponent<TextMeshProUGUI>();
-            _diagnosticsText.raycastTarget = false;
-            _diagnosticsText.text = "RIGHT INSPECTOR DEBUG\npanel created\nwaiting for Update";
-            _diagnosticsText.fontSize = 11f;
-            _diagnosticsText.fontStyle = FontStyles.Normal;
-            _diagnosticsText.alignment = TextAlignmentOptions.TopLeft;
-            _diagnosticsText.enableWordWrapping = true;
-            _diagnosticsText.overflowMode = TextOverflowModes.Truncate;
-            _diagnosticsText.margin = Vector4.zero;
-            _diagnosticsText.color = ColorFromHex("#DDE6EE", 1f);
-            return true;
-        }
-
-        private void AppendActiveTabDiagnostics()
-        {
-            if (!TryResolveActiveTab(_currentViewModel, _activeTabKey, out ArcUiInspectorTab activeTab))
-            {
-                _diagnosticsBuilder.AppendLine("activeTab resolved=false");
-                return;
-            }
-
-            _diagnosticsBuilder.Append("activeTab label=").Append(activeTab.Label)
-                .Append(" rows=").Append(activeTab.Rows.Length)
-                .AppendLine();
-
-            int maxRows = Mathf.Min(4, activeTab.Rows.Length);
-            for (int i = 0; i < maxRows; i++)
-            {
-                ArcUiInspectorRow row = activeTab.Rows[i];
-                _diagnosticsBuilder.Append("  row").Append(i)
-                    .Append(" kind=").Append(row.Kind)
-                    .Append(" label=").Append(string.IsNullOrWhiteSpace(row.Label) ? "--" : row.Label)
-                    .Append(" value=").Append(string.IsNullOrWhiteSpace(row.Value) ? "--" : row.Value)
-                    .AppendLine();
-            }
-        }
-
-        private void AppendLayoutDiagnostics()
-        {
-            _diagnosticsBuilder.Append("content children=")
-                .Append(_contentScrollContent != null ? _contentScrollContent.childCount : -1)
-                .Append(" contentRect=").Append(FormatRect(_contentScrollContent))
-                .AppendLine();
-
-            _diagnosticsBuilder.Append("contentRootRect=").Append(FormatRect(_contentRoot))
-                .Append(" preferred=").Append(_contentScrollContent != null ? LayoutUtility.GetPreferredHeight(_contentScrollContent).ToString("0.0") : "--")
-                .AppendLine();
-        }
-
-        private static string FormatRect(RectTransform rect)
-        {
-            if (rect == null)
-                return "null";
-
-            Rect source = rect.rect;
-            return source.width.ToString("0.0") + "x" + source.height.ToString("0.0")
-                + " pos=" + rect.anchoredPosition.x.ToString("0.0")
-                + "," + rect.anchoredPosition.y.ToString("0.0");
-        }
-
         private void ResolveContext(
             out ArcGraphRightInspectorMode mode,
             out ArcUiSelectionTarget target,
@@ -423,7 +298,7 @@ namespace Arcontio.View.ArcGraph
                 layout = _panelRoot.gameObject.AddComponent<VerticalLayoutGroup>();
 
             layout.padding = new RectOffset(12, 12, 12, 12);
-            layout.spacing = 8f;
+            layout.spacing = 5f;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -451,7 +326,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphRightInspectorMode mode,
             ArcUiSelectionTarget target,
             ArcUiSelectionActionRequest actionRequest,
-            bool preserveActiveTab = false)
+            bool preserveActiveTab = false,
+            bool resetScrollToTop = true)
         {
             ArcUiInspectorViewModel viewModel = actionRequest.IsValid
                 ? _viewModelFactory.BuildForAction(actionRequest)
@@ -461,7 +337,7 @@ namespace Arcontio.View.ArcGraph
             _activeTabKey = preserveActiveTab && ContainsTab(viewModel, _activeTabKey)
                 ? _activeTabKey
                 : ResolveInitialActiveTabKey(viewModel);
-            RenderViewModel(mode, viewModel);
+            RenderViewModel(mode, viewModel, resetScrollToTop);
 
             if (_inspectionController != null)
                 _inspectionController.Set(viewModel);
@@ -469,11 +345,12 @@ namespace Arcontio.View.ArcGraph
 
         private void RenderViewModel(
             ArcGraphRightInspectorMode mode,
-            ArcUiInspectorViewModel viewModel)
+            ArcUiInspectorViewModel viewModel,
+            bool resetScrollToTop)
         {
             BuildHeader(mode, viewModel);
             BuildTabs(viewModel);
-            BuildRows(viewModel);
+            BuildRows(viewModel, resetScrollToTop);
         }
 
         private void BuildHeader(
@@ -602,7 +479,9 @@ namespace Arcontio.View.ArcGraph
             }
         }
 
-        private void BuildRows(ArcUiInspectorViewModel viewModel)
+        private void BuildRows(
+            ArcUiInspectorViewModel viewModel,
+            bool resetScrollToTop)
         {
             RectTransform rowsRoot = _contentScrollContent != null
                 ? _contentScrollContent
@@ -612,7 +491,7 @@ namespace Arcontio.View.ArcGraph
 
             VerticalLayoutGroup layout = GetOrAddVerticalLayout(rowsRoot);
             layout.padding = new RectOffset(10, 10, 10, 10);
-            layout.spacing = 7f;
+            layout.spacing = CompactRowSpacing;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -629,10 +508,12 @@ namespace Arcontio.View.ArcGraph
                 CreateInspectorRow(rowsRoot, row);
             }
 
-            FinalizeScrollContentLayout(rowsRoot);
+            FinalizeScrollContentLayout(rowsRoot, resetScrollToTop);
         }
 
-        private void FinalizeScrollContentLayout(RectTransform rowsRoot)
+        private void FinalizeScrollContentLayout(
+            RectTransform rowsRoot,
+            bool resetScrollToTop)
         {
             if (rowsRoot == null)
                 return;
@@ -650,7 +531,13 @@ namespace Arcontio.View.ArcGraph
             rowsRoot.SetSizeWithCurrentAnchors(
                 RectTransform.Axis.Vertical,
                 Mathf.Max(1f, preferredHeight));
-            rowsRoot.anchoredPosition = Vector2.zero;
+
+            if (resetScrollToTop)
+            {
+                rowsRoot.anchoredPosition = Vector2.zero;
+                if (_contentScrollRect != null)
+                    _contentScrollRect.verticalNormalizedPosition = 1f;
+            }
 
             LayoutRebuilder.ForceRebuildLayoutImmediate(rowsRoot);
         }
@@ -764,7 +651,7 @@ namespace Arcontio.View.ArcGraph
                 _activeTabKey);
 
             BuildTabs(_currentViewModel);
-            BuildRows(_currentViewModel);
+            BuildRows(_currentViewModel, true);
             _inspectionController?.Set(_currentViewModel);
         }
 
@@ -874,14 +761,14 @@ namespace Arcontio.View.ArcGraph
             // Il RightInspector deve poter ospitare liste Memory/Belief/Job senza
             // uscire dal pannello. Lo scroll vive dentro ContentRoot e non cambia
             // il contratto dei dati: le righe restano gia' preparate dal ViewModel.
-            ScrollRect scroll = root.gameObject.AddComponent<ScrollRect>();
-            scroll.horizontal = false;
-            scroll.vertical = true;
-            scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 24f;
+            _contentScrollRect = root.gameObject.AddComponent<ScrollRect>();
+            _contentScrollRect.horizontal = false;
+            _contentScrollRect.vertical = true;
+            _contentScrollRect.movementType = ScrollRect.MovementType.Clamped;
+            _contentScrollRect.scrollSensitivity = 24f;
 
             RectTransform viewport = CreateRect("Viewport", root);
-            StretchFull(viewport, new Vector2(0f, 0f), new Vector2(0f, 0f));
+            StretchFull(viewport, new Vector2(0f, 0f), new Vector2(-10f, 0f));
             Image viewportImage = viewport.gameObject.AddComponent<Image>();
             viewportImage.raycastTarget = true;
             viewportImage.color = ColorFromHex("#000000", 0.01f);
@@ -899,14 +786,52 @@ namespace Arcontio.View.ArcGraph
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
-            layout.spacing = 7f;
-            layout.padding = new RectOffset(10, 10, 10, 18);
+            layout.spacing = CompactRowSpacing;
+            layout.padding = new RectOffset(8, 8, 6, 10);
 
             ContentSizeFitter fitter = _contentScrollContent.gameObject.AddComponent<ContentSizeFitter>();
             fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
 
-            scroll.viewport = viewport;
-            scroll.content = _contentScrollContent;
+            Scrollbar scrollbar = CreateVerticalScrollbar(root);
+            _contentScrollRect.viewport = viewport;
+            _contentScrollRect.content = _contentScrollContent;
+            _contentScrollRect.verticalScrollbar = scrollbar;
+            _contentScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.Permanent;
+            _contentScrollRect.verticalScrollbarSpacing = 2f;
+        }
+
+        private static Scrollbar CreateVerticalScrollbar(RectTransform parent)
+        {
+            RectTransform root = CreateRect("VerticalScrollbar", parent);
+            root.anchorMin = new Vector2(1f, 0f);
+            root.anchorMax = new Vector2(1f, 1f);
+            root.pivot = new Vector2(1f, 0.5f);
+            root.sizeDelta = new Vector2(8f, 0f);
+            root.anchoredPosition = new Vector2(-1f, 0f);
+
+            Image background = root.gameObject.AddComponent<Image>();
+            background.raycastTarget = true;
+            background.color = ColorFromHex("#0B1118", 0.82f);
+
+            // La Scrollbar UGUI lavora meglio quando la maniglia vive dentro una
+            // sliding area dedicata: in questo modo Unity puo' ridimensionarla in
+            // base al rapporto tra viewport e contenuto scrollabile.
+            RectTransform slidingArea = CreateRect("SlidingArea", root);
+            StretchFull(slidingArea, new Vector2(1f, 1f), new Vector2(-1f, -1f));
+
+            RectTransform handle = CreateRect("Handle", slidingArea);
+            StretchFull(handle, Vector2.zero, Vector2.zero);
+            Image handleImage = handle.gameObject.AddComponent<Image>();
+            handleImage.raycastTarget = true;
+            handleImage.color = ColorFromHex("#526777", 0.95f);
+
+            Scrollbar scrollbar = root.gameObject.AddComponent<Scrollbar>();
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+            scrollbar.targetGraphic = handleImage;
+            scrollbar.handleRect = handle;
+            scrollbar.size = 0.15f;
+            scrollbar.value = 1f;
+            return scrollbar;
         }
 
         private static RectTransform CreatePanelBlock(
@@ -980,8 +905,8 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform title = CreateRect("SectionTitle_" + SanitizeName(label), parent);
             LayoutElement layout = title.gameObject.AddComponent<LayoutElement>();
-            layout.preferredHeight = 24f;
-            CreateText(title, label, 12, FontStyles.Bold, TextAlignmentOptions.Left);
+            layout.preferredHeight = CompactSectionHeight;
+            CreateText(title, label, 10, FontStyles.Bold, TextAlignmentOptions.Left);
         }
 
         private void CreateInspectorRow(
@@ -1025,10 +950,10 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform root = CreateRect("ArcBarRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = 40f;
+            rootLayout.preferredHeight = CompactBarRowHeight;
 
             VerticalLayoutGroup layout = root.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 3f;
+            layout.spacing = 1f;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -1036,7 +961,7 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform header = CreateRect("Header", root);
             LayoutElement headerLayout = header.gameObject.AddComponent<LayoutElement>();
-            headerLayout.preferredHeight = 18f;
+            headerLayout.preferredHeight = CompactBarHeaderHeight;
 
             HorizontalLayoutGroup headerGroup = header.gameObject.AddComponent<HorizontalLayoutGroup>();
             headerGroup.childControlWidth = true;
@@ -1047,17 +972,17 @@ namespace Arcontio.View.ArcGraph
             RectTransform labelRoot = CreateRect("Label", header);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
             labelLayout.flexibleWidth = 1f;
-            CreateText(labelRoot, row.Label, 11, FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(labelRoot, row.Label, 9, FontStyles.Normal, TextAlignmentOptions.Left);
 
             RectTransform valueRoot = CreateRect("Value", header);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
-            valueLayout.preferredWidth = 68f;
-            TextMeshProUGUI value = CreateText(valueRoot, row.Value, 11, FontStyles.Bold, TextAlignmentOptions.Right);
+            valueLayout.preferredWidth = 56f;
+            TextMeshProUGUI value = CreateText(valueRoot, row.Value, 9, FontStyles.Bold, TextAlignmentOptions.Right);
             value.color = ColorForSeverity(row.Severity, 1f);
 
             RectTransform barRoot = CreateRect("Bar", root);
             LayoutElement barLayout = barRoot.gameObject.AddComponent<LayoutElement>();
-            barLayout.preferredHeight = 10f;
+            barLayout.preferredHeight = CompactBarHeight;
             Image barBackground = barRoot.gameObject.AddComponent<Image>();
             barBackground.raycastTarget = false;
             barBackground.color = ColorFromHex("#0B1118", 0.95f);
@@ -1101,10 +1026,10 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform root = CreateRect("ArcIconMetricsRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = 54f;
+            rootLayout.preferredHeight = CompactMetricRowHeight;
 
             VerticalLayoutGroup rootGroup = root.gameObject.AddComponent<VerticalLayoutGroup>();
-            rootGroup.spacing = 4f;
+            rootGroup.spacing = 1f;
             rootGroup.childControlWidth = true;
             rootGroup.childControlHeight = true;
             rootGroup.childForceExpandWidth = true;
@@ -1112,16 +1037,16 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform title = CreateRect("Title", root);
             LayoutElement titleLayout = title.gameObject.AddComponent<LayoutElement>();
-            titleLayout.preferredHeight = 16f;
-            TextMeshProUGUI titleText = CreateText(title, row.Label, 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            titleLayout.preferredHeight = CompactMetricTitleHeight;
+            TextMeshProUGUI titleText = CreateText(title, row.Label, 8, FontStyles.Bold, TextAlignmentOptions.Left);
             titleText.color = ColorFromHex("#A9B8C4", 1f);
 
             RectTransform metricsRoot = CreateRect("Metrics", root);
             LayoutElement metricsLayout = metricsRoot.gameObject.AddComponent<LayoutElement>();
-            metricsLayout.preferredHeight = 30f;
+            metricsLayout.preferredHeight = CompactMetricBodyHeight;
 
             HorizontalLayoutGroup metricsGroup = metricsRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
-            metricsGroup.spacing = 6f;
+            metricsGroup.spacing = 3f;
             metricsGroup.childControlWidth = true;
             metricsGroup.childControlHeight = true;
             metricsGroup.childForceExpandWidth = true;
@@ -1144,8 +1069,8 @@ namespace Arcontio.View.ArcGraph
             cellLayout.flexibleWidth = 1f;
 
             HorizontalLayoutGroup group = cell.gameObject.AddComponent<HorizontalLayoutGroup>();
-            group.padding = new RectOffset(4, 5, 3, 3);
-            group.spacing = 4f;
+            group.padding = new RectOffset(2, 3, 2, 2);
+            group.spacing = 2f;
             group.childControlWidth = true;
             group.childControlHeight = true;
             group.childForceExpandWidth = false;
@@ -1153,13 +1078,13 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform iconRoot = CreateRect("Icon", cell);
             LayoutElement iconLayout = iconRoot.gameObject.AddComponent<LayoutElement>();
-            iconLayout.preferredWidth = 18f;
+            iconLayout.preferredWidth = 14f;
             Image iconBackground = iconRoot.gameObject.AddComponent<Image>();
             iconBackground.raycastTarget = false;
             iconBackground.color = ColorForSeverity(metric.Severity, 0.28f);
 
             string iconText = string.IsNullOrEmpty(metric.IconKey) ? "*" : metric.IconKey.Substring(0, 1).ToUpperInvariant();
-            TextMeshProUGUI iconLabel = CreateText(iconRoot, iconText, 9, FontStyles.Bold, TextAlignmentOptions.Center);
+            TextMeshProUGUI iconLabel = CreateText(iconRoot, iconText, 8, FontStyles.Bold, TextAlignmentOptions.Center);
             iconLabel.color = ColorForSeverity(metric.Severity, 1f);
 
             RectTransform valueRoot = CreateRect("Value", cell);
@@ -1168,7 +1093,7 @@ namespace Arcontio.View.ArcGraph
             string valueText = string.IsNullOrEmpty(metric.Label)
                 ? metric.Value
                 : metric.Label + " " + metric.Value;
-            TextMeshProUGUI value = CreateText(valueRoot, valueText, 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            TextMeshProUGUI value = CreateText(valueRoot, valueText, 8, FontStyles.Bold, TextAlignmentOptions.Left);
             value.color = ColorForSeverity(metric.Severity, 1f);
         }
 
@@ -1181,11 +1106,11 @@ namespace Arcontio.View.ArcGraph
             RectTransform root = CreateRect("ArcExpandableRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
             rootLayout.preferredHeight = expanded
-                ? 32f + EstimateRowsHeight(row.Details)
-                : 30f;
+                ? CompactExpandableHeight + EstimateRowsHeight(row.Details)
+                : CompactExpandableHeight;
 
             VerticalLayoutGroup rootGroup = root.gameObject.AddComponent<VerticalLayoutGroup>();
-            rootGroup.spacing = 4f;
+            rootGroup.spacing = 2f;
             rootGroup.childControlWidth = true;
             rootGroup.childControlHeight = true;
             rootGroup.childForceExpandWidth = true;
@@ -1193,7 +1118,7 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform header = CreateRect("Header", root);
             LayoutElement headerLayout = header.gameObject.AddComponent<LayoutElement>();
-            headerLayout.preferredHeight = 28f;
+            headerLayout.preferredHeight = CompactExpandableHeight;
             Image headerImage = header.gameObject.AddComponent<Image>();
             headerImage.raycastTarget = true;
             headerImage.color = row.IsSelected
@@ -1201,8 +1126,8 @@ namespace Arcontio.View.ArcGraph
                 : ColorFromHex("#111A23", 0.92f);
 
             HorizontalLayoutGroup headerGroup = header.gameObject.AddComponent<HorizontalLayoutGroup>();
-            headerGroup.padding = new RectOffset(4, 6, 3, 3);
-            headerGroup.spacing = 5f;
+            headerGroup.padding = new RectOffset(3, 4, 2, 2);
+            headerGroup.spacing = 3f;
             headerGroup.childControlWidth = true;
             headerGroup.childControlHeight = true;
             headerGroup.childForceExpandWidth = false;
@@ -1215,13 +1140,13 @@ namespace Arcontio.View.ArcGraph
             RectTransform labelRoot = CreateRect("Label", header);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
             labelLayout.flexibleWidth = 1f;
-            TextMeshProUGUI label = CreateText(labelRoot, row.Label, 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            TextMeshProUGUI label = CreateText(labelRoot, row.Label, 8, FontStyles.Bold, TextAlignmentOptions.Left);
             label.color = row.IsSelected ? ColorFromHex("#9FE0B8", 1f) : ColorFromHex("#DDE6EE", 1f);
 
             RectTransform valueRoot = CreateRect("Value", header);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
-            valueLayout.preferredWidth = 88f;
-            TextMeshProUGUI value = CreateText(valueRoot, row.Value, 10, FontStyles.Bold, TextAlignmentOptions.Right);
+            valueLayout.preferredWidth = 70f;
+            TextMeshProUGUI value = CreateText(valueRoot, row.Value, 8, FontStyles.Bold, TextAlignmentOptions.Right);
             value.color = ColorForSeverity(row.Severity, 1f);
 
             if (!expanded)
@@ -1236,15 +1161,15 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform button = CreateRect("SmallButton_" + SanitizeName(label), parent);
             LayoutElement layout = button.gameObject.AddComponent<LayoutElement>();
-            layout.preferredWidth = 22f;
-            layout.preferredHeight = 22f;
+            layout.preferredWidth = 16f;
+            layout.preferredHeight = 16f;
 
             Image image = button.gameObject.AddComponent<Image>();
             image.raycastTarget = true;
             image.color = ColorFromHex("#22313D", 0.96f);
 
             Button buttonComponent = button.gameObject.AddComponent<Button>();
-            CreateText(button, label, 12, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
             return buttonComponent;
         }
 
@@ -1257,8 +1182,8 @@ namespace Arcontio.View.ArcGraph
             detailsLayout.preferredHeight = EstimateRowsHeight(rows);
 
             VerticalLayoutGroup detailsGroup = detailsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            detailsGroup.padding = new RectOffset(24, 0, 0, 0);
-            detailsGroup.spacing = 3f;
+            detailsGroup.padding = new RectOffset((int)CompactDetailIndent, 0, 0, 0);
+            detailsGroup.spacing = 1f;
             detailsGroup.childControlWidth = true;
             detailsGroup.childControlHeight = false;
             detailsGroup.childForceExpandWidth = true;
@@ -1277,25 +1202,25 @@ namespace Arcontio.View.ArcGraph
         private static float EstimateRowsHeight(ArcUiInspectorRow[] rows)
         {
             if (rows == null || rows.Length == 0)
-                return 26f;
+                return CompactTextRowHeight;
 
             float height = 0f;
             for (int i = 0; i < rows.Length; i++)
-                height += EstimateRowHeight(rows[i]) + 3f;
+                height += EstimateRowHeight(rows[i]) + CompactRowSpacing;
 
-            return Mathf.Max(26f, height);
+            return Mathf.Max(CompactTextRowHeight, height);
         }
 
         private static float EstimateRowHeight(ArcUiInspectorRow row)
         {
             return row.Kind switch
             {
-                ArcUiInspectorRowKind.Section => 24f,
-                ArcUiInspectorRowKind.Bar => 40f,
-                ArcUiInspectorRowKind.IconMetrics => 54f,
-                ArcUiInspectorRowKind.Expandable => 30f + (row.Details.Length > 0 ? EstimateRowsHeight(row.Details) : 0f),
-                ArcUiInspectorRowKind.Timeline => 24f,
-                _ => 26f
+                ArcUiInspectorRowKind.Section => CompactSectionHeight,
+                ArcUiInspectorRowKind.Bar => CompactBarRowHeight,
+                ArcUiInspectorRowKind.IconMetrics => CompactMetricRowHeight,
+                ArcUiInspectorRowKind.Expandable => CompactExpandableHeight + (row.Details.Length > 0 ? EstimateRowsHeight(row.Details) : 0f),
+                ArcUiInspectorRowKind.Timeline => CompactTimelineHeight,
+                _ => CompactTextRowHeight
             };
         }
 
@@ -1305,14 +1230,14 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform root = CreateRect("ArcTimelineRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = 24f;
+            rootLayout.preferredHeight = CompactTimelineHeight;
 
             Image image = root.gameObject.AddComponent<Image>();
             image.raycastTarget = false;
             image.color = ColorFromHex("#0F1821", 0.72f);
 
             HorizontalLayoutGroup layout = root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(5, 6, 2, 2);
+            layout.padding = new RectOffset(3, 4, 1, 1);
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -1320,14 +1245,14 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform labelRoot = CreateRect("Label", root);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
-            labelLayout.preferredWidth = 76f;
-            TextMeshProUGUI label = CreateText(labelRoot, row.Label, 10, FontStyles.Normal, TextAlignmentOptions.Left);
+            labelLayout.preferredWidth = 62f;
+            TextMeshProUGUI label = CreateText(labelRoot, row.Label, 8, FontStyles.Normal, TextAlignmentOptions.Left);
             label.color = ColorForSeverity(row.Severity, 1f);
 
             RectTransform valueRoot = CreateRect("Value", root);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
             valueLayout.flexibleWidth = 1f;
-            CreateText(valueRoot, row.Value, 10, FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(valueRoot, row.Value, 8, FontStyles.Normal, TextAlignmentOptions.Left);
         }
 
         private void ToggleRowExpanded(string rowKey)
@@ -1337,7 +1262,7 @@ namespace Arcontio.View.ArcGraph
 
             _expandedRows.TryGetValue(rowKey, out bool expanded);
             _expandedRows[rowKey] = !expanded;
-            BuildRows(_currentViewModel);
+            BuildRows(_currentViewModel, false);
         }
 
         private bool IsRowExpanded(ArcUiInspectorRow row)
@@ -1372,7 +1297,7 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform row = CreateRect("ArcInfoRow_" + SanitizeName(label), parent);
             LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
-            rowLayout.preferredHeight = 26f;
+            rowLayout.preferredHeight = CompactTextRowHeight;
 
             HorizontalLayoutGroup layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.childControlWidth = true;
@@ -1383,12 +1308,12 @@ namespace Arcontio.View.ArcGraph
             RectTransform labelRoot = CreateRect("Label", row);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
             labelLayout.flexibleWidth = 1f;
-            CreateText(labelRoot, label, 12, FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(labelRoot, label, 9, FontStyles.Normal, TextAlignmentOptions.Left);
 
             RectTransform valueRoot = CreateRect("Value", row);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
-            valueLayout.preferredWidth = 172f;
-            CreateText(valueRoot, value, 12, FontStyles.Bold, TextAlignmentOptions.Right);
+            valueLayout.preferredWidth = 132f;
+            CreateText(valueRoot, value, 9, FontStyles.Bold, TextAlignmentOptions.Right);
         }
 
         private static TextMeshProUGUI CreateText(
@@ -1399,7 +1324,7 @@ namespace Arcontio.View.ArcGraph
             TextAlignmentOptions alignment)
         {
             RectTransform textRoot = CreateRect("Text", parent);
-            StretchFull(textRoot, new Vector2(6f, 2f), new Vector2(-6f, -2f));
+            StretchFull(textRoot, new Vector2(4f, 1f), new Vector2(-4f, -1f));
 
             TextMeshProUGUI label = textRoot.gameObject.AddComponent<TextMeshProUGUI>();
             label.raycastTarget = false;
