@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -86,12 +87,15 @@ namespace Arcontio.View.ArcGraph
         private LayoutElement _tabLayout;
         private TextMeshProUGUI _titleText;
         private TextMeshProUGUI _subtitleText;
+        private RectTransform _diagnosticsRoot;
+        private TextMeshProUGUI _diagnosticsText;
         private ArcUiInspectorViewModel _currentViewModel = ArcUiInspectorViewModel.Empty();
         private string _activeTabKey = string.Empty;
         private ArcGraphRightInspectorMode _lastMode = ArcGraphRightInspectorMode.Hidden;
         private ArcUiSelectionTarget _lastTarget = ArcUiSelectionTarget.None("right_inspector");
         private float _lastRuntimeRefreshTime = -999f;
         private readonly Dictionary<string, bool> _expandedRows = new();
+        private readonly StringBuilder _diagnosticsBuilder = new(2048);
 
         // =============================================================================
         // Update
@@ -106,6 +110,10 @@ namespace Arcontio.View.ArcGraph
             if (!inspectorEnabled)
             {
                 HideInspector();
+                UpdateDiagnosticsPanel(
+                    ArcGraphRightInspectorMode.Hidden,
+                    ArcUiSelectionTarget.None("right_inspector_disabled"),
+                    default);
                 return;
             }
 
@@ -117,11 +125,15 @@ namespace Arcontio.View.ArcGraph
             if (mode == ArcGraphRightInspectorMode.Hidden || !target.IsValid)
             {
                 HideInspector();
+                UpdateDiagnosticsPanel(mode, target, actionRequest);
                 return;
             }
 
             if (!EnsureBuilt())
+            {
+                UpdateDiagnosticsPanel(mode, target, actionRequest);
                 return;
+            }
 
             if (mode == _lastMode && SameTarget(target, _lastTarget))
             {
@@ -134,6 +146,7 @@ namespace Arcontio.View.ArcGraph
                     _lastRuntimeRefreshTime = Time.unscaledTime;
                 }
 
+                UpdateDiagnosticsPanel(mode, target, actionRequest);
                 return;
             }
 
@@ -142,6 +155,7 @@ namespace Arcontio.View.ArcGraph
             ApplyContext(mode, target, actionRequest);
             _lastRuntimeRefreshTime = Time.unscaledTime;
             _panelRoot.gameObject.SetActive(true);
+            UpdateDiagnosticsPanel(mode, target, actionRequest);
         }
 
         // =============================================================================
@@ -226,6 +240,127 @@ namespace Arcontio.View.ArcGraph
 
             if (!enabled)
                 HideInspector();
+        }
+
+        private void UpdateDiagnosticsPanel(
+            ArcGraphRightInspectorMode mode,
+            ArcUiSelectionTarget target,
+            ArcUiSelectionActionRequest actionRequest)
+        {
+            if (!EnsureDiagnosticsPanel())
+                return;
+
+            _diagnosticsBuilder.Clear();
+            _diagnosticsBuilder.AppendLine("RIGHT INSPECTOR DEBUG");
+            _diagnosticsBuilder.Append("mode=").Append(mode)
+                .Append(" inspectorEnabled=").Append(inspectorEnabled)
+                .Append(" actionValid=").Append(actionRequest.IsValid)
+                .AppendLine();
+
+            _diagnosticsBuilder.Append("target valid=").Append(target.IsValid)
+                .Append(" kind=").Append(target.Kind)
+                .Append(" id=").Append(string.IsNullOrWhiteSpace(target.Id) ? "--" : target.Id)
+                .Append(" name=").Append(string.IsNullOrWhiteSpace(target.DisplayName) ? "--" : target.DisplayName)
+                .Append(" cell=(").Append(target.Cell.X).Append(',').Append(target.Cell.Y).Append(',').Append(target.Cell.Z).Append(')')
+                .AppendLine();
+
+            _diagnosticsBuilder.Append("panel built=").Append(_panelRoot != null)
+                .Append(" active=").Append(_panelRoot != null && _panelRoot.gameObject.activeSelf)
+                .Append(" header=").Append(_headerRoot != null)
+                .Append(" tabsRoot=").Append(_tabRoot != null)
+                .Append(" contentRoot=").Append(_contentRoot != null)
+                .AppendLine();
+
+            _diagnosticsBuilder.Append("vm target=").Append(_currentViewModel.HasTarget)
+                .Append(" title=").Append(string.IsNullOrWhiteSpace(_currentViewModel.Title) ? "--" : _currentViewModel.Title)
+                .Append(" tabs=").Append(_currentViewModel.Tabs.Length)
+                .Append(" activeTab=").Append(string.IsNullOrWhiteSpace(_activeTabKey) ? "--" : _activeTabKey)
+                .AppendLine();
+
+            AppendActiveTabDiagnostics();
+            AppendLayoutDiagnostics();
+            _diagnosticsText.text = _diagnosticsBuilder.ToString();
+        }
+
+        private bool EnsureDiagnosticsPanel()
+        {
+            if (_diagnosticsRoot != null && _diagnosticsText != null)
+                return true;
+
+            if (_uiRoot == null || !_uiRoot.TryGetDebugRoot(out RectTransform debugRoot))
+                return false;
+
+            debugRoot.gameObject.SetActive(true);
+
+            _diagnosticsRoot = CreateRect("ArcRightInspectorDebugPanel", debugRoot);
+            _diagnosticsRoot.anchorMin = new Vector2(0f, 1f);
+            _diagnosticsRoot.anchorMax = new Vector2(0f, 1f);
+            _diagnosticsRoot.pivot = new Vector2(0f, 1f);
+            _diagnosticsRoot.anchoredPosition = new Vector2(10f, -54f);
+            _diagnosticsRoot.sizeDelta = new Vector2(560f, 250f);
+
+            Image image = _diagnosticsRoot.gameObject.AddComponent<Image>();
+            image.raycastTarget = false;
+            image.color = ColorFromHex("#050B10", 0.78f);
+
+            _diagnosticsText = _diagnosticsRoot.gameObject.AddComponent<TextMeshProUGUI>();
+            _diagnosticsText.raycastTarget = false;
+            _diagnosticsText.fontSize = 11f;
+            _diagnosticsText.fontStyle = FontStyles.Normal;
+            _diagnosticsText.alignment = TextAlignmentOptions.TopLeft;
+            _diagnosticsText.enableWordWrapping = false;
+            _diagnosticsText.overflowMode = TextOverflowModes.Overflow;
+            _diagnosticsText.margin = new Vector4(8f, 7f, 8f, 7f);
+            _diagnosticsText.color = ColorFromHex("#DDE6EE", 1f);
+            ArcGraphUiFontProvider.ApplyOfficialFont(_diagnosticsText);
+            return true;
+        }
+
+        private void AppendActiveTabDiagnostics()
+        {
+            if (!TryResolveActiveTab(_currentViewModel, _activeTabKey, out ArcUiInspectorTab activeTab))
+            {
+                _diagnosticsBuilder.AppendLine("activeTab resolved=false");
+                return;
+            }
+
+            _diagnosticsBuilder.Append("activeTab label=").Append(activeTab.Label)
+                .Append(" rows=").Append(activeTab.Rows.Length)
+                .AppendLine();
+
+            int maxRows = Mathf.Min(4, activeTab.Rows.Length);
+            for (int i = 0; i < maxRows; i++)
+            {
+                ArcUiInspectorRow row = activeTab.Rows[i];
+                _diagnosticsBuilder.Append("  row").Append(i)
+                    .Append(" kind=").Append(row.Kind)
+                    .Append(" label=").Append(string.IsNullOrWhiteSpace(row.Label) ? "--" : row.Label)
+                    .Append(" value=").Append(string.IsNullOrWhiteSpace(row.Value) ? "--" : row.Value)
+                    .AppendLine();
+            }
+        }
+
+        private void AppendLayoutDiagnostics()
+        {
+            _diagnosticsBuilder.Append("content children=")
+                .Append(_contentScrollContent != null ? _contentScrollContent.childCount : -1)
+                .Append(" contentRect=").Append(FormatRect(_contentScrollContent))
+                .AppendLine();
+
+            _diagnosticsBuilder.Append("contentRootRect=").Append(FormatRect(_contentRoot))
+                .Append(" preferred=").Append(_contentScrollContent != null ? LayoutUtility.GetPreferredHeight(_contentScrollContent).ToString("0.0") : "--")
+                .AppendLine();
+        }
+
+        private static string FormatRect(RectTransform rect)
+        {
+            if (rect == null)
+                return "null";
+
+            Rect source = rect.rect;
+            return source.width.ToString("0.0") + "x" + source.height.ToString("0.0")
+                + " pos=" + rect.anchoredPosition.x.ToString("0.0")
+                + "," + rect.anchoredPosition.y.ToString("0.0");
         }
 
         private void ResolveContext(

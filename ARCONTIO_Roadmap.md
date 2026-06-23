@@ -16696,7 +16696,7 @@ Roadmap operativa:
 | v0.70.02 | Operation catalog minimo e gerarchia ActionPanel | Fatto su branch `ai-task/v0.70.02-arcgraph-ui-operation-catalog` |
 | v0.70.03 | Ponte placement | ⏳ Pending |
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
-| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.04.01c completato |
+| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.04.01d completato |
 | v0.70.06 | Simulation control | ⏳ Pending |
 | v0.70.07 | View modes | ⏳ Pending |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
@@ -17018,6 +17018,7 @@ Sottostep operativi previsti:
 | v0.70.05.04.01 | NPC read-only inspector con slot portrait | Fatto su branch `ai-task/v0.70.05.04.01-npc-readonly-inspector` |
 | v0.70.05.04.01b | NPC inspector layout ricco: Info/Stato/Inventario unificati, barre, metriche e righe espandibili | Fatto su branch `ai-task/v0.70.05.04.01b-npc-inspector-layout` |
 | v0.70.05.04.01c | Fix runtime inspector scroll vuoto e clamp hover menu dentro MapViewport | Fatto su branch `ai-task/v0.70.05.04.01c-inspector-hover-runtime-fix` |
+| v0.70.05.04.01d | Pannello diagnostico provvisorio RightInspector su DebugRoot | Fatto su branch `ai-task/v0.70.05.04.01d-inspector-debug-panel` |
 | v0.70.05.04.02 | Oggetti, muri e porte read-only inspector | Prossimo |
 | v0.70.05.05 | Edit shell da SelectionActionRequest | Pending |
 | v0.70.05.06 | Delete confirmation shell non distruttiva | Pending |

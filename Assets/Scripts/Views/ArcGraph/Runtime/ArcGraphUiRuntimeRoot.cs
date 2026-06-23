@@ -59,6 +59,7 @@ namespace Arcontio.View.ArcGraph
         private RectTransform _mapViewport;
         private RectTransform _rightInspector;
         private RectTransform _overlayRoot;
+        private RectTransform _debugRoot;
         private readonly Vector3[] _mapViewportCorners = new Vector3[4];
         private Button _fovViewModeButton;
 
@@ -211,6 +212,27 @@ namespace Arcontio.View.ArcGraph
         {
             rightInspector = _rightInspector;
             return rightInspector != null;
+        }
+
+        // =============================================================================
+        // TryGetDebugRoot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il root UGUI dedicato ai pannelli diagnostici provvisori.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug view-side isolato</b></para>
+        /// <para>
+        /// Il DebugRoot e' un contenitore visuale separato dal RightInspector e
+        /// dagli overlay di gameplay. Serve a mostrare informazioni gia' presenti
+        /// nei ViewModel UI senza scrivere in console e senza interrogare il World.
+        /// </para>
+        /// </summary>
+        public bool TryGetDebugRoot(out RectTransform debugRoot)
+        {
+            debugRoot = _debugRoot;
+            return debugRoot != null;
         }
 
         // =============================================================================
@@ -554,9 +576,9 @@ namespace Arcontio.View.ArcGraph
             _overlayRoot = CreateRect("OverlayRoot", _uiRoot.transform);
             StretchFull(_overlayRoot);
 
-            RectTransform debugRoot = CreateRect("DebugRoot", _uiRoot.transform);
-            StretchFull(debugRoot);
-            debugRoot.gameObject.SetActive(false);
+            _debugRoot = CreateRect("DebugRoot", _uiRoot.transform);
+            StretchFull(_debugRoot);
+            _debugRoot.gameObject.SetActive(false);
         }
 
         private static RectTransform CreatePanel(
