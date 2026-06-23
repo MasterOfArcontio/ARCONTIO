@@ -130,7 +130,10 @@ namespace Arcontio.View.ArcGraph
             IReadOnlyList<LandmarkOverlayEdge> jumpPathEdges,
             IReadOnlyList<LandmarkOverlayEdge> complexEdges,
             bool clearTarget = false,
-            bool isEnabled = true)
+            bool isEnabled = true,
+            bool includeLandmarkGraph = true,
+            bool includeLandmarkRoute = true,
+            bool includeLandmarkPaths = true)
         {
             if (target == null)
                 return CreateMissingTargetDiagnostics("TargetMissing");
@@ -143,19 +146,30 @@ namespace Arcontio.View.ArcGraph
 
             // Ogni gruppo conserva il proprio significato diagnostico. Il bridge non
             // prova a dedurre il tipo dal contenuto dei nodi, cosi' resta stabile.
-            addedNodes += AppendNodes(target, worldNodes, ArcGraphDebugOverlayKind.LandmarkWorldNode, WorldNodeScale, isEnabled);
-            addedEdges += AppendEdges(target, worldEdges, ArcGraphDebugOverlayKind.LandmarkWorldEdge, isEnabled);
+            // I flag permettono alla UI ArcGraph di attivare Landmark e Pathfinding
+            // come overlay sovrapponibili distinti, pur usando lo stesso DTO Core.
+            if (includeLandmarkGraph)
+            {
+                addedNodes += AppendNodes(target, worldNodes, ArcGraphDebugOverlayKind.LandmarkWorldNode, WorldNodeScale, isEnabled);
+                addedEdges += AppendEdges(target, worldEdges, ArcGraphDebugOverlayKind.LandmarkWorldEdge, isEnabled);
 
-            addedNodes += AppendNodes(target, knownNodes, ArcGraphDebugOverlayKind.LandmarkKnownNode, KnownNodeScale, isEnabled);
-            addedEdges += AppendEdges(target, knownEdges, ArcGraphDebugOverlayKind.LandmarkKnownEdge, isEnabled);
+                addedNodes += AppendNodes(target, knownNodes, ArcGraphDebugOverlayKind.LandmarkKnownNode, KnownNodeScale, isEnabled);
+                addedEdges += AppendEdges(target, knownEdges, ArcGraphDebugOverlayKind.LandmarkKnownEdge, isEnabled);
+            }
 
-            addedNodes += AppendNodes(target, routeNodes, ArcGraphDebugOverlayKind.LandmarkRouteNode, RouteNodeScale, isEnabled);
-            addedEdges += AppendEdges(target, routeEdges, ArcGraphDebugOverlayKind.LandmarkRouteEdge, isEnabled);
+            if (includeLandmarkRoute)
+            {
+                addedNodes += AppendNodes(target, routeNodes, ArcGraphDebugOverlayKind.LandmarkRouteNode, RouteNodeScale, isEnabled);
+                addedEdges += AppendEdges(target, routeEdges, ArcGraphDebugOverlayKind.LandmarkRouteEdge, isEnabled);
+            }
 
-            addedEdges += AppendEdges(target, lmPathEdges, ArcGraphDebugOverlayKind.LandmarkLmPathEdge, isEnabled);
-            addedEdges += AppendEdges(target, directPathEdges, ArcGraphDebugOverlayKind.LandmarkDirectPathEdge, isEnabled);
-            addedEdges += AppendEdges(target, jumpPathEdges, ArcGraphDebugOverlayKind.LandmarkJumpPathEdge, isEnabled);
-            addedEdges += AppendEdges(target, complexEdges, ArcGraphDebugOverlayKind.LandmarkComplexEdge, isEnabled);
+            if (includeLandmarkPaths)
+            {
+                addedEdges += AppendEdges(target, lmPathEdges, ArcGraphDebugOverlayKind.LandmarkLmPathEdge, isEnabled);
+                addedEdges += AppendEdges(target, directPathEdges, ArcGraphDebugOverlayKind.LandmarkDirectPathEdge, isEnabled);
+                addedEdges += AppendEdges(target, jumpPathEdges, ArcGraphDebugOverlayKind.LandmarkJumpPathEdge, isEnabled);
+                addedEdges += AppendEdges(target, complexEdges, ArcGraphDebugOverlayKind.LandmarkComplexEdge, isEnabled);
+            }
 
             int sourceNodes = Count(worldNodes) + Count(knownNodes) + Count(routeNodes);
             int sourceEdges = Count(worldEdges)

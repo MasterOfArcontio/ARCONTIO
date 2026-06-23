@@ -16698,7 +16698,7 @@ Roadmap operativa:
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
-| v0.70.07 | Visual overlay toggles | In corso - sottostep v0.70.07.03 completato |
+| v0.70.07 | Visual overlay toggles | In corso - sottostep v0.70.07.04 completato |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
 
 ---
@@ -17172,7 +17172,7 @@ Sottostep:
 | v0.70.07.01 | Foundation toggle overlay visuali: catalogo, request, state e controller UI non operativo | Fatto su branch `ai-task/v0.70.07.01-visual-overlay-toggle-foundation` |
 | v0.70.07.02 | Collegamento icone visuali TopBar senza root separata permanente | Fatto su branch `ai-task/v0.70.07.02-topbar-overlay-toggle-icons` |
 | v0.70.07.03 | LOS NPC on/off con vincolo target NPC selezionato | Fatto su branch `ai-task/v0.70.07.03-los-overlay-toggle-runtime` |
-| v0.70.07.04 | Landmark on/off tramite overlay esistente/adattato | Pending |
+| v0.70.07.04 | Landmark on/off tramite overlay esistente/adattato | Fatto su branch `ai-task/v0.70.07.04-landmark-overlay-toggle-runtime` |
 | v0.70.07.05 | Pathfinding/debug overlay on/off | Pending |
 
 Criteri di accettazione:

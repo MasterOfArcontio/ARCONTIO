@@ -56,6 +56,46 @@ namespace Arcontio.View.ArcGraph
         private Material _lineMaterial;
 
         // =============================================================================
+        // SetTileWorldSize
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna la dimensione mondo di una cella per il rendering runtime.
+        /// </para>
+        /// </summary>
+        public void SetTileWorldSize(float value)
+        {
+            tileWorldSize = value > 0.0001f ? value : 1f;
+        }
+
+        // =============================================================================
+        // SetPlaceProbeAtSceneCameraCenter
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Decide se il probe deve essere centrato sulla camera o sulle coordinate
+        /// reali della griglia. In runtime ArcGraph questo valore deve essere falso.
+        /// </para>
+        /// </summary>
+        public void SetPlaceProbeAtSceneCameraCenter(bool enabled)
+        {
+            placeProbeAtSceneCameraCenter = enabled;
+        }
+
+        // =============================================================================
+        // SetLogDiagnostics
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Abilita o disabilita i log del renderer debug.
+        /// </para>
+        /// </summary>
+        public void SetLogDiagnostics(bool enabled)
+        {
+            logDiagnostics = enabled;
+        }
+
+        // =============================================================================
         // Start
         // =============================================================================
         /// <summary>

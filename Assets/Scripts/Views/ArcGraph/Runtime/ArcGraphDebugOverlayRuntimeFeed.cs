@@ -132,7 +132,12 @@ namespace Arcontio.View.ArcGraph
                     _lmPathEdges,
                     _directPathEdges,
                     _jumpPathEdges,
-                    _complexEdges);
+                    _complexEdges,
+                    false,
+                    true,
+                    options.IncludeLandmarkGraph,
+                    options.IncludeLandmarkRoute,
+                    options.IncludeLandmarkPaths);
             }
 
             if (options.IncludeGvdDin)
@@ -216,7 +221,12 @@ namespace Arcontio.View.ArcGraph
                     lmPathEdges,
                     directPathEdges,
                     jumpPathEdges,
-                    complexEdges);
+                    complexEdges,
+                    false,
+                    true,
+                    options.IncludeLandmarkGraph,
+                    options.IncludeLandmarkRoute,
+                    options.IncludeLandmarkPaths);
             }
 
             if (options.IncludeGvdDin)

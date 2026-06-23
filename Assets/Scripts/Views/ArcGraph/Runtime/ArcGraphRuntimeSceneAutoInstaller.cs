@@ -74,6 +74,8 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphSelectionSceneConsumer _selectionConsumer;
         private ArcGraphFovDebugOverlaySceneConsumer _fovOverlayConsumer;
         private ArcGraphFovDebugOverlayRuntimeController _fovOverlayController;
+        private ArcGraphDebugOverlaySceneProbeRenderer _landmarkPathOverlayConsumer;
+        private ArcGraphLandmarkPathDebugOverlayRuntimeController _landmarkPathOverlayController;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
         private ArcGraphSerializedSpriteResolver _spriteResolver;
         private ArcGraphUiRuntimeRoot _uiRoot;
@@ -258,6 +260,8 @@ namespace Arcontio.View.ArcGraph
             _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
+            _landmarkPathOverlayConsumer = _visualRoot.AddComponent<ArcGraphDebugOverlaySceneProbeRenderer>();
+            _landmarkPathOverlayController = _visualRoot.AddComponent<ArcGraphLandmarkPathDebugOverlayRuntimeController>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
             _uiRoot = gameObject.AddComponent<ArcGraphUiRuntimeRoot>();
@@ -377,6 +381,17 @@ namespace Arcontio.View.ArcGraph
             _fovOverlayController.SetOverlayConsumer(_fovOverlayConsumer);
             _fovOverlayController.SetProcessInUpdate(true);
             _fovOverlayController.SetOverlayEnabled(false);
+
+            // Landmark e Pathfinding usano lo stesso feed debug Core, filtrato da
+            // un controller ArcGraph dedicato. In questo step colleghiamo solo il
+            // toggle Landmark; il Path viene abilitato nello step successivo.
+            _landmarkPathOverlayConsumer.SetPlaceProbeAtSceneCameraCenter(false);
+            _landmarkPathOverlayConsumer.SetLogDiagnostics(false);
+            _landmarkPathOverlayController.SetRuntimeContextProvider(_contextProvider);
+            _landmarkPathOverlayController.SetOverlayConsumer(_landmarkPathOverlayConsumer);
+            _landmarkPathOverlayController.SetProcessInUpdate(true);
+            _landmarkPathOverlayController.SetLandmarkOverlayEnabled(false);
+            _landmarkPathOverlayController.SetPathfindingOverlayEnabled(false);
         }
 
         // =============================================================================
@@ -459,22 +474,31 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Boundary controllato</b></para>
         /// <para>
         /// La UI comunica solo chiave e stato. Qui, lato installer, sappiamo quali
-        /// consumer runtime esistono davvero. In questo step viene collegato solo
-        /// <c>npc_los</c> al controller FOV/LOS gia' implementato.
+        /// consumer runtime esistono davvero. In questo step vengono collegati
+        /// <c>npc_los</c> e <c>landmarks</c> ai rispettivi controller.
         /// </para>
         /// </summary>
         private void OnVisualOverlayStateChanged(string overlayKey, bool enabled)
         {
             string normalized = ArcUiOperationDefinition.NormalizeKey(overlayKey);
-            if (normalized != ArcUiVisualOverlayCatalog.NpcLineOfSightKey)
+            if (normalized == ArcUiVisualOverlayCatalog.NpcLineOfSightKey)
+            {
+                if (_fovOverlayController == null)
+                    return;
+
+                _fovOverlayController.SetOverlayEnabled(enabled);
+                if (enabled)
+                    _fovOverlayController.ProcessFrame();
+                return;
+            }
+
+            if (normalized != ArcUiVisualOverlayCatalog.LandmarksKey)
                 return;
 
-            if (_fovOverlayController == null)
+            if (_landmarkPathOverlayController == null)
                 return;
 
-            _fovOverlayController.SetOverlayEnabled(enabled);
-            if (enabled)
-                _fovOverlayController.ProcessFrame();
+            _landmarkPathOverlayController.SetLandmarkOverlayEnabled(enabled);
         }
 
         // =============================================================================
