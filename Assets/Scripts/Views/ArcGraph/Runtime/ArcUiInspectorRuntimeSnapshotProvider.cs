@@ -99,6 +99,52 @@ namespace Arcontio.View.ArcGraph
             return true;
         }
 
+        // =============================================================================
+        // TryBuildObjectViewModel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il ViewModel read-only del RightInspector per oggetti, muri e
+        /// porte usando solo snapshot autorizzati dal World runtime.
+        /// </para>
+        /// </summary>
+        public bool TryBuildObjectViewModel(
+            ArcUiSelectionTarget target,
+            out ArcUiInspectorViewModel viewModel)
+        {
+            viewModel = ArcUiInspectorViewModel.Empty();
+
+            if ((target.Kind != ArcUiSelectionTargetKind.Object && target.Kind != ArcUiSelectionTargetKind.Wall)
+                || !TryParseObjectId(target, out int objectId))
+                return false;
+
+            if (!TryGetWorld(out World world)
+                || !world.Objects.TryGetValue(objectId, out WorldObjectInstance instance)
+                || instance == null)
+                return false;
+
+            world.TryGetObjectDef(instance.DefId, out ObjectDef def);
+
+            bool isDoor = def != null && def.IsDoor;
+            bool isWall = target.Kind == ArcUiSelectionTargetKind.Wall
+                || (def != null
+                    && def.Visual != null
+                    && string.Equals(def.Visual.VisualKind, "wall", System.StringComparison.OrdinalIgnoreCase));
+
+            ArcUiInspectorTab[] tabs = isDoor
+                ? BuildDoorTabs(world, target, instance, def)
+                : isWall
+                    ? BuildWallTabs(world, target, instance, def)
+                    : BuildObjectTabs(world, target, instance, def);
+
+            viewModel = new ArcUiInspectorViewModel(
+                ResolveObjectTitle(target, instance, def),
+                target,
+                tabs,
+                InfoTabKey);
+            return true;
+        }
+
         private bool TryGetWorld(out World world)
         {
             world = null;
@@ -120,12 +166,9 @@ namespace Arcontio.View.ArcGraph
             GridPosition position,
             NpcActionState action)
         {
-            var rows = new List<ArcUiInspectorRow>(24)
+            var rows = new List<ArcUiInspectorRow>(20)
             {
-                ArcUiInspectorRow.Section("Identita'"),
-                new ArcUiInspectorRow("Id", npcId.ToString(CultureInfo.InvariantCulture)),
-                new ArcUiInspectorRow("Nome", ReadString(dna.Identity.Name, target.DisplayName)),
-                new ArcUiInspectorRow("Cella logica", FormatCell(position.X, position.Y, 0)),
+                ArcUiInspectorRow.Section("Stato"),
                 ArcUiInspectorRow.Bar(
                     "npc_action_state",
                     "Azione",
@@ -140,6 +183,207 @@ namespace Arcontio.View.ArcGraph
             AddFoodMetrics(world, npcId, rows);
             rows.Add(new ArcUiInspectorRow("Sorgente", ReadString(target.SourceView, EmptyValue)));
             return rows.ToArray();
+        }
+
+        private static ArcUiInspectorTab[] BuildObjectTabs(
+            World world,
+            ArcUiSelectionTarget target,
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            return new[]
+            {
+                new ArcUiInspectorTab(InfoTabKey, "Info", BuildObjectInfoRows(target, instance, def)),
+                new ArcUiInspectorTab("state", "Stato", BuildObjectStateRows(world, instance, def)),
+                new ArcUiInspectorTab("use", "Uso", BuildObjectUseRows(world, instance, def)),
+                new ArcUiInspectorTab("storage", "Storage", BuildObjectStorageRows(world, instance, def))
+            };
+        }
+
+        private static ArcUiInspectorTab[] BuildDoorTabs(
+            World world,
+            ArcUiSelectionTarget target,
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            return new[]
+            {
+                new ArcUiInspectorTab(InfoTabKey, "Info", BuildObjectInfoRows(target, instance, def)),
+                new ArcUiInspectorTab("state", "Stato", BuildObjectStateRows(world, instance, def)),
+                new ArcUiInspectorTab("access", "Accesso", BuildDoorAccessRows(instance, def)),
+                new ArcUiInspectorTab("material", "Materiale", BuildObjectMaterialRows(instance, def))
+            };
+        }
+
+        private static ArcUiInspectorTab[] BuildWallTabs(
+            World world,
+            ArcUiSelectionTarget target,
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            return new[]
+            {
+                new ArcUiInspectorTab(InfoTabKey, "Info", BuildObjectInfoRows(target, instance, def)),
+                new ArcUiInspectorTab("material", "Materiale", BuildObjectMaterialRows(instance, def)),
+                new ArcUiInspectorTab("connections", "Connessioni", BuildWallConnectionRows(instance, def)),
+                new ArcUiInspectorTab("state", "Stato", BuildObjectStateRows(world, instance, def))
+            };
+        }
+
+        private static ArcUiInspectorRow[] BuildObjectInfoRows(
+            ArcUiSelectionTarget target,
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Identita'"),
+                new ArcUiInspectorRow("Id", instance.ObjectId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Def", ReadString(instance.DefId, EmptyValue)),
+                new ArcUiInspectorRow("Nome", ResolveObjectTitle(target, instance, def)),
+                new ArcUiInspectorRow("Cella logica", FormatCell(instance.CellX, instance.CellY, 0)),
+                new ArcUiInspectorRow("Footprint", FormatFootprint(def)),
+                new ArcUiInspectorRow("Sorgente", ReadString(target.SourceView, EmptyValue)),
+                ArcUiInspectorRow.Section("Ownership"),
+                new ArcUiInspectorRow("Owner", FormatOwner(instance.OwnerKind, instance.OwnerId)),
+                new ArcUiInspectorRow("Trasportato", instance.IsHeld ? "Si" : "No"),
+                new ArcUiInspectorRow("Holder NPC", instance.HolderNpcId > 0 ? instance.HolderNpcId.ToString(CultureInfo.InvariantCulture) : EmptyValue)
+            };
+        }
+
+        private static ArcUiInspectorRow[] BuildObjectStateRows(
+            World world,
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            ObjectUseState useState = world.GetUseStateOrDefault(instance.ObjectId);
+            var rows = new List<ArcUiInspectorRow>(20)
+            {
+                ArcUiInspectorRow.Section("Runtime"),
+                new ArcUiInspectorRow("In uso", useState.IsInUse ? "Si" : "No"),
+                new ArcUiInspectorRow("Using NPC", useState.UsingNpcId > 0 ? useState.UsingNpcId.ToString(CultureInfo.InvariantCulture) : EmptyValue),
+                new ArcUiInspectorRow("Occupante", instance.OccupantNpcId >= 0 ? instance.OccupantNpcId.ToString(CultureInfo.InvariantCulture) : EmptyValue),
+                ArcUiInspectorRow.Section("Regole"),
+                new ArcUiInspectorRow("Interagibile", BoolText(def != null && def.IsInteractable)),
+                new ArcUiInspectorRow("Occluder", BoolText(def != null && def.IsOccluder)),
+                new ArcUiInspectorRow("Blocca movimento", BoolText(def != null && def.BlocksMovement)),
+                new ArcUiInspectorRow("Blocca visione", BoolText(def != null && def.BlocksVision)),
+                new ArcUiInspectorRow("Vision cost", def == null ? EmptyValue : FormatDecimal(def.VisionCost))
+            };
+
+            if (def != null && def.MaxHp > 0)
+                rows.Add(new ArcUiInspectorRow("Max HP", def.MaxHp.ToString(CultureInfo.InvariantCulture)));
+
+            if (def != null && def.Hardness > 0f)
+                rows.Add(new ArcUiInspectorRow("Hardness", FormatDecimal(def.Hardness)));
+
+            return rows.ToArray();
+        }
+
+        private static ArcUiInspectorRow[] BuildObjectUseRows(
+            World world,
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            ObjectUseState useState = world.GetUseStateOrDefault(instance.ObjectId);
+            var rows = new List<ArcUiInspectorRow>(20)
+            {
+                ArcUiInspectorRow.Section("Uso runtime"),
+                new ArcUiInspectorRow("In uso", useState.IsInUse ? "Si" : "No"),
+                new ArcUiInspectorRow("NPC utilizzatore", useState.UsingNpcId > 0 ? useState.UsingNpcId.ToString(CultureInfo.InvariantCulture) : EmptyValue),
+                new ArcUiInspectorRow("Occupante", instance.OccupantNpcId >= 0 ? instance.OccupantNpcId.ToString(CultureInfo.InvariantCulture) : EmptyValue),
+                ArcUiInspectorRow.Section("Proprieta' catalogo")
+            };
+
+            AddObjectProperties(rows, def);
+            return rows.ToArray();
+        }
+
+        private static ArcUiInspectorRow[] BuildObjectStorageRows(
+            World world,
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            var rows = new List<ArcUiInspectorRow>(16)
+            {
+                ArcUiInspectorRow.Section("Storage")
+            };
+
+            if (world.FoodStocks.TryGetValue(instance.ObjectId, out FoodStockComponent stock))
+            {
+                rows.Add(ArcUiInspectorRow.IconMetrics(
+                    "object_food_stock",
+                    "Food stock",
+                    new[]
+                    {
+                        new ArcUiInspectorMetric("food_units", "Unita'", stock.Units.ToString(CultureInfo.InvariantCulture), stock.Units > 0 ? ArcUiInspectorSeverity.Good : ArcUiInspectorSeverity.Muted),
+                        new ArcUiInspectorMetric("food_owner", "Owner", FormatOwner(stock.OwnerKind, stock.OwnerId), ArcUiInspectorSeverity.Info)
+                    }));
+                rows.Add(new ArcUiInspectorRow("Vuoto", stock.IsEmpty ? "Si" : "No"));
+            }
+            else
+            {
+                rows.Add(new ArcUiInspectorRow("Food stock", "Assente"));
+            }
+
+            rows.Add(ArcUiInspectorRow.Section("Proprieta' catalogo"));
+            AddObjectProperties(rows, def);
+            return rows.ToArray();
+        }
+
+        private static ArcUiInspectorRow[] BuildDoorAccessRows(
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Porta"),
+                new ArcUiInspectorRow("Aperta", instance.IsOpen ? "Si" : "No"),
+                new ArcUiInspectorRow("Bloccata", instance.IsLocked ? "Si" : "No"),
+                new ArcUiInspectorRow("Lockable", BoolText(def != null && def.IsLockable)),
+                new ArcUiInspectorRow("Key", def == null ? EmptyValue : ReadString(def.KeyId, EmptyValue)),
+                ArcUiInspectorRow.Section("Effetto su mappa"),
+                new ArcUiInspectorRow("Blocca movimento", BoolText(def != null && def.BlocksMovement && !instance.IsOpen)),
+                new ArcUiInspectorRow("Blocca visione", BoolText(def != null && def.BlocksVision && !instance.IsOpen)),
+                new ArcUiInspectorRow("Nota", "Read-only: nessun comando porta inviato")
+            };
+        }
+
+        private static ArcUiInspectorRow[] BuildObjectMaterialRows(
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            ObjectVisualDef visual = def == null ? null : def.Visual;
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Definizione"),
+                new ArcUiInspectorRow("Def", ReadString(instance.DefId, EmptyValue)),
+                new ArcUiInspectorRow("Nome catalogo", def == null ? EmptyValue : ReadString(def.DisplayName, EmptyValue)),
+                new ArcUiInspectorRow("Sprite", def == null ? EmptyValue : ReadString(def.ResolveArcGraphSpritePath(), EmptyValue)),
+                ArcUiInspectorRow.Section("Visual"),
+                new ArcUiInspectorRow("Kind", visual == null ? EmptyValue : ReadString(visual.VisualKind, EmptyValue)),
+                new ArcUiInspectorRow("Resolver", visual == null ? EmptyValue : ReadString(visual.ResolverKey, EmptyValue)),
+                new ArcUiInspectorRow("Dimensione", visual == null ? EmptyValue : FormatSize(visual.WidthPixels, visual.HeightPixels)),
+                new ArcUiInspectorRow("Base", visual == null ? EmptyValue : FormatSize(visual.BaseWidthPixels, visual.BaseHeightPixels)),
+                new ArcUiInspectorRow("Pivot", visual == null ? EmptyValue : ReadString(visual.Pivot, EmptyValue)),
+                new ArcUiInspectorRow("Offset", visual == null ? EmptyValue : FormatOffset(visual.OffsetX, visual.OffsetY))
+            };
+        }
+
+        private static ArcUiInspectorRow[] BuildWallConnectionRows(
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            ObjectVisualDef visual = def == null ? null : def.Visual;
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Connessioni visuali"),
+                new ArcUiInspectorRow("Resolver", visual == null ? EmptyValue : ReadString(visual.ResolverKey, EmptyValue)),
+                new ArcUiInspectorRow("Mini-tile base", visual == null ? EmptyValue : ReadString(visual.BaseMiniTileMask, EmptyValue)),
+                new ArcUiInspectorRow("Footprint", FormatFootprint(def)),
+                new ArcUiInspectorRow("Cella base", FormatCell(instance.CellX, instance.CellY, 0)),
+                new ArcUiInspectorRow("Nota", "Connessioni cardinali calcolate dal renderer")
+            };
         }
 
         private static void AddNeedBars(
@@ -708,6 +952,11 @@ namespace Arcontio.View.ArcGraph
             return int.TryParse(target.Id, NumberStyles.Integer, CultureInfo.InvariantCulture, out npcId) && npcId > 0;
         }
 
+        private static bool TryParseObjectId(ArcUiSelectionTarget target, out int objectId)
+        {
+            return int.TryParse(target.Id, NumberStyles.Integer, CultureInfo.InvariantCulture, out objectId) && objectId > 0;
+        }
+
         private static string ResolveNpcTitle(
             ArcUiSelectionTarget target,
             NpcDnaProfile dna,
@@ -720,6 +969,79 @@ namespace Arcontio.View.ArcGraph
                 return target.DisplayName.Trim();
 
             return "NPC " + npcId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string ResolveObjectTitle(
+            ArcUiSelectionTarget target,
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            if (def != null && !string.IsNullOrWhiteSpace(def.DisplayName))
+                return def.DisplayName.Trim();
+
+            if (!string.IsNullOrWhiteSpace(target.DisplayName))
+                return target.DisplayName.Trim();
+
+            if (!string.IsNullOrWhiteSpace(instance.DefId))
+                return instance.DefId.Trim() + " #" + instance.ObjectId.ToString(CultureInfo.InvariantCulture);
+
+            return "Oggetto " + instance.ObjectId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static void AddObjectProperties(
+            List<ArcUiInspectorRow> rows,
+            ObjectDef def)
+        {
+            if (def == null || def.Properties == null || def.Properties.Count == 0)
+            {
+                rows.Add(new ArcUiInspectorRow("Proprieta'", "Nessuna"));
+                return;
+            }
+
+            for (int i = 0; i < def.Properties.Count; i++)
+            {
+                ObjectPropertyKV property = def.Properties[i];
+                rows.Add(new ArcUiInspectorRow(
+                    ReadString(property.Key, "Property"),
+                    FormatDecimal(property.Value)));
+            }
+        }
+
+        private static string FormatOwner(OwnerKind ownerKind, int ownerId)
+        {
+            if (ownerKind == OwnerKind.None)
+                return "None";
+
+            return ownerKind + ":" + ownerId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatFootprint(ObjectDef def)
+        {
+            if (def == null)
+                return EmptyValue;
+
+            int width = def.FootprintWidth <= 0 ? 1 : def.FootprintWidth;
+            int height = def.FootprintHeight <= 0 ? 1 : def.FootprintHeight;
+            return width.ToString(CultureInfo.InvariantCulture) + "x" + height.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatSize(int width, int height)
+        {
+            if (width <= 0 && height <= 0)
+                return EmptyValue;
+
+            return width.ToString(CultureInfo.InvariantCulture) + "x" + height.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatOffset(int x, int y)
+        {
+            return "x " + x.ToString(CultureInfo.InvariantCulture)
+                + " | y " + y.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string BoolText(bool value)
+        {
+            return value ? "Si" : "No";
         }
 
         private static ArcUiInspectorSeverity ResolveActionSeverity(NpcActionKind kind)

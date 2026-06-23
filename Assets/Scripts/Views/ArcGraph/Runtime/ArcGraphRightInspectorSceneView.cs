@@ -459,13 +459,13 @@ namespace Arcontio.View.ArcGraph
                 TextAlignmentOptions.Left);
             CreateText(
                 details,
-                "NPC",
+                "Id " + (string.IsNullOrWhiteSpace(viewModel.Target.Id) ? "--" : viewModel.Target.Id),
                 13,
                 FontStyles.Normal,
                 TextAlignmentOptions.Left);
             CreateText(
                 details,
-                "Scheda read-only",
+                FormatHeaderCell(viewModel.Target.Cell),
                 12,
                 FontStyles.Normal,
                 TextAlignmentOptions.Left);
@@ -750,6 +750,11 @@ namespace Arcontio.View.ArcGraph
                 ArcUiSelectionTargetKind.Debug => "Debug",
                 _ => "Nessun target"
             };
+        }
+
+        private static string FormatHeaderCell(ArcGraphCellCoord cell)
+        {
+            return "col " + cell.X + " | riga " + cell.Y + " | z " + cell.Z;
         }
 
         private static void ClearChildren(RectTransform root)

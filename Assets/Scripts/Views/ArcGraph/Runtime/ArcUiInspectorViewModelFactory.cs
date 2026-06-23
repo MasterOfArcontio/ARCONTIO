@@ -83,6 +83,13 @@ namespace Arcontio.View.ArcGraph
                 return npcViewModel;
             }
 
+            if ((target.Kind == ArcUiSelectionTargetKind.Object || target.Kind == ArcUiSelectionTargetKind.Wall)
+                && _runtimeSnapshotProvider != null
+                && _runtimeSnapshotProvider.TryBuildObjectViewModel(target, out ArcUiInspectorViewModel objectViewModel))
+            {
+                return objectViewModel;
+            }
+
             ArcUiInspectorTab[] tabs = target.Kind switch
             {
                 ArcUiSelectionTargetKind.Npc => BuildNpcTabs(target),
