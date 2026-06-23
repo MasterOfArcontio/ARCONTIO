@@ -204,6 +204,83 @@ namespace Arcontio.View.ArcGraph
             return true;
         }
 
+        // =============================================================================
+        // TryBuildObjectEditViewModel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la shell di modifica per oggetti, muri e porte selezionati.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: modifica oggetto come ViewModel</b></para>
+        /// <para>
+        /// Il metodo riceve una richiesta UI gia' prodotta dal menu selezione e
+        /// prepara soltanto tab e righe per il RightInspector. Non apre prefab, non
+        /// sostituisce ObjectDef, non modifica <c>World.Objects</c>, non cambia
+        /// food stock, porte o muri e non invia comandi.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Parametri</b>: identita' oggetto e parametri modificabili noti.</item>
+        ///   <item><b>Dettaglio</b>: storage, porta, materiale o proprieta' catalogo.</item>
+        ///   <item><b>Conferma</b>: punto futuro di passaggio a controller/gateway.</item>
+        /// </list>
+        /// </summary>
+        public bool TryBuildObjectEditViewModel(
+            ArcUiSelectionActionRequest request,
+            out ArcUiInspectorViewModel viewModel)
+        {
+            viewModel = ArcUiInspectorViewModel.Empty();
+
+            if (!request.IsEdit
+                || (request.Target.Kind != ArcUiSelectionTargetKind.Object && request.Target.Kind != ArcUiSelectionTargetKind.Wall)
+                || !TryParseObjectId(request.Target, out int objectId))
+            {
+                return false;
+            }
+
+            if (!TryGetWorld(out World world)
+                || !world.Objects.TryGetValue(objectId, out WorldObjectInstance instance)
+                || instance == null)
+            {
+                return false;
+            }
+
+            world.TryGetObjectDef(instance.DefId, out ObjectDef def);
+
+            bool hasFoodStock = world.FoodStocks.TryGetValue(instance.ObjectId, out FoodStockComponent stock);
+            bool isDoor = def != null && def.IsDoor;
+            bool isWall = request.Target.Kind == ArcUiSelectionTargetKind.Wall
+                || (def != null
+                    && def.Visual != null
+                    && string.Equals(def.Visual.VisualKind, "wall", System.StringComparison.OrdinalIgnoreCase));
+
+            var tabs = new List<ArcUiInspectorTab>(4)
+            {
+                new ArcUiInspectorTab("edit_params", "Parametri", BuildObjectEditParameterRows(request, instance, def, hasFoodStock, stock, isDoor, isWall))
+            };
+
+            if (hasFoodStock)
+                tabs.Add(new ArcUiInspectorTab("edit_storage", "Storage", BuildObjectEditStorageRows(stock)));
+            else if (isDoor)
+                tabs.Add(new ArcUiInspectorTab("edit_door", "Porta", BuildObjectEditDoorRows(instance, def)));
+            else if (isWall)
+                tabs.Add(new ArcUiInspectorTab("edit_material", "Materiale", BuildObjectEditMaterialRows(instance, def)));
+            else
+                tabs.Add(new ArcUiInspectorTab("edit_catalog", "Catalogo", BuildObjectUseRows(world, instance, def)));
+
+            tabs.Add(new ArcUiInspectorTab("edit_confirm", "Conferma", BuildObjectEditConfirmRows(request, instance, def, hasFoodStock, isDoor, isWall)));
+
+            viewModel = new ArcUiInspectorViewModel(
+                "Modifica " + ResolveObjectTitle(request.Target, instance, def),
+                request.Target,
+                tabs.ToArray(),
+                "edit_params");
+
+            return true;
+        }
+
         private bool TryGetWorld(out World world)
         {
             world = null;
@@ -357,6 +434,251 @@ namespace Arcontio.View.ArcGraph
                 ArcUiInspectorRow.Section("Conferma futura"),
                 new ArcUiInspectorRow("Stato", "Richiesta modifica pronta"),
                 new ArcUiInspectorRow("Target", "NPC " + npcId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Sorgente", ReadString(request.Source, EmptyValue)),
+                new ArcUiInspectorRow("Effetto attuale", "Nessuna mutazione"),
+                new ArcUiInspectorRow("Prossimo ponte", "Controller autorizzato + Command Gateway")
+            };
+        }
+
+        // =============================================================================
+        // BuildObjectEditParameterRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la tab principale della shell di modifica oggetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: parametri espliciti, niente payload generico</b></para>
+        /// <para>
+        /// La tab espone solo i dati che oggi hanno un significato runtime o di
+        /// catalogo chiaro: identita', cella, tipo, variante e presenza di parametri
+        /// specifici. Non usa un dizionario libero per anticipare funzioni future non
+        /// ancora decise.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Shell modifica</b>: stato non operativo della richiesta.</item>
+        ///   <item><b>Target</b>: id, def, nome e cella logica.</item>
+        ///   <item><b>Parametri disponibili</b>: tipo di modifica realmente preparabile.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildObjectEditParameterRows(
+            ArcUiSelectionActionRequest request,
+            WorldObjectInstance instance,
+            ObjectDef def,
+            bool hasFoodStock,
+            FoodStockComponent stock,
+            bool isDoor,
+            bool isWall)
+        {
+            var rows = new List<ArcUiInspectorRow>(28)
+            {
+                ArcUiInspectorRow.Section("Shell modifica"),
+                new ArcUiInspectorRow("Stato", "Modifica provvisoria"),
+                new ArcUiInspectorRow("Effetto", "Nessuna scrittura sul World"),
+                new ArcUiInspectorRow("Oggetto", instance.ObjectId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Def", ReadString(instance.DefId, EmptyValue)),
+                new ArcUiInspectorRow("Nome", ResolveObjectTitle(request.Target, instance, def)),
+                new ArcUiInspectorRow("Cella logica", FormatCell(instance.CellX, instance.CellY, 0)),
+                ArcUiInspectorRow.Section("Parametri disponibili")
+            };
+
+            if (hasFoodStock)
+            {
+                rows.Add(ArcUiInspectorRow.IconMetrics(
+                    "edit_food_stock",
+                    "Food stock",
+                    new[]
+                    {
+                        new ArcUiInspectorMetric("food_units", "Unita'", stock.Units.ToString(CultureInfo.InvariantCulture), stock.Units > 0 ? ArcUiInspectorSeverity.Good : ArcUiInspectorSeverity.Muted),
+                        new ArcUiInspectorMetric("food_owner", "Owner", FormatOwner(stock.OwnerKind, stock.OwnerId), ArcUiInspectorSeverity.Info)
+                    }));
+                rows.Add(new ArcUiInspectorRow("Parametro futuro", "Quantita' food stock"));
+            }
+            else if (isDoor)
+            {
+                rows.Add(new ArcUiInspectorRow("Parametro futuro", "Apertura / blocco porta"));
+                rows.Add(new ArcUiInspectorRow("Aperta", instance.IsOpen ? "Si" : "No"));
+                rows.Add(new ArcUiInspectorRow("Bloccata", instance.IsLocked ? "Si" : "No"));
+            }
+            else if (isWall)
+            {
+                rows.Add(new ArcUiInspectorRow("Parametro futuro", "Variante materiale muro"));
+                rows.Add(new ArcUiInspectorRow("Materiale attuale", def == null ? EmptyValue : ReadString(def.DisplayName, EmptyValue)));
+            }
+            else
+            {
+                rows.Add(new ArcUiInspectorRow("Parametro futuro", "Nessun parametro runtime noto"));
+                rows.Add(new ArcUiInspectorRow("Modifica possibile", "Solo sostituzione variante futura"));
+            }
+
+            rows.Add(ArcUiInspectorRow.Section("Ownership"));
+            rows.Add(new ArcUiInspectorRow("Owner", FormatOwner(instance.OwnerKind, instance.OwnerId)));
+            rows.Add(new ArcUiInspectorRow("Trasportato", instance.IsHeld ? "Si" : "No"));
+            return rows.ToArray();
+        }
+
+        // =============================================================================
+        // BuildObjectEditStorageRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la tab storage per oggetti che possiedono un FoodStockComponent.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: quantita' visualizzata, non applicata</b></para>
+        /// <para>
+        /// La quantita' viene mostrata come dato candidato alla modifica futura, ma
+        /// non viene cambiata. Il range, gli step e la validazione saranno parte del
+        /// controller autorizzato, non di questa shell.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Food stock</b>: unita', owner e stato vuoto.</item>
+        ///   <item><b>Controllo futuro</b>: descrive lo stepper/slider non ancora operativo.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildObjectEditStorageRows(FoodStockComponent stock)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Food stock"),
+                new ArcUiInspectorRow("Unita' attuali", stock.Units.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Owner", FormatOwner(stock.OwnerKind, stock.OwnerId)),
+                new ArcUiInspectorRow("Vuoto", stock.IsEmpty ? "Si" : "No"),
+                ArcUiInspectorRow.Section("Controllo futuro"),
+                new ArcUiInspectorRow("Tipo controllo", "Stepper / input numerico autorizzato"),
+                new ArcUiInspectorRow("Effetto attuale", "Nessuna modifica applicata")
+            };
+        }
+
+        // =============================================================================
+        // BuildObjectEditDoorRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la tab porta per la shell di modifica oggetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: stato porta senza comando diretto</b></para>
+        /// <para>
+        /// Apertura e blocco sono stati runtime sensibili per movimento e visione.
+        /// Qui vengono solo letti: un futuro toggle dovra' produrre una richiesta
+        /// autorizzata, non modificare direttamente l'istanza.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Stato porta</b>: aperta, bloccata, lockable e key.</item>
+        ///   <item><b>Controlli futuri</b>: toggle autorizzati non ancora operativi.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildObjectEditDoorRows(
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Stato porta"),
+                new ArcUiInspectorRow("Aperta", instance.IsOpen ? "Si" : "No"),
+                new ArcUiInspectorRow("Bloccata", instance.IsLocked ? "Si" : "No"),
+                new ArcUiInspectorRow("Lockable", BoolText(def != null && def.IsLockable)),
+                new ArcUiInspectorRow("Key", def == null ? EmptyValue : ReadString(def.KeyId, EmptyValue)),
+                ArcUiInspectorRow.Section("Controlli futuri"),
+                new ArcUiInspectorRow("Apertura", "Toggle autorizzato"),
+                new ArcUiInspectorRow("Blocco", "Toggle autorizzato se lockable"),
+                new ArcUiInspectorRow("Effetto attuale", "Nessun comando porta inviato")
+            };
+        }
+
+        // =============================================================================
+        // BuildObjectEditMaterialRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la tab materiale/variante per muri e oggetti senza storage.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: variante come scelta futura di catalogo</b></para>
+        /// <para>
+        /// Un cambio materiale non viene trattato come mutazione diretta del def
+        /// esistente. La shell espone il def attuale e segnala che il cambio dovra'
+        /// diventare una scelta catalogo validata da controller.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Definizione attuale</b>: def, nome catalogo, footprint e sprite.</item>
+        ///   <item><b>Variante futura</b>: dropdown/catalogo non ancora operativo.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildObjectEditMaterialRows(
+            WorldObjectInstance instance,
+            ObjectDef def)
+        {
+            var rows = new List<ArcUiInspectorRow>(16)
+            {
+                ArcUiInspectorRow.Section("Definizione attuale"),
+                new ArcUiInspectorRow("Def", ReadString(instance.DefId, EmptyValue)),
+                new ArcUiInspectorRow("Nome catalogo", def == null ? EmptyValue : ReadString(def.DisplayName, EmptyValue)),
+                new ArcUiInspectorRow("Footprint", FormatFootprint(def)),
+                new ArcUiInspectorRow("Sprite", def == null ? EmptyValue : ReadString(def.ResolveArcGraphSpritePath(), EmptyValue)),
+                ArcUiInspectorRow.Section("Variante futura"),
+                new ArcUiInspectorRow("Tipo controllo", "Dropdown/catalogo variante"),
+                new ArcUiInspectorRow("Effetto attuale", "Nessuna sostituzione applicata")
+            };
+
+            AddObjectProperties(rows, def);
+            return rows.ToArray();
+        }
+
+        // =============================================================================
+        // BuildObjectEditConfirmRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la tab di conferma futura per modifica oggetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: richiesta prima del comando</b></para>
+        /// <para>
+        /// Questa tab rende esplicito quale tipo di richiesta dovra' essere emessa
+        /// in futuro. Non contiene ancora il pulsante operativo e non produce alcun
+        /// command request.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Target</b>: oggetto runtime selezionato.</item>
+        ///   <item><b>Tipo modifica</b>: storage, porta, muro/materiale o generica.</item>
+        ///   <item><b>Prossimo ponte</b>: controller autorizzato e command gateway.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildObjectEditConfirmRows(
+            ArcUiSelectionActionRequest request,
+            WorldObjectInstance instance,
+            ObjectDef def,
+            bool hasFoodStock,
+            bool isDoor,
+            bool isWall)
+        {
+            string editKind = hasFoodStock
+                ? "Food stock"
+                : isDoor
+                    ? "Porta"
+                    : isWall
+                        ? "Muro/materiale"
+                        : "Oggetto generico";
+
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Conferma futura"),
+                new ArcUiInspectorRow("Stato", "Richiesta modifica pronta"),
+                new ArcUiInspectorRow("Target", "Oggetto " + instance.ObjectId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Nome", ResolveObjectTitle(request.Target, instance, def)),
+                new ArcUiInspectorRow("Tipo modifica", editKind),
                 new ArcUiInspectorRow("Sorgente", ReadString(request.Source, EmptyValue)),
                 new ArcUiInspectorRow("Effetto attuale", "Nessuna mutazione"),
                 new ArcUiInspectorRow("Prossimo ponte", "Controller autorizzato + Command Gateway")

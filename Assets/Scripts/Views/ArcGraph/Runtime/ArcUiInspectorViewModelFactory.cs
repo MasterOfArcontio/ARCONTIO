@@ -134,6 +134,14 @@ namespace Arcontio.View.ArcGraph
                 return npcEditViewModel;
             }
 
+            if (request.IsEdit
+                && (request.Target.Kind == ArcUiSelectionTargetKind.Object || request.Target.Kind == ArcUiSelectionTargetKind.Wall)
+                && _runtimeSnapshotProvider != null
+                && _runtimeSnapshotProvider.TryBuildObjectEditViewModel(request, out ArcUiInspectorViewModel objectEditViewModel))
+            {
+                return objectEditViewModel;
+            }
+
             ArcUiInspectorTab[] tabs = request.IsEdit
                 ? BuildEditTabs(request)
                 : BuildDeleteTabs(request);
