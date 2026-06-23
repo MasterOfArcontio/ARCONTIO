@@ -537,9 +537,9 @@ namespace Arcontio.View.ArcGraph
             layout.spacing = 6f;
             layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = false;
-            layout.childControlHeight = true;
+            layout.childControlHeight = false;
             layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = true;
+            layout.childForceExpandHeight = false;
 
             _dayLabel = CreateTopBarText(panel, "Giorno --");
             _monthLabel = CreateTopBarText(panel, "Mese --");
@@ -589,15 +589,22 @@ namespace Arcontio.View.ArcGraph
             _visualOverlayButtonKeys.Clear();
 
             RectTransform group = CreateRect("VisualOverlayButtons", parent);
+            group.anchorMin = new Vector2(0f, 0.5f);
+            group.anchorMax = new Vector2(0f, 0.5f);
+            group.pivot = new Vector2(0f, 0.5f);
+            group.sizeDelta = new Vector2(132f, 28f);
+
             LayoutElement groupLayout = group.gameObject.AddComponent<LayoutElement>();
+            groupLayout.minWidth = 132f;
             groupLayout.preferredWidth = 132f;
+            groupLayout.minHeight = 28f;
             groupLayout.preferredHeight = 28f;
 
             HorizontalLayoutGroup layout = group.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 4f;
-            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = false;
-            layout.childControlHeight = true;
+            layout.childControlHeight = false;
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = false;
 
@@ -1201,9 +1208,19 @@ namespace Arcontio.View.ArcGraph
 
             LayoutElement layout = rect.gameObject.AddComponent<LayoutElement>();
             if (preferredWidth > 0f)
+            {
+                layout.minWidth = preferredWidth;
                 layout.preferredWidth = preferredWidth;
+            }
             if (preferredHeight > 0f)
+            {
+                layout.minHeight = preferredHeight;
                 layout.preferredHeight = preferredHeight;
+            }
+
+            rect.sizeDelta = new Vector2(
+                preferredWidth > 0f ? preferredWidth : rect.sizeDelta.x,
+                preferredHeight > 0f ? preferredHeight : rect.sizeDelta.y);
 
             return rect;
         }
