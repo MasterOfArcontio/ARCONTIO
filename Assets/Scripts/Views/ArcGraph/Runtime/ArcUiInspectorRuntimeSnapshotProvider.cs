@@ -281,6 +281,175 @@ namespace Arcontio.View.ArcGraph
             return true;
         }
 
+        // =============================================================================
+        // TryBuildDeleteConfirmationViewModel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la shell di conferma eliminazione per target selezionati.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: eliminazione come richiesta autorizzata</b></para>
+        /// <para>
+        /// Il metodo prepara solo un ViewModel di conferma. Non rimuove NPC, non
+        /// rimuove oggetti, non aggiorna indici, non libera riserve e non modifica il
+        /// <c>World</c>. L'eliminazione reale dovra' passare da controller
+        /// autorizzato e Command Gateway.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>NPC</b>: conferma target NPC e impatto runtime minimale.</item>
+        ///   <item><b>Object/Wall</b>: conferma target oggetto, porta o muro.</item>
+        ///   <item><b>Fallback</b>: se il runtime non e' disponibile, la factory usa la conferma generica.</item>
+        /// </list>
+        /// </summary>
+        public bool TryBuildDeleteConfirmationViewModel(
+            ArcUiSelectionActionRequest request,
+            out ArcUiInspectorViewModel viewModel)
+        {
+            viewModel = ArcUiInspectorViewModel.Empty();
+
+            if (!request.IsDelete)
+                return false;
+
+            if (request.Target.Kind == ArcUiSelectionTargetKind.Npc
+                && TryBuildNpcDeleteConfirmationViewModel(request, out viewModel))
+            {
+                return true;
+            }
+
+            if ((request.Target.Kind == ArcUiSelectionTargetKind.Object || request.Target.Kind == ArcUiSelectionTargetKind.Wall)
+                && TryBuildObjectDeleteConfirmationViewModel(request, out viewModel))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryBuildNpcDeleteConfirmationViewModel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la conferma eliminazione specifica per NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: NPC letto come snapshot</b></para>
+        /// <para>
+        /// La funzione recupera nome, cella e stato runtime minimo per rendere
+        /// chiaro cosa verra' eliminato in futuro. Non tocca profilo, bisogni,
+        /// inventario, job o memoria dell'NPC.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Conferma</b>: identita' del target.</item>
+        ///   <item><b>Impatto</b>: stato e cibo collegato.</item>
+        ///   <item><b>Gateway</b>: richiesta futura non ancora inviata.</item>
+        /// </list>
+        /// </summary>
+        private bool TryBuildNpcDeleteConfirmationViewModel(
+            ArcUiSelectionActionRequest request,
+            out ArcUiInspectorViewModel viewModel)
+        {
+            viewModel = ArcUiInspectorViewModel.Empty();
+
+            if (!TryParseNpcId(request.Target, out int npcId))
+                return false;
+
+            if (!TryGetWorld(out World world) || !world.NpcDna.TryGetValue(npcId, out NpcDnaProfile dna) || dna == null)
+                return false;
+
+            world.GridPos.TryGetValue(npcId, out GridPosition position);
+            world.TryGetNpcAction(npcId, out NpcActionState action);
+
+            string title = "Elimina " + ResolveNpcTitle(request.Target, dna, npcId);
+            var tabs = new[]
+            {
+                new ArcUiInspectorTab("delete_confirm", "Conferma", BuildNpcDeleteConfirmRows(request, npcId, dna, position)),
+                new ArcUiInspectorTab("delete_impact", "Impatto", BuildNpcDeleteImpactRows(world, npcId, action)),
+                new ArcUiInspectorTab("delete_gateway", "Gateway", BuildDeleteGatewayRows(request, "DeleteNpcCommandRequest futuro"))
+            };
+
+            viewModel = new ArcUiInspectorViewModel(
+                title,
+                request.Target,
+                tabs,
+                "delete_confirm");
+
+            return true;
+        }
+
+        // =============================================================================
+        // TryBuildObjectDeleteConfirmationViewModel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la conferma eliminazione specifica per oggetti, muri e porte.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: eliminazione separata dal renderer</b></para>
+        /// <para>
+        /// Il metodo legge istanza oggetto e ObjectDef solo per descrivere il target.
+        /// Non distrugge renderer, GameObject, stock, porta o istanza World.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Conferma</b>: identita' e tipo oggetto.</item>
+        ///   <item><b>Impatto</b>: owner, occupazione, storage e regole mappa.</item>
+        ///   <item><b>Gateway</b>: richiesta futura non ancora inviata.</item>
+        /// </list>
+        /// </summary>
+        private bool TryBuildObjectDeleteConfirmationViewModel(
+            ArcUiSelectionActionRequest request,
+            out ArcUiInspectorViewModel viewModel)
+        {
+            viewModel = ArcUiInspectorViewModel.Empty();
+
+            if (!TryParseObjectId(request.Target, out int objectId))
+                return false;
+
+            if (!TryGetWorld(out World world)
+                || !world.Objects.TryGetValue(objectId, out WorldObjectInstance instance)
+                || instance == null)
+            {
+                return false;
+            }
+
+            world.TryGetObjectDef(instance.DefId, out ObjectDef def);
+
+            bool hasFoodStock = world.FoodStocks.TryGetValue(instance.ObjectId, out FoodStockComponent stock);
+            bool isDoor = def != null && def.IsDoor;
+            bool isWall = request.Target.Kind == ArcUiSelectionTargetKind.Wall
+                || (def != null
+                    && def.Visual != null
+                    && string.Equals(def.Visual.VisualKind, "wall", System.StringComparison.OrdinalIgnoreCase));
+
+            string deleteRequestName = isDoor
+                ? "DeleteDoorCommandRequest futuro"
+                : isWall
+                    ? "DeleteWallCommandRequest futuro"
+                    : "DeleteObjectCommandRequest futuro";
+
+            var tabs = new[]
+            {
+                new ArcUiInspectorTab("delete_confirm", "Conferma", BuildObjectDeleteConfirmRows(request, instance, def, isDoor, isWall)),
+                new ArcUiInspectorTab("delete_impact", "Impatto", BuildObjectDeleteImpactRows(world, instance, def, hasFoodStock, stock, isDoor, isWall)),
+                new ArcUiInspectorTab("delete_gateway", "Gateway", BuildDeleteGatewayRows(request, deleteRequestName))
+            };
+
+            viewModel = new ArcUiInspectorViewModel(
+                "Elimina " + ResolveObjectTitle(request.Target, instance, def),
+                request.Target,
+                tabs,
+                "delete_confirm");
+
+            return true;
+        }
+
         private bool TryGetWorld(out World world)
         {
             world = null;
@@ -682,6 +851,247 @@ namespace Arcontio.View.ArcGraph
                 new ArcUiInspectorRow("Sorgente", ReadString(request.Source, EmptyValue)),
                 new ArcUiInspectorRow("Effetto attuale", "Nessuna mutazione"),
                 new ArcUiInspectorRow("Prossimo ponte", "Controller autorizzato + Command Gateway")
+            };
+        }
+
+        // =============================================================================
+        // BuildNpcDeleteConfirmRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe della tab Conferma per eliminazione NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: conferma esplicita prima della mutazione</b></para>
+        /// <para>
+        /// La tab mostra il target e dichiara che l'effetto attuale e' nullo. La
+        /// conferma reale verra' introdotta solo quando esistera' un controller di
+        /// eliminazione autorizzato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Target</b>: id, nome e cella logica.</item>
+        ///   <item><b>Stato</b>: richiesta preparata ma non applicata.</item>
+        ///   <item><b>Avviso</b>: eliminazione non reversibile nel futuro gateway.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildNpcDeleteConfirmRows(
+            ArcUiSelectionActionRequest request,
+            int npcId,
+            NpcDnaProfile dna,
+            GridPosition position)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Conferma eliminazione"),
+                new ArcUiInspectorRow("Stato", "Richiesta eliminazione preparata"),
+                new ArcUiInspectorRow("Effetto attuale", "Nessuna eliminazione applicata"),
+                new ArcUiInspectorRow("Tipo", "NPC"),
+                new ArcUiInspectorRow("NPC", npcId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Nome", ResolveNpcTitle(request.Target, dna, npcId)),
+                new ArcUiInspectorRow("Cella logica", FormatCell(position.X, position.Y, 0)),
+                ArcUiInspectorRow.Section("Avviso"),
+                new ArcUiInspectorRow("Richiede conferma", "Si"),
+                new ArcUiInspectorRow("Mutazione futura", "Solo tramite controller autorizzato")
+            };
+        }
+
+        // =============================================================================
+        // BuildNpcDeleteImpactRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe di impatto potenziale per eliminazione NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: impatto descritto, non risolto</b></para>
+        /// <para>
+        /// La funzione elenca dati che il futuro controller dovra' considerare, come
+        /// azione corrente e cibo collegato. Non cancella job, food stock, memoria o
+        /// riferimenti all'NPC.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Runtime</b>: azione corrente.</item>
+        ///   <item><b>Cibo</b>: metriche cibo privato/comunitario gia' disponibili.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildNpcDeleteImpactRows(
+            World world,
+            int npcId,
+            NpcActionState action)
+        {
+            var rows = new List<ArcUiInspectorRow>(16)
+            {
+                ArcUiInspectorRow.Section("Runtime collegato"),
+                new ArcUiInspectorRow("Azione corrente", ReadString(action.ToString(), EmptyValue)),
+                new ArcUiInspectorRow("Cleanup futuro", "Job, inventario, memoria e riferimenti"),
+                ArcUiInspectorRow.Section("Cibo collegato")
+            };
+
+            AddFoodMetrics(world, npcId, rows);
+            return rows.ToArray();
+        }
+
+        // =============================================================================
+        // BuildObjectDeleteConfirmRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe della tab Conferma per eliminazione oggetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: target fisico separato dal comando</b></para>
+        /// <para>
+        /// La tab identifica oggetto, porta o muro senza distruggere l'istanza
+        /// runtime. Il futuro comando dovra' validare target, occupazione e permessi.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Target</b>: object id, def, nome e cella.</item>
+        ///   <item><b>Classificazione</b>: oggetto, muro o porta.</item>
+        ///   <item><b>Avviso</b>: nessuna mutazione in questa shell.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildObjectDeleteConfirmRows(
+            ArcUiSelectionActionRequest request,
+            WorldObjectInstance instance,
+            ObjectDef def,
+            bool isDoor,
+            bool isWall)
+        {
+            string kind = isDoor
+                ? "Porta"
+                : isWall
+                    ? "Muro"
+                    : "Oggetto";
+
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Conferma eliminazione"),
+                new ArcUiInspectorRow("Stato", "Richiesta eliminazione preparata"),
+                new ArcUiInspectorRow("Effetto attuale", "Nessuna eliminazione applicata"),
+                new ArcUiInspectorRow("Tipo", kind),
+                new ArcUiInspectorRow("Oggetto", instance.ObjectId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Def", ReadString(instance.DefId, EmptyValue)),
+                new ArcUiInspectorRow("Nome", ResolveObjectTitle(request.Target, instance, def)),
+                new ArcUiInspectorRow("Cella logica", FormatCell(instance.CellX, instance.CellY, 0)),
+                ArcUiInspectorRow.Section("Avviso"),
+                new ArcUiInspectorRow("Richiede conferma", "Si"),
+                new ArcUiInspectorRow("Mutazione futura", "Solo tramite controller autorizzato")
+            };
+        }
+
+        // =============================================================================
+        // BuildObjectDeleteImpactRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe di impatto potenziale per eliminazione oggetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: dipendenze visibili prima del comando</b></para>
+        /// <para>
+        /// La funzione mostra owner, occupazione, storage e regole mappa che il
+        /// controller futuro dovra' validare. Non libera celle, non rimuove stock e
+        /// non aggiorna pathfinding o occlusione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Runtime</b>: owner, trasporto e occupazione.</item>
+        ///   <item><b>Storage</b>: food stock eventuale.</item>
+        ///   <item><b>Mappa</b>: blocco movimento/visione e stato porta.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildObjectDeleteImpactRows(
+            World world,
+            WorldObjectInstance instance,
+            ObjectDef def,
+            bool hasFoodStock,
+            FoodStockComponent stock,
+            bool isDoor,
+            bool isWall)
+        {
+            ObjectUseState useState = world.GetUseStateOrDefault(instance.ObjectId);
+            var rows = new List<ArcUiInspectorRow>(24)
+            {
+                ArcUiInspectorRow.Section("Runtime collegato"),
+                new ArcUiInspectorRow("Owner", FormatOwner(instance.OwnerKind, instance.OwnerId)),
+                new ArcUiInspectorRow("Trasportato", instance.IsHeld ? "Si" : "No"),
+                new ArcUiInspectorRow("Holder NPC", instance.HolderNpcId > 0 ? instance.HolderNpcId.ToString(CultureInfo.InvariantCulture) : EmptyValue),
+                new ArcUiInspectorRow("In uso", useState.IsInUse ? "Si" : "No"),
+                new ArcUiInspectorRow("Using NPC", useState.UsingNpcId > 0 ? useState.UsingNpcId.ToString(CultureInfo.InvariantCulture) : EmptyValue),
+                new ArcUiInspectorRow("Occupante", instance.OccupantNpcId >= 0 ? instance.OccupantNpcId.ToString(CultureInfo.InvariantCulture) : EmptyValue)
+            };
+
+            if (hasFoodStock)
+            {
+                rows.Add(ArcUiInspectorRow.Section("Storage"));
+                rows.Add(ArcUiInspectorRow.IconMetrics(
+                    "delete_food_stock",
+                    "Food stock",
+                    new[]
+                    {
+                        new ArcUiInspectorMetric("food_units", "Unita'", stock.Units.ToString(CultureInfo.InvariantCulture), stock.Units > 0 ? ArcUiInspectorSeverity.Warning : ArcUiInspectorSeverity.Muted),
+                        new ArcUiInspectorMetric("food_owner", "Owner", FormatOwner(stock.OwnerKind, stock.OwnerId), ArcUiInspectorSeverity.Info)
+                    }));
+            }
+
+            rows.Add(ArcUiInspectorRow.Section("Mappa"));
+            rows.Add(new ArcUiInspectorRow("Footprint", FormatFootprint(def)));
+            rows.Add(new ArcUiInspectorRow("Blocca movimento", BoolText(def != null && def.BlocksMovement)));
+            rows.Add(new ArcUiInspectorRow("Blocca visione", BoolText(def != null && def.BlocksVision)));
+
+            if (isDoor)
+            {
+                rows.Add(new ArcUiInspectorRow("Porta aperta", instance.IsOpen ? "Si" : "No"));
+                rows.Add(new ArcUiInspectorRow("Porta bloccata", instance.IsLocked ? "Si" : "No"));
+            }
+
+            if (isWall)
+                rows.Add(new ArcUiInspectorRow("Connessioni visuali", "Da ricostruire dopo eliminazione futura"));
+
+            return rows.ToArray();
+        }
+
+        // =============================================================================
+        // BuildDeleteGatewayRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe comuni della tab Gateway per eliminazione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI produce intenzione, non comando diretto</b></para>
+        /// <para>
+        /// La tab dichiara il command request futuro, ma non lo crea e non lo invia.
+        /// Questo mantiene separati hover menu, inspector, controller e simulazione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Request UI</b>: sorgente e target della richiesta.</item>
+        ///   <item><b>Gateway futuro</b>: controller e command request attesi.</item>
+        /// </list>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildDeleteGatewayRows(
+            ArcUiSelectionActionRequest request,
+            string futureCommandRequestName)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Request UI"),
+                new ArcUiInspectorRow("Sorgente", ReadString(request.Source, EmptyValue)),
+                new ArcUiInspectorRow("Azione", "Delete"),
+                new ArcUiInspectorRow("Target id", ReadString(request.Target.Id, EmptyValue)),
+                ArcUiInspectorRow.Section("Gateway futuro"),
+                new ArcUiInspectorRow("Controller", "ArcDeleteSelectionController futuro"),
+                new ArcUiInspectorRow("Command request", futureCommandRequestName),
+                new ArcUiInspectorRow("Effetto attuale", "Nessun comando inviato")
             };
         }
 

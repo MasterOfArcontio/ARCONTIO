@@ -142,6 +142,13 @@ namespace Arcontio.View.ArcGraph
                 return objectEditViewModel;
             }
 
+            if (request.IsDelete
+                && _runtimeSnapshotProvider != null
+                && _runtimeSnapshotProvider.TryBuildDeleteConfirmationViewModel(request, out ArcUiInspectorViewModel deleteViewModel))
+            {
+                return deleteViewModel;
+            }
+
             ArcUiInspectorTab[] tabs = request.IsEdit
                 ? BuildEditTabs(request)
                 : BuildDeleteTabs(request);

@@ -16696,7 +16696,7 @@ Roadmap operativa:
 | v0.70.02 | Operation catalog minimo e gerarchia ActionPanel | Fatto su branch `ai-task/v0.70.02-arcgraph-ui-operation-catalog` |
 | v0.70.03 | Ponte placement | ⏳ Pending |
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
-| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.05.02 completato |
+| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | ⏳ Pending |
 | v0.70.07 | View modes | ⏳ Pending |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
@@ -17029,10 +17029,10 @@ Sottostep operativi previsti:
 | v0.70.05.04.01l | Asset font/png considerati parte progetto per UI runtime locale | Fatto su branch `ai-task/v0.70.05.04.02-object-wall-inspector` |
 | v0.70.05.04.02 | Oggetti, muri e porte read-only inspector | Fatto su branch `ai-task/v0.70.05.04.02-object-wall-inspector` |
 | v0.70.05.04.02b | Fix header NPC RightInspector: info visibili accanto al portrait e portrait 2:3 | Fatto su branch `ai-task/v0.70.05.04.02b-npc-header-layout-fix` |
-| v0.70.05.05 | Edit shell da SelectionActionRequest | In corso |
+| v0.70.05.05 | Edit shell da SelectionActionRequest | Fatto |
 | v0.70.05.05.01 | NPC edit shell nel RightInspector: DNA e inventario preparati senza scrittura World | Fatto su branch `ai-task/v0.70.05.05.01-npc-edit-shell` |
 | v0.70.05.05.02 | Object/Wall/Door edit shell nel RightInspector: parametri, storage, porta e materiale senza scrittura World | Fatto su branch `ai-task/v0.70.05.05.02-object-edit-shell` |
-| v0.70.05.06 | Delete confirmation shell non distruttiva | Pending |
+| v0.70.05.06 | Delete confirmation shell non distruttiva | Fatto su branch `ai-task/v0.70.05.06-delete-confirm-shell` |
 
 Tab iniziali:
 
