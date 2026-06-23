@@ -425,7 +425,7 @@ namespace Arcontio.View.ArcGraph
             layout.padding = new RectOffset(12, 12, 12, 12);
             layout.spacing = 8f;
             layout.childControlWidth = true;
-            layout.childControlHeight = false;
+            layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
@@ -614,7 +614,7 @@ namespace Arcontio.View.ArcGraph
             layout.padding = new RectOffset(10, 10, 10, 10);
             layout.spacing = 7f;
             layout.childControlWidth = true;
-            layout.childControlHeight = false;
+            layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
