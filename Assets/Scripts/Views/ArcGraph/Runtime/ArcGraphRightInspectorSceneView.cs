@@ -93,7 +93,7 @@ namespace Arcontio.View.ArcGraph
         private const float DenseExpandableHeight = 15f;
         private const float DenseTimelineHeight = 12f;
         private const float DenseDetailIndent = 9f;
-        private const float DenseFontSize = 7f;
+        private const int DenseFontSize = 7;
 
         [SerializeField] private bool inspectorEnabled = true;
 
