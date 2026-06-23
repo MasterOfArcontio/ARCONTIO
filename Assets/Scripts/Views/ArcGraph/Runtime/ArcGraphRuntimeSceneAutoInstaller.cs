@@ -68,6 +68,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiSimulationControlController _simulationControlController;
+        private ArcUiVisualOverlayController _visualOverlayController;
         private ArcGraphRightInspectorSceneView _rightInspectorView;
         private ArcUiInspectionController _inspectionController;
         private ArcGraphSelectionSceneConsumer _selectionConsumer;
@@ -251,6 +252,7 @@ namespace Arcontio.View.ArcGraph
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
             _selectionActionController = new ArcUiSelectionActionController();
             _simulationControlController = new ArcUiSimulationControlController();
+            _visualOverlayController = new ArcUiVisualOverlayController();
             _rightInspectorView = _visualRoot.AddComponent<ArcGraphRightInspectorSceneView>();
             _inspectionController = new ArcUiInspectionController();
             _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
@@ -403,6 +405,7 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetUiEnabled(true);
             ApplyUiMapViewportToMainCamera();
             _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
+            _uiRoot.SetVisualOverlayController(_visualOverlayController);
             _uiRoot.SetSimulationControlController(_simulationControlController);
         }
 

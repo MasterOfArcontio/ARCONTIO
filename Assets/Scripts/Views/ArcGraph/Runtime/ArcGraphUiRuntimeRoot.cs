@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
+using System.Collections.Generic;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem.UI;
 #endif
@@ -64,6 +65,8 @@ namespace Arcontio.View.ArcGraph
         private RectTransform _rightInspector;
         private RectTransform _overlayRoot;
         private readonly Vector3[] _mapViewportCorners = new Vector3[4];
+        private readonly List<Button> _visualOverlayButtons = new List<Button>(8);
+        private readonly List<string> _visualOverlayButtonKeys = new List<string>(8);
         private Button _fovViewModeButton;
         private Button _pauseSimulationButton;
         private Button _resumeSimulationButton;
@@ -82,6 +85,7 @@ namespace Arcontio.View.ArcGraph
         private TextMeshProUGUI _biosphereDebugMultiplierLabel;
         private TextMeshProUGUI _biosphereDebugGoStopLabel;
         private ArcUiSimulationControlController _simulationControlController;
+        private ArcUiVisualOverlayController _visualOverlayController;
 
         public GameObject RootGameObject => _uiRoot;
         public bool IsBuilt => _uiRoot != null;
@@ -210,6 +214,29 @@ namespace Arcontio.View.ArcGraph
 
             if (action != null)
                 _fovViewModeButton.onClick.AddListener(action);
+        }
+
+        // =============================================================================
+        // SetVisualOverlayController
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega la TopBar al controller dei toggle visuali indipendenti.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: TopBar -> richiesta overlay -> controller</b></para>
+        /// <para>
+        /// La TopBar non accende renderer e non legge il mondo. I pulsanti overlay
+        /// producono solo richieste verso <see cref="ArcUiVisualOverlayController"/>.
+        /// I passaggi successivi collegheranno lo stato del controller ai consumer
+        /// ArcGraph gia' esistenti.
+        /// </para>
+        /// </summary>
+        public void SetVisualOverlayController(ArcUiVisualOverlayController controller)
+        {
+            _visualOverlayController = controller;
+            WireVisualOverlayButtons();
+            RefreshVisualOverlayButtons();
         }
 
         // =============================================================================
@@ -494,6 +521,7 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
 
+            BuildVisualOverlayButtons(panel);
             _dayLabel = CreateTopBarText(panel, "Giorno --");
             _monthLabel = CreateTopBarText(panel, "Mese --");
             _yearLabel = CreateTopBarText(panel, "Anno ----");
@@ -518,6 +546,44 @@ namespace Arcontio.View.ArcGraph
                 : null;
             WireSimulationControlButtons();
             RefreshSimulationControlTopBar();
+            WireVisualOverlayButtons();
+            RefreshVisualOverlayButtons();
+        }
+
+        // =============================================================================
+        // BuildVisualOverlayButtons
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea il gruppo compatto di icone overlay dentro la TopBar.
+        /// </para>
+        ///
+        /// <para>
+        /// Non viene creato un root permanente separato. Le icone vivono nella
+        /// TopBar, come previsto dalla direzione UI corrente.
+        /// </para>
+        /// </summary>
+        private void BuildVisualOverlayButtons(RectTransform parent)
+        {
+            _visualOverlayButtons.Clear();
+            _visualOverlayButtonKeys.Clear();
+
+            RectTransform group = CreateRect("VisualOverlayButtons", parent);
+            LayoutElement groupLayout = group.gameObject.AddComponent<LayoutElement>();
+            groupLayout.preferredWidth = 178f;
+            groupLayout.preferredHeight = 30f;
+
+            HorizontalLayoutGroup layout = group.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childAlignment = TextAnchor.MiddleLeft;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.LandmarksKey, "LM", 42f);
+            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.NpcLineOfSightKey, "LOS", 48f);
+            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.PathfindingKey, "PATH", 72f);
         }
 
         private void BuildRightInspector()
@@ -773,6 +839,25 @@ namespace Arcontio.View.ArcGraph
             return button.GetComponent<Button>();
         }
 
+        private void CreateVisualOverlayButton(
+            RectTransform parent,
+            string overlayKey,
+            string label,
+            float preferredWidth)
+        {
+            RectTransform button = CreateButtonShell(
+                parent,
+                "ArcButton_VisualOverlay_" + SanitizeName(label),
+                preferredWidth,
+                30f,
+                false);
+            CreateText(button, label, 10, FontStyles.Bold, TextAlignmentOptions.Center);
+
+            Button component = button.GetComponent<Button>();
+            _visualOverlayButtons.Add(component);
+            _visualOverlayButtonKeys.Add(ArcUiOperationDefinition.NormalizeKey(overlayKey));
+        }
+
         private static TextMeshProUGUI CreateTopBarText(RectTransform parent, string label)
         {
             RectTransform textRoot = CreateRect("ArcInfoRow_Top_" + SanitizeName(label), parent);
@@ -828,6 +913,74 @@ namespace Arcontio.View.ArcGraph
                 if (_simulationControlController != null)
                     _biosphereDebugGoStopButton.onClick.AddListener(OnBiosphereDebugGoStopClicked);
             }
+        }
+
+        // =============================================================================
+        // WireVisualOverlayButtons
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega i pulsanti overlay al controller UI dedicato.
+        /// </para>
+        /// </summary>
+        private void WireVisualOverlayButtons()
+        {
+            int count = _visualOverlayButtons.Count;
+            for (int i = 0; i < count; i++)
+            {
+                Button button = _visualOverlayButtons[i];
+                if (button == null)
+                    continue;
+
+                button.onClick.RemoveAllListeners();
+                if (_visualOverlayController == null)
+                    continue;
+
+                string overlayKey = i < _visualOverlayButtonKeys.Count
+                    ? _visualOverlayButtonKeys[i]
+                    : string.Empty;
+                button.onClick.AddListener(() => OnVisualOverlayClicked(overlayKey));
+            }
+        }
+
+        // =============================================================================
+        // RefreshVisualOverlayButtons
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna lo stato cromatico dei toggle overlay.
+        /// </para>
+        /// </summary>
+        public void RefreshVisualOverlayButtons()
+        {
+            ArcUiVisualOverlayState state = _visualOverlayController != null
+                ? _visualOverlayController.BuildStateSnapshot()
+                : ArcUiVisualOverlayState.Empty();
+
+            int count = _visualOverlayButtons.Count;
+            for (int i = 0; i < count; i++)
+            {
+                Button button = _visualOverlayButtons[i];
+                string overlayKey = i < _visualOverlayButtonKeys.Count
+                    ? _visualOverlayButtonKeys[i]
+                    : string.Empty;
+                bool enabled = state.IsEnabled(overlayKey);
+                ApplyTopButtonVisualState(button, enabled, button == null || button.interactable, false);
+            }
+        }
+
+        // =============================================================================
+        // OnVisualOverlayClicked
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inoltra al controller la richiesta di toggle overlay prodotta dalla TopBar.
+        /// </para>
+        /// </summary>
+        private void OnVisualOverlayClicked(string overlayKey)
+        {
+            _visualOverlayController?.Apply(ArcUiVisualOverlayRequest.Toggle(overlayKey, "ArcTopBar"));
+            RefreshVisualOverlayButtons();
         }
 
         // =============================================================================
