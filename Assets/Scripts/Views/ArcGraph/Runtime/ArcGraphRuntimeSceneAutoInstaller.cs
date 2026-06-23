@@ -383,8 +383,8 @@ namespace Arcontio.View.ArcGraph
             _fovOverlayController.SetOverlayEnabled(false);
 
             // Landmark e Pathfinding usano lo stesso feed debug Core, filtrato da
-            // un controller ArcGraph dedicato. In questo step colleghiamo solo il
-            // toggle Landmark; il Path viene abilitato nello step successivo.
+            // un controller ArcGraph dedicato. I due toggle restano indipendenti:
+            // LM mostra il grafo landmark, PATH mostra route/path dell'NPC attivo.
             _landmarkPathOverlayConsumer.SetPlaceProbeAtSceneCameraCenter(false);
             _landmarkPathOverlayConsumer.SetLogDiagnostics(false);
             _landmarkPathOverlayController.SetRuntimeContextProvider(_contextProvider);
@@ -475,7 +475,7 @@ namespace Arcontio.View.ArcGraph
         /// <para>
         /// La UI comunica solo chiave e stato. Qui, lato installer, sappiamo quali
         /// consumer runtime esistono davvero. In questo step vengono collegati
-        /// <c>npc_los</c> e <c>landmarks</c> ai rispettivi controller.
+        /// <c>npc_los</c>, <c>landmarks</c> e <c>pathfinding</c>.
         /// </para>
         /// </summary>
         private void OnVisualOverlayStateChanged(string overlayKey, bool enabled)
@@ -492,13 +492,22 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            if (normalized != ArcUiVisualOverlayCatalog.LandmarksKey)
+            if (normalized == ArcUiVisualOverlayCatalog.LandmarksKey)
+            {
+                if (_landmarkPathOverlayController == null)
+                    return;
+
+                _landmarkPathOverlayController.SetLandmarkOverlayEnabled(enabled);
+                return;
+            }
+
+            if (normalized != ArcUiVisualOverlayCatalog.PathfindingKey)
                 return;
 
             if (_landmarkPathOverlayController == null)
                 return;
 
-            _landmarkPathOverlayController.SetLandmarkOverlayEnabled(enabled);
+            _landmarkPathOverlayController.SetPathfindingOverlayEnabled(enabled);
         }
 
         // =============================================================================
