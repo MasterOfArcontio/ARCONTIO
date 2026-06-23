@@ -64,6 +64,61 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphDebugOverlayRuntimeFeedDiagnostics LastDiagnostics => _feed.LastDiagnostics;
 
         // =============================================================================
+        // BuildRuntimeDiagnosticsText
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce una stringa compatta per il pannello diagnostico runtime LM/PF.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: osservabilita' read-only</b></para>
+        /// <para>
+        /// Questo metodo non accende overlay, non invia comandi e non muta il
+        /// mondo. Legge solo binding, stato toggle e ultima diagnostica del feed,
+        /// cosi' possiamo capire se la rottura e' nel controller, nei dati World,
+        /// nella queue o nel renderer Unity.
+        /// </para>
+        /// </summary>
+        public string BuildRuntimeDiagnosticsText()
+        {
+            ArcGraphRuntimeContext context = runtimeContextProvider != null
+                ? runtimeContextProvider.BuildTerrainRuntimeContext()
+                : null;
+            World world = context?.World;
+            int activeNpcId = ResolveSelectedNpcId(world);
+            ArcGraphDebugOverlayRuntimeFeedDiagnostics diagnostics = LastDiagnostics;
+            ArcGraphDebugOverlayQueueDiagnostics queue = diagnostics.QueueDiagnostics;
+
+            string probe = overlayConsumer != null
+                ? overlayConsumer.BuildProbeDiagnosticsText()
+                : "probeRoot=False children=0";
+
+            string tick = world != null
+                ? world.Global.CurrentTickIndex.ToString()
+                : "--";
+
+            return
+                "LM/PF DEBUG\n" +
+                "toggle LM=" + landmarkOverlayEnabled +
+                " PF=" + pathfindingOverlayEnabled +
+                " update=" + processInUpdate + "\n" +
+                "binding provider=" + (runtimeContextProvider != null) +
+                " consumer=" + (overlayConsumer != null) +
+                " world=" + (world != null) + "\n" +
+                "tick=" + tick +
+                " selectedNpc=" + activeNpcId +
+                " reason=" + diagnostics.Reason + "\n" +
+                "attempt LM=" + diagnostics.LandmarkAttempted +
+                " srcNodes=" + diagnostics.LandmarkSourceNodeCount +
+                " srcEdges=" + diagnostics.LandmarkSourceEdgeCount + "\n" +
+                "queue cells=" + queue.CellItemCount +
+                " nodes=" + queue.NodeItemCount +
+                " edges=" + queue.EdgeItemCount +
+                " visible=" + queue.VisibleItemCount + "\n" +
+                probe;
+        }
+
+        // =============================================================================
         // Update
         // =============================================================================
         /// <summary>

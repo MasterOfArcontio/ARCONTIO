@@ -422,6 +422,10 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
             _uiRoot.SetVisualOverlayController(_visualOverlayController);
             _uiRoot.SetVisualOverlayStateChanged(OnVisualOverlayStateChanged);
+            _uiRoot.SetVisualOverlayDiagnosticsProvider(
+                _landmarkPathOverlayController != null
+                    ? _landmarkPathOverlayController.BuildRuntimeDiagnosticsText
+                    : null);
             _uiRoot.SetSimulationControlController(_simulationControlController);
         }
 

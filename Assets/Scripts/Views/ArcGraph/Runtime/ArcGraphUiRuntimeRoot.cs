@@ -64,6 +64,7 @@ namespace Arcontio.View.ArcGraph
         private RectTransform _mapViewport;
         private RectTransform _rightInspector;
         private RectTransform _overlayRoot;
+        private RectTransform _debugRoot;
         private readonly Vector3[] _mapViewportCorners = new Vector3[4];
         private readonly List<Button> _visualOverlayButtons = new List<Button>(8);
         private readonly List<string> _visualOverlayButtonKeys = new List<string>(8);
@@ -84,9 +85,11 @@ namespace Arcontio.View.ArcGraph
         private TextMeshProUGUI _speedSimulationLabel;
         private TextMeshProUGUI _biosphereDebugMultiplierLabel;
         private TextMeshProUGUI _biosphereDebugGoStopLabel;
+        private TextMeshProUGUI _visualOverlayDiagnosticsLabel;
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
         private UnityAction<string, bool> _visualOverlayStateChanged;
+        private System.Func<string> _visualOverlayDiagnosticsProvider;
 
         public GameObject RootGameObject => _uiRoot;
         public bool IsBuilt => _uiRoot != null;
@@ -132,6 +135,8 @@ namespace Arcontio.View.ArcGraph
         {
             if (_simulationControlController != null)
                 RefreshSimulationControlTopBar();
+
+            RefreshVisualOverlayDiagnosticsPanel();
         }
 
         // =============================================================================
@@ -257,6 +262,27 @@ namespace Arcontio.View.ArcGraph
         public void SetVisualOverlayStateChanged(UnityAction<string, bool> action)
         {
             _visualOverlayStateChanged = action;
+        }
+
+        // =============================================================================
+        // SetVisualOverlayDiagnosticsProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega un provider testuale per il pannello diagnostico LM/PF.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: diagnostica UI read-only</b></para>
+        /// <para>
+        /// La UI non legge direttamente il mondo e non interroga renderer o
+        /// controller concreti. Riceve soltanto una funzione che restituisce testo
+        /// gia' preparato dal controller autorizzato.
+        /// </para>
+        /// </summary>
+        public void SetVisualOverlayDiagnosticsProvider(System.Func<string> provider)
+        {
+            _visualOverlayDiagnosticsProvider = provider;
+            RefreshVisualOverlayDiagnosticsPanel();
         }
 
         // =============================================================================
@@ -816,9 +842,44 @@ namespace Arcontio.View.ArcGraph
             StretchFull(_overlayRoot);
             _overlayRoot.SetSiblingIndex(1);
 
-            RectTransform debugRoot = CreateRect("DebugRoot", _uiRoot.transform);
-            StretchFull(debugRoot);
-            debugRoot.gameObject.SetActive(false);
+            _debugRoot = CreateRect("DebugRoot", _uiRoot.transform);
+            StretchFull(_debugRoot);
+            BuildVisualOverlayDiagnosticsPanel(_debugRoot);
+            _debugRoot.gameObject.SetActive(true);
+        }
+
+        private void BuildVisualOverlayDiagnosticsPanel(RectTransform parent)
+        {
+            RectTransform panel = CreatePanel(
+                "VisualOverlayDiagnosticsPanel",
+                parent,
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f),
+                new Vector2(8f, -TopBarHeight - 154f),
+                new Vector2(488f, -TopBarHeight - 8f));
+
+            Image image = panel.GetComponent<Image>();
+            if (image != null)
+                image.raycastTarget = false;
+
+            _visualOverlayDiagnosticsLabel = CreateText(
+                panel,
+                "LM/PF DEBUG\nprovider=False",
+                11,
+                FontStyles.Normal,
+                TextAlignmentOptions.TopLeft);
+            _visualOverlayDiagnosticsLabel.enableWordWrapping = false;
+            _visualOverlayDiagnosticsLabel.overflowMode = TextOverflowModes.Overflow;
+        }
+
+        private void RefreshVisualOverlayDiagnosticsPanel()
+        {
+            if (_visualOverlayDiagnosticsLabel == null)
+                return;
+
+            _visualOverlayDiagnosticsLabel.text = _visualOverlayDiagnosticsProvider != null
+                ? _visualOverlayDiagnosticsProvider.Invoke()
+                : "LM/PF DEBUG\nprovider=False";
         }
 
         private static RectTransform CreatePanel(

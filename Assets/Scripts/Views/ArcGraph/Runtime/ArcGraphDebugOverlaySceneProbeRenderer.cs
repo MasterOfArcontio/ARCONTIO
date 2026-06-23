@@ -98,6 +98,30 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // BuildProbeDiagnosticsText
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce una diagnostica testuale minima del probe visuale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug osservabile senza console log</b></para>
+        /// <para>
+        /// Il metodo non crea oggetti e non cambia stato: guarda soltanto se il
+        /// root runtime esiste e quanti figli contiene. Serve a distinguere un
+        /// problema di dati vuoti da un problema di rendering invisibile.
+        /// </para>
+        /// </summary>
+        public string BuildProbeDiagnosticsText()
+        {
+            Transform root = _root != null ? _root : FindExistingRoot();
+            if (root == null)
+                return "probeRoot=False children=0";
+
+            return "probeRoot=True children=" + root.childCount;
+        }
+
+        // =============================================================================
         // Start
         // =============================================================================
         /// <summary>
