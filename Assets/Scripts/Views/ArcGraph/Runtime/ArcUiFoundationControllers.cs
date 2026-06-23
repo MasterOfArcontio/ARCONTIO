@@ -1,4 +1,6 @@
 using Arcontio.Core;
+using Arcontio.Core.Environment;
+using System.Globalization;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -409,8 +411,8 @@ namespace Arcontio.View.ArcGraph
     /// La TopBar non riceve direttamente il <c>SimulationHost</c> e non chiama i
     /// suoi metodi. Questo controller riceve richieste UI tipizzate, applica solo
     /// le operazioni gia' esposte pubblicamente dal runtime e conserva lo stato
-    /// richiesto e delega al <c>SimulationHost</c> anche il moltiplicatore
-    /// velocita' runtime normale x1-x4.
+    /// richiesto. Le velocita' normali <c>x1-x4</c> e il fast-forward debug
+    /// Biosfera <c>x50/x100/x200</c> restano due percorsi separati.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -418,6 +420,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>_simulationHost</b>: host runtime esplicitamente assegnato dall'installer.</item>
     ///   <item><b>_lastRequest</b>: ultima intenzione UI ricevuta.</item>
     ///   <item><b>_speedMultiplier</b>: velocita' richiesta dalla UI e applicata al loop tick normale.</item>
+    ///   <item><b>_biosphereDebugFastForwardMultiplier</b>: fattore debug ambientale separato dalla simulazione sociale.</item>
     ///   <item><b>Request*</b>: metodi invocabili dai pulsanti TopBar.</item>
     ///   <item><b>BuildStateSnapshot</b>: snapshot letto dalla view.</item>
     /// </list>
@@ -427,10 +430,12 @@ namespace Arcontio.View.ArcGraph
         private SimulationHost _simulationHost;
         private ArcUiSimulationControlRequest _lastRequest;
         private int _speedMultiplier = 1;
+        private int _biosphereDebugFastForwardMultiplier = 50;
 
         public bool HasRuntimeHost => _simulationHost != null;
         public ArcUiSimulationControlRequest LastRequest => _lastRequest;
         public int RequestedSpeedMultiplier => _speedMultiplier;
+        public int RequestedBiosphereDebugFastForwardMultiplier => _biosphereDebugFastForwardMultiplier;
 
         // =============================================================================
         // SetSimulationHost
@@ -452,7 +457,10 @@ namespace Arcontio.View.ArcGraph
             _simulationHost = host;
 
             if (_simulationHost != null)
+            {
                 _simulationHost.SetRuntimeTickSpeedMultiplier(_speedMultiplier);
+                _simulationHost.SetBiosphereDebugFastForwardMultiplier(_biosphereDebugFastForwardMultiplier);
+            }
         }
 
         // =============================================================================
@@ -518,6 +526,57 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // RequestBiosphereDebugFastForwardMultiplier
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra la scelta del moltiplicatore debug Biosfera.
+        /// </para>
+        /// </summary>
+        public void RequestBiosphereDebugFastForwardMultiplier(
+            int multiplier,
+            string source)
+        {
+            Apply(ArcUiSimulationControlRequest.SetBiosphereDebugFastForwardMultiplier(multiplier, source));
+        }
+
+        // =============================================================================
+        // CycleBiosphereDebugFastForwardMultiplier
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Avanza ciclicamente tra <c>x50</c>, <c>x100</c> e <c>x200</c>.
+        /// </para>
+        /// </summary>
+        public void CycleBiosphereDebugFastForwardMultiplier(string source)
+        {
+            int next = _biosphereDebugFastForwardMultiplier >= 200
+                ? 50
+                : _biosphereDebugFastForwardMultiplier >= 100
+                    ? 200
+                    : 100;
+            RequestBiosphereDebugFastForwardMultiplier(next, source);
+        }
+
+        // =============================================================================
+        // ToggleBiosphereDebugFastForward
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Avvia o ferma il fast-forward debug solo Biosfera.
+        /// </para>
+        /// </summary>
+        public void ToggleBiosphereDebugFastForward(string source)
+        {
+            if (_simulationHost != null && _simulationHost.IsBiosphereDebugFastForwardActive)
+                Apply(ArcUiSimulationControlRequest.StopBiosphereDebugFastForward(source));
+            else
+                Apply(ArcUiSimulationControlRequest.StartBiosphereDebugFastForward(
+                    _biosphereDebugFastForwardMultiplier,
+                    source));
+        }
+
+        // =============================================================================
         // BuildStateSnapshot
         // =============================================================================
         /// <summary>
@@ -533,12 +592,35 @@ namespace Arcontio.View.ArcGraph
             int speedMultiplier = hasHost
                 ? _simulationHost.RuntimeTickSpeedMultiplier
                 : _speedMultiplier;
+            bool biosphereDebugActive = hasHost && _simulationHost.IsBiosphereDebugFastForwardActive;
+            int biosphereDebugMultiplier = hasHost
+                ? _simulationHost.BiosphereDebugFastForwardMultiplier
+                : _biosphereDebugFastForwardMultiplier;
+            BuildEnvironmentLabels(
+                out string dayLabel,
+                out string monthLabel,
+                out string yearLabel,
+                out string seasonLabel,
+                out string timeLabel,
+                out string temperatureLabel,
+                out string humidityLabel,
+                out string weatherLabel);
 
             return new ArcUiSimulationControlState(
                 hasHost,
                 isPaused,
                 speedMultiplier,
-                tickIndex);
+                tickIndex,
+                biosphereDebugActive,
+                biosphereDebugMultiplier,
+                dayLabel,
+                monthLabel,
+                yearLabel,
+                seasonLabel,
+                timeLabel,
+                temperatureLabel,
+                humidityLabel,
+                weatherLabel);
         }
 
         // =============================================================================
@@ -565,8 +647,30 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
+            if (request.IsSetBiosphereDebugFastForwardMultiplier)
+            {
+                _biosphereDebugFastForwardMultiplier = request.BiosphereDebugFastForwardMultiplier;
+                if (_simulationHost != null)
+                    _simulationHost.SetBiosphereDebugFastForwardMultiplier(_biosphereDebugFastForwardMultiplier);
+
+                return;
+            }
+
             if (_simulationHost == null)
                 return;
+
+            if (request.IsStartBiosphereDebugFastForward)
+            {
+                _biosphereDebugFastForwardMultiplier = request.BiosphereDebugFastForwardMultiplier;
+                _simulationHost.StartBiosphereDebugFastForward(_biosphereDebugFastForwardMultiplier);
+                return;
+            }
+
+            if (request.IsStopBiosphereDebugFastForward)
+            {
+                _simulationHost.StopBiosphereDebugFastForward();
+                return;
+            }
 
             if (request.IsPause)
             {
@@ -576,6 +680,93 @@ namespace Arcontio.View.ArcGraph
 
             if (request.IsResume)
                 _simulationHost.SetPaused(false);
+        }
+
+        private void BuildEnvironmentLabels(
+            out string dayLabel,
+            out string monthLabel,
+            out string yearLabel,
+            out string seasonLabel,
+            out string timeLabel,
+            out string temperatureLabel,
+            out string humidityLabel,
+            out string weatherLabel)
+        {
+            dayLabel = "Giorno --";
+            monthLabel = "Mese --";
+            yearLabel = "Anno ----";
+            seasonLabel = "Stagione --";
+            timeLabel = "--:--";
+            temperatureLabel = "-- C";
+            humidityLabel = "-- %";
+            weatherLabel = "Meteo --";
+
+            if (_simulationHost == null)
+                return;
+
+            if (_simulationHost.TryGetEnvironmentCalendarState(out EnvironmentCalendarState calendar))
+            {
+                dayLabel = "Giorno " + (calendar.Date.DayOfMonth + 1).ToString(CultureInfo.InvariantCulture);
+                monthLabel = "Mese " + (calendar.Date.Month + 1).ToString(CultureInfo.InvariantCulture);
+                yearLabel = "Anno " + calendar.Date.Year.ToString(CultureInfo.InvariantCulture);
+                seasonLabel = ToSeasonLabel(calendar.Date.Season);
+                timeLabel =
+                    calendar.TimeOfDay.Hour.ToString("00", CultureInfo.InvariantCulture) +
+                    ":" +
+                    calendar.TimeOfDay.Minute.ToString("00", CultureInfo.InvariantCulture);
+            }
+
+            if (_simulationHost.TryGetEnvironmentClimateState(out EnvironmentGlobalClimateState climate))
+            {
+                temperatureLabel = Mathf01ToTemperatureCelsius(climate.Temperature01);
+                humidityLabel = Mathf01ToPercent(climate.Humidity01);
+                weatherLabel = "Meteo " + ToWeatherLabel(climate.Weather.Kind);
+            }
+        }
+
+        private static string ToSeasonLabel(EnvironmentSeasonKind season)
+        {
+            return season switch
+            {
+                EnvironmentSeasonKind.Summer => "Estate",
+                EnvironmentSeasonKind.Autumn => "Autunno",
+                EnvironmentSeasonKind.Winter => "Inverno",
+                _ => "Primavera"
+            };
+        }
+
+        private static string ToWeatherLabel(EnvironmentWeatherKind weather)
+        {
+            return weather switch
+            {
+                EnvironmentWeatherKind.Rain => "Pioggia",
+                EnvironmentWeatherKind.Snow => "Neve",
+                EnvironmentWeatherKind.Wind => "Vento",
+                EnvironmentWeatherKind.HeatWave => "Caldo",
+                EnvironmentWeatherKind.Storm => "Tempesta",
+                _ => "Sereno"
+            };
+        }
+
+        private static string Mathf01ToPercent(float value01)
+        {
+            int value = (int)System.Math.Round(Clamp01(value01) * 100f);
+            return value.ToString(CultureInfo.InvariantCulture) + " %";
+        }
+
+        private static string Mathf01ToTemperatureCelsius(float value01)
+        {
+            float clamped = Clamp01(value01);
+            int celsius = (int)System.Math.Round(-10f + (clamped * 45f));
+            return celsius.ToString(CultureInfo.InvariantCulture) + " C";
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value < 0f)
+                return 0f;
+
+            return value > 1f ? 1f : value;
         }
     }
 }

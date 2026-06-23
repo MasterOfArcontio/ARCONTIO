@@ -521,10 +521,24 @@ namespace Arcontio.Core
         [SerializeField] private InputActionReference stepOneTickAction;
         [SerializeField] private InputActionReference stepTenTicksAction;
         [SerializeField] private int maxRuntimeTicksPerUnityFrame = 6;
+        [Header("Biosphere Debug Fast Forward")]
+        [SerializeField] private bool enableBiosphereDebugFastForward = true;
+        [SerializeField] private int maxBiosphereDebugEnvironmentDaysPerUnityFrame = 2;
 
         private int _runtimeTickSpeedMultiplier = 1;
         private int _lastRuntimeTicksProcessedInFrame;
         private float _lastDroppedRuntimeCatchUpSeconds;
+        private bool _biosphereDebugFastForwardActive;
+        private bool _wasPausedBeforeBiosphereDebugFastForward;
+        private int _biosphereDebugFastForwardMultiplier = 50;
+        private float _biosphereDebugFastForwardAccumulatedEnvironmentTicks;
+        private long _biosphereDebugFastForwardTotalEnvironmentTicksAdvanced;
+        private long _biosphereDebugFastForwardLastEnvironmentTick;
+        private int _lastBiosphereDebugAppliedPlantDeltas;
+        private int _lastBiosphereDebugPendingPlantDeltas;
+        private float _lastDroppedBiosphereDebugEnvironmentTicks;
+        private readonly EnvironmentCalendarConfig _biosphereDebugCalendarConfig = new();
+        private readonly EnvironmentClimateConfig _biosphereDebugClimateConfig = new();
 
         // =============================================================================
         // DirectKeyboardTickControl
@@ -565,6 +579,13 @@ namespace Arcontio.Core
         public int MaxRuntimeTicksPerUnityFrame => NormalizeMaxRuntimeTicksPerUnityFrame(maxRuntimeTicksPerUnityFrame);
         public int LastRuntimeTicksProcessedInFrame => _lastRuntimeTicksProcessedInFrame;
         public float LastDroppedRuntimeCatchUpSeconds => _lastDroppedRuntimeCatchUpSeconds;
+        public bool IsBiosphereDebugFastForwardActive => _biosphereDebugFastForwardActive;
+        public int BiosphereDebugFastForwardMultiplier => _biosphereDebugFastForwardMultiplier;
+        public long BiosphereDebugFastForwardTotalEnvironmentTicksAdvanced => _biosphereDebugFastForwardTotalEnvironmentTicksAdvanced;
+        public long BiosphereDebugFastForwardLastEnvironmentTick => _biosphereDebugFastForwardLastEnvironmentTick;
+        public int LastBiosphereDebugAppliedPlantDeltas => _lastBiosphereDebugAppliedPlantDeltas;
+        public int LastBiosphereDebugPendingPlantDeltas => _lastBiosphereDebugPendingPlantDeltas;
+        public float LastDroppedBiosphereDebugEnvironmentTicks => _lastDroppedBiosphereDebugEnvironmentTicks;
 
         public void SetPaused(bool paused)
         {
@@ -608,14 +629,167 @@ namespace Arcontio.Core
             }
         }
 
+        // =============================================================================
+        // SetBiosphereDebugFastForwardMultiplier
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Imposta il moltiplicatore debug del fast-forward ambientale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug Biosfera separato dalla simulazione sociale</b></para>
+        /// <para>
+        /// I valori ammessi sono volutamente pochi: <c>x50</c>, <c>x100</c> e
+        /// <c>x200</c>. Questo evita di riusare il moltiplicatore produttivo
+        /// <c>x1-x4</c> e rende esplicito che questo percorso non accelera NPC,
+        /// decisioni, job, memoria, belief, pathfinding o comunicazione.
+        /// </para>
+        /// </summary>
+        public void SetBiosphereDebugFastForwardMultiplier(int multiplier)
+        {
+            _biosphereDebugFastForwardMultiplier = NormalizeBiosphereDebugFastForwardMultiplier(multiplier);
+        }
+
+        // =============================================================================
+        // StartBiosphereDebugFastForward
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Avvia il fast-forward debug dedicato alla Biosfera.
+        /// </para>
+        ///
+        /// <para><b>Freeze sociale, clock ambientale separato</b></para>
+        /// <para>
+        /// Il metodo non chiama <see cref="StepOneTick"/>, non modifica
+        /// <c>_tickIndex</c> e non resetta alcuno stato NPC. Imposta solo una
+        /// modalita' runtime nella quale <see cref="Update"/> continua a pompare
+        /// input/UI e fa avanzare <see cref="EnvironmentState"/> con resolver
+        /// data-only.
+        /// </para>
+        /// </summary>
+        public bool StartBiosphereDebugFastForward(int multiplier)
+        {
+            if (!enableBiosphereDebugFastForward || _world == null || _world.EnvironmentState == null)
+                return false;
+
+            SetBiosphereDebugFastForwardMultiplier(multiplier);
+            _wasPausedBeforeBiosphereDebugFastForward = IsPaused;
+            _biosphereDebugFastForwardActive = true;
+            _biosphereDebugFastForwardAccumulatedEnvironmentTicks = 0f;
+            _lastDroppedBiosphereDebugEnvironmentTicks = 0f;
+            _lastBiosphereDebugAppliedPlantDeltas = 0;
+            _lastBiosphereDebugPendingPlantDeltas = 0;
+            _biosphereDebugFastForwardLastEnvironmentTick =
+                _world.EnvironmentState.Calendar.ElapsedEnvironmentTicks;
+
+            // Congeliamo esplicitamente la simulazione ordinaria. Lo stop potra'
+            // ripristinare lo stato pausa precedente, senza simulare tick sociali.
+            SetPaused(true);
+            return true;
+        }
+
+        // =============================================================================
+        // StopBiosphereDebugFastForward
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ferma il fast-forward debug Biosfera e applica solo refresh conservativi.
+        /// </para>
+        ///
+        /// <para><b>Refresh senza simulazione fittizia</b></para>
+        /// <para>
+        /// Alla chiusura marchiamo la percezione NPC come sporca, ma non eseguiamo
+        /// una percezione, non ricalcoliamo path e non applichiamo qui un rendering
+        /// produttivo delle piante. Questi hook profondi appartengono alla chat
+        /// Biosfera e agli step ArcGraph dedicati.
+        /// </para>
+        /// </summary>
+        public void StopBiosphereDebugFastForward()
+        {
+            if (!_biosphereDebugFastForwardActive)
+                return;
+
+            _biosphereDebugFastForwardActive = false;
+            _biosphereDebugFastForwardAccumulatedEnvironmentTicks = 0f;
+            CompleteBiosphereDebugFastForwardConservativeRefresh();
+            SetPaused(_wasPausedBeforeBiosphereDebugFastForward);
+        }
+
+        // =============================================================================
+        // ToggleBiosphereDebugFastForward
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Alterna lo stato del fast-forward debug Biosfera.
+        /// </para>
+        /// </summary>
+        public bool ToggleBiosphereDebugFastForward(int multiplier)
+        {
+            // Durante il fast-forward Biosfera non pompiamo comandi view -> core:
+            // devono restare attivi solo UI, selezione puntatore e calendario ambiente.
+            if (_biosphereDebugFastForwardActive)
+            {
+                StopBiosphereDebugFastForward();
+                return false;
+            }
+
+            return StartBiosphereDebugFastForward(multiplier);
+        }
+
+        // =============================================================================
+        // TryGetEnvironmentCalendarState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone alla UI autorizzata lo snapshot calendario ambientale corrente.
+        /// </para>
+        /// </summary>
+        public bool TryGetEnvironmentCalendarState(out EnvironmentCalendarState calendar)
+        {
+            if (_world?.EnvironmentState == null)
+            {
+                calendar = default;
+                return false;
+            }
+
+            calendar = _world.EnvironmentState.Calendar;
+            return true;
+        }
+
+        // =============================================================================
+        // TryGetEnvironmentClimateState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Espone alla UI autorizzata lo snapshot clima ambientale corrente.
+        /// </para>
+        /// </summary>
+        public bool TryGetEnvironmentClimateState(out EnvironmentGlobalClimateState climate)
+        {
+            if (_world?.EnvironmentState == null)
+            {
+                climate = default;
+                return false;
+            }
+
+            climate = _world.EnvironmentState.Climate;
+            return true;
+        }
+
         public void StepOneTickPaused()
         {
+            if (_biosphereDebugFastForwardActive)
+                return;
+
             if (!IsPaused) return;
             StepOneTick();
         }
 
         public void StepManyTicksPaused(int count)
         {
+            if (_biosphereDebugFastForwardActive)
+                return;
+
             if (!IsPaused) return;
             if (count <= 0) return;
 
@@ -947,11 +1121,18 @@ namespace Arcontio.Core
             HandleDirectKeyboardTickControl();
 
             // ============================================================
-            // DEVTOOLS / VIEW COMMANDS (always pumped)
+            // DEVTOOLS / VIEW COMMANDS
             // ============================================================
             // IMPORTANTISSIMO:
             // - DevMode deve poter editare la mappa anche quando la sim è in pausa.
-            // - Quindi eseguiamo sempre i comandi esterni prima del return su IsPaused.
+            if (_biosphereDebugFastForwardActive)
+            {
+                AdvanceBiosphereDebugFastForward(Time.unscaledDeltaTime);
+                return;
+            }
+
+            // - Quindi eseguiamo i comandi esterni prima del return su IsPaused,
+            //   ma solo quando non e' attivo il debug Biosfera-only.
             PumpExternalCommands();
 
             if (IsPaused)
@@ -1041,6 +1222,128 @@ namespace Arcontio.Core
                 return 1;
 
             return maxTicks > 32 ? 32 : maxTicks;
+        }
+
+        // =============================================================================
+        // NormalizeBiosphereDebugFastForwardMultiplier
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza il moltiplicatore debug Biosfera sui soli valori consentiti.
+        /// </para>
+        /// </summary>
+        public static int NormalizeBiosphereDebugFastForwardMultiplier(int multiplier)
+        {
+            if (multiplier <= 50)
+                return 50;
+
+            if (multiplier <= 100)
+                return 100;
+
+            return 200;
+        }
+
+        // =============================================================================
+        // ResolveBiosphereDebugEnvironmentTicksPerSecond
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola quanti tick ambientali debug avanzano in un secondo reale.
+        /// </para>
+        /// </summary>
+        public static float ResolveBiosphereDebugEnvironmentTicksPerSecond(
+            SimulationParams simParams,
+            int multiplier)
+        {
+            int ticksPerSecond = Mathf.Max(1, simParams?.ResolveTicksPerSecond() ?? TickParams.DefaultTicksPerSecond);
+            return ticksPerSecond * NormalizeBiosphereDebugFastForwardMultiplier(multiplier);
+        }
+
+        // =============================================================================
+        // AdvanceBiosphereDebugFastForward
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Avanza solo lo stato ambientale usando la scala configurata reale.
+        /// </para>
+        ///
+        /// <para><b>Nota sui delta fisici</b></para>
+        /// <para>
+        /// Il resolver puo' produrre delta di piante fisiche, ma qui li contiamo
+        /// soltanto. Non li applichiamo al <c>World</c> per non anticipare il feed
+        /// produttivo Biosfera -> ArcGraph e la dirty propagation avanzata.
+        /// </para>
+        /// </summary>
+        private void AdvanceBiosphereDebugFastForward(float deltaTime)
+        {
+            if (deltaTime <= 0f || _world?.EnvironmentState == null)
+                return;
+
+            float ticksPerSecond = ResolveBiosphereDebugEnvironmentTicksPerSecond(
+                _world.Config?.Sim,
+                _biosphereDebugFastForwardMultiplier);
+            _biosphereDebugFastForwardAccumulatedEnvironmentTicks += deltaTime * ticksPerSecond;
+
+            long wholeTicks = (long)_biosphereDebugFastForwardAccumulatedEnvironmentTicks;
+            if (wholeTicks <= 0L)
+                return;
+
+            long maxTicksThisFrame = ResolveMaxBiosphereDebugEnvironmentTicksPerFrame();
+            if (wholeTicks > maxTicksThisFrame)
+            {
+                _lastDroppedBiosphereDebugEnvironmentTicks =
+                    _biosphereDebugFastForwardAccumulatedEnvironmentTicks - maxTicksThisFrame;
+                wholeTicks = maxTicksThisFrame;
+                _biosphereDebugFastForwardAccumulatedEnvironmentTicks = 0f;
+            }
+            else
+            {
+                _biosphereDebugFastForwardAccumulatedEnvironmentTicks -= wholeTicks;
+                _lastDroppedBiosphereDebugEnvironmentTicks = 0f;
+            }
+
+            long previousEnvironmentTick = _world.EnvironmentState.Calendar.ElapsedEnvironmentTicks;
+            long currentEnvironmentTick = previousEnvironmentTick + wholeTicks;
+
+            EnvironmentAdvanceResult result = EnvironmentAdvanceResolver.AdvanceStateSnapshot(
+                _world.EnvironmentState,
+                currentEnvironmentTick,
+                _biosphereDebugCalendarConfig,
+                _biosphereDebugClimateConfig);
+
+            _world.SetEnvironmentState(result.State);
+            _biosphereDebugFastForwardTotalEnvironmentTicksAdvanced += wholeTicks;
+            _biosphereDebugFastForwardLastEnvironmentTick = currentEnvironmentTick;
+            _lastBiosphereDebugPendingPlantDeltas = result.PhysicalPlantDeltas?.Count ?? 0;
+            _lastBiosphereDebugAppliedPlantDeltas = 0;
+        }
+
+        private long ResolveMaxBiosphereDebugEnvironmentTicksPerFrame()
+        {
+            int hoursPerDay = _biosphereDebugCalendarConfig.ResolveHoursPerDay();
+            int ticksPerHour = _biosphereDebugCalendarConfig.ResolveCalendarTicksPerSimulatedHour();
+            int days = maxBiosphereDebugEnvironmentDaysPerUnityFrame < 1
+                ? 1
+                : maxBiosphereDebugEnvironmentDaysPerUnityFrame;
+
+            return (long)Mathf.Max(1, hoursPerDay * ticksPerHour) * days;
+        }
+
+        private void CompleteBiosphereDebugFastForwardConservativeRefresh()
+        {
+            if (_world == null)
+                return;
+
+            _world.MarkAllNpcPerceptionDirty();
+
+            // TODO Biosfera/Pathfinding:
+            // quando esistera' un hook globale esplicito per invalidare path e
+            // replan dovuti a piante nate/morte, chiamarlo qui senza simulare tick
+            // NPC e senza forzare MovementSystem.
+
+            // TODO ArcGraph ambiente:
+            // quando il feed produttivo Biosfera -> ArcGraph sara' disponibile,
+            // richiedere qui un refresh visuale conservativo delle celle ambiente.
         }
 
         // =============================================================================

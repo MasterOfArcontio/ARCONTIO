@@ -12,8 +12,8 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// La TopBar non deve decidere direttamente come mutare il simulatore. Questa
     /// enum descrive solo l'intenzione dell'utente: mettere in pausa, riprendere o
-    /// richiedere una velocita'. Il controller autorizzato decide cosa puo' essere
-    /// applicato al runtime corrente.
+    /// richiedere una velocita' o usare il fast-forward debug della Biosfera. Il
+    /// controller autorizzato decide cosa puo' essere applicato al runtime corrente.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -22,6 +22,9 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Pause</b>: richiesta di pausa.</item>
     ///   <item><b>Resume</b>: richiesta di ripresa.</item>
     ///   <item><b>SetSpeed</b>: richiesta di fattore velocita' UI.</item>
+    ///   <item><b>SetBiosphereDebugFastForwardMultiplier</b>: scelta x50/x100/x200.</item>
+    ///   <item><b>StartBiosphereDebugFastForward</b>: avvio del fast-forward solo Biosfera.</item>
+    ///   <item><b>StopBiosphereDebugFastForward</b>: stop del fast-forward solo Biosfera.</item>
     /// </list>
     /// </summary>
     public enum ArcUiSimulationControlRequestKind
@@ -29,7 +32,10 @@ namespace Arcontio.View.ArcGraph
         None = 0,
         Pause = 1,
         Resume = 2,
-        SetSpeed = 3
+        SetSpeed = 3,
+        SetBiosphereDebugFastForwardMultiplier = 4,
+        StartBiosphereDebugFastForward = 5,
+        StopBiosphereDebugFastForward = 6
     }
 
     // =============================================================================
@@ -43,7 +49,8 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: richiesta UI, non comando Core</b></para>
     /// <para>
     /// La richiesta non contiene riferimenti a <c>SimulationHost</c>, <c>World</c>,
-    /// scheduler o sistemi. Trasporta soltanto tipo, fattore velocita' e sorgente.
+    /// scheduler o sistemi. Trasporta soltanto tipo, fattore velocita',
+    /// moltiplicatore debug Biosfera e sorgente.
     /// Questo mantiene esplicito il passaggio TopBar -> controller autorizzato.
     /// </para>
     ///
@@ -51,6 +58,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Kind</b>: intenzione temporale richiesta.</item>
     ///   <item><b>SpeedMultiplier</b>: fattore normalizzato tra 1 e 4.</item>
+    ///   <item><b>BiosphereDebugFastForwardMultiplier</b>: fattore x50/x100/x200.</item>
     ///   <item><b>Source</b>: nome del componente UI che ha prodotto la richiesta.</item>
     ///   <item><b>IsValid</b>: true solo per richieste semanticamente utilizzabili.</item>
     /// </list>
@@ -59,12 +67,19 @@ namespace Arcontio.View.ArcGraph
     {
         public readonly ArcUiSimulationControlRequestKind Kind;
         public readonly int SpeedMultiplier;
+        public readonly int BiosphereDebugFastForwardMultiplier;
         public readonly string Source;
 
         public bool IsValid => Kind != ArcUiSimulationControlRequestKind.None;
         public bool IsPause => Kind == ArcUiSimulationControlRequestKind.Pause;
         public bool IsResume => Kind == ArcUiSimulationControlRequestKind.Resume;
         public bool IsSetSpeed => Kind == ArcUiSimulationControlRequestKind.SetSpeed;
+        public bool IsSetBiosphereDebugFastForwardMultiplier =>
+            Kind == ArcUiSimulationControlRequestKind.SetBiosphereDebugFastForwardMultiplier;
+        public bool IsStartBiosphereDebugFastForward =>
+            Kind == ArcUiSimulationControlRequestKind.StartBiosphereDebugFastForward;
+        public bool IsStopBiosphereDebugFastForward =>
+            Kind == ArcUiSimulationControlRequestKind.StopBiosphereDebugFastForward;
 
         // =============================================================================
         // ArcUiSimulationControlRequest
@@ -77,11 +92,26 @@ namespace Arcontio.View.ArcGraph
         public ArcUiSimulationControlRequest(
             ArcUiSimulationControlRequestKind kind,
             int speedMultiplier,
+            int biosphereDebugFastForwardMultiplier,
             string source)
         {
             Kind = kind;
             SpeedMultiplier = NormalizeSpeedMultiplier(speedMultiplier);
+            BiosphereDebugFastForwardMultiplier =
+                NormalizeBiosphereDebugFastForwardMultiplier(biosphereDebugFastForwardMultiplier);
             Source = string.IsNullOrWhiteSpace(source) ? string.Empty : source.Trim();
+        }
+
+        public ArcUiSimulationControlRequest(
+            ArcUiSimulationControlRequestKind kind,
+            int speedMultiplier,
+            string source)
+            : this(
+                kind,
+                speedMultiplier,
+                50,
+                source)
+        {
         }
 
         // =============================================================================
@@ -135,6 +165,61 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetBiosphereDebugFastForwardMultiplier
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una richiesta di scelta moltiplicatore per il fast-forward Biosfera.
+        /// </para>
+        /// </summary>
+        public static ArcUiSimulationControlRequest SetBiosphereDebugFastForwardMultiplier(
+            int multiplier,
+            string source)
+        {
+            return new ArcUiSimulationControlRequest(
+                ArcUiSimulationControlRequestKind.SetBiosphereDebugFastForwardMultiplier,
+                1,
+                multiplier,
+                source);
+        }
+
+        // =============================================================================
+        // StartBiosphereDebugFastForward
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una richiesta di avvio del fast-forward debug solo Biosfera.
+        /// </para>
+        /// </summary>
+        public static ArcUiSimulationControlRequest StartBiosphereDebugFastForward(
+            int multiplier,
+            string source)
+        {
+            return new ArcUiSimulationControlRequest(
+                ArcUiSimulationControlRequestKind.StartBiosphereDebugFastForward,
+                1,
+                multiplier,
+                source);
+        }
+
+        // =============================================================================
+        // StopBiosphereDebugFastForward
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una richiesta di stop del fast-forward debug solo Biosfera.
+        /// </para>
+        /// </summary>
+        public static ArcUiSimulationControlRequest StopBiosphereDebugFastForward(string source)
+        {
+            return new ArcUiSimulationControlRequest(
+                ArcUiSimulationControlRequestKind.StopBiosphereDebugFastForward,
+                1,
+                50,
+                source);
+        }
+
+        // =============================================================================
         // NormalizeSpeedMultiplier
         // =============================================================================
         /// <summary>
@@ -148,6 +233,25 @@ namespace Arcontio.View.ArcGraph
                 return 1;
 
             return speedMultiplier > 4 ? 4 : speedMultiplier;
+        }
+
+        // =============================================================================
+        // NormalizeBiosphereDebugFastForwardMultiplier
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza il fattore debug Biosfera sui valori previsti dalla TopBar.
+        /// </para>
+        /// </summary>
+        public static int NormalizeBiosphereDebugFastForwardMultiplier(int multiplier)
+        {
+            if (multiplier <= 50)
+                return 50;
+
+            if (multiplier <= 100)
+                return 100;
+
+            return 200;
         }
     }
 
@@ -180,17 +284,49 @@ namespace Arcontio.View.ArcGraph
         public readonly bool IsPaused;
         public readonly int SpeedMultiplier;
         public readonly long TickIndex;
+        public readonly bool BiosphereDebugFastForwardActive;
+        public readonly int BiosphereDebugFastForwardMultiplier;
+        public readonly string DayLabel;
+        public readonly string MonthLabel;
+        public readonly string YearLabel;
+        public readonly string SeasonLabel;
+        public readonly string TimeLabel;
+        public readonly string TemperatureLabel;
+        public readonly string HumidityLabel;
+        public readonly string WeatherLabel;
 
         public ArcUiSimulationControlState(
             bool hasRuntimeHost,
             bool isPaused,
             int speedMultiplier,
-            long tickIndex)
+            long tickIndex,
+            bool biosphereDebugFastForwardActive = false,
+            int biosphereDebugFastForwardMultiplier = 50,
+            string dayLabel = "Giorno --",
+            string monthLabel = "Mese --",
+            string yearLabel = "Anno ----",
+            string seasonLabel = "Stagione --",
+            string timeLabel = "--:--",
+            string temperatureLabel = "-- C",
+            string humidityLabel = "-- %",
+            string weatherLabel = "Meteo --")
         {
             HasRuntimeHost = hasRuntimeHost;
             IsPaused = isPaused;
             SpeedMultiplier = ArcUiSimulationControlRequest.NormalizeSpeedMultiplier(speedMultiplier);
             TickIndex = tickIndex < 0L ? 0L : tickIndex;
+            BiosphereDebugFastForwardActive = biosphereDebugFastForwardActive;
+            BiosphereDebugFastForwardMultiplier =
+                ArcUiSimulationControlRequest.NormalizeBiosphereDebugFastForwardMultiplier(
+                    biosphereDebugFastForwardMultiplier);
+            DayLabel = string.IsNullOrWhiteSpace(dayLabel) ? "Giorno --" : dayLabel;
+            MonthLabel = string.IsNullOrWhiteSpace(monthLabel) ? "Mese --" : monthLabel;
+            YearLabel = string.IsNullOrWhiteSpace(yearLabel) ? "Anno ----" : yearLabel;
+            SeasonLabel = string.IsNullOrWhiteSpace(seasonLabel) ? "Stagione --" : seasonLabel;
+            TimeLabel = string.IsNullOrWhiteSpace(timeLabel) ? "--:--" : timeLabel;
+            TemperatureLabel = string.IsNullOrWhiteSpace(temperatureLabel) ? "-- C" : temperatureLabel;
+            HumidityLabel = string.IsNullOrWhiteSpace(humidityLabel) ? "-- %" : humidityLabel;
+            WeatherLabel = string.IsNullOrWhiteSpace(weatherLabel) ? "Meteo --" : weatherLabel;
         }
     }
 }

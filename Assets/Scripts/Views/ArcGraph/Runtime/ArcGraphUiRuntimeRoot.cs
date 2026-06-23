@@ -64,7 +64,19 @@ namespace Arcontio.View.ArcGraph
         private Button _pauseSimulationButton;
         private Button _resumeSimulationButton;
         private Button _speedSimulationButton;
+        private Button _biosphereDebugMultiplierButton;
+        private Button _biosphereDebugGoStopButton;
+        private TextMeshProUGUI _dayLabel;
+        private TextMeshProUGUI _monthLabel;
+        private TextMeshProUGUI _yearLabel;
+        private TextMeshProUGUI _seasonLabel;
+        private TextMeshProUGUI _timeLabel;
+        private TextMeshProUGUI _temperatureLabel;
+        private TextMeshProUGUI _humidityLabel;
+        private TextMeshProUGUI _weatherLabel;
         private TextMeshProUGUI _speedSimulationLabel;
+        private TextMeshProUGUI _biosphereDebugMultiplierLabel;
+        private TextMeshProUGUI _biosphereDebugGoStopLabel;
         private ArcUiSimulationControlController _simulationControlController;
 
         public GameObject RootGameObject => _uiRoot;
@@ -234,13 +246,49 @@ namespace Arcontio.View.ArcGraph
             ArcUiSimulationControlState state = _simulationControlController.BuildStateSnapshot();
 
             if (_pauseSimulationButton != null)
-                _pauseSimulationButton.interactable = !state.HasRuntimeHost || !state.IsPaused;
+                _pauseSimulationButton.interactable =
+                    (!state.HasRuntimeHost || !state.IsPaused) && !state.BiosphereDebugFastForwardActive;
 
             if (_resumeSimulationButton != null)
-                _resumeSimulationButton.interactable = !state.HasRuntimeHost || state.IsPaused;
+                _resumeSimulationButton.interactable =
+                    (!state.HasRuntimeHost || state.IsPaused) && !state.BiosphereDebugFastForwardActive;
+
+            if (_speedSimulationButton != null)
+                _speedSimulationButton.interactable = !state.BiosphereDebugFastForwardActive;
 
             if (_speedSimulationLabel != null)
                 _speedSimulationLabel.text = "x" + state.SpeedMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            if (_biosphereDebugMultiplierLabel != null)
+                _biosphereDebugMultiplierLabel.text =
+                    "Bio x" + state.BiosphereDebugFastForwardMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            if (_biosphereDebugGoStopLabel != null)
+                _biosphereDebugGoStopLabel.text = state.BiosphereDebugFastForwardActive ? "Stop" : "Go";
+
+            if (_dayLabel != null)
+                _dayLabel.text = state.DayLabel;
+
+            if (_monthLabel != null)
+                _monthLabel.text = state.MonthLabel;
+
+            if (_yearLabel != null)
+                _yearLabel.text = state.YearLabel;
+
+            if (_seasonLabel != null)
+                _seasonLabel.text = state.SeasonLabel;
+
+            if (_timeLabel != null)
+                _timeLabel.text = state.TimeLabel;
+
+            if (_temperatureLabel != null)
+                _temperatureLabel.text = state.TemperatureLabel;
+
+            if (_humidityLabel != null)
+                _humidityLabel.text = state.HumidityLabel;
+
+            if (_weatherLabel != null)
+                _weatherLabel.text = state.WeatherLabel;
         }
 
         // =============================================================================
@@ -413,19 +461,27 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
 
-            CreateTopBarText(panel, "Giorno --");
-            CreateTopBarText(panel, "Mese --");
-            CreateTopBarText(panel, "Anno ----");
-            CreateTopBarText(panel, "Stagione --");
-            CreateTopBarText(panel, "--:--");
-            CreateTopBarText(panel, "-- C");
-            CreateTopBarText(panel, "-- %");
-            CreateTopBarText(panel, "Meteo --");
+            _dayLabel = CreateTopBarText(panel, "Giorno --");
+            _monthLabel = CreateTopBarText(panel, "Mese --");
+            _yearLabel = CreateTopBarText(panel, "Anno ----");
+            _seasonLabel = CreateTopBarText(panel, "Stagione --");
+            _timeLabel = CreateTopBarText(panel, "--:--");
+            _temperatureLabel = CreateTopBarText(panel, "-- C");
+            _humidityLabel = CreateTopBarText(panel, "-- %");
+            _weatherLabel = CreateTopBarText(panel, "Meteo --");
             _pauseSimulationButton = CreateTopBarButton(panel, "Pausa");
             _resumeSimulationButton = CreateTopBarButton(panel, "Play");
             _speedSimulationButton = CreateTopBarButton(panel, "x1");
             _speedSimulationLabel = _speedSimulationButton != null
                 ? _speedSimulationButton.GetComponentInChildren<TextMeshProUGUI>()
+                : null;
+            _biosphereDebugMultiplierButton = CreateTopBarButton(panel, "Bio x50", 86f);
+            _biosphereDebugMultiplierLabel = _biosphereDebugMultiplierButton != null
+                ? _biosphereDebugMultiplierButton.GetComponentInChildren<TextMeshProUGUI>()
+                : null;
+            _biosphereDebugGoStopButton = CreateTopBarButton(panel, "Go", 58f);
+            _biosphereDebugGoStopLabel = _biosphereDebugGoStopButton != null
+                ? _biosphereDebugGoStopButton.GetComponentInChildren<TextMeshProUGUI>()
                 : null;
             WireSimulationControlButtons();
             RefreshSimulationControlTopBar();
@@ -684,7 +740,7 @@ namespace Arcontio.View.ArcGraph
             return button.GetComponent<Button>();
         }
 
-        private static void CreateTopBarText(RectTransform parent, string label)
+        private static TextMeshProUGUI CreateTopBarText(RectTransform parent, string label)
         {
             RectTransform textRoot = CreateRect("ArcInfoRow_Top_" + SanitizeName(label), parent);
             LayoutElement layout = textRoot.gameObject.AddComponent<LayoutElement>();
@@ -692,7 +748,7 @@ namespace Arcontio.View.ArcGraph
             layout.preferredWidth = 96f;
             layout.flexibleWidth = 0f;
 
-            CreateText(textRoot, label, 14, FontStyles.Bold, TextAlignmentOptions.Center);
+            return CreateText(textRoot, label, 14, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
         // =============================================================================
@@ -724,6 +780,20 @@ namespace Arcontio.View.ArcGraph
                 _speedSimulationButton.onClick.RemoveAllListeners();
                 if (_simulationControlController != null)
                     _speedSimulationButton.onClick.AddListener(OnSpeedSimulationClicked);
+            }
+
+            if (_biosphereDebugMultiplierButton != null)
+            {
+                _biosphereDebugMultiplierButton.onClick.RemoveAllListeners();
+                if (_simulationControlController != null)
+                    _biosphereDebugMultiplierButton.onClick.AddListener(OnBiosphereDebugMultiplierClicked);
+            }
+
+            if (_biosphereDebugGoStopButton != null)
+            {
+                _biosphereDebugGoStopButton.onClick.RemoveAllListeners();
+                if (_simulationControlController != null)
+                    _biosphereDebugGoStopButton.onClick.AddListener(OnBiosphereDebugGoStopClicked);
             }
         }
 
@@ -769,9 +839,42 @@ namespace Arcontio.View.ArcGraph
             RefreshSimulationControlTopBar();
         }
 
+        // =============================================================================
+        // OnBiosphereDebugMultiplierClicked
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inoltra al controller il cambio moltiplicatore del fast-forward Biosfera.
+        /// </para>
+        /// </summary>
+        private void OnBiosphereDebugMultiplierClicked()
+        {
+            _simulationControlController?.CycleBiosphereDebugFastForwardMultiplier("ArcTopBar");
+            RefreshSimulationControlTopBar();
+        }
+
+        // =============================================================================
+        // OnBiosphereDebugGoStopClicked
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inoltra al controller l'avvio o lo stop del fast-forward Biosfera.
+        /// </para>
+        /// </summary>
+        private void OnBiosphereDebugGoStopClicked()
+        {
+            _simulationControlController?.ToggleBiosphereDebugFastForward("ArcTopBar");
+            RefreshSimulationControlTopBar();
+        }
+
         private static Button CreateTopBarButton(RectTransform parent, string label)
         {
-            RectTransform button = CreateButtonShell(parent, "ArcButton_Top_" + SanitizeName(label), 70f, 30f, false);
+            return CreateTopBarButton(parent, label, 70f);
+        }
+
+        private static Button CreateTopBarButton(RectTransform parent, string label, float preferredWidth)
+        {
+            RectTransform button = CreateButtonShell(parent, "ArcButton_Top_" + SanitizeName(label), preferredWidth, 30f, false);
             CreateText(button, label, 12, FontStyles.Bold, TextAlignmentOptions.Center);
             return button.GetComponent<Button>();
         }
