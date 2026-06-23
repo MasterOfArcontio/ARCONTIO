@@ -42,6 +42,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>VisualProjectionOk</b>: verifica proiezioni visuali neutrali senza ArcGraph.</item>
     ///   <item><b>ConsumerQueryOk</b>: verifica facade read-only per NPC/Decision futuri.</item>
     ///   <item><b>RuntimeSchedulerOk</b>: verifica cadenza biosfera configurabile senza SimulationHost.</item>
+    ///   <item><b>PhysicalPlantWorldBoundaryOk</b>: verifica delta piante fisiche verso World senza renderer.</item>
     ///   <item><b>IsSuccessful</b>: esito aggregato dei controlli.</item>
     /// </list>
     /// </summary>
@@ -70,6 +71,7 @@ namespace Arcontio.Core.Environment
         public readonly bool VisualProjectionOk;
         public readonly bool ConsumerQueryOk;
         public readonly bool RuntimeSchedulerOk;
+        public readonly bool PhysicalPlantWorldBoundaryOk;
 
         public bool IsSuccessful =>
             CalendarBaselineOk
@@ -94,7 +96,8 @@ namespace Arcontio.Core.Environment
             && PersistenceOk
             && VisualProjectionOk
             && ConsumerQueryOk
-            && RuntimeSchedulerOk;
+            && RuntimeSchedulerOk
+            && PhysicalPlantWorldBoundaryOk;
 
         // =============================================================================
         // EnvironmentFoundationHarnessResult
@@ -127,7 +130,8 @@ namespace Arcontio.Core.Environment
             bool persistenceOk,
             bool visualProjectionOk,
             bool consumerQueryOk,
-            bool runtimeSchedulerOk)
+            bool runtimeSchedulerOk,
+            bool physicalPlantWorldBoundaryOk)
         {
             CalendarBaselineOk = calendarBaselineOk;
             SeasonBoundaryOk = seasonBoundaryOk;
@@ -152,6 +156,7 @@ namespace Arcontio.Core.Environment
             VisualProjectionOk = visualProjectionOk;
             ConsumerQueryOk = consumerQueryOk;
             RuntimeSchedulerOk = runtimeSchedulerOk;
+            PhysicalPlantWorldBoundaryOk = physicalPlantWorldBoundaryOk;
         }
     }
 
@@ -196,6 +201,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>CheckVisualProjection</b>: controlla readiness adapter senza View types.</item>
     ///   <item><b>CheckConsumerQuery</b>: controlla facts read-only per consumer futuri.</item>
     ///   <item><b>CheckRuntimeScheduler</b>: controlla scheduler biosfera data-only.</item>
+    ///   <item><b>CheckPhysicalPlantWorldBoundary</b>: controlla proiezione fisica piante nel World.</item>
     /// </list>
     /// </summary>
     public static class EnvironmentFoundationHarness
@@ -238,6 +244,7 @@ namespace Arcontio.Core.Environment
             bool visualProjectionOk = CheckVisualProjection();
             bool consumerQueryOk = CheckConsumerQuery();
             bool runtimeSchedulerOk = CheckRuntimeScheduler();
+            bool physicalPlantWorldBoundaryOk = CheckPhysicalPlantWorldBoundary();
 
             return new EnvironmentFoundationHarnessResult(
                 calendarBaselineOk,
@@ -262,7 +269,8 @@ namespace Arcontio.Core.Environment
                 persistenceOk,
                 visualProjectionOk,
                 consumerQueryOk,
-                runtimeSchedulerOk);
+                runtimeSchedulerOk,
+                physicalPlantWorldBoundaryOk);
         }
 
         private static bool CheckCalendarBaseline(EnvironmentCalendarConfig calendarConfig)
@@ -2322,6 +2330,27 @@ namespace Arcontio.Core.Environment
                    && normalized.ResolveMaxPlantMutationsPerUpdate() == 1
                    && normalized.ResolveMaxVegetationMutationsPerUpdate() == 1
                    && normalized.ResolveUpdateMode() == BiosphereRuntimeParams.DefaultUpdateMode;
+        }
+
+        // =============================================================================
+        // CheckPhysicalPlantWorldBoundary
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Controlla il boundary fisico Biosfera -> World per le piante reali.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: harness Core senza renderer</b></para>
+        /// <para>
+        /// Il controllo resta confinato al Core: crea un World minimo, applica delta
+        /// pianta fisica e verifica solo occupazione, occlusione, movimento, LOS e
+        /// dirty perception. Non legge ArcGraph, MapGrid, sprite, scene o asset.
+        /// </para>
+        /// </summary>
+        private static bool CheckPhysicalPlantWorldBoundary()
+        {
+            var result = EnvironmentPhysicalPlantWorldHarness.RunDefaultChecks();
+            return result.IsSuccessful;
         }
     }
 }
