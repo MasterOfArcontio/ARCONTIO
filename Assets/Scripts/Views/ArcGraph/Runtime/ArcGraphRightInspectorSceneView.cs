@@ -417,11 +417,12 @@ namespace Arcontio.View.ArcGraph
             rootLayout.childControlWidth = true;
             rootLayout.childControlHeight = true;
             rootLayout.childForceExpandWidth = true;
-            rootLayout.childForceExpandHeight = true;
+            rootLayout.childForceExpandHeight = false;
 
             RectTransform row = CreateRect("NpcHeaderRow", _headerRoot);
             LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
             rowLayout.preferredHeight = 92f;
+            rowLayout.flexibleHeight = 0f;
 
             HorizontalLayoutGroup horizontal = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             horizontal.padding = new RectOffset(0, 0, 0, 0);
@@ -429,19 +430,21 @@ namespace Arcontio.View.ArcGraph
             horizontal.childControlWidth = true;
             horizontal.childControlHeight = true;
             horizontal.childForceExpandWidth = false;
-            horizontal.childForceExpandHeight = true;
+            horizontal.childForceExpandHeight = false;
 
             CreateNpcPortraitSlot(row);
 
             RectTransform details = CreateRect("NpcHeaderDetails", row);
             LayoutElement detailsLayout = details.gameObject.AddComponent<LayoutElement>();
             detailsLayout.flexibleWidth = 1f;
+            detailsLayout.preferredHeight = 84f;
+            detailsLayout.flexibleHeight = 0f;
 
             VerticalLayoutGroup detailsGroup = details.gameObject.AddComponent<VerticalLayoutGroup>();
             detailsGroup.padding = new RectOffset(0, 0, 0, 0);
-            detailsGroup.spacing = 1f;
+            detailsGroup.spacing = 0f;
             detailsGroup.childControlWidth = true;
-            detailsGroup.childControlHeight = false;
+            detailsGroup.childControlHeight = true;
             detailsGroup.childForceExpandWidth = true;
             detailsGroup.childForceExpandHeight = false;
 
@@ -875,8 +878,11 @@ namespace Arcontio.View.ArcGraph
             // interno con un'immagine senza cambiare il contratto ViewModel.
             RectTransform portrait = CreateRect("NpcPortraitSlot", parent);
             LayoutElement layout = portrait.gameObject.AddComponent<LayoutElement>();
-            layout.preferredWidth = 64f;
+            layout.minWidth = 56f;
+            layout.preferredWidth = 56f;
             layout.preferredHeight = 84f;
+            layout.flexibleWidth = 0f;
+            layout.flexibleHeight = 0f;
 
             Image image = portrait.gameObject.AddComponent<Image>();
             image.raycastTarget = false;
@@ -1391,6 +1397,10 @@ namespace Arcontio.View.ArcGraph
             label.extraPadding = true;
             label.color = ColorFromHex("#DDE6EE", 1f);
             ArcGraphUiFontProvider.ApplyOfficialFont(label);
+
+            LayoutElement layout = textRoot.gameObject.AddComponent<LayoutElement>();
+            layout.preferredHeight = Mathf.Max(fontSize + 5f, 14f);
+            layout.flexibleHeight = 0f;
             return label;
         }
 
