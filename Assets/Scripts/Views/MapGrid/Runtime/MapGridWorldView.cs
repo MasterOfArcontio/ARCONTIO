@@ -119,6 +119,7 @@ namespace Arcontio.View.MapGrid
         // ---------------- Debug overlay: Landmarks/edges (v0.02 Day1) ----------------
         private MapGridLandmarkOverlay _landmarkOverlay;
         private bool _landmarkOverlayEnabled;
+        private bool _arcGraphOwnsLegacyLandmarkOverlays;
 
         // Patch 0.03.02.a.2: label landmark via Canvas UI.
         private MapGridLandmarkLabelOverlay _landmarkLabelOverlay;
@@ -351,7 +352,7 @@ namespace Arcontio.View.MapGrid
 // Scelta:
 // - hotkey semplice per debug (come SummaryOverlay), senza toccare .inputactions.
 // - se in futuro vuoi, lo rendiamo InputActionReference.
-if (Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.current.lKey.wasPressedThisFrame)
+if (!_arcGraphOwnsLegacyLandmarkOverlays && Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.current.lKey.wasPressedThisFrame)
 {
     _landmarkOverlayEnabled = !_landmarkOverlayEnabled;
     _landmarkOverlay?.SetEnabled(_landmarkOverlayEnabled);
@@ -372,7 +373,7 @@ if (Keyboard.current != null && Keyboard.current.lKey != null && Keyboard.curren
 // Attiva/disattiva i tre layer GVD-DIN sovrapposti al LandmarkOverlay.
 // Funziona solo se il LandmarkOverlay è già attivo (L premuto).
 // Legge i flag di visibilità da game_params.json (gvd_din.debug.*).
-if (Keyboard.current != null && Keyboard.current.gKey != null && Keyboard.current.gKey.wasPressedThisFrame)
+if (!_arcGraphOwnsLegacyLandmarkOverlays && Keyboard.current != null && Keyboard.current.gKey != null && Keyboard.current.gKey.wasPressedThisFrame)
 {
     _gvdDinOverlayEnabled = !_gvdDinOverlayEnabled;
 
@@ -400,7 +401,7 @@ if (Keyboard.current != null && Keyboard.current.gKey != null && Keyboard.curren
 // Mostra il valore numerico della Distance Transform su ogni cella.
 // Utile per verificare che la DT sia calcolata correttamente.
 // Indipendente da L e G — può essere attivato da solo.
-if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.current.dKey.wasPressedThisFrame)
+if (!_arcGraphOwnsLegacyLandmarkOverlays && Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.current.dKey.wasPressedThisFrame)
 {
     _dtValueOverlayEnabled = !_dtValueOverlayEnabled;
     _dtValueOverlay?.SetEnabled(_dtValueOverlayEnabled);
@@ -459,6 +460,9 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
 
             SyncObjects();
             SyncNpcs();
+
+            if (_arcGraphOwnsLegacyLandmarkOverlays)
+                DisableLegacyLandmarkOverlaysForArcGraph();
 
             // (opzionale) cleanup: se entità spariscono, rimuovi view
             CleanupMissing();
@@ -595,6 +599,56 @@ if (Keyboard.current != null && Keyboard.current.dKey != null && Keyboard.curren
                 if (_summaryOverlay != null)
                     _summaryOverlay.SetEnabled(false);
             }
+        }
+
+        // =============================================================================
+        // SetArcGraphOwnsLegacyLandmarkOverlays
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Segnala al renderer legacy MapGrid che gli overlay landmark/pathfinding
+        /// sono controllati dalla UI ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: un solo proprietario visuale</b></para>
+        /// <para>
+        /// Durante la migrazione ArcGraph il vecchio <c>MapGridWorldView</c> resta
+        /// vivo come ponte operativo, ma non deve piu' disegnare il proprio
+        /// <c>MapGridLandmarkOverlay</c>. Se resta attivo, l'operatore vede il
+        /// vecchio overlay misto landmark/path e puo' sembrare che LM e PATH siano
+        /// ancora mutuamente esclusivi. Questo metodo spegne solo i layer visuali
+        /// legacy; non tocca World, memoria landmark, pathfinding o dati NPC.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>_arcGraphOwnsLegacyLandmarkOverlays</b>: blocca hotkey legacy L/G/D.</item>
+        ///   <item><b>DisableLegacyLandmarkOverlaysForArcGraph</b>: pulisce marker, label e DT legacy.</item>
+        /// </list>
+        /// </summary>
+        public void SetArcGraphOwnsLegacyLandmarkOverlays(bool enabled)
+        {
+            _arcGraphOwnsLegacyLandmarkOverlays = enabled;
+
+            if (enabled)
+                DisableLegacyLandmarkOverlaysForArcGraph();
+        }
+
+        private void DisableLegacyLandmarkOverlaysForArcGraph()
+        {
+            _landmarkOverlayEnabled = false;
+            _gvdDinOverlayEnabled = false;
+            _dtValueOverlayEnabled = false;
+
+            _landmarkOverlay?.SetEnabled(false);
+            _landmarkOverlay?.SetGvdDinLayerFlags(false, false, false);
+            _landmarkOverlay?.Clear();
+
+            _landmarkLabelOverlay?.SetEnabled(false);
+            _landmarkLabelOverlay?.Clear();
+
+            _dtValueOverlay?.SetEnabled(false);
+            _dtValueOverlay?.Clear();
         }
 
         private void ToggleSummaryOverlay()

@@ -568,6 +568,7 @@ namespace Arcontio.View.ArcGraph
         private void RefreshRuntimeSceneBindings()
         {
             MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
+            MapGridWorldView legacyWorldView = FindSceneComponent<MapGridWorldView>();
             MapGridRuntimeDevToolsOverlay legacyPlacementOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
             MonoBehaviour placementPreviewSource =
                 legacyPlacementOverlay != null
@@ -606,6 +607,7 @@ namespace Arcontio.View.ArcGraph
             ApplyUiMapViewportToMainCamera();
 
             ConfigureLegacyMapGridCameraControllerForArcGraph(cameraController);
+            ConfigureLegacyMapGridWorldViewForArcGraph(legacyWorldView);
             ConfigureLegacyMapGridPlacementOverlayForArcGraph(legacyPlacementOverlay);
 
             // Anche i root visuali MapGrid possono essere creati dal bootstrap
@@ -699,6 +701,24 @@ namespace Arcontio.View.ArcGraph
             cameraController.SetZoomInputEnabled(false);
             cameraController.SetPanInputEnabled(false);
             cameraController.enabled = false;
+        }
+
+        // =============================================================================
+        // ConfigureLegacyMapGridWorldViewForArcGraph
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Spegne gli overlay landmark/pathfinding legacy di MapGrid quando ArcGraph
+        /// possiede la UI visuale runtime.
+        /// </para>
+        /// </summary>
+        private static void ConfigureLegacyMapGridWorldViewForArcGraph(
+            MapGridWorldView worldView)
+        {
+            if (worldView == null)
+                return;
+
+            worldView.SetArcGraphOwnsLegacyLandmarkOverlays(true);
         }
 
         // =============================================================================
