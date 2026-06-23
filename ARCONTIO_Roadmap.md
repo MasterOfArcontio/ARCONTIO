@@ -16698,7 +16698,7 @@ Roadmap operativa:
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
-| v0.70.07 | View modes | ⏳ Pending |
+| v0.70.07 | Visual overlay toggles | In corso - sottostep v0.70.07.01 completato |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
 
 ---
@@ -17127,38 +17127,61 @@ Criteri di accettazione:
 
 ---
 
-### v0.70.07 - View modes
+### v0.70.07 - Visual overlay toggles
 
 Obiettivo:
 
 ```text
-separare modi di osservazione da azioni operative sul mondo
+separare overlay visuali indipendenti dalle azioni operative sul mondo
 ```
 
-View mode previste:
+Decisione architetturale:
 
-- normale;
-- POV NPC;
-- FOV;
-- pathfinding;
-- occupazione celle;
-- percezione debug;
-- belief overlay;
-- memory overlay.
+- la visuale normale non e' una modalita' selezionabile: resta sempre attiva;
+- landmark, LOS, pathfinding e overlay debug sono toggle on/off indipendenti;
+- piu' overlay possono essere attivi contemporaneamente;
+- questi toggle non modificano il mondo e non producono comandi simulativi;
+- modifica/elimina NPC, oggetti, muri e porte restano richieste operative separate su target selezionato.
+
+Overlay previsti:
+
+- landmark on/off;
+- LOS NPC on/off;
+- pathfinding on/off;
+- percezione debug on/off;
+- belief overlay on/off;
+- memory overlay on/off;
+- biosphere overlay futuro on/off;
+- resources overlay futuro on/off.
 
 Attivita':
 
-- introdurre catalogo `ViewModeDefinition`;
-- introdurre `ArcViewModeController`;
-- collegare overlay root;
+- introdurre catalogo `ArcUiVisualOverlayDefinition`;
+- introdurre `ArcUiVisualOverlayController`;
+- introdurre `ArcUiVisualOverlayState`;
+- introdurre request UI `Toggle`, `SetEnabled`, `ClearAll`;
+- collegare in futuro le icone visuali della TopBar;
+- collegare in futuro `OverlayRoot`;
 - richiedere NPC selezionato quando serve;
 - separare debug-only da runtime ordinario.
 
+Sottostep:
+
+| Step | Contenuto | Stato |
+|------|-----------|-------|
+| v0.70.07.01 | Foundation toggle overlay visuali: catalogo, request, state e controller UI non operativo | Fatto su branch `ai-task/v0.70.07.01-visual-overlay-toggle-foundation` |
+| v0.70.07.02 | Collegamento icone visuali TopBar senza root separata permanente | Pending |
+| v0.70.07.03 | Landmark on/off tramite overlay esistente/adattato | Pending |
+| v0.70.07.04 | LOS NPC on/off con vincolo target NPC selezionato | Pending |
+| v0.70.07.05 | Pathfinding/debug overlay on/off | Pending |
+
 Criteri di accettazione:
 
-- cambiare view mode non modifica il mondo;
-- overlay si aggiorna da snapshot/view state;
-- view mode e operation sono due sistemi distinti.
+- i toggle overlay sono componibili, non esclusivi;
+- la UI non legge direttamente il mondo;
+- il controller conserva solo stato UI;
+- nessun renderer viene acceso automaticamente in foundation;
+- azioni operative su selezione restano fuori da questo layer.
 
 ---
 

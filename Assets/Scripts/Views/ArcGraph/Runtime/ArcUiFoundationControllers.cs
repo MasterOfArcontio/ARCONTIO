@@ -344,26 +344,204 @@ namespace Arcontio.View.ArcGraph
     }
 
     // =============================================================================
-    // ArcUiViewModeController
+    // ArcUiVisualOverlayController
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Controller shell per la view mode UI corrente.
+    /// Controller shell per i toggle visuali sovrapponibili della UI ArcGraph.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: osservazione senza comando</b></para>
+    /// <para><b>Principio architetturale: Visuale normale + overlay indipendenti</b></para>
     /// <para>
-    /// Il controller conserva quale modalita' visuale e' stata scelta. Non accende
-    /// overlay Unity, non legge NPC e non modifica stato simulativo. Gli step futuri
-    /// collegheranno questa scelta a OverlayRoot.
+    /// Il controller conserva un insieme di overlay accesi. Non sceglie una modalita'
+    /// esclusiva, non interroga il <c>World</c>, non attiva renderer Unity e non
+    /// modifica la simulazione. I futuri consumer di <c>OverlayRoot</c> leggeranno
+    /// lo snapshot e decideranno cosa disegnare.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>_current</b>: definizione view mode corrente.</item>
-    ///   <item><b>Set</b>: aggiorna la modalita' se valida.</item>
-    ///   <item><b>Clear</b>: torna a nessuna modalita' dedicata.</item>
+    ///   <item><b>_enabledOverlayKeys</b>: chiavi normalizzate degli overlay attivi.</item>
+    ///   <item><b>Apply</b>: applica richieste Toggle, SetEnabled o ClearAll.</item>
+    ///   <item><b>Toggle</b>: inverte lo stato di un overlay noto al catalogo.</item>
+    ///   <item><b>SetEnabled</b>: forza acceso/spento un overlay noto al catalogo.</item>
+    ///   <item><b>BuildStateSnapshot</b>: produce uno snapshot data-only.</item>
     /// </list>
+    /// </summary>
+    public sealed class ArcUiVisualOverlayController
+    {
+        private string[] _enabledOverlayKeys = new string[0];
+        private ArcUiVisualOverlayRequest _lastRequest;
+
+        public ArcUiVisualOverlayRequest LastRequest => _lastRequest;
+
+        // =============================================================================
+        // Apply
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica una richiesta overlay senza produrre effetti sul mondo.
+        /// </para>
+        /// </summary>
+        public void Apply(ArcUiVisualOverlayRequest request)
+        {
+            if (!request.IsValid)
+                return;
+
+            _lastRequest = request;
+
+            if (request.Kind == ArcUiVisualOverlayRequestKind.ClearAll)
+            {
+                ClearAll();
+                return;
+            }
+
+            if (!ArcUiVisualOverlayCatalog.TryGet(
+                request.OverlayKey,
+                out ArcUiVisualOverlayDefinition definition))
+            {
+                return;
+            }
+
+            if (request.Kind == ArcUiVisualOverlayRequestKind.Toggle)
+            {
+                Toggle(definition);
+                return;
+            }
+
+            if (request.Kind == ArcUiVisualOverlayRequestKind.SetEnabled)
+                SetEnabled(definition, request.Enabled);
+        }
+
+        // =============================================================================
+        // Toggle
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inverte lo stato dell'overlay indicato dalla chiave.
+        /// </para>
+        /// </summary>
+        public void Toggle(string overlayKey)
+        {
+            Apply(ArcUiVisualOverlayRequest.Toggle(overlayKey, "visual_overlay_controller"));
+        }
+
+        // =============================================================================
+        // SetEnabled
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Forza acceso o spento un overlay indicato dalla chiave.
+        /// </para>
+        /// </summary>
+        public void SetEnabled(string overlayKey, bool enabled)
+        {
+            Apply(ArcUiVisualOverlayRequest.SetEnabled(
+                overlayKey,
+                enabled,
+                "visual_overlay_controller"));
+        }
+
+        // =============================================================================
+        // ClearAll
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Spegne tutti gli overlay visuali locali.
+        /// </para>
+        /// </summary>
+        public void ClearAll()
+        {
+            _enabledOverlayKeys = new string[0];
+        }
+
+        // =============================================================================
+        // BuildStateSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce uno snapshot immutabile degli overlay attivi.
+        /// </para>
+        /// </summary>
+        public ArcUiVisualOverlayState BuildStateSnapshot()
+        {
+            return new ArcUiVisualOverlayState(_enabledOverlayKeys);
+        }
+
+        public bool IsEnabled(string overlayKey)
+        {
+            return BuildStateSnapshot().IsEnabled(overlayKey);
+        }
+
+        private void Toggle(ArcUiVisualOverlayDefinition definition)
+        {
+            SetEnabled(definition, !IsEnabled(definition.OverlayKey));
+        }
+
+        private void SetEnabled(
+            ArcUiVisualOverlayDefinition definition,
+            bool enabled)
+        {
+            if (!definition.IsValid)
+                return;
+
+            bool currentlyEnabled = IsEnabled(definition.OverlayKey);
+            if (enabled && !currentlyEnabled)
+            {
+                Add(definition.OverlayKey);
+                return;
+            }
+
+            if (!enabled && currentlyEnabled)
+                Remove(definition.OverlayKey);
+        }
+
+        private void Add(string overlayKey)
+        {
+            string[] next = new string[_enabledOverlayKeys.Length + 1];
+            for (int i = 0; i < _enabledOverlayKeys.Length; i++)
+                next[i] = _enabledOverlayKeys[i];
+
+            next[_enabledOverlayKeys.Length] = overlayKey;
+            _enabledOverlayKeys = next;
+        }
+
+        private void Remove(string overlayKey)
+        {
+            int count = 0;
+            for (int i = 0; i < _enabledOverlayKeys.Length; i++)
+            {
+                if (_enabledOverlayKeys[i] != overlayKey)
+                    count++;
+            }
+
+            string[] next = new string[count];
+            int writeIndex = 0;
+            for (int i = 0; i < _enabledOverlayKeys.Length; i++)
+            {
+                if (_enabledOverlayKeys[i] == overlayKey)
+                    continue;
+
+                next[writeIndex] = _enabledOverlayKeys[i];
+                writeIndex++;
+            }
+
+            _enabledOverlayKeys = next;
+        }
+    }
+
+    // =============================================================================
+    // ArcUiViewModeController
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Compatibilita' temporanea con il vecchio controller a modalita' esclusiva.
+    /// </para>
+    ///
+    /// <para>
+    /// I nuovi step devono usare <see cref="ArcUiVisualOverlayController"/>, perche'
+    /// landmark, LOS e pathfinding sono toggle indipendenti sovrapponibili.
+    /// </para>
     /// </summary>
     public sealed class ArcUiViewModeController
     {
@@ -371,27 +549,11 @@ namespace Arcontio.View.ArcGraph
 
         public ArcUiViewModeDefinition Current => _current;
 
-        // =============================================================================
-        // Set
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Registra una view mode valida come scelta corrente.
-        /// </para>
-        /// </summary>
         public void Set(ArcUiViewModeDefinition definition)
         {
             _current = definition.IsValid ? definition : default;
         }
 
-        // =============================================================================
-        // Clear
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Cancella la view mode corrente senza spegnere overlay reali.
-        /// </para>
-        /// </summary>
         public void Clear()
         {
             _current = default;
