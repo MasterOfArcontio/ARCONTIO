@@ -173,7 +173,8 @@ namespace Arcontio.View.ArcGraph
                 worldZ,
                 ResolveSortingOrder(contract, queueIndex),
                 item.HasMotion,
-                item.MotionProgress01);
+                item.MotionProgress01,
+                item.FacingDirectionKey);
             return true;
         }
 

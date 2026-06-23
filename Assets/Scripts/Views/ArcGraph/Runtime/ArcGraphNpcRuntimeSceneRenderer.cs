@@ -1394,13 +1394,20 @@ namespace Arcontio.View.ArcGraph
         {
             if (!entry.HasMotion)
             {
-                // In assenza di movimento non abbiamo un vettore corrente da cui
-                // ricavare la direzione. Manteniamo quindi l'ultima direzione
-                // visuale nota dell'actor: cosi' un NPC che ha camminato verso
-                // nord resta in idle nord invece di scattare sempre a sud.
-                return handle != null && !string.IsNullOrWhiteSpace(handle.LastDirection)
-                    ? handle.LastDirection
-                    : "south";
+                // In assenza di movimento la direzione visuale non va inventata dal
+                // renderer. Usiamo il facing canonico copiato dal World nello
+                // payload ArcGraph: e' lo stesso dato consumato da LOS, percezione e
+                // job LookDirection. LastDirection resta solo fallback grafico.
+                string idleDirection = !string.IsNullOrWhiteSpace(entry.FacingDirectionKey)
+                    ? entry.FacingDirectionKey
+                    : handle != null && !string.IsNullOrWhiteSpace(handle.LastDirection)
+                        ? handle.LastDirection
+                        : "south";
+
+                if (handle != null)
+                    handle.LastDirection = idleDirection;
+
+                return idleDirection;
             }
 
             float tileSize = contract.TileWorldSize > 0f ? contract.TileWorldSize : 1f;

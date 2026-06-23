@@ -24,6 +24,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>VisualX/Y/Z</b>: posizione grafica frazionaria.</item>
     ///   <item><b>SpriteKey</b>: chiave sprite provvisoria.</item>
     ///   <item><b>ActorMode</b>: LOD actor risolto.</item>
+    ///   <item><b>FacingDirectionKey</b>: direzione visuale idle derivata dal World.</item>
     ///   <item><b>Hunger01</b>: valore fame read-only copiato dallo snapshot actor.</item>
     ///   <item><b>SortKey</b>: ordinamento deterministico.</item>
     /// </list>
@@ -41,6 +42,7 @@ namespace Arcontio.View.ArcGraph
         public readonly bool AllowsLayeredActorSprites;
         public readonly bool HasMotion;
         public readonly float MotionProgress01;
+        public readonly string FacingDirectionKey;
         public readonly bool HasHungerValue;
         public readonly float Hunger01;
         public readonly bool IsVisible;
@@ -78,7 +80,8 @@ namespace Arcontio.View.ArcGraph
             string hiddenReason,
             ArcGraphRenderSortKey sortKey,
             bool hasHungerValue = false,
-            float hunger01 = 0f)
+            float hunger01 = 0f,
+            string facingDirectionKey = "")
         {
             ActorId = actorId;
             DiscreteCell = discreteCell;
@@ -91,6 +94,7 @@ namespace Arcontio.View.ArcGraph
             AllowsLayeredActorSprites = allowsLayeredActorSprites;
             HasMotion = hasMotion;
             MotionProgress01 = Clamp01(motionProgress01);
+            FacingDirectionKey = NormalizeDirectionKey(facingDirectionKey);
             HasHungerValue = hasHungerValue;
             Hunger01 = Clamp01(hunger01);
             IsVisible = isVisible;
@@ -107,6 +111,24 @@ namespace Arcontio.View.ArcGraph
                 return 1f;
 
             return value;
+        }
+
+        private static string NormalizeDirectionKey(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            string normalized = value.Trim().ToLowerInvariant();
+            switch (normalized)
+            {
+                case "north":
+                case "south":
+                case "east":
+                case "west":
+                    return normalized;
+                default:
+                    return string.Empty;
+            }
         }
     }
 }

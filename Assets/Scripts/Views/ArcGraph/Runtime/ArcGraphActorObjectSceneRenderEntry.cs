@@ -23,6 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>WorldX/Y/Z</b>: posizione visuale gia' scalata.</item>
     ///   <item><b>SortingOrder</b>: ordine SpriteRenderer futuro.</item>
     ///   <item><b>HasMotion/MotionProgress01</b>: stato movimento actor copiato.</item>
+    ///   <item><b>FacingDirectionKey</b>: direzione idle/look direction per actor.</item>
     ///   <item><b>VisualWidth/Height</b>: dimensione sprite oggetto, se disponibile.</item>
     ///   <item><b>VisualBaseWidth/Height</b>: base dello sprite appoggiata alla cella.</item>
     ///   <item><b>VisualBaseMiniTileMask</b>: copertura 2x2 della base visuale su quarti 16x16.</item>
@@ -43,6 +44,7 @@ namespace Arcontio.View.ArcGraph
         public readonly int SortingOrder;
         public readonly bool HasMotion;
         public readonly float MotionProgress01;
+        public readonly string FacingDirectionKey;
         public readonly int VisualWidthPixels;
         public readonly int VisualHeightPixels;
         public readonly int VisualBaseWidthPixels;
@@ -87,7 +89,8 @@ namespace Arcontio.View.ArcGraph
             float worldZ,
             int sortingOrder,
             bool hasMotion,
-            float motionProgress01)
+            float motionProgress01,
+            string facingDirectionKey = "")
             : this(
                 kind,
                 entityId,
@@ -108,7 +111,8 @@ namespace Arcontio.View.ArcGraph
                 0,
                 0,
                 false,
-                false)
+                false,
+                facingDirectionKey)
         {
         }
 
@@ -149,7 +153,8 @@ namespace Arcontio.View.ArcGraph
             int visualOffsetX,
             int visualOffsetY,
             bool fadeWhenActorBehind,
-            bool useShadow)
+            bool useShadow,
+            string facingDirectionKey = "")
         {
             Kind = kind;
             EntityId = entityId;
@@ -161,6 +166,7 @@ namespace Arcontio.View.ArcGraph
             SortingOrder = sortingOrder;
             HasMotion = hasMotion;
             MotionProgress01 = Clamp01(motionProgress01);
+            FacingDirectionKey = NormalizeDirectionKey(facingDirectionKey);
             VisualWidthPixels = visualWidthPixels < 0 ? 0 : visualWidthPixels;
             VisualHeightPixels = visualHeightPixels < 0 ? 0 : visualHeightPixels;
             VisualBaseWidthPixels = visualBaseWidthPixels < 0 ? 0 : visualBaseWidthPixels;
@@ -171,6 +177,24 @@ namespace Arcontio.View.ArcGraph
             VisualOffsetY = visualOffsetY;
             FadeWhenActorBehind = fadeWhenActorBehind;
             UseShadow = useShadow;
+        }
+
+        private static string NormalizeDirectionKey(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return string.Empty;
+
+            string normalized = value.Trim().ToLowerInvariant();
+            switch (normalized)
+            {
+                case "north":
+                case "south":
+                case "east":
+                case "west":
+                    return normalized;
+                default:
+                    return string.Empty;
+            }
         }
 
         private static float Clamp01(float value)

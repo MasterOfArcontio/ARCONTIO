@@ -248,6 +248,7 @@ namespace Arcontio.View.ArcGraph
                 var position = pair.Value;
                 var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(position.X, position.Y);
                 var motion = ResolveActorMotion(world, actorId, cell);
+                string facingDirectionKey = ResolveActorFacingDirectionKey(world, actorId);
                 bool hasHungerValue = TryResolveActorHunger(world, actorId, out float hunger01);
 
                 target.Add(new ArcGraphActorVisualSnapshot(
@@ -256,7 +257,29 @@ namespace Arcontio.View.ArcGraph
                     _defaultNpcSpriteKey,
                     motion,
                     hasHungerValue,
-                    hunger01));
+                    hunger01,
+                    facingDirectionKey));
+            }
+        }
+
+        private static string ResolveActorFacingDirectionKey(World world, int actorId)
+        {
+            if (world == null || actorId <= 0)
+                return string.Empty;
+
+            CardinalDirection facing = world.GetFacing(actorId);
+            switch (facing)
+            {
+                case CardinalDirection.North:
+                    return "north";
+                case CardinalDirection.South:
+                    return "south";
+                case CardinalDirection.East:
+                    return "east";
+                case CardinalDirection.West:
+                    return "west";
+                default:
+                    return string.Empty;
             }
         }
 

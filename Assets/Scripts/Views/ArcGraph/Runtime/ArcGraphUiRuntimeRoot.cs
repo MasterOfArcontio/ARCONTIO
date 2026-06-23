@@ -533,15 +533,14 @@ namespace Arcontio.View.ArcGraph
                 new Vector2(0f, 0f));
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(18, 18, 6, 6);
-            layout.spacing = 12f;
-            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.padding = new RectOffset(10, 10, 6, 6);
+            layout.spacing = 6f;
+            layout.childAlignment = TextAnchor.MiddleLeft;
             layout.childControlWidth = false;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
 
-            BuildVisualOverlayButtons(panel);
             _dayLabel = CreateTopBarText(panel, "Giorno --");
             _monthLabel = CreateTopBarText(panel, "Mese --");
             _yearLabel = CreateTopBarText(panel, "Anno ----");
@@ -550,17 +549,18 @@ namespace Arcontio.View.ArcGraph
             _temperatureLabel = CreateTopBarText(panel, "-- C");
             _humidityLabel = CreateTopBarText(panel, "-- %");
             _weatherLabel = CreateTopBarText(panel, "Meteo --");
+            BuildVisualOverlayButtons(panel);
             _pauseSimulationButton = CreateTopBarButton(panel, "Pausa");
             _resumeSimulationButton = CreateTopBarButton(panel, "Play");
             _speedSimulationButton = CreateTopBarButton(panel, "x1");
             _speedSimulationLabel = _speedSimulationButton != null
                 ? _speedSimulationButton.GetComponentInChildren<TextMeshProUGUI>()
                 : null;
-            _biosphereDebugMultiplierButton = CreateTopBarButton(panel, "Bio x50", 86f);
+            _biosphereDebugMultiplierButton = CreateTopBarButton(panel, "Bio x50", 76f);
             _biosphereDebugMultiplierLabel = _biosphereDebugMultiplierButton != null
                 ? _biosphereDebugMultiplierButton.GetComponentInChildren<TextMeshProUGUI>()
                 : null;
-            _biosphereDebugGoStopButton = CreateTopBarButton(panel, "Go", 58f);
+            _biosphereDebugGoStopButton = CreateTopBarButton(panel, "Go", 52f);
             _biosphereDebugGoStopLabel = _biosphereDebugGoStopButton != null
                 ? _biosphereDebugGoStopButton.GetComponentInChildren<TextMeshProUGUI>()
                 : null;
@@ -590,8 +590,8 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform group = CreateRect("VisualOverlayButtons", parent);
             LayoutElement groupLayout = group.gameObject.AddComponent<LayoutElement>();
-            groupLayout.preferredWidth = 178f;
-            groupLayout.preferredHeight = 30f;
+            groupLayout.preferredWidth = 132f;
+            groupLayout.preferredHeight = 28f;
 
             HorizontalLayoutGroup layout = group.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 4f;
@@ -601,9 +601,9 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = false;
 
-            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.LandmarksKey, "LM", 42f);
-            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.NpcLineOfSightKey, "LOS", 48f);
-            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.PathfindingKey, "PATH", 72f);
+            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.LandmarksKey, "LM", 30f);
+            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.NpcLineOfSightKey, "LOS", 36f);
+            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.PathfindingKey, "PATH", 54f);
         }
 
         private void BuildRightInspector()
@@ -869,9 +869,9 @@ namespace Arcontio.View.ArcGraph
                 parent,
                 "ArcButton_VisualOverlay_" + SanitizeName(label),
                 preferredWidth,
-                30f,
+                28f,
                 false);
-            CreateText(button, label, 10, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
 
             Button component = button.GetComponent<Button>();
             _visualOverlayButtons.Add(component);
@@ -882,11 +882,11 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform textRoot = CreateRect("ArcInfoRow_Top_" + SanitizeName(label), parent);
             LayoutElement layout = textRoot.gameObject.AddComponent<LayoutElement>();
-            layout.minWidth = 74f;
-            layout.preferredWidth = 96f;
+            layout.minWidth = 58f;
+            layout.preferredWidth = 76f;
             layout.flexibleWidth = 0f;
 
-            return CreateText(textRoot, label, 14, FontStyles.Bold, TextAlignmentOptions.Center);
+            return CreateText(textRoot, label, 12, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
         // =============================================================================

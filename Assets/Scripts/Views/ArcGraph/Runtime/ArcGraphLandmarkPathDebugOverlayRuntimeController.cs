@@ -52,6 +52,11 @@ namespace Arcontio.View.ArcGraph
             IncludeGvdGraph = false
         };
 
+        private long _lastRenderedTick = long.MinValue;
+        private int _lastRenderedNpcId = -1;
+        private bool _lastRenderedLandmarkOverlayEnabled;
+        private bool _lastRenderedPathfindingOverlayEnabled;
+
         public bool LandmarkOverlayEnabled => landmarkOverlayEnabled;
         public bool PathfindingOverlayEnabled => pathfindingOverlayEnabled;
         public ArcGraphDebugOverlayRuntimeFeedDiagnostics LastDiagnostics => _feed.LastDiagnostics;
@@ -69,7 +74,7 @@ namespace Arcontio.View.ArcGraph
             if (!processInUpdate || !HasAnyOverlayEnabled())
                 return;
 
-            ProcessFrame();
+            ProcessFrame(forceRender: false);
         }
 
         // =============================================================================
@@ -149,15 +154,22 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void ProcessFrame()
         {
+            ProcessFrame(forceRender: true);
+        }
+
+        private void ProcessFrame(bool forceRender)
+        {
             if (!HasAnyOverlayEnabled())
             {
                 overlayConsumer?.ClearProbe();
+                ResetRenderMarkers();
                 return;
             }
 
             if (runtimeContextProvider == null || overlayConsumer == null)
             {
                 overlayConsumer?.ClearProbe();
+                ResetRenderMarkers();
                 Log("RuntimeBindingMissing");
                 return;
             }
@@ -167,6 +179,7 @@ namespace Arcontio.View.ArcGraph
             if (world == null)
             {
                 overlayConsumer.ClearProbe();
+                ResetRenderMarkers();
                 Log("WorldMissing");
                 return;
             }
@@ -175,7 +188,18 @@ namespace Arcontio.View.ArcGraph
             if (activeNpcId <= 0)
             {
                 overlayConsumer.ClearProbe();
+                ResetRenderMarkers();
                 Log("ActiveNpcMissing");
+                return;
+            }
+
+            long tick = world.Global.CurrentTickIndex;
+            if (!forceRender
+                && tick == _lastRenderedTick
+                && activeNpcId == _lastRenderedNpcId
+                && landmarkOverlayEnabled == _lastRenderedLandmarkOverlayEnabled
+                && pathfindingOverlayEnabled == _lastRenderedPathfindingOverlayEnabled)
+            {
                 return;
             }
 
@@ -187,6 +211,10 @@ namespace Arcontio.View.ArcGraph
             ArcGraphDebugOverlayRuntimeFeedDiagnostics diagnostics =
                 _feed.BuildFromWorld(world, activeNpcId, _options);
             overlayConsumer.RenderQueue(_feed.Queue);
+            _lastRenderedTick = tick;
+            _lastRenderedNpcId = activeNpcId;
+            _lastRenderedLandmarkOverlayEnabled = landmarkOverlayEnabled;
+            _lastRenderedPathfindingOverlayEnabled = pathfindingOverlayEnabled;
 
             Log(
                 diagnostics.Reason +
@@ -201,10 +229,19 @@ namespace Arcontio.View.ArcGraph
             if (!HasAnyOverlayEnabled())
             {
                 overlayConsumer?.ClearProbe();
+                ResetRenderMarkers();
                 return;
             }
 
-            ProcessFrame();
+            ProcessFrame(forceRender: true);
+        }
+
+        private void ResetRenderMarkers()
+        {
+            _lastRenderedTick = long.MinValue;
+            _lastRenderedNpcId = -1;
+            _lastRenderedLandmarkOverlayEnabled = false;
+            _lastRenderedPathfindingOverlayEnabled = false;
         }
 
         private void ConfigureOptions()
