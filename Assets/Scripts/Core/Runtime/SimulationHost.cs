@@ -520,6 +520,11 @@ namespace Arcontio.Core
         [SerializeField] private InputActionReference togglePauseAction;
         [SerializeField] private InputActionReference stepOneTickAction;
         [SerializeField] private InputActionReference stepTenTicksAction;
+        [SerializeField] private int maxRuntimeTicksPerUnityFrame = 6;
+
+        private int _runtimeTickSpeedMultiplier = 1;
+        private int _lastRuntimeTicksProcessedInFrame;
+        private float _lastDroppedRuntimeCatchUpSeconds;
 
         // =============================================================================
         // DirectKeyboardTickControl
@@ -556,6 +561,10 @@ namespace Arcontio.Core
         [SerializeField] private Key directStepTenTicksKey = Key.I;
 
         public bool IsPaused { get; private set; }
+        public int RuntimeTickSpeedMultiplier => _runtimeTickSpeedMultiplier;
+        public int MaxRuntimeTicksPerUnityFrame => NormalizeMaxRuntimeTicksPerUnityFrame(maxRuntimeTicksPerUnityFrame);
+        public int LastRuntimeTicksProcessedInFrame => _lastRuntimeTicksProcessedInFrame;
+        public float LastDroppedRuntimeCatchUpSeconds => _lastDroppedRuntimeCatchUpSeconds;
 
         public void SetPaused(bool paused)
         {
@@ -564,6 +573,40 @@ namespace Arcontio.Core
         }
 
         public void TogglePause() => SetPaused(!IsPaused);
+
+        // =============================================================================
+        // SetRuntimeTickSpeedMultiplier
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Imposta il moltiplicatore runtime dei tick normali della simulazione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: accelerazione del loop, non nuovo tempo canonico</b></para>
+        /// <para>
+        /// Il valore aumenta quanti tick discreti vengono eseguiti per secondo reale,
+        /// ma non cambia il delta canonico passato al singolo tick. In questo modo
+        /// <c>x2</c>, <c>x3</c> e <c>x4</c> accelerano davvero la simulazione senza
+        /// introdurre una seconda sorgente dati per la durata logica del tick.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Normalizzazione</b>: il range produttivo iniziale e' x1-x4.</item>
+        ///   <item><b>Clamp accumulatore</b>: quando il moltiplicatore cambia, l'accumulatore non puo' contenere arretrati eccessivi.</item>
+        /// </list>
+        /// </summary>
+        public void SetRuntimeTickSpeedMultiplier(int multiplier)
+        {
+            _runtimeTickSpeedMultiplier = NormalizeRuntimeTickSpeedMultiplier(multiplier);
+
+            if (_world != null)
+            {
+                float interval = ResolveRuntimeTickIntervalSeconds(_world.Config?.Sim, _runtimeTickSpeedMultiplier);
+                if (_accum > interval)
+                    _accum = interval;
+            }
+        }
 
         public void StepOneTickPaused()
         {
@@ -917,13 +960,87 @@ namespace Arcontio.Core
             float dt = Time.unscaledDeltaTime;
             _accum += dt;
 
-            float tickInterval = ResolveTickIntervalSeconds(_world?.Config?.Sim);
+            float tickInterval = ResolveRuntimeTickIntervalSeconds(_world?.Config?.Sim, _runtimeTickSpeedMultiplier);
+            int maxTicksThisFrame = MaxRuntimeTicksPerUnityFrame;
+            int ticksProcessed = 0;
+            _lastDroppedRuntimeCatchUpSeconds = 0f;
 
-            while (_accum >= tickInterval)
+            while (_accum >= tickInterval && ticksProcessed < maxTicksThisFrame)
             {
                 _accum -= tickInterval;
+                ticksProcessed++;
                 StepOneTick();
             }
+
+            _lastRuntimeTicksProcessedInFrame = ticksProcessed;
+
+            if (ticksProcessed >= maxTicksThisFrame && _accum >= tickInterval)
+            {
+                _lastDroppedRuntimeCatchUpSeconds = _accum;
+                _accum = 0f;
+            }
+        }
+
+        // =============================================================================
+        // ResolveRuntimeTickIntervalSeconds
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola l'intervallo reale tra tick applicando il moltiplicatore runtime.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: tick canonico, cadenza runtime variabile</b></para>
+        /// <para>
+        /// Il valore base resta quello risolto da <see cref="ResolveTickIntervalSeconds"/>.
+        /// Il moltiplicatore riduce l'intervallo reale tra due tick, ma il singolo
+        /// <see cref="Tick"/> continua a ricevere il delta canonico base tramite
+        /// <see cref="ResolveTickDeltaTime"/>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Base</b>: intervallo da game_params.</item>
+        ///   <item><b>Multiplier</b>: clamp x1-x4.</item>
+        ///   <item><b>Output</b>: secondi reali tra tick nel loop host.</item>
+        /// </list>
+        /// </summary>
+        public static float ResolveRuntimeTickIntervalSeconds(
+            SimulationParams simParams,
+            int runtimeSpeedMultiplier)
+        {
+            return ResolveTickIntervalSeconds(simParams) / NormalizeRuntimeTickSpeedMultiplier(runtimeSpeedMultiplier);
+        }
+
+        // =============================================================================
+        // NormalizeRuntimeTickSpeedMultiplier
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza il moltiplicatore runtime delle accelerazioni produttive.
+        /// </para>
+        /// </summary>
+        public static int NormalizeRuntimeTickSpeedMultiplier(int multiplier)
+        {
+            if (multiplier < 1)
+                return 1;
+
+            return multiplier > 4 ? 4 : multiplier;
+        }
+
+        // =============================================================================
+        // NormalizeMaxRuntimeTicksPerUnityFrame
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza il cap massimo di tick eseguibili nello stesso frame Unity.
+        /// </para>
+        /// </summary>
+        public static int NormalizeMaxRuntimeTicksPerUnityFrame(int maxTicks)
+        {
+            if (maxTicks < 1)
+                return 1;
+
+            return maxTicks > 32 ? 32 : maxTicks;
         }
 
         // =============================================================================

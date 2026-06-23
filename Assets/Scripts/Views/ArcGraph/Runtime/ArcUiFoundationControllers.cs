@@ -409,15 +409,15 @@ namespace Arcontio.View.ArcGraph
     /// La TopBar non riceve direttamente il <c>SimulationHost</c> e non chiama i
     /// suoi metodi. Questo controller riceve richieste UI tipizzate, applica solo
     /// le operazioni gia' esposte pubblicamente dal runtime e conserva lo stato
-    /// richiesto per le parti non ancora supportate dal core, come il moltiplicatore
-    /// velocita' runtime.
+    /// richiesto e delega al <c>SimulationHost</c> anche il moltiplicatore
+    /// velocita' runtime normale x1-x4.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>_simulationHost</b>: host runtime esplicitamente assegnato dall'installer.</item>
     ///   <item><b>_lastRequest</b>: ultima intenzione UI ricevuta.</item>
-    ///   <item><b>_speedMultiplier</b>: velocita' richiesta dalla UI, per ora non applicata al tick core.</item>
+    ///   <item><b>_speedMultiplier</b>: velocita' richiesta dalla UI e applicata al loop tick normale.</item>
     ///   <item><b>Request*</b>: metodi invocabili dai pulsanti TopBar.</item>
     ///   <item><b>BuildStateSnapshot</b>: snapshot letto dalla view.</item>
     /// </list>
@@ -450,6 +450,9 @@ namespace Arcontio.View.ArcGraph
         public void SetSimulationHost(SimulationHost host)
         {
             _simulationHost = host;
+
+            if (_simulationHost != null)
+                _simulationHost.SetRuntimeTickSpeedMultiplier(_speedMultiplier);
         }
 
         // =============================================================================
@@ -486,13 +489,11 @@ namespace Arcontio.View.ArcGraph
         /// Registra una richiesta di velocita' simulativa.
         /// </para>
         ///
-        /// <para><b>Velocita' preparata, non ancora applicata al tick core</b></para>
+        /// <para><b>Velocita' normale applicata al loop tick</b></para>
         /// <para>
-        /// Il <c>SimulationHost</c> attuale espone pausa, ripresa e step, ma non un
-        /// moltiplicatore runtime pubblico. Per evitare una mutazione fragile del
-        /// loop temporale, questo metodo salva la richiesta e aggiorna lo snapshot
-        /// UI. L'applicazione reale del fattore verra' introdotta in uno step core
-        /// dedicato.
+        /// Il controller applica solo i fattori semplici x1-x4. La futura modalita'
+        /// debug x50 resta fuori da questo percorso perche' richiede freeze visuale
+        /// e policy esplicita sui sistemi da eseguire o saltare.
         /// </para>
         /// </summary>
         public void RequestSpeed(
@@ -529,11 +530,14 @@ namespace Arcontio.View.ArcGraph
             bool hasHost = _simulationHost != null;
             bool isPaused = hasHost && _simulationHost.IsPaused;
             long tickIndex = hasHost ? _simulationHost.TickIndex : 0L;
+            int speedMultiplier = hasHost
+                ? _simulationHost.RuntimeTickSpeedMultiplier
+                : _speedMultiplier;
 
             return new ArcUiSimulationControlState(
                 hasHost,
                 isPaused,
-                _speedMultiplier,
+                speedMultiplier,
                 tickIndex);
         }
 
@@ -555,6 +559,9 @@ namespace Arcontio.View.ArcGraph
             if (request.IsSetSpeed)
             {
                 _speedMultiplier = request.SpeedMultiplier;
+                if (_simulationHost != null)
+                    _simulationHost.SetRuntimeTickSpeedMultiplier(_speedMultiplier);
+
                 return;
             }
 
