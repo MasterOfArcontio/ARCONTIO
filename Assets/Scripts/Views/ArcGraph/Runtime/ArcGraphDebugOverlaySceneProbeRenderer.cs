@@ -45,9 +45,8 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private float nodeScale = 0.55f;
         [SerializeField] private float normalEdgeWidth = 0.055f;
         [SerializeField] private float strongEdgeWidth = 0.10f;
-        [SerializeField] private string probeRootName = DefaultProbeRootName;
 
-        private const string DefaultProbeRootName = "ArcGraphDebugOverlaySceneProbeRoot";
+        private const string ProbeRootName = "ArcGraphDebugOverlaySceneProbeRoot";
         private const int CellSortingOrder = 180;
         private const int EdgeSortingOrder = 190;
         private const int NodeSortingOrder = 200;
@@ -96,36 +95,6 @@ namespace Arcontio.View.ArcGraph
         public void SetLogDiagnostics(bool enabled)
         {
             logDiagnostics = enabled;
-        }
-
-        // =============================================================================
-        // SetProbeRootName
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Imposta il nome del root runtime sotto cui il renderer crea primitive,
-        /// linee e label.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: overlay indipendenti</b></para>
-        /// <para>
-        /// Due istanze dello stesso renderer possono convivere sullo stesso
-        /// <c>GameObject</c> solo se non condividono il root. Questo permette a
-        /// Landmark e Pathfinding di cancellare e ricostruire i propri oggetti
-        /// senza toccare l'altro overlay.
-        /// </para>
-        /// </summary>
-        public void SetProbeRootName(string value)
-        {
-            string normalized = string.IsNullOrWhiteSpace(value)
-                ? DefaultProbeRootName
-                : value.Trim();
-
-            if (probeRootName == normalized)
-                return;
-
-            ClearProbe();
-            probeRootName = normalized;
         }
 
         // =============================================================================
@@ -471,21 +440,14 @@ namespace Arcontio.View.ArcGraph
             if (_root != null)
                 return;
 
-            var go = new GameObject(ResolveProbeRootName());
+            var go = new GameObject(ProbeRootName);
             go.transform.SetParent(transform, false);
             _root = go.transform;
         }
 
         private Transform FindExistingRoot()
         {
-            return transform.Find(ResolveProbeRootName());
-        }
-
-        private string ResolveProbeRootName()
-        {
-            return string.IsNullOrWhiteSpace(probeRootName)
-                ? DefaultProbeRootName
-                : probeRootName.Trim();
+            return transform.Find(ProbeRootName);
         }
 
         private void EnsureDebugSprite()
