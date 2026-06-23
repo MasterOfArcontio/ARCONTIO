@@ -33,14 +33,16 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphLandmarkPathDebugOverlayRuntimeController : MonoBehaviour
     {
         [SerializeField] private ArcGraphRuntimeContextProvider runtimeContextProvider;
-        [SerializeField] private ArcGraphDebugOverlaySceneProbeRenderer overlayConsumer;
+        [SerializeField] private ArcGraphDebugOverlaySceneProbeRenderer landmarkOverlayConsumer;
+        [SerializeField] private ArcGraphDebugOverlaySceneProbeRenderer pathfindingOverlayConsumer;
         [SerializeField] private bool landmarkOverlayEnabled;
         [SerializeField] private bool pathfindingOverlayEnabled;
         [SerializeField] private bool processInUpdate = true;
         [SerializeField] private bool logDiagnostics;
 
-        private readonly ArcGraphDebugOverlayRuntimeFeed _feed = new ArcGraphDebugOverlayRuntimeFeed();
-        private readonly ArcGraphDebugOverlayRuntimeFeedOptions _options = new ArcGraphDebugOverlayRuntimeFeedOptions
+        private readonly ArcGraphDebugOverlayRuntimeFeed _landmarkFeed = new ArcGraphDebugOverlayRuntimeFeed();
+        private readonly ArcGraphDebugOverlayRuntimeFeed _pathfindingFeed = new ArcGraphDebugOverlayRuntimeFeed();
+        private readonly ArcGraphDebugOverlayRuntimeFeedOptions _landmarkOptions = new ArcGraphDebugOverlayRuntimeFeedOptions
         {
             IncludeLandmark = true,
             IncludeLandmarkGraph = true,
@@ -48,6 +50,19 @@ namespace Arcontio.View.ArcGraph
             IncludeKnownLandmarkGraph = false,
             IncludeLandmarkRoute = false,
             IncludeLandmarkPaths = false,
+            IncludeGvdDin = false,
+            IncludeDtHeatmap = false,
+            IncludeGvdRaw = false,
+            IncludeGvdGraph = false
+        };
+        private readonly ArcGraphDebugOverlayRuntimeFeedOptions _pathfindingOptions = new ArcGraphDebugOverlayRuntimeFeedOptions
+        {
+            IncludeLandmark = true,
+            IncludeLandmarkGraph = false,
+            IncludeLandmarkGraphEdges = false,
+            IncludeKnownLandmarkGraph = false,
+            IncludeLandmarkRoute = true,
+            IncludeLandmarkPaths = true,
             IncludeGvdDin = false,
             IncludeDtHeatmap = false,
             IncludeGvdRaw = false,
@@ -61,7 +76,9 @@ namespace Arcontio.View.ArcGraph
 
         public bool LandmarkOverlayEnabled => landmarkOverlayEnabled;
         public bool PathfindingOverlayEnabled => pathfindingOverlayEnabled;
-        public ArcGraphDebugOverlayRuntimeFeedDiagnostics LastDiagnostics => _feed.LastDiagnostics;
+        public ArcGraphDebugOverlayRuntimeFeedDiagnostics LastDiagnostics => pathfindingOverlayEnabled
+            ? _pathfindingFeed.LastDiagnostics
+            : _landmarkFeed.LastDiagnostics;
 
         // =============================================================================
         // Update
@@ -97,12 +114,47 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Assegna il consumer visuale della queue debug Landmark/Path.
+        /// Assegna lo stesso consumer visuale a Landmark e Pathfinding.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' temporanea</b></para>
+        /// <para>
+        /// Il metodo resta disponibile per vecchi cablaggi manuali, ma il runtime
+        /// ArcGraph usa <see cref="SetLandmarkOverlayConsumer"/> e
+        /// <see cref="SetPathfindingOverlayConsumer"/> per tenere i due overlay
+        /// davvero separati.
         /// </para>
         /// </summary>
         public void SetOverlayConsumer(ArcGraphDebugOverlaySceneProbeRenderer consumer)
         {
-            overlayConsumer = consumer;
+            landmarkOverlayConsumer = consumer;
+            pathfindingOverlayConsumer = consumer;
+        }
+
+        // =============================================================================
+        // SetLandmarkOverlayConsumer
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il consumer visuale dedicato ai landmark globali.
+        /// </para>
+        /// </summary>
+        public void SetLandmarkOverlayConsumer(ArcGraphDebugOverlaySceneProbeRenderer consumer)
+        {
+            landmarkOverlayConsumer = consumer;
+        }
+
+        // =============================================================================
+        // SetPathfindingOverlayConsumer
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna il consumer visuale dedicato al pathfinding dell'NPC selezionato.
+        /// </para>
+        /// </summary>
+        public void SetPathfindingOverlayConsumer(ArcGraphDebugOverlaySceneProbeRenderer consumer)
+        {
+            pathfindingOverlayConsumer = consumer;
         }
 
         // =============================================================================
@@ -163,14 +215,14 @@ namespace Arcontio.View.ArcGraph
         {
             if (!HasAnyOverlayEnabled())
             {
-                overlayConsumer?.ClearProbe();
+                ClearAllConsumers();
                 ResetRenderMarkers();
                 return;
             }
 
-            if (runtimeContextProvider == null || overlayConsumer == null)
+            if (runtimeContextProvider == null)
             {
-                overlayConsumer?.ClearProbe();
+                ClearAllConsumers();
                 ResetRenderMarkers();
                 Log("RuntimeBindingMissing");
                 return;
@@ -180,21 +232,13 @@ namespace Arcontio.View.ArcGraph
             World world = context?.World;
             if (world == null)
             {
-                overlayConsumer.ClearProbe();
+                ClearAllConsumers();
                 ResetRenderMarkers();
                 Log("WorldMissing");
                 return;
             }
 
             int activeNpcId = ResolveSelectedNpcId(world);
-            if (pathfindingOverlayEnabled && activeNpcId <= 0 && !landmarkOverlayEnabled)
-            {
-                overlayConsumer.ClearProbe();
-                ResetRenderMarkers();
-                Log("SelectedNpcMissing");
-                return;
-            }
-
             long tick = world.Global.CurrentTickIndex;
             if (!forceRender
                 && tick == _lastRenderedTick
@@ -205,32 +249,32 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            ConfigureOptions();
-            overlayConsumer.SetTileWorldSize(context.TileSizeWorld);
-            overlayConsumer.SetPlaceProbeAtSceneCameraCenter(false);
-            overlayConsumer.SetLogDiagnostics(false);
+            ArcGraphDebugOverlayRuntimeFeedDiagnostics landmarkDiagnostics =
+                RenderLandmarkOverlay(world, context.TileSizeWorld);
+            ArcGraphDebugOverlayRuntimeFeedDiagnostics pathDiagnostics =
+                RenderPathfindingOverlay(world, activeNpcId, context.TileSizeWorld);
 
-            ArcGraphDebugOverlayRuntimeFeedDiagnostics diagnostics =
-                _feed.BuildFromWorld(world, activeNpcId, _options);
-            overlayConsumer.RenderQueue(_feed.Queue);
             _lastRenderedTick = tick;
             _lastRenderedNpcId = activeNpcId;
             _lastRenderedLandmarkOverlayEnabled = landmarkOverlayEnabled;
             _lastRenderedPathfindingOverlayEnabled = pathfindingOverlayEnabled;
 
             Log(
-                diagnostics.Reason +
+                landmarkDiagnostics.Reason +
+                "/" +
+                pathDiagnostics.Reason +
                 " npc=" + activeNpcId +
                 ", landmark=" + landmarkOverlayEnabled +
                 ", path=" + pathfindingOverlayEnabled +
-                ", visible=" + diagnostics.QueueDiagnostics.VisibleItemCount);
+                ", landmarkVisible=" + landmarkDiagnostics.QueueDiagnostics.VisibleItemCount +
+                ", pathVisible=" + pathDiagnostics.QueueDiagnostics.VisibleItemCount);
         }
 
         private void RefreshOrClear()
         {
             if (!HasAnyOverlayEnabled())
             {
-                overlayConsumer?.ClearProbe();
+                ClearAllConsumers();
                 ResetRenderMarkers();
                 return;
             }
@@ -246,22 +290,70 @@ namespace Arcontio.View.ArcGraph
             _lastRenderedPathfindingOverlayEnabled = false;
         }
 
-        private void ConfigureOptions()
+        private ArcGraphDebugOverlayRuntimeFeedDiagnostics RenderLandmarkOverlay(
+            World world,
+            float tileWorldSize)
         {
-            bool hasAny = HasAnyOverlayEnabled();
+            if (!landmarkOverlayEnabled)
+            {
+                landmarkOverlayConsumer?.ClearProbe();
+                return _landmarkFeed.LastDiagnostics;
+            }
 
-            // Il producer Core fornisce landmark e path in una sola chiamata.
-            // La separazione avviene qui, tramite opzioni, prima del rendering.
-            _options.IncludeLandmark = hasAny;
-            _options.IncludeLandmarkGraph = landmarkOverlayEnabled;
-            _options.IncludeLandmarkGraphEdges = false;
-            _options.IncludeKnownLandmarkGraph = false;
-            _options.IncludeLandmarkRoute = pathfindingOverlayEnabled;
-            _options.IncludeLandmarkPaths = pathfindingOverlayEnabled;
-            _options.IncludeGvdDin = false;
-            _options.IncludeDtHeatmap = false;
-            _options.IncludeGvdRaw = false;
-            _options.IncludeGvdGraph = false;
+            if (landmarkOverlayConsumer == null)
+                return _landmarkFeed.LastDiagnostics;
+
+            PrepareConsumer(landmarkOverlayConsumer, tileWorldSize);
+
+            // Il layer LM e' globale: non dipende dall'NPC selezionato e quindi
+            // usa -1 come id attivo. Le opzioni chiedono solo nodi landmark world,
+            // senza grafo noto dell'NPC e senza path.
+            ArcGraphDebugOverlayRuntimeFeedDiagnostics diagnostics =
+                _landmarkFeed.BuildFromWorld(world, -1, _landmarkOptions);
+            landmarkOverlayConsumer.RenderQueue(_landmarkFeed.Queue);
+            return diagnostics;
+        }
+
+        private ArcGraphDebugOverlayRuntimeFeedDiagnostics RenderPathfindingOverlay(
+            World world,
+            int activeNpcId,
+            float tileWorldSize)
+        {
+            if (!pathfindingOverlayEnabled || activeNpcId <= 0)
+            {
+                pathfindingOverlayConsumer?.ClearProbe();
+                return _pathfindingFeed.LastDiagnostics;
+            }
+
+            if (pathfindingOverlayConsumer == null)
+                return _pathfindingFeed.LastDiagnostics;
+
+            PrepareConsumer(pathfindingOverlayConsumer, tileWorldSize);
+
+            // Il layer PATH e' invece legato alla selezione: mostra solo route e
+            // path dell'NPC scelto, senza landmark globali. Questo evita che PATH
+            // diventi un secondo modo per disegnare anche LM.
+            ArcGraphDebugOverlayRuntimeFeedDiagnostics diagnostics =
+                _pathfindingFeed.BuildFromWorld(world, activeNpcId, _pathfindingOptions);
+            pathfindingOverlayConsumer.RenderQueue(_pathfindingFeed.Queue);
+            return diagnostics;
+        }
+
+        private static void PrepareConsumer(
+            ArcGraphDebugOverlaySceneProbeRenderer consumer,
+            float tileWorldSize)
+        {
+            consumer.SetTileWorldSize(tileWorldSize);
+            consumer.SetPlaceProbeAtSceneCameraCenter(false);
+            consumer.SetLogDiagnostics(false);
+        }
+
+        private void ClearAllConsumers()
+        {
+            landmarkOverlayConsumer?.ClearProbe();
+
+            if (pathfindingOverlayConsumer != landmarkOverlayConsumer)
+                pathfindingOverlayConsumer?.ClearProbe();
         }
 
         private bool HasAnyOverlayEnabled()

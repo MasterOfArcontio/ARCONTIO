@@ -74,7 +74,8 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphSelectionSceneConsumer _selectionConsumer;
         private ArcGraphFovDebugOverlaySceneConsumer _fovOverlayConsumer;
         private ArcGraphFovDebugOverlayRuntimeController _fovOverlayController;
-        private ArcGraphDebugOverlaySceneProbeRenderer _landmarkPathOverlayConsumer;
+        private ArcGraphDebugOverlaySceneProbeRenderer _landmarkOverlayConsumer;
+        private ArcGraphDebugOverlaySceneProbeRenderer _pathfindingOverlayConsumer;
         private ArcGraphLandmarkPathDebugOverlayRuntimeController _landmarkPathOverlayController;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
         private ArcGraphSerializedSpriteResolver _spriteResolver;
@@ -260,7 +261,8 @@ namespace Arcontio.View.ArcGraph
             _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
             _fovOverlayConsumer = _visualRoot.AddComponent<ArcGraphFovDebugOverlaySceneConsumer>();
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
-            _landmarkPathOverlayConsumer = _visualRoot.AddComponent<ArcGraphDebugOverlaySceneProbeRenderer>();
+            _landmarkOverlayConsumer = _visualRoot.AddComponent<ArcGraphDebugOverlaySceneProbeRenderer>();
+            _pathfindingOverlayConsumer = _visualRoot.AddComponent<ArcGraphDebugOverlaySceneProbeRenderer>();
             _landmarkPathOverlayController = _visualRoot.AddComponent<ArcGraphLandmarkPathDebugOverlayRuntimeController>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
@@ -382,13 +384,20 @@ namespace Arcontio.View.ArcGraph
             _fovOverlayController.SetProcessInUpdate(true);
             _fovOverlayController.SetOverlayEnabled(false);
 
-            // Landmark e Pathfinding usano lo stesso feed debug Core, filtrato da
-            // un controller ArcGraph dedicato. I due toggle restano indipendenti:
-            // LM mostra il grafo landmark, PATH mostra route/path dell'NPC attivo.
-            _landmarkPathOverlayConsumer.SetPlaceProbeAtSceneCameraCenter(false);
-            _landmarkPathOverlayConsumer.SetLogDiagnostics(false);
+            // Landmark e Pathfinding usano dati Core simili, ma non condividono
+            // piu' lo stesso root visuale. Questo e' importante perche' ogni
+            // toggle puo' cancellare e ricostruire il proprio layer senza
+            // spegnere l'altro: LM resta un overlay globale, PATH resta un overlay
+            // legato all'NPC selezionato.
+            _landmarkOverlayConsumer.SetProbeRootName("ArcGraphLandmarkOverlaySceneProbeRoot");
+            _landmarkOverlayConsumer.SetPlaceProbeAtSceneCameraCenter(false);
+            _landmarkOverlayConsumer.SetLogDiagnostics(false);
+            _pathfindingOverlayConsumer.SetProbeRootName("ArcGraphPathfindingOverlaySceneProbeRoot");
+            _pathfindingOverlayConsumer.SetPlaceProbeAtSceneCameraCenter(false);
+            _pathfindingOverlayConsumer.SetLogDiagnostics(false);
             _landmarkPathOverlayController.SetRuntimeContextProvider(_contextProvider);
-            _landmarkPathOverlayController.SetOverlayConsumer(_landmarkPathOverlayConsumer);
+            _landmarkPathOverlayController.SetLandmarkOverlayConsumer(_landmarkOverlayConsumer);
+            _landmarkPathOverlayController.SetPathfindingOverlayConsumer(_pathfindingOverlayConsumer);
             _landmarkPathOverlayController.SetProcessInUpdate(true);
             _landmarkPathOverlayController.SetLandmarkOverlayEnabled(false);
             _landmarkPathOverlayController.SetPathfindingOverlayEnabled(false);
