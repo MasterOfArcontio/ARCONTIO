@@ -16697,7 +16697,7 @@ Roadmap operativa:
 | v0.70.03 | Ponte placement | ⏳ Pending |
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
-| v0.70.06 | Simulation control | In corso - sottostep v0.70.06.03b completato |
+| v0.70.06 | Simulation control | In corso - sottostep v0.70.06.04 completato |
 | v0.70.07 | View modes | ⏳ Pending |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
 
@@ -17110,7 +17110,7 @@ Sottostep:
 | v0.70.06.02 | Snapshot tempo/ambiente TopBar: giorno, mese, anno, stagione, ora, temperatura, umidita', meteo | Pending |
 | v0.70.06.03a | Accelerazioni normali x1-x4 operative nel `SimulationHost` con cap anti-freeze per frame Unity | Fatto su branch `ai-task/v0.70.06.03a-normal-speed-cap` |
 | v0.70.06.03b | Modalita' debug Biosfera-only x50/x100/x200 con freeze sociale, calendario ambiente attivo e placeholder refresh conservativi | Fatto su branch `ai-task/v0.70.06.03b-biosphere-debug-fast-forward` |
-| v0.70.06.04 | Rifinitura visuale TopBar e stati attivi/disabilitati coerenti con ViewModel | Pending |
+| v0.70.06.04 | Rifinitura visuale TopBar: stati attivi/disabilitati, separazione Bio debug e blocco input temporale diretto durante fast-forward | Fatto su branch `ai-task/v0.70.06.04-topbar-visual-states` |
 
 Criteri di accettazione:
 

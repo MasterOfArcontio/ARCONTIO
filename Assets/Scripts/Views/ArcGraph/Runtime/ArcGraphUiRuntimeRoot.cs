@@ -49,6 +49,10 @@ namespace Arcontio.View.ArcGraph
         private const float BottomActionBarHeight = 92f;
         private const float ActionPanelHeight = 210f;
         private const float OuterMargin = 0f;
+        private static readonly Color TopButtonNormalColor = ColorFromHex("#17212B", 0.92f);
+        private static readonly Color TopButtonActiveColor = ColorFromHex("#324557", 0.96f);
+        private static readonly Color TopButtonDebugActiveColor = ColorFromHex("#24465A", 0.98f);
+        private static readonly Color TopButtonDisabledColor = ColorFromHex("#0B1117", 0.72f);
 
         [SerializeField] private bool uiEnabled = true;
         [SerializeField] private bool buildOnStart;
@@ -256,6 +260,9 @@ namespace Arcontio.View.ArcGraph
             if (_speedSimulationButton != null)
                 _speedSimulationButton.interactable = !state.BiosphereDebugFastForwardActive;
 
+            if (_biosphereDebugMultiplierButton != null)
+                _biosphereDebugMultiplierButton.interactable = !state.BiosphereDebugFastForwardActive;
+
             if (_speedSimulationLabel != null)
                 _speedSimulationLabel.text = "x" + state.SpeedMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
@@ -289,6 +296,32 @@ namespace Arcontio.View.ArcGraph
 
             if (_weatherLabel != null)
                 _weatherLabel.text = state.WeatherLabel;
+
+            ApplyTopButtonVisualState(
+                _pauseSimulationButton,
+                state.IsPaused && !state.BiosphereDebugFastForwardActive,
+                _pauseSimulationButton == null || _pauseSimulationButton.interactable,
+                false);
+            ApplyTopButtonVisualState(
+                _resumeSimulationButton,
+                !state.IsPaused && !state.BiosphereDebugFastForwardActive,
+                _resumeSimulationButton == null || _resumeSimulationButton.interactable,
+                false);
+            ApplyTopButtonVisualState(
+                _speedSimulationButton,
+                state.SpeedMultiplier > 1 && !state.BiosphereDebugFastForwardActive,
+                _speedSimulationButton == null || _speedSimulationButton.interactable,
+                false);
+            ApplyTopButtonVisualState(
+                _biosphereDebugMultiplierButton,
+                false,
+                _biosphereDebugMultiplierButton == null || _biosphereDebugMultiplierButton.interactable,
+                false);
+            ApplyTopButtonVisualState(
+                _biosphereDebugGoStopButton,
+                state.BiosphereDebugFastForwardActive,
+                _biosphereDebugGoStopButton == null || _biosphereDebugGoStopButton.interactable,
+                state.BiosphereDebugFastForwardActive);
         }
 
         // =============================================================================
@@ -454,7 +487,7 @@ namespace Arcontio.View.ArcGraph
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(18, 18, 6, 6);
-            layout.spacing = 22f;
+            layout.spacing = 12f;
             layout.childAlignment = TextAnchor.MiddleCenter;
             layout.childControlWidth = false;
             layout.childControlHeight = true;
@@ -869,7 +902,7 @@ namespace Arcontio.View.ArcGraph
 
         private static Button CreateTopBarButton(RectTransform parent, string label)
         {
-            return CreateTopBarButton(parent, label, 70f);
+            return CreateTopBarButton(parent, label, 64f);
         }
 
         private static Button CreateTopBarButton(RectTransform parent, string label, float preferredWidth)
@@ -877,6 +910,55 @@ namespace Arcontio.View.ArcGraph
             RectTransform button = CreateButtonShell(parent, "ArcButton_Top_" + SanitizeName(label), preferredWidth, 30f, false);
             CreateText(button, label, 12, FontStyles.Bold, TextAlignmentOptions.Center);
             return button.GetComponent<Button>();
+        }
+
+        // =============================================================================
+        // ApplyTopButtonVisualState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica lo stato cromatico coerente ai pulsanti della TopBar.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: stato visuale derivato dallo snapshot</b></para>
+        /// <para>
+        /// Il metodo non decide pause, velocita' o fast-forward. Riceve solo il
+        /// risultato gia' calcolato dal controller e aggiorna il colore del bottone,
+        /// mantenendo la TopBar una view UGUI.
+        /// </para>
+        /// </summary>
+        private static void ApplyTopButtonVisualState(
+            Button button,
+            bool active,
+            bool enabled,
+            bool debugActive)
+        {
+            if (button == null || button.targetGraphic == null)
+                return;
+
+            Color color = !enabled
+                ? TopButtonDisabledColor
+                : debugActive
+                    ? TopButtonDebugActiveColor
+                    : active
+                        ? TopButtonActiveColor
+                        : TopButtonNormalColor;
+
+            button.targetGraphic.color = color;
+
+            ColorBlock colors = button.colors;
+            colors.normalColor = color;
+            colors.highlightedColor = enabled
+                ? ColorFromHex("#41566A", 0.98f)
+                : TopButtonDisabledColor;
+            colors.pressedColor = enabled
+                ? ColorFromHex("#51708B", 1f)
+                : TopButtonDisabledColor;
+            colors.selectedColor = active || debugActive
+                ? color
+                : TopButtonActiveColor;
+            colors.disabledColor = TopButtonDisabledColor;
+            button.colors = colors;
         }
 
         private static void CreateTabButton(RectTransform parent, string label, bool active)

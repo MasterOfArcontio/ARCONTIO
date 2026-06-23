@@ -1431,6 +1431,9 @@ namespace Arcontio.Core
         /// </summary>
         private void HandleDirectKeyboardTickControl()
         {
+            if (_biosphereDebugFastForwardActive)
+                return;
+
             if (!directKeyboardTickControlEnabled)
                 return;
 
