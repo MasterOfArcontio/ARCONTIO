@@ -93,8 +93,6 @@ namespace Arcontio.View.ArcGraph
         private const float DenseExpandableHeight = 20f;
         private const float DenseTimelineHeight = 16f;
         private const float DenseDetailIndent = 9f;
-        private const float InfoLabelColumnWidth = 116f;
-        private const float DenseInfoLabelColumnWidth = 88f;
         private const int DenseFontSize = 9;
         private const int DenseToggleFontSize = 11;
 
@@ -1347,7 +1345,6 @@ namespace Arcontio.View.ArcGraph
             rowLayout.preferredHeight = ResolveTextRowHeight(dense);
 
             HorizontalLayoutGroup layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.spacing = dense ? 4f : 6f;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -1355,14 +1352,13 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform labelRoot = CreateRect("Label", row);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
-            labelLayout.preferredWidth = dense ? DenseInfoLabelColumnWidth : InfoLabelColumnWidth;
-            labelLayout.flexibleWidth = 0f;
+            labelLayout.flexibleWidth = 1f;
             CreateText(labelRoot, label, dense ? DenseFontSize : 10, FontStyles.Normal, TextAlignmentOptions.Left);
 
             RectTransform valueRoot = CreateRect("Value", row);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
-            valueLayout.flexibleWidth = 1f;
-            CreateText(valueRoot, value, dense ? DenseFontSize : 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            valueLayout.preferredWidth = dense ? 98f : 132f;
+            CreateText(valueRoot, value, dense ? DenseFontSize : 10, FontStyles.Bold, TextAlignmentOptions.Right);
         }
 
         private static float ResolveRowSpacing(bool dense)
