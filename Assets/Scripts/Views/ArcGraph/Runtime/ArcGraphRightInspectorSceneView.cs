@@ -82,18 +82,19 @@ namespace Arcontio.View.ArcGraph
         private const float CompactTimelineHeight = 18f;
         private const float CompactDetailIndent = 14f;
         private const float DenseRowSpacing = 0f;
-        private const float DenseTextRowHeight = 12f;
-        private const float DenseSectionHeight = 12f;
-        private const float DenseBarRowHeight = 19f;
-        private const float DenseBarHeaderHeight = 10f;
+        private const float DenseTextRowHeight = 14f;
+        private const float DenseSectionHeight = 14f;
+        private const float DenseBarRowHeight = 22f;
+        private const float DenseBarHeaderHeight = 12f;
         private const float DenseBarHeight = 4f;
-        private const float DenseMetricRowHeight = 24f;
-        private const float DenseMetricTitleHeight = 9f;
-        private const float DenseMetricBodyHeight = 13f;
-        private const float DenseExpandableHeight = 15f;
-        private const float DenseTimelineHeight = 12f;
+        private const float DenseMetricRowHeight = 28f;
+        private const float DenseMetricTitleHeight = 10f;
+        private const float DenseMetricBodyHeight = 16f;
+        private const float DenseExpandableHeight = 18f;
+        private const float DenseTimelineHeight = 14f;
         private const float DenseDetailIndent = 9f;
-        private const int DenseFontSize = 7;
+        private const int DenseFontSize = 8;
+        private const int DenseToggleFontSize = 10;
 
         [SerializeField] private bool inspectorEnabled = true;
 
@@ -1185,15 +1186,15 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform button = CreateRect("SmallButton_" + SanitizeName(label), parent);
             LayoutElement layout = button.gameObject.AddComponent<LayoutElement>();
-            layout.preferredWidth = dense ? 12f : 16f;
-            layout.preferredHeight = dense ? 12f : 16f;
+            layout.preferredWidth = dense ? 15f : 16f;
+            layout.preferredHeight = dense ? 15f : 16f;
 
             Image image = button.gameObject.AddComponent<Image>();
             image.raycastTarget = true;
             image.color = ColorFromHex("#22313D", 0.96f);
 
             Button buttonComponent = button.gameObject.AddComponent<Button>();
-            CreateText(button, label, dense ? DenseFontSize : 9, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(button, label, dense ? DenseToggleFontSize : 9, FontStyles.Bold, TextAlignmentOptions.Center);
             return buttonComponent;
         }
 
@@ -1209,7 +1210,7 @@ namespace Arcontio.View.ArcGraph
             detailsGroup.padding = new RectOffset((int)DenseDetailIndent, 0, 0, 0);
             detailsGroup.spacing = DenseRowSpacing;
             detailsGroup.childControlWidth = true;
-            detailsGroup.childControlHeight = false;
+            detailsGroup.childControlHeight = true;
             detailsGroup.childForceExpandWidth = true;
             detailsGroup.childForceExpandHeight = false;
 
