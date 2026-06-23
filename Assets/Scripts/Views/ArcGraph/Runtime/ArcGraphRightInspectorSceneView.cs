@@ -303,16 +303,19 @@ namespace Arcontio.View.ArcGraph
             image.raycastTarget = false;
             image.color = ColorFromHex("#050B10", 0.78f);
 
-            _diagnosticsText = _diagnosticsRoot.gameObject.AddComponent<TextMeshProUGUI>();
+            RectTransform textRoot = CreateRect("DebugText", _diagnosticsRoot);
+            StretchFull(textRoot, new Vector2(8f, 7f), new Vector2(-8f, -7f));
+
+            _diagnosticsText = textRoot.gameObject.AddComponent<TextMeshProUGUI>();
             _diagnosticsText.raycastTarget = false;
+            _diagnosticsText.text = "RIGHT INSPECTOR DEBUG\npanel created\nwaiting for Update";
             _diagnosticsText.fontSize = 11f;
             _diagnosticsText.fontStyle = FontStyles.Normal;
             _diagnosticsText.alignment = TextAlignmentOptions.TopLeft;
-            _diagnosticsText.enableWordWrapping = false;
-            _diagnosticsText.overflowMode = TextOverflowModes.Overflow;
-            _diagnosticsText.margin = new Vector4(8f, 7f, 8f, 7f);
+            _diagnosticsText.enableWordWrapping = true;
+            _diagnosticsText.overflowMode = TextOverflowModes.Truncate;
+            _diagnosticsText.margin = Vector4.zero;
             _diagnosticsText.color = ColorFromHex("#DDE6EE", 1f);
-            ArcGraphUiFontProvider.ApplyOfficialFont(_diagnosticsText);
             return true;
         }
 
