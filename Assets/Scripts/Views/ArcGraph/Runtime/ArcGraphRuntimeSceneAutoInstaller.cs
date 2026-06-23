@@ -406,6 +406,7 @@ namespace Arcontio.View.ArcGraph
             ApplyUiMapViewportToMainCamera();
             _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
             _uiRoot.SetVisualOverlayController(_visualOverlayController);
+            _uiRoot.SetVisualOverlayStateChanged(OnVisualOverlayStateChanged);
             _uiRoot.SetSimulationControlController(_simulationControlController);
         }
 
@@ -445,6 +446,35 @@ namespace Arcontio.View.ArcGraph
         private void ToggleFovDebugOverlay()
         {
             _fovOverlayController?.ToggleOverlay();
+        }
+
+        // =============================================================================
+        // OnVisualOverlayStateChanged
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce i toggle visuali UI nei controller runtime ArcGraph gia' pronti.
+        /// </para>
+        ///
+        /// <para><b>Boundary controllato</b></para>
+        /// <para>
+        /// La UI comunica solo chiave e stato. Qui, lato installer, sappiamo quali
+        /// consumer runtime esistono davvero. In questo step viene collegato solo
+        /// <c>npc_los</c> al controller FOV/LOS gia' implementato.
+        /// </para>
+        /// </summary>
+        private void OnVisualOverlayStateChanged(string overlayKey, bool enabled)
+        {
+            string normalized = ArcUiOperationDefinition.NormalizeKey(overlayKey);
+            if (normalized != ArcUiVisualOverlayCatalog.NpcLineOfSightKey)
+                return;
+
+            if (_fovOverlayController == null)
+                return;
+
+            _fovOverlayController.SetOverlayEnabled(enabled);
+            if (enabled)
+                _fovOverlayController.ProcessFrame();
         }
 
         // =============================================================================

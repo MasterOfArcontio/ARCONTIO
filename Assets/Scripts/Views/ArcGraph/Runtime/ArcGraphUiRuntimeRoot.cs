@@ -86,6 +86,7 @@ namespace Arcontio.View.ArcGraph
         private TextMeshProUGUI _biosphereDebugGoStopLabel;
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
+        private UnityAction<string, bool> _visualOverlayStateChanged;
 
         public GameObject RootGameObject => _uiRoot;
         public bool IsBuilt => _uiRoot != null;
@@ -237,6 +238,25 @@ namespace Arcontio.View.ArcGraph
             _visualOverlayController = controller;
             WireVisualOverlayButtons();
             RefreshVisualOverlayButtons();
+        }
+
+        // =============================================================================
+        // SetVisualOverlayStateChanged
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra una callback esterna per notificare i cambi stato overlay.
+        /// </para>
+        ///
+        /// <para><b>Boundary UI controllato</b></para>
+        /// <para>
+        /// La callback riceve solo chiave overlay e stato booleano. Non riceve
+        /// renderer, <c>World</c>, oggetti selezionati o strutture runtime mutabili.
+        /// </para>
+        /// </summary>
+        public void SetVisualOverlayStateChanged(UnityAction<string, bool> action)
+        {
+            _visualOverlayStateChanged = action;
         }
 
         // =============================================================================
@@ -981,6 +1001,10 @@ namespace Arcontio.View.ArcGraph
         {
             _visualOverlayController?.Apply(ArcUiVisualOverlayRequest.Toggle(overlayKey, "ArcTopBar"));
             RefreshVisualOverlayButtons();
+
+            bool enabled = _visualOverlayController != null
+                && _visualOverlayController.BuildStateSnapshot().IsEnabled(overlayKey);
+            _visualOverlayStateChanged?.Invoke(overlayKey, enabled);
         }
 
         // =============================================================================
