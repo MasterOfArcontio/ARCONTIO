@@ -26,7 +26,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>OfficialFont</b>: carica e mantiene in cache il font ufficiale IBM Plex Medium.</item>
-    ///   <item><b>ApplyOfficialFont</b>: applica il font a una label TextMeshProUGUI.</item>
+    ///   <item><b>ApplyOfficialFont</b>: applica il font a una label TextMeshProUGUI o TextMeshPro world-space.</item>
     ///   <item><b>TryLoadOfficialFont</b>: cerca path Resources compatibili con il naming previsto.</item>
     ///   <item><b>TryCreateFontAssetFromFont</b>: converte il .ttf IBM Plex in TMP_FontAsset runtime.</item>
     /// </list>
@@ -161,6 +161,24 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public static void ApplyOfficialFont(TextMeshProUGUI label)
         {
+            ApplyOfficialFontToText(label);
+        }
+
+        // =============================================================================
+        // ApplyOfficialFont
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica il font ufficiale a una label TextMeshPro world-space.
+        /// </para>
+        /// </summary>
+        public static void ApplyOfficialFont(TextMeshPro label)
+        {
+            ApplyOfficialFontToText(label);
+        }
+
+        private static void ApplyOfficialFontToText(TMP_Text label)
+        {
             if (label == null)
                 return;
 
@@ -254,7 +272,10 @@ namespace Arcontio.View.ArcGraph
             // questa patch la creazione o il versionamento di asset grafici/.meta.
             TMP_FontAsset runtimeFontAsset = TMP_FontAsset.CreateFontAsset(sourceFont);
             if (runtimeFontAsset != null)
+            {
                 runtimeFontAsset.name = runtimeAssetName;
+                runtimeFontAsset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+            }
 
             return runtimeFontAsset;
         }

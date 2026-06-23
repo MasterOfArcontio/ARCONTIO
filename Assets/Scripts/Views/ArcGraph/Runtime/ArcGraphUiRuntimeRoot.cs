@@ -1009,9 +1009,26 @@ namespace Arcontio.View.ArcGraph
             _visualOverlayController?.Apply(ArcUiVisualOverlayRequest.Toggle(overlayKey, "ArcTopBar"));
             RefreshVisualOverlayButtons();
 
-            bool enabled = _visualOverlayController != null
-                && _visualOverlayController.BuildStateSnapshot().IsEnabled(overlayKey);
-            _visualOverlayStateChanged?.Invoke(overlayKey, enabled);
+            ArcUiVisualOverlayState state = _visualOverlayController != null
+                ? _visualOverlayController.BuildStateSnapshot()
+                : ArcUiVisualOverlayState.Empty();
+            NotifyVisualOverlayStateChanged(state);
+        }
+
+        private void NotifyVisualOverlayStateChanged(ArcUiVisualOverlayState state)
+        {
+            if (_visualOverlayStateChanged == null)
+                return;
+
+            int count = _visualOverlayButtonKeys.Count;
+            for (int i = 0; i < count; i++)
+            {
+                string overlayKey = _visualOverlayButtonKeys[i];
+                if (string.IsNullOrEmpty(overlayKey))
+                    continue;
+
+                _visualOverlayStateChanged.Invoke(overlayKey, state.IsEnabled(overlayKey));
+            }
         }
 
         // =============================================================================

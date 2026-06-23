@@ -346,11 +346,14 @@ namespace Arcontio.View.ArcGraph
 
             var text = go.AddComponent<TextMeshPro>();
             text.text = label ?? string.Empty;
+            text.fontStyle = FontStyles.Normal;
+            ArcGraphUiFontProvider.ApplyOfficialFont(text);
             text.fontSize = 2.25f;
             text.enableWordWrapping = false;
+            text.overflowMode = TextOverflowModes.Overflow;
             text.alignment = TextAlignmentOptions.Left;
             text.color = new Color(0.88f, 0.94f, 1f, 0.92f);
-            text.rectTransform.sizeDelta = new Vector2(5f, 0.8f);
+            text.rectTransform.sizeDelta = new Vector2(Mathf.Max(3f, text.text.Length * 0.75f), 0.8f);
 
             Renderer renderer = text.renderer;
             if (renderer != null)
