@@ -16696,7 +16696,7 @@ Roadmap operativa:
 | v0.70.02 | Operation catalog minimo e gerarchia ActionPanel | Fatto su branch `ai-task/v0.70.02-arcgraph-ui-operation-catalog` |
 | v0.70.03 | Ponte placement | ⏳ Pending |
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
-| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.04.01g completato |
+| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.04.01h completato |
 | v0.70.06 | Simulation control | ⏳ Pending |
 | v0.70.07 | View modes | ⏳ Pending |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
@@ -17022,6 +17022,7 @@ Sottostep operativi previsti:
 | v0.70.05.04.01e | Fix rendering testo pannello diagnostico RightInspector | Fatto su branch `ai-task/v0.70.05.04.01e-inspector-debug-text-fix` |
 | v0.70.05.04.01f | Fix altezza layout RightInspector: usa preferredHeight dei blocchi e delle righe | Fatto su branch `ai-task/v0.70.05.04.01f-inspector-layout-height-fix` |
 | v0.70.05.04.01g | Cleanup debug panel, compattezza dati inspector, scrollbar visibile e layer hover sotto pannelli UI | Fatto su branch `ai-task/v0.70.05.04.01g-inspector-ui-cleanup-compact-scroll` |
+| v0.70.05.04.01h | Compattezza dense per tutti i gruppi espandibili del RightInspector | Fatto su branch `ai-task/v0.70.05.04.01h-inspector-expanded-compact` |
 | v0.70.05.04.02 | Oggetti, muri e porte read-only inspector | Prossimo |
 | v0.70.05.05 | Edit shell da SelectionActionRequest | Pending |
 | v0.70.05.06 | Delete confirmation shell non distruttiva | Pending |

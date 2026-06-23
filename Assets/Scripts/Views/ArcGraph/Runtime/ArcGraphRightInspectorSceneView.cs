@@ -81,6 +81,19 @@ namespace Arcontio.View.ArcGraph
         private const float CompactExpandableHeight = 22f;
         private const float CompactTimelineHeight = 18f;
         private const float CompactDetailIndent = 14f;
+        private const float DenseRowSpacing = 0f;
+        private const float DenseTextRowHeight = 12f;
+        private const float DenseSectionHeight = 12f;
+        private const float DenseBarRowHeight = 19f;
+        private const float DenseBarHeaderHeight = 10f;
+        private const float DenseBarHeight = 4f;
+        private const float DenseMetricRowHeight = 24f;
+        private const float DenseMetricTitleHeight = 9f;
+        private const float DenseMetricBodyHeight = 13f;
+        private const float DenseExpandableHeight = 15f;
+        private const float DenseTimelineHeight = 12f;
+        private const float DenseDetailIndent = 9f;
+        private const float DenseFontSize = 7f;
 
         [SerializeField] private bool inspectorEnabled = true;
 
@@ -500,7 +513,7 @@ namespace Arcontio.View.ArcGraph
             if (!TryResolveActiveTab(viewModel, _activeTabKey, out ArcUiInspectorTab activeTab))
                 return;
 
-            CreateSectionTitle(rowsRoot, string.IsNullOrWhiteSpace(activeTab.Label) ? "INFO" : activeTab.Label.ToUpperInvariant());
+            CreateSectionTitle(rowsRoot, string.IsNullOrWhiteSpace(activeTab.Label) ? "INFO" : activeTab.Label.ToUpperInvariant(), false);
 
             for (int i = 0; i < activeTab.Rows.Length; i++)
             {
@@ -901,17 +914,19 @@ namespace Arcontio.View.ArcGraph
 
         private static void CreateSectionTitle(
             RectTransform parent,
-            string label)
+            string label,
+            bool dense)
         {
             RectTransform title = CreateRect("SectionTitle_" + SanitizeName(label), parent);
             LayoutElement layout = title.gameObject.AddComponent<LayoutElement>();
-            layout.preferredHeight = CompactSectionHeight;
-            CreateText(title, label, 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            layout.preferredHeight = dense ? DenseSectionHeight : CompactSectionHeight;
+            CreateText(title, label, dense ? DenseFontSize : 10, FontStyles.Bold, TextAlignmentOptions.Left);
         }
 
         private void CreateInspectorRow(
             RectTransform parent,
-            ArcUiInspectorRow row)
+            ArcUiInspectorRow row,
+            bool dense = false)
         {
             // Il renderer sceglie solo il widget UGUI in base al tipo gia'
             // dichiarato nel ViewModel. Non deduce dati dalla simulazione e non
@@ -919,41 +934,42 @@ namespace Arcontio.View.ArcGraph
             switch (row.Kind)
             {
                 case ArcUiInspectorRowKind.Section:
-                    CreateSectionTitle(parent, row.Label);
+                    CreateSectionTitle(parent, row.Label, dense);
                     break;
 
                 case ArcUiInspectorRowKind.Bar:
-                    CreateBarRow(parent, row);
+                    CreateBarRow(parent, row, dense);
                     break;
 
                 case ArcUiInspectorRowKind.IconMetrics:
-                    CreateIconMetricsRow(parent, row);
+                    CreateIconMetricsRow(parent, row, dense);
                     break;
 
                 case ArcUiInspectorRowKind.Expandable:
-                    CreateExpandableRow(parent, row);
+                    CreateExpandableRow(parent, row, dense);
                     break;
 
                 case ArcUiInspectorRowKind.Timeline:
-                    CreateTimelineRow(parent, row);
+                    CreateTimelineRow(parent, row, dense);
                     break;
 
                 default:
-                    CreateInfoRow(parent, row.Label, row.Value);
+                    CreateInfoRow(parent, row.Label, row.Value, dense);
                     break;
             }
         }
 
         private static void CreateBarRow(
             RectTransform parent,
-            ArcUiInspectorRow row)
+            ArcUiInspectorRow row,
+            bool dense)
         {
             RectTransform root = CreateRect("ArcBarRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = CompactBarRowHeight;
+            rootLayout.preferredHeight = dense ? DenseBarRowHeight : CompactBarRowHeight;
 
             VerticalLayoutGroup layout = root.gameObject.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 1f;
+            layout.spacing = dense ? DenseRowSpacing : 1f;
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -961,7 +977,7 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform header = CreateRect("Header", root);
             LayoutElement headerLayout = header.gameObject.AddComponent<LayoutElement>();
-            headerLayout.preferredHeight = CompactBarHeaderHeight;
+            headerLayout.preferredHeight = dense ? DenseBarHeaderHeight : CompactBarHeaderHeight;
 
             HorizontalLayoutGroup headerGroup = header.gameObject.AddComponent<HorizontalLayoutGroup>();
             headerGroup.childControlWidth = true;
@@ -972,17 +988,17 @@ namespace Arcontio.View.ArcGraph
             RectTransform labelRoot = CreateRect("Label", header);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
             labelLayout.flexibleWidth = 1f;
-            CreateText(labelRoot, row.Label, 9, FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(labelRoot, row.Label, dense ? DenseFontSize : 9, FontStyles.Normal, TextAlignmentOptions.Left);
 
             RectTransform valueRoot = CreateRect("Value", header);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
-            valueLayout.preferredWidth = 56f;
-            TextMeshProUGUI value = CreateText(valueRoot, row.Value, 9, FontStyles.Bold, TextAlignmentOptions.Right);
+            valueLayout.preferredWidth = dense ? 46f : 56f;
+            TextMeshProUGUI value = CreateText(valueRoot, row.Value, dense ? DenseFontSize : 9, FontStyles.Bold, TextAlignmentOptions.Right);
             value.color = ColorForSeverity(row.Severity, 1f);
 
             RectTransform barRoot = CreateRect("Bar", root);
             LayoutElement barLayout = barRoot.gameObject.AddComponent<LayoutElement>();
-            barLayout.preferredHeight = CompactBarHeight;
+            barLayout.preferredHeight = dense ? DenseBarHeight : CompactBarHeight;
             Image barBackground = barRoot.gameObject.AddComponent<Image>();
             barBackground.raycastTarget = false;
             barBackground.color = ColorFromHex("#0B1118", 0.95f);
@@ -1022,14 +1038,15 @@ namespace Arcontio.View.ArcGraph
 
         private static void CreateIconMetricsRow(
             RectTransform parent,
-            ArcUiInspectorRow row)
+            ArcUiInspectorRow row,
+            bool dense)
         {
             RectTransform root = CreateRect("ArcIconMetricsRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = CompactMetricRowHeight;
+            rootLayout.preferredHeight = dense ? DenseMetricRowHeight : CompactMetricRowHeight;
 
             VerticalLayoutGroup rootGroup = root.gameObject.AddComponent<VerticalLayoutGroup>();
-            rootGroup.spacing = 1f;
+            rootGroup.spacing = dense ? DenseRowSpacing : 1f;
             rootGroup.childControlWidth = true;
             rootGroup.childControlHeight = true;
             rootGroup.childForceExpandWidth = true;
@@ -1037,28 +1054,29 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform title = CreateRect("Title", root);
             LayoutElement titleLayout = title.gameObject.AddComponent<LayoutElement>();
-            titleLayout.preferredHeight = CompactMetricTitleHeight;
-            TextMeshProUGUI titleText = CreateText(title, row.Label, 8, FontStyles.Bold, TextAlignmentOptions.Left);
+            titleLayout.preferredHeight = dense ? DenseMetricTitleHeight : CompactMetricTitleHeight;
+            TextMeshProUGUI titleText = CreateText(title, row.Label, dense ? DenseFontSize : 8, FontStyles.Bold, TextAlignmentOptions.Left);
             titleText.color = ColorFromHex("#A9B8C4", 1f);
 
             RectTransform metricsRoot = CreateRect("Metrics", root);
             LayoutElement metricsLayout = metricsRoot.gameObject.AddComponent<LayoutElement>();
-            metricsLayout.preferredHeight = CompactMetricBodyHeight;
+            metricsLayout.preferredHeight = dense ? DenseMetricBodyHeight : CompactMetricBodyHeight;
 
             HorizontalLayoutGroup metricsGroup = metricsRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
-            metricsGroup.spacing = 3f;
+            metricsGroup.spacing = dense ? 1f : 3f;
             metricsGroup.childControlWidth = true;
             metricsGroup.childControlHeight = true;
             metricsGroup.childForceExpandWidth = true;
             metricsGroup.childForceExpandHeight = true;
 
             for (int i = 0; i < row.Metrics.Length; i++)
-                CreateMetricCell(metricsRoot, row.Metrics[i]);
+                CreateMetricCell(metricsRoot, row.Metrics[i], dense);
         }
 
         private static void CreateMetricCell(
             RectTransform parent,
-            ArcUiInspectorMetric metric)
+            ArcUiInspectorMetric metric,
+            bool dense)
         {
             RectTransform cell = CreateRect("Metric_" + SanitizeName(metric.Label), parent);
             Image background = cell.gameObject.AddComponent<Image>();
@@ -1069,8 +1087,10 @@ namespace Arcontio.View.ArcGraph
             cellLayout.flexibleWidth = 1f;
 
             HorizontalLayoutGroup group = cell.gameObject.AddComponent<HorizontalLayoutGroup>();
-            group.padding = new RectOffset(2, 3, 2, 2);
-            group.spacing = 2f;
+            group.padding = dense
+                ? new RectOffset(1, 2, 1, 1)
+                : new RectOffset(2, 3, 2, 2);
+            group.spacing = dense ? 1f : 2f;
             group.childControlWidth = true;
             group.childControlHeight = true;
             group.childForceExpandWidth = false;
@@ -1078,13 +1098,13 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform iconRoot = CreateRect("Icon", cell);
             LayoutElement iconLayout = iconRoot.gameObject.AddComponent<LayoutElement>();
-            iconLayout.preferredWidth = 14f;
+            iconLayout.preferredWidth = dense ? 10f : 14f;
             Image iconBackground = iconRoot.gameObject.AddComponent<Image>();
             iconBackground.raycastTarget = false;
             iconBackground.color = ColorForSeverity(metric.Severity, 0.28f);
 
             string iconText = string.IsNullOrEmpty(metric.IconKey) ? "*" : metric.IconKey.Substring(0, 1).ToUpperInvariant();
-            TextMeshProUGUI iconLabel = CreateText(iconRoot, iconText, 8, FontStyles.Bold, TextAlignmentOptions.Center);
+            TextMeshProUGUI iconLabel = CreateText(iconRoot, iconText, dense ? DenseFontSize : 8, FontStyles.Bold, TextAlignmentOptions.Center);
             iconLabel.color = ColorForSeverity(metric.Severity, 1f);
 
             RectTransform valueRoot = CreateRect("Value", cell);
@@ -1093,24 +1113,25 @@ namespace Arcontio.View.ArcGraph
             string valueText = string.IsNullOrEmpty(metric.Label)
                 ? metric.Value
                 : metric.Label + " " + metric.Value;
-            TextMeshProUGUI value = CreateText(valueRoot, valueText, 8, FontStyles.Bold, TextAlignmentOptions.Left);
+            TextMeshProUGUI value = CreateText(valueRoot, valueText, dense ? DenseFontSize : 8, FontStyles.Bold, TextAlignmentOptions.Left);
             value.color = ColorForSeverity(metric.Severity, 1f);
         }
 
         private void CreateExpandableRow(
             RectTransform parent,
-            ArcUiInspectorRow row)
+            ArcUiInspectorRow row,
+            bool dense)
         {
             bool expanded = IsRowExpanded(row);
 
             RectTransform root = CreateRect("ArcExpandableRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
             rootLayout.preferredHeight = expanded
-                ? CompactExpandableHeight + EstimateRowsHeight(row.Details)
-                : CompactExpandableHeight;
+                ? ResolveExpandableHeight(dense) + EstimateRowsHeight(row.Details, true)
+                : ResolveExpandableHeight(dense);
 
             VerticalLayoutGroup rootGroup = root.gameObject.AddComponent<VerticalLayoutGroup>();
-            rootGroup.spacing = 2f;
+            rootGroup.spacing = dense ? DenseRowSpacing : 2f;
             rootGroup.childControlWidth = true;
             rootGroup.childControlHeight = true;
             rootGroup.childForceExpandWidth = true;
@@ -1118,7 +1139,7 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform header = CreateRect("Header", root);
             LayoutElement headerLayout = header.gameObject.AddComponent<LayoutElement>();
-            headerLayout.preferredHeight = CompactExpandableHeight;
+            headerLayout.preferredHeight = ResolveExpandableHeight(dense);
             Image headerImage = header.gameObject.AddComponent<Image>();
             headerImage.raycastTarget = true;
             headerImage.color = row.IsSelected
@@ -1126,27 +1147,29 @@ namespace Arcontio.View.ArcGraph
                 : ColorFromHex("#111A23", 0.92f);
 
             HorizontalLayoutGroup headerGroup = header.gameObject.AddComponent<HorizontalLayoutGroup>();
-            headerGroup.padding = new RectOffset(3, 4, 2, 2);
-            headerGroup.spacing = 3f;
+            headerGroup.padding = dense
+                ? new RectOffset(2, 3, 1, 1)
+                : new RectOffset(3, 4, 2, 2);
+            headerGroup.spacing = dense ? 2f : 3f;
             headerGroup.childControlWidth = true;
             headerGroup.childControlHeight = true;
             headerGroup.childForceExpandWidth = false;
             headerGroup.childForceExpandHeight = true;
 
-            Button toggleButton = CreateSmallButton(header, expanded ? "-" : "+");
+            Button toggleButton = CreateSmallButton(header, expanded ? "-" : "+", dense);
             string rowKey = row.RowKey;
             toggleButton.onClick.AddListener(() => ToggleRowExpanded(rowKey));
 
             RectTransform labelRoot = CreateRect("Label", header);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
             labelLayout.flexibleWidth = 1f;
-            TextMeshProUGUI label = CreateText(labelRoot, row.Label, 8, FontStyles.Bold, TextAlignmentOptions.Left);
+            TextMeshProUGUI label = CreateText(labelRoot, row.Label, dense ? DenseFontSize : 8, FontStyles.Bold, TextAlignmentOptions.Left);
             label.color = row.IsSelected ? ColorFromHex("#9FE0B8", 1f) : ColorFromHex("#DDE6EE", 1f);
 
             RectTransform valueRoot = CreateRect("Value", header);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
-            valueLayout.preferredWidth = 70f;
-            TextMeshProUGUI value = CreateText(valueRoot, row.Value, 8, FontStyles.Bold, TextAlignmentOptions.Right);
+            valueLayout.preferredWidth = dense ? 54f : 70f;
+            TextMeshProUGUI value = CreateText(valueRoot, row.Value, dense ? DenseFontSize : 8, FontStyles.Bold, TextAlignmentOptions.Right);
             value.color = ColorForSeverity(row.Severity, 1f);
 
             if (!expanded)
@@ -1157,19 +1180,20 @@ namespace Arcontio.View.ArcGraph
 
         private static Button CreateSmallButton(
             RectTransform parent,
-            string label)
+            string label,
+            bool dense)
         {
             RectTransform button = CreateRect("SmallButton_" + SanitizeName(label), parent);
             LayoutElement layout = button.gameObject.AddComponent<LayoutElement>();
-            layout.preferredWidth = 16f;
-            layout.preferredHeight = 16f;
+            layout.preferredWidth = dense ? 12f : 16f;
+            layout.preferredHeight = dense ? 12f : 16f;
 
             Image image = button.gameObject.AddComponent<Image>();
             image.raycastTarget = true;
             image.color = ColorFromHex("#22313D", 0.96f);
 
             Button buttonComponent = button.gameObject.AddComponent<Button>();
-            CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(button, label, dense ? DenseFontSize : 9, FontStyles.Bold, TextAlignmentOptions.Center);
             return buttonComponent;
         }
 
@@ -1179,11 +1203,11 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform detailsRoot = CreateRect("Details", parent);
             LayoutElement detailsLayout = detailsRoot.gameObject.AddComponent<LayoutElement>();
-            detailsLayout.preferredHeight = EstimateRowsHeight(rows);
+            detailsLayout.preferredHeight = EstimateRowsHeight(rows, true);
 
             VerticalLayoutGroup detailsGroup = detailsRoot.gameObject.AddComponent<VerticalLayoutGroup>();
-            detailsGroup.padding = new RectOffset((int)CompactDetailIndent, 0, 0, 0);
-            detailsGroup.spacing = 1f;
+            detailsGroup.padding = new RectOffset((int)DenseDetailIndent, 0, 0, 0);
+            detailsGroup.spacing = DenseRowSpacing;
             detailsGroup.childControlWidth = true;
             detailsGroup.childControlHeight = false;
             detailsGroup.childForceExpandWidth = true;
@@ -1191,53 +1215,61 @@ namespace Arcontio.View.ArcGraph
 
             if (rows.Length == 0)
             {
-                CreateInfoRow(detailsRoot, "Dettagli", "--");
+                CreateInfoRow(detailsRoot, "Dettagli", "--", true);
                 return;
             }
 
             for (int i = 0; i < rows.Length; i++)
-                CreateInspectorRow(detailsRoot, rows[i]);
+                CreateInspectorRow(detailsRoot, rows[i], true);
         }
 
-        private static float EstimateRowsHeight(ArcUiInspectorRow[] rows)
+        private static float EstimateRowsHeight(
+            ArcUiInspectorRow[] rows,
+            bool dense)
         {
             if (rows == null || rows.Length == 0)
-                return CompactTextRowHeight;
+                return ResolveTextRowHeight(dense);
 
             float height = 0f;
             for (int i = 0; i < rows.Length; i++)
-                height += EstimateRowHeight(rows[i]) + CompactRowSpacing;
+                height += EstimateRowHeight(rows[i], dense) + ResolveRowSpacing(dense);
 
-            return Mathf.Max(CompactTextRowHeight, height);
+            return Mathf.Max(ResolveTextRowHeight(dense), height);
         }
 
-        private static float EstimateRowHeight(ArcUiInspectorRow row)
+        private static float EstimateRowHeight(
+            ArcUiInspectorRow row,
+            bool dense)
         {
             return row.Kind switch
             {
-                ArcUiInspectorRowKind.Section => CompactSectionHeight,
-                ArcUiInspectorRowKind.Bar => CompactBarRowHeight,
-                ArcUiInspectorRowKind.IconMetrics => CompactMetricRowHeight,
-                ArcUiInspectorRowKind.Expandable => CompactExpandableHeight + (row.Details.Length > 0 ? EstimateRowsHeight(row.Details) : 0f),
-                ArcUiInspectorRowKind.Timeline => CompactTimelineHeight,
-                _ => CompactTextRowHeight
+                ArcUiInspectorRowKind.Section => dense ? DenseSectionHeight : CompactSectionHeight,
+                ArcUiInspectorRowKind.Bar => dense ? DenseBarRowHeight : CompactBarRowHeight,
+                ArcUiInspectorRowKind.IconMetrics => dense ? DenseMetricRowHeight : CompactMetricRowHeight,
+                ArcUiInspectorRowKind.Expandable => ResolveExpandableHeight(dense)
+                    + (row.Details.Length > 0 ? EstimateRowsHeight(row.Details, true) : 0f),
+                ArcUiInspectorRowKind.Timeline => dense ? DenseTimelineHeight : CompactTimelineHeight,
+                _ => ResolveTextRowHeight(dense)
             };
         }
 
         private static void CreateTimelineRow(
             RectTransform parent,
-            ArcUiInspectorRow row)
+            ArcUiInspectorRow row,
+            bool dense)
         {
             RectTransform root = CreateRect("ArcTimelineRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = CompactTimelineHeight;
+            rootLayout.preferredHeight = dense ? DenseTimelineHeight : CompactTimelineHeight;
 
             Image image = root.gameObject.AddComponent<Image>();
             image.raycastTarget = false;
             image.color = ColorFromHex("#0F1821", 0.72f);
 
             HorizontalLayoutGroup layout = root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            layout.padding = new RectOffset(3, 4, 1, 1);
+            layout.padding = dense
+                ? new RectOffset(1, 2, 0, 0)
+                : new RectOffset(3, 4, 1, 1);
             layout.childControlWidth = true;
             layout.childControlHeight = true;
             layout.childForceExpandWidth = true;
@@ -1245,14 +1277,14 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform labelRoot = CreateRect("Label", root);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
-            labelLayout.preferredWidth = 62f;
-            TextMeshProUGUI label = CreateText(labelRoot, row.Label, 8, FontStyles.Normal, TextAlignmentOptions.Left);
+            labelLayout.preferredWidth = dense ? 48f : 62f;
+            TextMeshProUGUI label = CreateText(labelRoot, row.Label, dense ? DenseFontSize : 8, FontStyles.Normal, TextAlignmentOptions.Left);
             label.color = ColorForSeverity(row.Severity, 1f);
 
             RectTransform valueRoot = CreateRect("Value", root);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
             valueLayout.flexibleWidth = 1f;
-            CreateText(valueRoot, row.Value, 8, FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(valueRoot, row.Value, dense ? DenseFontSize : 8, FontStyles.Normal, TextAlignmentOptions.Left);
         }
 
         private void ToggleRowExpanded(string rowKey)
@@ -1293,11 +1325,12 @@ namespace Arcontio.View.ArcGraph
         private static void CreateInfoRow(
             RectTransform parent,
             string label,
-            string value)
+            string value,
+            bool dense)
         {
             RectTransform row = CreateRect("ArcInfoRow_" + SanitizeName(label), parent);
             LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
-            rowLayout.preferredHeight = CompactTextRowHeight;
+            rowLayout.preferredHeight = ResolveTextRowHeight(dense);
 
             HorizontalLayoutGroup layout = row.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.childControlWidth = true;
@@ -1308,12 +1341,27 @@ namespace Arcontio.View.ArcGraph
             RectTransform labelRoot = CreateRect("Label", row);
             LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
             labelLayout.flexibleWidth = 1f;
-            CreateText(labelRoot, label, 9, FontStyles.Normal, TextAlignmentOptions.Left);
+            CreateText(labelRoot, label, dense ? DenseFontSize : 9, FontStyles.Normal, TextAlignmentOptions.Left);
 
             RectTransform valueRoot = CreateRect("Value", row);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
-            valueLayout.preferredWidth = 132f;
-            CreateText(valueRoot, value, 9, FontStyles.Bold, TextAlignmentOptions.Right);
+            valueLayout.preferredWidth = dense ? 98f : 132f;
+            CreateText(valueRoot, value, dense ? DenseFontSize : 9, FontStyles.Bold, TextAlignmentOptions.Right);
+        }
+
+        private static float ResolveRowSpacing(bool dense)
+        {
+            return dense ? DenseRowSpacing : CompactRowSpacing;
+        }
+
+        private static float ResolveTextRowHeight(bool dense)
+        {
+            return dense ? DenseTextRowHeight : CompactTextRowHeight;
+        }
+
+        private static float ResolveExpandableHeight(bool dense)
+        {
+            return dense ? DenseExpandableHeight : CompactExpandableHeight;
         }
 
         private static TextMeshProUGUI CreateText(
