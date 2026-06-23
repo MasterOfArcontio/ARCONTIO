@@ -16696,7 +16696,7 @@ Roadmap operativa:
 | v0.70.02 | Operation catalog minimo e gerarchia ActionPanel | Fatto su branch `ai-task/v0.70.02-arcgraph-ui-operation-catalog` |
 | v0.70.03 | Ponte placement | ⏳ Pending |
 | v0.70.04 | Selezione e hover | In corso - sottostep v0.70.04.04 completato |
-| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.04.01j completato |
+| v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.04.01k completato |
 | v0.70.06 | Simulation control | ⏳ Pending |
 | v0.70.07 | View modes | ⏳ Pending |
 | v0.70.08 | Migrazione progressiva F3 | ⏳ Pending |
@@ -17025,6 +17025,7 @@ Sottostep operativi previsti:
 | v0.70.05.04.01h | Compattezza dense per tutti i gruppi espandibili del RightInspector | Fatto su branch `ai-task/v0.70.05.04.01h-inspector-expanded-compact` |
 | v0.70.05.04.01i | Fix spaziatura reale dei dettagli espandibili e leggibilita' del toggle +/- | Fatto su branch `ai-task/v0.70.05.04.01i-inspector-expanded-spacing-fix` |
 | v0.70.05.04.01j | Tuning leggibilita' testi RightInspector con font e altezze leggermente maggiori | Fatto su branch `ai-task/v0.70.05.04.01j-inspector-text-readability` |
+| v0.70.05.04.01k | Font provider IBM Plex: Medium per testo UI e SemiBold reale per testi marcati Bold | Fatto su branch `ai-task/v0.70.05.04.01k-ibmplex-font-provider` |
 | v0.70.05.04.02 | Oggetti, muri e porte read-only inspector | Prossimo |
 | v0.70.05.05 | Edit shell da SelectionActionRequest | Pending |
 | v0.70.05.06 | Delete confirmation shell non distruttiva | Pending |
