@@ -256,6 +256,149 @@ namespace Arcontio.View.ArcGraph
     }
 
     // =============================================================================
+    // ArcUiEnvironmentStatusSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot compatto di tempo, calendario e clima mostrabile dalla TopBar.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: Environment -> Snapshot -> UI</b></para>
+    /// <para>
+    /// La TopBar non deve leggere direttamente <c>World</c> o
+    /// <c>EnvironmentState</c>. Questo contratto trasporta valori gia' filtrati dal
+    /// controller autorizzato: dati numerici semplici per future view Biosfera e
+    /// label gia' pronte per la UI provvisoria.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>HasCalendar</b>: indica se i campi data/ora sono disponibili.</item>
+    ///   <item><b>HasClimate</b>: indica se temperatura, umidita' e meteo sono disponibili.</item>
+    ///   <item><b>Campi numerici</b>: giorno, mese, anno, ora, temperatura e umidita'.</item>
+    ///   <item><b>Label</b>: stringhe gia' formattate per la TopBar UGUI.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ArcUiEnvironmentStatusSnapshot
+    {
+        public readonly bool HasCalendar;
+        public readonly bool HasClimate;
+        public readonly int Year;
+        public readonly int Month;
+        public readonly int DayOfMonth;
+        public readonly int DayOfYear;
+        public readonly int Hour;
+        public readonly int Minute;
+        public readonly string SeasonKey;
+        public readonly string SeasonLabel;
+        public readonly float Temperature01;
+        public readonly float Humidity01;
+        public readonly string WeatherKey;
+        public readonly string WeatherLabel;
+        public readonly string DayLabel;
+        public readonly string MonthLabel;
+        public readonly string YearLabel;
+        public readonly string TimeLabel;
+        public readonly string TemperatureLabel;
+        public readonly string HumidityLabel;
+
+        public bool HasAnyStatus => HasCalendar || HasClimate;
+
+        // =============================================================================
+        // ArcUiEnvironmentStatusSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce uno snapshot ambiente normalizzando label e valori minimi.
+        /// </para>
+        /// </summary>
+        public ArcUiEnvironmentStatusSnapshot(
+            bool hasCalendar,
+            bool hasClimate,
+            int year,
+            int month,
+            int dayOfMonth,
+            int dayOfYear,
+            int hour,
+            int minute,
+            string seasonKey,
+            string seasonLabel,
+            float temperature01,
+            float humidity01,
+            string weatherKey,
+            string weatherLabel,
+            string dayLabel,
+            string monthLabel,
+            string yearLabel,
+            string timeLabel,
+            string temperatureLabel,
+            string humidityLabel)
+        {
+            HasCalendar = hasCalendar;
+            HasClimate = hasClimate;
+            Year = year < 0 ? 0 : year;
+            Month = month < 0 ? 0 : month;
+            DayOfMonth = dayOfMonth < 0 ? 0 : dayOfMonth;
+            DayOfYear = dayOfYear < 0 ? 0 : dayOfYear;
+            Hour = hour < 0 ? 0 : hour;
+            Minute = minute < 0 ? 0 : minute;
+            SeasonKey = string.IsNullOrWhiteSpace(seasonKey) ? string.Empty : seasonKey;
+            SeasonLabel = string.IsNullOrWhiteSpace(seasonLabel) ? "Stagione --" : seasonLabel;
+            Temperature01 = Clamp01(temperature01);
+            Humidity01 = Clamp01(humidity01);
+            WeatherKey = string.IsNullOrWhiteSpace(weatherKey) ? string.Empty : weatherKey;
+            WeatherLabel = string.IsNullOrWhiteSpace(weatherLabel) ? "Meteo --" : weatherLabel;
+            DayLabel = string.IsNullOrWhiteSpace(dayLabel) ? "Giorno --" : dayLabel;
+            MonthLabel = string.IsNullOrWhiteSpace(monthLabel) ? "Mese --" : monthLabel;
+            YearLabel = string.IsNullOrWhiteSpace(yearLabel) ? "Anno ----" : yearLabel;
+            TimeLabel = string.IsNullOrWhiteSpace(timeLabel) ? "--:--" : timeLabel;
+            TemperatureLabel = string.IsNullOrWhiteSpace(temperatureLabel) ? "-- C" : temperatureLabel;
+            HumidityLabel = string.IsNullOrWhiteSpace(humidityLabel) ? "-- %" : humidityLabel;
+        }
+
+        // =============================================================================
+        // Empty
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce uno snapshot vuoto ma visualizzabile dalla TopBar.
+        /// </para>
+        /// </summary>
+        public static ArcUiEnvironmentStatusSnapshot Empty()
+        {
+            return new ArcUiEnvironmentStatusSnapshot(
+                false,
+                false,
+                0,
+                0,
+                0,
+                0,
+                0,
+                0,
+                string.Empty,
+                "Stagione --",
+                0f,
+                0f,
+                string.Empty,
+                "Meteo --",
+                "Giorno --",
+                "Mese --",
+                "Anno ----",
+                "--:--",
+                "-- C",
+                "-- %");
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value < 0f)
+                return 0f;
+
+            return value > 1f ? 1f : value;
+        }
+    }
+
+    // =============================================================================
     // ArcUiSimulationControlState
     // =============================================================================
     /// <summary>
@@ -276,6 +419,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>IsPaused</b>: stato pausa letto dal controller.</item>
     ///   <item><b>SpeedMultiplier</b>: fattore velocita' richiesto dalla UI.</item>
     ///   <item><b>TickIndex</b>: tick corrente noto, o 0 se non disponibile.</item>
+    ///   <item><b>EnvironmentStatus</b>: snapshot tempo/clima separato dal controllo pausa.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcUiSimulationControlState
@@ -286,14 +430,15 @@ namespace Arcontio.View.ArcGraph
         public readonly long TickIndex;
         public readonly bool BiosphereDebugFastForwardActive;
         public readonly int BiosphereDebugFastForwardMultiplier;
-        public readonly string DayLabel;
-        public readonly string MonthLabel;
-        public readonly string YearLabel;
-        public readonly string SeasonLabel;
-        public readonly string TimeLabel;
-        public readonly string TemperatureLabel;
-        public readonly string HumidityLabel;
-        public readonly string WeatherLabel;
+        public readonly ArcUiEnvironmentStatusSnapshot EnvironmentStatus;
+        public string DayLabel => string.IsNullOrWhiteSpace(EnvironmentStatus.DayLabel) ? "Giorno --" : EnvironmentStatus.DayLabel;
+        public string MonthLabel => string.IsNullOrWhiteSpace(EnvironmentStatus.MonthLabel) ? "Mese --" : EnvironmentStatus.MonthLabel;
+        public string YearLabel => string.IsNullOrWhiteSpace(EnvironmentStatus.YearLabel) ? "Anno ----" : EnvironmentStatus.YearLabel;
+        public string SeasonLabel => string.IsNullOrWhiteSpace(EnvironmentStatus.SeasonLabel) ? "Stagione --" : EnvironmentStatus.SeasonLabel;
+        public string TimeLabel => string.IsNullOrWhiteSpace(EnvironmentStatus.TimeLabel) ? "--:--" : EnvironmentStatus.TimeLabel;
+        public string TemperatureLabel => string.IsNullOrWhiteSpace(EnvironmentStatus.TemperatureLabel) ? "-- C" : EnvironmentStatus.TemperatureLabel;
+        public string HumidityLabel => string.IsNullOrWhiteSpace(EnvironmentStatus.HumidityLabel) ? "-- %" : EnvironmentStatus.HumidityLabel;
+        public string WeatherLabel => string.IsNullOrWhiteSpace(EnvironmentStatus.WeatherLabel) ? "Meteo --" : EnvironmentStatus.WeatherLabel;
 
         public ArcUiSimulationControlState(
             bool hasRuntimeHost,
@@ -302,14 +447,7 @@ namespace Arcontio.View.ArcGraph
             long tickIndex,
             bool biosphereDebugFastForwardActive = false,
             int biosphereDebugFastForwardMultiplier = 50,
-            string dayLabel = "Giorno --",
-            string monthLabel = "Mese --",
-            string yearLabel = "Anno ----",
-            string seasonLabel = "Stagione --",
-            string timeLabel = "--:--",
-            string temperatureLabel = "-- C",
-            string humidityLabel = "-- %",
-            string weatherLabel = "Meteo --")
+            ArcUiEnvironmentStatusSnapshot environmentStatus = default)
         {
             HasRuntimeHost = hasRuntimeHost;
             IsPaused = isPaused;
@@ -319,14 +457,9 @@ namespace Arcontio.View.ArcGraph
             BiosphereDebugFastForwardMultiplier =
                 ArcUiSimulationControlRequest.NormalizeBiosphereDebugFastForwardMultiplier(
                     biosphereDebugFastForwardMultiplier);
-            DayLabel = string.IsNullOrWhiteSpace(dayLabel) ? "Giorno --" : dayLabel;
-            MonthLabel = string.IsNullOrWhiteSpace(monthLabel) ? "Mese --" : monthLabel;
-            YearLabel = string.IsNullOrWhiteSpace(yearLabel) ? "Anno ----" : yearLabel;
-            SeasonLabel = string.IsNullOrWhiteSpace(seasonLabel) ? "Stagione --" : seasonLabel;
-            TimeLabel = string.IsNullOrWhiteSpace(timeLabel) ? "--:--" : timeLabel;
-            TemperatureLabel = string.IsNullOrWhiteSpace(temperatureLabel) ? "-- C" : temperatureLabel;
-            HumidityLabel = string.IsNullOrWhiteSpace(humidityLabel) ? "-- %" : humidityLabel;
-            WeatherLabel = string.IsNullOrWhiteSpace(weatherLabel) ? "Meteo --" : weatherLabel;
+            EnvironmentStatus = environmentStatus.HasAnyStatus
+                ? environmentStatus
+                : ArcUiEnvironmentStatusSnapshot.Empty();
         }
     }
 }

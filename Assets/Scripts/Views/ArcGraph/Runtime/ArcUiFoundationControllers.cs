@@ -596,15 +596,7 @@ namespace Arcontio.View.ArcGraph
             int biosphereDebugMultiplier = hasHost
                 ? _simulationHost.BiosphereDebugFastForwardMultiplier
                 : _biosphereDebugFastForwardMultiplier;
-            BuildEnvironmentLabels(
-                out string dayLabel,
-                out string monthLabel,
-                out string yearLabel,
-                out string seasonLabel,
-                out string timeLabel,
-                out string temperatureLabel,
-                out string humidityLabel,
-                out string weatherLabel);
+            ArcUiEnvironmentStatusSnapshot environmentStatus = BuildEnvironmentStatusSnapshot();
 
             return new ArcUiSimulationControlState(
                 hasHost,
@@ -613,14 +605,7 @@ namespace Arcontio.View.ArcGraph
                 tickIndex,
                 biosphereDebugActive,
                 biosphereDebugMultiplier,
-                dayLabel,
-                monthLabel,
-                yearLabel,
-                seasonLabel,
-                timeLabel,
-                temperatureLabel,
-                humidityLabel,
-                weatherLabel);
+                environmentStatus);
         }
 
         // =============================================================================
@@ -682,46 +667,101 @@ namespace Arcontio.View.ArcGraph
                 _simulationHost.SetPaused(false);
         }
 
-        private void BuildEnvironmentLabels(
-            out string dayLabel,
-            out string monthLabel,
-            out string yearLabel,
-            out string seasonLabel,
-            out string timeLabel,
-            out string temperatureLabel,
-            out string humidityLabel,
-            out string weatherLabel)
+        // =============================================================================
+        // BuildEnvironmentStatusSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce lo snapshot ambiente letto dalla TopBar.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: boundary ambiente autorizzato</b></para>
+        /// <para>
+        /// Solo questo controller conosce il <c>SimulationHost</c>. La UI riceve un
+        /// contratto data-only con valori semplici e label, senza accedere a
+        /// <c>World</c>, <c>EnvironmentState</c> o resolver della Biosfera.
+        /// </para>
+        /// </summary>
+        private ArcUiEnvironmentStatusSnapshot BuildEnvironmentStatusSnapshot()
         {
-            dayLabel = "Giorno --";
-            monthLabel = "Mese --";
-            yearLabel = "Anno ----";
-            seasonLabel = "Stagione --";
-            timeLabel = "--:--";
-            temperatureLabel = "-- C";
-            humidityLabel = "-- %";
-            weatherLabel = "Meteo --";
-
             if (_simulationHost == null)
-                return;
+                return ArcUiEnvironmentStatusSnapshot.Empty();
 
-            if (_simulationHost.TryGetEnvironmentCalendarState(out EnvironmentCalendarState calendar))
+            bool hasCalendar = _simulationHost.TryGetEnvironmentCalendarState(out EnvironmentCalendarState calendar);
+            bool hasClimate = _simulationHost.TryGetEnvironmentClimateState(out EnvironmentGlobalClimateState climate);
+            if (!hasCalendar && !hasClimate)
+                return ArcUiEnvironmentStatusSnapshot.Empty();
+
+            int year = 0;
+            int month = 0;
+            int dayOfMonth = 0;
+            int dayOfYear = 0;
+            int hour = 0;
+            int minute = 0;
+            string seasonKey = string.Empty;
+            string seasonLabel = "Stagione --";
+            string dayLabel = "Giorno --";
+            string monthLabel = "Mese --";
+            string yearLabel = "Anno ----";
+            string timeLabel = "--:--";
+
+            if (hasCalendar)
             {
+                year = calendar.Date.Year;
+                month = calendar.Date.Month + 1;
+                dayOfMonth = calendar.Date.DayOfMonth + 1;
+                dayOfYear = calendar.Date.DayOfYear + 1;
+                hour = calendar.TimeOfDay.Hour;
+                minute = calendar.TimeOfDay.Minute;
+                seasonKey = calendar.Date.Season.ToString();
+                seasonLabel = ToSeasonLabel(calendar.Date.Season);
                 dayLabel = "Giorno " + (calendar.Date.DayOfMonth + 1).ToString(CultureInfo.InvariantCulture);
                 monthLabel = "Mese " + (calendar.Date.Month + 1).ToString(CultureInfo.InvariantCulture);
                 yearLabel = "Anno " + calendar.Date.Year.ToString(CultureInfo.InvariantCulture);
-                seasonLabel = ToSeasonLabel(calendar.Date.Season);
                 timeLabel =
                     calendar.TimeOfDay.Hour.ToString("00", CultureInfo.InvariantCulture) +
                     ":" +
                     calendar.TimeOfDay.Minute.ToString("00", CultureInfo.InvariantCulture);
             }
 
-            if (_simulationHost.TryGetEnvironmentClimateState(out EnvironmentGlobalClimateState climate))
+            float temperature01 = 0f;
+            float humidity01 = 0f;
+            string weatherKey = string.Empty;
+            string weatherLabel = "Meteo --";
+            string temperatureLabel = "-- C";
+            string humidityLabel = "-- %";
+
+            if (hasClimate)
             {
+                temperature01 = Clamp01(climate.Temperature01);
+                humidity01 = Clamp01(climate.Humidity01);
+                weatherKey = climate.Weather.Kind.ToString();
                 temperatureLabel = Mathf01ToTemperatureCelsius(climate.Temperature01);
                 humidityLabel = Mathf01ToPercent(climate.Humidity01);
                 weatherLabel = "Meteo " + ToWeatherLabel(climate.Weather.Kind);
             }
+
+            return new ArcUiEnvironmentStatusSnapshot(
+                hasCalendar,
+                hasClimate,
+                year,
+                month,
+                dayOfMonth,
+                dayOfYear,
+                hour,
+                minute,
+                seasonKey,
+                seasonLabel,
+                temperature01,
+                humidity01,
+                weatherKey,
+                weatherLabel,
+                dayLabel,
+                monthLabel,
+                yearLabel,
+                timeLabel,
+                temperatureLabel,
+                humidityLabel);
         }
 
         private static string ToSeasonLabel(EnvironmentSeasonKind season)
