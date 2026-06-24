@@ -139,21 +139,12 @@ namespace Arcontio.Core
                 return StepResult.Failed(JobFailureReason.MovementFailed, knownRouteFailure);
             }
 
-            if (CanUseJobMovementRuntime(world))
-            {
-                TrackMoveToFailure(costObserver, costSample, costPerNpc, npcId);
-                return StepResult.Failed(JobFailureReason.MovementFailed, "MoveToKnownRouteMissing");
-            }
-
-            return EnqueueLegacyMoveIntent(
-                world,
-                runtime,
-                npcId,
-                job,
-                action,
-                tick,
-                explainabilityConfig,
-                explainabilityRegistry);
+            TrackMoveToFailure(costObserver, costSample, costPerNpc, npcId);
+            return StepResult.Failed(
+                JobFailureReason.MovementFailed,
+                CanUseJobMovementRuntime(world)
+                    ? "MoveToKnownRouteMissing"
+                    : "MoveToJobTraversalDisabled");
         }
 
         private static void TrackMoveToFailure(RuntimeCostObserver costObserver, bool costSample, bool costPerNpc, int npcId)
@@ -1263,45 +1254,6 @@ namespace Arcontio.Core
                 explainabilityRegistry,
                 tick,
                 npcId);
-        }
-
-        private static StepResult EnqueueLegacyMoveIntent(
-            World world,
-            JobRuntimeState runtime,
-            int npcId,
-            Job job,
-            JobAction action,
-            int tick,
-            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
-            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
-        {
-            bool alreadyMovingToTarget =
-                world.NpcMoveIntents.TryGetValue(npcId, out var currentIntent)
-                && currentIntent.Active
-                && currentIntent.TargetX == action.TargetCell.x
-                && currentIntent.TargetY == action.TargetCell.y
-                && currentIntent.TargetObjectId == action.TargetObjectId;
-
-            if (!alreadyMovingToTarget)
-            {
-                runtime.CommandBuffer.Enqueue(new SetMoveIntentCommand(npcId, new MoveIntent
-                {
-                    Active = true,
-                    TargetX = action.TargetCell.x,
-                    TargetY = action.TargetCell.y,
-                    Reason = ResolveMoveIntentReason(job.Request.IntentKind),
-                    TargetObjectId = action.TargetObjectId,
-                    Urgency01 = 1f
-                }),
-                explainabilityConfig,
-                explainabilityRegistry,
-                npcId,
-                tick,
-                job.JobId,
-                "MoveToCellCommandEnqueued");
-            }
-
-            return StepResult.Running(alreadyMovingToTarget ? "MoveAlreadyRequested" : "MoveCommandEnqueued");
         }
 
         private static bool CanAcquireDirectTarget(World world, int npcId, int targetX, int targetY, bool checkFov)

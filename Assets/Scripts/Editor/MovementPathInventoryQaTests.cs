@@ -1,6 +1,5 @@
 using Arcontio.Core;
 using Arcontio.Core.Config;
-using Arcontio.Core.Commands.DevTools;
 using Arcontio.Core.Diagnostics;
 using NUnit.Framework;
 using UnityEngine;
@@ -12,25 +11,24 @@ namespace Arcontio.Tests
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Test QA EditMode che documentano l'inventario corrente dei due percorsi di
-    /// movimento NPC: il path legacy basato su <c>MoveIntent</c>/<c>MovementSystem</c>
-    /// e il path Job multi-tick basato su <c>RunningAction</c>.
+    /// Test QA EditMode che documentano l'inventario corrente del movimento NPC:
+    /// il movimento fisico runtime deve passare dal Job Layer, tramite
+    /// <c>MoveToCell</c> e running action traversal.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: riduzione progressiva senza spegnimento brutale</b></para>
+    /// <para><b>Principio architetturale: autorita' unica del movimento</b></para>
     /// <para>
-    /// Questi test non migrano nessun routing e non introducono nuovi gate. Servono
-    /// a blindare lo stato corrente: il legacy resta necessario per path lunghi,
-    /// debug movement e fallback, mentre il traversal Job resta limitato a una cella
-    /// cardinale adiacente con gate esplicito attivo.
+    /// Questi test blindano il nuovo contratto: il vecchio ponte
+    /// <c>MoveIntent</c>/<c>MovementSystem</c> non e' piu' un fallback produttivo.
+    /// Se il Job Layer non possiede una route autorizzata, il job fallisce o resta
+    /// bloccato nel proprio runtime invece di attivare un movimento greedy esterno.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>Legacy consumer</b>: <c>MovementSystem</c> consuma <c>MoveIntent</c>.</item>
-    ///   <item><b>Legacy producer</b>: <c>SetMoveIntentCommand</c> scrive ancora il path legacy.</item>
     ///   <item><b>Job traversal</b>: target adiacente e gate attivo usano running action.</item>
-    ///   <item><b>Fallback</b>: gate spento, target lontano o diagonale restano su command legacy.</item>
+    ///   <item><b>No fallback legacy</b>: gate spento non produce command di movimento.</item>
+    ///   <item><b>Route dichiarata</b>: target lontani o diagonali usano route preparate da MoveTo.</item>
     /// </list>
     /// </summary>
     public sealed class MovementPathInventoryQaTests
@@ -50,11 +48,9 @@ namespace Arcontio.Tests
             {
                 var tests = new MovementPathInventoryQaTests();
 
-                tests.SetMoveIntentCommandStillFeedsLegacyMovementSystem();
                 tests.JobMoveToCellUsesRunningActionOnlyForAdjacentCardinalTargetWithGateEnabled();
-                tests.JobMoveToCellFallsBackToLegacyCommandWhenTraversalGateIsDisabled();
+                tests.JobMoveToCellFailsWhenTraversalGateIsDisabled();
                 tests.JobMoveToCellPreparesDeclaredDistantRoutesWhenTraversalGateIsEnabled();
-                tests.DebugClickMoveIntentUsesForcedPhysicalRouteOutsideFacing();
 
                 Debug.Log("[MovementPathInventoryQaTests] PASS");
                 UnityEditor.EditorApplication.Exit(0);
@@ -64,89 +60,6 @@ namespace Arcontio.Tests
                 Debug.LogError("[MovementPathInventoryQaTests] FAIL\n" + ex);
                 UnityEditor.EditorApplication.Exit(1);
             }
-        }
-
-        // =============================================================================
-        // SetMoveIntentCommandStillFeedsLegacyMovementSystem
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Verifica il contratto legacy esplicito: il command scrive un
-        /// <c>MoveIntent</c> e <c>MovementSystem</c> resta il consumer che muove
-        /// fisicamente l'NPC nel tick successivo del test.
-        /// </para>
-        /// </summary>
-        [Test]
-        public void SetMoveIntentCommandStillFeedsLegacyMovementSystem()
-        {
-            // Arrange: target adiacente semplice, nessun Job assegnato. Questo e'
-            // deliberatamente il path legacy command -> intent -> MovementSystem.
-            var world = MakeWorldWithNpc(out int npcId);
-            var startCell = world.GridPos[npcId];
-            var command = new SetMoveIntentCommand(npcId, new MoveIntent
-            {
-                Active = true,
-                TargetX = startCell.X + 1,
-                TargetY = startCell.Y,
-                Reason = MoveIntentReason.DebugClick,
-                TargetObjectId = 0
-            });
-            var bus = new MessageBus();
-
-            // Act 1: il command non muove. Scrive solo l'intent che verra' consumato
-            // dal MovementSystem.
-            command.Execute(world, bus);
-
-            // Assert 1: nessuna mutazione posizione anticipata.
-            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent), Is.True);
-            Assert.That(intent.Active, Is.True);
-            Assert.That(intent.IsNew, Is.True);
-            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
-            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
-
-            // Act 2: il consumer legacy processa l'intent.
-            TickContext.BeginTick(1);
-            new MovementSystem().Update(world, new Tick(1, 1f), bus, new Telemetry());
-
-            // Assert 2: il movimento legacy ha completato una cella nello stesso tick
-            // di MovementSystem, confermando che il path resta attivo.
-            Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X + 1));
-            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
-        }
-
-        // =============================================================================
-        // DebugClickMoveIntentUsesForcedPhysicalRouteOutsideFacing
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Verifica il comportamento separato del devtool K + mouse: il comando debug
-        /// puo' muovere l'NPC verso una cella non acquisita soggettivamente, perche'
-        /// rappresenta un ordine esterno dell'operatore e non una decisione MBQD.
-        /// </para>
-        /// </summary>
-        [Test]
-        public void DebugClickMoveIntentUsesForcedPhysicalRouteOutsideFacing()
-        {
-            var world = MakeWorldWithNpc(out int npcId);
-            var startCell = world.GridPos[npcId];
-            var targetCell = new Vector2Int(startCell.X, startCell.Y + 3);
-            var command = new DevOrderNpcMoveToCellCommand(npcId, targetCell.x, targetCell.y);
-            var bus = new MessageBus();
-
-            command.Execute(world, bus);
-
-            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent), Is.True);
-            Assert.That(intent.Active, Is.True);
-            Assert.That(intent.Reason, Is.EqualTo(MoveIntentReason.DebugClick));
-
-            for (int tick = 1; tick <= 6 && world.GridPos[npcId].Y != targetCell.y; tick++)
-            {
-                TickContext.BeginTick(tick);
-                new MovementSystem().Update(world, new Tick(tick, 1f), bus, new Telemetry());
-            }
-
-            Assert.That(world.GridPos[npcId].X, Is.EqualTo(targetCell.x));
-            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(targetCell.y));
         }
 
         // =============================================================================
@@ -177,17 +90,17 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
-        // JobMoveToCellFallsBackToLegacyCommandWhenTraversalGateIsDisabled
+        // JobMoveToCellFailsWhenTraversalGateIsDisabled
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Verifica che il gate spento mantenga il fallback legacy anche per un
-        /// target adiacente. Il test non spegne <c>MovementSystem</c> e non cambia
-        /// routing: fotografa solo il comportamento corrente.
+        /// Verifica che il gate spento non attivi piu' alcun fallback legacy.
+        /// Il movimento resta dentro il Job Layer: senza traversal autorizzato,
+        /// il job fallisce e non viene emesso nessun command di movimento.
         /// </para>
         /// </summary>
         [Test]
-        public void JobMoveToCellFallsBackToLegacyCommandWhenTraversalGateIsDisabled()
+        public void JobMoveToCellFailsWhenTraversalGateIsDisabled()
         {
             var world = MakeWorldWithNpc(out int npcId);
             world.Config.Sim.tick = new TickParams
@@ -203,8 +116,10 @@ namespace Arcontio.Tests
             new JobExecutionSystem().Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
             Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
-            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(1));
-            Assert.That(world.JobRuntimeState.CommandBuffer.Snapshot()[0], Is.TypeOf<SetMoveIntentCommand>());
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(job.Status, Is.EqualTo(JobStatus.Failed));
+            Assert.That(job.FailureReason, Is.EqualTo(JobFailureReason.MovementFailed));
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(startCell.X));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(startCell.Y));
         }
@@ -252,7 +167,7 @@ namespace Arcontio.Tests
 
         private static World MakeWorldWithNpc(out int npcId)
         {
-            // World minimale: abbastanza runtime per command, MovementSystem e
+            // World minimale: abbastanza runtime per command e
             // JobExecutionSystem, senza SimulationHost o modifiche config globali.
             var world = new World(new WorldConfig(new SimulationParams()));
             world.Global.Needs = NeedsConfig.Default();

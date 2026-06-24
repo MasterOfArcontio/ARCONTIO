@@ -243,7 +243,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void JobExecutionWhenFarFromFoodEnqueuesMoveIntentCommand()
+        public void JobExecutionWhenFarFromFoodStartsJobOwnedMoveToTraversal()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 1, npcY: 1, foodX: 5, foodY: 5, out int npcId, out int foodId);
             AssignFoodJob(world, npcId, foodId, 5, 5);
@@ -252,12 +252,13 @@ namespace Arcontio.Tests
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
             var commands = world.JobRuntimeState.CommandBuffer.Snapshot();
-            Assert.That(commands.Length, Is.EqualTo(1));
-            Assert.That(commands[0], Is.TypeOf<SetMoveIntentCommand>());
+            Assert.That(commands.Length, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent) && intent.Active, Is.False);
         }
 
         [Test]
-        public void GenericMoveJobWhenFarFromTargetEnqueuesMoveIntentCommand()
+        public void GenericMoveJobWhenFarFromTargetStartsJobOwnedMoveToTraversal()
         {
             var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
             var job = AssignMoveJob(world, npcId, 4, 6);
@@ -267,8 +268,9 @@ namespace Arcontio.Tests
 
             var commands = world.JobRuntimeState.CommandBuffer.Snapshot();
             Assert.That(job.Status, Is.EqualTo(JobStatus.Running));
-            Assert.That(commands.Length, Is.EqualTo(1));
-            Assert.That(commands[0], Is.TypeOf<SetMoveIntentCommand>());
+            Assert.That(commands.Length, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent) && intent.Active, Is.False);
         }
 
         [Test]
@@ -286,7 +288,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void GenericMoveJobDoesNotDuplicateCommandWhenIntentAlreadyMatches()
+        public void GenericMoveJobIgnoresObsoleteMoveIntentAndUsesJobOwnedTraversal()
         {
             var world = MakeWorldWithNpcOnly(npcX: 1, npcY: 1, out int npcId);
             AssignMoveJob(world, npcId, 4, 6);
@@ -303,6 +305,7 @@ namespace Arcontio.Tests
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
             Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
             Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.True);
         }
 
@@ -1145,6 +1148,12 @@ namespace Arcontio.Tests
         private static World MakeWorldWithNpcOnly(int npcX, int npcY, out int npcId, bool enableMbdExplainability = false)
         {
             var sim = new SimulationParams();
+            sim.tick = new TickParams
+            {
+                ticksPerSecond = TickParams.DefaultTicksPerSecond,
+                baseWalkCellDurationTicks = 3,
+                enableJobRunningActionTraversal = true
+            };
             if (enableMbdExplainability)
             {
                 sim.memory_belief_decision_explainability.enabled = true;

@@ -24,7 +24,7 @@ namespace Arcontio.Core
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>MoveToCell</b>: usa una running action di traversal quando esiste gia' una route nota, altrimenti mantiene il ponte <c>SetMoveIntentCommand</c>.</item>
+    ///   <item><b>MoveToCell</b>: usa solo running action e route possedute dal Job Layer; se non esiste una route autorizzata fallisce nel Job Layer.</item>
     ///   <item><b>Consume</b>: accoda <c>EatFromStockCommand</c> solo quando l'NPC e' sul target.</item>
     ///   <item><b>StateMachine</b>: applica <c>StepResult</c> e completa/fallisce il job.</item>
     /// </list>

@@ -29,7 +29,7 @@ namespace Arcontio.Tests
     /// <list type="bullet">
     ///   <item><b>Factory</b>: conserva il <c>JobRequest</c> pre-costruito.</item>
     ///   <item><b>Bridge</b>: SearchFood selezionato assegna un job senza command legacy.</item>
-    ///   <item><b>Execution</b>: il job produce <c>SetMoveIntentCommand</c> con purpose SeekFood.</item>
+    ///   <item><b>Execution</b>: il job muove tramite <c>MoveToCell</c> e running action traversal, senza command legacy.</item>
     ///   <item><b>Fallback</b>: quando non esiste probe fisica valida resta osservabile.</item>
     /// </list>
     /// </summary>
@@ -161,27 +161,25 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void SearchFoodJobEnqueuesSeekFoodMoveIntent()
+        public void SearchFoodJobStartsJobOwnedMoveToTraversal()
         {
             var world = MakeWorldWithHungryNpc(npcX: 5, npcY: 5, out int npcId);
             var commands = new List<ICommand>();
             RunDecisionOrchestrator(world, tick: 0);
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
             var probe = job.Request.TargetCell;
+            var start = world.GridPos[npcId];
             var system = new JobExecutionSystem();
 
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
 
             var buffered = world.JobRuntimeState.CommandBuffer.Snapshot();
-            Assert.That(buffered.Length, Is.EqualTo(1));
-            Assert.That(buffered[0], Is.TypeOf<SetMoveIntentCommand>());
-            buffered[0].Execute(world, new MessageBus());
-            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent), Is.True);
-            Assert.That(intent.Active, Is.True);
-            Assert.That(intent.TargetX, Is.EqualTo(probe.x));
-            Assert.That(intent.TargetY, Is.EqualTo(probe.y));
-            Assert.That(intent.TargetObjectId, Is.EqualTo(0));
-            Assert.That(intent.Reason, Is.EqualTo(MoveIntentReason.SeekFood));
+            Assert.That(buffered.Length, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.NpcMoveIntents.TryGetValue(npcId, out var intent) && intent.Active, Is.False);
+            Assert.That(probe, Is.Not.EqualTo(new Vector2Int(start.X, start.Y)));
+            Assert.That(world.GridPos[npcId].X, Is.EqualTo(start.X));
+            Assert.That(world.GridPos[npcId].Y, Is.EqualTo(start.Y));
         }
 
         [Test]
@@ -200,7 +198,7 @@ namespace Arcontio.Tests
             Assert.That(store.JobLifecycleTraceCount, Is.GreaterThanOrEqualTo(1));
             Assert.That(store.StepTraceCount, Is.EqualTo(1));
             Assert.That(store.JobStateTraceCount, Is.EqualTo(1));
-            Assert.That(store.CommandTraceCount, Is.EqualTo(1));
+            Assert.That(store.CommandTraceCount, Is.EqualTo(0));
 
             Assert.That(store.TryGetLatestJobLifecycleTrace(out var lifecycleTrace), Is.True);
             Assert.That(lifecycleTrace.JobLifecycle.Operation, Is.EqualTo(MemoryBeliefDecisionJobLifecycleOperation.Activated));
@@ -208,14 +206,12 @@ namespace Arcontio.Tests
             Assert.That(store.TryGetLatestStepTrace(out var stepTrace), Is.True);
             Assert.That(stepTrace.Step.Step.Kind, Is.EqualTo(JobActionKind.MoveToCell));
             Assert.That(stepTrace.Step.Result.Status, Is.EqualTo(StepResultStatus.Running));
-            Assert.That(stepTrace.Step.Result.DiagnosticMessage, Is.EqualTo("MoveCommandEnqueued"));
+            Assert.That(stepTrace.Step.Result.DiagnosticMessage, Does.StartWith("MoveToCellTraversal"));
 
             Assert.That(store.TryGetLatestJobStateTrace(out var stateTrace), Is.True);
             Assert.That(stateTrace.JobState.HasActiveJob, Is.True);
 
-            Assert.That(store.TryGetLatestCommandTrace(out var commandTrace), Is.True);
-            Assert.That(commandTrace.Command.Operation, Is.EqualTo(MemoryBeliefDecisionCommandOperation.Enqueued));
-            Assert.That(commandTrace.Command.CommandName, Is.EqualTo(nameof(SetMoveIntentCommand)));
+            Assert.That(store.TryGetLatestCommandTrace(out _), Is.False);
         }
 
         [Test]
@@ -230,16 +226,9 @@ namespace Arcontio.Tests
 
             var jobSystem = new JobExecutionSystem();
             var bus = new MessageBus();
-            jobSystem.Update(world, new Tick(1, 1f), bus, new Telemetry());
-            var buffered = world.JobRuntimeState.CommandBuffer.Snapshot();
-            Assert.That(buffered.Length, Is.EqualTo(1));
-            buffered[0].Execute(world, bus);
-            world.JobRuntimeState.CommandBuffer.Clear();
-
-            var movement = new MovementSystem();
             for (int i = 0; i < 20; i++)
             {
-                movement.Update(world, new Tick(2 + i, 1f), bus, new Telemetry());
+                jobSystem.Update(world, new Tick(1 + i, 1f), bus, new Telemetry());
                 if (world.GridPos[npcId].X == probe.x && world.GridPos[npcId].Y == probe.y)
                     break;
             }
@@ -247,7 +236,7 @@ namespace Arcontio.Tests
             Assert.That(world.GridPos[npcId].X, Is.EqualTo(probe.x));
             Assert.That(world.GridPos[npcId].Y, Is.EqualTo(probe.y));
 
-            jobSystem.Update(world, new Tick(3, 1f), bus, new Telemetry());
+            jobSystem.Update(world, new Tick(30, 1f), bus, new Telemetry());
 
             var viewModel = new MemoryBeliefDecisionExplainabilityViewModel();
             bool built = MemoryBeliefDecisionExplainabilityViewModelBuilder.BuildForNpc(world, npcId, viewModel);
@@ -433,6 +422,12 @@ namespace Arcontio.Tests
             world.Global.NpcVisionRangeCells = 16;
             world.Global.NpcVisionUseCone = false;
             world.Config.Sim.decision.selectionMode = "DeterministicTop1";
+            world.Config.Sim.tick = new TickParams
+            {
+                ticksPerSecond = TickParams.DefaultTicksPerSecond,
+                baseWalkCellDurationTicks = 3,
+                enableJobRunningActionTraversal = true
+            };
 
             npcId = world.CreateNpc(
                 NpcDnaProfile.CreateDefault("search_food_job_qa"),
@@ -460,24 +455,19 @@ namespace Arcontio.Tests
             var bus = new MessageBus();
             var telemetry = new Telemetry();
             var jobExecution = new JobExecutionSystem();
-            var movement = new MovementSystem();
             var perception = new ObjectPerceptionSystem();
             var memoryEncoding = new MemoryEncodingSystem();
             var eventBuffer = new List<ISimEvent>();
 
             // Il test riproduce la catena runtime minima senza chiamare
-            // SimulationHost: il JobExecutionSystem produce il command nel buffer
-            // del Job Layer, il piccolo command pump QA lo applica, MovementSystem
-            // consuma il MoveIntent, poi Perception e MemoryEncoding trasformano
+            // SimulationHost: il JobExecutionSystem possiede direttamente MoveTo
+            // e running action traversal; poi Perception e MemoryEncoding trasformano
             // solo eventi realmente osservati in memoria e belief.
-            jobExecution.Update(world, new Tick(tick, 1f), bus, telemetry);
-            FlushJobCommandBuffer(world, bus);
-
             Assert.That(world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var job), Is.True);
             var probe = job.Request.TargetCell;
             for (int i = 0; i < 20; i++)
             {
-                movement.Update(world, new Tick(tick + 1 + i, 1f), bus, telemetry);
+                jobExecution.Update(world, new Tick(tick + i, 1f), bus, telemetry);
                 if (world.GridPos.TryGetValue(npcId, out var pos)
                     && pos.X == probe.x
                     && pos.Y == probe.y)

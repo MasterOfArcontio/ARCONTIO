@@ -976,15 +976,11 @@ namespace Arcontio.Core
             // ******************************************************************************************************************************
 
             // ******************************************************************************************************************************
-            // 5.1) MOVIMENTO - MovementSystem (consuma MoveIntent)
-            // ******************************************************************************************************************************
-            _scheduler.AddSystem(new MovementSystem());
-
-            // ******************************************************************************************************************************
             // 5.1B) LANDMARK MEMORY (Day3) - NpcLandmarkMemorySystem
             // ******************************************************************************************************************************
             // Questo System applica maintenance (eviction + cap) alla memoria soggettiva dei landmark.
-            // Deve stare DOPO il MovementSystem per poter processare le nuove conoscenze acquisite nello stesso tick.
+            // Il movimento fisico NPC e' ora posseduto dal Job Layer tramite MoveTo,
+            // quindi questo system resta indipendente dal vecchio consumer MoveIntent.
             _scheduler.AddSystem(new NpcLandmarkMemorySystem());
 
             // v0.20n: lo scan automatico idle e' pensionato. Il guardarsi attorno
