@@ -1051,16 +1051,16 @@ namespace Arcontio.Core
         ///
         /// <para><b>Principio architetturale: visualizzazione del piano corrente, non dello storico</b></para>
         /// <para>
-        /// <c>NextPathIndex</c> punta alla prossima cella che l'NPC deve consumare.
-        /// Per disegnare un percorso leggibile partiamo dalla cella immediatamente
-        /// precedente, cioe' dalla posizione corrente o dall'ultimo punto allineato
-        /// al piano. In questo modo l'overlay mostra il segmento ancora utile del
-        /// percorso attivo senza riesporre vecchi path gia' superati.
+        /// <c>NextPathIndex</c> punta alla prossima cella che l'NPC deve consumare,
+        /// ma il pathfinding overlay deve mostrare l'intero piano corrente, non
+        /// solo il frammento residuo. Altrimenti, quando l'NPC e' vicino alla
+        /// destinazione, ArcGraph mostra soltanto un piccolo segmento finale e
+        /// diventa impossibile capire quale percorso fosse stato scelto.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>Clamp indice</b>: impedisce accessi fuori range se lo stato e' transitorio.</item>
+        ///   <item><b>Path completo</b>: parte dalla prima cella del piano corrente.</item>
         ///   <item><b>Filtro minimo</b>: richiede almeno due celle da collegare.</item>
         ///   <item><b>Conversione lineare</b>: crea un edge per ogni coppia consecutiva di celle.</item>
         /// </list>
@@ -1073,10 +1073,7 @@ namespace Arcontio.Core
             if (currentPath == null || outEdges == null || currentPath.Count < 2)
                 return;
 
-            int startIndex = Mathf.Clamp(
-                Mathf.Max(0, nextPathIndex - 1),
-                0,
-                currentPath.Count - 1);
+            int startIndex = 0;
 
             if (currentPath.Count - startIndex < 2)
                 return;

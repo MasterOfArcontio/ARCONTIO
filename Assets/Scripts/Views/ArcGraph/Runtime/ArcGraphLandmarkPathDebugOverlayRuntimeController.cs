@@ -394,7 +394,7 @@ namespace Arcontio.View.ArcGraph
             if (path == null || path.Count == 0)
                 return "[]";
 
-            int startIndex = Mathf.Clamp(Mathf.Max(0, nextPathIndex - 1), 0, path.Count - 1);
+            int startIndex = 0;
             int max = Mathf.Min(path.Count, startIndex + 10);
             var sb = new StringBuilder(160);
             sb.Append("[");
@@ -417,6 +417,8 @@ namespace Arcontio.View.ArcGraph
             sb.Append(path.Count);
             sb.Append(" start=");
             sb.Append(startIndex);
+            sb.Append(" next=");
+            sb.Append(nextPathIndex);
             return sb.ToString();
         }
 
