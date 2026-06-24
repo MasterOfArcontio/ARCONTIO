@@ -58,6 +58,10 @@ namespace Arcontio.View.ArcGraph
         private int _lastRenderedNpcId = -1;
         private bool _lastRenderedLandmarkOverlayEnabled;
         private bool _lastRenderedPathfindingOverlayEnabled;
+        private int _landmarkSetCallCount;
+        private int _pathfindingSetCallCount;
+        private int _processFrameCallCount;
+        private string _lastProcessReason = "NotProcessed";
 
         public bool LandmarkOverlayEnabled => landmarkOverlayEnabled;
         public bool PathfindingOverlayEnabled => pathfindingOverlayEnabled;
@@ -102,12 +106,16 @@ namespace Arcontio.View.ArcGraph
                 "toggle LM=" + landmarkOverlayEnabled +
                 " PF=" + pathfindingOverlayEnabled +
                 " update=" + processInUpdate + "\n" +
+                "calls setLM=" + _landmarkSetCallCount +
+                " setPF=" + _pathfindingSetCallCount +
+                " process=" + _processFrameCallCount + "\n" +
                 "binding provider=" + (runtimeContextProvider != null) +
                 " consumer=" + (overlayConsumer != null) +
                 " world=" + (world != null) + "\n" +
                 "tick=" + tick +
                 " selectedNpc=" + activeNpcId +
-                " reason=" + diagnostics.Reason + "\n" +
+                " reason=" + diagnostics.Reason +
+                " lastProcess=" + _lastProcessReason + "\n" +
                 "attempt LM=" + diagnostics.LandmarkAttempted +
                 " srcNodes=" + diagnostics.LandmarkSourceNodeCount +
                 " srcEdges=" + diagnostics.LandmarkSourceEdgeCount + "\n" +
@@ -183,6 +191,7 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void SetLandmarkOverlayEnabled(bool enabled)
         {
+            _landmarkSetCallCount++;
             landmarkOverlayEnabled = enabled;
             RefreshOrClear();
         }
@@ -197,6 +206,7 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void SetPathfindingOverlayEnabled(bool enabled)
         {
+            _pathfindingSetCallCount++;
             pathfindingOverlayEnabled = enabled;
             RefreshOrClear();
         }
@@ -216,10 +226,13 @@ namespace Arcontio.View.ArcGraph
 
         private void ProcessFrame(bool forceRender)
         {
+            _processFrameCallCount++;
+
             if (!HasAnyOverlayEnabled())
             {
                 overlayConsumer?.ClearProbe();
                 ResetRenderMarkers();
+                _lastProcessReason = "NoOverlayEnabled";
                 return;
             }
 
@@ -227,6 +240,7 @@ namespace Arcontio.View.ArcGraph
             {
                 overlayConsumer?.ClearProbe();
                 ResetRenderMarkers();
+                _lastProcessReason = "RuntimeBindingMissing";
                 Log("RuntimeBindingMissing");
                 return;
             }
@@ -237,6 +251,7 @@ namespace Arcontio.View.ArcGraph
             {
                 overlayConsumer.ClearProbe();
                 ResetRenderMarkers();
+                _lastProcessReason = "WorldMissing";
                 Log("WorldMissing");
                 return;
             }
@@ -246,6 +261,7 @@ namespace Arcontio.View.ArcGraph
             {
                 overlayConsumer.ClearProbe();
                 ResetRenderMarkers();
+                _lastProcessReason = "SelectedNpcMissing";
                 Log("SelectedNpcMissing");
                 return;
             }
@@ -257,6 +273,7 @@ namespace Arcontio.View.ArcGraph
                 && landmarkOverlayEnabled == _lastRenderedLandmarkOverlayEnabled
                 && pathfindingOverlayEnabled == _lastRenderedPathfindingOverlayEnabled)
             {
+                _lastProcessReason = "SkippedSameFrame";
                 return;
             }
 
@@ -268,6 +285,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphDebugOverlayRuntimeFeedDiagnostics diagnostics =
                 _feed.BuildFromWorld(world, activeNpcId, _options);
             overlayConsumer.RenderQueue(_feed.Queue);
+            _lastProcessReason = diagnostics.Reason;
             _lastRenderedTick = tick;
             _lastRenderedNpcId = activeNpcId;
             _lastRenderedLandmarkOverlayEnabled = landmarkOverlayEnabled;

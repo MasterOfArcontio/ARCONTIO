@@ -86,6 +86,9 @@ namespace Arcontio.View.ArcGraph
         private int _lateBindFramesLeft;
         private int _configuredMapGridRootCount;
         private bool _installed;
+        private int _visualOverlayCallbackCount;
+        private string _lastVisualOverlayKey = "None";
+        private bool _lastVisualOverlayEnabled;
 
         // =============================================================================
         // RegisterSceneHook
@@ -422,10 +425,7 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
             _uiRoot.SetVisualOverlayController(_visualOverlayController);
             _uiRoot.SetVisualOverlayStateChanged(OnVisualOverlayStateChanged);
-            _uiRoot.SetVisualOverlayDiagnosticsProvider(
-                _landmarkPathOverlayController != null
-                    ? _landmarkPathOverlayController.BuildRuntimeDiagnosticsText
-                    : null);
+            _uiRoot.SetVisualOverlayDiagnosticsProvider(BuildVisualOverlayDiagnosticsText);
             _uiRoot.SetSimulationControlController(_simulationControlController);
         }
 
@@ -485,6 +485,10 @@ namespace Arcontio.View.ArcGraph
         private void OnVisualOverlayStateChanged(string overlayKey, bool enabled)
         {
             string normalized = ArcUiOperationDefinition.NormalizeKey(overlayKey);
+            _visualOverlayCallbackCount++;
+            _lastVisualOverlayKey = normalized;
+            _lastVisualOverlayEnabled = enabled;
+
             if (normalized == ArcUiVisualOverlayCatalog.NpcLineOfSightKey)
             {
                 if (_fovOverlayController == null)
@@ -512,6 +516,27 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             _landmarkPathOverlayController.SetPathfindingOverlayEnabled(enabled);
+        }
+
+        private string BuildVisualOverlayDiagnosticsText()
+        {
+            ArcUiVisualOverlayState uiState = _visualOverlayController != null
+                ? _visualOverlayController.BuildStateSnapshot()
+                : ArcUiVisualOverlayState.Empty();
+
+            string controllerText = _landmarkPathOverlayController != null
+                ? _landmarkPathOverlayController.BuildRuntimeDiagnosticsText()
+                : "LM/PF DEBUG\ncontroller=False";
+
+            return
+                "UI OVERLAY\n" +
+                "ui LM=" + uiState.IsEnabled(ArcUiVisualOverlayCatalog.LandmarksKey) +
+                " PF=" + uiState.IsEnabled(ArcUiVisualOverlayCatalog.PathfindingKey) +
+                " LOS=" + uiState.IsEnabled(ArcUiVisualOverlayCatalog.NpcLineOfSightKey) + "\n" +
+                "callback count=" + _visualOverlayCallbackCount +
+                " last=" + _lastVisualOverlayKey +
+                " enabled=" + _lastVisualOverlayEnabled + "\n" +
+                controllerText;
         }
 
         // =============================================================================
