@@ -4308,7 +4308,7 @@ namespace Arcontio.Core
             // Nel file attuale gli helper:
             // - FillDebugVisibleGraphOverlayData(...)
             // - FillDebugKnownGraphOverlayData(...)
-            // - FillDebugNavigationPathOverlayData(...)
+            // - FillActiveNavigationPathOverlayData(...)
             // non risultano definiti.
             //
             // Per evitare ulteriori drift di firma o compile error, qui rimettiamo
@@ -4356,7 +4356,7 @@ namespace Arcontio.Core
             // ============================================================
             // PATH RUNTIME CELLA-PER-CELLA
             // ============================================================
-            FillDebugNavigationPathOverlayData(npcId, outLmPathEdges, outDirectPathEdges, outJumpPathEdges);
+            FillActiveNavigationPathOverlayData(npcId, outLmPathEdges, outDirectPathEdges, outJumpPathEdges);
 
             // ============================================================
             // COMPLEX EDGES (v0.03.04.c-ComplexEdge_Creation)
@@ -4423,15 +4423,15 @@ namespace Arcontio.Core
 
         /// <summary>
         /// Riempie gli edge di overlay cella-per-cella per i tre layer di navigazione.
-        /// Delega a <see cref="PathfindingState.FillDebugNavigationPathOverlayData"/>.
+        /// Delega a <see cref="PathfindingState.FillActiveNavigationPathOverlayData"/>.
         /// </summary>
-        private void FillDebugNavigationPathOverlayData(
+        private void FillActiveNavigationPathOverlayData(
             int npcId,
             System.Collections.Generic.List<LandmarkOverlayEdge> outLmPathEdges,
             System.Collections.Generic.List<LandmarkOverlayEdge> outDirectPathEdges,
             System.Collections.Generic.List<LandmarkOverlayEdge> outJumpPathEdges)
         {
-            Pathfinding.FillDebugNavigationPathOverlayData(npcId, outLmPathEdges, outDirectPathEdges, outJumpPathEdges);
+            Pathfinding.FillActiveNavigationPathOverlayData(npcId, outLmPathEdges, outDirectPathEdges, outJumpPathEdges);
         }
 
         /// <summary>

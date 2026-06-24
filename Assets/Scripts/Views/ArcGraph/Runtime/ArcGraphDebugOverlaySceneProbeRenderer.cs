@@ -640,7 +640,11 @@ namespace Arcontio.View.ArcGraph
                     color = new Color(0.20f, 1f, 0.55f, 0.34f);
                     break;
                 case "debug/landmark/route-node":
+                    color = new Color(1f, 0.70f, 0.16f, 0.95f);
+                    break;
                 case "debug/landmark/route-edge":
+                    color = new Color(1f, 0.70f, 0.16f, 0.34f);
+                    break;
                 case "debug/path/lm":
                     color = new Color(1f, 0.70f, 0.16f, 0.95f);
                     break;
@@ -651,7 +655,7 @@ namespace Arcontio.View.ArcGraph
                     color = new Color(1f, 0.20f, 0.75f, 0.95f);
                     break;
                 case "debug/path/complex":
-                    color = new Color(1f, 1f, 0f, 1f);
+                    color = new Color(1f, 0.90f, 0.18f, 0.34f);
                     break;
                 case "debug/landmark/gvd-node":
                 case "debug/gvd/edge":

@@ -866,6 +866,66 @@ namespace Arcontio.Core
                 AppendOverlayEdgesFromCellPath(jumpCells, outJumpPathEdges);
         }
 
+        // =============================================================================
+        // FillActiveNavigationPathOverlayData
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riempie gli edge di overlay usando lo stato di navigazione attivo dell'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: overlay read-only da stato esecutivo</b></para>
+        /// <para>
+        /// Questo metodo non pianifica nuovi percorsi e non modifica la simulazione.
+        /// Legge soltanto gli stati runtime gia' mantenuti dal pathfinding:
+        /// <c>DirectCommitExecution</c>, <c>GoalLocalSearchExecution</c> e, come
+        /// traccia eseguita, <c>DebugLmPathCells</c>. L'obiettivo e' evitare che
+        /// ArcGraph visualizzi path debug vecchi o accumulati quando l'NPC sta
+        /// seguendo un percorso corrente diverso.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>LM path</b>: mantiene solo la traccia realmente eseguita tra landmark.</item>
+        ///   <item><b>Direct commit</b>: visualizza il path attivo rimasto dal punto corrente in poi.</item>
+        ///   <item><b>Goal local search</b>: visualizza il path locale attivo rimasto dal punto corrente in poi.</item>
+        /// </list>
+        /// </summary>
+        public void FillActiveNavigationPathOverlayData(
+            int npcId,
+            List<LandmarkOverlayEdge> outLmPathEdges,
+            List<LandmarkOverlayEdge> outDirectPathEdges,
+            List<LandmarkOverlayEdge> outJumpPathEdges)
+        {
+            if (outLmPathEdges != null) outLmPathEdges.Clear();
+            if (outDirectPathEdges != null) outDirectPathEdges.Clear();
+            if (outJumpPathEdges != null) outJumpPathEdges.Clear();
+
+            if (DebugLmPathCells.TryGetValue(npcId, out var lmCells) && lmCells != null)
+                AppendOverlayEdgesFromCellPath(lmCells, outLmPathEdges);
+
+            if (GoalLocalSearchExecution.TryGetValue(npcId, out var localState)
+                && localState != null
+                && localState.Active)
+            {
+                AppendOverlayEdgesFromCurrentPath(
+                    localState.CurrentPath,
+                    localState.NextPathIndex,
+                    outJumpPathEdges);
+                return;
+            }
+
+            if (DirectCommitExecution.TryGetValue(npcId, out var directState)
+                && directState != null
+                && directState.Active)
+            {
+                AppendOverlayEdgesFromCurrentPath(
+                    directState.CurrentPath,
+                    directState.NextPathIndex,
+                    outDirectPathEdges);
+            }
+        }
+
         // =====================================================================
         // HELPER PRIVATI
         // =====================================================================
@@ -977,6 +1037,54 @@ namespace Arcontio.Core
             {
                 var a = path[i];
                 var b = path[i + 1];
+                outEdges.Add(new LandmarkOverlayEdge(ax: a.X, ay: a.Y, bx: b.X, by: b.Y, reliability01: 1f));
+            }
+        }
+
+        // =============================================================================
+        // AppendOverlayEdgesFromCurrentPath
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte la parte ancora rilevante di un path esecutivo in edge overlay.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: visualizzazione del piano corrente, non dello storico</b></para>
+        /// <para>
+        /// <c>NextPathIndex</c> punta alla prossima cella che l'NPC deve consumare.
+        /// Per disegnare un percorso leggibile partiamo dalla cella immediatamente
+        /// precedente, cioe' dalla posizione corrente o dall'ultimo punto allineato
+        /// al piano. In questo modo l'overlay mostra il segmento ancora utile del
+        /// percorso attivo senza riesporre vecchi path gia' superati.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Clamp indice</b>: impedisce accessi fuori range se lo stato e' transitorio.</item>
+        ///   <item><b>Filtro minimo</b>: richiede almeno due celle da collegare.</item>
+        ///   <item><b>Conversione lineare</b>: crea un edge per ogni coppia consecutiva di celle.</item>
+        /// </list>
+        /// </summary>
+        private static void AppendOverlayEdgesFromCurrentPath(
+            List<GridPosition> currentPath,
+            int nextPathIndex,
+            List<LandmarkOverlayEdge> outEdges)
+        {
+            if (currentPath == null || outEdges == null || currentPath.Count < 2)
+                return;
+
+            int startIndex = Mathf.Clamp(
+                Mathf.Max(0, nextPathIndex - 1),
+                0,
+                currentPath.Count - 1);
+
+            if (currentPath.Count - startIndex < 2)
+                return;
+
+            for (int i = startIndex; i < currentPath.Count - 1; i++)
+            {
+                var a = currentPath[i];
+                var b = currentPath[i + 1];
                 outEdges.Add(new LandmarkOverlayEdge(ax: a.X, ay: a.Y, bx: b.X, by: b.Y, reliability01: 1f));
             }
         }
