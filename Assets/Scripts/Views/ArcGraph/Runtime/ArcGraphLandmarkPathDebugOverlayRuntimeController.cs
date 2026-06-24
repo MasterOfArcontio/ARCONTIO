@@ -271,7 +271,8 @@ namespace Arcontio.View.ArcGraph
                 && tick == _lastRenderedTick
                 && activeNpcId == _lastRenderedNpcId
                 && landmarkOverlayEnabled == _lastRenderedLandmarkOverlayEnabled
-                && pathfindingOverlayEnabled == _lastRenderedPathfindingOverlayEnabled)
+                && pathfindingOverlayEnabled == _lastRenderedPathfindingOverlayEnabled
+                && overlayConsumer.HasProbeRoot())
             {
                 _lastProcessReason = "SkippedSameFrame";
                 return;

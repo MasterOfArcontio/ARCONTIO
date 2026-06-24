@@ -121,6 +121,11 @@ namespace Arcontio.View.ArcGraph
             return "probeRoot=True children=" + root.childCount;
         }
 
+        public bool HasProbeRoot()
+        {
+            return (_root != null ? _root : FindExistingRoot()) != null;
+        }
+
         // =============================================================================
         // Start
         // =============================================================================
@@ -190,10 +195,11 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
-            if (clearBeforeRender)
-                ClearProbe();
-
             EnsureRoot();
+
+            if (clearBeforeRender)
+                ClearProbeChildren();
+
             EnsureDebugSprite();
             EnsureLineMaterial();
 
@@ -240,6 +246,25 @@ namespace Arcontio.View.ArcGraph
 
             DestroyProbeObject(_root.gameObject);
             _root = null;
+        }
+
+        private void ClearProbeChildren()
+        {
+            if (_root == null)
+                _root = FindExistingRoot();
+
+            if (_root == null)
+                return;
+
+            for (int i = _root.childCount - 1; i >= 0; i--)
+            {
+                Transform child = _root.GetChild(i);
+                if (child == null)
+                    continue;
+
+                child.gameObject.SetActive(false);
+                DestroyProbeObject(child.gameObject);
+            }
         }
 
         private void RenderCells(ArcGraphDebugOverlayQueue queue)
