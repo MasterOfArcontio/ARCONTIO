@@ -63,6 +63,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementToolController _placementToolController;
         private ArcGraphPointerCellHoverSceneConsumer _pointerCellHoverConsumer;
+        private ArcGraphPointerHudSceneConsumer _pointerHudConsumer;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphUiSelectionSceneConsumer _uiSelectionConsumer;
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
@@ -86,9 +87,6 @@ namespace Arcontio.View.ArcGraph
         private int _lateBindFramesLeft;
         private int _configuredMapGridRootCount;
         private bool _installed;
-        private int _visualOverlayCallbackCount;
-        private string _lastVisualOverlayKey = "None";
-        private bool _lastVisualOverlayEnabled;
 
         // =============================================================================
         // RegisterSceneHook
@@ -252,6 +250,7 @@ namespace Arcontio.View.ArcGraph
             _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
             _placementToolController.enabled = false;
             _pointerCellHoverConsumer = _visualRoot.AddComponent<ArcGraphPointerCellHoverSceneConsumer>();
+            _pointerHudConsumer = _visualRoot.AddComponent<ArcGraphPointerHudSceneConsumer>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _uiSelectionConsumer = _visualRoot.AddComponent<ArcGraphUiSelectionSceneConsumer>();
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
@@ -352,11 +351,14 @@ namespace Arcontio.View.ArcGraph
             _interactionRouter.SetRouterEnabled(true);
             _interactionRouter.SetRuntimeConsumers(
                 _pointerCellHoverConsumer,
+                _pointerHudConsumer,
                 _placementHighlightConsumer,
                 _uiSelectionConsumer);
             _placementToolController.SetRuntimeContextProvider(_contextProvider);
             _placementToolController.SetSceneCamera(Camera.main);
             _pointerCellHoverConsumer.SetSceneCamera(Camera.main);
+            _pointerHudConsumer.SetSceneCamera(Camera.main);
+            _pointerHudConsumer.SetHudEnabled(true);
             _placementHighlightConsumer.SetRuntimeContextProvider(_contextProvider);
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
             _placementHighlightConsumer.SetSceneCamera(Camera.main);
@@ -425,7 +427,6 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetFovViewModeClicked(ToggleFovDebugOverlay);
             _uiRoot.SetVisualOverlayController(_visualOverlayController);
             _uiRoot.SetVisualOverlayStateChanged(OnVisualOverlayStateChanged);
-            _uiRoot.SetVisualOverlayDiagnosticsProvider(BuildVisualOverlayDiagnosticsText);
             _uiRoot.SetSimulationControlController(_simulationControlController);
         }
 
@@ -485,9 +486,6 @@ namespace Arcontio.View.ArcGraph
         private void OnVisualOverlayStateChanged(string overlayKey, bool enabled)
         {
             string normalized = ArcUiOperationDefinition.NormalizeKey(overlayKey);
-            _visualOverlayCallbackCount++;
-            _lastVisualOverlayKey = normalized;
-            _lastVisualOverlayEnabled = enabled;
 
             if (normalized == ArcUiVisualOverlayCatalog.NpcLineOfSightKey)
             {
@@ -516,27 +514,6 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             _landmarkPathOverlayController.SetPathfindingOverlayEnabled(enabled);
-        }
-
-        private string BuildVisualOverlayDiagnosticsText()
-        {
-            ArcUiVisualOverlayState uiState = _visualOverlayController != null
-                ? _visualOverlayController.BuildStateSnapshot()
-                : ArcUiVisualOverlayState.Empty();
-
-            string controllerText = _landmarkPathOverlayController != null
-                ? _landmarkPathOverlayController.BuildRuntimeDiagnosticsText()
-                : "LM/PF DEBUG\ncontroller=False";
-
-            return
-                "UI OVERLAY\n" +
-                "ui LM=" + uiState.IsEnabled(ArcUiVisualOverlayCatalog.LandmarksKey) +
-                " PF=" + uiState.IsEnabled(ArcUiVisualOverlayCatalog.PathfindingKey) +
-                " LOS=" + uiState.IsEnabled(ArcUiVisualOverlayCatalog.NpcLineOfSightKey) + "\n" +
-                "callback count=" + _visualOverlayCallbackCount +
-                " last=" + _lastVisualOverlayKey +
-                " enabled=" + _lastVisualOverlayEnabled + "\n" +
-                controllerText;
         }
 
         // =============================================================================

@@ -66,13 +66,13 @@ namespace Arcontio.View.ArcGraph
             ArcGraphPointerHudSnapshot uiSnapshot = builder.Build(CreateUiBlockedFrame());
             ArcGraphPointerHudSnapshot emptySnapshot = builder.BuildEmpty("HarnessEmpty");
 
-            bool passed = actorSnapshot.DisplayText == "Cell: 12,14 | Actor #7"
+            bool passed = actorSnapshot.DisplayText == "col 12 | riga 14 | Actor #7"
                           && actorSnapshot.HasActor
-                          && cellSnapshot.DisplayText == "Cell: 2,3"
+                          && cellSnapshot.DisplayText == "col 2 | riga 3"
                           && cellSnapshot.TargetKind == ArcGraphInteractionTargetKind.Cell
-                          && uiSnapshot.DisplayText == "Cell: -,- | UI blocked"
+                          && uiSnapshot.DisplayText == "col -- | riga -- | UI blocked"
                           && uiSnapshot.IsPointerOverUi
-                          && emptySnapshot.DisplayText == "Cell: -,-"
+                          && emptySnapshot.DisplayText == "col -- | riga --"
                           && !emptySnapshot.HasInteractionFrame;
 
             return new ArcGraphPointerHudSnapshotBuilderHarnessResult(

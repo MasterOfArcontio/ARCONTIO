@@ -89,7 +89,7 @@ namespace Arcontio.View.ArcGraph
             SourceFrameIndex = sourceFrameIndex;
             InteractionReason = string.IsNullOrWhiteSpace(interactionReason) ? "None" : interactionReason;
             AdapterReason = string.IsNullOrWhiteSpace(adapterReason) ? "None" : adapterReason;
-            DisplayText = string.IsNullOrWhiteSpace(displayText) ? "Cell: -,-" : displayText;
+            DisplayText = string.IsNullOrWhiteSpace(displayText) ? "col -- | riga --" : displayText;
         }
 
         // =============================================================================
@@ -116,7 +116,7 @@ namespace Arcontio.View.ArcGraph
                 0,
                 reason,
                 reason,
-                "Cell: -,-");
+                "col -- | riga --");
         }
     }
 }

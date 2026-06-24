@@ -95,6 +95,7 @@ namespace Arcontio.View.ArcGraph
         private const float DenseDetailIndent = 9f;
         private const int DenseFontSize = 9;
         private const int DenseToggleFontSize = 11;
+        private const int LongTextRowThreshold = 18;
 
         [SerializeField] private bool inspectorEnabled = true;
 
@@ -1260,8 +1261,8 @@ namespace Arcontio.View.ArcGraph
                 ArcUiInspectorRowKind.IconMetrics => dense ? DenseMetricRowHeight : CompactMetricRowHeight,
                 ArcUiInspectorRowKind.Expandable => ResolveExpandableHeight(dense)
                     + (row.Details.Length > 0 ? EstimateRowsHeight(row.Details, true) : 0f),
-                ArcUiInspectorRowKind.Timeline => dense ? DenseTimelineHeight : CompactTimelineHeight,
-                _ => ResolveTextRowHeight(dense)
+                ArcUiInspectorRowKind.Timeline => EstimateTextLikeRowHeight(row.Label, row.Value, dense),
+                _ => EstimateTextLikeRowHeight(row.Label, row.Value, dense)
             };
         }
 
@@ -1272,7 +1273,7 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform root = CreateRect("ArcTimelineRow_" + SanitizeName(row.RowKey), parent);
             LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = dense ? DenseTimelineHeight : CompactTimelineHeight;
+            rootLayout.preferredHeight = EstimateTextLikeRowHeight(row.Label, row.Value, dense);
 
             Image image = root.gameObject.AddComponent<Image>();
             image.raycastTarget = false;
@@ -1296,7 +1297,8 @@ namespace Arcontio.View.ArcGraph
             RectTransform valueRoot = CreateRect("Value", root);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
             valueLayout.flexibleWidth = 1f;
-            CreateText(valueRoot, row.Value, dense ? DenseFontSize : 9, FontStyles.Normal, TextAlignmentOptions.Left);
+            TextMeshProUGUI value = CreateText(valueRoot, row.Value, dense ? DenseFontSize : 9, FontStyles.Normal, TextAlignmentOptions.Left);
+            ConfigureWrappedText(value);
         }
 
         private void ToggleRowExpanded(string rowKey)
@@ -1340,6 +1342,12 @@ namespace Arcontio.View.ArcGraph
             string value,
             bool dense)
         {
+            if (ShouldUseLongTextRow(label, value))
+            {
+                CreateLongTextInfoRow(parent, label, value, dense);
+                return;
+            }
+
             RectTransform row = CreateRect("ArcInfoRow_" + SanitizeName(label), parent);
             LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
             rowLayout.preferredHeight = ResolveTextRowHeight(dense);
@@ -1361,6 +1369,36 @@ namespace Arcontio.View.ArcGraph
             CreateText(valueRoot, value, dense ? DenseFontSize : 10, FontStyles.Bold, TextAlignmentOptions.Right);
         }
 
+        private static void CreateLongTextInfoRow(
+            RectTransform parent,
+            string label,
+            string value,
+            bool dense)
+        {
+            RectTransform row = CreateRect("ArcLongInfoRow_" + SanitizeName(label), parent);
+            LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
+            rowLayout.preferredHeight = EstimateTextLikeRowHeight(label, value, dense);
+
+            VerticalLayoutGroup layout = row.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 0f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            RectTransform labelRoot = CreateRect("Label", row);
+            LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
+            labelLayout.preferredHeight = dense ? 12f : 14f;
+            TextMeshProUGUI labelText = CreateText(labelRoot, label, dense ? DenseFontSize : 10, FontStyles.Normal, TextAlignmentOptions.Left);
+            labelText.color = ColorFromHex("#80909C", 1f);
+
+            RectTransform valueRoot = CreateRect("Value", row);
+            LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
+            valueLayout.preferredHeight = EstimateWrappedValueHeight(value, dense);
+            TextMeshProUGUI valueText = CreateText(valueRoot, value, dense ? DenseFontSize : 10, FontStyles.Bold, TextAlignmentOptions.Left);
+            ConfigureWrappedText(valueText);
+        }
+
         private static float ResolveRowSpacing(bool dense)
         {
             return dense ? DenseRowSpacing : CompactRowSpacing;
@@ -1369,6 +1407,45 @@ namespace Arcontio.View.ArcGraph
         private static float ResolveTextRowHeight(bool dense)
         {
             return dense ? DenseTextRowHeight : CompactTextRowHeight;
+        }
+
+        private static float EstimateTextLikeRowHeight(
+            string label,
+            string value,
+            bool dense)
+        {
+            if (!ShouldUseLongTextRow(label, value))
+                return ResolveTextRowHeight(dense);
+
+            return (dense ? 12f : 14f) + EstimateWrappedValueHeight(value, dense);
+        }
+
+        private static float EstimateWrappedValueHeight(
+            string value,
+            bool dense)
+        {
+            int length = string.IsNullOrEmpty(value) ? 0 : value.Length;
+            int charsPerLine = dense ? 34 : 42;
+            int lineCount = Mathf.Clamp(Mathf.CeilToInt(length / (float)charsPerLine), 1, 4);
+            return lineCount * (dense ? 13f : 15f);
+        }
+
+        private static bool ShouldUseLongTextRow(
+            string label,
+            string value)
+        {
+            int labelLength = string.IsNullOrEmpty(label) ? 0 : label.Length;
+            int valueLength = string.IsNullOrEmpty(value) ? 0 : value.Length;
+            return labelLength > LongTextRowThreshold || valueLength > LongTextRowThreshold;
+        }
+
+        private static void ConfigureWrappedText(TextMeshProUGUI label)
+        {
+            if (label == null)
+                return;
+
+            label.enableWordWrapping = true;
+            label.overflowMode = TextOverflowModes.Ellipsis;
         }
 
         private static float ResolveExpandableHeight(bool dense)

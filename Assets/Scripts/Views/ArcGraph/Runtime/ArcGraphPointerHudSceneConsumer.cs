@@ -33,6 +33,10 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool hudEnabled;
         [SerializeField] private bool drawInOnGui = true;
         [SerializeField] private bool consumeWhenHudDisabled = true;
+        [SerializeField] private Camera sceneCamera;
+        [SerializeField] private bool preferSceneCameraCell = true;
+        [SerializeField] private float tileWorldSize = 1f;
+        [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private Rect hudRect = new Rect(150f, 62f, 420f, 30f);
         [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0.60f);
         [SerializeField] private Color textColor = Color.white;
@@ -70,6 +74,21 @@ namespace Arcontio.View.ArcGraph
         {
             if (!hudEnabled && !consumeWhenHudDisabled)
                 return;
+
+            if (preferSceneCameraCell &&
+                TryResolveCellFromSceneCamera(interactionFrame, out ArcGraphCellCoord cameraCell))
+            {
+                interactionFrame = new ArcGraphInteractionFrame(
+                    interactionFrame.Input,
+                    interactionFrame.Coordinate,
+                    interactionFrame.TargetKind,
+                    cameraCell,
+                    interactionFrame.ActorId,
+                    interactionFrame.ObjectId,
+                    true,
+                    interactionFrame.IsPointerOverUi,
+                    interactionFrame.Reason);
+            }
 
             // Il builder resta la fonte unica del testo HUD. Il componente scena non
             // duplica logica di formattazione, cosi' il contratto data-only e la UI
@@ -145,6 +164,26 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // SetSceneCamera
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna la camera usata per convertire il puntatore in cella renderizzata.
+        /// </para>
+        ///
+        /// <para><b>Coerenza con hover cella</b></para>
+        /// <para>
+        /// Il Pointer HUD deve mostrare la stessa riga/colonna evidenziata dal
+        /// consumer hover. Per questo usa la camera scena solo come trasformazione
+        /// view-side, senza interrogare World o selezione.
+        /// </para>
+        /// </summary>
+        public void SetSceneCamera(Camera camera)
+        {
+            sceneCamera = camera;
+        }
+
+        // =============================================================================
         // EnableHudFromInspector
         // =============================================================================
         /// <summary>
@@ -214,6 +253,63 @@ namespace Arcontio.View.ArcGraph
                 richText = false,
                 clipping = TextClipping.Clip
             };
+        }
+
+        private bool TryResolveCellFromSceneCamera(
+            ArcGraphInteractionFrame interactionFrame,
+            out ArcGraphCellCoord cell)
+        {
+            cell = interactionFrame.Cell;
+
+            if (!interactionFrame.Input.HasPointerScreenPosition)
+                return false;
+
+            Camera camera = ResolveSceneCamera();
+            if (camera == null)
+                return false;
+
+            Rect pixelRect = camera.pixelRect;
+            if (pixelRect.width <= 0f || pixelRect.height <= 0f)
+                return false;
+
+            Vector2 absoluteScreenPoint = new Vector2(
+                interactionFrame.Input.PointerScreenX + pixelRect.x,
+                interactionFrame.Input.PointerScreenY + pixelRect.y);
+
+            if (!pixelRect.Contains(absoluteScreenPoint))
+                return false;
+
+            float safeTileWorldSize = tileWorldSize > 0.0001f ? tileWorldSize : 1f;
+            float worldPlaneDistance = ResolveWorldPlaneDistance(camera);
+            Vector3 worldPoint = camera.ScreenToWorldPoint(new Vector3(
+                absoluteScreenPoint.x,
+                absoluteScreenPoint.y,
+                worldPlaneDistance));
+
+            int cellX = Mathf.FloorToInt((worldPoint.x - originOffset.x) / safeTileWorldSize);
+            int cellY = Mathf.FloorToInt((worldPoint.y - originOffset.y) / safeTileWorldSize);
+            int cellZ = interactionFrame.HasValidCell ? interactionFrame.Cell.Z : 0;
+            cell = new ArcGraphCellCoord(cellX, cellY, cellZ);
+            return true;
+        }
+
+        private Camera ResolveSceneCamera()
+        {
+            if (sceneCamera != null)
+                return sceneCamera;
+
+            return Camera.main;
+        }
+
+        private float ResolveWorldPlaneDistance(Camera camera)
+        {
+            if (camera == null)
+                return 0f;
+
+            float distance = originOffset.z - camera.transform.position.z;
+            return Mathf.Abs(distance) > 0.001f
+                ? Mathf.Abs(distance)
+                : Mathf.Max(0.001f, camera.nearClipPlane);
         }
 
         private static Rect CreateTextRect(Rect source)

@@ -127,15 +127,15 @@ namespace Arcontio.View.ArcGraph
         private static string BuildDisplayText(ArcGraphInteractionFrame frame)
         {
             if (frame.IsPointerOverUi || frame.TargetKind == ArcGraphInteractionTargetKind.UiBlocked)
-                return "Cell: -,- | UI blocked";
+                return "col -- | riga -- | UI blocked";
 
             if (!frame.Input.HasPointerScreenPosition)
-                return "Cell: -,- | Pointer missing";
+                return "col -- | riga -- | Pointer missing";
 
             if (!frame.HasValidCell)
-                return "Cell: -,- | " + NormalizeReason(frame.Reason);
+                return "col -- | riga -- | " + NormalizeReason(frame.Reason);
 
-            string cellText = "Cell: " + FormatCell(frame.Cell);
+            string cellText = FormatCell(frame.Cell);
 
             switch (frame.TargetKind)
             {
@@ -153,9 +153,9 @@ namespace Arcontio.View.ArcGraph
         private static string FormatCell(ArcGraphCellCoord cell)
         {
             if (cell.Z == 0)
-                return cell.X + "," + cell.Y;
+                return "col " + cell.X + " | riga " + cell.Y;
 
-            return cell.X + "," + cell.Y + "," + cell.Z;
+            return "col " + cell.X + " | riga " + cell.Y + " | z " + cell.Z;
         }
 
         private static string NormalizeReason(string reason)

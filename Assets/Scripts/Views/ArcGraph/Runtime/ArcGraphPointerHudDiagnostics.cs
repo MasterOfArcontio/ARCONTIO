@@ -62,7 +62,7 @@ namespace Arcontio.View.ArcGraph
             ObjectId = objectId > 0 ? objectId : -1;
             SourceFrameIndex = sourceFrameIndex;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
-            DisplayText = string.IsNullOrWhiteSpace(displayText) ? "Cell: -,-" : displayText;
+            DisplayText = string.IsNullOrWhiteSpace(displayText) ? "col -- | riga --" : displayText;
         }
     }
 }
