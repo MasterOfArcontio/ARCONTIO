@@ -643,7 +643,7 @@ namespace Arcontio.View.ArcGraph
                     color = new Color(1f, 0.70f, 0.16f, 0.95f);
                     break;
                 case "debug/landmark/route-edge":
-                    color = new Color(1f, 0.70f, 0.16f, 0.10f);
+                    color = new Color(1f, 0.70f, 0.16f, 0.92f);
                     break;
                 case "debug/path/lm":
                     color = new Color(1f, 0.70f, 0.16f, 0.95f);

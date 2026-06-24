@@ -126,6 +126,8 @@ namespace Arcontio.View.ArcGraph
                 " nodes=" + queue.NodeItemCount +
                 " edges=" + queue.EdgeItemCount +
                 " visible=" + queue.VisibleItemCount + "\n" +
+                "visual routeEdge=" + _options.IncludeLandmarkRoute +
+                " complexEdges=" + _options.IncludeLandmarkComplexEdges + "\n" +
                 probe + "\n" +
                 BuildSelectedNpcPathfindingDiagnostics(world, activeNpcId);
         }
