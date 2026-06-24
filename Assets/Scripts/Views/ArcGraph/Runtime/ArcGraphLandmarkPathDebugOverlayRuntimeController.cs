@@ -578,7 +578,12 @@ namespace Arcontio.View.ArcGraph
             }
 
             long tick = world.Global.CurrentTickIndex;
-            if (!forceRender
+            // Il layer landmark puro puo' saltare frame identici: i nodi statici
+            // non cambiano di continuo. Il layer pathfinding, invece, deve leggere
+            // ogni Update quando resta acceso, perche' il Job MoveTo aggiorna route
+            // e DirectCommit mentre il toggle UI e l'NPC selezionato restano uguali.
+            if (!pathfindingOverlayEnabled
+                && !forceRender
                 && tick == _lastRenderedTick
                 && activeNpcId == _lastRenderedNpcId
                 && landmarkOverlayEnabled == _lastRenderedLandmarkOverlayEnabled
