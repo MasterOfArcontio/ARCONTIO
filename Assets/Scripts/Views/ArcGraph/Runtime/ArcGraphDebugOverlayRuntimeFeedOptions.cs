@@ -24,6 +24,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>IncludeKnownLandmarkGraph</b>: abilita nodi/edge landmark conosciuti dall'NPC.</item>
     ///   <item><b>IncludeLandmarkRoute</b>: abilita route corrente dell'NPC.</item>
     ///   <item><b>IncludeLandmarkPaths</b>: abilita edge pathfinding/collegamento.</item>
+    ///   <item><b>IncludeLandmarkComplexEdges</b>: abilita edge soggettivi/memorizzati fra landmark.</item>
     ///   <item><b>IncludeGvdDin</b>: abilita dati GVD-DIN globali.</item>
     ///   <item><b>IncludeDtHeatmap</b>: include celle Distance Transform.</item>
     ///   <item><b>IncludeGvdRaw</b>: include celle GVD grezze.</item>
@@ -39,6 +40,7 @@ namespace Arcontio.View.ArcGraph
         public bool IncludeKnownLandmarkGraph { get; set; } = true;
         public bool IncludeLandmarkRoute { get; set; } = true;
         public bool IncludeLandmarkPaths { get; set; } = true;
+        public bool IncludeLandmarkComplexEdges { get; set; } = true;
         public bool IncludeGvdDin { get; set; } = true;
         public bool IncludeDtHeatmap { get; set; } = true;
         public bool IncludeGvdRaw { get; set; } = true;

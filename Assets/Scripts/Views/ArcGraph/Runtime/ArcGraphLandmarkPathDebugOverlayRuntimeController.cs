@@ -50,6 +50,7 @@ namespace Arcontio.View.ArcGraph
             IncludeKnownLandmarkGraph = false,
             IncludeLandmarkRoute = false,
             IncludeLandmarkPaths = false,
+            IncludeLandmarkComplexEdges = false,
             IncludeGvdDin = false,
             IncludeDtHeatmap = false,
             IncludeGvdRaw = false,
@@ -638,6 +639,7 @@ namespace Arcontio.View.ArcGraph
             _options.IncludeKnownLandmarkGraph = false;
             _options.IncludeLandmarkRoute = pathfindingOverlayEnabled;
             _options.IncludeLandmarkPaths = pathfindingOverlayEnabled;
+            _options.IncludeLandmarkComplexEdges = false;
             _options.IncludeGvdDin = false;
             _options.IncludeDtHeatmap = false;
             _options.IncludeGvdRaw = false;
