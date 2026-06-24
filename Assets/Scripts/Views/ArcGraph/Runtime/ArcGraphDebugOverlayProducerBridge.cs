@@ -294,13 +294,58 @@ namespace Arcontio.View.ArcGraph
                     ArcGraphZLevelPolicy.CreateRuntimeCell(node.CellX, node.CellY),
                     ResolveNodeOverlayKind(kind, node),
                     node.NodeId,
-                    node.Label,
+                    ResolveNodeLabel(kind, node),
                     scale01,
                     ResolveNodeColorKey(kind, node),
                     isEnabled));
             }
 
             return nodes.Count;
+        }
+
+        // =============================================================================
+        // ResolveNodeLabel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce l'etichetta breve da consegnare alla view per un nodo landmark.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: fallback visuale senza interrogare il World</b></para>
+        /// <para>
+        /// Il bridge usa prima la label gia' preparata dal Core. Se quella label non
+        /// e' disponibile, costruisce un fallback minimo usando solo i campi del DTO
+        /// view-only ricevuto. In questo modo la UI resta consumer passiva e non deve
+        /// conoscere il registry o cercare dati aggiuntivi.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Label sorgente</b>: mantiene il testo se il Core lo ha fornito.</item>
+        ///   <item><b>Filtro layer</b>: produce fallback solo per il grafo landmark oggettivo.</item>
+        ///   <item><b>Prefissi brevi</b>: D/A/B/J per doorway, area, biological anchor e junction.</item>
+        /// </list>
+        /// </summary>
+        private static string ResolveNodeLabel(
+            ArcGraphDebugOverlayKind fallback,
+            LandmarkOverlayNode node)
+        {
+            if (!string.IsNullOrWhiteSpace(node.Label))
+                return node.Label;
+
+            if (fallback != ArcGraphDebugOverlayKind.LandmarkWorldNode)
+                return string.Empty;
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.Doorway)
+                return "D#" + node.NodeId;
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.AreaCenter)
+                return "A#" + node.NodeId;
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.BiologicalAnchor)
+                return "B#" + node.NodeId;
+
+            return "J#" + node.NodeId;
         }
 
         private static ArcGraphDebugOverlayKind ResolveNodeOverlayKind(

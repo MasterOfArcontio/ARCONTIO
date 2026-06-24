@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using Arcontio.Core;
-using TMPro;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -56,6 +55,7 @@ namespace Arcontio.View.ArcGraph
         private Sprite _debugSprite;
         private Texture2D _debugTexture;
         private Material _lineMaterial;
+        private Font _labelFont;
 
         // =============================================================================
         // SetTileWorldSize
@@ -381,7 +381,7 @@ namespace Arcontio.View.ArcGraph
             return line;
         }
 
-        private TextMeshPro CreateWorldLabel(
+        private TextMesh CreateWorldLabel(
             string name,
             Vector3 localCellPosition,
             string label)
@@ -391,24 +391,66 @@ namespace Arcontio.View.ArcGraph
             var go = new GameObject(name);
             go.transform.SetParent(_root, false);
             go.transform.position = ResolveWorldPosition(localCellPosition);
-            go.transform.localScale = Vector3.one * Mathf.Max(0.05f, 0.12f * tileWorldSize);
+            go.transform.localScale = Vector3.one;
 
-            var text = go.AddComponent<TextMeshPro>();
+            var text = go.AddComponent<TextMesh>();
             text.text = label ?? string.Empty;
-            text.fontStyle = FontStyles.Normal;
-            ArcGraphUiFontProvider.ApplyOfficialFont(text);
-            text.fontSize = 2.25f;
-            text.enableWordWrapping = false;
-            text.overflowMode = TextOverflowModes.Overflow;
-            text.alignment = TextAlignmentOptions.Left;
-            text.color = new Color(0.88f, 0.94f, 1f, 0.92f);
-            text.rectTransform.sizeDelta = new Vector2(Mathf.Max(3f, text.text.Length * 0.75f), 0.8f);
+            text.fontStyle = FontStyle.Bold;
+            text.fontSize = 28;
+            text.characterSize = Mathf.Max(0.05f, 0.10f * tileWorldSize);
+            text.anchor = TextAnchor.MiddleLeft;
+            text.alignment = TextAlignment.Left;
+            text.color = new Color(0.86f, 0.96f, 1f, 0.96f);
 
-            Renderer renderer = text.renderer;
+            Font labelFont = ResolveLabelFont();
+            if (labelFont != null)
+                text.font = labelFont;
+
+            Renderer renderer = go.GetComponent<Renderer>();
             if (renderer != null)
+            {
+                if (labelFont != null)
+                    renderer.sharedMaterial = labelFont.material;
+
                 renderer.sortingOrder = LabelSortingOrder;
+            }
 
             return text;
+        }
+
+        // =============================================================================
+        // ResolveLabelFont
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica il font IBM Plex usato dalle etichette world-space del probe.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: stile UI centralizzato con fallback locale</b></para>
+        /// <para>
+        /// Il renderer prova a usare lo stesso font ufficiale gia' importato sotto
+        /// Resources, ma non rende la sonda debug dipendente da quel caricamento:
+        /// se Unity non trova il font, il <c>TextMesh</c> resta comunque visibile
+        /// con il font di default del motore.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Cache</b>: evita lookup ripetuti a ogni redraw degli overlay.</item>
+        ///   <item><b>Medium</b>: peso preferito per leggibilita' sulle label piccole.</item>
+        ///   <item><b>Regular</b>: fallback se il Medium non e' disponibile.</item>
+        /// </list>
+        /// </summary>
+        private Font ResolveLabelFont()
+        {
+            if (_labelFont != null)
+                return _labelFont;
+
+            _labelFont = Resources.Load<Font>("ArcGraph/UI/fonts/IBMPlex/IBMPlexSans-Medium");
+            if (_labelFont == null)
+                _labelFont = Resources.Load<Font>("ArcGraph/UI/fonts/IBMPlex/IBMPlexSans-Regular");
+
+            return _labelFont;
         }
 
         private ArcGraphDebugOverlayQueue CreateDefaultDebugOverlayQueue()
@@ -574,8 +616,10 @@ namespace Arcontio.View.ArcGraph
                     color = new Color(0f, 1f, 1f, 0.55f);
                     break;
                 case "debug/landmark/world-node":
-                case "debug/landmark/world-edge":
                     color = new Color(1f, 1f, 1f, 0.85f);
+                    break;
+                case "debug/landmark/world-edge":
+                    color = new Color(0.86f, 0.94f, 1f, 0.24f);
                     break;
                 case "debug/landmark/doorway":
                     color = new Color(0.35f, 0.68f, 1f, 1f);
@@ -590,19 +634,21 @@ namespace Arcontio.View.ArcGraph
                     color = new Color(0.10f, 0.95f, 0.25f, 1f);
                     break;
                 case "debug/landmark/known-node":
-                case "debug/landmark/known-edge":
                     color = new Color(0.20f, 1f, 0.55f, 1f);
+                    break;
+                case "debug/landmark/known-edge":
+                    color = new Color(0.20f, 1f, 0.55f, 0.34f);
                     break;
                 case "debug/landmark/route-node":
                 case "debug/landmark/route-edge":
                 case "debug/path/lm":
-                    color = new Color(1f, 0.65f, 0.15f, 0.85f);
+                    color = new Color(1f, 0.70f, 0.16f, 0.95f);
                     break;
                 case "debug/path/direct":
-                    color = new Color(0.20f, 0.75f, 1f, 0.75f);
+                    color = new Color(0.20f, 0.75f, 1f, 0.95f);
                     break;
                 case "debug/path/jump":
-                    color = new Color(1f, 0.20f, 0.75f, 0.75f);
+                    color = new Color(1f, 0.20f, 0.75f, 0.95f);
                     break;
                 case "debug/path/complex":
                     color = new Color(1f, 1f, 0f, 1f);
