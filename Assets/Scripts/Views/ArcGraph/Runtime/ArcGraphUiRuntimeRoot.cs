@@ -2,6 +2,7 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
+using Arcontio.Core;
 using System.Collections.Generic;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem.UI;
@@ -50,6 +51,10 @@ namespace Arcontio.View.ArcGraph
         private const float BottomActionBarHeight = 92f;
         private const float ActionPanelHeight = 210f;
         private const float OuterMargin = 0f;
+        private const string ObjectDefsResourcePath = "Arcontio/Config/object_defs";
+        private const string InsertStructuresGroupKey = "structures";
+        private const string InsertObjectsGroupKey = "objects";
+        private const string InsertNpcGroupKey = "npc";
         private static readonly Color TopButtonNormalColor = ColorFromHex("#17212B", 0.92f);
         private static readonly Color TopButtonActiveColor = ColorFromHex("#324557", 0.96f);
         private static readonly Color TopButtonDebugActiveColor = ColorFromHex("#24465A", 0.98f);
@@ -63,11 +68,18 @@ namespace Arcontio.View.ArcGraph
         private GameObject _uiRoot;
         private RectTransform _mapViewport;
         private RectTransform _rightInspector;
+        private RectTransform _actionPanel;
+        private RectTransform _actionPanelGroupRoot;
+        private RectTransform _operationGridRoot;
+        private RectTransform _operationParamsRoot;
         private RectTransform _overlayRoot;
         private RectTransform _debugRoot;
         private readonly Vector3[] _mapViewportCorners = new Vector3[4];
         private readonly List<Button> _visualOverlayButtons = new List<Button>(8);
         private readonly List<string> _visualOverlayButtonKeys = new List<string>(8);
+        private readonly List<ArcGraphActionPanelObjectEntry> _actionPanelObjects = new List<ArcGraphActionPanelObjectEntry>(32);
+        private readonly List<Button> _insertGroupButtons = new List<Button>(3);
+        private readonly List<string> _insertGroupKeys = new List<string>(3);
         private Button _fovViewModeButton;
         private Button _pauseSimulationButton;
         private Button _resumeSimulationButton;
@@ -87,10 +99,63 @@ namespace Arcontio.View.ArcGraph
         private TextMeshProUGUI _biosphereDebugGoStopLabel;
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
+        private ArcGraphUiPlacementPreviewSource _placementPreviewSource;
         private UnityAction<string, bool> _visualOverlayStateChanged;
+        private string _activeInsertGroupKey = InsertStructuresGroupKey;
 
         public GameObject RootGameObject => _uiRoot;
         public bool IsBuilt => _uiRoot != null;
+
+        // =============================================================================
+        // ArcGraphActionPanelObjectEntry
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riga locale usata dall'ActionPanel per presentare un <c>ObjectDef</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: vista derivata, non catalogo parallelo</b></para>
+        /// <para>
+        /// La struttura non sostituisce <c>object_defs.json</c> e non introduce nuove
+        /// regole simulitative. Conserva solo i campi minimi necessari alla UI per
+        /// disegnare un bottone e attivare la preview passiva del defId scelto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>DefId</b>: chiave oggetto originale.</item>
+        ///   <item><b>Label</b>: nome leggibile per il bottone.</item>
+        ///   <item><b>GroupKey</b>: gruppo UI derivato, strutture oppure oggetti.</item>
+        ///   <item><b>SupportsDoorOptions</b>: indica se mostrare gli stati porta.</item>
+        ///   <item><b>SupportsBrushOptions</b>: indica se mostrare click/brush.</item>
+        ///   <item><b>SupportsFoodOptions</b>: indica se mostrare quantita' food stock.</item>
+        /// </list>
+        /// </summary>
+        private readonly struct ArcGraphActionPanelObjectEntry
+        {
+            public readonly string DefId;
+            public readonly string Label;
+            public readonly string GroupKey;
+            public readonly bool SupportsDoorOptions;
+            public readonly bool SupportsBrushOptions;
+            public readonly bool SupportsFoodOptions;
+
+            public ArcGraphActionPanelObjectEntry(
+                string defId,
+                string label,
+                string groupKey,
+                bool supportsDoorOptions,
+                bool supportsBrushOptions,
+                bool supportsFoodOptions)
+            {
+                DefId = string.IsNullOrWhiteSpace(defId) ? string.Empty : defId.Trim();
+                Label = string.IsNullOrWhiteSpace(label) ? DefId : label.Trim();
+                GroupKey = string.IsNullOrWhiteSpace(groupKey) ? InsertObjectsGroupKey : groupKey.Trim();
+                SupportsDoorOptions = supportsDoorOptions;
+                SupportsBrushOptions = supportsBrushOptions;
+                SupportsFoodOptions = supportsFoodOptions;
+            }
+        }
 
         // =============================================================================
         // Start
@@ -280,6 +345,27 @@ namespace Arcontio.View.ArcGraph
             _simulationControlController = controller;
             WireSimulationControlButtons();
             RefreshSimulationControlTopBar();
+        }
+
+        // =============================================================================
+        // SetPlacementPreviewSource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega l'ActionPanel alla sorgente preview placement passiva.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ActionPanel senza comando</b></para>
+        /// <para>
+        /// Il pannello riceve solo un oggetto view-side capace di mostrare una
+        /// preview. Non riceve un gateway comandi, non legge il mondo e non puo'
+        /// creare, sostituire o cancellare entita'. Il ponte produttivo verra'
+        /// introdotto nello step successivo.
+        /// </para>
+        /// </summary>
+        public void SetPlacementPreviewSource(ArcGraphUiPlacementPreviewSource source)
+        {
+            _placementPreviewSource = source;
         }
 
         // =============================================================================
@@ -722,6 +808,7 @@ namespace Arcontio.View.ArcGraph
                 new Vector2(1f, 0f),
                 new Vector2(0f, BottomActionBarHeight),
                 new Vector2(0f, BottomActionBarHeight + ActionPanelHeight));
+            _actionPanel = panel;
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(10, 10, 10, 10);
@@ -731,14 +818,17 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
 
+            LoadActionPanelObjectDefinitions();
             BuildActionPanelTabs(panel);
-            BuildOperationGrid(panel);
+            BuildActionPanelContent(panel);
+            SelectInsertGroup(InsertStructuresGroupKey);
             panel.gameObject.SetActive(false);
         }
 
         private void BuildActionPanelTabs(RectTransform parent)
         {
             RectTransform tabs = CreateRect("CategoryTabs", parent);
+            _actionPanelGroupRoot = tabs;
             LayoutElement tabsLayout = tabs.gameObject.AddComponent<LayoutElement>();
             tabsLayout.preferredWidth = 150f;
 
@@ -749,38 +839,235 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = false;
 
-            CreateCategoryButton(tabs, "Strutture", active: true);
-            CreateCategoryButton(tabs, "Mobili", active: false);
-            CreateCategoryButton(tabs, "Produzione", active: false);
-            CreateCategoryButton(tabs, "Depositi", active: false);
-            CreateCategoryButton(tabs, "Difesa", active: false);
-            CreateCategoryButton(tabs, "Decorazioni", active: false);
+            CreateInsertGroupButton(tabs, InsertStructuresGroupKey, "STRUTTURE", active: true);
+            CreateInsertGroupButton(tabs, InsertObjectsGroupKey, "OGGETTI", active: false);
+            CreateInsertGroupButton(tabs, InsertNpcGroupKey, "NPC", active: false);
+        }
+
+        private void BuildActionPanelContent(RectTransform parent)
+        {
+            RectTransform rightRoot = CreateRect("ActionPanelRight", parent);
+            LayoutElement rightLayout = rightRoot.gameObject.AddComponent<LayoutElement>();
+            rightLayout.flexibleWidth = 1f;
+
+            VerticalLayoutGroup layout = rightRoot.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 8f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            BuildOperationGrid(rightRoot);
+            BuildOperationParams(rightRoot);
         }
 
         private void BuildOperationGrid(RectTransform parent)
         {
             RectTransform gridRoot = CreateRect("OperationGrid", parent);
+            _operationGridRoot = gridRoot;
             LayoutElement gridLayout = gridRoot.gameObject.AddComponent<LayoutElement>();
             gridLayout.flexibleWidth = 1f;
+            gridLayout.preferredHeight = 116f;
 
             GridLayoutGroup grid = gridRoot.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(104f, 78f);
-            grid.spacing = new Vector2(10f, 10f);
+            grid.cellSize = new Vector2(108f, 52f);
+            grid.spacing = new Vector2(8f, 8f);
             grid.constraint = GridLayoutGroup.Constraint.FixedRowCount;
             grid.constraintCount = 2;
+        }
 
-            CreateOperationButton(gridRoot, "Muro");
-            CreateOperationButton(gridRoot, "Porta");
-            CreateOperationButton(gridRoot, "Finestra");
-            CreateOperationButton(gridRoot, "Letto");
-            CreateOperationButton(gridRoot, "Tavolo");
-            CreateOperationButton(gridRoot, "Sedia");
-            CreateOperationButton(gridRoot, "Torcia");
-            CreateOperationButton(gridRoot, "Armadio");
-            CreateOperationButton(gridRoot, "Magazzino");
-            CreateOperationButton(gridRoot, "Forno");
-            CreateOperationButton(gridRoot, "Cucina");
-            CreateOperationButton(gridRoot, "Forgia");
+        private void BuildOperationParams(RectTransform parent)
+        {
+            _operationParamsRoot = CreateRect("OperationParams", parent);
+            LayoutElement layoutElement = _operationParamsRoot.gameObject.AddComponent<LayoutElement>();
+            layoutElement.flexibleWidth = 1f;
+            layoutElement.preferredHeight = 58f;
+
+            HorizontalLayoutGroup layout = _operationParamsRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 6f;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = true;
+        }
+
+        // =============================================================================
+        // LoadActionPanelObjectDefinitions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica da <c>object_defs.json</c> le definizioni piazzabili da mostrare
+        /// nel pannello Inserisci.
+        /// </para>
+        /// </summary>
+        private void LoadActionPanelObjectDefinitions()
+        {
+            _actionPanelObjects.Clear();
+
+            TextAsset asset = Resources.Load<TextAsset>(ObjectDefsResourcePath);
+            if (asset == null || string.IsNullOrWhiteSpace(asset.text))
+                return;
+
+            ObjectDefDatabase database = JsonUtility.FromJson<ObjectDefDatabase>(asset.text);
+            if (database?.Objects == null)
+                return;
+
+            for (int i = 0; i < database.Objects.Count; i++)
+            {
+                ObjectDef def = database.Objects[i];
+                if (def == null || string.IsNullOrWhiteSpace(def.Id))
+                    continue;
+
+                string groupKey = IsStructureObjectDef(def) ? InsertStructuresGroupKey : InsertObjectsGroupKey;
+                bool isWall = IsWallObjectDef(def);
+                bool isFoodStock = string.Equals(def.Id, "food_stock", System.StringComparison.OrdinalIgnoreCase);
+
+                _actionPanelObjects.Add(new ArcGraphActionPanelObjectEntry(
+                    def.Id,
+                    string.IsNullOrWhiteSpace(def.DisplayName) ? def.Id : def.DisplayName,
+                    groupKey,
+                    def.IsDoor,
+                    isWall,
+                    isFoodStock));
+            }
+        }
+
+        private void CreateInsertGroupButton(
+            RectTransform parent,
+            string groupKey,
+            string label,
+            bool active)
+        {
+            Button button = CreateCategoryButton(parent, label, active);
+            string capturedGroupKey = groupKey;
+
+            _insertGroupButtons.Add(button);
+            _insertGroupKeys.Add(capturedGroupKey);
+            button.onClick.AddListener(() => SelectInsertGroup(capturedGroupKey));
+        }
+
+        private void SelectInsertGroup(string groupKey)
+        {
+            _activeInsertGroupKey = string.IsNullOrWhiteSpace(groupKey)
+                ? InsertStructuresGroupKey
+                : groupKey.Trim();
+
+            RefreshInsertGroupButtons();
+            RefreshOperationGrid();
+            ClearOperationParams("Seleziona una operation.");
+
+            if (_placementPreviewSource != null)
+                _placementPreviewSource.ClearPreview();
+        }
+
+        private void RefreshInsertGroupButtons()
+        {
+            for (int i = 0; i < _insertGroupButtons.Count; i++)
+            {
+                bool active = i < _insertGroupKeys.Count && _insertGroupKeys[i] == _activeInsertGroupKey;
+                ApplyButtonColor(_insertGroupButtons[i], active);
+            }
+        }
+
+        private void RefreshOperationGrid()
+        {
+            if (_operationGridRoot == null)
+                return;
+
+            ClearChildren(_operationGridRoot);
+
+            if (_activeInsertGroupKey == InsertNpcGroupKey)
+            {
+                Button npcButton = CreateOperationButton(_operationGridRoot, "Umano");
+                npcButton.onClick.AddListener(SelectNpcSpawnOperation);
+                return;
+            }
+
+            bool hasEntries = false;
+            for (int i = 0; i < _actionPanelObjects.Count; i++)
+            {
+                ArcGraphActionPanelObjectEntry entry = _actionPanelObjects[i];
+                if (entry.GroupKey != _activeInsertGroupKey)
+                    continue;
+
+                hasEntries = true;
+                ArcGraphActionPanelObjectEntry capturedEntry = entry;
+                Button button = CreateOperationButton(_operationGridRoot, entry.Label);
+                button.onClick.AddListener(() => SelectObjectOperation(capturedEntry));
+            }
+
+            if (!hasEntries)
+                CreateOperationButton(_operationGridRoot, "Vuoto").interactable = false;
+        }
+
+        private void SelectObjectOperation(ArcGraphActionPanelObjectEntry entry)
+        {
+            if (_placementPreviewSource != null)
+                _placementPreviewSource.SetPreviewDef(entry.DefId);
+
+            ClearChildren(_operationParamsRoot);
+            CreateParameterChip(_operationParamsRoot, "Preview: " + entry.DefId, false);
+
+            if (entry.SupportsDoorOptions)
+                BuildDoorParameterChips(entry);
+            else if (entry.SupportsBrushOptions)
+                BuildWallParameterChips();
+            else if (entry.SupportsFoodOptions)
+                BuildFoodStockParameterChips();
+            else
+                BuildObjectOwnershipParameterChips();
+        }
+
+        private void SelectNpcSpawnOperation()
+        {
+            if (_placementPreviewSource != null)
+                _placementPreviewSource.ClearPreview();
+
+            ClearChildren(_operationParamsRoot);
+            CreateParameterChip(_operationParamsRoot, "NPC preview: prossimo step", false);
+            CreateParameterChip(_operationParamsRoot, "DNA/config da inspector", false);
+        }
+
+        private void BuildDoorParameterChips(ArcGraphActionPanelObjectEntry entry)
+        {
+            Button closed = CreateParameterChip(_operationParamsRoot, "Chiusa", true);
+            closed.onClick.AddListener(() => _placementPreviewSource?.SetPreviewDef("door_wood"));
+
+            Button open = CreateParameterChip(_operationParamsRoot, "Aperta", true);
+            open.onClick.AddListener(() => _placementPreviewSource?.SetPreviewDef(entry.DefId));
+
+            Button locked = CreateParameterChip(_operationParamsRoot, "Chiusa a chiave", true);
+            locked.onClick.AddListener(() => _placementPreviewSource?.SetPreviewDef("door_wood_locked"));
+        }
+
+        private void BuildWallParameterChips()
+        {
+            CreateParameterChip(_operationParamsRoot, "Click", true);
+            CreateParameterChip(_operationParamsRoot, "Brush", true);
+        }
+
+        private void BuildFoodStockParameterChips()
+        {
+            CreateParameterChip(_operationParamsRoot, "Qty 1", true);
+            CreateParameterChip(_operationParamsRoot, "Qty 5", true);
+            CreateParameterChip(_operationParamsRoot, "Qty 10", true);
+            CreateParameterChip(_operationParamsRoot, "Owner: Community", true);
+            CreateParameterChip(_operationParamsRoot, "Owner: NPC snapshot futuro", false);
+        }
+
+        private void BuildObjectOwnershipParameterChips()
+        {
+            CreateParameterChip(_operationParamsRoot, "Owner: Community", true);
+            CreateParameterChip(_operationParamsRoot, "Owner: NPC snapshot futuro", false);
+        }
+
+        private void ClearOperationParams(string message)
+        {
+            if (_operationParamsRoot == null)
+                return;
+
+            ClearChildren(_operationParamsRoot);
+            CreateParameterChip(_operationParamsRoot, message, false);
         }
 
         private void BuildBottomActionBar()
@@ -801,14 +1088,34 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = true;
             layout.childForceExpandHeight = true;
 
-            CreateBottomActionButton(panel, "Costruisci", active: true);
-            CreateBottomActionButton(panel, "Inserisci", active: false);
+            CreateBottomActionButton(panel, "Costruisci", active: false);
+            Button insertButton = CreateBottomActionButton(panel, "Inserisci", active: true);
+            insertButton.onClick.AddListener(ToggleInsertActionPanel);
             CreateBottomActionButton(panel, "Gestisci lavori", active: false);
             CreateBottomActionButton(panel, "Zone", active: false);
             CreateBottomActionButton(panel, "Oggetti", active: false);
             CreateBottomActionButton(panel, "NPC", active: false);
             CreateBottomActionButton(panel, "Istituzioni", active: false);
             CreateBottomActionButton(panel, "Ricerca", active: false);
+        }
+
+        private void ToggleInsertActionPanel()
+        {
+            if (_actionPanel == null)
+                return;
+
+            bool nextVisible = !_actionPanel.gameObject.activeSelf;
+            _actionPanel.gameObject.SetActive(nextVisible);
+
+            if (nextVisible)
+            {
+                RefreshOperationGrid();
+                ClearOperationParams("Seleziona una operation.");
+            }
+            else if (_placementPreviewSource != null)
+            {
+                _placementPreviewSource.ClearPreview();
+            }
         }
 
         private void BuildOverlayRoots()
@@ -1169,31 +1476,83 @@ namespace Arcontio.View.ArcGraph
             CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
-        private static void CreateCategoryButton(RectTransform parent, string label, bool active)
+        private static Button CreateCategoryButton(RectTransform parent, string label, bool active)
         {
             RectTransform button = CreateButtonShell(parent, "ArcButton_Category_" + SanitizeName(label), -1f, 28f, active);
             CreateText(button, label, 12, FontStyles.Bold, TextAlignmentOptions.Left);
+            return button.GetComponent<Button>();
         }
 
-        private static void CreateOperationButton(RectTransform parent, string label)
+        private static Button CreateOperationButton(RectTransform parent, string label)
         {
-            RectTransform button = CreateButtonShell(parent, "ArcOperationButton_" + SanitizeName(label), 104f, 78f, false);
+            RectTransform button = CreateButtonShell(parent, "ArcOperationButton_" + SanitizeName(label), 108f, 52f, false);
 
             RectTransform iconSlot = CreateRect("IconSlot", button);
-            SetAnchors(iconSlot, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(-22f, -42f), new Vector2(22f, -10f));
+            SetAnchors(iconSlot, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, -13f), new Vector2(34f, 13f));
             Image iconImage = iconSlot.gameObject.AddComponent<Image>();
             iconImage.raycastTarget = false;
             iconImage.color = ColorFromHex("#9AA7B2", 0.72f);
 
             RectTransform labelRoot = CreateRect("Label", button);
-            SetAnchors(labelRoot, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(4f, 4f), new Vector2(-4f, 24f));
-            CreateText(labelRoot, label, 10, FontStyles.Bold, TextAlignmentOptions.Center);
+            SetAnchors(labelRoot, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(38f, 4f), new Vector2(-4f, -4f));
+            CreateText(labelRoot, label, 9, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            return button.GetComponent<Button>();
         }
 
-        private static void CreateBottomActionButton(RectTransform parent, string label, bool active)
+        private static Button CreateBottomActionButton(RectTransform parent, string label, bool active)
         {
             RectTransform button = CreateButtonShell(parent, "ArcButton_Bottom_" + SanitizeName(label), -1f, 72f, active);
             CreateText(button, label, 13, FontStyles.Bold, TextAlignmentOptions.Center);
+            return button.GetComponent<Button>();
+        }
+
+        private static Button CreateParameterChip(RectTransform parent, string label, bool interactable)
+        {
+            RectTransform button = CreateButtonShell(parent, "ArcParam_" + SanitizeName(label), 118f, 30f, false);
+            Button component = button.GetComponent<Button>();
+            component.interactable = interactable;
+            CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
+            return component;
+        }
+
+        private static void ApplyButtonColor(Button button, bool active)
+        {
+            if (button == null)
+                return;
+
+            Image image = button.targetGraphic as Image;
+            if (image != null)
+                image.color = active ? ColorFromHex("#324557", 0.94f) : ColorFromHex("#17212B", 0.92f);
+
+            ColorBlock colors = button.colors;
+            colors.normalColor = active ? ColorFromHex("#324557", 0.94f) : ColorFromHex("#17212B", 0.92f);
+            colors.selectedColor = ColorFromHex("#324557", 1f);
+            button.colors = colors;
+        }
+
+        private static void ClearChildren(RectTransform root)
+        {
+            if (root == null)
+                return;
+
+            for (int i = root.childCount - 1; i >= 0; i--)
+                Destroy(root.GetChild(i).gameObject);
+        }
+
+        private static bool IsStructureObjectDef(ObjectDef def)
+        {
+            return def != null
+                   && (def.IsDoor
+                       || IsWallObjectDef(def)
+                       || string.Equals(def.Visual?.VisualKind, "door", System.StringComparison.OrdinalIgnoreCase));
+        }
+
+        private static bool IsWallObjectDef(ObjectDef def)
+        {
+            return def != null
+                   && (string.Equals(def.Visual?.VisualKind, "wall", System.StringComparison.OrdinalIgnoreCase)
+                       || (!string.IsNullOrWhiteSpace(def.Id)
+                           && def.Id.IndexOf("wall", System.StringComparison.OrdinalIgnoreCase) >= 0));
         }
 
         private static RectTransform CreateButtonShell(

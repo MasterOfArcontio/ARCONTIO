@@ -62,6 +62,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementToolController _placementToolController;
+        private ArcGraphUiPlacementPreviewSource _uiPlacementPreviewSource;
         private ArcGraphPointerCellHoverSceneConsumer _pointerCellHoverConsumer;
         private ArcGraphPointerHudSceneConsumer _pointerHudConsumer;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
@@ -249,6 +250,7 @@ namespace Arcontio.View.ArcGraph
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
             _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
             _placementToolController.enabled = false;
+            _uiPlacementPreviewSource = _visualRoot.AddComponent<ArcGraphUiPlacementPreviewSource>();
             _pointerCellHoverConsumer = _visualRoot.AddComponent<ArcGraphPointerCellHoverSceneConsumer>();
             _pointerHudConsumer = _visualRoot.AddComponent<ArcGraphPointerHudSceneConsumer>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
@@ -356,6 +358,7 @@ namespace Arcontio.View.ArcGraph
                 _uiSelectionConsumer);
             _placementToolController.SetRuntimeContextProvider(_contextProvider);
             _placementToolController.SetSceneCamera(Camera.main);
+            _uiPlacementPreviewSource.SetSceneCamera(Camera.main);
             _pointerCellHoverConsumer.SetSceneCamera(Camera.main);
             _pointerHudConsumer.SetSceneCamera(Camera.main);
             _pointerHudConsumer.SetHudEnabled(true);
@@ -428,6 +431,7 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetVisualOverlayController(_visualOverlayController);
             _uiRoot.SetVisualOverlayStateChanged(OnVisualOverlayStateChanged);
             _uiRoot.SetSimulationControlController(_simulationControlController);
+            _uiRoot.SetPlacementPreviewSource(_uiPlacementPreviewSource);
         }
 
         // =============================================================================
@@ -576,12 +580,16 @@ namespace Arcontio.View.ArcGraph
             MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
             MapGridWorldView legacyWorldView = FindSceneComponent<MapGridWorldView>();
             MapGridRuntimeDevToolsOverlay legacyPlacementOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
-            MonoBehaviour placementPreviewSource =
+            MonoBehaviour legacyOrToolPreviewSource =
                 legacyPlacementOverlay != null
                     ? legacyPlacementOverlay
                     : _placementToolController != null
                         ? _placementToolController
                         : FindSceneBehaviourImplementing<IArcGraphPlacementPreviewSource>();
+            MonoBehaviour placementPreviewSource =
+                _uiPlacementPreviewSource != null
+                    ? _uiPlacementPreviewSource
+                    : legacyOrToolPreviewSource;
             Arcontio.Core.SimulationHost simulationHost = Arcontio.Core.SimulationHost.Instance;
 
             if (_contextProvider != null)
@@ -599,6 +607,12 @@ namespace Arcontio.View.ArcGraph
             {
                 _placementToolController.SetRuntimeContextProvider(_contextProvider);
                 _placementToolController.SetSceneCamera(Camera.main);
+            }
+
+            if (_uiPlacementPreviewSource != null)
+            {
+                _uiPlacementPreviewSource.SetSceneCamera(Camera.main);
+                _uiPlacementPreviewSource.SetFallbackPreviewSource(legacyOrToolPreviewSource);
             }
 
             if (_placementHighlightConsumer != null)

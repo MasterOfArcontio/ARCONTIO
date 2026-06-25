@@ -17213,6 +17213,19 @@ Ordine consigliato:
 7. strumenti save/load solo come debug separato;
 8. chiusura F3 legacy.
 
+Sottostep operativi:
+
+| Step | Contenuto | Stato |
+|------|-----------|-------|
+| v0.70.08.01 | Audit F3 legacy: funzioni, comandi DevTools, cataloghi e boundary SimulationHost | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.02 | ActionPanel Inserisci: gruppi STRUTTURE/OGGETTI/NPC, lettura `object_defs.json`, preview passiva ArcGraph con fallback F3 | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.03 | PlacementRequest bridge: operation selezionata + parametri UI -> richiesta placement verificabile, ancora senza cancellare F3 | Prossimo |
+| v0.70.08.04 | Command bridge temporaneo: richiesta placement -> comando esistente autorizzato per muri, porte e oggetti | Pending |
+| v0.70.08.05 | NPC spawn shell: preview/config iniziale NPC e richiesta spawn configurata | Pending |
+| v0.70.08.06 | Delete bridge: eliminazione selezione tramite conferma e comando autorizzato | Pending |
+| v0.70.08.07 | Edit bridge: parametri modificabili per NPC/oggetti/muri senza scrittura diretta World | Pending |
+| v0.70.08.08 | Gate spegnimento F3: disattivare solo le funzioni migrate e mantenere debug separato | Pending |
+
 Criteri di accettazione:
 
 - nessuna perdita di funzionalita' runtime utile;
