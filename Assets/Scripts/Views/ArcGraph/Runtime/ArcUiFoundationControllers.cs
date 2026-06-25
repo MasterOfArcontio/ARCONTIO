@@ -574,7 +574,7 @@ namespace Arcontio.View.ArcGraph
     /// suoi metodi. Questo controller riceve richieste UI tipizzate, applica solo
     /// le operazioni gia' esposte pubblicamente dal runtime e conserva lo stato
     /// richiesto. Le velocita' normali <c>x1-x4</c> e il fast-forward debug
-    /// Biosfera <c>x50/x100/x200</c> restano due percorsi separati.
+    /// Biosfera <c>x50/x100/x200/x500</c> restano due percorsi separati.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -707,16 +707,18 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Avanza ciclicamente tra <c>x50</c>, <c>x100</c> e <c>x200</c>.
+        /// Avanza ciclicamente tra <c>x50</c>, <c>x100</c>, <c>x200</c> e <c>x500</c>.
         /// </para>
         /// </summary>
         public void CycleBiosphereDebugFastForwardMultiplier(string source)
         {
-            int next = _biosphereDebugFastForwardMultiplier >= 200
+            int next = _biosphereDebugFastForwardMultiplier >= 500
                 ? 50
-                : _biosphereDebugFastForwardMultiplier >= 100
-                    ? 200
-                    : 100;
+                : _biosphereDebugFastForwardMultiplier >= 200
+                    ? 500
+                    : _biosphereDebugFastForwardMultiplier >= 100
+                        ? 200
+                        : 100;
             RequestBiosphereDebugFastForwardMultiplier(next, source);
         }
 

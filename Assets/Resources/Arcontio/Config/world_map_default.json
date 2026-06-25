@@ -98,14 +98,9 @@
                                 "Recovery01":  0.45,
                                 "SeedBank":  [
                                                  {
-                                                     "SpeciesKey":  "wild_grass",
-                                                     "Amount01":  0.9,
-                                                     "Viability01":  0.85
-                                                 },
-                                                 {
                                                      "SpeciesKey":  "oak_tree",
-                                                     "Amount01":  0.22,
-                                                     "Viability01":  0.45
+                                                     "Amount01":  0.95,
+                                                     "Viability01":  0.95
                                                  }
                                              ]
                             }

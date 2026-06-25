@@ -38,6 +38,15 @@ namespace Arcontio.Core.Environment
                 EnvironmentAreaId.None,
                 new EnvironmentSeedBankEntry[0]);
 
+        // Scala iniziale seed -> piante fisiche: il numero non rappresenta un target
+        // fisso, ma la quota di celle naturali libere che una seed pressure massima
+        // puo' occupare all'avvio. Con area raggio 14 e oak 0.95/0.95 produce circa
+        // il range di test richiesto senza scollegarsi da Amount/Viability.
+        private const float PhysicalPlantSeedPressurePlacementScale01 = 0.045f;
+        private const float InitialPhysicalPlantVitalityMin01 = 0.70f;
+        private const float InitialPhysicalPlantVitalityMax01 = 1.35f;
+        private const float InitialPhysicalPlantHealthVitalityScale01 = 0.22f;
+
         private readonly Dictionary<EnvironmentAreaId, EnvironmentAreaDefinition> _areaDefinitions = new();
         private readonly Dictionary<EnvironmentAreaId, EnvironmentFertilityAreaState> _fertilityAreas = new();
         private readonly Dictionary<EnvironmentAreaId, EnvironmentWaterAreaState> _waterAreas = new();
@@ -539,12 +548,15 @@ namespace Arcontio.Core.Environment
                 return;
 
             int targetCount = ResolvePlacementCount(freeCells.Count, vegetation.Density01, 1.0f);
+            var distributedCells = new List<EnvironmentCellCoord>(freeCells);
+            SortCellsByDistributionScore(distributedCells, ResolveStableAreaSeed(area));
+
             int created = 0;
-            for (int i = 0; i < freeCells.Count && created < targetCount; i++)
+            for (int i = 0; i < distributedCells.Count && created < targetCount; i++)
             {
                 _vegetationCellPlacements.Add(new EnvironmentVegetationCellPlacement(
                     area.AreaId,
-                    freeCells[i],
+                    distributedCells[i],
                     vegetation.VegetationKind,
                     vegetation.Density01,
                     vegetation.Health01));
@@ -565,7 +577,6 @@ namespace Arcontio.Core.Environment
                 return;
             }
 
-            int plantCapacity = System.Math.Max(1, freeCells.Count / 40);
             int createdInArea = 0;
 
             for (int entryIndex = 0; entryIndex < seedBank.Entries.Count; entryIndex++)
@@ -575,14 +586,21 @@ namespace Arcontio.Core.Environment
                     continue;
 
                 float pressure = entry.Amount01 * entry.Viability01;
-                int targetForSpecies = ResolvePlacementCount(plantCapacity, pressure, 0.25f);
+                int targetForSpecies = ResolvePlacementCount(
+                    freeCells.Count,
+                    pressure,
+                    PhysicalPlantSeedPressurePlacementScale01);
                 for (int i = 0; i < targetForSpecies; i++)
                 {
-                    if (!TryPickPlantCell(freeCells, anchorCells, usedPlantCells, entryIndex, i, out EnvironmentCellCoord cell))
+                    if (!TryPickPlantCell(freeCells, anchorCells, usedPlantCells, area, entryIndex, i, out EnvironmentCellCoord cell))
                         return;
 
                     int plantOrdinal = createdInArea + 1;
                     var plantId = new EnvironmentPlantId(200000 + (area.AreaId.Value * 1000) + plantOrdinal);
+                    float initialHealth01 = ResolveInitialPhysicalPlantHealth01(
+                        entry,
+                        plantId,
+                        cell);
                     var plant = new EnvironmentPlantInstance(
                         plantId,
                         entry.SpeciesKey,
@@ -591,7 +609,7 @@ namespace Arcontio.Core.Environment
                         EnvironmentPlantGrowthStage.Seedling,
                         "seedling",
                         EnvironmentPlantHealthState.Healthy,
-                        entry.Viability01,
+                        initialHealth01,
                         0f,
                         false,
                         area.AreaId);
@@ -606,6 +624,49 @@ namespace Arcontio.Core.Environment
                     createdInArea++;
                 }
             }
+        }
+
+        // =============================================================================
+        // ResolveInitialPhysicalPlantHealth01
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola una salute iniziale differenziata per le piante fisiche di bootstrap.
+        /// </para>
+        ///
+        /// <para><b>Coerenza con il modello naturale giornaliero</b></para>
+        /// <para>
+        /// Le piante create all'avvio usano lo stesso concetto di vigore individuale
+        /// poi applicato dal ciclo naturale: individui piu' robusti partono con piu'
+        /// margine, quelli fragili con meno. Il valore resta deterministico su
+        /// specie, id e cella, quindi non cambia tra due avvii identici.
+        /// </para>
+        /// </summary>
+        private static float ResolveInitialPhysicalPlantHealth01(
+            EnvironmentSeedBankEntry entry,
+            EnvironmentPlantId plantId,
+            EnvironmentCellCoord cell)
+        {
+            float vitality = ResolveInitialPhysicalPlantVitality01(
+                plantId,
+                entry.SpeciesKey,
+                cell);
+            float offset = (vitality - 1f) * InitialPhysicalPlantHealthVitalityScale01;
+            return EnvironmentMath.Clamp01(entry.Viability01 + offset);
+        }
+
+        private static float ResolveInitialPhysicalPlantVitality01(
+            EnvironmentPlantId plantId,
+            string speciesKey,
+            EnvironmentCellCoord cell)
+        {
+            float roll = ResolveInitialPhysicalPlantHash01(
+                plantId,
+                speciesKey,
+                cell,
+                431);
+            return InitialPhysicalPlantVitalityMin01
+                   + ((InitialPhysicalPlantVitalityMax01 - InitialPhysicalPlantVitalityMin01) * roll);
         }
 
         private static int ResolvePlacementCount(int availableCount, float intensity01, float scale)
@@ -625,6 +686,7 @@ namespace Arcontio.Core.Environment
             List<EnvironmentCellCoord> freeCells,
             List<EnvironmentCellCoord> anchorCells,
             List<EnvironmentCellCoord> usedPlantCells,
+            EnvironmentAreaDefinition area,
             int entryIndex,
             int localIndex,
             out EnvironmentCellCoord cell)
@@ -633,18 +695,124 @@ namespace Arcontio.Core.Environment
             if (freeCells == null || freeCells.Count == 0)
                 return false;
 
-            int start = System.Math.Abs((entryIndex * 37) + (localIndex * 17)) % freeCells.Count;
-            for (int offset = 0; offset < freeCells.Count; offset++)
+            int bestScore = int.MinValue;
+            bool hasBest = false;
+            int areaSeed = ResolveStableAreaSeed(area);
+            int salt = (entryIndex * 1009) ^ (localIndex * 9176) ^ areaSeed;
+
+            for (int i = 0; i < freeCells.Count; i++)
             {
-                EnvironmentCellCoord candidate = freeCells[(start + offset) % freeCells.Count];
+                EnvironmentCellCoord candidate = freeCells[i];
                 if (ContainsCell(anchorCells, candidate) || ContainsCell(usedPlantCells, candidate))
                     continue;
 
+                int score = ResolveCellDistributionScore(candidate, salt);
+                if (hasBest && score <= bestScore)
+                    continue;
+
+                bestScore = score;
                 cell = candidate;
-                return true;
+                hasBest = true;
             }
 
-            return false;
+            return hasBest;
+        }
+
+        // =============================================================================
+        // SortCellsByDistributionScore
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ordina le celle candidate con uno score pseudo-casuale deterministico.
+        /// </para>
+        ///
+        /// <para><b>Distribuzione spaziale stabile</b></para>
+        /// <para>
+        /// Il <c>World</c> consegna celle in ordine di scansione. Ordinare una copia
+        /// locale con hash evita pattern a righe senza introdurre random runtime:
+        /// la stessa mappa, la stessa area e la stessa configurazione producono
+        /// sempre la stessa distribuzione iniziale e gli stessi cambiamenti sparsi.
+        /// </para>
+        /// </summary>
+        private static void SortCellsByDistributionScore(
+            List<EnvironmentCellCoord> cells,
+            int salt)
+        {
+            if (cells == null || cells.Count <= 1)
+                return;
+
+            cells.Sort((left, right) =>
+            {
+                int rightScore = ResolveCellDistributionScore(right, salt);
+                int leftScore = ResolveCellDistributionScore(left, salt);
+                int scoreCompare = rightScore.CompareTo(leftScore);
+                if (scoreCompare != 0)
+                    return scoreCompare;
+
+                int yCompare = left.Y.CompareTo(right.Y);
+                if (yCompare != 0)
+                    return yCompare;
+
+                int xCompare = left.X.CompareTo(right.X);
+                if (xCompare != 0)
+                    return xCompare;
+
+                return left.Z.CompareTo(right.Z);
+            });
+        }
+
+        private static int ResolveStableAreaSeed(EnvironmentAreaDefinition area)
+        {
+            return (area.AreaId.Value * 73856093)
+                   ^ (area.CenterX * 19349663)
+                   ^ (area.CenterY * 83492791)
+                   ^ (area.RadiusCells * 265443576);
+        }
+
+        private static float ResolveInitialPhysicalPlantHash01(
+            EnvironmentPlantId plantId,
+            string speciesKey,
+            EnvironmentCellCoord cell,
+            int salt)
+        {
+            unchecked
+            {
+                int hash = 97 + salt;
+                hash = (hash * 397) ^ plantId.Value;
+                hash = (hash * 397) ^ ResolveStableSpeciesHash(speciesKey);
+                hash = (hash * 397) ^ (cell.X * 73856093);
+                hash = (hash * 397) ^ (cell.Y * 19349663);
+                hash = (hash * 397) ^ (cell.Z * 83492791);
+                return (hash & int.MaxValue) / (float)int.MaxValue;
+            }
+        }
+
+        private static int ResolveStableSpeciesHash(string speciesKey)
+        {
+            if (string.IsNullOrWhiteSpace(speciesKey))
+                return 17;
+
+            int hash = 23;
+            for (int i = 0; i < speciesKey.Length; i++)
+            {
+                // Hash stabile e minimale: serve a differenziare individui iniziali
+                // senza usare Random runtime o stato globale.
+                hash = (hash * 31) + speciesKey[i];
+            }
+
+            return hash;
+        }
+
+        private static int ResolveCellDistributionScore(EnvironmentCellCoord cell, int salt)
+        {
+            unchecked
+            {
+                int hash = salt;
+                hash = (hash * 397) ^ (cell.X * 73856093);
+                hash = (hash * 397) ^ (cell.Y * 19349663);
+                hash = (hash * 397) ^ (cell.Z * 83492791);
+                return hash & int.MaxValue;
+            }
         }
 
         private static void SelectBiologicalAnchorCells(

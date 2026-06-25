@@ -52,6 +52,7 @@ namespace Arcontio.View.ArcGraph
         private const string TerrainVisualCatalogPath = ArcGraphTerrainVisualCatalogJson.DefaultResourcePath;
         private const string NpcVisualCatalogPath = "ArcGraph/Config/ArcGraphNpcVisualCatalog";
         private const int LateBindFrameBudget = 240;
+        private const string DiagnosticsPrefix = "[ArcGraphRuntimeSceneAutoInstaller v0.63]";
 
         private ArcGraphRuntimeWorldAdapter _contextProvider;
         private ArcGraphMinimalRuntimeSceneWrapper _wrapper;
@@ -70,6 +71,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiSimulationControlController _simulationControlController;
+        private ArcUiBiosphereRuntimeSnapshotProvider _biosphereSnapshotProvider;
         private ArcUiVisualOverlayController _visualOverlayController;
         private ArcGraphRightInspectorSceneView _rightInspectorView;
         private ArcUiInspectionController _inspectionController;
@@ -159,6 +161,8 @@ namespace Arcontio.View.ArcGraph
             // durante lo stesso avvio.
             if (GameObject.Find(ControllerRootName) != null)
                 return;
+
+            Debug.Log(DiagnosticsPrefix + " installazione runtime richiesta su " + scene.name + ".");
 
             var controllerRoot = new GameObject(ControllerRootName);
             controllerRoot.AddComponent<ArcGraphRuntimeSceneAutoInstaller>();
@@ -258,6 +262,7 @@ namespace Arcontio.View.ArcGraph
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
             _selectionActionController = new ArcUiSelectionActionController();
             _simulationControlController = new ArcUiSimulationControlController();
+            _biosphereSnapshotProvider = new ArcUiBiosphereRuntimeSnapshotProvider();
             _visualOverlayController = new ArcUiVisualOverlayController();
             _rightInspectorView = _visualRoot.AddComponent<ArcGraphRightInspectorSceneView>();
             _inspectionController = new ArcUiInspectionController();
@@ -282,6 +287,7 @@ namespace Arcontio.View.ArcGraph
             _lateBindFramesLeft = LateBindFrameBudget;
             _installed = true;
 
+            Debug.Log(DiagnosticsPrefix + " installazione completata; UI ArcGraph costruita e provider Biosfera collegato.");
         }
 
         // =============================================================================
@@ -437,6 +443,7 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetVisualOverlayController(_visualOverlayController);
             _uiRoot.SetVisualOverlayStateChanged(OnVisualOverlayStateChanged);
             _uiRoot.SetSimulationControlController(_simulationControlController);
+            _uiRoot.SetBiosphereRuntimeSnapshotProvider(_biosphereSnapshotProvider);
         }
 
         // =============================================================================
@@ -599,6 +606,9 @@ namespace Arcontio.View.ArcGraph
 
             if (_simulationControlController != null)
                 _simulationControlController.SetSimulationHost(simulationHost);
+
+            if (_biosphereSnapshotProvider != null)
+                _biosphereSnapshotProvider.SetSimulationHost(simulationHost);
 
             if (_uiRoot != null)
                 _uiRoot.RefreshSimulationControlTopBar();

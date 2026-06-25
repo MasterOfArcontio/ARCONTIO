@@ -527,6 +527,7 @@ namespace Arcontio.Core
         [SerializeField] private int maxBiosphereDebugEnvironmentDaysPerUnityFrame = 2;
 
         private const string EnvironmentPlantCatalogResourcePath = "Arcontio/Config/environment_plants";
+        private const string EnvironmentNaturalGrowthConfigResourcePath = "Arcontio/Config/environment_natural_growth";
 
         private int _runtimeTickSpeedMultiplier = 1;
         private int _lastRuntimeTicksProcessedInFrame;
@@ -547,9 +548,10 @@ namespace Arcontio.Core
         private float _lastDroppedBiosphereDebugEnvironmentTicks;
         private readonly EnvironmentCalendarConfig _biosphereDebugCalendarConfig = new();
         private readonly EnvironmentClimateConfig _biosphereDebugClimateConfig = new();
-        private readonly EnvironmentNaturalGrowthConfig _environmentNaturalGrowthConfig = new();
+        private EnvironmentNaturalGrowthConfig _environmentNaturalGrowthConfig = new();
         private EnvironmentPlantCatalog _environmentPlantCatalog =
             new EnvironmentPlantCatalogConfig().ToCatalog();
+        private readonly EnvironmentHistoryBuffer _biosphereHistoryBuffer = new EnvironmentHistoryBuffer();
 
         // =============================================================================
         // DirectKeyboardTickControl
@@ -603,6 +605,11 @@ namespace Arcontio.Core
         public int LastBiosphereDebugPendingPlantDeltas => _lastBiosphereDebugPendingPlantDeltas;
         public float LastDroppedBiosphereDebugEnvironmentTicks => _lastDroppedBiosphereDebugEnvironmentTicks;
 
+        public EnvironmentHistorySnapshot CreateBiosphereHistorySnapshot()
+        {
+            return _biosphereHistoryBuffer.CreateSnapshot();
+        }
+
         public void SetPaused(bool paused)
         {
             IsPaused = paused;
@@ -655,8 +662,8 @@ namespace Arcontio.Core
         ///
         /// <para><b>Principio architetturale: debug Biosfera separato dalla simulazione sociale</b></para>
         /// <para>
-        /// I valori ammessi sono volutamente pochi: <c>x50</c>, <c>x100</c> e
-        /// <c>x200</c>. Questo evita di riusare il moltiplicatore produttivo
+            /// I valori ammessi sono volutamente pochi: <c>x50</c>, <c>x100</c>,
+            /// <c>x200</c> e <c>x500</c>. Questo evita di riusare il moltiplicatore produttivo
         /// <c>x1-x4</c> e rende esplicito che questo percorso non accelera NPC,
         /// decisioni, job, memoria, belief, pathfinding o comunicazione.
         /// </para>
@@ -900,6 +907,7 @@ namespace Arcontio.Core
 
             RuntimeDiagnosticsLifecycle.InitFromSimulationParams(simParams);
             ArcontioLogger.InitFromSimulationParams(simParams);
+            _environmentNaturalGrowthConfig = LoadEnvironmentNaturalGrowthConfigFromResources();
             ArcontioLogger.Info(
                 new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "Core"),
                 new LogBlock(LogLevel.Info, "log.core.persistent_path")
@@ -1252,7 +1260,10 @@ namespace Arcontio.Core
             if (multiplier <= 100)
                 return 100;
 
-            return 200;
+            if (multiplier <= 200)
+                return 200;
+
+            return 500;
         }
 
         // =============================================================================
@@ -1371,6 +1382,7 @@ namespace Arcontio.Core
                     maxVegetationDeltaCount);
 
             _world.SetEnvironmentState(result.State);
+            CaptureBiosphereHistorySample();
             appliedVegetationDeltas =
                 _world.ApplyEnvironmentDiffuseVegetationDeltas(result.DiffuseVegetationDeltas);
 
@@ -1992,6 +2004,7 @@ namespace Arcontio.Core
             EnvironmentFoundationBootstrapResult environmentBootstrap =
                 ApplyEnvironmentFoundationBootstrap(_world);
             _environmentPlantCatalog = environmentBootstrap.PlantCatalog;
+            CaptureBiosphereHistorySample();
             ResetBiosphereRuntimeSchedule(_tickIndex);
 
             // ============================================================
@@ -2136,8 +2149,15 @@ namespace Arcontio.Core
             EnvironmentFoundationBootstrapResult environmentBootstrap =
                 ApplyEnvironmentFoundationBootstrap(loadedWorld);
             _environmentPlantCatalog = environmentBootstrap.PlantCatalog;
+            _biosphereHistoryBuffer.Clear();
+            _biosphereHistoryBuffer.Capture(loadedWorld.EnvironmentState);
             loadedWorld.RebuildLandmarksBootstrap();
             return true;
+        }
+
+        private void CaptureBiosphereHistorySample()
+        {
+            _biosphereHistoryBuffer.Capture(_world?.EnvironmentState);
         }
 
         // =============================================================================
@@ -2224,6 +2244,42 @@ namespace Arcontio.Core
                     "[SimulationHost] Environment plant catalog config failed to load. " +
                     $"path={EnvironmentPlantCatalogResourcePath} error={ex.Message}");
                 return new EnvironmentPlantCatalogConfig();
+            }
+        }
+
+        // =============================================================================
+        // LoadEnvironmentNaturalGrowthConfigFromResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica da Resources la configurazione produttiva/debug del ciclo naturale
+        /// della biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: tuning fuori dal loop simulativo</b></para>
+        /// <para>
+        /// Il fast-forward biosfera deve poter essere calibrato senza ricompilare il
+        /// codice. Il loader mantiene un fallback locale sicuro se il JSON manca o
+        /// non e' leggibile, ma quando il file esiste usa i parametri dichiarati in
+        /// <c>Assets/Resources/Arcontio/Config/environment_natural_growth.json</c>.
+        /// </para>
+        /// </summary>
+        private static EnvironmentNaturalGrowthConfig LoadEnvironmentNaturalGrowthConfigFromResources()
+        {
+            TextAsset asset = Resources.Load<TextAsset>(EnvironmentNaturalGrowthConfigResourcePath);
+            if (asset == null || string.IsNullOrWhiteSpace(asset.text))
+                return new EnvironmentNaturalGrowthConfig();
+
+            try
+            {
+                EnvironmentNaturalGrowthConfig config =
+                    JsonUtility.FromJson<EnvironmentNaturalGrowthConfig>(asset.text);
+
+                return config ?? new EnvironmentNaturalGrowthConfig();
+            }
+            catch
+            {
+                return new EnvironmentNaturalGrowthConfig();
             }
         }
 

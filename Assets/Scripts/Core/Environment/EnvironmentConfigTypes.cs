@@ -197,6 +197,7 @@ namespace Arcontio.Core.Environment
 
         public float weatherPersistence01 = 0.35f;
         public float hourlyTemperatureVariation01 = 0.10f;
+        public int seasonClimateBlendDays = 75;
 
         public float ResolveWeatherPersistence01()
         {
@@ -206,6 +207,11 @@ namespace Arcontio.Core.Environment
         public float ResolveHourlyTemperatureVariation01()
         {
             return EnvironmentMath.Clamp01(hourlyTemperatureVariation01);
+        }
+
+        public int ResolveSeasonClimateBlendDays()
+        {
+            return seasonClimateBlendDays < 0 ? 0 : seasonClimateBlendDays;
         }
     }
 

@@ -1,8 +1,8 @@
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Events;
-using System.Collections.Generic;
 #if ENABLE_INPUT_SYSTEM
 using UnityEngine.InputSystem.UI;
 #endif
@@ -48,8 +48,17 @@ namespace Arcontio.View.ArcGraph
         private const float TopBarHeight = 44f;
         private const float RightInspectorWidth = 350f;
         private const float BottomActionBarHeight = 92f;
-        private const float ActionPanelHeight = 210f;
+        private const float ActionPanelTopY = 600f;
+        private const float ActionPanelHeight = ActionPanelTopY - BottomActionBarHeight;
+        private const float BiospherePanelPadding = 5f;
+        private const float BiosphereLeftColumnWidth = 100f;
+        private const float BiosphereColumnGap = 5f;
         private const float OuterMargin = 0f;
+        private const float BiosphereToolbarHeight = 20f;
+        private const float BiosphereChipHeight = 18f;
+        private const string RuntimeUiSchemaMarkerName = "ArcUIRuntimeSchema_BiosphereGraphs_v4";
+        private const string BiosphereWorldGraphsGroupKey = "biosphere_world_graphs";
+        private const string BiosphereAreaGraphsGroupKey = "biosphere_area_graphs";
         private static readonly Color TopButtonNormalColor = ColorFromHex("#17212B", 0.92f);
         private static readonly Color TopButtonActiveColor = ColorFromHex("#324557", 0.96f);
         private static readonly Color TopButtonDebugActiveColor = ColorFromHex("#24465A", 0.98f);
@@ -63,11 +72,17 @@ namespace Arcontio.View.ArcGraph
         private GameObject _uiRoot;
         private RectTransform _mapViewport;
         private RectTransform _rightInspector;
+        private RectTransform _actionPanel;
+        private RectTransform _actionPanelGroupRoot;
+        private RectTransform _actionPanelContentRoot;
         private RectTransform _overlayRoot;
         private RectTransform _debugRoot;
         private readonly Vector3[] _mapViewportCorners = new Vector3[4];
         private readonly List<Button> _visualOverlayButtons = new List<Button>(8);
         private readonly List<string> _visualOverlayButtonKeys = new List<string>(8);
+        private readonly List<Button> _biosphereGroupButtons = new List<Button>(2);
+        private readonly List<string> _biosphereGroupKeys = new List<string>(2);
+        private readonly HashSet<string> _hiddenBiosphereSeriesKeys = new HashSet<string>();
         private Button _fovViewModeButton;
         private Button _pauseSimulationButton;
         private Button _resumeSimulationButton;
@@ -86,11 +101,41 @@ namespace Arcontio.View.ArcGraph
         private TextMeshProUGUI _biosphereDebugMultiplierLabel;
         private TextMeshProUGUI _biosphereDebugGoStopLabel;
         private ArcUiSimulationControlController _simulationControlController;
+        private ArcUiBiosphereRuntimeSnapshotProvider _biosphereSnapshotProvider;
         private ArcUiVisualOverlayController _visualOverlayController;
         private UnityAction<string, bool> _visualOverlayStateChanged;
+        private string _activeBiosphereGroupKey = BiosphereWorldGraphsGroupKey;
+        private ArcUiBiosphereGraphScope _activeBiosphereGraphScope = ArcUiBiosphereGraphScope.World;
+        private ArcUiBiosphereGraphBucket _activeBiosphereGraphBucket = ArcUiBiosphereGraphBucket.Days;
+        private int _selectedBiosphereAreaId;
+        private string _biosphereLegendSignature = string.Empty;
+        private ArcUiBiosphereGraphCanvas _biosphereGraphCanvas;
 
         public GameObject RootGameObject => _uiRoot;
         public bool IsBuilt => _uiRoot != null;
+
+        // =============================================================================
+        // OnEnable
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Controlla al rientro del componente se la UI runtime gia' esistente e'
+        /// ancora compatibile con lo schema corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: tolleranza ai reload del Play Mode</b></para>
+        /// <para>
+        /// Unity puo' mantenere riferimenti a GameObject runtime dopo un reload degli
+        /// script. In quel caso <c>Start</c> potrebbe non ricostruire subito la shell,
+        /// mentre <c>OnEnable</c> e' il punto piu' pulito per invalidare la vista
+        /// transiente senza coinvolgere logica simulativa.
+        /// </para>
+        /// </summary>
+        private void OnEnable()
+        {
+            if (_uiRoot != null && !IsRuntimeUiSchemaCurrent())
+                BuildRuntimeUi();
+        }
 
         // =============================================================================
         // Start
@@ -133,6 +178,11 @@ namespace Arcontio.View.ArcGraph
         {
             if (_simulationControlController != null)
                 RefreshSimulationControlTopBar();
+
+            if (_biosphereGraphCanvas != null
+                && _actionPanel != null
+                && _actionPanel.gameObject.activeSelf)
+                RefreshBiosphereGraphPanel();
         }
 
         // =============================================================================
@@ -156,13 +206,19 @@ namespace Arcontio.View.ArcGraph
         {
             if (_uiRoot != null)
             {
-                _uiRoot.SetActive(uiEnabled);
-                return;
+                if (IsRuntimeUiSchemaCurrent())
+                {
+                    _uiRoot.SetActive(uiEnabled);
+                    return;
+                }
+
+                DestroyRuntimeUiHierarchyForSchemaRebuild();
             }
 
             EnsureEventSystemExists();
             CreateCanvasRoot();
             CreateUiRoot();
+            CreateRuntimeUiSchemaMarker();
             BuildMapViewport();
             BuildTopBar();
             BuildRightInspector();
@@ -280,6 +336,27 @@ namespace Arcontio.View.ArcGraph
             _simulationControlController = controller;
             WireSimulationControlButtons();
             RefreshSimulationControlTopBar();
+        }
+
+        // =============================================================================
+        // SetBiosphereRuntimeSnapshotProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega alla shell UI il provider read-only dei grafici Biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI alimentata da snapshot</b></para>
+        /// <para>
+        /// Il root non riceve <c>SimulationHost</c> e non attraversa <c>World</c>.
+        /// Chiede al provider un ViewModel gia' derivato ogni volta che deve
+        /// ridisegnare il pannello Biosfera.
+        /// </para>
+        /// </summary>
+        public void SetBiosphereRuntimeSnapshotProvider(ArcUiBiosphereRuntimeSnapshotProvider provider)
+        {
+            _biosphereSnapshotProvider = provider;
+            RefreshBiosphereGraphPanel();
         }
 
         // =============================================================================
@@ -511,6 +588,127 @@ namespace Arcontio.View.ArcGraph
             _uiRoot = root.gameObject;
         }
 
+        // =============================================================================
+        // IsRuntimeUiSchemaCurrent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se la gerarchia UI runtime gia' presente appartiene allo schema
+        /// corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: rebuild esplicito delle view transienti</b></para>
+        /// <para>
+        /// La UI ArcGraph viene generata a runtime e puo' sopravvivere ai reload
+        /// script del Play Mode. Il marker evita che una gerarchia vecchia continui
+        /// a essere riutilizzata dopo una patch: se il marker manca, la shell e'
+        /// considerata obsoleta e viene ricostruita.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Marker</b>: GameObject inattivo sotto <c>ArcUIRoot</c>.</item>
+        ///   <item><b>Controllo locale</b>: nessuna lettura di World o SimulationHost.</item>
+        /// </list>
+        /// </summary>
+        private bool IsRuntimeUiSchemaCurrent()
+        {
+            return _uiRoot != null
+                && _uiRoot.transform.Find(RuntimeUiSchemaMarkerName) != null;
+        }
+
+        // =============================================================================
+        // CreateRuntimeUiSchemaMarker
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scrive nella gerarchia UI un marker tecnico invisibile usato solo per
+        /// riconoscere lo schema runtime corrente.
+        /// </para>
+        /// </summary>
+        private void CreateRuntimeUiSchemaMarker()
+        {
+            RectTransform marker = CreateRect(RuntimeUiSchemaMarkerName, _uiRoot.transform);
+            StretchFull(marker);
+            marker.gameObject.SetActive(false);
+        }
+
+        // =============================================================================
+        // DestroyRuntimeUiHierarchyForSchemaRebuild
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Elimina la vecchia shell UI generata a runtime e ripulisce i riferimenti
+        /// C# prima di ricostruirla.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gerarchia</b>: distrugge il canvas auto-generato quando esiste.</item>
+        ///   <item><b>Riferimenti</b>: azzera campi e liste che puntavano ai vecchi pulsanti.</item>
+        ///   <item><b>Play Mode</b>: usa <c>Destroy</c> durante il runtime e <c>DestroyImmediate</c> fuori runtime.</item>
+        /// </list>
+        /// </summary>
+        private void DestroyRuntimeUiHierarchyForSchemaRebuild()
+        {
+            GameObject hierarchyRoot = _canvasRoot != null ? _canvasRoot : ResolveCanvasRootFromUiRoot();
+
+            if (hierarchyRoot != null)
+            {
+                if (Application.isPlaying)
+                    Destroy(hierarchyRoot);
+                else
+                    DestroyImmediate(hierarchyRoot);
+            }
+
+            ResetRuntimeUiReferences();
+        }
+
+        private GameObject ResolveCanvasRootFromUiRoot()
+        {
+            if (_uiRoot == null || _uiRoot.transform.parent == null)
+                return null;
+
+            GameObject candidate = _uiRoot.transform.parent.gameObject;
+            return candidate.name == CanvasName ? candidate : _uiRoot;
+        }
+
+        private void ResetRuntimeUiReferences()
+        {
+            _canvasRoot = null;
+            _uiRoot = null;
+            _mapViewport = null;
+            _rightInspector = null;
+            _actionPanel = null;
+            _actionPanelGroupRoot = null;
+            _actionPanelContentRoot = null;
+            _overlayRoot = null;
+            _debugRoot = null;
+            _visualOverlayButtons.Clear();
+            _visualOverlayButtonKeys.Clear();
+            _biosphereGroupButtons.Clear();
+            _biosphereGroupKeys.Clear();
+            _fovViewModeButton = null;
+            _pauseSimulationButton = null;
+            _resumeSimulationButton = null;
+            _speedSimulationButton = null;
+            _biosphereDebugMultiplierButton = null;
+            _biosphereDebugGoStopButton = null;
+            _dayLabel = null;
+            _monthLabel = null;
+            _yearLabel = null;
+            _seasonLabel = null;
+            _timeLabel = null;
+            _temperatureLabel = null;
+            _humidityLabel = null;
+            _weatherLabel = null;
+            _speedSimulationLabel = null;
+            _biosphereDebugMultiplierLabel = null;
+            _biosphereDebugGoStopLabel = null;
+            _biosphereLegendSignature = string.Empty;
+            _biosphereGraphCanvas = null;
+        }
+
         private void BuildMapViewport()
         {
             RectTransform viewport = CreateRect("MapViewport", _uiRoot.transform);
@@ -721,7 +919,9 @@ namespace Arcontio.View.ArcGraph
                 new Vector2(0f, 0f),
                 new Vector2(1f, 0f),
                 new Vector2(0f, BottomActionBarHeight),
-                new Vector2(0f, BottomActionBarHeight + ActionPanelHeight));
+                new Vector2(-RightInspectorWidth, BottomActionBarHeight + ActionPanelHeight));
+            _actionPanel = panel;
+            panel.gameObject.AddComponent<RectMask2D>();
 
             HorizontalLayoutGroup layout = panel.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.padding = new RectOffset(10, 10, 10, 10);
@@ -731,14 +931,32 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandWidth = false;
             layout.childForceExpandHeight = true;
 
-            BuildActionPanelTabs(panel);
-            BuildOperationGrid(panel);
+            BuildConstructionActionPanelContent();
             panel.gameObject.SetActive(false);
+        }
+
+        private void BuildConstructionActionPanelContent()
+        {
+            if (_actionPanel == null)
+                return;
+
+            HorizontalLayoutGroup panelLayout = _actionPanel.GetComponent<HorizontalLayoutGroup>();
+            if (panelLayout != null)
+                panelLayout.enabled = true;
+
+            ClearChildren(_actionPanel);
+            _biosphereGraphCanvas = null;
+            _actionPanelGroupRoot = null;
+            _actionPanelContentRoot = null;
+
+            BuildActionPanelTabs(_actionPanel);
+            BuildOperationGrid(_actionPanel);
         }
 
         private void BuildActionPanelTabs(RectTransform parent)
         {
             RectTransform tabs = CreateRect("CategoryTabs", parent);
+            _actionPanelGroupRoot = tabs;
             LayoutElement tabsLayout = tabs.gameObject.AddComponent<LayoutElement>();
             tabsLayout.preferredWidth = 150f;
 
@@ -760,6 +978,7 @@ namespace Arcontio.View.ArcGraph
         private void BuildOperationGrid(RectTransform parent)
         {
             RectTransform gridRoot = CreateRect("OperationGrid", parent);
+            _actionPanelContentRoot = gridRoot;
             LayoutElement gridLayout = gridRoot.gameObject.AddComponent<LayoutElement>();
             gridLayout.flexibleWidth = 1f;
 
@@ -783,6 +1002,387 @@ namespace Arcontio.View.ArcGraph
             CreateOperationButton(gridRoot, "Forgia");
         }
 
+        // =============================================================================
+        // RebuildBiosphereActionPanel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce l'ActionPanel nella modalita' grafici Biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug UI confinata</b></para>
+        /// <para>
+        /// Il pannello riceve soltanto ViewModel read-only. Non avanza il tempo,
+        /// non modifica World e non invia comandi ad ArcGraph.
+        /// </para>
+        /// </summary>
+        private void RebuildBiosphereActionPanel()
+        {
+            if (_actionPanel == null)
+                return;
+
+            HorizontalLayoutGroup panelLayout = _actionPanel.GetComponent<HorizontalLayoutGroup>();
+            if (panelLayout != null)
+                panelLayout.enabled = false;
+
+            ClearChildren(_actionPanel);
+            _biosphereGroupButtons.Clear();
+            _biosphereGroupKeys.Clear();
+            _actionPanelGroupRoot = null;
+            _actionPanelContentRoot = null;
+
+            RectTransform leftColumn = CreateRect("BiosphereLeftColumn", _actionPanel);
+            _actionPanelGroupRoot = leftColumn;
+            SetAnchors(
+                leftColumn,
+                new Vector2(0f, 0f),
+                new Vector2(0f, 1f),
+                new Vector2(BiospherePanelPadding, BiospherePanelPadding),
+                new Vector2(BiospherePanelPadding + BiosphereLeftColumnWidth, -BiospherePanelPadding));
+
+            VerticalLayoutGroup leftLayout = leftColumn.gameObject.AddComponent<VerticalLayoutGroup>();
+            leftLayout.spacing = 4f;
+            leftLayout.childControlWidth = true;
+            leftLayout.childControlHeight = false;
+            leftLayout.childForceExpandWidth = true;
+            leftLayout.childForceExpandHeight = false;
+
+            RectTransform content = CreateRect("BiosphereContent", _actionPanel);
+            _actionPanelContentRoot = content;
+            SetAnchors(
+                content,
+                new Vector2(0f, 0f),
+                new Vector2(1f, 1f),
+                new Vector2(BiospherePanelPadding + BiosphereLeftColumnWidth + BiosphereColumnGap, BiospherePanelPadding),
+                new Vector2(-BiospherePanelPadding, -BiospherePanelPadding));
+
+            BuildBiosphereActionPanelContent();
+        }
+
+        private void CreateBiosphereGroupButton(RectTransform parent, string groupKey, string label, bool active)
+        {
+            Button button = CreateParameterChip(parent, label, true, 54f, BiosphereChipHeight, 7);
+            ApplyButtonColor(button, active);
+            string capturedGroupKey = groupKey;
+            _biosphereGroupButtons.Add(button);
+            _biosphereGroupKeys.Add(capturedGroupKey);
+            button.onClick.AddListener(() => SelectBiosphereGroup(capturedGroupKey));
+        }
+
+        private void SelectBiosphereGroup(string groupKey)
+        {
+            _activeBiosphereGroupKey = string.IsNullOrWhiteSpace(groupKey)
+                ? BiosphereWorldGraphsGroupKey
+                : groupKey.Trim();
+            _activeBiosphereGraphScope = _activeBiosphereGroupKey == BiosphereAreaGraphsGroupKey
+                ? ArcUiBiosphereGraphScope.BiologicalArea
+                : ArcUiBiosphereGraphScope.World;
+
+            RefreshBiosphereGroupButtons();
+            BuildBiosphereActionPanelContent();
+        }
+
+        private void RefreshBiosphereGroupButtons()
+        {
+            for (int i = 0; i < _biosphereGroupButtons.Count; i++)
+            {
+                bool active = i < _biosphereGroupKeys.Count && _biosphereGroupKeys[i] == _activeBiosphereGroupKey;
+                ApplyButtonColor(_biosphereGroupButtons[i], active);
+            }
+        }
+
+        private void BuildBiosphereActionPanelContent()
+        {
+            if (_actionPanelContentRoot == null)
+                return;
+
+            ClearChildren(_actionPanelContentRoot);
+            if (_actionPanelGroupRoot != null)
+                ClearChildren(_actionPanelGroupRoot);
+
+            _biosphereGroupButtons.Clear();
+            _biosphereGroupKeys.Clear();
+
+            ArcUiBiosphereGraphViewModel viewModel = BuildActiveBiosphereGraphViewModel();
+            _biosphereLegendSignature = BuildBiosphereLegendSignature(viewModel);
+
+            BuildBiosphereLeftColumn(_actionPanelGroupRoot, viewModel);
+            BuildBiosphereToolbar(_actionPanelContentRoot, viewModel);
+            BuildBiosphereGraphBlock(_actionPanelContentRoot, viewModel);
+        }
+
+        private void BuildBiosphereLeftColumn(RectTransform parent, ArcUiBiosphereGraphViewModel viewModel)
+        {
+            if (parent == null)
+                return;
+
+            Button days = CreateParameterChip(parent, "Giorni", true, -1f, BiosphereChipHeight, 7);
+            ApplyButtonColor(days, _activeBiosphereGraphBucket == ArcUiBiosphereGraphBucket.Days);
+            days.onClick.AddListener(() => SelectBiosphereBucket(ArcUiBiosphereGraphBucket.Days));
+
+            Button months = CreateParameterChip(parent, "Mesi", true, -1f, BiosphereChipHeight, 7);
+            ApplyButtonColor(months, _activeBiosphereGraphBucket == ArcUiBiosphereGraphBucket.Months);
+            months.onClick.AddListener(() => SelectBiosphereBucket(ArcUiBiosphereGraphBucket.Months));
+
+            if (_activeBiosphereGraphScope == ArcUiBiosphereGraphScope.BiologicalArea)
+            {
+                Button area = CreateParameterChip(parent, ResolveBiosphereAreaLabel(viewModel), true, -1f, BiosphereChipHeight, 7);
+                area.onClick.AddListener(() => SelectNextBiosphereArea(viewModel));
+            }
+        }
+
+        private void BuildBiosphereToolbar(RectTransform parent, ArcUiBiosphereGraphViewModel viewModel)
+        {
+            RectTransform toolbar = CreateRect("BiosphereToolbar", parent);
+            SetAnchors(
+                toolbar,
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, -BiosphereToolbarHeight),
+                new Vector2(0f, 0f));
+
+            HorizontalLayoutGroup layout = toolbar.gameObject.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 3f;
+            layout.childControlWidth = false;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = false;
+
+            CreateBiosphereGroupButton(toolbar, BiosphereWorldGraphsGroupKey, "Mondo", _activeBiosphereGroupKey == BiosphereWorldGraphsGroupKey);
+            CreateBiosphereGroupButton(toolbar, BiosphereAreaGraphsGroupKey, "Area", _activeBiosphereGroupKey == BiosphereAreaGraphsGroupKey);
+
+            ArcUiBiosphereGraphSeries[] series = viewModel.Series ?? new ArcUiBiosphereGraphSeries[0];
+            for (int i = 0; i < series.Length; i++)
+            {
+                ArcUiBiosphereGraphSeries captured = series[i];
+                Button chip = CreateLegendChip(
+                    toolbar,
+                    ResolveBiosphereLegendLabel(viewModel, captured),
+                    captured.Color,
+                    captured.Visible);
+                chip.onClick.AddListener(() => ToggleBiosphereSeries(captured.Key));
+            }
+
+            if (viewModel.Scope == ArcUiBiosphereGraphScope.World)
+            {
+                string weatherKey = "world_weather";
+                bool visible = !_hiddenBiosphereSeriesKeys.Contains(ArcUiOperationDefinition.NormalizeKey(weatherKey));
+                Button weather = CreateLegendChip(
+                    toolbar,
+                    viewModel.Bucket == ArcUiBiosphereGraphBucket.Months
+                        ? "Meteo (giorni/mese)"
+                        : "Meteo (giorni)",
+                    ColorFromHex("#D8C85A", 1f),
+                    visible);
+                weather.onClick.AddListener(() => ToggleBiosphereSeries(weatherKey));
+            }
+        }
+
+        private void BuildBiosphereGraphBlock(RectTransform parent, ArcUiBiosphereGraphViewModel viewModel)
+        {
+            RectTransform block = CreateRect("BiosphereGraphBlock", parent);
+            SetAnchors(
+                block,
+                new Vector2(0f, 0f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, 0f),
+                new Vector2(0f, -BiosphereToolbarHeight));
+            Image image = block.gameObject.AddComponent<Image>();
+            image.raycastTarget = false;
+            image.color = ColorFromHex("#18222C", 0.82f);
+
+            RectTransform graphRoot = CreateRect("BiosphereGraphCanvas", block);
+            StretchFull(graphRoot);
+            _biosphereGraphCanvas = graphRoot.gameObject.AddComponent<ArcUiBiosphereGraphCanvas>();
+            _biosphereGraphCanvas.raycastTarget = false;
+            _biosphereGraphCanvas.SetViewModel(viewModel);
+
+            CreateGraphOverlayLabel(
+                block,
+                "BiosphereGraphYUnit",
+                ResolveBiosphereYUnitLabel(viewModel),
+                new Vector2(0f, 1f),
+                new Vector2(0f, 1f),
+                new Vector2(42f, -26f),
+                new Vector2(250f, -6f),
+                TextAlignmentOptions.Left);
+            CreateGraphOverlayLabel(
+                block,
+                "BiosphereGraphXUnit",
+                ResolveBiosphereXUnitLabel(viewModel),
+                new Vector2(1f, 0f),
+                new Vector2(1f, 0f),
+                new Vector2(-170f, 4f),
+                new Vector2(-12f, 24f),
+                TextAlignmentOptions.Right);
+        }
+
+        private ArcUiBiosphereGraphViewModel BuildActiveBiosphereGraphViewModel()
+        {
+            if (_biosphereSnapshotProvider == null)
+                return ArcUiBiosphereGraphViewModel.Empty();
+
+            ArcUiBiosphereGraphViewModel viewModel = _biosphereSnapshotProvider.BuildGraphViewModel(
+                _activeBiosphereGraphScope,
+                _activeBiosphereGraphBucket,
+                _selectedBiosphereAreaId,
+                _hiddenBiosphereSeriesKeys);
+
+            if (_selectedBiosphereAreaId <= 0 && viewModel.SelectedAreaId > 0)
+                _selectedBiosphereAreaId = viewModel.SelectedAreaId;
+
+            return viewModel;
+        }
+
+        private void SelectBiosphereBucket(ArcUiBiosphereGraphBucket bucket)
+        {
+            _activeBiosphereGraphBucket = bucket;
+            BuildBiosphereActionPanelContent();
+        }
+
+        private void SelectNextBiosphereArea(ArcUiBiosphereGraphViewModel viewModel)
+        {
+            ArcUiBiosphereAreaOption[] areas = viewModel.AreaOptions ?? new ArcUiBiosphereAreaOption[0];
+            if (areas.Length == 0)
+                return;
+
+            int index = 0;
+            for (int i = 0; i < areas.Length; i++)
+            {
+                if (areas[i].AreaId == viewModel.SelectedAreaId)
+                {
+                    index = i;
+                    break;
+                }
+            }
+
+            _selectedBiosphereAreaId = areas[(index + 1) % areas.Length].AreaId;
+            BuildBiosphereActionPanelContent();
+        }
+
+        private void ToggleBiosphereSeries(string key)
+        {
+            string normalized = ArcUiOperationDefinition.NormalizeKey(key);
+            if (_hiddenBiosphereSeriesKeys.Contains(normalized))
+                _hiddenBiosphereSeriesKeys.Remove(normalized);
+            else
+                _hiddenBiosphereSeriesKeys.Add(normalized);
+
+            BuildBiosphereActionPanelContent();
+        }
+
+        private void RefreshBiosphereGraphPanel()
+        {
+            if (_biosphereGraphCanvas == null)
+                return;
+
+            ArcUiBiosphereGraphViewModel viewModel = BuildActiveBiosphereGraphViewModel();
+            string signature = BuildBiosphereLegendSignature(viewModel);
+            if (_biosphereLegendSignature != signature)
+            {
+                BuildBiosphereActionPanelContent();
+                return;
+            }
+
+            _biosphereGraphCanvas.SetViewModel(viewModel);
+        }
+
+        private static string ResolveBiosphereAreaLabel(ArcUiBiosphereGraphViewModel viewModel)
+        {
+            ArcUiBiosphereAreaOption[] areas = viewModel.AreaOptions ?? new ArcUiBiosphereAreaOption[0];
+            for (int i = 0; i < areas.Length; i++)
+                if (areas[i].AreaId == viewModel.SelectedAreaId)
+                    return areas[i].Label;
+
+            return "Nessuna area";
+        }
+
+        // =============================================================================
+        // ResolveBiosphereLegendLabel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il testo leggibile della legenda Biosfera aggiungendo l'unita'
+        /// operativa della serie visualizzata.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: UI come spiegazione del dato, non sorgente del dato</b></para>
+        /// <para>
+        /// Il metodo non interpreta la simulazione e non cambia i valori del grafico:
+        /// riceve serie gia' risolte dal ViewModel read-only e aggiunge solo una
+        /// descrizione compatta per evitare legenda muta o ambigua.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Serie mondo</b>: temperatura e umidita' sono indici normalizzati 0-1.</item>
+        ///   <item><b>Serie area</b>: piante e vegetazione sono conteggi fisici o celle diffuse.</item>
+        /// </list>
+        /// </summary>
+        private static string ResolveBiosphereLegendLabel(
+            ArcUiBiosphereGraphViewModel viewModel,
+            ArcUiBiosphereGraphSeries series)
+        {
+            string label = string.IsNullOrWhiteSpace(series.Label) ? series.Key : series.Label.Trim();
+            string key = ArcUiOperationDefinition.NormalizeKey(series.Key);
+            if (key.StartsWith("world_temperature", System.StringComparison.Ordinal))
+                return label + " (indice 0-1)";
+            if (key.StartsWith("world_humidity", System.StringComparison.Ordinal))
+                return label + " (indice 0-1)";
+            if (key.StartsWith("plant_", System.StringComparison.Ordinal))
+                return label + " (piante)";
+            if (key.StartsWith("vegetation_", System.StringComparison.Ordinal))
+                return label + " (celle)";
+
+            return viewModel.Scope == ArcUiBiosphereGraphScope.BiologicalArea
+                ? label + " (conteggio)"
+                : label;
+        }
+
+        // =============================================================================
+        // ResolveBiosphereYUnitLabel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce l'etichetta dell'asse verticale del grafico Biosfera.
+        /// </para>
+        /// </summary>
+        private static string ResolveBiosphereYUnitLabel(ArcUiBiosphereGraphViewModel viewModel)
+        {
+            return viewModel.Scope == ArcUiBiosphereGraphScope.BiologicalArea
+                ? "Y: conteggio piante / celle"
+                : "Y: indice normalizzato 0-1";
+        }
+
+        // =============================================================================
+        // ResolveBiosphereXUnitLabel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce l'etichetta dell'asse orizzontale in base al bucket temporale
+        /// selezionato dall'operatore.
+        /// </para>
+        /// </summary>
+        private static string ResolveBiosphereXUnitLabel(ArcUiBiosphereGraphViewModel viewModel)
+        {
+            return viewModel.Bucket == ArcUiBiosphereGraphBucket.Months
+                ? "X: mesi"
+                : "X: giorni";
+        }
+
+        private static string BuildBiosphereLegendSignature(ArcUiBiosphereGraphViewModel viewModel)
+        {
+            ArcUiBiosphereGraphSeries[] series = viewModel.Series ?? new ArcUiBiosphereGraphSeries[0];
+            string signature = viewModel.Scope.ToString() + "|" + viewModel.Bucket.ToString() + "|" + viewModel.SelectedAreaId.ToString();
+            for (int i = 0; i < series.Length; i++)
+                signature += "|" + series[i].Key;
+
+            if (viewModel.Scope == ArcUiBiosphereGraphScope.World)
+                signature += "|world_weather";
+
+            return signature;
+        }
+
         private void BuildBottomActionBar()
         {
             RectTransform panel = CreatePanel(
@@ -803,12 +1403,29 @@ namespace Arcontio.View.ArcGraph
 
             CreateBottomActionButton(panel, "Costruisci", active: true);
             CreateBottomActionButton(panel, "Inserisci", active: false);
+            Button biosphereButton = CreateBottomActionButton(panel, "Biosfera v0.63", active: false);
+            biosphereButton.onClick.AddListener(ToggleBiosphereActionPanel);
             CreateBottomActionButton(panel, "Gestisci lavori", active: false);
             CreateBottomActionButton(panel, "Zone", active: false);
             CreateBottomActionButton(panel, "Oggetti", active: false);
             CreateBottomActionButton(panel, "NPC", active: false);
             CreateBottomActionButton(panel, "Istituzioni", active: false);
             CreateBottomActionButton(panel, "Ricerca", active: false);
+        }
+
+        private void ToggleBiosphereActionPanel()
+        {
+            if (_actionPanel == null)
+                return;
+
+            bool switchFromConstruction = _biosphereGraphCanvas == null;
+            bool nextVisible = !_actionPanel.gameObject.activeSelf || switchFromConstruction;
+            _actionPanel.gameObject.SetActive(nextVisible);
+
+            if (nextVisible)
+                RebuildBiosphereActionPanel();
+            else
+                _biosphereGraphCanvas = null;
         }
 
         private void BuildOverlayRoots()
@@ -853,9 +1470,13 @@ namespace Arcontio.View.ArcGraph
             image.color = ColorFromHex("#18222C", 0.82f);
 
             LayoutElement layout = rect.gameObject.AddComponent<LayoutElement>();
+            layout.minHeight = preferredHeight;
             layout.preferredHeight = preferredHeight;
             if (preferredWidth > 0f)
+            {
+                layout.minWidth = preferredWidth;
                 layout.preferredWidth = preferredWidth;
+            }
 
             return rect;
         }
@@ -1169,10 +1790,11 @@ namespace Arcontio.View.ArcGraph
             CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
-        private static void CreateCategoryButton(RectTransform parent, string label, bool active)
+        private static Button CreateCategoryButton(RectTransform parent, string label, bool active)
         {
             RectTransform button = CreateButtonShell(parent, "ArcButton_Category_" + SanitizeName(label), -1f, 28f, active);
             CreateText(button, label, 12, FontStyles.Bold, TextAlignmentOptions.Left);
+            return button.GetComponent<Button>();
         }
 
         private static void CreateOperationButton(RectTransform parent, string label)
@@ -1190,10 +1812,172 @@ namespace Arcontio.View.ArcGraph
             CreateText(labelRoot, label, 10, FontStyles.Bold, TextAlignmentOptions.Center);
         }
 
-        private static void CreateBottomActionButton(RectTransform parent, string label, bool active)
+        private static Button CreateBottomActionButton(RectTransform parent, string label, bool active)
         {
             RectTransform button = CreateButtonShell(parent, "ArcButton_Bottom_" + SanitizeName(label), -1f, 72f, active);
             CreateText(button, label, 13, FontStyles.Bold, TextAlignmentOptions.Center);
+            return button.GetComponent<Button>();
+        }
+
+        private static Button CreateParameterChip(RectTransform parent, string label, bool interactable)
+        {
+            return CreateParameterChip(parent, label, interactable, 118f, 30f, 9);
+        }
+
+        private static Button CreateParameterChip(
+            RectTransform parent,
+            string label,
+            bool interactable,
+            float preferredWidth,
+            float preferredHeight,
+            int fontSize)
+        {
+            RectTransform button = CreateButtonShell(
+                parent,
+                "ArcParam_" + SanitizeName(label),
+                preferredWidth,
+                preferredHeight,
+                false);
+            Button component = button.GetComponent<Button>();
+            component.interactable = interactable;
+            CreateText(button, label, fontSize, FontStyles.Bold, TextAlignmentOptions.Center);
+            return component;
+        }
+
+        // =============================================================================
+        // CreateLegendChip
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un chip di legenda compatto con swatch colorato e testo con unita'.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: legenda come contratto visivo locale</b></para>
+        /// <para>
+        /// Il colore arriva dalla serie del ViewModel e resta confinato alla UI: non
+        /// viene usato per dedurre tipo di dato, scala o comportamento simulativo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Shell</b>: normale bottone togglable della toolbar Biosfera.</item>
+        ///   <item><b>Swatch</b>: piccolo campione cromatico della linea o del meteo.</item>
+        ///   <item><b>Label</b>: testo ellittico con unita' di misura.</item>
+        /// </list>
+        /// </summary>
+        private static Button CreateLegendChip(
+            RectTransform parent,
+            string label,
+            Color swatchColor,
+            bool active)
+        {
+            RectTransform button = CreateButtonShell(
+                parent,
+                "ArcLegend_" + SanitizeName(label),
+                156f,
+                BiosphereChipHeight,
+                false);
+            Button component = button.GetComponent<Button>();
+            component.interactable = true;
+            ApplySeriesButtonColor(component, swatchColor, active);
+
+            RectTransform swatch = CreateRect("Swatch", button);
+            SetAnchors(
+                swatch,
+                new Vector2(0f, 0.5f),
+                new Vector2(0f, 0.5f),
+                new Vector2(8f, -5f),
+                new Vector2(18f, 5f));
+            Image swatchImage = swatch.gameObject.AddComponent<Image>();
+            swatchImage.raycastTarget = false;
+            swatchImage.color = active ? swatchColor : ColorFromHex("#4A5158", 0.9f);
+
+            RectTransform labelRoot = CreateRect("LegendLabel", button);
+            SetAnchors(
+                labelRoot,
+                new Vector2(0f, 0f),
+                new Vector2(1f, 1f),
+                new Vector2(23f, 1f),
+                new Vector2(-5f, -1f));
+            TextMeshProUGUI text = CreateText(labelRoot, label, 8, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.enableWordWrapping = false;
+            return component;
+        }
+
+        // =============================================================================
+        // CreateGraphOverlayLabel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una label non interattiva sopra il grafico per indicare unita' e scala
+        /// degli assi senza alterare il renderer texture-based del grafico.
+        /// </para>
+        /// </summary>
+        private static TextMeshProUGUI CreateGraphOverlayLabel(
+            RectTransform parent,
+            string name,
+            string label,
+            Vector2 anchorMin,
+            Vector2 anchorMax,
+            Vector2 offsetMin,
+            Vector2 offsetMax,
+            TextAlignmentOptions alignment)
+        {
+            RectTransform root = CreateRect(name, parent);
+            SetAnchors(root, anchorMin, anchorMax, offsetMin, offsetMax);
+            TextMeshProUGUI text = CreateText(root, label, 8, FontStyles.Bold, alignment);
+            text.raycastTarget = false;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.enableWordWrapping = false;
+            text.color = ColorFromHex("#DDE6EE", 0.82f);
+            return text;
+        }
+
+        private static void ApplyButtonColor(Button button, bool active)
+        {
+            if (button == null)
+                return;
+
+            Image image = button.targetGraphic as Image;
+            if (image != null)
+                image.color = active ? ColorFromHex("#324557", 0.94f) : ColorFromHex("#17212B", 0.92f);
+
+            ColorBlock colors = button.colors;
+            colors.normalColor = active ? ColorFromHex("#324557", 0.94f) : ColorFromHex("#17212B", 0.92f);
+            colors.selectedColor = ColorFromHex("#324557", 1f);
+            button.colors = colors;
+        }
+
+        private static void ApplySeriesButtonColor(Button button, Color seriesColor, bool active)
+        {
+            if (button == null)
+                return;
+
+            Color normal = active
+                ? new Color(seriesColor.r, seriesColor.g, seriesColor.b, 0.94f)
+                : ColorFromHex("#17212B", 0.92f);
+
+            Image image = button.targetGraphic as Image;
+            if (image != null)
+                image.color = normal;
+
+            ColorBlock colors = button.colors;
+            colors.normalColor = normal;
+            colors.highlightedColor = new Color(seriesColor.r, seriesColor.g, seriesColor.b, 1f);
+            colors.pressedColor = ColorFromHex("#DDE6EE", 1f);
+            colors.selectedColor = normal;
+            colors.disabledColor = ColorFromHex("#0B1117", 0.72f);
+            button.colors = colors;
+        }
+
+        private static void ClearChildren(RectTransform root)
+        {
+            if (root == null)
+                return;
+
+            for (int i = root.childCount - 1; i >= 0; i--)
+                Destroy(root.GetChild(i).gameObject);
         }
 
         private static RectTransform CreateButtonShell(

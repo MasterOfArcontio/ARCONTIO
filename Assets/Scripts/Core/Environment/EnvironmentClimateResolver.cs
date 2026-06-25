@@ -40,7 +40,7 @@ namespace Arcontio.Core.Environment
             EnvironmentClimateConfig config)
         {
             var safeConfig = config ?? new EnvironmentClimateConfig();
-            var profile = ResolveSeasonClimateProfile(safeConfig, calendar.Date.Season);
+            var profile = ResolveSmoothedSeasonClimateProfile(safeConfig, calendar);
             float dayNoise01 = Hash01(calendar.Date.Year, calendar.Date.DayOfYear, 17);
             float hourWave01 = ComputeHourWave01(calendar.TimeOfDay.NormalizedDay01);
             float hourlyVariation = safeConfig.ResolveHourlyTemperatureVariation01();
@@ -108,6 +108,86 @@ namespace Arcontio.Core.Environment
             }
 
             return defaults[0].ToProfile();
+        }
+
+        // =============================================================================
+        // ResolveSmoothedSeasonClimateProfile
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il profilo climatico stagionale con una transizione morbida
+        /// distribuita sulla finestra configurata.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: stagioni continue, medie ancora configurate</b></para>
+        /// <para>
+        /// I valori stagionali restano quelli del JSON, ma il passaggio da una
+        /// stagione alla successiva non viene piu' applicato come gradino secco al
+        /// giorno zero. Il resolver interpola dal profilo precedente a quello
+        /// corrente per una finestra configurabile. Nei test correnti la finestra
+        /// coincide con l'intera stagione, evitando il gradino netto tra due profili
+        /// climatici molto distanti.
+        /// </para>
+        /// </summary>
+        private static EnvironmentSeasonClimateProfile ResolveSmoothedSeasonClimateProfile(
+            EnvironmentClimateConfig config,
+            EnvironmentCalendarState calendar)
+        {
+            var current = ResolveSeasonClimateProfile(config, calendar.Date.Season);
+            int blendDays = config.ResolveSeasonClimateBlendDays();
+            if (blendDays <= 0 || calendar.Date.DayInSeason >= blendDays)
+                return current;
+
+            var previous = ResolveSeasonClimateProfile(
+                config,
+                ResolvePreviousSeason(calendar.Date.Season));
+            float t = SmoothStep01(calendar.Date.DayInSeason / (float)blendDays);
+            return BlendProfiles(previous, current, t);
+        }
+
+        private static EnvironmentSeasonClimateProfile BlendProfiles(
+            EnvironmentSeasonClimateProfile from,
+            EnvironmentSeasonClimateProfile to,
+            float t01)
+        {
+            float t = EnvironmentMath.Clamp01(t01);
+            return new EnvironmentSeasonClimateProfile(
+                Lerp(from.MeanTemperature01, to.MeanTemperature01, t),
+                Lerp(from.TemperatureVariation01, to.TemperatureVariation01, t),
+                Lerp(from.RainProbability01, to.RainProbability01, t),
+                Lerp(from.SnowProbability01, to.SnowProbability01, t),
+                Lerp(from.WindProbability01, to.WindProbability01, t),
+                Lerp(from.HeatWaveProbability01, to.HeatWaveProbability01, t),
+                Lerp(from.BaseHumidity01, to.BaseHumidity01, t),
+                (int)Math.Round(Lerp(
+                    from.AverageEventDurationHours,
+                    to.AverageEventDurationHours,
+                    t)));
+        }
+
+        private static EnvironmentSeasonKind ResolvePreviousSeason(EnvironmentSeasonKind season)
+        {
+            if (season == EnvironmentSeasonKind.Summer)
+                return EnvironmentSeasonKind.Spring;
+
+            if (season == EnvironmentSeasonKind.Autumn)
+                return EnvironmentSeasonKind.Summer;
+
+            if (season == EnvironmentSeasonKind.Winter)
+                return EnvironmentSeasonKind.Autumn;
+
+            return EnvironmentSeasonKind.Winter;
+        }
+
+        private static float SmoothStep01(float value01)
+        {
+            float t = EnvironmentMath.Clamp01(value01);
+            return t * t * (3f - (2f * t));
+        }
+
+        private static float Lerp(float from, float to, float t01)
+        {
+            return from + ((to - from) * EnvironmentMath.Clamp01(t01));
         }
 
         private static EnvironmentWeatherKind ResolveWeatherKind(

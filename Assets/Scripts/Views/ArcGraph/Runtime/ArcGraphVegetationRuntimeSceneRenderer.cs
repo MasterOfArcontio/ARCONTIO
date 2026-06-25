@@ -324,7 +324,7 @@ namespace Arcontio.View.ArcGraph
 
                 int entityId = ResolveEntityId(item);
                 VegetationHandle handle = GetOrCreateHandle(entityId, contract, out bool wasCreated);
-                ApplyItem(handle, item, sprite, contract, i);
+                ApplyItem(handle, item, sprite, contract);
 
                 rendered++;
                 if (wasCreated)
@@ -397,22 +397,97 @@ namespace Arcontio.View.ArcGraph
             VegetationHandle handle,
             ArcGraphVegetationRenderItem item,
             Sprite sprite,
-            ArcGraphVegetationRuntimeSceneRendererContract contract,
-            int queueIndex)
+            ArcGraphVegetationRuntimeSceneRendererContract contract)
         {
-            Vector3 localPosition = contract.OriginOffset + new Vector3(
-                (item.Cell.X + 0.5f) * contract.TileWorldSize,
-                (item.Cell.Y + 0.5f) * contract.TileWorldSize,
-                item.Cell.Z + contract.ZOffset);
+            Vector3 localPosition = ResolveItemLocalPosition(item, sprite, contract);
 
             handle.GameObject.transform.localPosition = localPosition;
             handle.GameObject.transform.localScale = Vector3.one * contract.VegetationScale;
             handle.Renderer.sprite = sprite;
-            handle.Renderer.sortingOrder = contract.BaseSortingOrder + queueIndex;
+            handle.Renderer.sortingOrder = ResolveVegetationSortingOrder(contract, item);
             handle.Renderer.color = ResolveTint(item);
             handle.Renderer.enabled = true;
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
+        }
+
+        // =============================================================================
+        // ResolveItemLocalPosition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la posizione locale dello sprite vegetale distinguendo vegetazione
+        /// diffusa e piante fisiche alte.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: base cella come ancoraggio fisico</b></para>
+        /// <para>
+        /// La vegetazione diffusa resta centrata nella cella per comportarsi come un
+        /// tile/overlay. Le piante fisiche, invece, devono appoggiare la base al
+        /// bordo basso della cella e svilupparsi verso l'alto: un albero 32x48 non
+        /// deve invadere la cella sotto, ma eccedere sopra la propria cella base.
+        /// </para>
+        /// </summary>
+        private static Vector3 ResolveItemLocalPosition(
+            ArcGraphVegetationRenderItem item,
+            Sprite sprite,
+            ArcGraphVegetationRuntimeSceneRendererContract contract)
+        {
+            float x = (item.Cell.X + 0.5f) * contract.TileWorldSize;
+            float y = (item.Cell.Y + 0.5f) * contract.TileWorldSize;
+
+            if (IsPhysicalPlantItem(item))
+            {
+                float cellBottom = item.Cell.Y * contract.TileWorldSize;
+                float pivotOffsetFromSpriteBottom = ResolveSpritePivotOffsetFromBottom(sprite);
+                y = cellBottom + (pivotOffsetFromSpriteBottom * contract.VegetationScale);
+            }
+
+            return contract.OriginOffset + new Vector3(
+                x,
+                y,
+                item.Cell.Z + contract.ZOffset);
+        }
+
+        private static bool IsPhysicalPlantItem(ArcGraphVegetationRenderItem item)
+        {
+            return !string.IsNullOrWhiteSpace(item.SpriteKey)
+                   && item.SpriteKey.StartsWith(
+                       "ArcGraph/Environment/Plants/",
+                       System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static float ResolveSpritePivotOffsetFromBottom(Sprite sprite)
+        {
+            if (sprite == null || sprite.pixelsPerUnit <= 0f)
+                return 0.5f;
+
+            return sprite.pivot.y / sprite.pixelsPerUnit;
+        }
+
+        // =============================================================================
+        // ResolveVegetationSortingOrder
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il sorting Unity della vegetazione mantenendola sotto oggetti,
+        /// muri e NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: layer ambientale sotto le entita' fisiche</b></para>
+        /// <para>
+        /// La queue vegetazione puo' contenere centinaia di celle. Usare l'indice
+        /// della queue come sorting order assoluto fa crescere il valore fino a
+        /// superare la queue actor/object, che parte da sorting 40. Qui usiamo
+        /// invece solo il layer visuale dichiarato dalla sort key: la vegetazione
+        /// resta sopra il terreno, ma non copre muri, oggetti o NPC.
+        /// </para>
+        /// </summary>
+        private static int ResolveVegetationSortingOrder(
+            ArcGraphVegetationRuntimeSceneRendererContract contract,
+            ArcGraphVegetationRenderItem item)
+        {
+            return contract.BaseSortingOrder + item.SortKey.VisualLayerOrder;
         }
 
         private static Color ResolveTint(ArcGraphVegetationRenderItem item)

@@ -22,7 +22,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Pause</b>: richiesta di pausa.</item>
     ///   <item><b>Resume</b>: richiesta di ripresa.</item>
     ///   <item><b>SetSpeed</b>: richiesta di fattore velocita' UI.</item>
-    ///   <item><b>SetBiosphereDebugFastForwardMultiplier</b>: scelta x50/x100/x200.</item>
+    ///   <item><b>SetBiosphereDebugFastForwardMultiplier</b>: scelta x50/x100/x200/x500.</item>
     ///   <item><b>StartBiosphereDebugFastForward</b>: avvio del fast-forward solo Biosfera.</item>
     ///   <item><b>StopBiosphereDebugFastForward</b>: stop del fast-forward solo Biosfera.</item>
     /// </list>
@@ -58,7 +58,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>Kind</b>: intenzione temporale richiesta.</item>
     ///   <item><b>SpeedMultiplier</b>: fattore normalizzato tra 1 e 4.</item>
-    ///   <item><b>BiosphereDebugFastForwardMultiplier</b>: fattore x50/x100/x200.</item>
+    ///   <item><b>BiosphereDebugFastForwardMultiplier</b>: fattore x50/x100/x200/x500.</item>
     ///   <item><b>Source</b>: nome del componente UI che ha prodotto la richiesta.</item>
     ///   <item><b>IsValid</b>: true solo per richieste semanticamente utilizzabili.</item>
     /// </list>
@@ -251,7 +251,10 @@ namespace Arcontio.View.ArcGraph
             if (multiplier <= 100)
                 return 100;
 
-            return 200;
+            if (multiplier <= 200)
+                return 200;
+
+            return 500;
         }
     }
 
