@@ -81,7 +81,7 @@
                             {
                                 "AreaId":  1,
                                 "Key":  "debug_grassland_meadow",
-                                "BiomeKey":  "grassland",
+                                "BiomeKey":  "temperate_grassland",
                                 "VegetationKind":  "Grass",
                                 "SoilKind":  "Grassland",
                                 "CenterX":  32,
