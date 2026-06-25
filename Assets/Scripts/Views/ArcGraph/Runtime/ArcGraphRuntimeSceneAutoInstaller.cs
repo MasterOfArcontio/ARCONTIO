@@ -71,6 +71,7 @@ namespace Arcontio.View.ArcGraph
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
+        private ArcUiPlacementController _placementController;
         private ArcGraphRightInspectorSceneView _rightInspectorView;
         private ArcUiInspectionController _inspectionController;
         private ArcGraphSelectionSceneConsumer _selectionConsumer;
@@ -259,6 +260,7 @@ namespace Arcontio.View.ArcGraph
             _selectionActionController = new ArcUiSelectionActionController();
             _simulationControlController = new ArcUiSimulationControlController();
             _visualOverlayController = new ArcUiVisualOverlayController();
+            _placementController = new ArcUiPlacementController();
             _rightInspectorView = _visualRoot.AddComponent<ArcGraphRightInspectorSceneView>();
             _inspectionController = new ArcUiInspectionController();
             _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
@@ -432,6 +434,7 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetVisualOverlayStateChanged(OnVisualOverlayStateChanged);
             _uiRoot.SetSimulationControlController(_simulationControlController);
             _uiRoot.SetPlacementPreviewSource(_uiPlacementPreviewSource);
+            _uiRoot.SetPlacementController(_placementController);
         }
 
         // =============================================================================

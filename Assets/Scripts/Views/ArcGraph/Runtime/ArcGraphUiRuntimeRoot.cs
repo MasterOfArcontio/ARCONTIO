@@ -99,9 +99,12 @@ namespace Arcontio.View.ArcGraph
         private TextMeshProUGUI _biosphereDebugGoStopLabel;
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
+        private ArcUiPlacementController _placementController;
         private ArcGraphUiPlacementPreviewSource _placementPreviewSource;
         private UnityAction<string, bool> _visualOverlayStateChanged;
         private string _activeInsertGroupKey = InsertStructuresGroupKey;
+        private ArcUiPlacementMode _activePlacementMode = ArcUiPlacementMode.Single;
+        private ArcUiPlacementConfig _activePlacementConfig = ArcUiPlacementConfig.Default();
 
         public GameObject RootGameObject => _uiRoot;
         public bool IsBuilt => _uiRoot != null;
@@ -366,6 +369,26 @@ namespace Arcontio.View.ArcGraph
         public void SetPlacementPreviewSource(ArcGraphUiPlacementPreviewSource source)
         {
             _placementPreviewSource = source;
+        }
+
+        // =============================================================================
+        // SetPlacementController
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega l'ActionPanel al controller dati della richiesta placement.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: pannello -> request, non pannello -> World</b></para>
+        /// <para>
+        /// Il controller conserva la request selezionata dall'utente. La UI continua
+        /// a non conoscere <c>SimulationHost</c>, command buffer, <c>World</c> o
+        /// comandi DevTools.
+        /// </para>
+        /// </summary>
+        public void SetPlacementController(ArcUiPlacementController controller)
+        {
+            _placementController = controller;
         }
 
         // =============================================================================
@@ -958,6 +981,8 @@ namespace Arcontio.View.ArcGraph
 
             if (_placementPreviewSource != null)
                 _placementPreviewSource.ClearPreview();
+
+            _placementController?.Cancel();
         }
 
         private void RefreshInsertGroupButtons()
@@ -1002,20 +1027,21 @@ namespace Arcontio.View.ArcGraph
 
         private void SelectObjectOperation(ArcGraphActionPanelObjectEntry entry)
         {
-            if (_placementPreviewSource != null)
-                _placementPreviewSource.SetPreviewDef(entry.DefId);
+            _activePlacementMode = ArcUiPlacementMode.Single;
+            _activePlacementConfig = ArcUiPlacementConfig.Default();
+            UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
 
             ClearChildren(_operationParamsRoot);
-            CreateParameterChip(_operationParamsRoot, "Preview: " + entry.DefId, false);
+            CreateParameterChip(_operationParamsRoot, "Request: " + ResolveOperationKey(entry), false);
 
             if (entry.SupportsDoorOptions)
                 BuildDoorParameterChips(entry);
             else if (entry.SupportsBrushOptions)
-                BuildWallParameterChips();
+                BuildWallParameterChips(entry);
             else if (entry.SupportsFoodOptions)
-                BuildFoodStockParameterChips();
+                BuildFoodStockParameterChips(entry);
             else
-                BuildObjectOwnershipParameterChips();
+                BuildObjectOwnershipParameterChips(entry);
         }
 
         private void SelectNpcSpawnOperation()
@@ -1026,39 +1052,141 @@ namespace Arcontio.View.ArcGraph
             ClearChildren(_operationParamsRoot);
             CreateParameterChip(_operationParamsRoot, "NPC preview: prossimo step", false);
             CreateParameterChip(_operationParamsRoot, "DNA/config da inspector", false);
+            _placementController?.Cancel();
         }
 
         private void BuildDoorParameterChips(ArcGraphActionPanelObjectEntry entry)
         {
             Button closed = CreateParameterChip(_operationParamsRoot, "Chiusa", true);
-            closed.onClick.AddListener(() => _placementPreviewSource?.SetPreviewDef("door_wood"));
+            closed.onClick.AddListener(() =>
+            {
+                _activePlacementConfig = _activePlacementConfig.WithDoorState(ArcUiDoorPlacementState.Closed);
+                UpdatePlacementRequest(entry, "door_wood", _activePlacementMode, _activePlacementConfig);
+            });
 
             Button open = CreateParameterChip(_operationParamsRoot, "Aperta", true);
-            open.onClick.AddListener(() => _placementPreviewSource?.SetPreviewDef(entry.DefId));
+            open.onClick.AddListener(() =>
+            {
+                _activePlacementConfig = _activePlacementConfig.WithDoorState(ArcUiDoorPlacementState.Open);
+                UpdatePlacementRequest(entry, "door_wood", _activePlacementMode, _activePlacementConfig);
+            });
 
             Button locked = CreateParameterChip(_operationParamsRoot, "Chiusa a chiave", true);
-            locked.onClick.AddListener(() => _placementPreviewSource?.SetPreviewDef("door_wood_locked"));
+            locked.onClick.AddListener(() =>
+            {
+                _activePlacementConfig = _activePlacementConfig.WithDoorState(ArcUiDoorPlacementState.Locked);
+                UpdatePlacementRequest(entry, "door_wood_locked", _activePlacementMode, _activePlacementConfig);
+            });
         }
 
-        private void BuildWallParameterChips()
+        private void BuildWallParameterChips(ArcGraphActionPanelObjectEntry entry)
         {
-            CreateParameterChip(_operationParamsRoot, "Click", true);
-            CreateParameterChip(_operationParamsRoot, "Brush", true);
+            Button click = CreateParameterChip(_operationParamsRoot, "Click", true);
+            click.onClick.AddListener(() =>
+            {
+                _activePlacementMode = ArcUiPlacementMode.Single;
+                UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
+            });
+
+            Button brush = CreateParameterChip(_operationParamsRoot, "Brush", true);
+            brush.onClick.AddListener(() =>
+            {
+                _activePlacementMode = ArcUiPlacementMode.Brush;
+                UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
+            });
         }
 
-        private void BuildFoodStockParameterChips()
+        private void BuildFoodStockParameterChips(ArcGraphActionPanelObjectEntry entry)
         {
-            CreateParameterChip(_operationParamsRoot, "Qty 1", true);
-            CreateParameterChip(_operationParamsRoot, "Qty 5", true);
-            CreateParameterChip(_operationParamsRoot, "Qty 10", true);
-            CreateParameterChip(_operationParamsRoot, "Owner: Community", true);
+            Button qty1 = CreateParameterChip(_operationParamsRoot, "Qty 1", true);
+            qty1.onClick.AddListener(() =>
+            {
+                _activePlacementConfig = _activePlacementConfig.WithFoodUnits(1);
+                UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
+            });
+
+            Button qty5 = CreateParameterChip(_operationParamsRoot, "Qty 5", true);
+            qty5.onClick.AddListener(() =>
+            {
+                _activePlacementConfig = _activePlacementConfig.WithFoodUnits(5);
+                UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
+            });
+
+            Button qty10 = CreateParameterChip(_operationParamsRoot, "Qty 10", true);
+            qty10.onClick.AddListener(() =>
+            {
+                _activePlacementConfig = _activePlacementConfig.WithFoodUnits(10);
+                UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
+            });
+
+            Button community = CreateParameterChip(_operationParamsRoot, "Owner: Community", true);
+            community.onClick.AddListener(() =>
+            {
+                _activePlacementConfig = _activePlacementConfig.WithOwner(ArcUiPlacementOwnerKind.Community, 0);
+                UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
+            });
+
             CreateParameterChip(_operationParamsRoot, "Owner: NPC snapshot futuro", false);
         }
 
-        private void BuildObjectOwnershipParameterChips()
+        private void BuildObjectOwnershipParameterChips(ArcGraphActionPanelObjectEntry entry)
         {
-            CreateParameterChip(_operationParamsRoot, "Owner: Community", true);
+            Button community = CreateParameterChip(_operationParamsRoot, "Owner: Community", true);
+            community.onClick.AddListener(() =>
+            {
+                _activePlacementConfig = _activePlacementConfig.WithOwner(ArcUiPlacementOwnerKind.Community, 0);
+                UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
+            });
+
             CreateParameterChip(_operationParamsRoot, "Owner: NPC snapshot futuro", false);
+        }
+
+        private void UpdatePlacementRequest(
+            ArcGraphActionPanelObjectEntry entry,
+            string targetDefId,
+            ArcUiPlacementMode mode,
+            ArcUiPlacementConfig config)
+        {
+            string safeDefId = string.IsNullOrWhiteSpace(targetDefId) ? entry.DefId : targetDefId.Trim();
+
+            if (_placementPreviewSource != null)
+                _placementPreviewSource.SetPreviewDef(safeDefId);
+
+            ArcUiOperationDefinition operation = BuildInsertOperationDefinition(entry, safeDefId);
+            _placementController?.Begin(operation, safeDefId, mode, config);
+        }
+
+        private static ArcUiOperationDefinition BuildInsertOperationDefinition(
+            ArcGraphActionPanelObjectEntry entry,
+            string targetDefId)
+        {
+            return new ArcUiOperationDefinition(
+                ResolveOperationKey(entry),
+                entry.Label,
+                targetDefId,
+                "insert",
+                entry.GroupKey,
+                ArcUiOperationKind.Insert,
+                entry.SupportsBrushOptions ? ArcUiOperationTargetKind.Wall : ArcUiOperationTargetKind.Object,
+                targetDefId,
+                true,
+                entry.SupportsDoorOptions || entry.SupportsFoodOptions,
+                entry.SupportsBrushOptions,
+                false);
+        }
+
+        private static string ResolveOperationKey(ArcGraphActionPanelObjectEntry entry)
+        {
+            if (entry.SupportsBrushOptions)
+                return "build_wall_" + ArcUiOperationDefinition.NormalizeKey(entry.DefId.Replace("wall_", string.Empty));
+
+            if (entry.SupportsDoorOptions)
+                return "place_door_wood";
+
+            if (entry.SupportsFoodOptions)
+                return "place_food_stock";
+
+            return "place_" + ArcUiOperationDefinition.NormalizeKey(entry.DefId);
         }
 
         private void ClearOperationParams(string message)

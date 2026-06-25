@@ -30,6 +30,131 @@ namespace Arcontio.View.ArcGraph
     }
 
     // =============================================================================
+    // ArcUiPlacementOwnerKind
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Proprietario logico richiesto dalla UI per un oggetto inserito.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: contratto UI senza dipendenza Core</b></para>
+    /// <para>
+    /// Il valore descrive solo la scelta dell'utente nel pannello. Non usa
+    /// direttamente <c>OwnerKind</c> del Core per mantenere la request UI separata
+    /// dal comando finale. Il ponte placement mappera' questo valore verso il tipo
+    /// Core autorizzato nello step successivo.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Community</b>: proprieta' comunitaria o neutra.</item>
+    ///   <item><b>Npc</b>: proprieta' associata a un NPC specifico.</item>
+    /// </list>
+    /// </summary>
+    public enum ArcUiPlacementOwnerKind
+    {
+        Community = 0,
+        Npc = 1
+    }
+
+    // =============================================================================
+    // ArcUiDoorPlacementState
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Stato iniziale richiesto per una porta inserita dalla UI.
+    /// </para>
+    ///
+    /// <para><b>Contratto specifico, non payload generico</b></para>
+    /// <para>
+    /// Le porte sono gia' una funzione reale del vecchio F3. Per questo la request
+    /// espone soltanto i tre stati necessari ora: chiusa, aperta e chiusa a chiave.
+    /// Non introduce un dizionario libero di parametri.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Closed</b>: porta chiusa.</item>
+    ///   <item><b>Open</b>: porta aperta.</item>
+    ///   <item><b>Locked</b>: porta chiusa a chiave, se supportata dal defId.</item>
+    /// </list>
+    /// </summary>
+    public enum ArcUiDoorPlacementState
+    {
+        Closed = 0,
+        Open = 1,
+        Locked = 2
+    }
+
+    // =============================================================================
+    // ArcUiPlacementConfig
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Configurazione minima associata a una richiesta placement ArcGraph.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: parametri espliciti e limitati</b></para>
+    /// <para>
+    /// Questa struttura contiene solo i parametri emersi come necessari per la
+    /// migrazione F3 iniziale: stato porta, quantita' food stock, proprietario e
+    /// NPC proprietario. Non contiene payload generici, reflection, oggetti Unity o
+    /// riferimenti al <c>World</c>.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>DoorState</b>: stato iniziale porta.</item>
+    ///   <item><b>FoodUnits</b>: quantita' iniziale del food stock.</item>
+    ///   <item><b>OwnerKind</b>: community oppure NPC.</item>
+    ///   <item><b>OwnerNpcId</b>: id NPC usato solo se <c>OwnerKind</c> e' NPC.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ArcUiPlacementConfig
+    {
+        public readonly ArcUiDoorPlacementState DoorState;
+        public readonly int FoodUnits;
+        public readonly ArcUiPlacementOwnerKind OwnerKind;
+        public readonly int OwnerNpcId;
+
+        public ArcUiPlacementConfig(
+            ArcUiDoorPlacementState doorState,
+            int foodUnits,
+            ArcUiPlacementOwnerKind ownerKind,
+            int ownerNpcId)
+        {
+            DoorState = doorState;
+            FoodUnits = foodUnits < 1 ? 1 : foodUnits;
+            OwnerKind = ownerKind;
+            OwnerNpcId = ownerKind == ArcUiPlacementOwnerKind.Npc && ownerNpcId > 0 ? ownerNpcId : 0;
+        }
+
+        public static ArcUiPlacementConfig Default()
+        {
+            return new ArcUiPlacementConfig(
+                ArcUiDoorPlacementState.Closed,
+                1,
+                ArcUiPlacementOwnerKind.Community,
+                0);
+        }
+
+        public ArcUiPlacementConfig WithDoorState(ArcUiDoorPlacementState state)
+        {
+            return new ArcUiPlacementConfig(state, FoodUnits, OwnerKind, OwnerNpcId);
+        }
+
+        public ArcUiPlacementConfig WithFoodUnits(int units)
+        {
+            return new ArcUiPlacementConfig(DoorState, units, OwnerKind, OwnerNpcId);
+        }
+
+        public ArcUiPlacementConfig WithOwner(ArcUiPlacementOwnerKind ownerKind, int ownerNpcId)
+        {
+            return new ArcUiPlacementConfig(DoorState, FoodUnits, ownerKind, ownerNpcId);
+        }
+    }
+
+    // =============================================================================
     // ArcUiPlacementRequest
     // =============================================================================
     /// <summary>
@@ -60,6 +185,7 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphCellCoord TargetCell;
         public readonly string TargetDefId;
         public readonly ArcUiPlacementMode Mode;
+        public readonly ArcUiPlacementConfig Config;
         public readonly bool HasTargetCell;
 
         public bool IsValid => !string.IsNullOrEmpty(OperationKey) && Mode != ArcUiPlacementMode.None;
@@ -86,11 +212,29 @@ namespace Arcontio.View.ArcGraph
             string targetDefId,
             ArcUiPlacementMode mode,
             bool hasTargetCell)
+            : this(
+                operationKey,
+                targetCell,
+                targetDefId,
+                mode,
+                ArcUiPlacementConfig.Default(),
+                hasTargetCell)
+        {
+        }
+
+        public ArcUiPlacementRequest(
+            string operationKey,
+            ArcGraphCellCoord targetCell,
+            string targetDefId,
+            ArcUiPlacementMode mode,
+            ArcUiPlacementConfig config,
+            bool hasTargetCell)
         {
             OperationKey = ArcUiOperationDefinition.NormalizeKey(operationKey);
             TargetCell = targetCell;
             TargetDefId = string.IsNullOrWhiteSpace(targetDefId) ? string.Empty : targetDefId.Trim();
             Mode = mode;
+            Config = config;
             HasTargetCell = hasTargetCell;
         }
 
@@ -149,11 +293,30 @@ namespace Arcontio.View.ArcGraph
             string targetDefId,
             ArcUiPlacementMode mode)
         {
+            return WithoutCell(operationKey, targetDefId, mode, ArcUiPlacementConfig.Default());
+        }
+
+        // =============================================================================
+        // WithoutCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una richiesta di placement ancora priva della cella target,
+        /// includendo la configurazione scelta nel pannello.
+        /// </para>
+        /// </summary>
+        public static ArcUiPlacementRequest WithoutCell(
+            string operationKey,
+            string targetDefId,
+            ArcUiPlacementMode mode,
+            ArcUiPlacementConfig config)
+        {
             return new ArcUiPlacementRequest(
                 operationKey,
                 new ArcGraphCellCoord(0, 0, 0),
                 targetDefId,
                 mode == ArcUiPlacementMode.None ? ArcUiPlacementMode.Single : mode,
+                config,
                 false);
         }
     }

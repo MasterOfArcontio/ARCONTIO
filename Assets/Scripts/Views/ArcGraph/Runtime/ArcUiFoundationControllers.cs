@@ -217,11 +217,36 @@ namespace Arcontio.View.ArcGraph
             string targetDefId,
             ArcUiPlacementMode mode)
         {
+            Begin(operation, targetDefId, mode, ArcUiPlacementConfig.Default());
+        }
+
+        // =============================================================================
+        // Begin
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inizia una intenzione di placement con configurazione esplicita.
+        /// </para>
+        ///
+        /// <para><b>Request completa, ancora non comando</b></para>
+        /// <para>
+        /// La configurazione viene memorizzata nel controller UI per essere
+        /// verificata e poi consegnata al futuro ponte comandi. Questo metodo non
+        /// invia nulla al <c>SimulationHost</c> e non valida contro il mondo.
+        /// </para>
+        /// </summary>
+        public void Begin(
+            ArcUiOperationDefinition operation,
+            string targetDefId,
+            ArcUiPlacementMode mode,
+            ArcUiPlacementConfig config)
+        {
             _pending = operation.IsValid
                 ? ArcUiPlacementRequest.WithoutCell(
                     operation.OperationKey,
                     string.IsNullOrWhiteSpace(targetDefId) ? operation.TargetDefId : targetDefId,
-                    mode)
+                    mode,
+                    config)
                 : default;
         }
 
@@ -245,6 +270,31 @@ namespace Arcontio.View.ArcGraph
                 _pending.TargetCell,
                 _pending.TargetDefId,
                 mode == ArcUiPlacementMode.None ? ArcUiPlacementMode.Single : mode,
+                _pending.Config,
+                _pending.HasTargetCell);
+        }
+
+        // =============================================================================
+        // SetConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna i parametri configurati della richiesta placement corrente.
+        /// </para>
+        /// </summary>
+        public void SetConfig(ArcUiPlacementConfig config)
+        {
+            if (!_pending.IsValid)
+            {
+                return;
+            }
+
+            _pending = new ArcUiPlacementRequest(
+                _pending.OperationKey,
+                _pending.TargetCell,
+                _pending.TargetDefId,
+                _pending.Mode,
+                config,
                 _pending.HasTargetCell);
         }
 
@@ -268,6 +318,7 @@ namespace Arcontio.View.ArcGraph
                 cell,
                 _pending.TargetDefId,
                 _pending.Mode,
+                _pending.Config,
                 true);
         }
 
