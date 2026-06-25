@@ -33,6 +33,7 @@ namespace Arcontio.View.ArcGraph
         private readonly List<ArcGraphTerrainCellSnapshot> _terrainSnapshots = new();
         private readonly List<ArcGraphObjectVisualSnapshot> _objectSnapshots = new();
         private readonly List<ArcGraphActorVisualSnapshot> _actorSnapshots = new();
+        private readonly List<ArcGraphVegetationVisualSnapshot> _vegetationSnapshots = new();
 
         private ArcGraphRenderState _renderState;
         private ArcGraphLayerStack _layerStack;
@@ -51,6 +52,7 @@ namespace Arcontio.View.ArcGraph
         public IReadOnlyList<ArcGraphTerrainCellSnapshot> TerrainSnapshots => _terrainSnapshots;
         public IReadOnlyList<ArcGraphObjectVisualSnapshot> ObjectSnapshots => _objectSnapshots;
         public IReadOnlyList<ArcGraphActorVisualSnapshot> ActorSnapshots => _actorSnapshots;
+        public IReadOnlyList<ArcGraphVegetationVisualSnapshot> VegetationSnapshots => _vegetationSnapshots;
 
         public bool IsInitialized => _diagnostics.IsInitialized;
         public bool IsDisposed => _diagnostics.IsDisposed;
@@ -238,6 +240,7 @@ namespace Arcontio.View.ArcGraph
             _terrainSnapshots.Clear();
             _objectSnapshots.Clear();
             _actorSnapshots.Clear();
+            _vegetationSnapshots.Clear();
 
             _renderState = null;
             _layerStack = null;
@@ -270,11 +273,13 @@ namespace Arcontio.View.ArcGraph
             // aggiornati spesso, ma non devono invalidare il terrain renderer.
             _objectSnapshots.Clear();
             _actorSnapshots.Clear();
+            _vegetationSnapshots.Clear();
 
             if (_context?.World != null)
             {
                 _adapter.FillObjectSnapshots(_context.World, _objectSnapshots);
                 _adapter.FillActorSnapshots(_context.World, _actorSnapshots);
+                _adapter.FillVegetationSnapshots(_context.World, _vegetationSnapshots);
 
                 if (_layerStack.TryGetLayer<ArcGraphObjectLayer>(out var objectLayer))
                 {
@@ -288,6 +293,14 @@ namespace Arcontio.View.ArcGraph
 
                 if (_layerStack.TryGetLayer<ArcGraphActorLayer>(out var actorLayer))
                     actorLayer.ReplaceSnapshots(_actorSnapshots, null);
+
+                if (_layerStack.TryGetLayer<ArcGraphVegetationLayer>(out var vegetationLayer))
+                {
+                    // La vegetazione e' dinamica ma non deve sporcare i chunk
+                    // terrain in questa fase: il renderer vegetazione futuro
+                    // consumera' il proprio layer senza far ricostruire il terreno.
+                    vegetationLayer.ReplaceSnapshots(_vegetationSnapshots, null);
+                }
             }
         }
 
@@ -308,7 +321,8 @@ namespace Arcontio.View.ArcGraph
                 _layerStack != null ? _layerStack.Count : 0,
                 _terrainSnapshots.Count,
                 _objectSnapshots.Count,
-                _actorSnapshots.Count);
+                _actorSnapshots.Count,
+                _vegetationSnapshots.Count);
         }
 
         private static float ResolveTileSizeWorld(

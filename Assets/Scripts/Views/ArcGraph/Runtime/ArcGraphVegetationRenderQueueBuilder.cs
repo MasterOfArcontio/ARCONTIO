@@ -204,6 +204,9 @@ namespace Arcontio.View.ArcGraph
             ArcGraphVegetationVisualSnapshot snapshot,
             ArcGraphVegetationLodMode vegetationMode)
         {
+            if (!string.IsNullOrWhiteSpace(snapshot.SpriteKey))
+                return snapshot.SpriteKey.Trim();
+
             string species = SanitizeKeyPart(snapshot.SpeciesKey);
 
             if (vegetationMode == ArcGraphVegetationLodMode.AreaAggregate)

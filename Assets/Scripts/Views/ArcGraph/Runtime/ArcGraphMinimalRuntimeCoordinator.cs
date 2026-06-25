@@ -176,7 +176,7 @@ namespace Arcontio.View.ArcGraph
             _runtime = new ArcGraphBootstrapRuntime();
             return _runtime.Initialize(
                 context,
-                ArcGraphBootstrapOptions.CreateDefault());
+                CreateRuntimeOptions());
         }
 
         private void BuildActorObjectQueue(
@@ -185,6 +185,30 @@ namespace Arcontio.View.ArcGraph
         {
             ArcGraphZoomLodProfile lodProfile = ArcGraphZoomLodPolicy.ResolveFullDetail();
             _queueBuilder.Build(actorLayer, objectLayer, lodProfile, _renderQueue);
+        }
+
+        // =============================================================================
+        // CreateRuntimeOptions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea le opzioni del coordinator runtime minimo includendo i layer
+        /// ambientali passivi.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: feed ambientale senza rendering forzato</b></para>
+        /// <para>
+        /// I layer placeholder vengono registrati per ricevere snapshot da World,
+        /// ma questo non abilita automaticamente un renderer vegetazione. Il
+        /// coordinator conserva quindi il feed biosfera disponibile senza cambiare
+        /// la policy scene-side di materializzazione grafica.
+        /// </para>
+        /// </summary>
+        private static ArcGraphBootstrapOptions CreateRuntimeOptions()
+        {
+            var options = ArcGraphBootstrapOptions.CreateDefault();
+            options.IncludeFuturePlaceholderLayers = true;
+            return options;
         }
 
         private bool HasLayer<TLayer>()

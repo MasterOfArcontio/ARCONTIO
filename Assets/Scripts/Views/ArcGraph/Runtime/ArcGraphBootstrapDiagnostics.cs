@@ -42,6 +42,7 @@ namespace Arcontio.View.ArcGraph
         public int TerrainSnapshotCount { get; }
         public int ObjectSnapshotCount { get; }
         public int ActorSnapshotCount { get; }
+        public int VegetationSnapshotCount { get; }
 
         public bool IsInitialized => Status == ArcGraphBootstrapStatus.Initialized;
         public bool IsDisposed => Status == ArcGraphBootstrapStatus.Disposed;
@@ -75,7 +76,8 @@ namespace Arcontio.View.ArcGraph
             int layerCount,
             int terrainSnapshotCount,
             int objectSnapshotCount,
-            int actorSnapshotCount)
+            int actorSnapshotCount,
+            int vegetationSnapshotCount = 0)
         {
             Status = status;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
@@ -92,6 +94,7 @@ namespace Arcontio.View.ArcGraph
             TerrainSnapshotCount = terrainSnapshotCount;
             ObjectSnapshotCount = objectSnapshotCount;
             ActorSnapshotCount = actorSnapshotCount;
+            VegetationSnapshotCount = vegetationSnapshotCount < 0 ? 0 : vegetationSnapshotCount;
         }
     }
 }
