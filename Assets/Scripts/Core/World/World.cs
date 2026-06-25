@@ -222,10 +222,13 @@ namespace Arcontio.Core
         public EnvironmentState EnvironmentState { get; private set; }
         public EnvironmentAreaSetConfig InitialEnvironmentAreaSetConfig { get; private set; }
         public IReadOnlyDictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> PhysicalPlants => _physicalPlants;
+        public IReadOnlyDictionary<EnvironmentCellCoord, WorldDiffuseVegetationProjection> DiffuseVegetation =>
+            _diffuseVegetation;
 
         private readonly List<LandmarkRegistry.ManualLandmarkCandidate> _environmentLandmarkCandidates = new(64);
         private readonly List<LandmarkRegistry.ManualLandmarkResolution> _environmentLandmarkResolutions = new(64);
         private readonly Dictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> _physicalPlants = new();
+        private readonly Dictionary<EnvironmentCellCoord, WorldDiffuseVegetationProjection> _diffuseVegetation = new();
 
         /// <summary>
         /// Debug token logs (Patch 0.01P2):
@@ -1474,6 +1477,90 @@ namespace Arcontio.Core
             }
 
             return applied;
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentDiffuseVegetationProjections
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sincronizza nel <see cref="World"/> la vegetazione diffusa cell-based
+        /// prodotta dalla biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: proiezione decorativa senza fisica</b></para>
+        /// <para>
+        /// La vegetazione diffusa non blocca movimento o vista e non crea oggetti
+        /// world-level. Il metodo costruisce solo uno store read-only per futuri
+        /// consumer visuali/debug, evitando che ArcGraph debba leggere direttamente
+        /// <see cref="EnvironmentState"/>.
+        /// </para>
+        /// </summary>
+        public int ApplyEnvironmentDiffuseVegetationProjections()
+        {
+            _diffuseVegetation.Clear();
+
+            if (EnvironmentState == null)
+                return 0;
+
+            var deltas = EnvironmentDiffuseVegetationDeltaProducer.BuildFullRefresh(
+                EnvironmentState.VegetationCellPlacements);
+            return ApplyEnvironmentDiffuseVegetationDeltas(deltas);
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentDiffuseVegetationDeltas
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica delta incrementali di vegetazione diffusa prodotti dalla biosfera.
+        /// </para>
+        /// </summary>
+        public int ApplyEnvironmentDiffuseVegetationDeltas(IReadOnlyList<EnvironmentDiffuseVegetationDelta> deltas)
+        {
+            if (deltas == null || deltas.Count == 0)
+                return 0;
+
+            int applied = 0;
+            for (int i = 0; i < deltas.Count; i++)
+            {
+                if (ApplyEnvironmentDiffuseVegetationDelta(deltas[i]))
+                    applied++;
+            }
+
+            return applied;
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentDiffuseVegetationDelta
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un singolo delta di vegetazione diffusa.
+        /// </para>
+        /// </summary>
+        public bool ApplyEnvironmentDiffuseVegetationDelta(EnvironmentDiffuseVegetationDelta delta)
+        {
+            if (!delta.IsValid)
+                return false;
+
+            EnvironmentCellCoord cell = delta.Cell;
+            if (!InBounds(cell.X, cell.Y))
+                return false;
+
+            if (delta.Kind == EnvironmentDiffuseVegetationDeltaKind.Disappeared
+                || delta.CoverageBand == EnvironmentVegetationCoverageBand.None)
+            {
+                return _diffuseVegetation.Remove(cell);
+            }
+
+            _diffuseVegetation[cell] = new WorldDiffuseVegetationProjection(
+                delta.AreaId,
+                cell,
+                delta.VegetationKind,
+                delta.CoverageBand,
+                delta.ConditionBand);
+            return true;
         }
 
         // =============================================================================

@@ -435,6 +435,68 @@ namespace Arcontio.Core.Environment
             return _vegetationCellPlacements.Count + _physicalPlantPlacements.Count;
         }
 
+        // =============================================================================
+        // RebuildRuntimeBiologicalPlacements
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce solo i placement runtime derivati da uno stato biologico gia'
+        /// esistente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: derivato fisico/visuale, biologia immutata</b></para>
+        /// <para>
+        /// Dopo un avanzamento giornaliero la biosfera puo' avere nuova densita'
+        /// vegetale, nuove condizioni e PlantInstance aggiornate. Questo metodo
+        /// riallinea le liste cell-based usate dai boundary World/ArcGraph senza
+        /// svuotare <c>_plantInstances</c>, senza rigenerare piante da seed bank e
+        /// senza modificare il catalogo biologico.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Vegetazione diffusa</b>: ricalcolata dalle aree e dalle celle naturali fornite dal World.</item>
+        ///   <item><b>Piante fisiche</b>: ricavate dalle PlantInstance vive gia' presenti nello stato.</item>
+        ///   <item><b>Nessuna mutazione biologica</b>: eta', salute, specie e seed bank restano quelli prodotti dal resolver.</item>
+        /// </list>
+        /// </summary>
+        public int RebuildRuntimeBiologicalPlacements(World world)
+        {
+            _vegetationCellPlacements.Clear();
+            _physicalPlantPlacements.Clear();
+
+            if (world == null)
+                return 0;
+
+            var freeCells = new List<EnvironmentCellCoord>(128);
+
+            foreach (var pair in _areaDefinitions)
+            {
+                EnvironmentAreaDefinition area = pair.Value;
+                if (!IsBiologicalArea(area))
+                    continue;
+
+                freeCells.Clear();
+                CollectBiologicalFreeCells(world, area, freeCells);
+                BuildVegetationCells(area, freeCells);
+            }
+
+            foreach (var pair in _plantInstances)
+            {
+                EnvironmentPlantInstance plant = pair.Value;
+                if (!plant.IsAlive || !plant.PlantId.IsValid)
+                    continue;
+
+                _physicalPlantPlacements.Add(new EnvironmentPhysicalPlantPlacement(
+                    plant.PlantId,
+                    plant.SourceAreaId,
+                    plant.Cell,
+                    plant.SpeciesKey));
+            }
+
+            return _vegetationCellPlacements.Count + _physicalPlantPlacements.Count;
+        }
+
         private bool IsBiologicalArea(EnvironmentAreaDefinition area)
         {
             return area.AreaId.IsValid

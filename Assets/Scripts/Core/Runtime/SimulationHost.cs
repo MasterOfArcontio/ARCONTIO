@@ -493,6 +493,7 @@ namespace Arcontio.Core
                 $"objectCountPre={preObjectCount} objectCountPost={CountObjectsForDiagnostics(_world)}");
 
             RestoreTickFromWorldSnapshot(data.savedAtTick);
+            ResetBiosphereRuntimeSchedule(_tickIndex);
             ResetTransientRuntimeAfterWorldSnapshotLoad();
 
             // Il load dev viene lasciato in pausa per evitare che il primo tick
@@ -525,9 +526,16 @@ namespace Arcontio.Core
         [SerializeField] private bool enableBiosphereDebugFastForward = true;
         [SerializeField] private int maxBiosphereDebugEnvironmentDaysPerUnityFrame = 2;
 
+        private const string EnvironmentPlantCatalogResourcePath = "Arcontio/Config/environment_plants";
+
         private int _runtimeTickSpeedMultiplier = 1;
         private int _lastRuntimeTicksProcessedInFrame;
         private float _lastDroppedRuntimeCatchUpSeconds;
+        private long _lastBiosphereRuntimeProcessedSimulationTick;
+        private int _lastBiosphereRuntimeDueUpdateCount;
+        private int _lastBiosphereRuntimeAppliedPlantDeltas;
+        private int _lastBiosphereRuntimePendingPlantDeltas;
+        private int _lastBiosphereRuntimeDiffuseVegetationDeltas;
         private bool _biosphereDebugFastForwardActive;
         private bool _wasPausedBeforeBiosphereDebugFastForward;
         private int _biosphereDebugFastForwardMultiplier = 50;
@@ -539,6 +547,9 @@ namespace Arcontio.Core
         private float _lastDroppedBiosphereDebugEnvironmentTicks;
         private readonly EnvironmentCalendarConfig _biosphereDebugCalendarConfig = new();
         private readonly EnvironmentClimateConfig _biosphereDebugClimateConfig = new();
+        private readonly EnvironmentNaturalGrowthConfig _environmentNaturalGrowthConfig = new();
+        private EnvironmentPlantCatalog _environmentPlantCatalog =
+            new EnvironmentPlantCatalogConfig().ToCatalog();
 
         // =============================================================================
         // DirectKeyboardTickControl
@@ -579,6 +590,11 @@ namespace Arcontio.Core
         public int MaxRuntimeTicksPerUnityFrame => NormalizeMaxRuntimeTicksPerUnityFrame(maxRuntimeTicksPerUnityFrame);
         public int LastRuntimeTicksProcessedInFrame => _lastRuntimeTicksProcessedInFrame;
         public float LastDroppedRuntimeCatchUpSeconds => _lastDroppedRuntimeCatchUpSeconds;
+        public long LastBiosphereRuntimeProcessedSimulationTick => _lastBiosphereRuntimeProcessedSimulationTick;
+        public int LastBiosphereRuntimeDueUpdateCount => _lastBiosphereRuntimeDueUpdateCount;
+        public int LastBiosphereRuntimeAppliedPlantDeltas => _lastBiosphereRuntimeAppliedPlantDeltas;
+        public int LastBiosphereRuntimePendingPlantDeltas => _lastBiosphereRuntimePendingPlantDeltas;
+        public int LastBiosphereRuntimeDiffuseVegetationDeltas => _lastBiosphereRuntimeDiffuseVegetationDeltas;
         public bool IsBiosphereDebugFastForwardActive => _biosphereDebugFastForwardActive;
         public int BiosphereDebugFastForwardMultiplier => _biosphereDebugFastForwardMultiplier;
         public long BiosphereDebugFastForwardTotalEnvironmentTicksAdvanced => _biosphereDebugFastForwardTotalEnvironmentTicksAdvanced;
@@ -1256,6 +1272,205 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // ProcessBiosphereRuntimeDailyUpdate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue il batch giornaliero produttivo della biosfera quando la cadenza
+        /// configurata in <c>game_params.json</c> lo richiede.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: SimulationHost orchestra, Biosfera calcola</b></para>
+        /// <para>
+        /// Il metodo non contiene formule ecologiche. Legge solo il tick ufficiale,
+        /// chiede allo scheduler data-only se il batch e' dovuto, poi delega a
+        /// <see cref="AdvanceAndApplyBiosphereEnvironmentState"/> la produzione dei
+        /// delta e l'applicazione al <see cref="World"/>.
+        /// </para>
+        /// </summary>
+        private void ProcessBiosphereRuntimeDailyUpdate(long currentSimulationTick)
+        {
+            _lastBiosphereRuntimeDueUpdateCount = 0;
+            _lastBiosphereRuntimeAppliedPlantDeltas = 0;
+            _lastBiosphereRuntimePendingPlantDeltas = 0;
+            _lastBiosphereRuntimeDiffuseVegetationDeltas = 0;
+
+            if (_world?.EnvironmentState == null)
+                return;
+
+            BiosphereRuntimeParams runtimeParams =
+                _world.Config?.Sim?.ResolveBiosphereRuntimeParams()
+                ?? new BiosphereRuntimeParams();
+            EnvironmentRuntimeScheduleDecision decision =
+                EnvironmentRuntimeScheduler.Evaluate(
+                    runtimeParams,
+                    _lastBiosphereRuntimeProcessedSimulationTick,
+                    currentSimulationTick);
+
+            if (!decision.IsEnabled || !decision.ShouldAdvance)
+                return;
+
+            int maxPlantDeltas = runtimeParams.ResolveMaxPlantMutationsPerUpdate();
+            int maxVegetationDeltas = runtimeParams.ResolveMaxVegetationMutationsPerUpdate();
+            long processedTick = decision.LastProcessedSimulationTick;
+
+            for (int i = 0; i < decision.DueUpdateCount; i++)
+            {
+                long targetEnvironmentTick = processedTick + decision.SimulationTicksPerDailyUpdate;
+                EnvironmentAdvanceResult result =
+                    AdvanceAndApplyBiosphereEnvironmentState(
+                        targetEnvironmentTick,
+                        maxPlantDeltas,
+                        maxVegetationDeltas,
+                        applyPhysicalPlantDeltas: true,
+                        out int appliedPlantDeltas,
+                        out int appliedVegetationDeltas);
+
+                _lastBiosphereRuntimePendingPlantDeltas += result.PhysicalPlantDeltas?.Count ?? 0;
+                _lastBiosphereRuntimeAppliedPlantDeltas += appliedPlantDeltas;
+                _lastBiosphereRuntimeDiffuseVegetationDeltas += appliedVegetationDeltas;
+                processedTick = targetEnvironmentTick;
+            }
+
+            _lastBiosphereRuntimeDueUpdateCount = decision.DueUpdateCount;
+            _lastBiosphereRuntimeProcessedSimulationTick = processedTick;
+        }
+
+        // =============================================================================
+        // AdvanceAndApplyBiosphereEnvironmentState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Avanza lo stato ambientale con il ciclo naturale e applica al World i
+        /// boundary derivati.
+        /// </para>
+        ///
+        /// <para><b>Boundary Biosfera -> World</b></para>
+        /// <para>
+        /// La biosfera resta proprietaria di calendario, clima, aree, seed bank e
+        /// PlantInstance. Il World riceve soltanto proiezioni derivate: piante
+        /// fisiche come ostacoli/occluder e vegetazione diffusa come stato
+        /// decorativo cell-based.
+        /// </para>
+        /// </summary>
+        private EnvironmentAdvanceResult AdvanceAndApplyBiosphereEnvironmentState(
+            long currentEnvironmentTick,
+            int maxPlantDeltaCount,
+            int maxVegetationDeltaCount,
+            bool applyPhysicalPlantDeltas,
+            out int appliedPlantDeltas,
+            out int appliedVegetationDeltas)
+        {
+            appliedPlantDeltas = 0;
+            appliedVegetationDeltas = 0;
+
+            EnvironmentAdvanceResult result =
+                AdvanceBiosphereEnvironmentState(
+                    currentEnvironmentTick,
+                    maxPlantDeltaCount,
+                    maxVegetationDeltaCount);
+
+            _world.SetEnvironmentState(result.State);
+            appliedVegetationDeltas =
+                _world.ApplyEnvironmentDiffuseVegetationDeltas(result.DiffuseVegetationDeltas);
+
+            if (applyPhysicalPlantDeltas)
+                appliedPlantDeltas =
+                    _world.ApplyEnvironmentPhysicalPlantDeltas(result.PhysicalPlantDeltas);
+
+            return result;
+        }
+
+        // =============================================================================
+        // AdvanceBiosphereEnvironmentState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Produce il prossimo stato biosfera senza side effect World.
+        /// </para>
+        /// </summary>
+        private EnvironmentAdvanceResult AdvanceBiosphereEnvironmentState(
+            long currentEnvironmentTick,
+            int maxPlantDeltaCount,
+            int maxVegetationDeltaCount)
+        {
+            EnvironmentState sourceState = _world?.EnvironmentState ?? new EnvironmentState();
+            EnvironmentSnapshot sourceSnapshot = sourceState.CreateSnapshot();
+            long previousTicks = sourceSnapshot.Calendar.ElapsedEnvironmentTicks;
+            EnvironmentTemporalTransition transition = EnvironmentTemporalTransitionResolver.Resolve(
+                previousTicks,
+                currentEnvironmentTick,
+                _biosphereDebugCalendarConfig);
+            EnvironmentGlobalClimateState climate = EnvironmentClimateResolver.Resolve(
+                transition.Current,
+                _biosphereDebugClimateConfig);
+            EnvironmentSeasonProfile seasonProfile =
+                EnvironmentCalendarResolver.ResolveSeasonProfile(
+                    _biosphereDebugCalendarConfig,
+                    transition.Current.Date.Season);
+            EnvironmentPlantCatalog plantCatalog =
+                _environmentPlantCatalog ?? new EnvironmentPlantCatalogConfig().ToCatalog();
+
+            EnvironmentNaturalGrowthResult growth =
+                EnvironmentNaturalGrowthResolver.Evolve(
+                    sourceSnapshot,
+                    plantCatalog,
+                    transition,
+                    climate,
+                    seasonProfile,
+                    _environmentNaturalGrowthConfig);
+            growth.State.RebuildRuntimeBiologicalPlacements(_world);
+
+            EnvironmentSnapshot nextSnapshot = growth.State.CreateSnapshot();
+            EnvironmentSnapshotDiffResult diff =
+                EnvironmentSnapshotDiffResolver.Diff(sourceSnapshot, nextSnapshot);
+            IReadOnlyList<EnvironmentPhysicalPlantDelta> physicalPlantDeltas =
+                EnvironmentPhysicalPlantDeltaProducer.DiffSnapshots(
+                    sourceSnapshot,
+                    nextSnapshot,
+                    maxPlantDeltaCount);
+            IReadOnlyList<EnvironmentDiffuseVegetationDelta> diffuseVegetationDeltas =
+                EnvironmentDiffuseVegetationDeltaProducer.DiffPlacements(
+                    sourceState.VegetationCellPlacements,
+                    growth.State.VegetationCellPlacements,
+                    maxVegetationDeltaCount);
+            var evolutionReport = new EnvironmentSnapshotEvolutionReport(
+                growth.Report.AreasVisited,
+                0,
+                0,
+                growth.Report.SeedBanksUpdated,
+                growth.Report.HasChanges ? 1 : 0);
+
+            return new EnvironmentAdvanceResult(
+                transition,
+                climate,
+                seasonProfile,
+                growth.State,
+                nextSnapshot,
+                evolutionReport,
+                diff,
+                physicalPlantDeltas,
+                diffuseVegetationDeltas);
+        }
+
+        // =============================================================================
+        // ResetBiosphereRuntimeSchedule
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riallinea il cursore runtime della biosfera al tick simulativo corrente.
+        /// </para>
+        /// </summary>
+        private void ResetBiosphereRuntimeSchedule(long simulationTick)
+        {
+            _lastBiosphereRuntimeProcessedSimulationTick = simulationTick < 0 ? 0 : simulationTick;
+            _lastBiosphereRuntimeDueUpdateCount = 0;
+            _lastBiosphereRuntimeAppliedPlantDeltas = 0;
+            _lastBiosphereRuntimePendingPlantDeltas = 0;
+            _lastBiosphereRuntimeDiffuseVegetationDeltas = 0;
+        }
+
+        // =============================================================================
         // AdvanceBiosphereDebugFastForward
         // =============================================================================
         /// <summary>
@@ -1301,17 +1516,22 @@ namespace Arcontio.Core
             long previousEnvironmentTick = _world.EnvironmentState.Calendar.ElapsedEnvironmentTicks;
             long currentEnvironmentTick = previousEnvironmentTick + wholeTicks;
 
-            EnvironmentAdvanceResult result = EnvironmentAdvanceResolver.AdvanceStateSnapshot(
-                _world.EnvironmentState,
-                currentEnvironmentTick,
-                _biosphereDebugCalendarConfig,
-                _biosphereDebugClimateConfig);
+            BiosphereRuntimeParams runtimeParams =
+                _world.Config?.Sim?.ResolveBiosphereRuntimeParams()
+                ?? new BiosphereRuntimeParams();
+            EnvironmentAdvanceResult result =
+                AdvanceAndApplyBiosphereEnvironmentState(
+                    currentEnvironmentTick,
+                    runtimeParams.ResolveMaxPlantMutationsPerUpdate(),
+                    runtimeParams.ResolveMaxVegetationMutationsPerUpdate(),
+                    applyPhysicalPlantDeltas: true,
+                    out int appliedPlantDeltas,
+                    out _);
 
-            _world.SetEnvironmentState(result.State);
             _biosphereDebugFastForwardTotalEnvironmentTicksAdvanced += wholeTicks;
             _biosphereDebugFastForwardLastEnvironmentTick = currentEnvironmentTick;
             _lastBiosphereDebugPendingPlantDeltas = result.PhysicalPlantDeltas?.Count ?? 0;
-            _lastBiosphereDebugAppliedPlantDeltas = 0;
+            _lastBiosphereDebugAppliedPlantDeltas = appliedPlantDeltas;
         }
 
         private long ResolveMaxBiosphereDebugEnvironmentTicksPerFrame()
@@ -1733,6 +1953,8 @@ namespace Arcontio.Core
             _world.DebugFovTelemetry?.AdvanceTickWindow();
             _world.RuntimeCostObserver?.TryWriteJsonlSnapshot(_tickIndex);
 
+            ProcessBiosphereRuntimeDailyUpdate(_tickIndex + 1);
+
             _tickIndex++;
 
             // Debug: verifica che l'host resti vivo cambiando scena
@@ -1767,7 +1989,10 @@ namespace Arcontio.Core
             }
 
             SeedTestWorld();
-            ApplyEnvironmentFoundationBootstrap(_world);
+            EnvironmentFoundationBootstrapResult environmentBootstrap =
+                ApplyEnvironmentFoundationBootstrap(_world);
+            _environmentPlantCatalog = environmentBootstrap.PlantCatalog;
+            ResetBiosphereRuntimeSchedule(_tickIndex);
 
             // ============================================================
             // (v0.02 Day2) LandmarkRegistry bootstrap
@@ -1826,6 +2051,7 @@ namespace Arcontio.Core
             ResetTransientRuntimeAfterWorldSnapshotLoad();
 
             RestoreTickFromWorldSnapshot(data.savedAtTick);
+            ResetBiosphereRuntimeSchedule(_tickIndex);
 
             Debug.Log($"[SimulationHost] World snapshot bootstrap loaded slot '{worldSnapshotSlotName}' at tick {_tickIndex}.");
             return true;
@@ -1907,7 +2133,9 @@ namespace Arcontio.Core
                 $"worldHash={loadedWorld.GetHashCode()} npcCount={CountNpcsForDiagnostics(loadedWorld)} " +
                 $"objectCount={CountObjectsForDiagnostics(loadedWorld)}");
 
-            ApplyEnvironmentFoundationBootstrap(loadedWorld);
+            EnvironmentFoundationBootstrapResult environmentBootstrap =
+                ApplyEnvironmentFoundationBootstrap(loadedWorld);
+            _environmentPlantCatalog = environmentBootstrap.PlantCatalog;
             loadedWorld.RebuildLandmarksBootstrap();
             return true;
         }
@@ -1936,19 +2164,21 @@ namespace Arcontio.Core
         ///   <item><b>Diagnostica</b>: logga warning se la config default produce validazione sospetta.</item>
         /// </list>
         /// </summary>
-        private static void ApplyEnvironmentFoundationBootstrap(World world)
+        private EnvironmentFoundationBootstrapResult ApplyEnvironmentFoundationBootstrap(World world)
         {
             if (world == null)
-                return;
+                return EnvironmentFoundationBootstrap.Bootstrap(null);
 
             EnvironmentFoundationConfig config = EnvironmentFoundationBootstrap.CreateDefaultConfig();
             config.areas = world.InitialEnvironmentAreaSetConfig ?? new EnvironmentAreaSetConfig();
+            config.plantCatalog = LoadEnvironmentPlantCatalogConfigFromResources();
 
             EnvironmentFoundationBootstrapResult bootstrap =
                 EnvironmentFoundationBootstrap.Bootstrap(config);
 
             world.SetEnvironmentState(bootstrap.Build.State);
             world.EnvironmentState?.BuildInitialBiologicalOccupancy(world);
+            world.ApplyEnvironmentDiffuseVegetationProjections();
             world.ApplyEnvironmentPhysicalPlantProjections();
 
             if (bootstrap.Validation != null && !bootstrap.Validation.IsValid)
@@ -1956,6 +2186,44 @@ namespace Arcontio.Core
                 Debug.LogWarning(
                     "[SimulationHost] Environment foundation bootstrap completed with validation issues. " +
                     $"errors={bootstrap.Validation.ErrorCount} warnings={bootstrap.Validation.WarningCount}");
+            }
+
+            return bootstrap;
+        }
+
+        // =============================================================================
+        // LoadEnvironmentPlantCatalogConfigFromResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica il catalogo biologico piante da Resources con fallback sicuro.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: config data-driven, fallback deterministico</b></para>
+        /// <para>
+        /// La crescita naturale runtime non deve dipendere da dati hardcoded nel
+        /// <c>SimulationHost</c>. Se il file manca o non e' leggibile, pero', il
+        /// runtime resta avviabile usando il catalogo default tipizzato della
+        /// Environment Foundation.
+        /// </para>
+        /// </summary>
+        private static EnvironmentPlantCatalogConfig LoadEnvironmentPlantCatalogConfigFromResources()
+        {
+            TextAsset asset = Resources.Load<TextAsset>(EnvironmentPlantCatalogResourcePath);
+            if (asset == null || string.IsNullOrWhiteSpace(asset.text))
+                return new EnvironmentPlantCatalogConfig();
+
+            try
+            {
+                return JsonUtility.FromJson<EnvironmentPlantCatalogConfig>(asset.text)
+                       ?? new EnvironmentPlantCatalogConfig();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning(
+                    "[SimulationHost] Environment plant catalog config failed to load. " +
+                    $"path={EnvironmentPlantCatalogResourcePath} error={ex.Message}");
+                return new EnvironmentPlantCatalogConfig();
             }
         }
 
