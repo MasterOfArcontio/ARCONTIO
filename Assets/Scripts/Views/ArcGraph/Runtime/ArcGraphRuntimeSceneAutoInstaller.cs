@@ -63,6 +63,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphInteractionConsumerRouter _interactionRouter;
         private ArcGraphPlacementToolController _placementToolController;
         private ArcGraphUiPlacementPreviewSource _uiPlacementPreviewSource;
+        private ArcGraphUiPlacementCommandBridge _uiPlacementCommandBridge;
         private ArcGraphPointerCellHoverSceneConsumer _pointerCellHoverConsumer;
         private ArcGraphPointerHudSceneConsumer _pointerHudConsumer;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
@@ -252,6 +253,7 @@ namespace Arcontio.View.ArcGraph
             _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
             _placementToolController.enabled = false;
             _uiPlacementPreviewSource = _visualRoot.AddComponent<ArcGraphUiPlacementPreviewSource>();
+            _uiPlacementCommandBridge = _visualRoot.AddComponent<ArcGraphUiPlacementCommandBridge>();
             _pointerCellHoverConsumer = _visualRoot.AddComponent<ArcGraphPointerCellHoverSceneConsumer>();
             _pointerHudConsumer = _visualRoot.AddComponent<ArcGraphPointerHudSceneConsumer>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
@@ -616,6 +618,12 @@ namespace Arcontio.View.ArcGraph
             {
                 _uiPlacementPreviewSource.SetSceneCamera(Camera.main);
                 _uiPlacementPreviewSource.SetFallbackPreviewSource(legacyOrToolPreviewSource);
+            }
+
+            if (_uiPlacementCommandBridge != null)
+            {
+                _uiPlacementCommandBridge.SetPlacementController(_placementController);
+                _uiPlacementCommandBridge.SetPlacementPreviewSource(_uiPlacementPreviewSource);
             }
 
             if (_placementHighlightConsumer != null)

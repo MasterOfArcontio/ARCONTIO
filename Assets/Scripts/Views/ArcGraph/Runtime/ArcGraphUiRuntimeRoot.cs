@@ -1244,6 +1244,9 @@ namespace Arcontio.View.ArcGraph
             {
                 _placementPreviewSource.ClearPreview();
             }
+
+            if (!nextVisible)
+                _placementController?.Cancel();
         }
 
         private void BuildOverlayRoots()

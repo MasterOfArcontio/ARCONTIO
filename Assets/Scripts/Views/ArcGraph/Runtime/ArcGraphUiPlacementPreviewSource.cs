@@ -53,6 +53,9 @@ namespace Arcontio.View.ArcGraph
                     && _fallbackPreviewSource != null
                     && _fallbackPreviewSource.IsPointerOverPlacementUi);
 
+        public bool HasUiPlacementPreviewActive =>
+            previewEnabled && !string.IsNullOrWhiteSpace(previewDefId);
+
         // =============================================================================
         // SetSceneCamera
         // =============================================================================
