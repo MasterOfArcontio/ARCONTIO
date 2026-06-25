@@ -3,6 +3,221 @@ using System.Collections.Generic;
 namespace Arcontio.Core.Environment
 {
     // =============================================================================
+    // EnvironmentRuntimeEventKind
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Tipo compatto dell'evento runtime prodotto dal boundary Biosfera -> sistemi.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: evento come notifica, non come stato</b></para>
+    /// <para>
+    /// Il kind permette ai consumer di distinguere bootstrap, load e aggiornamento
+    /// giornaliero senza leggere direttamente <c>EnvironmentState</c>. I dati
+    /// ambientali completi restano nella Biosfera/World, mentre l'evento comunica
+    /// solo che un nuovo stato osservabile e' disponibile.
+    /// </para>
+    /// </summary>
+    public enum EnvironmentRuntimeEventKind
+    {
+        Bootstrap = 0,
+        Loaded = 1,
+        DailyUpdate = 2,
+        DebugFastForwardDailyUpdate = 3
+    }
+
+    // =============================================================================
+    // EnvironmentRuntimeEvent
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Evento read-only compatto pubblicato quando la Biosfera rende disponibile un
+    /// nuovo stato osservabile.
+    /// </para>
+    ///
+    /// <para><b>Boundary Biosfera -> UI/sistemi</b></para>
+    /// <para>
+    /// Questo DTO non contiene riferimenti mutabili a <c>EnvironmentState</c>,
+    /// <c>World</c>, renderer o oggetti Unity. Serve a notificare UI, debug,
+    /// telemetria e futuri sistemi listener che clima, calendario, piante fisiche o
+    /// vegetazione diffusa possono essere cambiati.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Tempo</b>: tick ambiente e data leggibile.</item>
+    ///   <item><b>Clima</b>: temperatura, umidita', stagione e meteo gia' risolti.</item>
+    ///   <item><b>Delta</b>: conteggi di piante/vegetazione prodotti e applicati.</item>
+    ///   <item><b>Diagnostica</b>: aree visitate e aree cambiate nel batch.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct EnvironmentRuntimeEvent
+    {
+        public readonly EnvironmentRuntimeEventKind Kind;
+        public readonly long EnvironmentTick;
+        public readonly int AbsoluteDay;
+        public readonly int Year;
+        public readonly int Month;
+        public readonly int DayOfMonth;
+        public readonly int DayOfYear;
+        public readonly EnvironmentSeasonKind Season;
+        public readonly float Temperature01;
+        public readonly float Humidity01;
+        public readonly EnvironmentWeatherKind WeatherKind;
+        public readonly int AreasVisited;
+        public readonly int ChangedAreas;
+        public readonly int PhysicalPlantDeltaCount;
+        public readonly int AppliedPhysicalPlantDeltaCount;
+        public readonly int DiffuseVegetationDeltaCount;
+        public readonly int AppliedDiffuseVegetationDeltaCount;
+
+        // =============================================================================
+        // EnvironmentRuntimeEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce l'evento normalizzando i conteggi negativi e mantenendo i valori
+        /// climatici nel range ambientale standard 0-1.
+        /// </para>
+        /// </summary>
+        public EnvironmentRuntimeEvent(
+            EnvironmentRuntimeEventKind kind,
+            long environmentTick,
+            int absoluteDay,
+            int year,
+            int month,
+            int dayOfMonth,
+            int dayOfYear,
+            EnvironmentSeasonKind season,
+            float temperature01,
+            float humidity01,
+            EnvironmentWeatherKind weatherKind,
+            int areasVisited,
+            int changedAreas,
+            int physicalPlantDeltaCount,
+            int appliedPhysicalPlantDeltaCount,
+            int diffuseVegetationDeltaCount,
+            int appliedDiffuseVegetationDeltaCount)
+        {
+            Kind = kind;
+            EnvironmentTick = environmentTick < 0 ? 0 : environmentTick;
+            AbsoluteDay = absoluteDay < 0 ? 0 : absoluteDay;
+            Year = year < 0 ? 0 : year;
+            Month = month < 0 ? 0 : month;
+            DayOfMonth = dayOfMonth < 0 ? 0 : dayOfMonth;
+            DayOfYear = dayOfYear < 0 ? 0 : dayOfYear;
+            Season = season;
+            Temperature01 = EnvironmentMath.Clamp01(temperature01);
+            Humidity01 = EnvironmentMath.Clamp01(humidity01);
+            WeatherKind = weatherKind;
+            AreasVisited = areasVisited < 0 ? 0 : areasVisited;
+            ChangedAreas = changedAreas < 0 ? 0 : changedAreas;
+            PhysicalPlantDeltaCount = physicalPlantDeltaCount < 0 ? 0 : physicalPlantDeltaCount;
+            AppliedPhysicalPlantDeltaCount = appliedPhysicalPlantDeltaCount < 0 ? 0 : appliedPhysicalPlantDeltaCount;
+            DiffuseVegetationDeltaCount = diffuseVegetationDeltaCount < 0 ? 0 : diffuseVegetationDeltaCount;
+            AppliedDiffuseVegetationDeltaCount = appliedDiffuseVegetationDeltaCount < 0 ? 0 : appliedDiffuseVegetationDeltaCount;
+        }
+
+        // =============================================================================
+        // FromState
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un evento da uno stato ambientale gia' avanzato, senza conservarne il
+        /// riferimento. Viene usato per bootstrap e load.
+        /// </para>
+        /// </summary>
+        public static EnvironmentRuntimeEvent FromState(
+            EnvironmentRuntimeEventKind kind,
+            EnvironmentState state)
+        {
+            EnvironmentSnapshot snapshot = state != null
+                ? state.CreateSnapshot()
+                : new EnvironmentState().CreateSnapshot();
+            return FromSnapshot(
+                kind,
+                snapshot,
+                new EnvironmentSnapshotEvolutionReport(0, 0, 0, 0, 0),
+                0,
+                0,
+                0,
+                0);
+        }
+
+        // =============================================================================
+        // FromAdvanceResult
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un evento dal risultato di avanzamento giornaliero, includendo i conteggi
+        /// dei delta prodotti dalla Biosfera e quelli applicati al World.
+        /// </para>
+        /// </summary>
+        public static EnvironmentRuntimeEvent FromAdvanceResult(
+            EnvironmentRuntimeEventKind kind,
+            EnvironmentAdvanceResult result,
+            int appliedPlantDeltas,
+            int appliedVegetationDeltas)
+        {
+            EnvironmentSnapshot snapshot = result != null
+                ? result.Snapshot
+                : new EnvironmentState().CreateSnapshot();
+            EnvironmentSnapshotEvolutionReport report = result != null
+                ? result.EvolutionReport
+                : new EnvironmentSnapshotEvolutionReport(0, 0, 0, 0, 0);
+            int plantDeltaCount = result?.PhysicalPlantDeltas?.Count ?? 0;
+            int vegetationDeltaCount = result?.DiffuseVegetationDeltas?.Count ?? 0;
+            return FromSnapshot(
+                kind,
+                snapshot,
+                report,
+                plantDeltaCount,
+                appliedPlantDeltas,
+                vegetationDeltaCount,
+                appliedVegetationDeltas);
+        }
+
+        private static EnvironmentRuntimeEvent FromSnapshot(
+            EnvironmentRuntimeEventKind kind,
+            EnvironmentSnapshot snapshot,
+            EnvironmentSnapshotEvolutionReport report,
+            int physicalPlantDeltaCount,
+            int appliedPhysicalPlantDeltaCount,
+            int diffuseVegetationDeltaCount,
+            int appliedDiffuseVegetationDeltaCount)
+        {
+            EnvironmentCalendarState calendar = snapshot.Calendar;
+            EnvironmentDate date = calendar.Date;
+            EnvironmentGlobalClimateState climate = snapshot.Climate;
+            return new EnvironmentRuntimeEvent(
+                kind,
+                calendar.ElapsedEnvironmentTicks,
+                ResolveAbsoluteDay(date),
+                date.Year,
+                date.Month,
+                date.DayOfMonth,
+                date.DayOfYear,
+                date.Season,
+                climate.Temperature01,
+                climate.Humidity01,
+                climate.Weather.Kind,
+                report.AreasVisited,
+                report.ChangedAreas,
+                physicalPlantDeltaCount,
+                appliedPhysicalPlantDeltaCount,
+                diffuseVegetationDeltaCount,
+                appliedDiffuseVegetationDeltaCount);
+        }
+
+        private static int ResolveAbsoluteDay(EnvironmentDate date)
+        {
+            int yearIndex = date.Year <= 0 ? 0 : date.Year - 1;
+            int dayOfYearIndex = date.DayOfYear <= 0 ? 0 : date.DayOfYear - 1;
+            return yearIndex * 365 + dayOfYearIndex;
+        }
+    }
+
+    // =============================================================================
     // EnvironmentHistoryCount
     // =============================================================================
     /// <summary>

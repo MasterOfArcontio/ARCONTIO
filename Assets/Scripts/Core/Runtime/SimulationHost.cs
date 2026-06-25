@@ -552,6 +552,7 @@ namespace Arcontio.Core
         private EnvironmentPlantCatalog _environmentPlantCatalog =
             new EnvironmentPlantCatalogConfig().ToCatalog();
         private readonly EnvironmentHistoryBuffer _biosphereHistoryBuffer = new EnvironmentHistoryBuffer();
+        private EnvironmentRuntimeEvent _lastEnvironmentRuntimeEvent;
 
         // =============================================================================
         // DirectKeyboardTickControl
@@ -604,6 +605,9 @@ namespace Arcontio.Core
         public int LastBiosphereDebugAppliedPlantDeltas => _lastBiosphereDebugAppliedPlantDeltas;
         public int LastBiosphereDebugPendingPlantDeltas => _lastBiosphereDebugPendingPlantDeltas;
         public float LastDroppedBiosphereDebugEnvironmentTicks => _lastDroppedBiosphereDebugEnvironmentTicks;
+        public EnvironmentRuntimeEvent LastEnvironmentRuntimeEvent => _lastEnvironmentRuntimeEvent;
+
+        public event System.Action<EnvironmentRuntimeEvent> EnvironmentRuntimeEventPublished;
 
         public EnvironmentHistorySnapshot CreateBiosphereHistorySnapshot()
         {
@@ -1334,6 +1338,7 @@ namespace Arcontio.Core
                         maxPlantDeltas,
                         maxVegetationDeltas,
                         applyPhysicalPlantDeltas: true,
+                        EnvironmentRuntimeEventKind.DailyUpdate,
                         out int appliedPlantDeltas,
                         out int appliedVegetationDeltas);
 
@@ -1369,6 +1374,7 @@ namespace Arcontio.Core
             int maxPlantDeltaCount,
             int maxVegetationDeltaCount,
             bool applyPhysicalPlantDeltas,
+            EnvironmentRuntimeEventKind eventKind,
             out int appliedPlantDeltas,
             out int appliedVegetationDeltas)
         {
@@ -1389,6 +1395,13 @@ namespace Arcontio.Core
             if (applyPhysicalPlantDeltas)
                 appliedPlantDeltas =
                     _world.ApplyEnvironmentPhysicalPlantDeltas(result.PhysicalPlantDeltas);
+
+            PublishEnvironmentRuntimeEvent(
+                EnvironmentRuntimeEvent.FromAdvanceResult(
+                    eventKind,
+                    result,
+                    appliedPlantDeltas,
+                    appliedVegetationDeltas));
 
             return result;
         }
@@ -1537,6 +1550,7 @@ namespace Arcontio.Core
                     runtimeParams.ResolveMaxPlantMutationsPerUpdate(),
                     runtimeParams.ResolveMaxVegetationMutationsPerUpdate(),
                     applyPhysicalPlantDeltas: true,
+                    EnvironmentRuntimeEventKind.DebugFastForwardDailyUpdate,
                     out int appliedPlantDeltas,
                     out _);
 
@@ -2005,6 +2019,10 @@ namespace Arcontio.Core
                 ApplyEnvironmentFoundationBootstrap(_world);
             _environmentPlantCatalog = environmentBootstrap.PlantCatalog;
             CaptureBiosphereHistorySample();
+            PublishEnvironmentRuntimeEvent(
+                EnvironmentRuntimeEvent.FromState(
+                    EnvironmentRuntimeEventKind.Bootstrap,
+                    _world.EnvironmentState));
             ResetBiosphereRuntimeSchedule(_tickIndex);
 
             // ============================================================
@@ -2151,6 +2169,10 @@ namespace Arcontio.Core
             _environmentPlantCatalog = environmentBootstrap.PlantCatalog;
             _biosphereHistoryBuffer.Clear();
             _biosphereHistoryBuffer.Capture(loadedWorld.EnvironmentState);
+            PublishEnvironmentRuntimeEvent(
+                EnvironmentRuntimeEvent.FromState(
+                    EnvironmentRuntimeEventKind.Loaded,
+                    loadedWorld.EnvironmentState));
             loadedWorld.RebuildLandmarksBootstrap();
             return true;
         }
@@ -2158,6 +2180,53 @@ namespace Arcontio.Core
         private void CaptureBiosphereHistorySample()
         {
             _biosphereHistoryBuffer.Capture(_world?.EnvironmentState);
+        }
+
+        // =============================================================================
+        // PublishEnvironmentRuntimeEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Pubblica un evento ambiente compatto verso UI e sistemi listener.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: listener isolati dal loop deterministico</b></para>
+        /// <para>
+        /// Il <c>SimulationHost</c> resta l'orchestratore temporale. I listener non
+        /// ricevono riferimenti mutabili alla Biosfera e un errore in un listener non
+        /// deve interrompere il tick loop: per questo ogni callback viene protetta e
+        /// loggata singolarmente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>LastEnvironmentRuntimeEvent</b>: ultimo evento consultabile in polling sicuro.</item>
+        ///   <item><b>EnvironmentRuntimeEventPublished</b>: notifica push per UI/sistemi.</item>
+        /// </list>
+        /// </summary>
+        private void PublishEnvironmentRuntimeEvent(EnvironmentRuntimeEvent runtimeEvent)
+        {
+            _lastEnvironmentRuntimeEvent = runtimeEvent;
+            System.Action<EnvironmentRuntimeEvent> handlers = EnvironmentRuntimeEventPublished;
+            if (handlers == null)
+                return;
+
+            System.Delegate[] invocationList = handlers.GetInvocationList();
+            for (int i = 0; i < invocationList.Length; i++)
+            {
+                var handler = invocationList[i] as System.Action<EnvironmentRuntimeEvent>;
+                if (handler == null)
+                    continue;
+
+                try
+                {
+                    handler(runtimeEvent);
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError("[SimulationHost] Environment runtime listener failed: " + ex);
+                }
+            }
         }
 
         // =============================================================================
