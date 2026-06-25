@@ -54,6 +54,7 @@ namespace Arcontio.View.ArcGraph
         public readonly bool HasTerrainRenderer;
         public readonly bool HasNpcRenderer;
         public readonly bool HasObjectRenderer;
+        public readonly bool HasVegetationRenderer;
         public readonly bool DidToggle;
         public readonly bool DidProcessArcGraphFrame;
         public readonly string Reason;
@@ -79,6 +80,7 @@ namespace Arcontio.View.ArcGraph
             bool hasTerrainRenderer,
             bool hasNpcRenderer,
             bool hasObjectRenderer,
+            bool hasVegetationRenderer,
             bool didToggle,
             bool didProcessArcGraphFrame,
             string reason)
@@ -95,6 +97,7 @@ namespace Arcontio.View.ArcGraph
             HasTerrainRenderer = hasTerrainRenderer;
             HasNpcRenderer = hasNpcRenderer;
             HasObjectRenderer = hasObjectRenderer;
+            HasVegetationRenderer = hasVegetationRenderer;
             DidToggle = didToggle;
             DidProcessArcGraphFrame = didProcessArcGraphFrame;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
@@ -141,6 +144,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private ArcGraphTerrainRuntimeSceneRenderer terrainRenderer;
         [SerializeField] private ArcGraphNpcRuntimeSceneRenderer npcRenderer;
         [SerializeField] private ArcGraphObjectRuntimeSceneRenderer objectRenderer;
+        [SerializeField] private ArcGraphVegetationRuntimeSceneRenderer vegetationRenderer;
         [SerializeField] private bool configureWrapperRenderingOnSwitch = true;
         [SerializeField] private bool enableWrapperUpdateInArcGraphMode = true;
         [SerializeField] private bool processArcGraphFrameOnSwitch = true;
@@ -207,7 +211,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphMinimalRuntimeSceneWrapper wrapper,
             ArcGraphTerrainRuntimeSceneRenderer terrain,
             ArcGraphNpcRuntimeSceneRenderer npc,
-            ArcGraphObjectRuntimeSceneRenderer objects = null)
+            ArcGraphObjectRuntimeSceneRenderer objects = null,
+            ArcGraphVegetationRuntimeSceneRenderer vegetation = null)
         {
             mapGridVisualRoots = mapGridRoots;
             arcGraphVisualRoots = arcGraphRoots;
@@ -215,6 +220,7 @@ namespace Arcontio.View.ArcGraph
             terrainRenderer = terrain;
             npcRenderer = npc;
             objectRenderer = objects;
+            vegetationRenderer = vegetation;
 
             if (_hasAppliedMode)
                 ReapplyCurrentModeWithoutFrame();
@@ -428,7 +434,8 @@ namespace Arcontio.View.ArcGraph
             bool hasRuntimeWiring = runtimeWrapper != null
                 && terrainRenderer != null
                 && npcRenderer != null
-                && objectRenderer != null;
+                && objectRenderer != null
+                && vegetationRenderer != null;
             bool rootsMatchCurrentMode = AreRootsCoherentWithCurrentMode(
                 mapGridActiveCount,
                 arcGraphActiveCount);
@@ -454,6 +461,7 @@ namespace Arcontio.View.ArcGraph
                 ", terrainRenderer=" + (terrainRenderer != null) +
                 ", npcRenderer=" + (npcRenderer != null) +
                 ", objectRenderer=" + (objectRenderer != null) +
+                ", vegetationRenderer=" + (vegetationRenderer != null) +
                 ", rootsCoherent=" + rootsMatchCurrentMode +
                 ", expectedHumanCheck=terrain+npc+muri+previewF3");
         }
@@ -533,6 +541,9 @@ namespace Arcontio.View.ArcGraph
             if (objectRenderer != null)
                 objectRenderer.SetRendererEnabled(arcGraphMode);
 
+            if (vegetationRenderer != null)
+                vegetationRenderer.SetRendererEnabled(arcGraphMode);
+
             if (runtimeWrapper == null)
                 return;
 
@@ -548,9 +559,11 @@ namespace Arcontio.View.ArcGraph
                     arcGraphMode,
                     arcGraphMode,
                     arcGraphMode,
+                    arcGraphMode,
                     enableTerrainBeforeRender: arcGraphMode,
                     enableNpcBeforeRender: arcGraphMode,
-                    enableObjectBeforeRender: arcGraphMode);
+                    enableObjectBeforeRender: arcGraphMode,
+                    enableVegetationBeforeRender: arcGraphMode);
             }
         }
 
@@ -576,6 +589,9 @@ namespace Arcontio.View.ArcGraph
 
             if (objectRenderer != null)
                 objectRenderer.ClearRuntimeRenderer();
+
+            if (vegetationRenderer != null)
+                vegetationRenderer.ClearRuntimeRenderer();
         }
 
         // =============================================================================
@@ -639,6 +655,7 @@ namespace Arcontio.View.ArcGraph
                 terrainRenderer != null,
                 npcRenderer != null,
                 objectRenderer != null,
+                vegetationRenderer != null,
                 didToggle,
                 didProcessArcGraphFrame,
                 reason);
@@ -665,6 +682,7 @@ namespace Arcontio.View.ArcGraph
                 ", terrainRenderer=" + _lastDiagnostics.HasTerrainRenderer +
                 ", npcRenderer=" + _lastDiagnostics.HasNpcRenderer +
                 ", objectRenderer=" + _lastDiagnostics.HasObjectRenderer +
+                ", vegetationRenderer=" + _lastDiagnostics.HasVegetationRenderer +
                 ", toggled=" + _lastDiagnostics.DidToggle +
                 ", processedFrame=" + _lastDiagnostics.DidProcessArcGraphFrame);
         }

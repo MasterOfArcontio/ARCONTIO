@@ -58,6 +58,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainRuntimeSceneRenderer _terrainRenderer;
         private ArcGraphNpcRuntimeSceneRenderer _npcRenderer;
         private ArcGraphObjectRuntimeSceneRenderer _objectRenderer;
+        private ArcGraphVegetationRuntimeSceneRenderer _vegetationRenderer;
         private ArcGraphCameraViewportController _cameraViewportController;
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
@@ -244,6 +245,7 @@ namespace Arcontio.View.ArcGraph
             _terrainRenderer = _visualRoot.AddComponent<ArcGraphTerrainRuntimeSceneRenderer>();
             _npcRenderer = _visualRoot.AddComponent<ArcGraphNpcRuntimeSceneRenderer>();
             _objectRenderer = _visualRoot.AddComponent<ArcGraphObjectRuntimeSceneRenderer>();
+            _vegetationRenderer = _visualRoot.AddComponent<ArcGraphVegetationRuntimeSceneRenderer>();
             _cameraViewportController = _visualRoot.AddComponent<ArcGraphCameraViewportController>();
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
@@ -323,6 +325,12 @@ namespace Arcontio.View.ArcGraph
             _objectRenderer.SetRuntimeWrapper(_wrapper);
             _objectRenderer.SetSpriteResolverBehaviour(_spriteResolver);
 
+            // La vegetazione usa lo stesso resolver Resources degli oggetti. Se un
+            // PNG reale manca, il renderer vegetazione mostra un fallback generato
+            // e lo dichiara in diagnostica senza fermare il runtime.
+            _vegetationRenderer.SetRuntimeWrapper(_wrapper);
+            _vegetationRenderer.SetSpriteResolverBehaviour(_spriteResolver);
+
             // Il probe NPC resta passivo: viene solo preparato con lo stesso
             // catalogo e lo stesso resolver del renderer. Non gira in Update, non
             // disegna e non modifica scena; serve al prossimo gate per capire
@@ -334,6 +342,7 @@ namespace Arcontio.View.ArcGraph
             _wrapper.SetTerrainRenderer(_terrainRenderer);
             _wrapper.SetNpcRenderer(_npcRenderer);
             _wrapper.SetObjectRenderer(_objectRenderer);
+            _wrapper.SetVegetationRenderer(_vegetationRenderer);
             _wrapper.SetInteractionWrapper(_interactionWrapper);
             _wrapper.SetCameraViewportController(_cameraViewportController);
             _wrapper.SetViewConfig(_viewConfig);
@@ -536,7 +545,8 @@ namespace Arcontio.View.ArcGraph
                 _wrapper,
                 _terrainRenderer,
                 _npcRenderer,
-                _objectRenderer);
+                _objectRenderer,
+                _vegetationRenderer);
         }
 
         // =============================================================================

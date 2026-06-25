@@ -39,6 +39,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private ArcGraphTerrainRuntimeSceneRenderer terrainRenderer;
         [SerializeField] private ArcGraphNpcRuntimeSceneRenderer npcRenderer;
         [SerializeField] private ArcGraphObjectRuntimeSceneRenderer objectRenderer;
+        [SerializeField] private ArcGraphVegetationRuntimeSceneRenderer vegetationRenderer;
         [SerializeField] private ArcGraphInteractionSceneAdapterWrapper interactionWrapper;
         [SerializeField] private ArcGraphCameraViewportController cameraViewportController;
         [SerializeField] private bool wrapperEnabled;
@@ -48,9 +49,11 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool renderTerrainRuntime;
         [SerializeField] private bool renderNpcRuntime;
         [SerializeField] private bool renderObjectRuntime;
+        [SerializeField] private bool renderVegetationRuntime;
         [SerializeField] private bool enableTerrainRendererBeforeRender;
         [SerializeField] private bool enableNpcRendererBeforeRender;
         [SerializeField] private bool enableObjectRendererBeforeRender;
+        [SerializeField] private bool enableVegetationRendererBeforeRender;
         [SerializeField] private bool pushQueueToInteractionWrapper;
         [SerializeField] private bool enableInteractionWrapperAfterPush;
         [SerializeField] private bool logDiagnostics;
@@ -61,6 +64,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphTerrainRuntimeSceneRendererDiagnostics _lastTerrainRendererDiagnostics;
         private ArcGraphNpcRuntimeSceneRendererDiagnostics _lastNpcRendererDiagnostics;
         private ArcGraphObjectRuntimeSceneRendererDiagnostics _lastObjectRendererDiagnostics;
+        private ArcGraphVegetationRuntimeSceneRendererDiagnostics _lastVegetationRendererDiagnostics;
         private ArcGraphMapViewConfig _configuredViewConfig;
         private ArcGraphMapViewConfig _currentViewConfig;
         private long _sourceFrameIndex;
@@ -73,7 +77,9 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphTerrainRuntimeSceneRendererDiagnostics LastTerrainRendererDiagnostics => _lastTerrainRendererDiagnostics;
         public ArcGraphNpcRuntimeSceneRendererDiagnostics LastNpcRendererDiagnostics => _lastNpcRendererDiagnostics;
         public ArcGraphObjectRuntimeSceneRendererDiagnostics LastObjectRendererDiagnostics => _lastObjectRendererDiagnostics;
+        public ArcGraphVegetationRuntimeSceneRendererDiagnostics LastVegetationRendererDiagnostics => _lastVegetationRendererDiagnostics;
         public ArcGraphRenderQueue RenderQueue => _coordinator.RenderQueue;
+        public ArcGraphBootstrapRuntime Runtime => _coordinator.Runtime;
         public bool WrapperEnabled => wrapperEnabled;
 
         // =============================================================================
@@ -180,9 +186,11 @@ namespace Arcontio.View.ArcGraph
                 renderTerrain,
                 renderNpc,
                 renderObject: renderNpc,
-                enableTerrainBeforeRender,
-                enableNpcBeforeRender,
-                enableObjectBeforeRender: enableNpcBeforeRender);
+                renderVegetation: renderNpc,
+                enableTerrainBeforeRender: enableTerrainBeforeRender,
+                enableNpcBeforeRender: enableNpcBeforeRender,
+                enableObjectBeforeRender: enableNpcBeforeRender,
+                enableVegetationBeforeRender: enableNpcBeforeRender);
         }
 
         // =============================================================================
@@ -205,16 +213,20 @@ namespace Arcontio.View.ArcGraph
             bool renderTerrain,
             bool renderNpc,
             bool renderObject,
+            bool renderVegetation,
             bool enableTerrainBeforeRender,
             bool enableNpcBeforeRender,
-            bool enableObjectBeforeRender)
+            bool enableObjectBeforeRender,
+            bool enableVegetationBeforeRender = false)
         {
             renderTerrainRuntime = renderTerrain;
             renderNpcRuntime = renderNpc;
             renderObjectRuntime = renderObject;
+            renderVegetationRuntime = renderVegetation;
             enableTerrainRendererBeforeRender = enableTerrainBeforeRender;
             enableNpcRendererBeforeRender = enableNpcBeforeRender;
             enableObjectRendererBeforeRender = enableObjectBeforeRender;
+            enableVegetationRendererBeforeRender = enableVegetationBeforeRender;
         }
 
         // =============================================================================
@@ -284,6 +296,20 @@ namespace Arcontio.View.ArcGraph
         public void SetObjectRenderer(ArcGraphObjectRuntimeSceneRenderer renderer)
         {
             objectRenderer = renderer;
+        }
+
+        // =============================================================================
+        // SetVegetationRenderer
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna esplicitamente il renderer vegetazione runtime che puo' ricevere
+        /// il layer vegetazione prodotto dal coordinator.
+        /// </para>
+        /// </summary>
+        public void SetVegetationRenderer(ArcGraphVegetationRuntimeSceneRenderer renderer)
+        {
+            vegetationRenderer = renderer;
         }
 
         // =============================================================================
@@ -430,6 +456,7 @@ namespace Arcontio.View.ArcGraph
                     didRenderTerrainRuntime: false,
                     didRenderNpcRuntime: false,
                     didRenderObjectRuntime: false,
+                    didRenderVegetationRuntime: false,
                     didPushQueueToInteractionWrapper: false,
                     contextWorldObjectCount: 0,
                     firstContextObjectId: -1,
@@ -455,6 +482,7 @@ namespace Arcontio.View.ArcGraph
                     didRenderTerrainRuntime: false,
                     didRenderNpcRuntime: false,
                     didRenderObjectRuntime: false,
+                    didRenderVegetationRuntime: false,
                     didPushQueueToInteractionWrapper: false,
                     contextWorldObjectCount: 0,
                     firstContextObjectId: -1,
@@ -488,6 +516,7 @@ namespace Arcontio.View.ArcGraph
             bool renderedTerrain = TryRenderTerrainRuntime(context, coordinatorDiagnostics);
             bool renderedNpc = shouldRefreshActorObjectFrame && TryRenderNpcRuntime(coordinatorDiagnostics);
             bool renderedObject = shouldRefreshActorObjectFrame && TryRenderObjectRuntime(coordinatorDiagnostics);
+            bool renderedVegetation = TryRenderVegetationRuntime(coordinatorDiagnostics);
             bool pushedQueue = TryPushQueueToInteractionWrapper(coordinatorDiagnostics);
 
             _lastDiagnostics = CreateDiagnostics(
@@ -496,12 +525,13 @@ namespace Arcontio.View.ArcGraph
                 didRenderTerrainRuntime: renderedTerrain,
                 didRenderNpcRuntime: renderedNpc,
                 didRenderObjectRuntime: renderedObject,
+                didRenderVegetationRuntime: renderedVegetation,
                 didPushQueueToInteractionWrapper: pushedQueue,
                 contextWorldObjectCount,
                 firstContextObjectId,
                 firstContextObjectDefId,
                 coordinatorDiagnostics,
-                ResolveReason(coordinatorDiagnostics, renderedTerrain, renderedNpc, renderedObject, pushedQueue));
+                ResolveReason(coordinatorDiagnostics, renderedTerrain, renderedNpc, renderedObject, renderedVegetation, pushedQueue));
 
             if (shouldRefreshActorObjectFrame)
                 _hasRenderedActorObjectFrame = true;
@@ -608,6 +638,31 @@ namespace Arcontio.View.ArcGraph
             return true;
         }
 
+        private bool TryRenderVegetationRuntime(
+            ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics)
+        {
+            // La vegetazione dipende dal layer ambientale popolato dal runtime, non
+            // dalla queue actor/object. Puo' quindi aggiornarsi anche quando actor e
+            // oggetti sono throttled dal refresh a intervalli.
+            if (!renderVegetationRuntime)
+                return false;
+
+            if (vegetationRenderer == null)
+                return false;
+
+            if (!coordinatorDiagnostics.DidInitializeRuntime)
+                return false;
+
+            if (_coordinator.Runtime == null || !_coordinator.Runtime.IsInitialized)
+                return false;
+
+            if (enableVegetationRendererBeforeRender)
+                vegetationRenderer.SetRendererEnabled(true);
+
+            _lastVegetationRendererDiagnostics = vegetationRenderer.RenderFromRuntime(_coordinator.Runtime);
+            return true;
+        }
+
         private bool TryPushQueueToInteractionWrapper(
             ArcGraphMinimalRuntimeCoordinatorDiagnostics coordinatorDiagnostics)
         {
@@ -711,6 +766,7 @@ namespace Arcontio.View.ArcGraph
             bool didRenderTerrainRuntime,
             bool didRenderNpcRuntime,
             bool didRenderObjectRuntime,
+            bool didRenderVegetationRuntime,
             bool didPushQueueToInteractionWrapper,
             int contextWorldObjectCount,
             int firstContextObjectId,
@@ -727,6 +783,7 @@ namespace Arcontio.View.ArcGraph
                 terrainRenderer != null,
                 npcRenderer != null,
                 objectRenderer != null,
+                vegetationRenderer != null,
                 wrapperEnabled,
                 processInUpdate,
                 refreshSnapshots,
@@ -734,6 +791,7 @@ namespace Arcontio.View.ArcGraph
                 renderTerrainRuntime,
                 renderNpcRuntime,
                 renderObjectRuntime,
+                renderVegetationRuntime,
                 pushQueueToInteractionWrapper,
                 enableInteractionWrapperAfterPush,
                 didBuildContext,
@@ -741,6 +799,7 @@ namespace Arcontio.View.ArcGraph
                 didRenderTerrainRuntime,
                 didRenderNpcRuntime,
                 didRenderObjectRuntime,
+                didRenderVegetationRuntime,
                 didPushQueueToInteractionWrapper,
                 contextWorldObjectCount,
                 firstContextObjectId,
@@ -749,6 +808,7 @@ namespace Arcontio.View.ArcGraph
                 _lastTerrainRendererDiagnostics,
                 _lastNpcRendererDiagnostics,
                 _lastObjectRendererDiagnostics,
+                _lastVegetationRendererDiagnostics,
                 reason);
         }
 
@@ -757,13 +817,20 @@ namespace Arcontio.View.ArcGraph
             bool renderedTerrain,
             bool renderedNpc,
             bool renderedObject,
+            bool renderedVegetation,
             bool pushedQueue)
         {
             if (pushedQueue)
                 return "MinimalRuntimeFrameProcessedAndQueuePushed";
 
+            if (renderedTerrain && renderedNpc && renderedObject && renderedVegetation)
+                return "MinimalRuntimeFrameProcessedAndRenderedTerrainNpcObjectVegetation";
+
             if (renderedTerrain && renderedNpc && renderedObject)
                 return "MinimalRuntimeFrameProcessedAndRenderedTerrainNpcObject";
+
+            if (renderedTerrain && renderedVegetation)
+                return "MinimalRuntimeFrameProcessedAndRenderedTerrainVegetation";
 
             if (renderedTerrain && renderedNpc)
                 return "MinimalRuntimeFrameProcessedAndRenderedTerrainNpc";
@@ -773,6 +840,9 @@ namespace Arcontio.View.ArcGraph
 
             if (renderedObject)
                 return "MinimalRuntimeFrameProcessedAndRenderedObject";
+
+            if (renderedVegetation)
+                return "MinimalRuntimeFrameProcessedAndRenderedVegetation";
 
             if (renderedTerrain)
                 return "MinimalRuntimeFrameProcessedAndRenderedTerrain";
@@ -802,6 +872,7 @@ namespace Arcontio.View.ArcGraph
                 ", terrainRenderer=" + _lastDiagnostics.HasTerrainRenderer +
                 ", npcRenderer=" + _lastDiagnostics.HasNpcRenderer +
                 ", objectRenderer=" + _lastDiagnostics.HasObjectRenderer +
+                ", vegetationRenderer=" + _lastDiagnostics.HasVegetationRenderer +
                 ", interactionWrapper=" + _lastDiagnostics.HasInteractionWrapper +
                 ", contextBuilt=" + _lastDiagnostics.DidBuildContext +
                 ", coordinatorProcessed=" + _lastDiagnostics.DidProcessCoordinator +
@@ -816,6 +887,8 @@ namespace Arcontio.View.ArcGraph
                 ", npcReason=" + _lastDiagnostics.NpcRendererDiagnostics.Reason +
                 ", renderedObject=" + _lastDiagnostics.DidRenderObjectRuntime +
                 ", objectReason=" + _lastDiagnostics.ObjectRendererDiagnostics.Reason +
+                ", renderedVegetation=" + _lastDiagnostics.DidRenderVegetationRuntime +
+                ", vegetationReason=" + _lastDiagnostics.VegetationRendererDiagnostics.Reason +
                 ", contextWorldObjects=" + _lastDiagnostics.ContextWorldObjectCount +
                 ", firstContextObjectId=" + _lastDiagnostics.FirstContextObjectId +
                 ", firstContextObjectDefId=" + _lastDiagnostics.FirstContextObjectDefId +
