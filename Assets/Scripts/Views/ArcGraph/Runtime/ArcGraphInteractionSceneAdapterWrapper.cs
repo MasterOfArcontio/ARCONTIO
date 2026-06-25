@@ -624,7 +624,8 @@ namespace Arcontio.View.ArcGraph
                 viewportPoint.y,
                 true,
                 isPointerOverUi,
-                mouse.leftButton.wasPressedThisFrame);
+                mouse.leftButton.wasPressedThisFrame,
+                mouse.rightButton.wasPressedThisFrame);
         }
 
         // =============================================================================

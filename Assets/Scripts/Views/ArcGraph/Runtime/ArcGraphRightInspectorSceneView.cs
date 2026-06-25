@@ -68,7 +68,8 @@ namespace Arcontio.View.ArcGraph
         private const float TabCellHeight = 30f;
         private const float TabSpacing = 4f;
         private const int TabColumnsPerRow = 4;
-        private const float RuntimeRefreshIntervalSeconds = 0.5f;
+        private const float FastRuntimeRefreshIntervalSeconds = 0.5f;
+        private const float SlowRuntimeRefreshIntervalSeconds = 2.0f;
         private const float CompactRowSpacing = 2f;
         private const float CompactTextRowHeight = 20f;
         private const float CompactSectionHeight = 20f;
@@ -95,7 +96,7 @@ namespace Arcontio.View.ArcGraph
         private const float DenseDetailIndent = 9f;
         private const int DenseFontSize = 9;
         private const int DenseToggleFontSize = 11;
-        private const int LongTextRowThreshold = 18;
+        private const int LongTextRowThreshold = 12;
 
         [SerializeField] private bool inspectorEnabled = true;
 
@@ -158,7 +159,7 @@ namespace Arcontio.View.ArcGraph
 
                 if (ShouldRefreshRuntimeInspector(target))
                 {
-                    ApplyContext(mode, target, actionRequest, true, false);
+                    RefreshRuntimeRowsOnly(target, actionRequest);
                     _lastRuntimeRefreshTime = Time.unscaledTime;
                 }
 
@@ -366,6 +367,27 @@ namespace Arcontio.View.ArcGraph
             BuildHeader(mode, viewModel);
             BuildTabs(viewModel);
             BuildRows(viewModel, resetScrollToTop);
+        }
+
+        private void RefreshRuntimeRowsOnly(
+            ArcUiSelectionTarget target,
+            ArcUiSelectionActionRequest actionRequest)
+        {
+            ArcUiInspectorViewModel viewModel = actionRequest.IsValid
+                ? _viewModelFactory.BuildForAction(actionRequest)
+                : _viewModelFactory.BuildForSelection(target);
+
+            _currentViewModel = new ArcUiInspectorViewModel(
+                viewModel.Title,
+                viewModel.Target,
+                viewModel.Tabs,
+                ContainsTab(viewModel, _activeTabKey)
+                    ? _activeTabKey
+                    : ResolveInitialActiveTabKey(viewModel));
+
+            _activeTabKey = _currentViewModel.ActiveTabKey;
+            BuildRows(_currentViewModel, false);
+            _inspectionController?.Set(_currentViewModel);
         }
 
         private void BuildHeader(
@@ -638,7 +660,11 @@ namespace Arcontio.View.ArcGraph
             if (target.Kind != ArcUiSelectionTargetKind.Npc)
                 return false;
 
-            return Time.unscaledTime - _lastRuntimeRefreshTime >= RuntimeRefreshIntervalSeconds;
+            float interval = string.Equals(_activeTabKey, "info", System.StringComparison.Ordinal)
+                ? FastRuntimeRefreshIntervalSeconds
+                : SlowRuntimeRefreshIntervalSeconds;
+
+            return Time.unscaledTime - _lastRuntimeRefreshTime >= interval;
         }
 
         // =============================================================================
@@ -1181,8 +1207,8 @@ namespace Arcontio.View.ArcGraph
 
             RectTransform valueRoot = CreateRect("Value", header);
             LayoutElement valueLayout = valueRoot.gameObject.AddComponent<LayoutElement>();
-            valueLayout.preferredWidth = dense ? 54f : 70f;
-            TextMeshProUGUI value = CreateText(valueRoot, row.Value, dense ? DenseFontSize : 9, FontStyles.Bold, TextAlignmentOptions.Right);
+            valueLayout.preferredWidth = dense ? 92f : 122f;
+            TextMeshProUGUI value = CreateText(valueRoot, row.Value, dense ? DenseFontSize : 9, FontStyles.Bold, TextAlignmentOptions.Left);
             value.color = ColorForSeverity(row.Severity, 1f);
 
             if (!expanded)

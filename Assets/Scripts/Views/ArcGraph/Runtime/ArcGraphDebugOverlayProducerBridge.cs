@@ -163,6 +163,11 @@ namespace Arcontio.View.ArcGraph
                         addedEdges += AppendEdges(target, knownEdges, ArcGraphDebugOverlayKind.LandmarkKnownEdge, isEnabled);
                 }
             }
+            else if (includeKnownLandmarkGraph)
+            {
+                addedNodes += AppendNodes(target, knownNodes, ArcGraphDebugOverlayKind.LandmarkKnownNode, KnownNodeScale, isEnabled);
+                addedEdges += AppendEdges(target, knownEdges, ArcGraphDebugOverlayKind.LandmarkKnownEdge, isEnabled);
+            }
 
             if (includeLandmarkRoute)
             {

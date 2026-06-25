@@ -637,7 +637,7 @@ namespace Arcontio.View.ArcGraph
                     color = new Color(0.20f, 1f, 0.55f, 1f);
                     break;
                 case "debug/landmark/known-edge":
-                    color = new Color(0.20f, 1f, 0.55f, 0.34f);
+                    color = new Color(0.20f, 1f, 0.55f, 0.62f);
                     break;
                 case "debug/landmark/route-node":
                     color = new Color(1f, 0.70f, 0.16f, 0.95f);

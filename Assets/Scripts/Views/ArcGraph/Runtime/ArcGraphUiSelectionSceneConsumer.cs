@@ -66,11 +66,34 @@ namespace Arcontio.View.ArcGraph
             if (interactionFrame.IsPointerOverUi)
                 return;
 
+            if (interactionFrame.Input.IsSecondaryPointerPressedThisFrame)
+            {
+                TryClearSelectionFromSecondaryClick(interactionFrame);
+                return;
+            }
+
             if (!interactionFrame.Input.IsPrimaryPointerPressedThisFrame)
                 return;
 
             ArcGraphRenderQueue queue = ResolveRenderQueue();
             TrySelectFromInteractionFrame(interactionFrame, queue);
+        }
+
+        private void TryClearSelectionFromSecondaryClick(ArcGraphInteractionFrame interactionFrame)
+        {
+            if (!CurrentSelection.IsValid)
+                return;
+
+            ArcGraphRenderQueue queue = ResolveRenderQueue();
+            bool hasSelectableTarget =
+                interactionFrame.TargetKind == ArcGraphInteractionTargetKind.Actor ||
+                interactionFrame.TargetKind == ArcGraphInteractionTargetKind.Object ||
+                (interactionFrame.HasValidCell &&
+                    (TryFindActorByCell(queue, interactionFrame.Cell, out _) ||
+                     TryFindObjectByCell(queue, interactionFrame.Cell, out _)));
+
+            if (hasSelectableTarget)
+                ClearSelection();
         }
 
         // =============================================================================

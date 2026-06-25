@@ -644,8 +644,8 @@ namespace Arcontio.View.ArcGraph
             // La separazione avviene qui, tramite opzioni, prima del rendering.
             _options.IncludeLandmark = hasAny;
             _options.IncludeLandmarkGraph = landmarkOverlayEnabled;
-            _options.IncludeLandmarkGraphEdges = false;
-            _options.IncludeKnownLandmarkGraph = false;
+            _options.IncludeLandmarkGraphEdges = pathfindingOverlayEnabled;
+            _options.IncludeKnownLandmarkGraph = pathfindingOverlayEnabled;
             _options.IncludeLandmarkRoute = pathfindingOverlayEnabled;
             _options.IncludeLandmarkPaths = pathfindingOverlayEnabled;
             _options.IncludeLandmarkComplexEdges = false;
