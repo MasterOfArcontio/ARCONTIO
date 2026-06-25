@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Arcontio.Core;
+using Arcontio.Core.Environment;
 using UnityEngine;
 
 namespace Arcontio.Core.Save
@@ -99,6 +100,7 @@ namespace Arcontio.Core.Save
                 // il chiamante o il World non esporranno una provenance canonica.
                 objectDefsResourcePath = string.Empty,
                 scenarioResourceName = scenarioRef ?? string.Empty,
+                environment = EnvironmentPersistenceResolver.Capture(world.EnvironmentState),
 
                 npcs = BuildNpcEntries(world),
                 objects = BuildObjectEntries(world),

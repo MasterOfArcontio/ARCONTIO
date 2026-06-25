@@ -2164,9 +2164,15 @@ namespace Arcontio.Core
                 $"worldHash={loadedWorld.GetHashCode()} npcCount={CountNpcsForDiagnostics(loadedWorld)} " +
                 $"objectCount={CountObjectsForDiagnostics(loadedWorld)}");
 
-            EnvironmentFoundationBootstrapResult environmentBootstrap =
-                ApplyEnvironmentFoundationBootstrap(loadedWorld);
-            _environmentPlantCatalog = environmentBootstrap.PlantCatalog;
+            if (!TryRestoreEnvironmentFromSnapshotData(data, loadedWorld, out error))
+            {
+                Debug.LogError(
+                    $"[WorldSnapshotLoadDiag][SimulationHost] Environment restore FAILED " +
+                    $"worldHash={loadedWorld.GetHashCode()} error='{error}'");
+                loadedWorld = null;
+                return false;
+            }
+
             _biosphereHistoryBuffer.Clear();
             _biosphereHistoryBuffer.Capture(loadedWorld.EnvironmentState);
             PublishEnvironmentRuntimeEvent(
@@ -2175,6 +2181,95 @@ namespace Arcontio.Core
                     loadedWorld.EnvironmentState));
             loadedWorld.RebuildLandmarksBootstrap();
             return true;
+        }
+
+        // =============================================================================
+        // TryRestoreEnvironmentFromSnapshotData
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ripristina la biosfera persistita nello snapshot oppure applica il bootstrap
+        /// ambientale quando il salvataggio non contiene ancora quella sezione.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: save/load prima del bootstrap rigenerativo</b></para>
+        /// <para>
+        /// Uno snapshot vissuto deve preservare calendario, clima, aree, piante e
+        /// placement prodotti dalla biosfera. Il bootstrap naturale resta solo il
+        /// fallback per salvataggi vecchi o tecnici privi di sezione ambiente.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Catalogo</b>: carica il catalogo piante runtime corrente.</item>
+        ///   <item><b>Restore</b>: converte <c>EnvironmentSaveData</c> in EnvironmentState.</item>
+        ///   <item><b>Proiezioni</b>: riallinea vegetazione diffusa e piante fisiche nel World.</item>
+        ///   <item><b>Fallback</b>: usa il bootstrap foundation se non c'e' una biosfera persistita.</item>
+        /// </list>
+        /// </summary>
+        private bool TryRestoreEnvironmentFromSnapshotData(
+            WorldSaveData data,
+            World loadedWorld,
+            out string error)
+        {
+            error = string.Empty;
+            if (loadedWorld == null)
+            {
+                error = "World nullo durante restore biosfera.";
+                return false;
+            }
+
+            EnvironmentPlantCatalogConfig plantCatalogConfig =
+                LoadEnvironmentPlantCatalogConfigFromResources();
+            _environmentPlantCatalog = plantCatalogConfig.ToCatalog();
+
+            if (!HasPersistedEnvironmentSection(data))
+            {
+                EnvironmentFoundationBootstrapResult environmentBootstrap =
+                    ApplyEnvironmentFoundationBootstrap(loadedWorld);
+                _environmentPlantCatalog = environmentBootstrap.PlantCatalog;
+                return true;
+            }
+
+            EnvironmentFoundationConfig environmentConfig =
+                EnvironmentFoundationBootstrap.CreateDefaultConfig();
+            environmentConfig.plantCatalog = plantCatalogConfig;
+
+            EnvironmentLoadResult loadResult =
+                EnvironmentPersistenceResolver.Restore(
+                    data.environment,
+                    environmentConfig.calendar);
+
+            loadedWorld.SetEnvironmentState(loadResult.State);
+
+            if (data.environment.ResolveSchemaVersion() < 2)
+                loadedWorld.EnvironmentState?.RebuildRuntimeBiologicalPlacements(loadedWorld);
+
+            loadedWorld.ApplyEnvironmentDiffuseVegetationProjections();
+            loadedWorld.ApplyEnvironmentPhysicalPlantProjections();
+
+            if (loadResult.Report.HasRejectedRecords)
+            {
+                Debug.LogWarning(
+                    "[SimulationHost] Environment restore completed with rejected records. " +
+                    $"areas={loadResult.Report.AreasLoaded} plants={loadResult.Report.PlantsLoaded} " +
+                    $"rejected={loadResult.Report.RejectedRecords}");
+            }
+
+            return true;
+        }
+
+        private static bool HasPersistedEnvironmentSection(WorldSaveData data)
+        {
+            EnvironmentSaveData environment = data?.environment;
+            if (environment == null)
+                return false;
+
+            return environment.elapsedEnvironmentTicks > 0
+                || (environment.areas != null && environment.areas.Length > 0)
+                || (environment.plants != null && environment.plants.Length > 0)
+                || (environment.vegetationPlacements != null && environment.vegetationPlacements.Length > 0)
+                || (environment.physicalPlantPlacements != null && environment.physicalPlantPlacements.Length > 0);
         }
 
         private void CaptureBiosphereHistorySample()

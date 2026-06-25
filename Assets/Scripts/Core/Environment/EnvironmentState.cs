@@ -506,6 +506,70 @@ namespace Arcontio.Core.Environment
             return _vegetationCellPlacements.Count + _physicalPlantPlacements.Count;
         }
 
+        // =============================================================================
+        // ReplaceBiologicalPlacementsForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce i placement cell-based della biosfera durante un load canonico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: restore del layout senza rigenerazione</b></para>
+        /// <para>
+        /// Le <c>PlantInstance</c> conservano biologia, eta', salute e specie; questi
+        /// placement conservano invece dove la biosfera aveva materializzato piante e
+        /// vegetazione diffusa. Il load non deve rilanciare il bootstrap naturale se
+        /// uno snapshot contiene gia' il layout vissuto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Vegetazione diffusa</b>: accettata se area e coordinate sono valide.</item>
+        ///   <item><b>Piante fisiche</b>: accettate solo se puntano a una PlantInstance viva esistente.</item>
+        ///   <item><b>Rejected</b>: conteggio record scartati senza mutare altri domini.</item>
+        /// </list>
+        /// </summary>
+        public int ReplaceBiologicalPlacementsForSaveLoad(
+            IReadOnlyList<EnvironmentVegetationCellPlacement> vegetationPlacements,
+            IReadOnlyList<EnvironmentPhysicalPlantPlacement> physicalPlantPlacements)
+        {
+            _vegetationCellPlacements.Clear();
+            _physicalPlantPlacements.Clear();
+
+            int rejected = 0;
+            var safeVegetation = vegetationPlacements ?? new EnvironmentVegetationCellPlacement[0];
+            for (int i = 0; i < safeVegetation.Count; i++)
+            {
+                EnvironmentVegetationCellPlacement placement = safeVegetation[i];
+                if (!placement.AreaId.IsValid || !_areaDefinitions.ContainsKey(placement.AreaId))
+                {
+                    rejected++;
+                    continue;
+                }
+
+                _vegetationCellPlacements.Add(placement);
+            }
+
+            var safePhysicalPlants = physicalPlantPlacements ?? new EnvironmentPhysicalPlantPlacement[0];
+            for (int i = 0; i < safePhysicalPlants.Count; i++)
+            {
+                EnvironmentPhysicalPlantPlacement placement = safePhysicalPlants[i];
+                if (!placement.PlantId.IsValid
+                    || !_plantInstances.TryGetValue(placement.PlantId, out EnvironmentPlantInstance plant)
+                    || !plant.IsAlive
+                    || !placement.AreaId.IsValid
+                    || !_areaDefinitions.ContainsKey(placement.AreaId))
+                {
+                    rejected++;
+                    continue;
+                }
+
+                _physicalPlantPlacements.Add(placement);
+            }
+
+            return rejected;
+        }
+
         private bool IsBiologicalArea(EnvironmentAreaDefinition area)
         {
             return area.AreaId.IsValid
