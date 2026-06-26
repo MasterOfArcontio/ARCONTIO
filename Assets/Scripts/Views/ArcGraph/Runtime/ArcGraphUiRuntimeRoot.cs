@@ -100,7 +100,9 @@ namespace Arcontio.View.ArcGraph
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
         private ArcUiPlacementController _placementController;
+        private ArcUiNpcSpawnController _npcSpawnController;
         private ArcGraphUiPlacementPreviewSource _placementPreviewSource;
+        private ArcGraphUiNpcSpawnPreviewSource _npcSpawnPreviewSource;
         private UnityAction<string, bool> _visualOverlayStateChanged;
         private string _activeInsertGroupKey = InsertStructuresGroupKey;
         private ArcUiPlacementMode _activePlacementMode = ArcUiPlacementMode.Single;
@@ -389,6 +391,32 @@ namespace Arcontio.View.ArcGraph
         public void SetPlacementController(ArcUiPlacementController controller)
         {
             _placementController = controller;
+        }
+
+        // =============================================================================
+        // SetNpcSpawnPreviewSource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega il pannello NPC alla preview semitrasparente dello spawn futuro.
+        /// </para>
+        /// </summary>
+        public void SetNpcSpawnPreviewSource(ArcGraphUiNpcSpawnPreviewSource source)
+        {
+            _npcSpawnPreviewSource = source;
+        }
+
+        // =============================================================================
+        // SetNpcSpawnController
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega il pannello NPC al controller request, senza command gateway.
+        /// </para>
+        /// </summary>
+        public void SetNpcSpawnController(ArcUiNpcSpawnController controller)
+        {
+            _npcSpawnController = controller;
         }
 
         // =============================================================================
@@ -983,6 +1011,8 @@ namespace Arcontio.View.ArcGraph
                 _placementPreviewSource.ClearPreview();
 
             _placementController?.Cancel();
+            _npcSpawnPreviewSource?.ClearPreview();
+            _npcSpawnController?.Cancel();
         }
 
         private void RefreshInsertGroupButtons()
@@ -1027,6 +1057,8 @@ namespace Arcontio.View.ArcGraph
 
         private void SelectObjectOperation(ArcGraphActionPanelObjectEntry entry)
         {
+            _npcSpawnPreviewSource?.ClearPreview();
+            _npcSpawnController?.Cancel();
             _activePlacementMode = ArcUiPlacementMode.Single;
             _activePlacementConfig = ArcUiPlacementConfig.Default();
             UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
@@ -1049,10 +1081,37 @@ namespace Arcontio.View.ArcGraph
             if (_placementPreviewSource != null)
                 _placementPreviewSource.ClearPreview();
 
-            ClearChildren(_operationParamsRoot);
-            CreateParameterChip(_operationParamsRoot, "NPC preview: prossimo step", false);
-            CreateParameterChip(_operationParamsRoot, "DNA/config da inspector", false);
             _placementController?.Cancel();
+            ArcUiNpcSpawnConfig config = ArcUiNpcSpawnConfig.Default();
+            _npcSpawnController?.Begin("spawn_npc_human", config);
+            _npcSpawnPreviewSource?.SetPreview(config.VisualKey, config.Facing);
+
+            ClearChildren(_operationParamsRoot);
+            CreateParameterChip(_operationParamsRoot, "Request: spawn_npc_human", false);
+            CreateParameterChip(_operationParamsRoot, "DNA/config da inspector", false);
+            BuildNpcFacingParameterChips(config);
+        }
+
+        private void BuildNpcFacingParameterChips(ArcUiNpcSpawnConfig config)
+        {
+            CreateNpcFacingChip("Sud", config, ArcUiNpcSpawnFacing.South);
+            CreateNpcFacingChip("Nord", config, ArcUiNpcSpawnFacing.North);
+            CreateNpcFacingChip("Est", config, ArcUiNpcSpawnFacing.East);
+            CreateNpcFacingChip("Ovest", config, ArcUiNpcSpawnFacing.West);
+        }
+
+        private void CreateNpcFacingChip(
+            string label,
+            ArcUiNpcSpawnConfig currentConfig,
+            ArcUiNpcSpawnFacing facing)
+        {
+            Button chip = CreateParameterChip(_operationParamsRoot, label, true);
+            chip.onClick.AddListener(() =>
+            {
+                ArcUiNpcSpawnConfig nextConfig = currentConfig.WithFacing(facing);
+                _npcSpawnController?.SetConfig(nextConfig);
+                _npcSpawnPreviewSource?.SetPreview(nextConfig.VisualKey, nextConfig.Facing);
+            });
         }
 
         private void BuildDoorParameterChips(ArcGraphActionPanelObjectEntry entry)
@@ -1246,7 +1305,11 @@ namespace Arcontio.View.ArcGraph
             }
 
             if (!nextVisible)
+            {
                 _placementController?.Cancel();
+                _npcSpawnPreviewSource?.ClearPreview();
+                _npcSpawnController?.Cancel();
+            }
         }
 
         private void BuildOverlayRoots()

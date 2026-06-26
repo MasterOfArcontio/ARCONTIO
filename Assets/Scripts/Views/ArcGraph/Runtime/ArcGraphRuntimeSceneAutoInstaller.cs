@@ -64,6 +64,9 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphPlacementToolController _placementToolController;
         private ArcGraphUiPlacementPreviewSource _uiPlacementPreviewSource;
         private ArcGraphUiPlacementCommandBridge _uiPlacementCommandBridge;
+        private ArcGraphUiNpcSpawnPreviewSource _uiNpcSpawnPreviewSource;
+        private ArcGraphUiNpcSpawnRequestBridge _uiNpcSpawnRequestBridge;
+        private ArcGraphNpcSpawnPreviewSceneView _npcSpawnPreviewView;
         private ArcGraphPointerCellHoverSceneConsumer _pointerCellHoverConsumer;
         private ArcGraphPointerHudSceneConsumer _pointerHudConsumer;
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
@@ -73,6 +76,7 @@ namespace Arcontio.View.ArcGraph
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
         private ArcUiPlacementController _placementController;
+        private ArcUiNpcSpawnController _npcSpawnController;
         private ArcGraphRightInspectorSceneView _rightInspectorView;
         private ArcUiInspectionController _inspectionController;
         private ArcGraphSelectionSceneConsumer _selectionConsumer;
@@ -254,6 +258,9 @@ namespace Arcontio.View.ArcGraph
             _placementToolController.enabled = false;
             _uiPlacementPreviewSource = _visualRoot.AddComponent<ArcGraphUiPlacementPreviewSource>();
             _uiPlacementCommandBridge = _visualRoot.AddComponent<ArcGraphUiPlacementCommandBridge>();
+            _uiNpcSpawnPreviewSource = _visualRoot.AddComponent<ArcGraphUiNpcSpawnPreviewSource>();
+            _uiNpcSpawnRequestBridge = _visualRoot.AddComponent<ArcGraphUiNpcSpawnRequestBridge>();
+            _npcSpawnPreviewView = _visualRoot.AddComponent<ArcGraphNpcSpawnPreviewSceneView>();
             _pointerCellHoverConsumer = _visualRoot.AddComponent<ArcGraphPointerCellHoverSceneConsumer>();
             _pointerHudConsumer = _visualRoot.AddComponent<ArcGraphPointerHudSceneConsumer>();
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
@@ -263,6 +270,7 @@ namespace Arcontio.View.ArcGraph
             _simulationControlController = new ArcUiSimulationControlController();
             _visualOverlayController = new ArcUiVisualOverlayController();
             _placementController = new ArcUiPlacementController();
+            _npcSpawnController = new ArcUiNpcSpawnController();
             _rightInspectorView = _visualRoot.AddComponent<ArcGraphRightInspectorSceneView>();
             _inspectionController = new ArcUiInspectionController();
             _selectionConsumer = _visualRoot.AddComponent<ArcGraphSelectionSceneConsumer>();
@@ -322,6 +330,9 @@ namespace Arcontio.View.ArcGraph
             _npcRenderer.SetNpcVisualCatalogJson(npcVisualCatalog);
             _npcRenderer.SetUseLayeredActorCatalog(true);
             _npcRenderer.SetRenderActorShadow(true);
+
+            _npcSpawnPreviewView.SetSpriteResolverBehaviour(_spriteResolver);
+            _npcSpawnPreviewView.SetNpcVisualCatalogJson(npcVisualCatalog);
 
             // Gli oggetti ArcGraph, inclusi i muri wall_stone, usano lo stesso
             // resolver scene-side. Il resolver supporta anche la forma
@@ -437,6 +448,8 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetSimulationControlController(_simulationControlController);
             _uiRoot.SetPlacementPreviewSource(_uiPlacementPreviewSource);
             _uiRoot.SetPlacementController(_placementController);
+            _uiRoot.SetNpcSpawnPreviewSource(_uiNpcSpawnPreviewSource);
+            _uiRoot.SetNpcSpawnController(_npcSpawnController);
         }
 
         // =============================================================================
@@ -618,6 +631,18 @@ namespace Arcontio.View.ArcGraph
             {
                 _uiPlacementPreviewSource.SetSceneCamera(Camera.main);
                 _uiPlacementPreviewSource.SetFallbackPreviewSource(legacyOrToolPreviewSource);
+            }
+
+            if (_uiNpcSpawnPreviewSource != null)
+                _uiNpcSpawnPreviewSource.SetSceneCamera(Camera.main);
+
+            if (_npcSpawnPreviewView != null)
+                _npcSpawnPreviewView.SetPreviewSource(_uiNpcSpawnPreviewSource);
+
+            if (_uiNpcSpawnRequestBridge != null)
+            {
+                _uiNpcSpawnRequestBridge.SetNpcSpawnController(_npcSpawnController);
+                _uiNpcSpawnRequestBridge.SetPreviewSource(_uiNpcSpawnPreviewSource);
             }
 
             if (_uiPlacementCommandBridge != null)

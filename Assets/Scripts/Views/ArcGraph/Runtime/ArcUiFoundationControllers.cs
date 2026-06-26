@@ -337,6 +337,74 @@ namespace Arcontio.View.ArcGraph
     }
 
     // =============================================================================
+    // ArcUiNpcSpawnController
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Controller shell per la richiesta di spawn NPC preparata dalla UI.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: configurazione prima del comando</b></para>
+    /// <para>
+    /// Il controller conserva solo una <see cref="ArcUiNpcSpawnRequest"/> pending.
+    /// Non accoda <c>DevSpawnNpcCommand</c>, non crea NPC, non legge il mondo e non
+    /// decide validita' della cella. Serve a separare il pannello NPC dal futuro
+    /// bridge autorizzato che potra' usare DNA/configurazione reale.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>_pending</b>: richiesta NPC in preparazione.</item>
+    ///   <item><b>Begin</b>: apre una richiesta senza cella.</item>
+    ///   <item><b>SetConfig</b>: aggiorna facing/visuale.</item>
+    ///   <item><b>SetTargetCell</b>: registra la cella quando il futuro bridge la confermera'.</item>
+    ///   <item><b>Cancel</b>: cancella la request locale.</item>
+    /// </list>
+    /// </summary>
+    public sealed class ArcUiNpcSpawnController
+    {
+        private ArcUiNpcSpawnRequest _pending;
+
+        public ArcUiNpcSpawnRequest Pending => _pending;
+
+        public void Begin(
+            string operationKey,
+            ArcUiNpcSpawnConfig config)
+        {
+            _pending = ArcUiNpcSpawnRequest.WithoutCell(operationKey, config);
+        }
+
+        public void SetConfig(ArcUiNpcSpawnConfig config)
+        {
+            if (!_pending.IsValid)
+                return;
+
+            _pending = new ArcUiNpcSpawnRequest(
+                _pending.OperationKey,
+                _pending.TargetCell,
+                config,
+                _pending.HasTargetCell);
+        }
+
+        public void SetTargetCell(ArcGraphCellCoord cell)
+        {
+            if (!_pending.IsValid)
+                return;
+
+            _pending = new ArcUiNpcSpawnRequest(
+                _pending.OperationKey,
+                cell,
+                _pending.Config,
+                true);
+        }
+
+        public void Cancel()
+        {
+            _pending = default;
+        }
+    }
+
+    // =============================================================================
     // ArcUiInspectionController
     // =============================================================================
     /// <summary>

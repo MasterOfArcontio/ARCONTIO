@@ -16699,7 +16699,7 @@ Roadmap operativa:
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
 | v0.70.07 | Visual overlay toggles | Fatto - LM/LOS/PATH collegati, stabilizzati e separati semanticamente |
-| v0.70.08 | Migrazione progressiva F3 | In corso - bridge UI placement -> comando temporaneo completato |
+| v0.70.08 | Migrazione progressiva F3 | In corso - shell spawn NPC completata, command bridge NPC da fare |
 
 ---
 
@@ -17221,10 +17221,11 @@ Sottostep operativi:
 | v0.70.08.02 | ActionPanel Inserisci: gruppi STRUTTURE/OGGETTI/NPC, lettura `object_defs.json`, preview passiva ArcGraph con fallback F3 | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.03 | PlacementRequest bridge: operation selezionata + parametri UI -> richiesta placement verificabile, ancora senza cancellare F3 | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.04 | Command bridge temporaneo: richiesta placement -> comando esistente autorizzato per muri, porte e oggetti | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.05 | NPC spawn shell: preview/config iniziale NPC e richiesta spawn configurata | Prossimo |
-| v0.70.08.06 | Delete bridge: eliminazione selezione tramite conferma e comando autorizzato | Pending |
-| v0.70.08.07 | Edit bridge: parametri modificabili per NPC/oggetti/muri senza scrittura diretta World | Pending |
-| v0.70.08.08 | Gate spegnimento F3: disattivare solo le funzioni migrate e mantenere debug separato | Pending |
+| v0.70.08.05 | NPC spawn shell: preview/config iniziale NPC e richiesta spawn configurata | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.06 | NPC spawn command bridge: richiesta NPC -> comando autorizzato temporaneo, senza DNA reale | Prossimo |
+| v0.70.08.07 | Delete bridge: eliminazione selezione tramite conferma e comando autorizzato | Pending |
+| v0.70.08.08 | Edit bridge: parametri modificabili per NPC/oggetti/muri senza scrittura diretta World | Pending |
+| v0.70.08.09 | Gate spegnimento F3: disattivare solo le funzioni migrate e mantenere debug separato | Pending |
 
 Esito `v0.70.08.04`:
 
@@ -17243,6 +17244,24 @@ Prossimo step `v0.70.08.05`:
 - introdurre richiesta UI minima per spawn NPC con cella target e configurazione placeholder;
 - predisporre preview NPC semitrasparente coerente con la preview oggetti;
 - rimandare DNA reale e owner/inventario a pannello configurazione/RightInspector dedicato.
+
+Esito `v0.70.08.05`:
+
+- aggiunto contratto `ArcUiNpcSpawnRequest` con config minima visuale/facing;
+- aggiunto `ArcUiNpcSpawnController` come stato pending non distruttivo;
+- il gruppo `NPC` del pannello Inserisci attiva una preview semitrasparente del futuro umano;
+- la preview usa `ArcGraphNpcVisualCatalog.json` e `ArcGraphSerializedSpriteResolver`, quindi resta nel sistema visuale ArcGraph e non copia MapGrid;
+- il click sulla mappa registra solo la cella target nella request pending;
+- nessun comando spawn viene ancora accodato;
+- nessun accesso diretto al `World` dalla UI.
+
+Prossimo step `v0.70.08.06`:
+
+- introdurre un bridge comando NPC separato;
+- leggere solo `ArcUiNpcSpawnRequest` valida e completa di cella;
+- mappare il facing UI verso il facing Core;
+- accodare temporaneamente `DevSpawnNpcCommand`;
+- mantenere DNA reale e pannello configurazione avanzato fuori da questo step.
 
 Criteri di accettazione:
 
