@@ -845,10 +845,17 @@ namespace Arcontio.View.ArcGraph
             input.contentType = TMP_InputField.ContentType.DecimalNumber;
             input.lineType = TMP_InputField.LineType.SingleLine;
             input.characterLimit = 5;
+            input.targetGraphic = image;
 
-            TextMeshProUGUI text = CreateText(root, FormatDraftPercentNumber(value01), 10, FontStyles.Bold, TextAlignmentOptions.Center);
+            RectTransform textArea = CreateRect("TextArea", root);
+            StretchFull(textArea, new Vector2(3f, 1f), new Vector2(-3f, -1f));
+            textArea.gameObject.AddComponent<RectMask2D>();
+
+            TextMeshProUGUI text = CreateText(textArea, FormatDraftPercentNumber(value01), 10, FontStyles.Bold, TextAlignmentOptions.Center);
             text.color = ColorFromHex("#DDE6EE", 1f);
+            text.raycastTarget = false;
             input.textComponent = text;
+            input.textViewport = textArea;
             input.text = FormatDraftPercentNumber(value01);
             return input;
         }
