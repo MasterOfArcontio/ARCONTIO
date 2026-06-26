@@ -537,6 +537,8 @@ namespace Arcontio.Core
         private int _lastBiosphereRuntimeAppliedPlantDeltas;
         private int _lastBiosphereRuntimePendingPlantDeltas;
         private int _lastBiosphereRuntimeDiffuseVegetationDeltas;
+        private long _environmentDisplayBaseSimulationTick;
+        private long _environmentDisplayBaseEnvironmentTick;
         private bool _biosphereDebugFastForwardActive;
         private bool _wasPausedBeforeBiosphereDebugFastForward;
         private int _biosphereDebugFastForwardMultiplier = 50;
@@ -827,7 +829,13 @@ namespace Arcontio.Core
         /// ferma per tutto l'intervallo tra due batch giornalieri. Questo helper usa
         /// il massimo tra tick simulativo e tick gia' materializzato nello stato
         /// ambientale, cosi' il fast-forward debug non viene fatto tornare indietro
-        /// dalla simulazione sociale ordinaria.
+        /// dalla simulazione sociale ordinaria. Il valore non puo' pero' essere un
+        /// semplice massimo tra tick simulativo e tick ambientale salvato: dopo un
+        /// fast-forward solo Biosfera l'ambiente puo' essere avanti di anni rispetto
+        /// al tick sociale, e un massimo secco congelerebbe la UI finche' il tick
+        /// sociale non lo raggiunge. Usiamo quindi una base relativa: il tick
+        /// ambientale gia' materializzato piu' i tick sociali trascorsi dall'ultimo
+        /// riallineamento.
         /// </para>
         /// </summary>
         private long ResolveEnvironmentDisplayTicks()
@@ -836,7 +844,12 @@ namespace Arcontio.Core
                 ? _world.EnvironmentState.Calendar.ElapsedEnvironmentTicks
                 : 0L;
             long simulationTicks = _tickIndex < 0L ? 0L : _tickIndex;
-            return stateTicks > simulationTicks ? stateTicks : simulationTicks;
+            long elapsedSimulationTicks = simulationTicks - _environmentDisplayBaseSimulationTick;
+            if (elapsedSimulationTicks < 0L)
+                elapsedSimulationTicks = 0L;
+
+            long relativeDisplayTicks = _environmentDisplayBaseEnvironmentTick + elapsedSimulationTicks;
+            return stateTicks > relativeDisplayTicks ? stateTicks : relativeDisplayTicks;
         }
 
         public void StepOneTickPaused()
@@ -1363,11 +1376,17 @@ namespace Arcontio.Core
 
             int maxPlantDeltas = runtimeParams.ResolveMaxPlantMutationsPerUpdate();
             int maxVegetationDeltas = runtimeParams.ResolveMaxVegetationCellsChangedPerDay();
-            long processedTick = decision.LastProcessedSimulationTick;
+            long processedSimulationTick = decision.LastProcessedSimulationTick;
 
             for (int i = 0; i < decision.DueUpdateCount; i++)
             {
-                long targetEnvironmentTick = processedTick + decision.SimulationTicksPerDailyUpdate;
+                // Il tick sociale schedula quando il batch e' dovuto; il tick
+                // ambientale dice da dove riparte davvero la biosfera. Dopo un
+                // fast-forward debug o un save/load con ambiente gia' avanzato, non
+                // dobbiamo riportare indietro calendario e clima al valore del tick
+                // SimulationHost.
+                long currentEnvironmentTick = _world.EnvironmentState.Calendar.ElapsedEnvironmentTicks;
+                long targetEnvironmentTick = currentEnvironmentTick + decision.SimulationTicksPerDailyUpdate;
                 EnvironmentAdvanceResult result =
                     AdvanceAndApplyBiosphereEnvironmentState(
                         targetEnvironmentTick,
@@ -1382,11 +1401,12 @@ namespace Arcontio.Core
                 _lastBiosphereRuntimePendingPlantDeltas += result.PhysicalPlantDeltas?.Count ?? 0;
                 _lastBiosphereRuntimeAppliedPlantDeltas += appliedPlantDeltas;
                 _lastBiosphereRuntimeDiffuseVegetationDeltas += appliedVegetationDeltas;
-                processedTick = targetEnvironmentTick;
+                processedSimulationTick += decision.SimulationTicksPerDailyUpdate;
+                RebaseEnvironmentDisplayClock(processedSimulationTick);
             }
 
             _lastBiosphereRuntimeDueUpdateCount = decision.DueUpdateCount;
-            _lastBiosphereRuntimeProcessedSimulationTick = processedTick;
+            _lastBiosphereRuntimeProcessedSimulationTick = processedSimulationTick;
         }
 
         // =============================================================================
@@ -1602,6 +1622,33 @@ namespace Arcontio.Core
             _lastBiosphereRuntimeAppliedPlantDeltas = 0;
             _lastBiosphereRuntimePendingPlantDeltas = 0;
             _lastBiosphereRuntimeDiffuseVegetationDeltas = 0;
+            RebaseEnvironmentDisplayClock(_lastBiosphereRuntimeProcessedSimulationTick);
+        }
+
+        // =============================================================================
+        // RebaseEnvironmentDisplayClock
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riallinea la base relativa usata dal calendario UI.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: tick sociale e tick ambientale non sono sempre identici</b></para>
+        /// <para>
+        /// Il fast-forward debug della Biosfera avanza lo stato ambientale senza
+        /// eseguire tick NPC. Per questo il calendario visibile non puo' leggere solo
+        /// <c>_tickIndex</c>. Questo metodo memorizza il punto di contatto tra tick
+        /// sociale corrente e tick ambientale corrente, poi
+        /// <see cref="ResolveEnvironmentDisplayTicks"/> continua la proiezione in
+        /// avanti mentre il runtime normale procede.
+        /// </para>
+        /// </summary>
+        private void RebaseEnvironmentDisplayClock(long simulationTick)
+        {
+            _environmentDisplayBaseSimulationTick = simulationTick < 0L ? 0L : simulationTick;
+            _environmentDisplayBaseEnvironmentTick = _world?.EnvironmentState != null
+                ? _world.EnvironmentState.Calendar.ElapsedEnvironmentTicks
+                : 0L;
         }
 
         // =============================================================================
@@ -1668,6 +1715,7 @@ namespace Arcontio.Core
             _biosphereDebugFastForwardLastEnvironmentTick = currentEnvironmentTick;
             _lastBiosphereDebugPendingPlantDeltas = result.PhysicalPlantDeltas?.Count ?? 0;
             _lastBiosphereDebugAppliedPlantDeltas = appliedPlantDeltas;
+            RebaseEnvironmentDisplayClock(_tickIndex);
         }
 
         private long ResolveMaxBiosphereDebugEnvironmentTicksPerFrame()
