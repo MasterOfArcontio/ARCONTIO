@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Arcontio.Core.Environment
@@ -163,6 +164,81 @@ namespace Arcontio.Core.Environment
     }
 
     // =============================================================================
+    // EnvironmentConsumerAreaCandidate
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Area biologica candidata per una richiesta NPC/Decision Layer.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: NPC cercano luoghi, non registry interni</b></para>
+    /// <para>
+    /// Il candidate non espone la seed bank mutabile e non trasforma le piante in
+    /// oggetti. Dice soltanto che una certa area, rappresentata da centro/raggio e
+    /// chiavi semantiche, e' un buon luogo in cui cercare una specie o una risorsa.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Area</b>: id, key, centro e raggio della sfera biologica.</item>
+    ///   <item><b>Match</b>: specie e resource output che hanno soddisfatto la query.</item>
+    ///   <item><b>Pressione</b>: seed bank, piante vive e piante harvestable presenti.</item>
+    ///   <item><b>Score</b>: valore normalizzato per ordinare candidate vicine e fertili.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct EnvironmentConsumerAreaCandidate
+    {
+        public readonly EnvironmentAreaId AreaId;
+        public readonly string AreaKey;
+        public readonly EnvironmentCellCoord CenterCell;
+        public readonly int RadiusCells;
+        public readonly string MatchedSpeciesKey;
+        public readonly string ResourceOutputKey;
+        public readonly float SeedPressure01;
+        public readonly int LivePlantCount;
+        public readonly int HarvestablePlantCount;
+        public readonly float Score01;
+
+        public bool IsValid =>
+            AreaId.IsValid
+            && Score01 > 0f
+            && (!string.IsNullOrWhiteSpace(MatchedSpeciesKey)
+                || !string.IsNullOrWhiteSpace(ResourceOutputKey));
+
+        // =============================================================================
+        // EnvironmentConsumerAreaCandidate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una candidata area biologica normalizzando pressione e score.
+        /// </para>
+        /// </summary>
+        public EnvironmentConsumerAreaCandidate(
+            EnvironmentAreaId areaId,
+            string areaKey,
+            EnvironmentCellCoord centerCell,
+            int radiusCells,
+            string matchedSpeciesKey,
+            string resourceOutputKey,
+            float seedPressure01,
+            int livePlantCount,
+            int harvestablePlantCount,
+            float score01)
+        {
+            AreaId = areaId;
+            AreaKey = areaKey ?? string.Empty;
+            CenterCell = centerCell;
+            RadiusCells = radiusCells < 0 ? 0 : radiusCells;
+            MatchedSpeciesKey = matchedSpeciesKey ?? string.Empty;
+            ResourceOutputKey = resourceOutputKey ?? string.Empty;
+            SeedPressure01 = EnvironmentMath.Clamp01(seedPressure01);
+            LivePlantCount = livePlantCount < 0 ? 0 : livePlantCount;
+            HarvestablePlantCount = harvestablePlantCount < 0 ? 0 : harvestablePlantCount;
+            Score01 = EnvironmentMath.Clamp01(score01);
+        }
+    }
+
+    // =============================================================================
     // EnvironmentConsumerQueryResolver
     // =============================================================================
     /// <summary>
@@ -188,6 +264,8 @@ namespace Arcontio.Core.Environment
     {
         private static readonly EnvironmentConsumerResourceCandidate[] EmptyCandidates =
             new EnvironmentConsumerResourceCandidate[0];
+        private static readonly EnvironmentConsumerAreaCandidate[] EmptyAreaCandidates =
+            new EnvironmentConsumerAreaCandidate[0];
 
         // =============================================================================
         // BuildCellFacts
@@ -355,6 +433,251 @@ namespace Arcontio.Core.Environment
             }
 
             return candidates.Count == 0 ? EmptyCandidates : candidates.ToArray();
+        }
+
+        // =============================================================================
+        // QueryBiologicalAreasForSpeciesOrResource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce aree biologiche candidate in cui cercare una specie vegetale o
+        /// una risorsa prodotta da una specie vegetale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: conoscenza spaziale ad area</b></para>
+        /// <para>
+        /// Gli NPC non devono memorizzare ogni singola pianta decorativa o ogni cella
+        /// della seed bank. Questa query produce luoghi biologici stabili: un job o
+        /// una belief futura potranno puntare all'area/landmark e solo dopo cercare
+        /// piante puntuali quando servira'.
+        /// </para>
+        /// </summary>
+        public static IReadOnlyList<EnvironmentConsumerAreaCandidate> QueryBiologicalAreasForSpeciesOrResource(
+            EnvironmentFullSnapshot snapshot,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentCellCoord requesterCell,
+            string speciesOrResourceKey,
+            int maxResults)
+        {
+            if (snapshot == null || string.IsNullOrWhiteSpace(speciesOrResourceKey))
+                return EmptyAreaCandidates;
+
+            int safeMaxResults = maxResults <= 0 ? 8 : maxResults;
+            string requestedKey = speciesOrResourceKey.Trim();
+            var candidates = new List<EnvironmentConsumerAreaCandidate>();
+
+            for (int i = 0; i < snapshot.Areas.Count; i++)
+            {
+                EnvironmentAreaSnapshot area = snapshot.Areas[i];
+                if (!area.Definition.IsEnabled || !IsBiologicalSearchArea(area))
+                    continue;
+
+                string matchedSpeciesKey = string.Empty;
+                string resourceOutputKey = string.Empty;
+                float seedPressure01 = ResolveSeedPressureForRequest(
+                    area,
+                    catalog,
+                    requestedKey,
+                    out matchedSpeciesKey,
+                    out resourceOutputKey);
+
+                CountPlantsForAreaRequest(
+                    snapshot,
+                    catalog,
+                    area.Definition.AreaId,
+                    requestedKey,
+                    ref matchedSpeciesKey,
+                    ref resourceOutputKey,
+                    out int livePlantCount,
+                    out int harvestablePlantCount);
+
+                if (seedPressure01 <= 0f && livePlantCount <= 0 && harvestablePlantCount <= 0)
+                    continue;
+
+                EnvironmentCellCoord center = new EnvironmentCellCoord(
+                    area.Definition.CenterX,
+                    area.Definition.CenterY,
+                    area.Definition.Bounds.Z);
+                float score = ResolveAreaCandidateScore(
+                    requesterCell,
+                    center,
+                    seedPressure01,
+                    livePlantCount,
+                    harvestablePlantCount);
+
+                candidates.Add(new EnvironmentConsumerAreaCandidate(
+                    area.Definition.AreaId,
+                    area.Definition.Key,
+                    center,
+                    area.Definition.RadiusCells,
+                    matchedSpeciesKey,
+                    resourceOutputKey,
+                    seedPressure01,
+                    livePlantCount,
+                    harvestablePlantCount,
+                    score));
+            }
+
+            if (candidates.Count == 0)
+                return EmptyAreaCandidates;
+
+            candidates.Sort(CompareAreaCandidates);
+            if (candidates.Count <= safeMaxResults)
+                return candidates.ToArray();
+
+            var trimmed = new EnvironmentConsumerAreaCandidate[safeMaxResults];
+            for (int i = 0; i < safeMaxResults; i++)
+                trimmed[i] = candidates[i];
+
+            return trimmed;
+        }
+
+        private static bool IsBiologicalSearchArea(EnvironmentAreaSnapshot area)
+        {
+            return area.HasSeedBank
+                   || area.HasVegetation
+                   || area.Definition.Kind == EnvironmentAreaKind.Vegetation;
+        }
+
+        private static float ResolveSeedPressureForRequest(
+            EnvironmentAreaSnapshot area,
+            EnvironmentPlantCatalog catalog,
+            string requestedKey,
+            out string matchedSpeciesKey,
+            out string resourceOutputKey)
+        {
+            matchedSpeciesKey = string.Empty;
+            resourceOutputKey = string.Empty;
+            if (!area.HasSeedBank || area.SeedBankState == null)
+                return 0f;
+
+            float bestPressure = 0f;
+            IReadOnlyList<EnvironmentSeedBankEntry> entries = area.SeedBankState.Entries;
+            for (int i = 0; i < entries.Count; i++)
+            {
+                EnvironmentSeedBankEntry entry = entries[i];
+                if (!DoesSpeciesMatchRequest(entry.SpeciesKey, catalog, requestedKey, out string outputKey))
+                    continue;
+
+                float pressure = EnvironmentMath.Clamp01(entry.Amount01 * entry.Viability01);
+                if (pressure <= bestPressure)
+                    continue;
+
+                bestPressure = pressure;
+                matchedSpeciesKey = entry.SpeciesKey;
+                resourceOutputKey = outputKey;
+            }
+
+            return bestPressure;
+        }
+
+        private static void CountPlantsForAreaRequest(
+            EnvironmentFullSnapshot snapshot,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentAreaId areaId,
+            string requestedKey,
+            ref string matchedSpeciesKey,
+            ref string resourceOutputKey,
+            out int livePlantCount,
+            out int harvestablePlantCount)
+        {
+            livePlantCount = 0;
+            harvestablePlantCount = 0;
+            for (int i = 0; i < snapshot.Plants.Count; i++)
+            {
+                EnvironmentPlantSnapshot plant = snapshot.Plants[i];
+                if (!plant.SourceAreaId.Equals(areaId))
+                    continue;
+
+                if (!DoesSpeciesMatchRequest(plant.SpeciesKey, catalog, requestedKey, out string outputKey))
+                    continue;
+
+                livePlantCount++;
+                if (string.IsNullOrWhiteSpace(matchedSpeciesKey))
+                    matchedSpeciesKey = plant.SpeciesKey;
+
+                if (string.IsNullOrWhiteSpace(resourceOutputKey))
+                    resourceOutputKey = outputKey;
+
+                if (EnvironmentAgricultureFoundationResolver.TryBuildHarvestOutput(
+                    plant,
+                    catalog,
+                    out EnvironmentHarvestOutput harvest)
+                    && harvest.IsAvailable)
+                {
+                    harvestablePlantCount++;
+                    if (string.IsNullOrWhiteSpace(resourceOutputKey))
+                        resourceOutputKey = harvest.ResourceOutputKey;
+                }
+            }
+        }
+
+        private static bool DoesSpeciesMatchRequest(
+            string speciesKey,
+            EnvironmentPlantCatalog catalog,
+            string requestedKey,
+            out string resourceOutputKey)
+        {
+            resourceOutputKey = string.Empty;
+            if (string.IsNullOrWhiteSpace(speciesKey) || string.IsNullOrWhiteSpace(requestedKey))
+                return false;
+
+            if (string.Equals(speciesKey, requestedKey, StringComparison.OrdinalIgnoreCase))
+            {
+                resourceOutputKey = ResolveResourceOutputKey(catalog, speciesKey);
+                return true;
+            }
+
+            string outputKey = ResolveResourceOutputKey(catalog, speciesKey);
+            if (!string.IsNullOrWhiteSpace(outputKey)
+                && string.Equals(outputKey, requestedKey, StringComparison.OrdinalIgnoreCase))
+            {
+                resourceOutputKey = outputKey;
+                return true;
+            }
+
+            return false;
+        }
+
+        private static string ResolveResourceOutputKey(
+            EnvironmentPlantCatalog catalog,
+            string speciesKey)
+        {
+            if (catalog == null || !catalog.TryGetSpecies(speciesKey, out EnvironmentPlantSpeciesDefinition species))
+                return string.Empty;
+
+            return species.ResourceOutputKey ?? string.Empty;
+        }
+
+        private static float ResolveAreaCandidateScore(
+            EnvironmentCellCoord requesterCell,
+            EnvironmentCellCoord center,
+            float seedPressure01,
+            int livePlantCount,
+            int harvestablePlantCount)
+        {
+            int distance = requesterCell.Z == center.Z
+                ? System.Math.Abs(requesterCell.X - center.X) + System.Math.Abs(requesterCell.Y - center.Y)
+                : 9999;
+            float distanceScore = 1f / (1f + (distance / 32f));
+            float plantScore = EnvironmentMath.Clamp01(livePlantCount / 24f);
+            float harvestScore = EnvironmentMath.Clamp01(harvestablePlantCount / 12f);
+            return EnvironmentMath.Clamp01(
+                (seedPressure01 * 0.40f)
+                + (plantScore * 0.25f)
+                + (harvestScore * 0.20f)
+                + (distanceScore * 0.15f));
+        }
+
+        private static int CompareAreaCandidates(
+            EnvironmentConsumerAreaCandidate a,
+            EnvironmentConsumerAreaCandidate b)
+        {
+            int byScore = b.Score01.CompareTo(a.Score01);
+            if (byScore != 0)
+                return byScore;
+
+            return a.AreaId.Value.CompareTo(b.AreaId.Value);
         }
 
         private static bool IsInsideRadius(

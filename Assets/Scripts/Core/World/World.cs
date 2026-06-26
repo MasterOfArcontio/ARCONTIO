@@ -1318,6 +1318,125 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // TryBuildEnvironmentCellFacts
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce facts ambientali read-only per una cella, destinati a NPC,
+        /// Decision Layer o debug.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: NPC interrogano World, non EnvironmentState</b></para>
+        /// <para>
+        /// Il <see cref="World"/> resta il confine pubblico della simulazione. Gli
+        /// NPC non ricevono accesso al registry mutabile della biosfera: il World
+        /// crea uno snapshot read-only e delega l'aggregazione al resolver Environment.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Bounds</b>: rifiuta celle fuori mappa.</item>
+        ///   <item><b>Snapshot</b>: materializza una vista read-only della biosfera corrente.</item>
+        ///   <item><b>Resolver</b>: produce facts compatti senza side effect.</item>
+        /// </list>
+        /// </summary>
+        public bool TryBuildEnvironmentCellFacts(
+            int x,
+            int y,
+            EnvironmentPlantCatalog catalog,
+            out EnvironmentConsumerCellFacts facts)
+        {
+            var cell = new EnvironmentCellCoord(x, y, 0);
+            if (EnvironmentState == null || !InBounds(x, y))
+            {
+                facts = default;
+                return false;
+            }
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            facts = EnvironmentConsumerQueryResolver.BuildCellFacts(
+                snapshot,
+                cell,
+                catalog);
+            return true;
+        }
+
+        // =============================================================================
+        // QueryEnvironmentHarvestableResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interroga la biosfera per risorse vegetali harvestable entro un raggio.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query senza job impliciti</b></para>
+        /// <para>
+        /// Il metodo non crea richieste job, non prenota piante e non scrive belief.
+        /// Restituisce soltanto candidate data-only che un sistema decisionale potra'
+        /// valutare in un checkpoint successivo.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerResourceCandidate> QueryEnvironmentHarvestableResources(
+            int centerX,
+            int centerY,
+            int radius,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (EnvironmentState == null || !InBounds(centerX, centerY))
+                return new EnvironmentConsumerResourceCandidate[0];
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryHarvestableResources(
+                snapshot,
+                catalog,
+                new EnvironmentCellCoord(centerX, centerY, 0),
+                radius);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentBiologicalAreasForSpeciesOrResource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interroga la biosfera per aree biologiche in cui cercare una specie o una
+        /// risorsa prodotta da una specie.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ricerca per luogo stabile</b></para>
+        /// <para>
+        /// Le piante decorative e la seed bank non devono diventare migliaia di memory
+        /// trace puntuali. Questa query restituisce aree/centri/raggi: l'NPC potra'
+        /// ricordare o raggiungere il landmark biologico e poi cercare localmente.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerAreaCandidate> QueryEnvironmentBiologicalAreasForSpeciesOrResource(
+            int requesterX,
+            int requesterY,
+            string speciesOrResourceKey,
+            EnvironmentPlantCatalog catalog,
+            int maxResults = 8)
+        {
+            if (EnvironmentState == null || !InBounds(requesterX, requesterY))
+                return new EnvironmentConsumerAreaCandidate[0];
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryBiologicalAreasForSpeciesOrResource(
+                snapshot,
+                catalog,
+                new EnvironmentCellCoord(requesterX, requesterY, 0),
+                speciesOrResourceKey,
+                maxResults);
+        }
+
+        private EnvironmentFullSnapshot BuildEnvironmentFullSnapshot()
+        {
+            EnvironmentSnapshot snapshot = EnvironmentState != null
+                ? EnvironmentState.CreateSnapshot()
+                : new EnvironmentState().CreateSnapshot();
+            return EnvironmentReadOnlySnapshotResolver.BuildFullSnapshot(snapshot);
+        }
+
+        // =============================================================================
         // ApplyEnvironmentPhysicalPlantProjections
         // =============================================================================
         /// <summary>
