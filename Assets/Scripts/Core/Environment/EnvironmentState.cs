@@ -46,6 +46,11 @@ namespace Arcontio.Core.Environment
         private const float InitialPhysicalPlantVitalityMin01 = 0.70f;
         private const float InitialPhysicalPlantVitalityMax01 = 1.35f;
         private const float InitialPhysicalPlantHealthVitalityScale01 = 0.22f;
+        private const int BiologicalOrganicMaskCoarseCellSize = 3;
+        private const float BiologicalOrganicMaskBaseCoreRadius01 = 0.26f;
+        private const float BiologicalOrganicMaskIntensityCoreRadius01 = 0.18f;
+        private const float BiologicalOrganicMaskNoiseStrength01 = 0.62f;
+        private const float BiologicalOrganicMaskEdgeThreshold01 = 0.08f;
 
         private readonly Dictionary<EnvironmentAreaId, EnvironmentAreaDefinition> _areaDefinitions = new();
         private readonly Dictionary<EnvironmentAreaId, EnvironmentFertilityAreaState> _fertilityAreas = new();
@@ -629,7 +634,7 @@ namespace Arcontio.Core.Environment
                        || _seedBankAreas.ContainsKey(area.AreaId));
         }
 
-        private static void CollectBiologicalFreeCells(
+        private void CollectBiologicalFreeCells(
             World world,
             EnvironmentAreaDefinition area,
             List<EnvironmentCellCoord> outCells)
@@ -638,9 +643,10 @@ namespace Arcontio.Core.Environment
                 return;
 
             world.CollectEnvironmentNaturalCandidateCells(area, outCells);
+            ApplyBiologicalOrganicMask(area, outCells);
         }
 
-        private static void CollectPhysicalPlantFreeCells(
+        private void CollectPhysicalPlantFreeCells(
             World world,
             EnvironmentAreaDefinition area,
             List<EnvironmentCellCoord> outCells)
@@ -652,6 +658,136 @@ namespace Arcontio.Core.Environment
                 area,
                 outCells,
                 requirePhysicalPlantHost: true);
+            ApplyBiologicalOrganicMask(area, outCells);
+        }
+
+        // =============================================================================
+        // ApplyBiologicalOrganicMask
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Filtra le celle naturali candidate di un'area biologica usando una
+        /// maschera organica deterministica.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: raggio massimo, forma biologica locale</b></para>
+        /// <para>
+        /// Il <see cref="World"/> continua a rispondere con tutte le celle naturali
+        /// dentro il raggio massimo dell'area. La biosfera, che e' proprietaria della
+        /// semantica biologica, decide poi quali celle appartengono davvero alla
+        /// macchia ecologica. In questo modo non introduciamo un sistema di forme
+        /// parallelo e non appesantiamo il file mappa: centro e raggio restano il
+        /// contratto spaziale minimo, mentre il bordo reale viene irregolarizzato con
+        /// hash stabile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Compatibilita'</b>: aree non circolari e raggi minuscoli restano invariate.</item>
+        ///   <item><b>Intensita'</b>: ricavata dai payload esistenti di vegetazione, seed bank e fertilita'.</item>
+        ///   <item><b>Noise</b>: combinazione coarse/fine deterministica, senza Random runtime.</item>
+        ///   <item><b>Fallback</b>: se il filtro svuotasse l'area, conserva le celle originali.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyBiologicalOrganicMask(
+            EnvironmentAreaDefinition area,
+            List<EnvironmentCellCoord> cells)
+        {
+            if (cells == null || cells.Count <= 1 || !area.UsesCircularArea || area.RadiusCells <= 2)
+                return;
+
+            float intensity01 = ResolveBiologicalAreaMaskIntensity01(area);
+            int writeIndex = 0;
+
+            for (int readIndex = 0; readIndex < cells.Count; readIndex++)
+            {
+                EnvironmentCellCoord cell = cells[readIndex];
+                if (!IsInsideBiologicalOrganicMask(area, cell, intensity01))
+                    continue;
+
+                cells[writeIndex] = cell;
+                writeIndex++;
+            }
+
+            if (writeIndex <= 0)
+                return;
+
+            if (writeIndex < cells.Count)
+                cells.RemoveRange(writeIndex, cells.Count - writeIndex);
+        }
+
+        private float ResolveBiologicalAreaMaskIntensity01(EnvironmentAreaDefinition area)
+        {
+            float intensity01 = 0.5f;
+
+            if (_vegetationAreas.TryGetValue(area.AreaId, out EnvironmentVegetationAreaState vegetation))
+                intensity01 = System.Math.Max(intensity01, vegetation.Density01);
+
+            if (_seedBankAreas.TryGetValue(area.AreaId, out EnvironmentSeedBankAreaState seedBank))
+                intensity01 = System.Math.Max(
+                    intensity01,
+                    EnvironmentMath.Clamp01(seedBank.TotalAmount01 * seedBank.AverageViability01));
+
+            if (_fertilityAreas.TryGetValue(area.AreaId, out EnvironmentFertilityAreaState fertility))
+                intensity01 = System.Math.Max(intensity01, fertility.GrowthModifier01);
+
+            return EnvironmentMath.Clamp01(intensity01);
+        }
+
+        private static bool IsInsideBiologicalOrganicMask(
+            EnvironmentAreaDefinition area,
+            EnvironmentCellCoord cell,
+            float intensity01)
+        {
+            int dx = cell.X - area.CenterX;
+            int dy = cell.Y - area.CenterY;
+            int radius = area.RadiusCells;
+            int distanceSquared = (dx * dx) + (dy * dy);
+            if (distanceSquared > radius * radius)
+                return false;
+
+            float distance01 = (float)(System.Math.Sqrt(distanceSquared) / radius);
+            float coreRadius01 = BiologicalOrganicMaskBaseCoreRadius01
+                                  + (EnvironmentMath.Clamp01(intensity01) * BiologicalOrganicMaskIntensityCoreRadius01);
+            if (distance01 <= coreRadius01)
+                return true;
+
+            float edgePresence01 = 1f - distance01;
+            float noise01 = ResolveBiologicalOrganicMaskNoise01(area, cell);
+            float intensityBias01 = (EnvironmentMath.Clamp01(intensity01) - 0.5f) * 0.20f;
+            float presence01 = edgePresence01
+                                + ((noise01 - 0.5f) * BiologicalOrganicMaskNoiseStrength01)
+                                + intensityBias01;
+
+            return presence01 >= BiologicalOrganicMaskEdgeThreshold01;
+        }
+
+        private static float ResolveBiologicalOrganicMaskNoise01(
+            EnvironmentAreaDefinition area,
+            EnvironmentCellCoord cell)
+        {
+            int coarseX = cell.X / BiologicalOrganicMaskCoarseCellSize;
+            int coarseY = cell.Y / BiologicalOrganicMaskCoarseCellSize;
+            float coarse01 = ResolveBiologicalOrganicMaskHash01(area, coarseX, coarseY, 719);
+            float fine01 = ResolveBiologicalOrganicMaskHash01(area, cell.X, cell.Y, 421);
+            return (coarse01 * 0.75f) + (fine01 * 0.25f);
+        }
+
+        private static float ResolveBiologicalOrganicMaskHash01(
+            EnvironmentAreaDefinition area,
+            int x,
+            int y,
+            int salt)
+        {
+            unchecked
+            {
+                int hash = salt;
+                hash = (hash * 397) ^ ResolveStableAreaSeed(area);
+                hash = (hash * 397) ^ (x * 73856093);
+                hash = (hash * 397) ^ (y * 19349663);
+                hash = (hash * 397) ^ (area.Bounds.Z * 83492791);
+                return (hash & int.MaxValue) / (float)int.MaxValue;
+            }
         }
 
         private void BuildVegetationCells(
