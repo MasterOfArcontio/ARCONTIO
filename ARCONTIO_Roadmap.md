@@ -17228,7 +17228,8 @@ Sottostep operativi:
 | v0.70.08.09 | Gate spegnimento F3: disconnettere ArcGraph runtime da F3 legacy e dal fallback preview MapGrid | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.10 | Rimozione fisica controllata dei residui F3 ArcGraph non piu' referenziati | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.11 | Audit cancellazione MapGrid/F3 legacy: dipendenze residue prima del delete fisico completo | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.12 | Bootstrap ArcGraph autonomo: togliere avvio obbligato da `Scene_MapGrid` | Prossimo |
+| v0.70.08.12 | Bootstrap ArcGraph autonomo: togliere avvio obbligato da `Scene_MapGrid` | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.13 | Creazione/configurazione scena ArcGraph autonoma o switch bootstrap effettivo | Prossimo |
 
 Esito `v0.70.08.04`:
 
@@ -17382,6 +17383,21 @@ Criteri di accettazione:
 - nessuna nuova dipendenza UI -> World;
 - MapGrid non e' piu' necessario per le operazioni migrate;
 - vecchi strumenti debug restano separati dalla UI produttiva.
+
+Esito `v0.70.08.12`:
+
+- `ViewSwitcherInputActions` espone ora una scelta di avvio controllata: `MapGrid`, `ArcGraph` o `CurrentScene`;
+- il default resta `MapGrid`, quindi il comportamento runtime attuale non cambia finche' non viene configurato esplicitamente lo switch;
+- `ArcGraphRuntimeSceneAutoInstaller` puo' installarsi sia in `Scene_MapGrid` sia nella futura `Scene_ArcGraph`;
+- non sono state create o modificate scene, prefab, asset grafici o `.meta`;
+- build C# verificata con 0 errori.
+
+Prossimo step `v0.70.08.13`:
+
+- decidere se creare una vera `Scene_ArcGraph` autonoma o configurare `Scene_Bootstrap` per avviare ArcGraph;
+- collegare lo switch effettivo senza cancellare ancora `Scene_MapGrid`;
+- verificare in Unity che ArcGraph parta senza il vecchio F3 e senza dipendere da MapGrid come scena operativa;
+- solo dopo il test runtime, preparare il delete fisico dei componenti MapGrid/F3 rimasti.
 
 ---
 

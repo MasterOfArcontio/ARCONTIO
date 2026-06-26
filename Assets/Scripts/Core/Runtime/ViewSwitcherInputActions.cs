@@ -5,6 +5,36 @@ using UnityEngine.SceneManagement;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // StartupViewMode
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Modalita' con cui il bootstrap runtime decide quale vista caricare dopo
+    /// l'avvio persistente.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: bootstrap vista configurabile</b></para>
+    /// <para>
+    /// La vista iniziale non deve piu' essere vincolata per sempre a MapGrid. Il
+    /// default resta MapGrid per compatibilita', ma ArcGraph puo' diventare la
+    /// vista iniziale appena esiste una scena autonoma dedicata.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>MapGrid</b>: comportamento storico, carica la scena MapGrid.</item>
+    ///   <item><b>ArcGraph</b>: carica la futura scena autonoma ArcGraph.</item>
+    ///   <item><b>CurrentScene</b>: non cambia scena e lascia operare il bootstrap corrente.</item>
+    /// </list>
+    /// </summary>
+    public enum StartupViewMode
+    {
+        MapGrid = 0,
+        ArcGraph = 1,
+        CurrentScene = 2
+    }
+
     /// <summary>
     /// ViewSwitcher basato su InputActions asset (New Input System).
     /// Va messo su ArcontioRuntime (DontDestroyOnLoad), così funziona in qualunque scena.
@@ -14,8 +44,10 @@ namespace Arcontio.Core
         [Header("Scene names (devono essere in Build Settings)")]
         [SerializeField] private string atomViewerSceneName = "Scene_AtomViewer";
         [SerializeField] private string mapGridName = "Scene_MapGrid";
+        [SerializeField] private string arcGraphSceneName = "Scene_ArcGraph";
 
         [Header("Startup View")]
+        [SerializeField] private StartupViewMode startupViewMode = StartupViewMode.MapGrid;
         [SerializeField] private bool loadMapGridOnStart = true;
 
         // 1) QUI: sostituisci con il nome della classe generata dal tuo .inputactions
@@ -59,7 +91,7 @@ namespace Arcontio.Core
             if (!loadMapGridOnStart)
                 return;
 
-            LoadIfNotActive(mapGridName);
+            LoadStartupView();
         }
 
         private void OnEnable()
@@ -117,6 +149,44 @@ namespace Arcontio.Core
 
         private void OnSwitchToAtomViewer(InputAction.CallbackContext ctx) => LoadIfNotActive(atomViewerSceneName);
         private void OnSwitchToMap(InputAction.CallbackContext ctx) => LoadIfNotActive(mapGridName);
+
+        // =============================================================================
+        // LoadStartupView
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica la scelta iniziale della vista runtime.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' progressiva</b></para>
+        /// <para>
+        /// MapGrid resta il default finche' l'operatore non seleziona ArcGraph o
+        /// CurrentScene. Questo evita di rompere il bootstrap attuale e consente di
+        /// introdurre la futura scena ArcGraph in modo reversibile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>CurrentScene</b>: non carica scene aggiuntive.</item>
+        ///   <item><b>ArcGraph</b>: tenta di caricare la scena ArcGraph configurata.</item>
+        ///   <item><b>MapGrid</b>: conserva il percorso storico.</item>
+        /// </list>
+        /// </summary>
+        private void LoadStartupView()
+        {
+            switch (startupViewMode)
+            {
+                case StartupViewMode.CurrentScene:
+                    return;
+                case StartupViewMode.ArcGraph:
+                    LoadIfNotActive(arcGraphSceneName);
+                    return;
+                case StartupViewMode.MapGrid:
+                default:
+                    LoadIfNotActive(mapGridName);
+                    return;
+            }
+        }
 
         private static void LoadIfNotActive(string sceneName)
         {
