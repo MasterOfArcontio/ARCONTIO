@@ -16699,7 +16699,7 @@ Roadmap operativa:
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
 | v0.70.07 | Visual overlay toggles | Fatto - LM/LOS/PATH collegati, stabilizzati e separati semanticamente |
-| v0.70.08 | Migrazione progressiva F3 | In corso - F3 legacy scollegato da ArcGraph runtime, rimozione fisica progressiva da completare |
+| v0.70.08 | Migrazione progressiva F3 | In corso - residuo F3 ArcGraph rimosso, audit MapGrid/F3 legacy completo da fare |
 
 ---
 
@@ -17226,7 +17226,8 @@ Sottostep operativi:
 | v0.70.08.07 | Delete bridge: eliminazione selezione tramite richiesta UI e comando autorizzato | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.08 | Edit bridge: draft modifica per NPC/oggetti/muri senza scrittura diretta World | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.09 | Gate spegnimento F3: disconnettere ArcGraph runtime da F3 legacy e dal fallback preview MapGrid | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.10 | Rimozione fisica controllata dei residui F3 ArcGraph non piu' referenziati | Prossimo |
+| v0.70.08.10 | Rimozione fisica controllata dei residui F3 ArcGraph non piu' referenziati | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.11 | Audit cancellazione MapGrid/F3 legacy: dipendenze residue prima del delete fisico completo | Prossimo |
 
 Esito `v0.70.08.04`:
 
@@ -17327,6 +17328,20 @@ Prossimo step `v0.70.08.10`:
 - eliminare fisicamente il file `ArcGraphPlacementToolController.cs` se resta davvero non referenziato;
 - non toccare ancora `MapGridRuntimeDevToolsOverlay`, `MapGridWorldView` o componenti MapGrid finche' non e' completato un audit separato delle dipendenze residue;
 - preparare la lista dei residui MapGrid che bloccano la cancellazione fisica completa del vecchio sistema.
+
+Esito `v0.70.08.10`:
+
+- auditato `ArcGraphPlacementToolController`: nessun chiamante runtime ArcGraph residuo;
+- eliminato fisicamente `Assets/Scripts/Views/ArcGraph/Runtime/ArcGraphPlacementToolController.cs`;
+- il comando placement resta disponibile attraverso `ArcGraphUiPlacementCommandBridge`, che usa `ArcUiPlacementRequest` prodotta dal nuovo pannello azione;
+- non sono stati toccati `MapGridRuntimeDevToolsOverlay`, `MapGridWorldView`, `MapGridRuntimeControlTopBar`, scene, prefab o `.meta`.
+
+Prossimo step `v0.70.08.11`:
+
+- auditare tutte le dipendenze runtime residue verso MapGrid e F3 legacy;
+- separare cio' che e' cancellabile subito da cio' che serve ancora come bootstrap, dati terrain, topbar legacy o debug;
+- produrre una tabella file-per-file con decisione: eliminare, congelare, sostituire, rimandare;
+- non cancellare ancora MapGrid in blocco prima della verifica runtime e della lista completa dei sostituti ArcGraph.
 
 Criteri di accettazione:
 
