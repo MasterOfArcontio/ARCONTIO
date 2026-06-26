@@ -72,6 +72,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphUiSelectionSceneConsumer _uiSelectionConsumer;
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
+        private ArcGraphUiSelectionDeleteCommandBridge _selectionDeleteCommandBridge;
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
@@ -266,6 +267,7 @@ namespace Arcontio.View.ArcGraph
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _uiSelectionConsumer = _visualRoot.AddComponent<ArcGraphUiSelectionSceneConsumer>();
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
+            _selectionDeleteCommandBridge = _visualRoot.AddComponent<ArcGraphUiSelectionDeleteCommandBridge>();
             _selectionActionController = new ArcUiSelectionActionController();
             _simulationControlController = new ArcUiSimulationControlController();
             _visualOverlayController = new ArcUiVisualOverlayController();
@@ -388,6 +390,8 @@ namespace Arcontio.View.ArcGraph
             _selectionActionMenu.SetRenderQueue(_wrapper.RenderQueue);
             _selectionActionMenu.SetSceneCamera(Camera.main);
             _selectionActionMenu.SetMenuEnabled(true);
+            _selectionDeleteCommandBridge.SetSelectionActionController(_selectionActionController);
+            _selectionDeleteCommandBridge.SetSelectionConsumer(_uiSelectionConsumer);
             _rightInspectorView.SetUiRoot(_uiRoot);
             _rightInspectorView.SetSelectionConsumer(_uiSelectionConsumer);
             _rightInspectorView.SetSelectionActionController(_selectionActionController);
@@ -659,6 +663,12 @@ namespace Arcontio.View.ArcGraph
 
             if (_selectionActionMenu != null)
                 _selectionActionMenu.SetSceneCamera(Camera.main);
+
+            if (_selectionDeleteCommandBridge != null)
+            {
+                _selectionDeleteCommandBridge.SetSelectionActionController(_selectionActionController);
+                _selectionDeleteCommandBridge.SetSelectionConsumer(_uiSelectionConsumer);
+            }
 
             ApplyUiMapViewportToMainCamera();
 

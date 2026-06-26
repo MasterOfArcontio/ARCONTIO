@@ -933,14 +933,14 @@ namespace Arcontio.View.ArcGraph
             _operationParamsRoot = CreateRect("OperationParams", parent);
             LayoutElement layoutElement = _operationParamsRoot.gameObject.AddComponent<LayoutElement>();
             layoutElement.flexibleWidth = 1f;
-            layoutElement.preferredHeight = ActionPanelButtonHeight + 6f;
+            layoutElement.preferredHeight = ActionPanelButtonHeight;
 
             HorizontalLayoutGroup layout = _operationParamsRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 6f;
             layout.childControlWidth = false;
-            layout.childControlHeight = true;
+            layout.childControlHeight = false;
             layout.childForceExpandWidth = false;
-            layout.childForceExpandHeight = true;
+            layout.childForceExpandHeight = false;
         }
 
         // =============================================================================
