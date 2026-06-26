@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using UnityEngine.UI;
 
 namespace Arcontio.View.ArcGraph
@@ -105,6 +106,7 @@ namespace Arcontio.View.ArcGraph
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiInspectionController _inspectionController;
         private ArcGraphNpcPrivateFoodCommandBridge _npcPrivateFoodCommandBridge;
+        private ArcGraphNpcDnaEditCommandBridge _npcDnaEditCommandBridge;
         private readonly ArcUiInspectorViewModelFactory _viewModelFactory = new();
         private readonly ArcUiInspectorRuntimeSnapshotProvider _runtimeSnapshotProvider = new();
         private RectTransform _panelRoot;
@@ -122,6 +124,9 @@ namespace Arcontio.View.ArcGraph
         private ArcUiSelectionTarget _lastTarget = ArcUiSelectionTarget.None("right_inspector");
         private float _lastRuntimeRefreshTime = -999f;
         private readonly Dictionary<string, bool> _expandedRows = new();
+        private readonly Dictionary<string, float> _npcDnaDraftValues = new();
+        private string _npcDnaDraftTargetKey = string.Empty;
+        private bool _npcDnaDraftDirty;
 
         // =============================================================================
         // Update
@@ -254,6 +259,19 @@ namespace Arcontio.View.ArcGraph
         public void SetNpcPrivateFoodCommandBridge(ArcGraphNpcPrivateFoodCommandBridge bridge)
         {
             _npcPrivateFoodCommandBridge = bridge;
+        }
+
+        // =============================================================================
+        // SetNpcDnaEditCommandBridge
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega il RightInspector al bridge autorizzato per applicare il draft DNA.
+        /// </para>
+        /// </summary>
+        public void SetNpcDnaEditCommandBridge(ArcGraphNpcDnaEditCommandBridge bridge)
+        {
+            _npcDnaEditCommandBridge = bridge;
         }
 
         // =============================================================================
@@ -556,17 +574,75 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             CreateSectionTitle(rowsRoot, string.IsNullOrWhiteSpace(activeTab.Label) ? "INFO" : activeTab.Label.ToUpperInvariant(), false);
+            bool npcDnaEdit = ShouldShowNpcDnaEditActions(viewModel, activeTab);
+            if (npcDnaEdit)
+                EnsureNpcDnaDraft(viewModel, activeTab);
 
             for (int i = 0; i < activeTab.Rows.Length; i++)
             {
                 ArcUiInspectorRow row = activeTab.Rows[i];
-                CreateInspectorRow(rowsRoot, row);
+                if (npcDnaEdit && IsNpcDnaEditableBar(row))
+                    CreateEditableDnaBarRow(rowsRoot, row);
+                else
+                    CreateInspectorRow(rowsRoot, row);
             }
+
+            if (npcDnaEdit)
+                CreateNpcDnaEditActions(rowsRoot, viewModel.Target);
 
             if (ShouldShowNpcPrivateFoodActions(viewModel, activeTab))
                 CreateNpcPrivateFoodActions(rowsRoot, viewModel.Target);
 
             FinalizeScrollContentLayout(rowsRoot, resetScrollToTop);
+        }
+
+        // =============================================================================
+        // ShouldShowNpcDnaEditActions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Decide se il tab corrente deve esporre barre DNA editabili.
+        /// </para>
+        /// </summary>
+        private bool ShouldShowNpcDnaEditActions(
+            ArcUiInspectorViewModel viewModel,
+            ArcUiInspectorTab activeTab)
+        {
+            return _lastMode == ArcGraphRightInspectorMode.EditRequested
+                   && viewModel.Target.Kind == ArcUiSelectionTargetKind.Npc
+                   && string.Equals(activeTab.TabKey, "edit_dna", System.StringComparison.Ordinal);
+        }
+
+        private static bool IsNpcDnaEditableBar(ArcUiInspectorRow row)
+        {
+            return row.Kind == ArcUiInspectorRowKind.Bar
+                   && !string.IsNullOrWhiteSpace(row.RowKey)
+                   && row.RowKey.StartsWith("dna_", System.StringComparison.Ordinal);
+        }
+
+        private void EnsureNpcDnaDraft(
+            ArcUiInspectorViewModel viewModel,
+            ArcUiInspectorTab activeTab)
+        {
+            string targetKey = BuildDnaDraftTargetKey(viewModel.Target);
+            if (string.Equals(_npcDnaDraftTargetKey, targetKey, System.StringComparison.Ordinal))
+                return;
+
+            _npcDnaDraftTargetKey = targetKey;
+            _npcDnaDraftDirty = false;
+            _npcDnaDraftValues.Clear();
+
+            for (int i = 0; i < activeTab.Rows.Length; i++)
+            {
+                ArcUiInspectorRow row = activeTab.Rows[i];
+                if (IsNpcDnaEditableBar(row))
+                    _npcDnaDraftValues[row.RowKey] = row.NumericValue01;
+            }
+        }
+
+        private static string BuildDnaDraftTargetKey(ArcUiSelectionTarget target)
+        {
+            return target.Kind.ToString() + ":" + target.Id;
         }
 
         // =============================================================================
@@ -661,7 +737,7 @@ namespace Arcontio.View.ArcGraph
         {
             RectTransform button = CreateRect("ActionButton_" + SanitizeName(label), parent);
             LayoutElement layout = button.gameObject.AddComponent<LayoutElement>();
-            layout.preferredWidth = 44f;
+            layout.preferredWidth = label != null && label.Length > 3 ? 62f : 44f;
             layout.preferredHeight = 24f;
 
             Image image = button.gameObject.AddComponent<Image>();
@@ -671,6 +747,208 @@ namespace Arcontio.View.ArcGraph
             Button component = button.gameObject.AddComponent<Button>();
             CreateText(button, label, 10, FontStyles.Bold, TextAlignmentOptions.Center);
             return component;
+        }
+
+        // =============================================================================
+        // CreateEditableDnaBarRow
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna una barra DNA modificabile con click sulla barra e tuner numerico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: draft locale prima del comando</b></para>
+        /// <para>
+        /// Il click non modifica il World. Aggiorna solo <c>_npcDnaDraftValues</c>.
+        /// Il comando autorizzato viene accodato soltanto dal bottone Applica.
+        /// </para>
+        /// </summary>
+        private void CreateEditableDnaBarRow(RectTransform parent, ArcUiInspectorRow row)
+        {
+            float value01 = ResolveDraftValue(row);
+
+            RectTransform root = CreateRect("ArcEditableDnaRow_" + SanitizeName(row.RowKey), parent);
+            LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
+            rootLayout.preferredHeight = 34f;
+
+            VerticalLayoutGroup layout = root.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = 2f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            RectTransform header = CreateRect("Header", root);
+            LayoutElement headerLayout = header.gameObject.AddComponent<LayoutElement>();
+            headerLayout.preferredHeight = 18f;
+
+            HorizontalLayoutGroup headerGroup = header.gameObject.AddComponent<HorizontalLayoutGroup>();
+            headerGroup.spacing = 4f;
+            headerGroup.childControlWidth = true;
+            headerGroup.childControlHeight = true;
+            headerGroup.childForceExpandWidth = false;
+            headerGroup.childForceExpandHeight = true;
+
+            RectTransform labelRoot = CreateRect("Label", header);
+            LayoutElement labelLayout = labelRoot.gameObject.AddComponent<LayoutElement>();
+            labelLayout.flexibleWidth = 1f;
+            CreateText(labelRoot, row.Label, 10, FontStyles.Normal, TextAlignmentOptions.Left);
+
+            TMP_InputField input = CreateDnaNumericInput(header, value01);
+            string rowKey = row.RowKey;
+            input.onEndEdit.AddListener(text => CommitDnaNumericInput(rowKey, text));
+
+            RectTransform barRoot = CreateRect("Bar", root);
+            LayoutElement barLayout = barRoot.gameObject.AddComponent<LayoutElement>();
+            barLayout.preferredHeight = 8f;
+
+            Image barBackground = barRoot.gameObject.AddComponent<Image>();
+            barBackground.raycastTarget = true;
+            barBackground.color = ColorFromHex("#0B1118", 0.95f);
+
+            Button barButton = barRoot.gameObject.AddComponent<Button>();
+            barButton.onClick.AddListener(() => CommitDnaBarClick(rowKey, barRoot));
+
+            RectTransform fill = CreateRect("Fill", barRoot);
+            fill.anchorMin = Vector2.zero;
+            fill.anchorMax = new Vector2(Mathf.Clamp01(value01), 1f);
+            fill.offsetMin = Vector2.zero;
+            fill.offsetMax = Vector2.zero;
+            Image fillImage = fill.gameObject.AddComponent<Image>();
+            fillImage.raycastTarget = false;
+            fillImage.color = _npcDnaDraftDirty
+                ? ColorFromHex("#86B7D9", 0.96f)
+                : ColorFromHex("#5D819B", 0.94f);
+        }
+
+        private float ResolveDraftValue(ArcUiInspectorRow row)
+        {
+            if (_npcDnaDraftValues.TryGetValue(row.RowKey, out float value01))
+                return Mathf.Clamp01(value01);
+
+            _npcDnaDraftValues[row.RowKey] = row.NumericValue01;
+            return row.NumericValue01;
+        }
+
+        private static TMP_InputField CreateDnaNumericInput(RectTransform parent, float value01)
+        {
+            RectTransform root = CreateRect("NumericTuner", parent);
+            LayoutElement layout = root.gameObject.AddComponent<LayoutElement>();
+            layout.preferredWidth = 44f;
+            layout.preferredHeight = 18f;
+
+            Image image = root.gameObject.AddComponent<Image>();
+            image.raycastTarget = true;
+            image.color = ColorFromHex("#101923", 0.96f);
+
+            TMP_InputField input = root.gameObject.AddComponent<TMP_InputField>();
+            input.contentType = TMP_InputField.ContentType.DecimalNumber;
+            input.lineType = TMP_InputField.LineType.SingleLine;
+            input.characterLimit = 5;
+
+            TextMeshProUGUI text = CreateText(root, FormatDraftPercentNumber(value01), 10, FontStyles.Bold, TextAlignmentOptions.Center);
+            text.color = ColorFromHex("#DDE6EE", 1f);
+            input.textComponent = text;
+            input.text = FormatDraftPercentNumber(value01);
+            return input;
+        }
+
+        private void CommitDnaNumericInput(string rowKey, string text)
+        {
+            if (string.IsNullOrWhiteSpace(rowKey))
+                return;
+
+            string normalized = text.Replace(',', '.');
+            if (!float.TryParse(
+                    normalized,
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    out float percent))
+            {
+                BuildRows(_currentViewModel, false);
+                return;
+            }
+
+            SetDnaDraftValue(rowKey, Mathf.Clamp01(percent / 100f));
+        }
+
+        private void CommitDnaBarClick(string rowKey, RectTransform barRoot)
+        {
+            if (string.IsNullOrWhiteSpace(rowKey) || barRoot == null || Mouse.current == null)
+                return;
+
+            Vector2 screenPosition = Mouse.current.position.ReadValue();
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(barRoot, screenPosition, null, out Vector2 localPoint))
+                return;
+
+            float value01 = Mathf.InverseLerp(barRoot.rect.xMin, barRoot.rect.xMax, localPoint.x);
+            SetDnaDraftValue(rowKey, value01);
+        }
+
+        private void SetDnaDraftValue(string rowKey, float value01)
+        {
+            _npcDnaDraftValues[rowKey] = Mathf.Clamp01(value01);
+            _npcDnaDraftDirty = true;
+            BuildRows(_currentViewModel, false);
+        }
+
+        private void CreateNpcDnaEditActions(RectTransform parent, ArcUiSelectionTarget target)
+        {
+            RectTransform root = CreateRect("NpcDnaEditActions", parent);
+            LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
+            rootLayout.preferredHeight = 28f;
+
+            HorizontalLayoutGroup group = root.gameObject.AddComponent<HorizontalLayoutGroup>();
+            group.spacing = 4f;
+            group.childControlWidth = true;
+            group.childControlHeight = true;
+            group.childForceExpandWidth = false;
+            group.childForceExpandHeight = true;
+
+            string status = _npcDnaDraftDirty ? "Draft modificato" : "Nessuna modifica";
+            CreateTextActionLabel(root, status);
+            Button cancel = CreateSmallActionButton(root, "Annulla");
+            cancel.onClick.AddListener(CancelNpcDnaDraft);
+
+            Button apply = CreateSmallActionButton(root, "Applica");
+            apply.interactable = _npcDnaDraftDirty && _npcDnaEditCommandBridge != null;
+            apply.onClick.AddListener(() => ApplyNpcDnaDraft(target));
+        }
+
+        private void CancelNpcDnaDraft()
+        {
+            _npcDnaDraftTargetKey = string.Empty;
+            _npcDnaDraftDirty = false;
+            _npcDnaDraftValues.Clear();
+            BuildRows(_currentViewModel, false);
+        }
+
+        private void ApplyNpcDnaDraft(ArcUiSelectionTarget target)
+        {
+            if (_npcDnaEditCommandBridge == null || !_npcDnaDraftDirty)
+                return;
+
+            ArcGraphNpcDnaDraftValue[] values = BuildNpcDnaDraftValues();
+            if (_npcDnaEditCommandBridge.RequestApplyDnaDraft(target, values))
+            {
+                _npcDnaDraftDirty = false;
+                _lastRuntimeRefreshTime = -999f;
+                BuildRows(_currentViewModel, false);
+            }
+        }
+
+        private ArcGraphNpcDnaDraftValue[] BuildNpcDnaDraftValues()
+        {
+            var values = new List<ArcGraphNpcDnaDraftValue>(_npcDnaDraftValues.Count);
+            foreach (KeyValuePair<string, float> pair in _npcDnaDraftValues)
+                values.Add(new ArcGraphNpcDnaDraftValue(pair.Key, pair.Value));
+
+            return values.ToArray();
+        }
+
+        private static string FormatDraftPercentNumber(float value01)
+        {
+            return Mathf.RoundToInt(Mathf.Clamp01(value01) * 100f).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private void FinalizeScrollContentLayout(

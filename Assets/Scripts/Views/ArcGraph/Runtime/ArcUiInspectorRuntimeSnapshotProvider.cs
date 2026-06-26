@@ -523,8 +523,8 @@ namespace Arcontio.View.ArcGraph
             var rows = new List<ArcUiInspectorRow>(32)
             {
                 ArcUiInspectorRow.Section("Shell modifica"),
-                new ArcUiInspectorRow("Stato", "Modifica provvisoria"),
-                new ArcUiInspectorRow("Effetto", "Nessuna scrittura sul World"),
+                new ArcUiInspectorRow("Stato", "Draft DNA editabile"),
+                new ArcUiInspectorRow("Effetto", "Applica accoda comando autorizzato"),
                 new ArcUiInspectorRow("NPC", npcId.ToString(CultureInfo.InvariantCulture)),
                 new ArcUiInspectorRow("Nome", ResolveNpcTitle(request.Target, dna, npcId)),
                 new ArcUiInspectorRow("Cella logica", FormatCell(position.X, position.Y, 0)),
