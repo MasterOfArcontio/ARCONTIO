@@ -16699,7 +16699,7 @@ Roadmap operativa:
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
 | v0.70.07 | Visual overlay toggles | Fatto - LM/LOS/PATH collegati, stabilizzati e separati semanticamente |
-| v0.70.08 | Migrazione progressiva F3 | In corso - shell spawn NPC completata, command bridge NPC da fare |
+| v0.70.08 | Migrazione progressiva F3 | In corso - bridge spawn NPC temporaneo completato, delete bridge da fare |
 
 ---
 
@@ -17222,8 +17222,8 @@ Sottostep operativi:
 | v0.70.08.03 | PlacementRequest bridge: operation selezionata + parametri UI -> richiesta placement verificabile, ancora senza cancellare F3 | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.04 | Command bridge temporaneo: richiesta placement -> comando esistente autorizzato per muri, porte e oggetti | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.05 | NPC spawn shell: preview/config iniziale NPC e richiesta spawn configurata | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.06 | NPC spawn command bridge: richiesta NPC -> comando autorizzato temporaneo, senza DNA reale | Prossimo |
-| v0.70.08.07 | Delete bridge: eliminazione selezione tramite conferma e comando autorizzato | Pending |
+| v0.70.08.06 | NPC spawn command bridge: richiesta NPC -> comando autorizzato temporaneo, senza DNA reale | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.07 | Delete bridge: eliminazione selezione tramite conferma e comando autorizzato | Prossimo |
 | v0.70.08.08 | Edit bridge: parametri modificabili per NPC/oggetti/muri senza scrittura diretta World | Pending |
 | v0.70.08.09 | Gate spegnimento F3: disattivare solo le funzioni migrate e mantenere debug separato | Pending |
 
@@ -17262,6 +17262,21 @@ Prossimo step `v0.70.08.06`:
 - mappare il facing UI verso il facing Core;
 - accodare temporaneamente `DevSpawnNpcCommand`;
 - mantenere DNA reale e pannello configurazione avanzato fuori da questo step.
+
+Esito `v0.70.08.06`:
+
+- il bridge NPC ora completa la request con la cella cliccata e accoda `DevSpawnNpcCommand`;
+- il facing UI viene convertito in `CardinalDirection` Core nel bridge, senza esporre tipi Core al contratto UI;
+- la UI non crea NPC direttamente e non legge il `World`;
+- le guardie su cella bloccata e cella gia' occupata restano dentro il comando autorizzato;
+- i pulsanti del pannello azione generati per categorie, operation e parametri sono stati uniformati a 24 px di altezza.
+
+Prossimo step `v0.70.08.07`:
+
+- collegare la richiesta `DeleteSelectionRequest` gia' prevista all'elemento selezionato;
+- introdurre un bridge cancellazione separato per NPC/oggetto/muro;
+- usare solo selezione corrente e comando autorizzato, senza accesso diretto UI -> `World`;
+- mantenere conferma/cancellazione come flusso provvisorio verificabile prima dell'edit bridge.
 
 Criteri di accettazione:
 

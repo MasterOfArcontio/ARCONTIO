@@ -51,6 +51,7 @@ namespace Arcontio.View.ArcGraph
         private const float BottomActionBarHeight = 92f;
         private const float ActionPanelHeight = 210f;
         private const float OuterMargin = 0f;
+        private const float ActionPanelButtonHeight = 24f;
         private const string ObjectDefsResourcePath = "Arcontio/Config/object_defs";
         private const string InsertStructuresGroupKey = "structures";
         private const string InsertObjectsGroupKey = "objects";
@@ -918,10 +919,10 @@ namespace Arcontio.View.ArcGraph
             _operationGridRoot = gridRoot;
             LayoutElement gridLayout = gridRoot.gameObject.AddComponent<LayoutElement>();
             gridLayout.flexibleWidth = 1f;
-            gridLayout.preferredHeight = 116f;
+            gridLayout.preferredHeight = (ActionPanelButtonHeight * 2f) + 8f;
 
             GridLayoutGroup grid = gridRoot.gameObject.AddComponent<GridLayoutGroup>();
-            grid.cellSize = new Vector2(108f, 52f);
+            grid.cellSize = new Vector2(108f, ActionPanelButtonHeight);
             grid.spacing = new Vector2(8f, 8f);
             grid.constraint = GridLayoutGroup.Constraint.FixedRowCount;
             grid.constraintCount = 2;
@@ -932,7 +933,7 @@ namespace Arcontio.View.ArcGraph
             _operationParamsRoot = CreateRect("OperationParams", parent);
             LayoutElement layoutElement = _operationParamsRoot.gameObject.AddComponent<LayoutElement>();
             layoutElement.flexibleWidth = 1f;
-            layoutElement.preferredHeight = 58f;
+            layoutElement.preferredHeight = ActionPanelButtonHeight + 6f;
 
             HorizontalLayoutGroup layout = _operationParamsRoot.gameObject.AddComponent<HorizontalLayoutGroup>();
             layout.spacing = 6f;
@@ -1672,24 +1673,24 @@ namespace Arcontio.View.ArcGraph
 
         private static Button CreateCategoryButton(RectTransform parent, string label, bool active)
         {
-            RectTransform button = CreateButtonShell(parent, "ArcButton_Category_" + SanitizeName(label), -1f, 28f, active);
-            CreateText(button, label, 12, FontStyles.Bold, TextAlignmentOptions.Left);
+            RectTransform button = CreateButtonShell(parent, "ArcButton_Category_" + SanitizeName(label), -1f, ActionPanelButtonHeight, active);
+            CreateText(button, label, 11, FontStyles.Bold, TextAlignmentOptions.Left);
             return button.GetComponent<Button>();
         }
 
         private static Button CreateOperationButton(RectTransform parent, string label)
         {
-            RectTransform button = CreateButtonShell(parent, "ArcOperationButton_" + SanitizeName(label), 108f, 52f, false);
+            RectTransform button = CreateButtonShell(parent, "ArcOperationButton_" + SanitizeName(label), 108f, ActionPanelButtonHeight, false);
 
             RectTransform iconSlot = CreateRect("IconSlot", button);
-            SetAnchors(iconSlot, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(8f, -13f), new Vector2(34f, 13f));
+            SetAnchors(iconSlot, new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(6f, -8f), new Vector2(22f, 8f));
             Image iconImage = iconSlot.gameObject.AddComponent<Image>();
             iconImage.raycastTarget = false;
             iconImage.color = ColorFromHex("#9AA7B2", 0.72f);
 
             RectTransform labelRoot = CreateRect("Label", button);
-            SetAnchors(labelRoot, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(38f, 4f), new Vector2(-4f, -4f));
-            CreateText(labelRoot, label, 9, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            SetAnchors(labelRoot, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(28f, 2f), new Vector2(-4f, -2f));
+            CreateText(labelRoot, label, 8, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
             return button.GetComponent<Button>();
         }
 
@@ -1702,10 +1703,10 @@ namespace Arcontio.View.ArcGraph
 
         private static Button CreateParameterChip(RectTransform parent, string label, bool interactable)
         {
-            RectTransform button = CreateButtonShell(parent, "ArcParam_" + SanitizeName(label), 118f, 30f, false);
+            RectTransform button = CreateButtonShell(parent, "ArcParam_" + SanitizeName(label), 118f, ActionPanelButtonHeight, false);
             Button component = button.GetComponent<Button>();
             component.interactable = interactable;
-            CreateText(button, label, 9, FontStyles.Bold, TextAlignmentOptions.Center);
+            CreateText(button, label, 8, FontStyles.Bold, TextAlignmentOptions.Center);
             return component;
         }
 
