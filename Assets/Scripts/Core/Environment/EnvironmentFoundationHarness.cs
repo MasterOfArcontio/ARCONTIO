@@ -2228,6 +2228,12 @@ namespace Arcontio.Core.Environment
 
             var catalog = new EnvironmentPlantCatalogConfig().ToCatalog();
             catalog.TryGetSpecies("oak_tree", out EnvironmentPlantSpeciesDefinition oak);
+            bool oakHasWood = oak.TryGetProduct(
+                "wood",
+                out EnvironmentPlantProductDefinition oakWood);
+            bool oakHasAcorn = oak.TryGetProduct(
+                "acorn",
+                out EnvironmentPlantProductDefinition oakAcorn);
             state.SetPlantInstance(EnvironmentPlantInstance.CreateFromSpecies(
                 new EnvironmentPlantId(1000),
                 oak,
@@ -2255,9 +2261,73 @@ namespace Arcontio.Core.Environment
                 catalog,
                 new EnvironmentCellCoord(20, 20),
                 1);
+            var productFacts = EnvironmentConsumerQueryResolver.QueryPotentialProductsForArea(
+                full,
+                catalog,
+                areaId);
+            var acorns = EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                full,
+                catalog,
+                cell,
+                2,
+                "acorn");
+            var wood = EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                full,
+                catalog,
+                cell,
+                2,
+                "wood");
+            var impossible = EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                full,
+                catalog,
+                cell,
+                2,
+                "apple");
+            bool productFactsExposeWood = false;
+            bool productFactsExposeAcorn = false;
+            for (int i = 0; i < productFacts.Count; i++)
+            {
+                EnvironmentConsumerProductCandidate product = productFacts[i];
+                if (product.ProductKey == "wood"
+                    && !product.IsFood
+                    && product.DestroysPlantOnHarvest
+                    && product.RequiresToolKey == "axe"
+                    && product.LivePlantCount == 2
+                    && product.HarvestablePlantCount == 2)
+                {
+                    productFactsExposeWood = true;
+                }
+
+                if (product.ProductKey == "acorn"
+                    && product.IsFood
+                    && !product.DestroysPlantOnHarvest
+                    && product.RequiresToolKey == string.Empty
+                    && product.LivePlantCount == 2
+                    && product.HarvestablePlantCount == 2)
+                {
+                    productFactsExposeAcorn = true;
+                }
+            }
+
+            bool nutritionPropertyOk = new Arcontio.Core.ObjectDef
+            {
+                Properties = new System.Collections.Generic.List<Arcontio.Core.ObjectPropertyKV>
+                {
+                    new Arcontio.Core.ObjectPropertyKV
+                    {
+                        Key = "NutritionValue",
+                        Value = 0.45f
+                    }
+                }
+            }.TryGetPropertyValue(
+                "nutritionvalue",
+                out float nutritionValue);
 
             // Il facade consumer deve condensare il read model in facts e candidate
             // risorsa, senza esporre EnvironmentState o avviare job/raccolte.
+            // v0.66 congela anche il contratto area/LM -> prodotti potenziali e
+            // query locale per prodotto, lasciando job, inventario e belief reali
+            // ai layer futuri.
             return facts.Cell.Equals(cell)
                    && facts.Season == EnvironmentSeasonKind.Spring
                    && facts.HasFertility
@@ -2273,9 +2343,34 @@ namespace Arcontio.Core.Environment
                    && facts.HarvestablePlantCount == 1
                    && facts.HasHarvestableResource
                    && facts.BestResourceOutputKey == "wood"
+                   && oakHasWood
+                   && oakWood.DestroysPlantOnHarvest
+                   && oakWood.RequiresToolKey == "axe"
+                   && !oakWood.IsFood
+                   && oakHasAcorn
+                   && oakAcorn.IsFood
+                   && !oakAcorn.DestroysPlantOnHarvest
                    && nearby.Count == 2
                    && nearby[0].IsAvailable
                    && nearby[0].ResourceOutputKey == "wood"
+                   && nearby[0].DestroysPlantOnHarvest
+                   && nearby[0].RequiresToolKey == "axe"
+                   && productFacts.Count == 2
+                   && productFactsExposeWood
+                   && productFactsExposeAcorn
+                   && acorns.Count == 2
+                   && acorns[0].IsAvailable
+                   && acorns[0].ResourceOutputKey == "acorn"
+                   && acorns[0].IsFood
+                   && !acorns[0].DestroysPlantOnHarvest
+                   && wood.Count == 2
+                   && wood[0].IsAvailable
+                   && wood[0].ResourceOutputKey == "wood"
+                   && wood[0].DestroysPlantOnHarvest
+                   && wood[0].RequiresToolKey == "axe"
+                   && impossible.Count == 0
+                   && nutritionPropertyOk
+                   && nutritionValue == 0.45f
                    && far.Count == 0;
         }
 

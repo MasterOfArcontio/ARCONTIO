@@ -70,7 +70,7 @@
 | v0.63 | ArcGraph Environment Runtime Feed | Post-v0.62 | ⏳ Pending |
 | v0.64 | Environment Event / Listener Boundary | Post-v0.63 | ⏳ Pending |
 | v0.65 | Biosphere Runtime Save/Load Integration | Post-v0.64 | ⏳ Pending |
-| v0.66 | NPC Environment Query Integration | Post-v0.65 | ⏳ Pending |
+| v0.66 | NPC Environment Query Integration | Post-v0.65 | ✅ Foundation query/prodotti biologici completata, job completo futuro |
 | v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⏳ Pending |
 | v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ⏳ Pending |
 | v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ⏳ Pending |
@@ -16592,7 +16592,7 @@ Blocchi previsti:
 | v0.63 | produrre feed runtime derivato per ArcGraph | ⏳ Pending |
 | v0.64 | esporre eventi/listener ambiente per UI e sistemi | ⏳ Pending |
 | v0.65 | integrare save/load biosfera runtime | ⏳ Pending |
-| v0.66 | integrare query NPC verso aree/risorse biologiche | ⏳ Pending |
+| v0.66 | integrare query NPC verso aree/risorse biologiche | ✅ Foundation query/prodotti biologici completata, belief/job completi futuri |
 | v0.67 | pannello debug/calibrazione runtime biosfera | ⏳ Pending |
 | v0.68 | budget e batch processing produttivo | ⏳ Pending |
 | v0.69 | QA closeout integrazione fisica biosfera | ⏳ Pending |

@@ -170,6 +170,7 @@ Regola corrente:
 - il debito mini-tile 16x16 resta noto ma non blocca il passaggio a `v0.38k`, perche' riguarda la composizione futura dei pavimenti sotto muri sottili quando interno/esterno useranno floor diversi;
 - prima del pensionamento MapGrid, il mini-tile dovra' essere recuperato o esplicitamente trasformato in requisito del blocco object/floor avanzato;
 - il blocco biosfera `v0.39-v0.52` e' stato documentato in roadmap e diario Notion come foundation dati/snapshot/query/adapter; non e' ancora agganciato al tick runtime e non attiva simulazione produttiva automatica;
+- aggiornamento biosfera `v0.66`: completata foundation query prodotti biologici per consumer futuri; da area/LM biologico si possono derivare prodotti potenziali e piante raccoglibili per prodotto, senza ancora creare belief, decision, job o inventario NPC;
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;
