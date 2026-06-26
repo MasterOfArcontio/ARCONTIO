@@ -96,7 +96,8 @@ namespace Arcontio.Core.Environment
     /// <para>
     /// Luce, meteo e comportamento futuro possono leggere questa struttura, ma non
     /// devono possedere il tempo. La baseline progettuale stabilita e':
-    /// <c>24 ore simulate = 20 minuti reali</c>, con valori futuri configurabili.
+    /// <c>24 ore simulate = 9000 tick SimulationHost</c>, pari a 10 minuti reali
+    /// a 15 tick al secondo, con valori futuri configurabili.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>

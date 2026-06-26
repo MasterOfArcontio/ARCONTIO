@@ -4,7 +4,7 @@
   "initialEnvironmentTicks": 0,
   "calendar": {
     "hoursPerDay": 24,
-    "calendarTicksPerSimulatedHour": 50,
+    "calendarTicksPerSimulatedHour": 375,
     "daysPerMonth": 25,
     "monthsPerYear": 12,
     "monthsPerSeason": 3,

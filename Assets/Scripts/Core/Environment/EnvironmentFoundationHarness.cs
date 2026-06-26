@@ -19,7 +19,7 @@ namespace Arcontio.Core.Environment
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>CalendarBaselineOk</b>: verifica scala 24 ore simulate in 20 minuti reali.</item>
+    ///   <item><b>CalendarBaselineOk</b>: verifica scala 24 ore simulate in 9000 tick SimulationHost.</item>
     ///   <item><b>SeasonBoundaryOk</b>: verifica cambio stagione con configurazione default.</item>
     ///   <item><b>ClimateResolutionOk</b>: verifica produzione clima globale normalizzato.</item>
     ///   <item><b>SnapshotOk</b>: verifica registry aree e snapshot read-only.</item>
@@ -276,8 +276,8 @@ namespace Arcontio.Core.Environment
                 * EnvironmentCalendarConfig.DefaultCalendarTicksPerSimulatedHour,
                 calendarConfig);
 
-            // Con la config default: tick 0 e' primavera giorno 0 ora 0, 50 tick sono
-            // un'ora simulata, 1200 tick sono un giorno simulato completo.
+            // Con la config default: tick 0 e' primavera giorno 0 ora 0, 375 tick
+            // sono un'ora simulata, 9000 tick sono un giorno simulato completo.
             return start.Date.Season == EnvironmentSeasonKind.Spring
                    && start.Date.DayOfYear == 0
                    && start.TimeOfDay.Hour == 0
@@ -619,8 +619,8 @@ namespace Arcontio.Core.Environment
                 10,
                 calendarConfig);
 
-            // I confini verificano la baseline progettuale: 50 tick sono un'ora,
-            // 1200 tick sono un giorno, 90000 tick sono tre mesi da venticinque giorni.
+            // I confini verificano la baseline progettuale: 375 tick sono un'ora,
+            // 9000 tick sono un giorno, 675000 tick sono tre mesi da venticinque giorni.
             return hourTransition.HourChanged
                    && !hourTransition.DayChanged
                    && hourTransition.ElapsedTicks == 1
@@ -2418,12 +2418,12 @@ namespace Arcontio.Core.Environment
             var disabled = new BiosphereRuntimeParams
             {
                 enabled = false,
-                simulationTicksPerDailyUpdate = 1200
+                simulationTicksPerDailyUpdate = BiosphereRuntimeParams.DefaultSimulationTicksPerDailyUpdate
             };
             var enabled = new BiosphereRuntimeParams
             {
                 enabled = true,
-                simulationTicksPerDailyUpdate = 1200,
+                simulationTicksPerDailyUpdate = BiosphereRuntimeParams.DefaultSimulationTicksPerDailyUpdate,
                 maxPlantMutationsPerUpdate = 0,
                 maxVegetationMutationsPerUpdate = -2,
                 maxPlantUpdatesPerDay = 12,
@@ -2435,10 +2435,11 @@ namespace Arcontio.Core.Environment
                 updateMode = string.Empty
             };
 
-            var disabledDecision = EnvironmentRuntimeScheduler.Evaluate(disabled, 0, 1200);
-            var beforeBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 1199);
-            var onBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 1200);
-            var skippedDays = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 3600);
+            int dailyUpdateTicks = BiosphereRuntimeParams.DefaultSimulationTicksPerDailyUpdate;
+            var disabledDecision = EnvironmentRuntimeScheduler.Evaluate(disabled, 0, dailyUpdateTicks);
+            var beforeBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, dailyUpdateTicks - 1);
+            var onBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, dailyUpdateTicks);
+            var skippedDays = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, dailyUpdateTicks * 3);
             var afterDecisionTick = EnvironmentRuntimeScheduler.ResolveProcessedTickAfterDecision(onBoundary);
             var normalized = BiosphereRuntimeParams.WithFallbackDefaults(enabled);
 
@@ -2446,19 +2447,19 @@ namespace Arcontio.Core.Environment
             // niente World, niente ArcGraph e niente mutazioni reali in questo step.
             return !disabledDecision.IsEnabled
                    && !disabledDecision.ShouldAdvance
-                   && disabledDecision.NextDueSimulationTick == 1200
+                   && disabledDecision.NextDueSimulationTick == dailyUpdateTicks
                    && beforeBoundary.IsEnabled
                    && !beforeBoundary.ShouldAdvance
-                   && beforeBoundary.NextDueSimulationTick == 1200
+                   && beforeBoundary.NextDueSimulationTick == dailyUpdateTicks
                    && onBoundary.ShouldAdvance
                    && onBoundary.DueUpdateCount == 1
                    && onBoundary.PreviousEnvironmentTicks == 0
-                   && onBoundary.CurrentEnvironmentTicks == 1200
-                   && onBoundary.NextDueSimulationTick == 2400
+                   && onBoundary.CurrentEnvironmentTicks == dailyUpdateTicks
+                   && onBoundary.NextDueSimulationTick == dailyUpdateTicks * 2
                    && skippedDays.ShouldAdvance
                    && skippedDays.DueUpdateCount == 3
-                   && skippedDays.CurrentEnvironmentTicks == 3600
-                   && afterDecisionTick == 1200
+                   && skippedDays.CurrentEnvironmentTicks == dailyUpdateTicks * 3
+                   && afterDecisionTick == dailyUpdateTicks
                    && normalized.ResolveMaxPlantMutationsPerUpdate() == 1
                    && normalized.ResolveMaxVegetationMutationsPerUpdate() == 1
                    && normalized.ResolveMaxPlantUpdatesPerDay() == 12

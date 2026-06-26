@@ -15894,7 +15894,7 @@ Problemi progettuali da chiudere prima del runtime produttivo:
 
 | Nodo | Rischio | Decisione provvisoria |
 |---|---|---|
-| Scala tempo reale/simulato | La pagina BIOSFERA conteneva durate non coerenti tra loro | Decisione: `24 ore simulate = 20 minuti reali`; valori futuri in file di configurazione |
+| Scala tempo reale/simulato | La pagina BIOSFERA conteneva durate non coerenti tra loro | Decisione runtime aggiornata: `24 ore simulate = 9000 tick SimulationHost`, cioe' 10 minuti reali a 15 tick/sec; valori in file di configurazione |
 | Cella come contenitore unico | Saturazione del vincolo `1 oggetto per cella` | Cella come coordinata + layer sovrapposti |
 | Aree sovrapposte | Un solo `AreaId` non basta | Registry per layer: fertility/water/vegetation/room/territory |
 | Vegetazione diffusa | Troppe entita' se ogni filo d'erba diventa oggetto | `VegetationArea` + seedBank astratta |
@@ -15984,8 +15984,8 @@ definire il tempo ambientale canonico e derivare ora, giorno, mese, anno e stagi
 
 Decisione obbligatoria iniziale:
 
-- usare come baseline `24 ore simulate = 20 minuti reali`;
-- derivare da questa scala la durata dell'ora simulata: `1 ora simulata = 50 secondi reali`;
+- usare come baseline `24 ore simulate = 9000 tick SimulationHost`;
+- derivare da questa scala la durata dell'ora simulata: `1 ora simulata = 375 tick SimulationHost`, cioe' 25 secondi reali a 15 tick/sec;
 - dichiarare tutti questi valori come configurabili, non hardcoded;
 - collocare giorni per mese, mesi per anno, durata giorno, stagioni e profili luce in file di configurazione dedicati.
 
@@ -16003,8 +16003,8 @@ Valori baseline da configurare:
 | Parametro | Valore baseline | Stato |
 |---|---|---|
 | ore per giorno | 24 | ✅ Configurato come baseline |
-| durata giorno simulato | 20 minuti reali | ✅ Configurato come baseline |
-| durata ora simulata | 50 secondi reali | ✅ Derivato dalla baseline |
+| durata giorno simulato | 9000 tick SimulationHost / 10 minuti reali a 15 tick/sec | ✅ Configurato come baseline |
+| durata ora simulata | 375 tick SimulationHost / 25 secondi reali a 15 tick/sec | ✅ Derivato dalla baseline |
 | giorni per mese | 25 | ✅ Configurato come baseline |
 | mesi per anno | 12 | ✅ Configurato come baseline |
 | giorni per anno | 300 | ✅ Derivato dalla baseline |

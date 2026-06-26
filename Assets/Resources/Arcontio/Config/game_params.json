@@ -160,7 +160,7 @@
   },
   "biosphere": {
     "enabled": true,
-    "simulationTicksPerDailyUpdate": 1200,
+    "simulationTicksPerDailyUpdate": 9000,
     "updateMode": "DailyBatch",
     "maxPlantMutationsPerUpdate": 128,
     "maxVegetationMutationsPerUpdate": 256,

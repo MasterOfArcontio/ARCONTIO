@@ -450,7 +450,7 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class BiosphereRuntimeParams
     {
-        public const int DefaultSimulationTicksPerDailyUpdate = 1200;
+        public const int DefaultSimulationTicksPerDailyUpdate = 9000;
         public const int DefaultMaxPlantMutationsPerUpdate = 128;
         public const int DefaultMaxVegetationMutationsPerUpdate = 256;
         public const string DefaultUpdateMode = "DailyBatch";
