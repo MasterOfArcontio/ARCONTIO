@@ -16699,7 +16699,7 @@ Roadmap operativa:
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
 | v0.70.07 | Visual overlay toggles | Fatto - LM/LOS/PATH collegati, stabilizzati e separati semanticamente |
-| v0.70.08 | Migrazione progressiva F3 | In corso - edit bridge draft completato, gate spegnimento F3 da fare |
+| v0.70.08 | Migrazione progressiva F3 | In corso - F3 legacy scollegato da ArcGraph runtime, rimozione fisica progressiva da completare |
 
 ---
 
@@ -17218,14 +17218,15 @@ Sottostep operativi:
 | Step | Contenuto | Stato |
 |------|-----------|-------|
 | v0.70.08.01 | Audit F3 legacy: funzioni, comandi DevTools, cataloghi e boundary SimulationHost | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.02 | ActionPanel Inserisci: gruppi STRUTTURE/OGGETTI/NPC, lettura `object_defs.json`, preview passiva ArcGraph con fallback F3 | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.02 | ActionPanel Inserisci: gruppi STRUTTURE/OGGETTI/NPC, lettura `object_defs.json`, preview passiva ArcGraph | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.03 | PlacementRequest bridge: operation selezionata + parametri UI -> richiesta placement verificabile, ancora senza cancellare F3 | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.04 | Command bridge temporaneo: richiesta placement -> comando esistente autorizzato per muri, porte e oggetti | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.05 | NPC spawn shell: preview/config iniziale NPC e richiesta spawn configurata | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.06 | NPC spawn command bridge: richiesta NPC -> comando autorizzato temporaneo, senza DNA reale | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.07 | Delete bridge: eliminazione selezione tramite richiesta UI e comando autorizzato | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.08 | Edit bridge: draft modifica per NPC/oggetti/muri senza scrittura diretta World | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.09 | Gate spegnimento F3: disattivare solo le funzioni migrate e mantenere debug separato | Prossimo |
+| v0.70.08.09 | Gate spegnimento F3: disconnettere ArcGraph runtime da F3 legacy e dal fallback preview MapGrid | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.10 | Rimozione fisica controllata dei residui F3 ArcGraph non piu' referenziati | Prossimo |
 
 Esito `v0.70.08.04`:
 
@@ -17311,6 +17312,21 @@ Prossimo step `v0.70.08.09`:
 - disattivare solo le funzioni migrate, evitando di cancellare fisicamente MapGrid;
 - mantenere eventuali tool debug non migrati separati dalla UI produttiva;
 - preparare un handoff pulito verso integrazione con Biosfera.
+
+Esito `v0.70.08.09`:
+
+- `ArcGraphRuntimeSceneAutoInstaller` non crea piu' `ArcGraphPlacementToolController`;
+- ArcGraph non usa piu' `MapGridRuntimeDevToolsOverlay` come sorgente placement/preview;
+- `ArcGraphUiPlacementPreviewSource` non possiede piu' fallback F3: preview e cella placement arrivano solo dal nuovo pannello azione;
+- `MapGridRuntimeDevToolsOverlay` e MapGrid legacy non sono stati cancellati in questo step, ma non sono piu' riattivati dall'installer ArcGraph;
+- il progetto compila con `dotnet build Assembly-CSharp.csproj --no-restore -v:minimal`.
+
+Prossimo step `v0.70.08.10`:
+
+- verificare con `rg` che `ArcGraphPlacementToolController` non abbia piu' chiamanti runtime;
+- eliminare fisicamente il file `ArcGraphPlacementToolController.cs` se resta davvero non referenziato;
+- non toccare ancora `MapGridRuntimeDevToolsOverlay`, `MapGridWorldView` o componenti MapGrid finche' non e' completato un audit separato delle dipendenze residue;
+- preparare la lista dei residui MapGrid che bloccano la cancellazione fisica completa del vecchio sistema.
 
 Criteri di accettazione:
 

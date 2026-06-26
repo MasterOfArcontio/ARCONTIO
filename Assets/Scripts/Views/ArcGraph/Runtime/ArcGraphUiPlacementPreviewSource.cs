@@ -17,17 +17,15 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// Questo componente espone solo quale definizione oggetto la UI vuole
     /// visualizzare come fantasma rosso e quale cella si trova sotto il puntatore.
-    /// Non interpreta click, non accoda comandi, non legge direttamente il
-    /// <c>World</c> e non sostituisce ancora il ponte placement definitivo. Se la
-    /// nuova UI non ha nessuna preview attiva, il componente puo' delegare al vecchio
-    /// F3 legacy tramite fallback, mantenendo stabile il comportamento gia' validato.
+    /// Non interpreta click, non accoda comandi e non legge direttamente il
+    /// <c>World</c>. Da questo step la preview dipende solo dal nuovo pannello
+    /// azione ArcGraph: il vecchio F3 legacy non e' piu' una sorgente secondaria.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>SetPreviewDef</b>: abilita una preview oggetto dalla UI.</item>
-    ///   <item><b>ClearPreview</b>: spegne la preview UI senza toccare F3.</item>
-    ///   <item><b>SetFallbackPreviewSource</b>: collega il vecchio F3 come sorgente secondaria.</item>
+    ///   <item><b>ClearPreview</b>: spegne la preview UI.</item>
     ///   <item><b>TryGetObjectPlacementPreviewCell</b>: converte mouse e camera in cella mappa.</item>
     /// </list>
     /// </summary>
@@ -38,20 +36,11 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private string previewDefId;
         [SerializeField] private bool previewEnabled;
-        [SerializeField] private MonoBehaviour fallbackPreviewSourceBehaviour;
-
-        private IArcGraphPlacementPreviewSource _fallbackPreviewSource;
-
         public bool IsObjectPlacementPreviewActive =>
-            previewEnabled
-                ? !string.IsNullOrWhiteSpace(previewDefId)
-                : _fallbackPreviewSource != null && _fallbackPreviewSource.IsObjectPlacementPreviewActive;
+            previewEnabled && !string.IsNullOrWhiteSpace(previewDefId);
 
         public bool IsPointerOverPlacementUi =>
-            IsPointerOverCurrentUi()
-                || (!previewEnabled
-                    && _fallbackPreviewSource != null
-                    && _fallbackPreviewSource.IsPointerOverPlacementUi);
+            IsPointerOverCurrentUi();
 
         public bool HasUiPlacementPreviewActive =>
             previewEnabled && !string.IsNullOrWhiteSpace(previewDefId);
@@ -67,20 +56,6 @@ namespace Arcontio.View.ArcGraph
         public void SetSceneCamera(Camera camera)
         {
             sceneCamera = camera;
-        }
-
-        // =============================================================================
-        // SetFallbackPreviewSource
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Collega una sorgente preview secondaria, oggi il vecchio pannello F3.
-        /// </para>
-        /// </summary>
-        public void SetFallbackPreviewSource(MonoBehaviour sourceBehaviour)
-        {
-            fallbackPreviewSourceBehaviour = sourceBehaviour;
-            _fallbackPreviewSource = sourceBehaviour as IArcGraphPlacementPreviewSource;
         }
 
         // =============================================================================
@@ -127,9 +102,6 @@ namespace Arcontio.View.ArcGraph
                 return true;
             }
 
-            if (_fallbackPreviewSource != null)
-                return _fallbackPreviewSource.TryGetActiveObjectPlacementPreviewDefId(out defId);
-
             defId = string.Empty;
             return false;
         }
@@ -148,10 +120,7 @@ namespace Arcontio.View.ArcGraph
             cellY = 0;
 
             if (!previewEnabled)
-            {
-                return _fallbackPreviewSource != null
-                       && _fallbackPreviewSource.TryGetObjectPlacementPreviewCell(out cellX, out cellY);
-            }
+                return false;
 
             if (IsPointerOverCurrentUi())
                 return false;

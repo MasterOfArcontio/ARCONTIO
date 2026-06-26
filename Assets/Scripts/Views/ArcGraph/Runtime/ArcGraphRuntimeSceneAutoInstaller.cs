@@ -61,7 +61,6 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphCameraViewportController _cameraViewportController;
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
-        private ArcGraphPlacementToolController _placementToolController;
         private ArcGraphUiPlacementPreviewSource _uiPlacementPreviewSource;
         private ArcGraphUiPlacementCommandBridge _uiPlacementCommandBridge;
         private ArcGraphUiNpcSpawnPreviewSource _uiNpcSpawnPreviewSource;
@@ -260,8 +259,6 @@ namespace Arcontio.View.ArcGraph
             _cameraViewportController = _visualRoot.AddComponent<ArcGraphCameraViewportController>();
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
-            _placementToolController = gameObject.AddComponent<ArcGraphPlacementToolController>();
-            _placementToolController.enabled = false;
             _uiPlacementPreviewSource = _visualRoot.AddComponent<ArcGraphUiPlacementPreviewSource>();
             _uiPlacementCommandBridge = _visualRoot.AddComponent<ArcGraphUiPlacementCommandBridge>();
             _uiNpcSpawnPreviewSource = _visualRoot.AddComponent<ArcGraphUiNpcSpawnPreviewSource>();
@@ -383,8 +380,6 @@ namespace Arcontio.View.ArcGraph
                 _pointerHudConsumer,
                 _placementHighlightConsumer,
                 _uiSelectionConsumer);
-            _placementToolController.SetRuntimeContextProvider(_contextProvider);
-            _placementToolController.SetSceneCamera(Camera.main);
             _uiPlacementPreviewSource.SetSceneCamera(Camera.main);
             _pointerCellHoverConsumer.SetSceneCamera(Camera.main);
             _pointerHudConsumer.SetSceneCamera(Camera.main);
@@ -619,17 +614,7 @@ namespace Arcontio.View.ArcGraph
         {
             MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
             MapGridWorldView legacyWorldView = FindSceneComponent<MapGridWorldView>();
-            MapGridRuntimeDevToolsOverlay legacyPlacementOverlay = FindSceneComponent<MapGridRuntimeDevToolsOverlay>();
-            MonoBehaviour legacyOrToolPreviewSource =
-                legacyPlacementOverlay != null
-                    ? legacyPlacementOverlay
-                    : _placementToolController != null
-                        ? _placementToolController
-                        : FindSceneBehaviourImplementing<IArcGraphPlacementPreviewSource>();
-            MonoBehaviour placementPreviewSource =
-                _uiPlacementPreviewSource != null
-                    ? _uiPlacementPreviewSource
-                    : legacyOrToolPreviewSource;
+            MonoBehaviour placementPreviewSource = _uiPlacementPreviewSource;
             Arcontio.Core.SimulationHost simulationHost = Arcontio.Core.SimulationHost.Instance;
 
             if (_contextProvider != null)
@@ -652,17 +637,8 @@ namespace Arcontio.View.ArcGraph
 
             RefreshViewConfigFromRuntimeContext();
 
-            if (_placementToolController != null)
-            {
-                _placementToolController.SetRuntimeContextProvider(_contextProvider);
-                _placementToolController.SetSceneCamera(Camera.main);
-            }
-
             if (_uiPlacementPreviewSource != null)
-            {
                 _uiPlacementPreviewSource.SetSceneCamera(Camera.main);
-                _uiPlacementPreviewSource.SetFallbackPreviewSource(legacyOrToolPreviewSource);
-            }
 
             if (_uiNpcSpawnPreviewSource != null)
                 _uiNpcSpawnPreviewSource.SetSceneCamera(Camera.main);
@@ -713,7 +689,6 @@ namespace Arcontio.View.ArcGraph
 
             ConfigureLegacyMapGridCameraControllerForArcGraph(cameraController);
             ConfigureLegacyMapGridWorldViewForArcGraph(legacyWorldView);
-            ConfigureLegacyMapGridPlacementOverlayForArcGraph(legacyPlacementOverlay);
 
             // Anche i root visuali MapGrid possono essere creati dal bootstrap
             // legacy dopo l'installazione ArcGraph. Ricablare il controller per
@@ -824,33 +799,6 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             worldView.SetArcGraphOwnsLegacyLandmarkOverlays(true);
-        }
-
-        // =============================================================================
-        // ConfigureLegacyMapGridPlacementOverlayForArcGraph
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Riattiva temporaneamente il DevTools placement legacy MapGrid mentre
-        /// ArcGraph possiede la vista runtime.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: un solo lettore operativo di F3</b></para>
-        /// <para>
-        /// Il vecchio overlay MapGrid resta un debito da eliminare, ma in questo
-        /// gate viene riesumato come strumento debug per leggere/scrivere mappe,
-        /// piazzare food stock, porte e muri. La vista resta ArcGraph: il pannello
-        /// legacy invia comunque comandi al <c>SimulationHost</c> e viene usato
-        /// anche come sorgente preview tramite <c>IArcGraphPlacementPreviewSource</c>.
-        /// </para>
-        /// </summary>
-        private static void ConfigureLegacyMapGridPlacementOverlayForArcGraph(
-            MapGridRuntimeDevToolsOverlay legacyPlacementOverlay)
-        {
-            if (legacyPlacementOverlay == null)
-                return;
-
-            legacyPlacementOverlay.enabled = true;
         }
 
         // =============================================================================
