@@ -102,6 +102,7 @@ namespace Arcontio.View.ArcGraph
         private ArcUiVisualOverlayController _visualOverlayController;
         private ArcUiPlacementController _placementController;
         private ArcUiNpcSpawnController _npcSpawnController;
+        private ArcGraphUiNpcOptionProvider _npcOptionProvider;
         private ArcGraphUiPlacementPreviewSource _placementPreviewSource;
         private ArcGraphUiNpcSpawnPreviewSource _npcSpawnPreviewSource;
         private UnityAction<string, bool> _visualOverlayStateChanged;
@@ -418,6 +419,26 @@ namespace Arcontio.View.ArcGraph
         public void SetNpcSpawnController(ArcUiNpcSpawnController controller)
         {
             _npcSpawnController = controller;
+        }
+
+        // =============================================================================
+        // SetNpcOptionProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega l'ActionPanel a un provider read-only di opzioni NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: lista NPC come snapshot</b></para>
+        /// <para>
+        /// Il pannello non riceve il <c>World</c> e non conserva riferimenti a NPC.
+        /// Quando deve mostrare "Owner: NPC", chiede al provider una fotografia
+        /// id/nome e usa l'id solo per preparare la request di placement.
+        /// </para>
+        /// </summary>
+        public void SetNpcOptionProvider(ArcGraphUiNpcOptionProvider provider)
+        {
+            _npcOptionProvider = provider;
         }
 
         // =============================================================================
@@ -1186,7 +1207,7 @@ namespace Arcontio.View.ArcGraph
                 UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
             });
 
-            CreateParameterChip(_operationParamsRoot, "Owner: NPC snapshot futuro", false);
+            BuildNpcOwnerParameterChips(entry);
         }
 
         private void BuildObjectOwnershipParameterChips(ArcGraphActionPanelObjectEntry entry)
@@ -1198,7 +1219,54 @@ namespace Arcontio.View.ArcGraph
                 UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
             });
 
-            CreateParameterChip(_operationParamsRoot, "Owner: NPC snapshot futuro", false);
+            BuildNpcOwnerParameterChips(entry);
+        }
+
+        // =============================================================================
+        // BuildNpcOwnerParameterChips
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiunge al pannello parametri i bottoni proprietario NPC disponibili.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: owner come parametro di request</b></para>
+        /// <para>
+        /// Il bottone non modifica oggetti e non assegna proprieta' nel mondo. Aggiorna
+        /// solo <see cref="ArcUiPlacementConfig"/>; il bridge placement trasformera'
+        /// il valore in <c>OwnerKind.Npc</c> dentro <c>DevPlaceObjectCommand</c>.
+        /// </para>
+        /// </summary>
+        private void BuildNpcOwnerParameterChips(ArcGraphActionPanelObjectEntry entry)
+        {
+            ArcGraphUiNpcOption[] options = _npcOptionProvider != null
+                ? _npcOptionProvider.GetNpcOptions()
+                : System.Array.Empty<ArcGraphUiNpcOption>();
+
+            if (options.Length == 0)
+            {
+                CreateParameterChip(_operationParamsRoot, "Owner: nessun NPC", false);
+                return;
+            }
+
+            for (int i = 0; i < options.Length; i++)
+            {
+                ArcGraphUiNpcOption option = options[i];
+                if (!option.IsValid)
+                    continue;
+
+                Button npcOwner = CreateParameterChip(
+                    _operationParamsRoot,
+                    "Owner: " + option.DisplayName,
+                    true);
+
+                int npcId = option.NpcId;
+                npcOwner.onClick.AddListener(() =>
+                {
+                    _activePlacementConfig = _activePlacementConfig.WithOwner(ArcUiPlacementOwnerKind.Npc, npcId);
+                    UpdatePlacementRequest(entry, entry.DefId, _activePlacementMode, _activePlacementConfig);
+                });
+            }
         }
 
         private void UpdatePlacementRequest(

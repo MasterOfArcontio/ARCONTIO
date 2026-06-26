@@ -74,6 +74,8 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
         private ArcGraphUiSelectionEditRequestBridge _selectionEditRequestBridge;
         private ArcGraphUiSelectionDeleteCommandBridge _selectionDeleteCommandBridge;
+        private ArcGraphNpcPrivateFoodCommandBridge _npcPrivateFoodCommandBridge;
+        private ArcGraphUiNpcOptionProvider _npcOptionProvider;
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiEditSelectionController _editSelectionController;
         private ArcUiSimulationControlController _simulationControlController;
@@ -271,6 +273,8 @@ namespace Arcontio.View.ArcGraph
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
             _selectionEditRequestBridge = _visualRoot.AddComponent<ArcGraphUiSelectionEditRequestBridge>();
             _selectionDeleteCommandBridge = _visualRoot.AddComponent<ArcGraphUiSelectionDeleteCommandBridge>();
+            _npcPrivateFoodCommandBridge = _visualRoot.AddComponent<ArcGraphNpcPrivateFoodCommandBridge>();
+            _npcOptionProvider = _visualRoot.AddComponent<ArcGraphUiNpcOptionProvider>();
             _selectionActionController = new ArcUiSelectionActionController();
             _editSelectionController = new ArcUiEditSelectionController();
             _simulationControlController = new ArcUiSimulationControlController();
@@ -398,11 +402,14 @@ namespace Arcontio.View.ArcGraph
             _selectionEditRequestBridge.SetEditSelectionController(_editSelectionController);
             _selectionDeleteCommandBridge.SetSelectionActionController(_selectionActionController);
             _selectionDeleteCommandBridge.SetSelectionConsumer(_uiSelectionConsumer);
+            _npcPrivateFoodCommandBridge.SetSimulationHost(Arcontio.Core.SimulationHost.Instance);
+            _npcOptionProvider.SetRuntimeContextProvider(_contextProvider);
             _rightInspectorView.SetUiRoot(_uiRoot);
             _rightInspectorView.SetSelectionConsumer(_uiSelectionConsumer);
             _rightInspectorView.SetSelectionActionController(_selectionActionController);
             _rightInspectorView.SetRuntimeContextProvider(_contextProvider);
             _rightInspectorView.SetInspectionController(_inspectionController);
+            _rightInspectorView.SetNpcPrivateFoodCommandBridge(_npcPrivateFoodCommandBridge);
             _rightInspectorView.SetInspectorEnabled(true);
             _selectionConsumer.SetSelectionEnabled(false);
 
@@ -460,6 +467,7 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetPlacementController(_placementController);
             _uiRoot.SetNpcSpawnPreviewSource(_uiNpcSpawnPreviewSource);
             _uiRoot.SetNpcSpawnController(_npcSpawnController);
+            _uiRoot.SetNpcOptionProvider(_npcOptionProvider);
         }
 
         // =============================================================================
@@ -626,6 +634,12 @@ namespace Arcontio.View.ArcGraph
             if (_simulationControlController != null)
                 _simulationControlController.SetSimulationHost(simulationHost);
 
+            if (_npcPrivateFoodCommandBridge != null)
+                _npcPrivateFoodCommandBridge.SetSimulationHost(simulationHost);
+
+            if (_npcOptionProvider != null)
+                _npcOptionProvider.SetRuntimeContextProvider(_contextProvider);
+
             if (_uiRoot != null)
                 _uiRoot.RefreshSimulationControlTopBar();
 
@@ -681,6 +695,9 @@ namespace Arcontio.View.ArcGraph
                 _selectionDeleteCommandBridge.SetSelectionActionController(_selectionActionController);
                 _selectionDeleteCommandBridge.SetSelectionConsumer(_uiSelectionConsumer);
             }
+
+            if (_rightInspectorView != null)
+                _rightInspectorView.SetNpcPrivateFoodCommandBridge(_npcPrivateFoodCommandBridge);
 
             ApplyUiMapViewportToMainCamera();
 

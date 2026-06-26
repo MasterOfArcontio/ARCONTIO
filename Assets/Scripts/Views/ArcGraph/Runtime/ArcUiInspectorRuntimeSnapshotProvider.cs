@@ -563,8 +563,8 @@ namespace Arcontio.View.ArcGraph
             var rows = new List<ArcUiInspectorRow>(12)
             {
                 ArcUiInspectorRow.Section("Inventario shell"),
-                new ArcUiInspectorRow("Stato", "Modifica inventario non ancora operativa"),
-                new ArcUiInspectorRow("Effetto", "Nessuna modifica applicata"),
+                new ArcUiInspectorRow("Stato", "Modifica cibo addosso disponibile"),
+                new ArcUiInspectorRow("Effetto", "I bottoni sotto accodano comando autorizzato"),
                 ArcUiInspectorRow.Section("Cibo")
             };
 
