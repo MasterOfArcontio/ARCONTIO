@@ -1326,7 +1326,7 @@ namespace Arcontio.Core
                 return;
 
             int maxPlantDeltas = runtimeParams.ResolveMaxPlantMutationsPerUpdate();
-            int maxVegetationDeltas = runtimeParams.ResolveMaxVegetationMutationsPerUpdate();
+            int maxVegetationDeltas = runtimeParams.ResolveMaxVegetationCellsChangedPerDay();
             long processedTick = decision.LastProcessedSimulationTick;
 
             for (int i = 0; i < decision.DueUpdateCount; i++)
@@ -1335,6 +1335,7 @@ namespace Arcontio.Core
                 EnvironmentAdvanceResult result =
                     AdvanceAndApplyBiosphereEnvironmentState(
                         targetEnvironmentTick,
+                        runtimeParams,
                         maxPlantDeltas,
                         maxVegetationDeltas,
                         applyPhysicalPlantDeltas: true,
@@ -1371,6 +1372,7 @@ namespace Arcontio.Core
         /// </summary>
         private EnvironmentAdvanceResult AdvanceAndApplyBiosphereEnvironmentState(
             long currentEnvironmentTick,
+            BiosphereRuntimeParams runtimeParams,
             int maxPlantDeltaCount,
             int maxVegetationDeltaCount,
             bool applyPhysicalPlantDeltas,
@@ -1384,6 +1386,7 @@ namespace Arcontio.Core
             EnvironmentAdvanceResult result =
                 AdvanceBiosphereEnvironmentState(
                     currentEnvironmentTick,
+                    runtimeParams,
                     maxPlantDeltaCount,
                     maxVegetationDeltaCount);
 
@@ -1416,6 +1419,7 @@ namespace Arcontio.Core
         /// </summary>
         private EnvironmentAdvanceResult AdvanceBiosphereEnvironmentState(
             long currentEnvironmentTick,
+            BiosphereRuntimeParams runtimeParams,
             int maxPlantDeltaCount,
             int maxVegetationDeltaCount)
         {
@@ -1435,6 +1439,10 @@ namespace Arcontio.Core
                     transition.Current.Date.Season);
             EnvironmentPlantCatalog plantCatalog =
                 _environmentPlantCatalog ?? new EnvironmentPlantCatalogConfig().ToCatalog();
+            EnvironmentNaturalGrowthConfig growthConfig =
+                BuildRuntimeNaturalGrowthConfig(
+                    _environmentNaturalGrowthConfig,
+                    runtimeParams);
 
             EnvironmentNaturalGrowthResult growth =
                 EnvironmentNaturalGrowthResolver.Evolve(
@@ -1443,7 +1451,7 @@ namespace Arcontio.Core
                     transition,
                     climate,
                     seasonProfile,
-                    _environmentNaturalGrowthConfig);
+                    growthConfig);
             growth.State.RebuildRuntimeBiologicalPlacements(_world);
 
             EnvironmentSnapshot nextSnapshot = growth.State.CreateSnapshot();
@@ -1476,6 +1484,71 @@ namespace Arcontio.Core
                 diff,
                 physicalPlantDeltas,
                 diffuseVegetationDeltas);
+        }
+
+        // =============================================================================
+        // BuildRuntimeNaturalGrowthConfig
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la configurazione del ciclo naturale per il batch corrente,
+        /// sovrapponendo ai parametri biologici fini i soli budget runtime dichiarati
+        /// in <c>game_params.json</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: tuning biologico separato dal carico runtime</b></para>
+        /// <para>
+        /// <c>environment_natural_growth.json</c> descrive come cresce la biosfera.
+        /// <c>game_params.json/biosphere</c> descrive quanto lavoro puo' fare per
+        /// batch. Questa copia evita di mutare il DTO caricato da Resources e
+        /// mantiene esplicita la separazione tra modello biologico e budget.
+        /// </para>
+        /// </summary>
+        private static EnvironmentNaturalGrowthConfig BuildRuntimeNaturalGrowthConfig(
+            EnvironmentNaturalGrowthConfig baseConfig,
+            BiosphereRuntimeParams runtimeParams)
+        {
+            EnvironmentNaturalGrowthConfig source = baseConfig ?? new EnvironmentNaturalGrowthConfig();
+            BiosphereRuntimeParams budget = BiosphereRuntimeParams.WithFallbackDefaults(runtimeParams);
+            var result = new EnvironmentNaturalGrowthConfig
+            {
+                allowNewPlantInstances = source.allowNewPlantInstances,
+                maxNewPlantsPerDay = source.maxNewPlantsPerDay,
+                maxNewPlantsPerAreaPerDay = source.maxNewPlantsPerAreaPerDay,
+                maxExistingPlantUpdatesPerDay = source.maxExistingPlantUpdatesPerDay,
+                maxDeadPlantsRemovedPerDay = source.maxDeadPlantsRemovedPerDay,
+                maxAreasProcessedPerDay = source.maxAreasProcessedPerDay,
+                minimumGerminationScore01 = source.minimumGerminationScore01,
+                healthRecoveryStep01 = source.healthRecoveryStep01,
+                healthStressStep01 = source.healthStressStep01,
+                removeDeadPlants = source.removeDeadPlants,
+                plantAridityHealthStressScale01 = source.plantAridityHealthStressScale01,
+                seedPressureDesiredPlantAreaScale01 = source.seedPressureDesiredPlantAreaScale01,
+                plantVitalityMin01 = source.plantVitalityMin01,
+                plantVitalityMax01 = source.plantVitalityMax01,
+                initialPlantHealthVitalityScale01 = source.initialPlantHealthVitalityScale01,
+                unfavorableSeasonFallbackStressMultiplier01 = source.unfavorableSeasonFallbackStressMultiplier01,
+                perennialDormancyStressMultiplier01 = source.perennialDormancyStressMultiplier01,
+                deciduousDormancyStressMultiplier01 = source.deciduousDormancyStressMultiplier01,
+                evergreenDormancyStressMultiplier01 = source.evergreenDormancyStressMultiplier01
+            };
+
+            if (budget.ResolveMaxPlantBirthsPerDay() > 0)
+                result.maxNewPlantsPerDay = budget.ResolveMaxPlantBirthsPerDay();
+
+            if (budget.ResolveMaxPlantBirthsPerAreaPerDay() > 0)
+                result.maxNewPlantsPerAreaPerDay = budget.ResolveMaxPlantBirthsPerAreaPerDay();
+
+            if (budget.ResolveMaxPlantUpdatesPerDay() > 0)
+                result.maxExistingPlantUpdatesPerDay = budget.ResolveMaxPlantUpdatesPerDay();
+
+            if (budget.ResolveMaxPlantDeathsPerDay() > 0)
+                result.maxDeadPlantsRemovedPerDay = budget.ResolveMaxPlantDeathsPerDay();
+
+            if (budget.ResolveMaxAreasProcessedPerDay() > 0)
+                result.maxAreasProcessedPerDay = budget.ResolveMaxAreasProcessedPerDay();
+
+            return result;
         }
 
         // =============================================================================
@@ -1547,8 +1620,9 @@ namespace Arcontio.Core
             EnvironmentAdvanceResult result =
                 AdvanceAndApplyBiosphereEnvironmentState(
                     currentEnvironmentTick,
+                    runtimeParams,
                     runtimeParams.ResolveMaxPlantMutationsPerUpdate(),
-                    runtimeParams.ResolveMaxVegetationMutationsPerUpdate(),
+                    runtimeParams.ResolveMaxVegetationCellsChangedPerDay(),
                     applyPhysicalPlantDeltas: true,
                     EnvironmentRuntimeEventKind.DebugFastForwardDailyUpdate,
                     out int appliedPlantDeltas,

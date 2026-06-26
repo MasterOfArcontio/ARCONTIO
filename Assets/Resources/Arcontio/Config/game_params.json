@@ -164,6 +164,12 @@
     "updateMode": "DailyBatch",
     "maxPlantMutationsPerUpdate": 128,
     "maxVegetationMutationsPerUpdate": 256,
+    "maxPlantUpdatesPerDay": 512,
+    "maxPlantBirthsPerDay": 8,
+    "maxPlantBirthsPerAreaPerDay": 3,
+    "maxPlantDeathsPerDay": 64,
+    "maxVegetationCellsChangedPerDay": 256,
+    "maxAreasProcessedPerDay": 64,
     "spreadWorkAcrossTicks": false,
     "debugFastForwardEnabled": false
   },

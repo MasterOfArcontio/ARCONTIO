@@ -435,8 +435,14 @@ namespace Arcontio.Core.Config
     ///   <item><b>enabled</b>: gate generale del runtime biosfera.</item>
     ///   <item><b>simulationTicksPerDailyUpdate</b>: numero di tick SimulationHost tra due update biologici giornalieri.</item>
     ///   <item><b>updateMode</b>: chiave leggibile della modalita' di scheduling.</item>
-    ///   <item><b>maxPlantMutationsPerUpdate</b>: budget massimo mutazioni piante fisiche per batch.</item>
-    ///   <item><b>maxVegetationMutationsPerUpdate</b>: budget massimo mutazioni vegetazione decorativa per batch.</item>
+    ///   <item><b>maxPlantMutationsPerUpdate</b>: alias storico del budget delta piante fisiche per batch.</item>
+    ///   <item><b>maxVegetationMutationsPerUpdate</b>: alias storico del budget delta vegetazione decorativa per batch.</item>
+    ///   <item><b>maxPlantUpdatesPerDay</b>: limite opzionale di piante vive evolute nel giorno.</item>
+    ///   <item><b>maxPlantBirthsPerDay</b>: limite opzionale di nuove piante naturali create nel giorno.</item>
+    ///   <item><b>maxPlantBirthsPerAreaPerDay</b>: limite opzionale di nuove piante naturali per area.</item>
+    ///   <item><b>maxPlantDeathsPerDay</b>: limite opzionale di rimozioni di piante morte nel giorno.</item>
+    ///   <item><b>maxVegetationCellsChangedPerDay</b>: limite opzionale di celle vegetazione diffusa proiettate come delta.</item>
+    ///   <item><b>maxAreasProcessedPerDay</b>: limite opzionale di aree biologiche evolute nel giorno.</item>
     ///   <item><b>spreadWorkAcrossTicks</b>: consente in futuro di distribuire lavoro arretrato su piu' tick.</item>
     ///   <item><b>debugFastForwardEnabled</b>: abilita strumenti protetti di accelerazione test.</item>
     /// </list>
@@ -454,6 +460,12 @@ namespace Arcontio.Core.Config
         public string updateMode = DefaultUpdateMode;
         public int maxPlantMutationsPerUpdate = DefaultMaxPlantMutationsPerUpdate;
         public int maxVegetationMutationsPerUpdate = DefaultMaxVegetationMutationsPerUpdate;
+        public int maxPlantUpdatesPerDay = 0;
+        public int maxPlantBirthsPerDay = 0;
+        public int maxPlantBirthsPerAreaPerDay = 0;
+        public int maxPlantDeathsPerDay = 0;
+        public int maxVegetationCellsChangedPerDay = 0;
+        public int maxAreasProcessedPerDay = 0;
         public bool spreadWorkAcrossTicks = false;
         public bool debugFastForwardEnabled = false;
 
@@ -497,6 +509,92 @@ namespace Arcontio.Core.Config
         }
 
         // =============================================================================
+        // ResolveMaxPlantUpdatesPerDay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve quante piante esistenti possono essere evolute in un singolo
+        /// giorno simulato. Zero o valori negativi indicano nessun limite specifico.
+        /// </para>
+        /// </summary>
+        public int ResolveMaxPlantUpdatesPerDay()
+        {
+            return Mathf.Max(0, maxPlantUpdatesPerDay);
+        }
+
+        // =============================================================================
+        // ResolveMaxPlantBirthsPerDay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il limite giornaliero di nuove piante naturali. Zero o valori
+        /// negativi indicano nessun limite runtime specifico.
+        /// </para>
+        /// </summary>
+        public int ResolveMaxPlantBirthsPerDay()
+        {
+            return Mathf.Max(0, maxPlantBirthsPerDay);
+        }
+
+        // =============================================================================
+        // ResolveMaxPlantBirthsPerAreaPerDay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il limite giornaliero di nuove piante naturali per singola area.
+        /// Zero o valori negativi indicano nessun limite runtime specifico.
+        /// </para>
+        /// </summary>
+        public int ResolveMaxPlantBirthsPerAreaPerDay()
+        {
+            return Mathf.Max(0, maxPlantBirthsPerAreaPerDay);
+        }
+
+        // =============================================================================
+        // ResolveMaxPlantDeathsPerDay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve quante piante morte possono essere rimosse in un giorno simulato.
+        /// Zero o valori negativi indicano nessun limite specifico.
+        /// </para>
+        /// </summary>
+        public int ResolveMaxPlantDeathsPerDay()
+        {
+            return Mathf.Max(0, maxPlantDeathsPerDay);
+        }
+
+        // =============================================================================
+        // ResolveMaxVegetationCellsChangedPerDay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve quante celle di vegetazione diffusa possono essere emesse come
+        /// delta in un giorno simulato.
+        /// </para>
+        /// </summary>
+        public int ResolveMaxVegetationCellsChangedPerDay()
+        {
+            return maxVegetationCellsChangedPerDay > 0
+                ? maxVegetationCellsChangedPerDay
+                : ResolveMaxVegetationMutationsPerUpdate();
+        }
+
+        // =============================================================================
+        // ResolveMaxAreasProcessedPerDay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve quante aree biologiche possono essere evolute in un giorno
+        /// simulato. Zero o valori negativi indicano nessun limite specifico.
+        /// </para>
+        /// </summary>
+        public int ResolveMaxAreasProcessedPerDay()
+        {
+            return Mathf.Max(0, maxAreasProcessedPerDay);
+        }
+
+        // =============================================================================
         // ResolveUpdateMode
         // =============================================================================
         /// <summary>
@@ -534,6 +632,12 @@ namespace Arcontio.Core.Config
                     : source.updateMode,
                 maxPlantMutationsPerUpdate = Mathf.Max(1, source.maxPlantMutationsPerUpdate),
                 maxVegetationMutationsPerUpdate = Mathf.Max(1, source.maxVegetationMutationsPerUpdate),
+                maxPlantUpdatesPerDay = Mathf.Max(0, source.maxPlantUpdatesPerDay),
+                maxPlantBirthsPerDay = Mathf.Max(0, source.maxPlantBirthsPerDay),
+                maxPlantBirthsPerAreaPerDay = Mathf.Max(0, source.maxPlantBirthsPerAreaPerDay),
+                maxPlantDeathsPerDay = Mathf.Max(0, source.maxPlantDeathsPerDay),
+                maxVegetationCellsChangedPerDay = Mathf.Max(0, source.maxVegetationCellsChangedPerDay),
+                maxAreasProcessedPerDay = Mathf.Max(0, source.maxAreasProcessedPerDay),
                 spreadWorkAcrossTicks = source.spreadWorkAcrossTicks,
                 debugFastForwardEnabled = source.debugFastForwardEnabled
             };

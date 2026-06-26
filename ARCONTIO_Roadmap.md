@@ -72,7 +72,7 @@
 | v0.65 | Biosphere Runtime Save/Load Integration | Post-v0.64 | ⏳ Pending |
 | v0.66 | NPC Environment Query Integration | Post-v0.65 | ✅ Foundation query/prodotti biologici completata, job completo futuro |
 | v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⏳ Pending |
-| v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ⏳ Pending |
+| v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ✅ Core budget runtime completato, spreading multi-tick futuro |
 | v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ⏳ Pending |
 | v0.70 | ArcGraph Runtime UI Architecture | Post-v0.69 / track UI dedicata | 🔄 Pianificata |
 | v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ Pending |
@@ -16594,7 +16594,7 @@ Blocchi previsti:
 | v0.65 | integrare save/load biosfera runtime | ⏳ Pending |
 | v0.66 | integrare query NPC verso aree/risorse biologiche | ✅ Foundation query/prodotti biologici completata, belief/job completi futuri |
 | v0.67 | pannello debug/calibrazione runtime biosfera | ⏳ Pending |
-| v0.68 | budget e batch processing produttivo | ⏳ Pending |
+| v0.68 | budget e batch processing produttivo | ✅ Core budget runtime completato, spreading multi-tick futuro |
 | v0.69 | QA closeout integrazione fisica biosfera | ⏳ Pending |
 
 Nota boundary piante fisiche:

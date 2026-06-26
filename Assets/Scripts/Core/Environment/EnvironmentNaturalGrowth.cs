@@ -23,6 +23,9 @@ namespace Arcontio.Core.Environment
     ///   <item><b>allowNewPlantInstances</b>: gate per generare PlantInstance naturali.</item>
     ///   <item><b>maxNewPlantsPerDay</b>: limite globale giornaliero.</item>
     ///   <item><b>maxNewPlantsPerAreaPerDay</b>: limite giornaliero per area.</item>
+    ///   <item><b>maxExistingPlantUpdatesPerDay</b>: limite opzionale piante esistenti evolute.</item>
+    ///   <item><b>maxDeadPlantsRemovedPerDay</b>: limite opzionale rimozioni piante morte.</item>
+    ///   <item><b>maxAreasProcessedPerDay</b>: limite opzionale aree biologiche evolute.</item>
     ///   <item><b>minimumGerminationScore01</b>: soglia minima di germinazione.</item>
     ///   <item><b>healthRecoveryStep01</b>: recupero salute in ambiente favorevole.</item>
     ///   <item><b>healthStressStep01</b>: perdita salute in ambiente sfavorevole.</item>
@@ -35,6 +38,9 @@ namespace Arcontio.Core.Environment
         public bool allowNewPlantInstances = true;
         public int maxNewPlantsPerDay = 8;
         public int maxNewPlantsPerAreaPerDay = 3;
+        public int maxExistingPlantUpdatesPerDay = 0;
+        public int maxDeadPlantsRemovedPerDay = 0;
+        public int maxAreasProcessedPerDay = 0;
         public float minimumGerminationScore01 = 0.42f;
         public float healthRecoveryStep01 = 0.055f;
         public float healthStressStep01 = 0.025f;
@@ -386,6 +392,8 @@ namespace Arcontio.Core.Environment
             int seedEntriesVisited = 0;
             int seedBanksUpdated = 0;
             int plantsCreated = 0;
+            int areasProcessed = 0;
+            int maxAreasProcessed = NormalizeOptionalBudget(config.maxAreasProcessedPerDay);
             var areas = snapshot.Areas ?? new EnvironmentAreaSnapshot[0];
             var livePlantCounts = BuildLivePlantCounts(snapshot.Plants);
             var createdPlantCounts = new Dictionary<PlantPopulationKey, int>();
@@ -401,6 +409,13 @@ namespace Arcontio.Core.Environment
                 var area = areas[i];
                 nextState.SetAreaDefinition(area.Definition);
 
+                if (maxAreasProcessed > 0 && areasProcessed >= maxAreasProcessed)
+                {
+                    CopyAreaPayloadsUnchanged(nextState, area);
+                    continue;
+                }
+
+                areasProcessed++;
                 var evolved = EvolveAreaPayloads(area, context);
                 if (area.HasFertility)
                     nextState.SetFertilityArea(evolved.Fertility);
@@ -458,10 +473,27 @@ namespace Arcontio.Core.Environment
             }
 
             return new AreaGrowthStats(
-                areas.Count,
+                areasProcessed,
                 seedEntriesVisited,
                 seedBanksUpdated,
                 plantsCreated);
+        }
+
+        private static void CopyAreaPayloadsUnchanged(
+            EnvironmentState nextState,
+            EnvironmentAreaSnapshot area)
+        {
+            if (area.HasFertility)
+                nextState.SetFertilityArea(area.FertilityState);
+
+            if (area.HasWater)
+                nextState.SetWaterArea(area.WaterState);
+
+            if (area.HasVegetation)
+                nextState.SetVegetationArea(area.VegetationState);
+
+            if (area.HasSeedBank)
+                nextState.SetSeedBankArea(area.SeedBankState);
         }
 
         private static EnvironmentAreaEvolutionResult EvolveAreaPayloads(
@@ -534,12 +566,20 @@ namespace Arcontio.Core.Environment
             int visited = 0;
             int updated = 0;
             int removed = 0;
+            int maxUpdates = NormalizeOptionalBudget(config.maxExistingPlantUpdatesPerDay);
+            int maxRemovals = NormalizeOptionalBudget(config.maxDeadPlantsRemovedPerDay);
             var plants = snapshot.Plants ?? new EnvironmentPlantSnapshot[0];
 
             for (int i = 0; i < plants.Count; i++)
             {
                 visited++;
                 var current = plants[i];
+                if (maxUpdates > 0 && updated >= maxUpdates)
+                {
+                    nextState.SetPlantInstance(CopyPlantUnchanged(current));
+                    continue;
+                }
+
                 var next = EvolvePlant(
                     current,
                     plantCatalog,
@@ -547,7 +587,9 @@ namespace Arcontio.Core.Environment
                     transition,
                     config);
 
-                if (config.removeDeadPlants && !next.IsAlive)
+                if (config.removeDeadPlants
+                    && !next.IsAlive
+                    && (maxRemovals <= 0 || removed < maxRemovals))
                 {
                     removed++;
                     continue;
@@ -558,6 +600,22 @@ namespace Arcontio.Core.Environment
             }
 
             return new PlantGrowthStats(visited, updated, removed);
+        }
+
+        private static EnvironmentPlantInstance CopyPlantUnchanged(EnvironmentPlantSnapshot plant)
+        {
+            return new EnvironmentPlantInstance(
+                plant.PlantId,
+                plant.SpeciesKey,
+                plant.Cell,
+                plant.AgeDays,
+                plant.GrowthStage,
+                plant.GrowthStageKey,
+                plant.HealthState,
+                plant.Health01,
+                plant.Maturity01,
+                plant.IsHarvestable,
+                plant.SourceAreaId);
         }
 
         private static EnvironmentPlantInstance EvolvePlant(
@@ -1088,6 +1146,11 @@ namespace Arcontio.Core.Environment
         private static int SafeMax(int value)
         {
             return value < 0 ? 0 : value;
+        }
+
+        private static int NormalizeOptionalBudget(int value)
+        {
+            return value <= 0 ? 0 : value;
         }
 
         private static EnvironmentFertilityAreaState CreateNeutralFertility(

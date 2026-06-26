@@ -1709,9 +1709,42 @@ namespace Arcontio.Core.Environment
             var cellPlants = EnvironmentSnapshotQuery.QueryPlantsAtCell(
                 snapshot,
                 new EnvironmentCellCoord(4, 4));
+            state.SetPlantInstance(EnvironmentPlantInstance.CreateFromSpecies(
+                new EnvironmentPlantId(501),
+                oak,
+                new EnvironmentCellCoord(7, 6),
+                240,
+                0.75f,
+                areaId));
+            var budgeted = EnvironmentNaturalGrowthResolver.Evolve(
+                state.CreateSnapshot(),
+                catalog,
+                transition,
+                climate,
+                seasonProfile,
+                new EnvironmentNaturalGrowthConfig
+                {
+                    allowNewPlantInstances = false,
+                    maxExistingPlantUpdatesPerDay = 1,
+                    maxAreasProcessedPerDay = 1,
+                    minimumGerminationScore01 = 0.50f
+                });
+            var budgetedSnapshot = budgeted.State.CreateSnapshot();
+            bool firstBudgetedPlantUpdated = EnvironmentSnapshotQuery.TryGetPlant(
+                budgetedSnapshot,
+                new EnvironmentPlantId(500),
+                out EnvironmentPlantSnapshot firstBudgetedPlant)
+                                            && firstBudgetedPlant.AgeDays == 241;
+            bool secondBudgetedPlantPreserved = EnvironmentSnapshotQuery.TryGetPlant(
+                budgetedSnapshot,
+                new EnvironmentPlantId(501),
+                out EnvironmentPlantSnapshot secondBudgetedPlant)
+                                                && secondBudgetedPlant.AgeDays == 240;
 
             // Il ciclo naturale deve collegare area, seed bank e piante in modo
             // esplicito e giornaliero: nessun tick frame-based e nessun consumer esterno.
+            // Il budget runtime deve limitare il lavoro senza cancellare le piante
+            // che non rientrano nel batch corrente.
             return transition.DayChanged
                    && result.Report.AreasVisited == 1
                    && result.Report.SeedBankEntriesVisited == 1
@@ -1726,7 +1759,13 @@ namespace Arcontio.Core.Environment
                    && oaks.Count == 2
                    && cellPlants.Count == 1
                    && cellPlants[0].AgeDays == 0
-                   && cellPlants[0].IsAlive;
+                   && cellPlants[0].IsAlive
+                   && budgeted.Report.ExistingPlantsVisited == 2
+                   && budgeted.Report.PlantInstancesUpdated == 1
+                   && budgeted.Report.PlantInstancesCreated == 0
+                   && budgetedSnapshot.Plants.Count == 2
+                   && firstBudgetedPlantUpdated
+                   && secondBudgetedPlantPreserved;
         }
 
         private static bool CheckAgricultureFoundation()
@@ -2387,6 +2426,12 @@ namespace Arcontio.Core.Environment
                 simulationTicksPerDailyUpdate = 1200,
                 maxPlantMutationsPerUpdate = 0,
                 maxVegetationMutationsPerUpdate = -2,
+                maxPlantUpdatesPerDay = 12,
+                maxPlantBirthsPerDay = 4,
+                maxPlantBirthsPerAreaPerDay = 2,
+                maxPlantDeathsPerDay = -1,
+                maxVegetationCellsChangedPerDay = 64,
+                maxAreasProcessedPerDay = 3,
                 updateMode = string.Empty
             };
 
@@ -2416,6 +2461,12 @@ namespace Arcontio.Core.Environment
                    && afterDecisionTick == 1200
                    && normalized.ResolveMaxPlantMutationsPerUpdate() == 1
                    && normalized.ResolveMaxVegetationMutationsPerUpdate() == 1
+                   && normalized.ResolveMaxPlantUpdatesPerDay() == 12
+                   && normalized.ResolveMaxPlantBirthsPerDay() == 4
+                   && normalized.ResolveMaxPlantBirthsPerAreaPerDay() == 2
+                   && normalized.ResolveMaxPlantDeathsPerDay() == 0
+                   && normalized.ResolveMaxVegetationCellsChangedPerDay() == 64
+                   && normalized.ResolveMaxAreasProcessedPerDay() == 3
                    && normalized.ResolveUpdateMode() == BiosphereRuntimeParams.DefaultUpdateMode;
         }
     }
