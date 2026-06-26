@@ -72,8 +72,10 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphUiSelectionSceneConsumer _uiSelectionConsumer;
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
+        private ArcGraphUiSelectionEditRequestBridge _selectionEditRequestBridge;
         private ArcGraphUiSelectionDeleteCommandBridge _selectionDeleteCommandBridge;
         private ArcUiSelectionActionController _selectionActionController;
+        private ArcUiEditSelectionController _editSelectionController;
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiVisualOverlayController _visualOverlayController;
         private ArcUiPlacementController _placementController;
@@ -267,8 +269,10 @@ namespace Arcontio.View.ArcGraph
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _uiSelectionConsumer = _visualRoot.AddComponent<ArcGraphUiSelectionSceneConsumer>();
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
+            _selectionEditRequestBridge = _visualRoot.AddComponent<ArcGraphUiSelectionEditRequestBridge>();
             _selectionDeleteCommandBridge = _visualRoot.AddComponent<ArcGraphUiSelectionDeleteCommandBridge>();
             _selectionActionController = new ArcUiSelectionActionController();
+            _editSelectionController = new ArcUiEditSelectionController();
             _simulationControlController = new ArcUiSimulationControlController();
             _visualOverlayController = new ArcUiVisualOverlayController();
             _placementController = new ArcUiPlacementController();
@@ -390,6 +394,8 @@ namespace Arcontio.View.ArcGraph
             _selectionActionMenu.SetRenderQueue(_wrapper.RenderQueue);
             _selectionActionMenu.SetSceneCamera(Camera.main);
             _selectionActionMenu.SetMenuEnabled(true);
+            _selectionEditRequestBridge.SetSelectionActionController(_selectionActionController);
+            _selectionEditRequestBridge.SetEditSelectionController(_editSelectionController);
             _selectionDeleteCommandBridge.SetSelectionActionController(_selectionActionController);
             _selectionDeleteCommandBridge.SetSelectionConsumer(_uiSelectionConsumer);
             _rightInspectorView.SetUiRoot(_uiRoot);
@@ -663,6 +669,12 @@ namespace Arcontio.View.ArcGraph
 
             if (_selectionActionMenu != null)
                 _selectionActionMenu.SetSceneCamera(Camera.main);
+
+            if (_selectionEditRequestBridge != null)
+            {
+                _selectionEditRequestBridge.SetSelectionActionController(_selectionActionController);
+                _selectionEditRequestBridge.SetEditSelectionController(_editSelectionController);
+            }
 
             if (_selectionDeleteCommandBridge != null)
             {

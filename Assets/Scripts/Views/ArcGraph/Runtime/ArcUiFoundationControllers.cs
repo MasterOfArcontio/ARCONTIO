@@ -155,6 +155,64 @@ namespace Arcontio.View.ArcGraph
     }
 
     // =============================================================================
+    // ArcUiEditSelectionController
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Controller shell per la modifica del target selezionato.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: draft edit senza mutazione</b></para>
+    /// <para>
+    /// Il controller conserva una <see cref="ArcUiEditSelectionRequest"/> pending.
+    /// Non applica DNA, non modifica inventario, non cambia food stock, non apre
+    /// porte, non sostituisce muri e non legge il <c>World</c>. Il suo scopo e'
+    /// rendere esplicito lo stato "sono in modifica" prima di collegare controlli
+    /// reali e command request autorizzate.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>_pending</b>: draft edit corrente.</item>
+    ///   <item><b>Begin</b>: registra una nuova draft edit valida.</item>
+    ///   <item><b>Clear</b>: cancella la draft senza effetti runtime.</item>
+    /// </list>
+    /// </summary>
+    public sealed class ArcUiEditSelectionController
+    {
+        private ArcUiEditSelectionRequest _pending;
+
+        public ArcUiEditSelectionRequest Pending => _pending;
+        public bool HasPending => _pending.IsValid;
+
+        // =============================================================================
+        // Begin
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra una draft edit valida.
+        /// </para>
+        /// </summary>
+        public void Begin(ArcUiEditSelectionRequest request)
+        {
+            _pending = request.IsValid ? request : default;
+        }
+
+        // =============================================================================
+        // Clear
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cancella la draft edit corrente senza toccare selezione o simulazione.
+        /// </para>
+        /// </summary>
+        public void Clear()
+        {
+            _pending = default;
+        }
+    }
+
+    // =============================================================================
     // ArcUiPlacementController
     // =============================================================================
     /// <summary>

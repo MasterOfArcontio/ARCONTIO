@@ -604,8 +604,9 @@ namespace Arcontio.View.ArcGraph
                 new ArcUiInspectorRow("Stato", "Richiesta modifica pronta"),
                 new ArcUiInspectorRow("Target", "NPC " + npcId.ToString(CultureInfo.InvariantCulture)),
                 new ArcUiInspectorRow("Sorgente", ReadString(request.Source, EmptyValue)),
+                new ArcUiInspectorRow("Draft request", "ArcUiEditSelectionRequest attiva"),
                 new ArcUiInspectorRow("Effetto attuale", "Nessuna mutazione"),
-                new ArcUiInspectorRow("Prossimo ponte", "Controller autorizzato + Command Gateway")
+                new ArcUiInspectorRow("Prossimo ponte", "Command Gateway autorizzato")
             };
         }
 
@@ -849,8 +850,9 @@ namespace Arcontio.View.ArcGraph
                 new ArcUiInspectorRow("Nome", ResolveObjectTitle(request.Target, instance, def)),
                 new ArcUiInspectorRow("Tipo modifica", editKind),
                 new ArcUiInspectorRow("Sorgente", ReadString(request.Source, EmptyValue)),
+                new ArcUiInspectorRow("Draft request", "ArcUiEditSelectionRequest attiva"),
                 new ArcUiInspectorRow("Effetto attuale", "Nessuna mutazione"),
-                new ArcUiInspectorRow("Prossimo ponte", "Controller autorizzato + Command Gateway")
+                new ArcUiInspectorRow("Prossimo ponte", "Command Gateway autorizzato")
             };
         }
 

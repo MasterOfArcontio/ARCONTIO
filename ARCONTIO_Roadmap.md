@@ -16699,7 +16699,7 @@ Roadmap operativa:
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
 | v0.70.07 | Visual overlay toggles | Fatto - LM/LOS/PATH collegati, stabilizzati e separati semanticamente |
-| v0.70.08 | Migrazione progressiva F3 | In corso - delete bridge completato, edit bridge da fare |
+| v0.70.08 | Migrazione progressiva F3 | In corso - edit bridge draft completato, gate spegnimento F3 da fare |
 
 ---
 
@@ -17224,8 +17224,8 @@ Sottostep operativi:
 | v0.70.08.05 | NPC spawn shell: preview/config iniziale NPC e richiesta spawn configurata | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.06 | NPC spawn command bridge: richiesta NPC -> comando autorizzato temporaneo, senza DNA reale | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.07 | Delete bridge: eliminazione selezione tramite richiesta UI e comando autorizzato | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.08 | Edit bridge: parametri modificabili per NPC/oggetti/muri senza scrittura diretta World | Prossimo |
-| v0.70.08.09 | Gate spegnimento F3: disattivare solo le funzioni migrate e mantenere debug separato | Pending |
+| v0.70.08.08 | Edit bridge: draft modifica per NPC/oggetti/muri senza scrittura diretta World | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.09 | Gate spegnimento F3: disattivare solo le funzioni migrate e mantenere debug separato | Prossimo |
 
 Esito `v0.70.08.04`:
 
@@ -17294,6 +17294,23 @@ Prossimo step `v0.70.08.08`:
 - aprire RightInspector in modalita' edit per NPC, oggetti e muri;
 - mantenere modifiche reali fuori dal pannello finche' non esistono request/command autorizzati dedicati;
 - iniziare da shell provvisoria verificabile, senza scrittura diretta su `World`.
+
+Esito `v0.70.08.08`:
+
+- aggiunto contratto `ArcUiEditSelectionRequest`;
+- aggiunto controller `ArcUiEditSelectionController` per conservare una draft edit separata;
+- aggiunto bridge `ArcGraphUiSelectionEditRequestBridge`;
+- il tasto Modifica del menu selezione produce una draft edit per NPC, oggetto o muro;
+- il RightInspector continua ad aprirsi in modalita' edit usando la richiesta UI gia' esistente;
+- le tab edit indicano che la draft request e' attiva, ma nessuna modifica viene applicata;
+- nessun accesso diretto UI -> `World`, nessun comando di modifica inviato.
+
+Prossimo step `v0.70.08.09`:
+
+- valutare quali funzioni F3 sono ormai coperte dal nuovo pannello ArcGraph;
+- disattivare solo le funzioni migrate, evitando di cancellare fisicamente MapGrid;
+- mantenere eventuali tool debug non migrati separati dalla UI produttiva;
+- preparare un handoff pulito verso integrazione con Biosfera.
 
 Criteri di accettazione:
 
