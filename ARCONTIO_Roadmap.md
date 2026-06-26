@@ -16699,7 +16699,7 @@ Roadmap operativa:
 | v0.70.05 | Inspector ViewModel/tab | In corso - sottostep v0.70.05.06 completato |
 | v0.70.06 | Simulation control | In corso - sottostep v0.70.06.02 stabilizzato dopo v0.70.06.04 |
 | v0.70.07 | Visual overlay toggles | Fatto - LM/LOS/PATH collegati, stabilizzati e separati semanticamente |
-| v0.70.08 | Migrazione progressiva F3 | In corso - residuo F3 ArcGraph rimosso, audit MapGrid/F3 legacy completo da fare |
+| v0.70.08 | Migrazione progressiva F3 | In corso - audit MapGrid/F3 legacy completato, serve bootstrap ArcGraph autonomo prima del delete fisico |
 
 ---
 
@@ -17227,7 +17227,8 @@ Sottostep operativi:
 | v0.70.08.08 | Edit bridge: draft modifica per NPC/oggetti/muri senza scrittura diretta World | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.09 | Gate spegnimento F3: disconnettere ArcGraph runtime da F3 legacy e dal fallback preview MapGrid | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.10 | Rimozione fisica controllata dei residui F3 ArcGraph non piu' referenziati | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.11 | Audit cancellazione MapGrid/F3 legacy: dipendenze residue prima del delete fisico completo | Prossimo |
+| v0.70.08.11 | Audit cancellazione MapGrid/F3 legacy: dipendenze residue prima del delete fisico completo | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.12 | Bootstrap ArcGraph autonomo: togliere avvio obbligato da `Scene_MapGrid` | Prossimo |
 
 Esito `v0.70.08.04`:
 
@@ -17342,6 +17343,38 @@ Prossimo step `v0.70.08.11`:
 - separare cio' che e' cancellabile subito da cio' che serve ancora come bootstrap, dati terrain, topbar legacy o debug;
 - produrre una tabella file-per-file con decisione: eliminare, congelare, sostituire, rimandare;
 - non cancellare ancora MapGrid in blocco prima della verifica runtime e della lista completa dei sostituti ArcGraph.
+
+Esito `v0.70.08.11`:
+
+| Area/file | Stato audit | Decisione |
+|---|---|---|
+| `Assets/Scenes/Scene_Bootstrap.unity` + `ViewSwitcherInputActions` | caricano ancora `Scene_MapGrid` all'avvio (`mapGridName = Scene_MapGrid`, `loadMapGridOnStart = true`) | sostituire prima del delete con bootstrap/scena ArcGraph autonoma |
+| `Assets/Scenes/Scene_MapGrid.unity` | contiene `MapGridBootstrap`, `MapGridRuntimeDevToolsOverlay`, root e input provider MapGrid | non cancellabile finche' non esiste scena ArcGraph equivalente |
+| `ArcGraphRuntimeSceneAutoInstaller` | si installa solo se la scena attiva si chiama `Scene_MapGrid`; cerca ancora `MapGridCameraController`, `MapGridWorldView` e root visuali legacy per spegnerli | modificare nello step successivo: supporto ad avvio ArcGraph autonomo e riduzione bridge legacy |
+| `ArcGraphRuntimeWorldAdapter` | legge `SimulationHost -> World`, non `MapGridData`, `MapGridBootstrap` o `MapGridWorldView` | mantenere: e' il provider corretto per ArcGraph |
+| `ArcGraphTerrainRuntimeMapGridAdapter` | adapter/probe legacy che legge `MapGridBootstrap.RuntimeMap/RuntimeConfig` | congelare come legacy/probe o eliminare dopo bootstrap autonomo |
+| `ArcGraphDebugRuntimeMapGridAdapter` | bridge manuale debug da `MapGridWorldView.RuntimeWorld` | congelare/eliminare dopo che debug runtime ArcGraph usa solo provider neutri |
+| `ArcGraphViewModeSwitcher` | conserva modalita' `MapGrid` e F12/switch visuale comparativo | rimuovere dopo che ArcGraph resta unica vista runtime |
+| `MapGridWorldView` | crea `MapGridRuntimeDevToolsOverlay`, `MapGridRuntimeControlTopBar`, rendering NPC/oggetti, overlay, cache e rebind World legacy | non cancellabile singolarmente: va eliminato insieme alla scena MapGrid o dopo sostituti completi |
+| `MapGridRuntimeDevToolsOverlay` | vero F3 legacy; usa `MapGridWorldProvider`, input/camera MapGrid, comandi DevTools e save/load debug | cancellabile solo dopo rimozione scena MapGrid o separazione debug residua |
+| `MapGridRuntimeControlTopBar` | topbar legacy collegata a F3 e `MapGridWorldView` | cancellabile con MapGrid UI legacy, non prima |
+| `Assets/Scripts/Views/MapGrid/**` | circa 60 file inclusi `.meta`, runtime, debug e input legacy | delete fisico finale in step dedicato, senza toccare `.meta` sporchi separatamente |
+| `Assets/Resources/MapGrid/**` | config, layout e sprite legacy MapGrid | delete fisico finale dopo verifica che cataloghi ArcGraph non referenzino piu' path MapGrid |
+
+Conclusione:
+
+- non esiste piu' un blocco F3 ArcGraph da rimuovere;
+- il vero blocco residuo e' l'avvio dentro `Scene_MapGrid`;
+- cancellare subito MapGrid romperebbe bootstrap, scena e alcuni bridge transitori;
+- la prossima patch non deve cancellare MapGrid: deve creare o abilitare un percorso ArcGraph autonomo.
+
+Prossimo step `v0.70.08.12`:
+
+- cambiare la logica di avvio per permettere una scena/entry ArcGraph autonoma;
+- far installare `ArcGraphRuntimeSceneAutoInstaller` anche fuori da `Scene_MapGrid`, con criterio controllato;
+- mantenere compatibilita' temporanea con `Scene_MapGrid`;
+- non cancellare ancora `Scene_MapGrid`, `MapGridWorldView` o `MapGridRuntimeDevToolsOverlay`;
+- dopo test runtime, iniziare la rimozione dello switch MapGrid/F12 e dei bridge legacy.
 
 Criteri di accettazione:
 
