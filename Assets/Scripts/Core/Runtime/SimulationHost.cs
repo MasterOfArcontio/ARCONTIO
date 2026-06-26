@@ -636,13 +636,13 @@ namespace Arcontio.Core
         /// <para>
         /// Il valore aumenta quanti tick discreti vengono eseguiti per secondo reale,
         /// ma non cambia il delta canonico passato al singolo tick. In questo modo
-        /// <c>x2</c>, <c>x3</c> e <c>x4</c> accelerano davvero la simulazione senza
+        /// <c>x2</c>, <c>x3</c>, <c>x4</c> e <c>x10</c> accelerano davvero la simulazione senza
         /// introdurre una seconda sorgente dati per la durata logica del tick.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>Normalizzazione</b>: il range produttivo iniziale e' x1-x4.</item>
+        ///   <item><b>Normalizzazione</b>: il range produttivo iniziale e' x1-x10.</item>
         ///   <item><b>Clamp accumulatore</b>: quando il moltiplicatore cambia, l'accumulatore non puo' contenere arretrati eccessivi.</item>
         /// </list>
         /// </summary>
@@ -668,10 +668,11 @@ namespace Arcontio.Core
         ///
         /// <para><b>Principio architetturale: debug Biosfera separato dalla simulazione sociale</b></para>
         /// <para>
-            /// I valori ammessi sono volutamente pochi: <c>x50</c>, <c>x100</c>,
-            /// <c>x200</c> e <c>x500</c>. Questo evita di riusare il moltiplicatore produttivo
-        /// <c>x1-x4</c> e rende esplicito che questo percorso non accelera NPC,
-        /// decisioni, job, memoria, belief, pathfinding o comunicazione.
+        /// I valori ammessi sono volutamente pochi: <c>x50</c>, <c>x100</c>,
+        /// <c>x200</c>, <c>x500</c> e <c>x4000</c>. Questo evita di riusare il
+        /// moltiplicatore produttivo <c>x1/x2/x3/x4/x10</c> e rende esplicito che
+        /// questo percorso non accelera NPC, decisioni, job, memoria, belief,
+        /// pathfinding o comunicazione.
         /// </para>
         /// </summary>
         public void SetBiosphereDebugFastForwardMultiplier(int multiplier)
@@ -1254,7 +1255,7 @@ namespace Arcontio.Core
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Base</b>: intervallo da game_params.</item>
-        ///   <item><b>Multiplier</b>: clamp x1-x4.</item>
+        ///   <item><b>Multiplier</b>: clamp x1-x10.</item>
         ///   <item><b>Output</b>: secondi reali tra tick nel loop host.</item>
         /// </list>
         /// </summary>
@@ -1278,7 +1279,7 @@ namespace Arcontio.Core
             if (multiplier < 1)
                 return 1;
 
-            return multiplier > 4 ? 4 : multiplier;
+            return multiplier > 10 ? 10 : multiplier;
         }
 
         // =============================================================================
@@ -1316,7 +1317,10 @@ namespace Arcontio.Core
             if (multiplier <= 200)
                 return 200;
 
-            return 500;
+            if (multiplier <= 500)
+                return 500;
+
+            return 4000;
         }
 
         // =============================================================================

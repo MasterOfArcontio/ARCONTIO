@@ -573,8 +573,8 @@ namespace Arcontio.View.ArcGraph
     /// La TopBar non riceve direttamente il <c>SimulationHost</c> e non chiama i
     /// suoi metodi. Questo controller riceve richieste UI tipizzate, applica solo
     /// le operazioni gia' esposte pubblicamente dal runtime e conserva lo stato
-    /// richiesto. Le velocita' normali <c>x1-x4</c> e il fast-forward debug
-    /// Biosfera <c>x50/x100/x200/x500</c> restano due percorsi separati.
+    /// richiesto. Le velocita' normali <c>x1/x2/x3/x4/x10</c> e il fast-forward debug
+    /// Biosfera <c>x50/x100/x200/x500/x4000</c> restano due percorsi separati.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -661,9 +661,10 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Velocita' normale applicata al loop tick</b></para>
         /// <para>
-        /// Il controller applica solo i fattori semplici x1-x4. La futura modalita'
-        /// debug x50 resta fuori da questo percorso perche' richiede freeze visuale
-        /// e policy esplicita sui sistemi da eseguire o saltare.
+        /// Il controller applica solo i fattori semplici x1/x2/x3/x4/x10. Il
+        /// fast-forward debug Biosfera resta fuori da questo percorso perche'
+        /// richiede freeze visuale e policy esplicita sui sistemi da eseguire
+        /// o saltare.
         /// </para>
         /// </summary>
         public void RequestSpeed(
@@ -678,12 +679,16 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Avanza ciclicamente tra i fattori x1, x2, x3 e x4.
+        /// Avanza ciclicamente tra i fattori x1, x2, x3, x4 e x10.
         /// </para>
         /// </summary>
         public void CycleSpeed(string source)
         {
-            int next = _speedMultiplier >= 4 ? 1 : _speedMultiplier + 1;
+            int next = _speedMultiplier >= 10
+                ? 1
+                : _speedMultiplier >= 4
+                    ? 10
+                    : _speedMultiplier + 1;
             RequestSpeed(next, source);
         }
 
@@ -707,18 +712,20 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Avanza ciclicamente tra <c>x50</c>, <c>x100</c>, <c>x200</c> e <c>x500</c>.
+        /// Avanza ciclicamente tra <c>x50</c>, <c>x100</c>, <c>x200</c>, <c>x500</c> e <c>x4000</c>.
         /// </para>
         /// </summary>
         public void CycleBiosphereDebugFastForwardMultiplier(string source)
         {
-            int next = _biosphereDebugFastForwardMultiplier >= 500
+            int next = _biosphereDebugFastForwardMultiplier >= 4000
                 ? 50
-                : _biosphereDebugFastForwardMultiplier >= 200
-                    ? 500
-                    : _biosphereDebugFastForwardMultiplier >= 100
-                        ? 200
-                        : 100;
+                : _biosphereDebugFastForwardMultiplier >= 500
+                    ? 4000
+                    : _biosphereDebugFastForwardMultiplier >= 200
+                        ? 500
+                        : _biosphereDebugFastForwardMultiplier >= 100
+                            ? 200
+                            : 100;
             RequestBiosphereDebugFastForwardMultiplier(next, source);
         }
 

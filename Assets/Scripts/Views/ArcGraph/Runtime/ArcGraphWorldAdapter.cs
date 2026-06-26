@@ -497,12 +497,17 @@ namespace Arcontio.View.ArcGraph
             string growthKey = ToKeyPart(projection.GrowthStageKey);
             string healthKey = ToKeyPart(projection.HealthState.ToString());
             string visualKey = "plant_" + speciesKey + "_" + growthKey + "_" + healthKey;
+
+            // ARCONTIO non produce, per ora, una tavola completa di sprite per ogni
+            // combinazione crescita/salute della stessa pianta. La proiezione fisica
+            // conserva comunque lo stato reale per sorting, debug e futuro resolver,
+            // ma lo sprite iniziale cade sulla rappresentazione stabile della specie.
+            // Questo evita il fallback verde al bootstrap quando la pianta ha uno
+            // stato biologico come seedling, che non corrisponde a uno stato sprite
+            // definito nel catalogo visuale corrente.
             string spriteKey = "ArcGraph/Environment/Plants/"
                                + speciesKey
-                               + "#"
-                               + growthKey
-                               + "_"
-                               + healthKey;
+                               + "#adult_healthy";
 
             return new ArcGraphVegetationVisualSnapshot(
                 ConvertEnvironmentCell(projection.Cell),
