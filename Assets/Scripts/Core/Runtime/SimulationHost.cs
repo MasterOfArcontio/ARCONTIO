@@ -779,7 +779,9 @@ namespace Arcontio.Core
                 return false;
             }
 
-            calendar = _world.EnvironmentState.Calendar;
+            calendar = EnvironmentCalendarResolver.Resolve(
+                ResolveEnvironmentDisplayTicks(),
+                _biosphereDebugCalendarConfig);
             return true;
         }
 
@@ -799,8 +801,42 @@ namespace Arcontio.Core
                 return false;
             }
 
-            climate = _world.EnvironmentState.Climate;
+            EnvironmentCalendarState displayCalendar = EnvironmentCalendarResolver.Resolve(
+                ResolveEnvironmentDisplayTicks(),
+                _biosphereDebugCalendarConfig);
+            climate = EnvironmentClimateResolver.Resolve(
+                displayCalendar,
+                _biosphereDebugClimateConfig);
             return true;
+        }
+
+        // =============================================================================
+        // ResolveEnvironmentDisplayTicks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il tick ambientale da mostrare alla UI senza forzare il batch
+        /// biologico giornaliero.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: clock di lettura separato dal ciclo biologico</b></para>
+        /// <para>
+        /// La crescita, le nascite e le morti della biosfera devono restare cadenzate
+        /// da <c>simulationTicksPerDailyUpdate</c>. Il calendario visibile pero' deve
+        /// poter scorrere mentre la simulazione normale avanza, altrimenti la UI resta
+        /// ferma per tutto l'intervallo tra due batch giornalieri. Questo helper usa
+        /// il massimo tra tick simulativo e tick gia' materializzato nello stato
+        /// ambientale, cosi' il fast-forward debug non viene fatto tornare indietro
+        /// dalla simulazione sociale ordinaria.
+        /// </para>
+        /// </summary>
+        private long ResolveEnvironmentDisplayTicks()
+        {
+            long stateTicks = _world?.EnvironmentState != null
+                ? _world.EnvironmentState.Calendar.ElapsedEnvironmentTicks
+                : 0L;
+            long simulationTicks = _tickIndex < 0L ? 0L : _tickIndex;
+            return stateTicks > simulationTicks ? stateTicks : simulationTicks;
         }
 
         public void StepOneTickPaused()
