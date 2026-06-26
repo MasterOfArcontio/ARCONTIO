@@ -49,8 +49,10 @@ namespace Arcontio.Core.Environment
         private const int BiologicalOrganicMaskCoarseCellSize = 3;
         private const float BiologicalOrganicMaskBaseCoreRadius01 = 0.26f;
         private const float BiologicalOrganicMaskIntensityCoreRadius01 = 0.18f;
-        private const float BiologicalOrganicMaskNoiseStrength01 = 0.62f;
-        private const float BiologicalOrganicMaskEdgeThreshold01 = 0.08f;
+        private const float BiologicalOrganicMaskMinNoiseStrength01 = 0.18f;
+        private const float BiologicalOrganicMaskMaxNoiseStrength01 = 0.88f;
+        private const float BiologicalOrganicMaskMinEdgeThreshold01 = 0.02f;
+        private const float BiologicalOrganicMaskMaxEdgeThreshold01 = 0.16f;
 
         private readonly Dictionary<EnvironmentAreaId, EnvironmentAreaDefinition> _areaDefinitions = new();
         private readonly Dictionary<EnvironmentAreaId, EnvironmentFertilityAreaState> _fertilityAreas = new();
@@ -755,11 +757,20 @@ namespace Arcontio.Core.Environment
             float edgePresence01 = 1f - distance01;
             float noise01 = ResolveBiologicalOrganicMaskNoise01(area, cell);
             float intensityBias01 = (EnvironmentMath.Clamp01(intensity01) - 0.5f) * 0.20f;
+            float irregularity01 = EnvironmentMath.Clamp01(area.Irregularity01);
+            float noiseStrength01 = Lerp(
+                BiologicalOrganicMaskMinNoiseStrength01,
+                BiologicalOrganicMaskMaxNoiseStrength01,
+                irregularity01);
+            float edgeThreshold01 = Lerp(
+                BiologicalOrganicMaskMinEdgeThreshold01,
+                BiologicalOrganicMaskMaxEdgeThreshold01,
+                irregularity01);
             float presence01 = edgePresence01
-                                + ((noise01 - 0.5f) * BiologicalOrganicMaskNoiseStrength01)
+                                + ((noise01 - 0.5f) * noiseStrength01)
                                 + intensityBias01;
 
-            return presence01 >= BiologicalOrganicMaskEdgeThreshold01;
+            return presence01 >= edgeThreshold01;
         }
 
         private static float ResolveBiologicalOrganicMaskNoise01(
@@ -788,6 +799,12 @@ namespace Arcontio.Core.Environment
                 hash = (hash * 397) ^ (area.Bounds.Z * 83492791);
                 return (hash & int.MaxValue) / (float)int.MaxValue;
             }
+        }
+
+        private static float Lerp(float from, float to, float t)
+        {
+            float safeT = EnvironmentMath.Clamp01(t);
+            return from + ((to - from) * safeT);
         }
 
         private void BuildVegetationCells(

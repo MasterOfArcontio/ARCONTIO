@@ -334,6 +334,7 @@ namespace Arcontio.Core
                     centerX = area.CenterX,
                     centerY = area.CenterY,
                     radiusCells = radius,
+                    irregularity01 = Clamp01(area.Irregularity01, 0.5f),
                     priority = area.Priority,
                     isEnabled = area.IsEnabled,
                     key = areaKey
@@ -550,6 +551,7 @@ namespace Arcontio.Core
             public int Priority;
             public bool IsEnabled = true;
             public float Intensity01 = 0.5f;
+            public float Irregularity01 = 0.5f;
             public float BaseFertility01 = 0.5f;
             public float CurrentFertility01 = 0.5f;
             public float GrowthPotential01 = 0.5f;

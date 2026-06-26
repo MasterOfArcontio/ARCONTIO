@@ -91,6 +91,7 @@
                                 "Priority":  0,
                                 "IsEnabled":  true,
                                 "Intensity01":  0.55,
+                                "Irregularity01":  0.9,
                                 "BaseFertility01":  0.7,
                                 "CurrentFertility01":  0.7,
                                 "GrowthPotential01":  0.65,

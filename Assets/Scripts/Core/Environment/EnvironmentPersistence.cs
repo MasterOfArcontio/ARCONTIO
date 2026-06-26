@@ -252,6 +252,10 @@ namespace Arcontio.Core.Environment
         public int maxX;
         public int maxY;
         public int z;
+        public int centerX;
+        public int centerY;
+        public int radiusCells;
+        public float irregularity01 = 0.5f;
         public int priority;
         public bool isEnabled;
         public string key = string.Empty;
@@ -271,6 +275,10 @@ namespace Arcontio.Core.Environment
                 new EnvironmentAreaId(areaId),
                 kind,
                 new EnvironmentAreaBounds(minX, minY, maxX, maxY, z),
+                radiusCells > 0 ? centerX : (minX + maxX) / 2,
+                radiusCells > 0 ? centerY : (minY + maxY) / 2,
+                radiusCells,
+                irregularity01,
                 priority,
                 isEnabled,
                 key);
@@ -289,6 +297,10 @@ namespace Arcontio.Core.Environment
                 maxX = definition.Bounds.MaxX,
                 maxY = definition.Bounds.MaxY,
                 z = definition.Bounds.Z,
+                centerX = definition.CenterX,
+                centerY = definition.CenterY,
+                radiusCells = definition.RadiusCells,
+                irregularity01 = definition.Irregularity01,
                 priority = definition.Priority,
                 isEnabled = definition.IsEnabled,
                 key = definition.Key,

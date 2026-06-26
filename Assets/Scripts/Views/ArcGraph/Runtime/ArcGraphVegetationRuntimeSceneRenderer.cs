@@ -45,6 +45,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private float vegetationScale = 1f;
         [SerializeField] private int baseSortingOrder = 10;
         [SerializeField] private string runtimeRootName = "ArcGraphVegetationRuntimeRoot";
+        private const int PhysicalPlantSortingDepthBand = 25;
 
         private readonly Dictionary<int, VegetationHandle> _vegetationPool = new();
         private readonly ArcGraphVegetationRenderQueueBuilder _queueBuilder = new();
@@ -470,24 +471,36 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Risolve il sorting Unity della vegetazione mantenendola sotto oggetti,
-        /// muri e NPC.
+        /// Risolve il sorting Unity della vegetazione mantenendo la vegetazione
+        /// diffusa sotto oggetti, muri e NPC e ordinando le piante fisiche tra loro.
         /// </para>
         ///
         /// <para><b>Principio architetturale: layer ambientale sotto le entita' fisiche</b></para>
         /// <para>
         /// La queue vegetazione puo' contenere centinaia di celle. Usare l'indice
         /// della queue come sorting order assoluto fa crescere il valore fino a
-        /// superare la queue actor/object, che parte da sorting 40. Qui usiamo
-        /// invece solo il layer visuale dichiarato dalla sort key: la vegetazione
-        /// resta sopra il terreno, ma non copre muri, oggetti o NPC.
+        /// superare la queue actor/object, che parte da sorting 40. La vegetazione
+        /// diffusa resta quindi sul layer basso uniforme. Le piante fisiche, invece,
+        /// hanno sprite alti che possono sovrapporsi tra righe adiacenti: ricevono
+        /// una piccola banda Y sotto gli oggetti, sufficiente a disegnare dal retro
+        /// verso il fronte senza tornare a coprire NPC, muri o oggetti.
         /// </para>
         /// </summary>
         private static int ResolveVegetationSortingOrder(
             ArcGraphVegetationRuntimeSceneRendererContract contract,
             ArcGraphVegetationRenderItem item)
         {
-            return contract.BaseSortingOrder + item.SortKey.VisualLayerOrder;
+            int baseOrder = contract.BaseSortingOrder + item.SortKey.VisualLayerOrder;
+            if (!IsPhysicalPlantItem(item))
+                return baseOrder;
+
+            return baseOrder + ResolvePhysicalPlantSortingDepthOffset(item);
+        }
+
+        private static int ResolvePhysicalPlantSortingDepthOffset(ArcGraphVegetationRenderItem item)
+        {
+            int y = item.Cell.Y < 0 ? -item.Cell.Y : item.Cell.Y;
+            return PhysicalPlantSortingDepthBand - (y % PhysicalPlantSortingDepthBand);
         }
 
         private static Color ResolveTint(ArcGraphVegetationRenderItem item)

@@ -68,7 +68,7 @@
 | v0.61 | Decorative Vegetation Placement | Post-v0.60 | ✅ Contratto/delta vegetazione diffusa data-only completato, World projection pending |
 | v0.62 | Dirty Propagation / FOV & Perception | Post-v0.61 | ⏳ Pending |
 | v0.63 | ArcGraph Environment Runtime Feed | Post-v0.62 | ⏳ Pending |
-| v0.63.1 | Biological Area Organic Mask | Dentro v0.63 | ✅ Implementato |
+| v0.63.1 | Biological Area Organic Mask configurabile | Dentro v0.63 | ✅ Implementato |
 | v0.64 | Environment Event / Listener Boundary | Post-v0.63 | ⏳ Pending |
 | v0.65 | Biosphere Runtime Save/Load Integration | Post-v0.64 | ⏳ Pending |
 | v0.66 | NPC Environment Query Integration | Post-v0.65 | ✅ Foundation query/prodotti biologici completata, job completo futuro |
@@ -16591,7 +16591,7 @@ Blocchi previsti:
 | v0.61 | piazzare vegetazione decorativa non oggetto | ✅ Contratto/delta vegetazione diffusa data-only completato, World projection pending |
 | v0.62 | sporcare FOV/percezione quando cambiano celle fisiche | ⏳ Pending |
 | v0.63 | produrre feed runtime derivato per ArcGraph | ⏳ Pending |
-| v0.63.1 | generare maschera organica deterministica per aree biologiche entro raggio massimo | ✅ Implementato |
+| v0.63.1 | generare maschera organica deterministica configurabile per aree biologiche entro raggio massimo | ✅ Implementato |
 | v0.64 | esporre eventi/listener ambiente per UI e sistemi | ⏳ Pending |
 | v0.65 | integrare save/load biosfera runtime | ⏳ Pending |
 | v0.66 | integrare query NPC verso aree/risorse biologiche | ✅ Foundation query/prodotti biologici completata, belief/job completi futuri |

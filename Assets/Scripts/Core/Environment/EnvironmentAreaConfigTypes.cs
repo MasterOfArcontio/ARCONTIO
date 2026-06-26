@@ -140,6 +140,8 @@ namespace Arcontio.Core.Environment
     ///   <item><b>areaId</b>: identita' numerica stabile.</item>
     ///   <item><b>kind</b>: tipo area espresso come stringa configurabile.</item>
     ///   <item><b>minX/minY/maxX/maxY/z</b>: bounding box discreta.</item>
+    ///   <item><b>centerX/centerY/radiusCells</b>: area circolare massima per biologia fisica.</item>
+    ///   <item><b>irregularity01</b>: frastagliatura della maschera biologica organica.</item>
     ///   <item><b>priority</b>: precedenza futura tra aree dello stesso layer.</item>
     ///   <item><b>isEnabled</b>: gate dichiarativo.</item>
     ///   <item><b>key</b>: chiave leggibile per debug/config.</item>
@@ -158,6 +160,7 @@ namespace Arcontio.Core.Environment
         public int centerX;
         public int centerY;
         public int radiusCells;
+        public float irregularity01 = 0.5f;
         public int priority;
         public bool isEnabled = true;
         public string key = string.Empty;
@@ -181,6 +184,7 @@ namespace Arcontio.Core.Environment
                 radiusCells > 0 ? centerX : (minX + maxX) / 2,
                 radiusCells > 0 ? centerY : (minY + maxY) / 2,
                 radiusCells,
+                irregularity01,
                 priority,
                 isEnabled,
                 key);
