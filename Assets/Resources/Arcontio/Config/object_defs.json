@@ -89,7 +89,8 @@
         "UseShadow": false
       },
       "Properties": [
-        { "Key": "FoodStock", "Value": 1.0 }
+        { "Key": "FoodStock", "Value": 1.0 },
+        { "Key": "NutritionValue", "Value": 0.45 }
       ]
     },
     {

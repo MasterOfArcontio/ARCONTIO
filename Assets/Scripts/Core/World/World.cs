@@ -1394,6 +1394,41 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // QueryEnvironmentHarvestableResourcesForProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interroga la biosfera per piante vicine capaci di fornire uno specifico
+        /// prodotto biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query locale, non decisione onnisciente</b></para>
+        /// <para>
+        /// Questo facade non deve essere usato per far conoscere a distanza la
+        /// disponibilita' puntuale a un NPC. Serve al futuro job quando l'NPC e'
+        /// gia' vicino all'area/landmark e puo' cercare localmente una risorsa.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerResourceCandidate> QueryEnvironmentHarvestableResourcesForProduct(
+            int centerX,
+            int centerY,
+            int radius,
+            string productKey,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (EnvironmentState == null || !InBounds(centerX, centerY))
+                return new EnvironmentConsumerResourceCandidate[0];
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                snapshot,
+                catalog,
+                new EnvironmentCellCoord(centerX, centerY, 0),
+                radius,
+                productKey);
+        }
+
+        // =============================================================================
         // QueryEnvironmentBiologicalAreasForSpeciesOrResource
         // =============================================================================
         /// <summary>
@@ -1426,6 +1461,89 @@ namespace Arcontio.Core
                 new EnvironmentCellCoord(requesterX, requesterY, 0),
                 speciesOrResourceKey,
                 maxResults);
+        }
+
+        // =============================================================================
+        // TryResolveEnvironmentAreaFromBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve l'area biologica collegata a un landmark biologico visto o
+        /// ricordato da un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: landmark come indizio, biosfera come mapping</b></para>
+        /// <para>
+        /// Il landmark registry resta leggero e non conserva payload ecologici. Il
+        /// <see cref="World"/> espone solo una query read-only che delega alla
+        /// biosfera il mapping laterale <c>landmarkNodeId -> areaId</c>.
+        /// </para>
+        /// </summary>
+        public bool TryResolveEnvironmentAreaFromBiologicalLandmark(
+            int landmarkNodeId,
+            out EnvironmentAreaId areaId)
+        {
+            areaId = EnvironmentAreaId.None;
+            return EnvironmentState != null
+                   && EnvironmentState.TryResolveAreaIdForBiologicalLandmark(
+                       landmarkNodeId,
+                       out areaId);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentPotentialProductsForArea
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce i prodotti biologici potenziali associati a una specifica
+        /// area biologica.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: belief potenziale senza quantita' reali</b></para>
+        /// <para>
+        /// La query e' adatta a costruire credenze come "questa area puo' offrire
+        /// acorn". Non restituisce una disponibilita' garantita e non muta piante,
+        /// stock o inventari.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerProductCandidate> QueryEnvironmentPotentialProductsForArea(
+            EnvironmentAreaId areaId,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (EnvironmentState == null || !areaId.IsValid)
+                return new EnvironmentConsumerProductCandidate[0];
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryPotentialProductsForArea(
+                snapshot,
+                catalog,
+                areaId);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentPotentialProductsForBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce i prodotti potenziali dell'area collegata a un landmark
+        /// biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: percorso futuro Memory -> Belief</b></para>
+        /// <para>
+        /// Un NPC puo' ricordare un landmark biologico. Questa query consente al
+        /// layer cognitivo futuro di trasformare quel ricordo in belief potenziali
+        /// sulle risorse dell'area, senza leggere direttamente registry ambientali.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerProductCandidate> QueryEnvironmentPotentialProductsForBiologicalLandmark(
+            int landmarkNodeId,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (!TryResolveEnvironmentAreaFromBiologicalLandmark(landmarkNodeId, out EnvironmentAreaId areaId))
+                return new EnvironmentConsumerProductCandidate[0];
+
+            return QueryEnvironmentPotentialProductsForArea(areaId, catalog);
         }
 
         private EnvironmentFullSnapshot BuildEnvironmentFullSnapshot()

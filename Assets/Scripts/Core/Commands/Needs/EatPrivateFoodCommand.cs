@@ -45,8 +45,13 @@ namespace Arcontio.Core
             world.NpcLastPrivateFoodConsumeTick[_npcId] = world.Global.CurrentTickIndex;
             
             // 2) Mutazione hunger
+            // Il cibo privato e' ancora un aggregato generico: finche' non esiste un
+            // inventario typed, ogni unita' privata usa il NutritionValue di food_stock.
             var cfg = world.Global.Needs;
-            needs.AddValue(NeedKind.Hunger, -cfg.eatSatietyGain);
+            float nutritionValue = ResolvePrivateFoodNutritionValue(
+                world,
+                cfg.eatSatietyGain);
+            needs.AddValue(NeedKind.Hunger, -nutritionValue);
 
             world.Needs[_npcId] = needs;
 
@@ -69,6 +74,47 @@ namespace Arcontio.Core
                 cellX: cellX,
                 cellY: cellY,
                 hungerAfter: needs.GetValue(NeedKind.Hunger)));
+        }
+
+        // =============================================================================
+        // ResolvePrivateFoodNutritionValue
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve il valore nutritivo del cibo privato generico trasportato da un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: cibo privato come food_stock aggregato</b></para>
+        /// <para>
+        /// <c>NpcPrivateFood</c> oggi conserva solo un conteggio intero, non una lista
+        /// typed di alimenti. Per non anticipare il refactor inventario, ogni unita'
+        /// privata viene trattata come una porzione di <c>food_stock</c> aggregato e
+        /// legge da li' il proprio <c>NutritionValue</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>catalog lookup</b>: cerca la definizione oggetto food_stock.</item>
+        ///   <item><b>NutritionValue</b>: usa il valore dichiarato nel JSON oggetti.</item>
+        ///   <item><b>fallback</b>: usa eatSatietyGain solo se il dato catalogo manca o non e' valido.</item>
+        /// </list>
+        /// </summary>
+        private static float ResolvePrivateFoodNutritionValue(
+            World world,
+            float fallback)
+        {
+            float safeFallback = fallback > 0f ? fallback : 0.45f;
+            if (world == null
+                || !world.TryGetObjectDef("food_stock", out var def)
+                || def == null)
+            {
+                return safeFallback;
+            }
+
+            return def.TryGetPropertyValue("NutritionValue", out float nutritionValue)
+                   && nutritionValue > 0f
+                ? nutritionValue
+                : safeFallback;
         }
     }
 }

@@ -27,6 +27,20 @@
       "idealHumidity01": 0.65,
       "minimumFertility01": 0.55,
       "resourceOutputKey": "",
+      "products": [
+        {
+          "productKey": "wood",
+          "isFood": false,
+          "destroysPlantOnHarvest": true,
+          "requiresToolKey": "axe"
+        },
+        {
+          "productKey": "acorn",
+          "isFood": true,
+          "destroysPlantOnHarvest": false,
+          "requiresToolKey": ""
+        }
+      ],
       "seasonalBehavior": "Deciduous"
     },
     {
@@ -41,6 +55,14 @@
       "idealHumidity01": 0.62,
       "minimumFertility01": 0.48,
       "resourceOutputKey": "",
+      "products": [
+        {
+          "productKey": "berry",
+          "isFood": true,
+          "destroysPlantOnHarvest": false,
+          "requiresToolKey": ""
+        }
+      ],
       "seasonalBehavior": "Deciduous"
     },
     {

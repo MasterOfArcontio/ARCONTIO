@@ -130,6 +130,9 @@ namespace Arcontio.Core.Environment
         public readonly string SpeciesKey;
         public readonly EnvironmentCellCoord Cell;
         public readonly string ResourceOutputKey;
+        public readonly bool IsFood;
+        public readonly bool DestroysPlantOnHarvest;
+        public readonly string RequiresToolKey;
         public readonly float Availability01;
         public readonly float Quality01;
 
@@ -152,14 +155,192 @@ namespace Arcontio.Core.Environment
             EnvironmentCellCoord cell,
             string resourceOutputKey,
             float availability01,
-            float quality01)
+            float quality01,
+            bool isFood = false,
+            bool destroysPlantOnHarvest = false,
+            string requiresToolKey = "")
         {
             PlantId = plantId;
             SpeciesKey = speciesKey ?? string.Empty;
             Cell = cell;
             ResourceOutputKey = resourceOutputKey ?? string.Empty;
+            IsFood = isFood;
+            DestroysPlantOnHarvest = destroysPlantOnHarvest;
+            RequiresToolKey = requiresToolKey ?? string.Empty;
             Availability01 = EnvironmentMath.Clamp01(availability01);
             Quality01 = EnvironmentMath.Clamp01(quality01);
+        }
+    }
+
+    // =============================================================================
+    // EnvironmentConsumerProductCandidate
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Prodotto biologico potenziale associato a un'area biologica.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: belief potenziale senza onniscienza quantitativa</b></para>
+    /// <para>
+    /// Questo candidate non dice quante mele o ghiande siano disponibili ora. Dice
+    /// soltanto che un'area, tramite seed bank o piante vive osservabili dal Core,
+    /// puo' essere un luogo sensato in cui cercare un certo prodotto. Le quantita'
+    /// reali restano dominio di query locali future e job sul posto.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Area</b>: id, key, centro e raggio del luogo biologico.</item>
+    ///   <item><b>Product</b>: chiave prodotto e specie sorgente.</item>
+    ///   <item><b>Flags</b>: food, distruzione pianta e strumento richiesto.</item>
+    ///   <item><b>Evidence</b>: pressione seed, piante vive e harvestable note al Core.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct EnvironmentConsumerProductCandidate
+    {
+        public readonly EnvironmentAreaId AreaId;
+        public readonly string AreaKey;
+        public readonly EnvironmentCellCoord CenterCell;
+        public readonly int RadiusCells;
+        public readonly string SpeciesKey;
+        public readonly string ProductKey;
+        public readonly bool IsFood;
+        public readonly bool DestroysPlantOnHarvest;
+        public readonly string RequiresToolKey;
+        public readonly float SeedPressure01;
+        public readonly int LivePlantCount;
+        public readonly int HarvestablePlantCount;
+        public readonly float Score01;
+
+        public bool IsValid =>
+            AreaId.IsValid
+            && !string.IsNullOrWhiteSpace(ProductKey)
+            && Score01 > 0f;
+
+        // =============================================================================
+        // EnvironmentConsumerProductCandidate
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un candidate prodotto normalizzando pressione e score.
+        /// </para>
+        /// </summary>
+        public EnvironmentConsumerProductCandidate(
+            EnvironmentAreaId areaId,
+            string areaKey,
+            EnvironmentCellCoord centerCell,
+            int radiusCells,
+            string speciesKey,
+            string productKey,
+            bool isFood,
+            bool destroysPlantOnHarvest,
+            string requiresToolKey,
+            float seedPressure01,
+            int livePlantCount,
+            int harvestablePlantCount,
+            float score01)
+        {
+            AreaId = areaId;
+            AreaKey = areaKey ?? string.Empty;
+            CenterCell = centerCell;
+            RadiusCells = radiusCells < 0 ? 0 : radiusCells;
+            SpeciesKey = speciesKey ?? string.Empty;
+            ProductKey = productKey ?? string.Empty;
+            IsFood = isFood;
+            DestroysPlantOnHarvest = destroysPlantOnHarvest;
+            RequiresToolKey = requiresToolKey ?? string.Empty;
+            SeedPressure01 = EnvironmentMath.Clamp01(seedPressure01);
+            LivePlantCount = livePlantCount < 0 ? 0 : livePlantCount;
+            HarvestablePlantCount = harvestablePlantCount < 0 ? 0 : harvestablePlantCount;
+            Score01 = EnvironmentMath.Clamp01(score01);
+        }
+    }
+
+    // =============================================================================
+    // EnvironmentBiologicalResourceBeliefKind
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Tipo di suggerimento cognitivo derivabile da una query biosfera.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: potenziale e osservato non coincidono</b></para>
+    /// <para>
+    /// Un NPC puo' credere che un'area produca potenzialmente una risorsa, oppure
+    /// puo' avere una stima osservata dopo una visita. Questa enum prepara la
+    /// distinzione senza modificare ancora <c>BeliefEntry</c> o il save/load dei
+    /// belief esistenti.
+    /// </para>
+    /// </summary>
+    public enum EnvironmentBiologicalResourceBeliefKind
+    {
+        Potential = 0,
+        Observed = 10
+    }
+
+    // =============================================================================
+    // EnvironmentBiologicalResourceBeliefHint
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Contratto dati per una futura credenza NPC su risorse biologiche.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: hint cognitivo, non belief store mutato</b></para>
+    /// <para>
+    /// La biosfera e il <see cref="World"/> possono produrre questo record, ma non
+    /// scrivono automaticamente nel BeliefStore. Un futuro layer cognitivo decidera'
+    /// se convertirlo in belief, con quale confidence e con quale decadimento.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Kind</b>: potenziale o osservato.</item>
+    ///   <item><b>LandmarkNodeId/AreaId</b>: luogo soggettivo a cui ancorare la credenza.</item>
+    ///   <item><b>ProductKey</b>: risorsa biologica coinvolta.</item>
+    ///   <item><b>EstimatedAmount</b>: quantita' stimata solo per belief osservati, zero per potenziali.</item>
+    ///   <item><b>Confidence01</b>: forza soggettiva proposta, non verita' oggettiva.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct EnvironmentBiologicalResourceBeliefHint
+    {
+        public readonly EnvironmentBiologicalResourceBeliefKind Kind;
+        public readonly int LandmarkNodeId;
+        public readonly EnvironmentAreaId AreaId;
+        public readonly string ProductKey;
+        public readonly int EstimatedAmount;
+        public readonly float Confidence01;
+        public readonly int ObservedDay;
+
+        public bool IsValid =>
+            AreaId.IsValid
+            && !string.IsNullOrWhiteSpace(ProductKey)
+            && Confidence01 > 0f;
+
+        // =============================================================================
+        // EnvironmentBiologicalResourceBeliefHint
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un hint belief normalizzando quantita' e confidence.
+        /// </para>
+        /// </summary>
+        public EnvironmentBiologicalResourceBeliefHint(
+            EnvironmentBiologicalResourceBeliefKind kind,
+            int landmarkNodeId,
+            EnvironmentAreaId areaId,
+            string productKey,
+            int estimatedAmount,
+            float confidence01,
+            int observedDay)
+        {
+            Kind = kind;
+            LandmarkNodeId = landmarkNodeId < 0 ? 0 : landmarkNodeId;
+            AreaId = areaId;
+            ProductKey = productKey ?? string.Empty;
+            EstimatedAmount = estimatedAmount < 0 ? 0 : estimatedAmount;
+            Confidence01 = EnvironmentMath.Clamp01(confidence01);
+            ObservedDay = observedDay < 0 ? 0 : observedDay;
         }
     }
 
@@ -266,6 +447,8 @@ namespace Arcontio.Core.Environment
             new EnvironmentConsumerResourceCandidate[0];
         private static readonly EnvironmentConsumerAreaCandidate[] EmptyAreaCandidates =
             new EnvironmentConsumerAreaCandidate[0];
+        private static readonly EnvironmentConsumerProductCandidate[] EmptyProductCandidates =
+            new EnvironmentConsumerProductCandidate[0];
 
         // =============================================================================
         // BuildCellFacts
@@ -429,7 +612,68 @@ namespace Arcontio.Core.Environment
                     plant.Cell,
                     output.ResourceOutputKey,
                     output.Amount01,
-                    output.Quality01));
+                    output.Quality01,
+                    output.IsFood,
+                    output.DestroysPlantOnHarvest,
+                    output.RequiresToolKey));
+            }
+
+            return candidates.Count == 0 ? EmptyCandidates : candidates.ToArray();
+        }
+
+        // =============================================================================
+        // QueryHarvestableResourcesForProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce piante harvestable entro raggio che possono fornire uno
+        /// specifico prodotto biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query locale per job futuro</b></para>
+        /// <para>
+        /// Questa query e' pensata per la fase in cui un NPC e' gia' arrivato vicino
+        /// a un landmark/area conosciuta. Non deve essere usata come conoscenza
+        /// globale onnisciente dal Decision Layer remoto.
+        /// </para>
+        /// </summary>
+        public static IReadOnlyList<EnvironmentConsumerResourceCandidate> QueryHarvestableResourcesForProduct(
+            EnvironmentFullSnapshot snapshot,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentCellCoord center,
+            int radius,
+            string productKey)
+        {
+            if (snapshot == null || catalog == null || string.IsNullOrWhiteSpace(productKey))
+                return EmptyCandidates;
+
+            int safeRadius = radius < 0 ? 0 : radius;
+            var candidates = new List<EnvironmentConsumerResourceCandidate>();
+            for (int i = 0; i < snapshot.Plants.Count; i++)
+            {
+                var plant = snapshot.Plants[i];
+                if (!IsInsideRadius(center, plant.Cell, safeRadius))
+                    continue;
+
+                if (!EnvironmentAgricultureFoundationResolver.TryBuildHarvestOutputForProduct(
+                    plant,
+                    catalog,
+                    productKey,
+                    out EnvironmentHarvestOutput output))
+                {
+                    continue;
+                }
+
+                candidates.Add(new EnvironmentConsumerResourceCandidate(
+                    plant.PlantId,
+                    plant.SpeciesKey,
+                    plant.Cell,
+                    output.ResourceOutputKey,
+                    output.Amount01,
+                    output.Quality01,
+                    output.IsFood,
+                    output.DestroysPlantOnHarvest,
+                    output.RequiresToolKey));
             }
 
             return candidates.Count == 0 ? EmptyCandidates : candidates.ToArray();
@@ -532,11 +776,152 @@ namespace Arcontio.Core.Environment
             return trimmed;
         }
 
+        // =============================================================================
+        // QueryPotentialProductsForArea
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce i prodotti biologici potenziali dichiarabili per una singola
+        /// area biologica.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: conoscenza potenziale separata dalla disponibilita' reale</b></para>
+        /// <para>
+        /// La risposta e' adatta a generare belief del tipo "qui possono esserci
+        /// mele". Non rappresenta una quantita' reale garantita e non consuma
+        /// prodotti dalla biosfera.
+        /// </para>
+        /// </summary>
+        public static IReadOnlyList<EnvironmentConsumerProductCandidate> QueryPotentialProductsForArea(
+            EnvironmentFullSnapshot snapshot,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentAreaId areaId)
+        {
+            if (snapshot == null || catalog == null || !areaId.IsValid)
+                return EmptyProductCandidates;
+
+            for (int i = 0; i < snapshot.Areas.Count; i++)
+            {
+                EnvironmentAreaSnapshot area = snapshot.Areas[i];
+                if (!area.Definition.AreaId.Equals(areaId)
+                    || !area.Definition.IsEnabled
+                    || !IsBiologicalSearchArea(area))
+                {
+                    continue;
+                }
+
+                return BuildPotentialProductsForArea(snapshot, catalog, area);
+            }
+
+            return EmptyProductCandidates;
+        }
+
         private static bool IsBiologicalSearchArea(EnvironmentAreaSnapshot area)
         {
             return area.HasSeedBank
                    || area.HasVegetation
                    || area.Definition.Kind == EnvironmentAreaKind.Vegetation;
+        }
+
+        private static IReadOnlyList<EnvironmentConsumerProductCandidate> BuildPotentialProductsForArea(
+            EnvironmentFullSnapshot snapshot,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentAreaSnapshot area)
+        {
+            var accumulators = new List<ProductPotentialAccumulator>();
+
+            if (area.HasSeedBank && area.SeedBankState != null)
+            {
+                IReadOnlyList<EnvironmentSeedBankEntry> entries = area.SeedBankState.Entries;
+                for (int i = 0; i < entries.Count; i++)
+                {
+                    EnvironmentSeedBankEntry entry = entries[i];
+                    if (!catalog.TryGetSpecies(entry.SpeciesKey, out EnvironmentPlantSpeciesDefinition species))
+                        continue;
+
+                    float pressure = EnvironmentMath.Clamp01(entry.Amount01 * entry.Viability01);
+                    AddProductsFromSpecies(accumulators, area, species, pressure, 0, 0);
+                }
+            }
+
+            for (int i = 0; i < snapshot.Plants.Count; i++)
+            {
+                EnvironmentPlantSnapshot plant = snapshot.Plants[i];
+                if (!plant.SourceAreaId.Equals(area.Definition.AreaId)
+                    || !plant.IsAlive
+                    || !catalog.TryGetSpecies(plant.SpeciesKey, out EnvironmentPlantSpeciesDefinition species))
+                {
+                    continue;
+                }
+
+                AddProductsFromSpecies(
+                    accumulators,
+                    area,
+                    species,
+                    0f,
+                    1,
+                    plant.IsHarvestable ? 1 : 0);
+            }
+
+            if (accumulators.Count == 0)
+                return EmptyProductCandidates;
+
+            var result = new EnvironmentConsumerProductCandidate[accumulators.Count];
+            for (int i = 0; i < accumulators.Count; i++)
+                result[i] = accumulators[i].ToCandidate();
+
+            Array.Sort(result, CompareProductCandidates);
+            return result;
+        }
+
+        private static void AddProductsFromSpecies(
+            List<ProductPotentialAccumulator> accumulators,
+            EnvironmentAreaSnapshot area,
+            EnvironmentPlantSpeciesDefinition species,
+            float seedPressure01,
+            int livePlantCount,
+            int harvestablePlantCount)
+        {
+            for (int i = 0; i < species.Products.Count; i++)
+            {
+                EnvironmentPlantProductDefinition product = species.Products[i];
+                if (!product.IsValid)
+                    continue;
+
+                ProductPotentialAccumulator accumulator = FindProductAccumulator(
+                    accumulators,
+                    species.SpeciesKey,
+                    product.ProductKey);
+                if (accumulator == null)
+                {
+                    accumulator = new ProductPotentialAccumulator(area, species.SpeciesKey, product);
+                    accumulators.Add(accumulator);
+                }
+
+                accumulator.SeedPressure01 = System.Math.Max(
+                    accumulator.SeedPressure01,
+                    seedPressure01);
+                accumulator.LivePlantCount += livePlantCount;
+                accumulator.HarvestablePlantCount += harvestablePlantCount;
+            }
+        }
+
+        private static ProductPotentialAccumulator FindProductAccumulator(
+            List<ProductPotentialAccumulator> accumulators,
+            string speciesKey,
+            string productKey)
+        {
+            for (int i = 0; i < accumulators.Count; i++)
+            {
+                ProductPotentialAccumulator accumulator = accumulators[i];
+                if (string.Equals(accumulator.SpeciesKey, speciesKey, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(accumulator.Product.ProductKey, productKey, StringComparison.OrdinalIgnoreCase))
+                {
+                    return accumulator;
+                }
+            }
+
+            return null;
         }
 
         private static float ResolveSeedPressureForRequest(
@@ -628,9 +1013,7 @@ namespace Arcontio.Core.Environment
                 return true;
             }
 
-            string outputKey = ResolveResourceOutputKey(catalog, speciesKey);
-            if (!string.IsNullOrWhiteSpace(outputKey)
-                && string.Equals(outputKey, requestedKey, StringComparison.OrdinalIgnoreCase))
+            if (TryResolveMatchingProductKey(catalog, speciesKey, requestedKey, out string outputKey))
             {
                 resourceOutputKey = outputKey;
                 return true;
@@ -647,6 +1030,33 @@ namespace Arcontio.Core.Environment
                 return string.Empty;
 
             return species.ResourceOutputKey ?? string.Empty;
+        }
+
+        private static bool TryResolveMatchingProductKey(
+            EnvironmentPlantCatalog catalog,
+            string speciesKey,
+            string requestedKey,
+            out string productKey)
+        {
+            productKey = string.Empty;
+            if (catalog == null
+                || string.IsNullOrWhiteSpace(requestedKey)
+                || !catalog.TryGetSpecies(speciesKey, out EnvironmentPlantSpeciesDefinition species))
+            {
+                return false;
+            }
+
+            for (int i = 0; i < species.Products.Count; i++)
+            {
+                EnvironmentPlantProductDefinition product = species.Products[i];
+                if (!string.Equals(product.ProductKey, requestedKey, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                productKey = product.ProductKey;
+                return true;
+            }
+
+            return false;
         }
 
         private static float ResolveAreaCandidateScore(
@@ -680,6 +1090,27 @@ namespace Arcontio.Core.Environment
             return a.AreaId.Value.CompareTo(b.AreaId.Value);
         }
 
+        private static int CompareProductCandidates(
+            EnvironmentConsumerProductCandidate a,
+            EnvironmentConsumerProductCandidate b)
+        {
+            int byScore = b.Score01.CompareTo(a.Score01);
+            if (byScore != 0)
+                return byScore;
+
+            int byProduct = string.Compare(
+                a.ProductKey,
+                b.ProductKey,
+                StringComparison.OrdinalIgnoreCase);
+            if (byProduct != 0)
+                return byProduct;
+
+            return string.Compare(
+                a.SpeciesKey,
+                b.SpeciesKey,
+                StringComparison.OrdinalIgnoreCase);
+        }
+
         private static bool IsInsideRadius(
             EnvironmentCellCoord center,
             EnvironmentCellCoord candidate,
@@ -691,6 +1122,55 @@ namespace Arcontio.Core.Environment
             int dx = System.Math.Abs(center.X - candidate.X);
             int dy = System.Math.Abs(center.Y - candidate.Y);
             return dx + dy <= radius;
+        }
+
+        private sealed class ProductPotentialAccumulator
+        {
+            public readonly EnvironmentAreaSnapshot Area;
+            public readonly string SpeciesKey;
+            public readonly EnvironmentPlantProductDefinition Product;
+            public float SeedPressure01;
+            public int LivePlantCount;
+            public int HarvestablePlantCount;
+
+            public ProductPotentialAccumulator(
+                EnvironmentAreaSnapshot area,
+                string speciesKey,
+                EnvironmentPlantProductDefinition product)
+            {
+                Area = area;
+                SpeciesKey = speciesKey ?? string.Empty;
+                Product = product;
+            }
+
+            public EnvironmentConsumerProductCandidate ToCandidate()
+            {
+                EnvironmentCellCoord center = new EnvironmentCellCoord(
+                    Area.Definition.CenterX,
+                    Area.Definition.CenterY,
+                    Area.Definition.Bounds.Z);
+                float plantScore = EnvironmentMath.Clamp01(LivePlantCount / 24f);
+                float harvestScore = EnvironmentMath.Clamp01(HarvestablePlantCount / 12f);
+                float score = EnvironmentMath.Clamp01(
+                    (SeedPressure01 * 0.50f)
+                    + (plantScore * 0.30f)
+                    + (harvestScore * 0.20f));
+
+                return new EnvironmentConsumerProductCandidate(
+                    Area.Definition.AreaId,
+                    Area.Definition.Key,
+                    center,
+                    Area.Definition.RadiusCells,
+                    SpeciesKey,
+                    Product.ProductKey,
+                    Product.IsFood,
+                    Product.DestroysPlantOnHarvest,
+                    Product.RequiresToolKey,
+                    SeedPressure01,
+                    LivePlantCount,
+                    HarvestablePlantCount,
+                    score);
+            }
         }
     }
 }

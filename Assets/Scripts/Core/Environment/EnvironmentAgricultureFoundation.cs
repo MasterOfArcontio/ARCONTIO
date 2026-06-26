@@ -224,6 +224,9 @@ namespace Arcontio.Core.Environment
         public readonly EnvironmentPlantId PlantId;
         public readonly string SpeciesKey;
         public readonly string ResourceOutputKey;
+        public readonly bool IsFood;
+        public readonly bool DestroysPlantOnHarvest;
+        public readonly string RequiresToolKey;
         public readonly float Amount01;
         public readonly float Quality01;
         public readonly bool IsAvailable;
@@ -242,11 +245,17 @@ namespace Arcontio.Core.Environment
             string resourceOutputKey,
             float amount01,
             float quality01,
-            bool isAvailable)
+            bool isAvailable,
+            bool isFood = false,
+            bool destroysPlantOnHarvest = false,
+            string requiresToolKey = "")
         {
             PlantId = plantId;
             SpeciesKey = speciesKey ?? string.Empty;
             ResourceOutputKey = resourceOutputKey ?? string.Empty;
+            IsFood = isFood;
+            DestroysPlantOnHarvest = destroysPlantOnHarvest;
+            RequiresToolKey = requiresToolKey ?? string.Empty;
             Amount01 = EnvironmentMath.Clamp01(amount01);
             Quality01 = EnvironmentMath.Clamp01(quality01);
             IsAvailable = isAvailable
@@ -384,21 +393,86 @@ namespace Arcontio.Core.Environment
                 || !catalog.TryGetSpecies(
                     plant.SpeciesKey,
                     out EnvironmentPlantSpeciesDefinition species)
-                || string.IsNullOrWhiteSpace(species.ResourceOutputKey))
+                || !TryResolvePrimaryProduct(species, out EnvironmentPlantProductDefinition product))
             {
                 return false;
             }
+
+            return TryBuildHarvestOutputFromProduct(plant, product, out output);
+        }
+
+        // =============================================================================
+        // TryBuildHarvestOutputForProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un output raccolto per uno specifico prodotto richiesto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query locale senza job implicito</b></para>
+        /// <para>
+        /// Il metodo permette a un futuro job di chiedere <c>apple</c>, <c>acorn</c>
+        /// o <c>wood</c> senza trasformare questa query in una raccolta reale. Se la
+        /// specie non dichiara quel prodotto, la pianta non e' candidata.
+        /// </para>
+        /// </summary>
+        public static bool TryBuildHarvestOutputForProduct(
+            EnvironmentPlantSnapshot plant,
+            EnvironmentPlantCatalog catalog,
+            string productKey,
+            out EnvironmentHarvestOutput output)
+        {
+            output = default;
+
+            if (!plant.IsAlive
+                || !plant.IsHarvestable
+                || catalog == null
+                || string.IsNullOrWhiteSpace(productKey)
+                || !catalog.TryGetSpecies(
+                    plant.SpeciesKey,
+                    out EnvironmentPlantSpeciesDefinition species)
+                || !species.TryGetProduct(productKey, out EnvironmentPlantProductDefinition product))
+            {
+                return false;
+            }
+
+            return TryBuildHarvestOutputFromProduct(plant, product, out output);
+        }
+
+        private static bool TryBuildHarvestOutputFromProduct(
+            EnvironmentPlantSnapshot plant,
+            EnvironmentPlantProductDefinition product,
+            out EnvironmentHarvestOutput output)
+        {
+            output = default;
+            if (!product.IsValid)
+                return false;
 
             float amount = plant.Maturity01 * plant.Health01;
             float quality = (plant.Maturity01 + plant.Health01) * 0.5f;
             output = new EnvironmentHarvestOutput(
                 plant.PlantId,
                 plant.SpeciesKey,
-                species.ResourceOutputKey,
+                product.ProductKey,
                 amount,
                 quality,
-                true);
+                true,
+                product.IsFood,
+                product.DestroysPlantOnHarvest,
+                product.RequiresToolKey);
             return output.IsAvailable;
+        }
+
+        private static bool TryResolvePrimaryProduct(
+            EnvironmentPlantSpeciesDefinition species,
+            out EnvironmentPlantProductDefinition product)
+        {
+            product = default;
+            if (species == null || species.Products.Count == 0)
+                return false;
+
+            product = species.Products[0];
+            return product.IsValid;
         }
 
         // =============================================================================

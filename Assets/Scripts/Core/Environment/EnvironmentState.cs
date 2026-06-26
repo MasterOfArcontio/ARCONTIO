@@ -392,6 +392,56 @@ namespace Arcontio.Core.Environment
         }
 
         // =============================================================================
+        // TryResolveAreaIdForBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve l'area biologica collegata a un landmark biologico gia' registrato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: mapping laterale, landmark leggero</b></para>
+        /// <para>
+        /// Il <see cref="LandmarkRegistry"/> conserva solo nodi compatti. Il legame
+        /// semantico <c>landmark -> area biologica</c> resta nella biosfera, cosi'
+        /// NPC e World possono interrogare l'ambiente senza appesantire ogni nodo
+        /// landmark con payload ecologici.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>landmarkNodeId</b>: id del nodo visto o ricordato dall'NPC.</item>
+        ///   <item><b>areaId</b>: area biologica risolta, se il nodo appartiene alla biosfera.</item>
+        ///   <item><b>return</b>: false per id non validi, mapping assente o rebuild non ancora eseguita.</item>
+        /// </list>
+        /// </summary>
+        public bool TryResolveAreaIdForBiologicalLandmark(
+            int landmarkNodeId,
+            out EnvironmentAreaId areaId)
+        {
+            areaId = EnvironmentAreaId.None;
+            if (landmarkNodeId <= 0)
+                return false;
+
+            foreach (var pair in _biologicalLandmarkNodeIdsByArea)
+            {
+                int[] nodeIds = pair.Value;
+                if (nodeIds == null)
+                    continue;
+
+                for (int i = 0; i < nodeIds.Length; i++)
+                {
+                    if (nodeIds[i] != landmarkNodeId)
+                        continue;
+
+                    areaId = pair.Key;
+                    return areaId.IsValid;
+                }
+            }
+
+            return false;
+        }
+
+        // =============================================================================
         // BuildInitialBiologicalOccupancy
         // =============================================================================
         /// <summary>

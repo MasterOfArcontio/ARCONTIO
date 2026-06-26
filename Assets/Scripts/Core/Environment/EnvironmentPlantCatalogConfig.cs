@@ -105,6 +105,56 @@ namespace Arcontio.Core.Environment
     }
 
     // =============================================================================
+    // EnvironmentPlantProductConfig
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// DTO serializzabile di un prodotto biologico ottenibile da una specie vegetale.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: prodotti come contratto, non inventario</b></para>
+    /// <para>
+    /// Il file piante dichiara che una specie puo' produrre una certa chiave, ma non
+    /// decide peso, sprite, stack, proprieta' o nutrizione concreta dell'oggetto.
+    /// Quei dati appartengono al catalogo risorse/oggetti. Qui restano solo i flag
+    /// biologici indispensabili per query e job futuri.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>productKey</b>: chiave del prodotto futuro, per esempio apple, acorn o wood.</item>
+    ///   <item><b>isFood</b>: indizio per decisioni alimentari future.</item>
+    ///   <item><b>destroysPlantOnHarvest</b>: true se il raccolto abbatte o consuma la pianta.</item>
+    ///   <item><b>requiresToolKey</b>: strumento richiesto dal job futuro, vuoto se non serve.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class EnvironmentPlantProductConfig
+    {
+        public string productKey = string.Empty;
+        public bool isFood;
+        public bool destroysPlantOnHarvest;
+        public string requiresToolKey = string.Empty;
+
+        // =============================================================================
+        // ToDefinition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte il DTO prodotto in definizione read-only.
+        /// </para>
+        /// </summary>
+        public EnvironmentPlantProductDefinition ToDefinition()
+        {
+            return new EnvironmentPlantProductDefinition(
+                productKey,
+                isFood,
+                destroysPlantOnHarvest,
+                requiresToolKey);
+        }
+    }
+
+    // =============================================================================
     // EnvironmentPlantSpeciesConfig
     // =============================================================================
     /// <summary>
@@ -142,6 +192,7 @@ namespace Arcontio.Core.Environment
         public float idealHumidity01 = 0.55f;
         public float minimumFertility01 = 0.25f;
         public string resourceOutputKey = string.Empty;
+        public EnvironmentPlantProductConfig[] products;
         public string seasonalBehavior = "Perennial";
 
         // =============================================================================
@@ -175,6 +226,7 @@ namespace Arcontio.Core.Environment
                 idealHumidity01,
                 minimumFertility01,
                 resourceOutputKey,
+                BuildProductDefinitions(products, resourceOutputKey),
                 EnvironmentPlantCatalogParsing.ParseSeasonalBehavior(seasonalBehavior));
         }
 
@@ -192,6 +244,13 @@ namespace Arcontio.Core.Environment
                     idealHumidity01 = 0.55f,
                     minimumFertility01 = 0.20f,
                     resourceOutputKey = "grass_cuttings",
+                    products = new[]
+                    {
+                        new EnvironmentPlantProductConfig
+                        {
+                            productKey = "grass_cuttings"
+                        }
+                    },
                     seasonalBehavior = "Perennial"
                 },
                 new EnvironmentPlantSpeciesConfig
@@ -225,6 +284,20 @@ namespace Arcontio.Core.Environment
                     idealHumidity01 = 0.65f,
                     minimumFertility01 = 0.55f,
                     resourceOutputKey = "wood",
+                    products = new[]
+                    {
+                        new EnvironmentPlantProductConfig
+                        {
+                            productKey = "wood",
+                            destroysPlantOnHarvest = true,
+                            requiresToolKey = "axe"
+                        },
+                        new EnvironmentPlantProductConfig
+                        {
+                            productKey = "acorn",
+                            isFood = true
+                        }
+                    },
                     seasonalBehavior = "Deciduous"
                 }
             };
@@ -248,6 +321,49 @@ namespace Arcontio.Core.Environment
                     isHarvestable = true
                 }
             };
+        }
+
+        private static EnvironmentPlantProductDefinition[] BuildProductDefinitions(
+            EnvironmentPlantProductConfig[] productConfigs,
+            string legacyResourceOutputKey)
+        {
+            var safeProducts = productConfigs ?? new EnvironmentPlantProductConfig[0];
+            var definitions = new List<EnvironmentPlantProductDefinition>(safeProducts.Length);
+            for (int i = 0; i < safeProducts.Length; i++)
+            {
+                if (safeProducts[i] == null)
+                    continue;
+
+                EnvironmentPlantProductDefinition definition = safeProducts[i].ToDefinition();
+                if (!definition.IsValid || ContainsProduct(definitions, definition.ProductKey))
+                    continue;
+
+                definitions.Add(definition);
+            }
+
+            if (definitions.Count == 0 && !string.IsNullOrWhiteSpace(legacyResourceOutputKey))
+            {
+                definitions.Add(new EnvironmentPlantProductDefinition(
+                    legacyResourceOutputKey,
+                    false,
+                    false,
+                    string.Empty));
+            }
+
+            return definitions.ToArray();
+        }
+
+        private static bool ContainsProduct(
+            IReadOnlyList<EnvironmentPlantProductDefinition> definitions,
+            string productKey)
+        {
+            for (int i = 0; i < definitions.Count; i++)
+            {
+                if (string.Equals(definitions[i].ProductKey, productKey, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
     }
 
