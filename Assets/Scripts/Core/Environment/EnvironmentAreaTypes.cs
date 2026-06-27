@@ -193,6 +193,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>AreaId</b>: identita' stabile dell'area.</item>
     ///   <item><b>Kind</b>: layer logico a cui appartiene.</item>
     ///   <item><b>Bounds</b>: bounding box iniziale.</item>
+    ///   <item><b>PhysicalPlantDominance01</b>: bilanciamento tra vegetazione diffusa e piante fisiche.</item>
     ///   <item><b>Priority</b>: precedenza futura dentro lo stesso layer.</item>
     ///   <item><b>IsEnabled</b>: gate passivo di utilizzo.</item>
     ///   <item><b>Key</b>: chiave opzionale leggibile per config/debug.</item>
@@ -207,6 +208,7 @@ namespace Arcontio.Core.Environment
         public readonly int CenterY;
         public readonly int RadiusCells;
         public readonly float Irregularity01;
+        public readonly float PhysicalPlantDominance01;
         public readonly int Priority;
         public readonly bool IsEnabled;
         public readonly string Key;
@@ -234,6 +236,7 @@ namespace Arcontio.Core.Environment
                 (bounds.MinY + bounds.MaxY) / 2,
                 0,
                 0.5f,
+                0.045f,
                 priority,
                 isEnabled,
                 key)
@@ -258,6 +261,7 @@ namespace Arcontio.Core.Environment
                 centerY,
                 radiusCells,
                 0.5f,
+                0.045f,
                 priority,
                 isEnabled,
                 key)
@@ -272,6 +276,7 @@ namespace Arcontio.Core.Environment
             int centerY,
             int radiusCells,
             float irregularity01,
+            float physicalPlantDominance01,
             int priority,
             bool isEnabled,
             string key)
@@ -283,6 +288,7 @@ namespace Arcontio.Core.Environment
             CenterY = centerY;
             RadiusCells = radiusCells < 0 ? 0 : radiusCells;
             Irregularity01 = EnvironmentMath.Clamp01(irregularity01);
+            PhysicalPlantDominance01 = EnvironmentMath.Clamp01(physicalPlantDominance01);
             Priority = priority;
             IsEnabled = isEnabled;
             Key = key ?? string.Empty;

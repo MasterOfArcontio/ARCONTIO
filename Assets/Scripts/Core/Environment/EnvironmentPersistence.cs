@@ -256,6 +256,7 @@ namespace Arcontio.Core.Environment
         public int centerY;
         public int radiusCells;
         public float irregularity01 = 0.5f;
+        public float physicalPlantDominance01 = 0.045f;
         public int priority;
         public bool isEnabled;
         public string key = string.Empty;
@@ -279,6 +280,7 @@ namespace Arcontio.Core.Environment
                 radiusCells > 0 ? centerY : (minY + maxY) / 2,
                 radiusCells,
                 irregularity01,
+                physicalPlantDominance01,
                 priority,
                 isEnabled,
                 key);
@@ -301,6 +303,7 @@ namespace Arcontio.Core.Environment
                 centerY = definition.CenterY,
                 radiusCells = definition.RadiusCells,
                 irregularity01 = definition.Irregularity01,
+                physicalPlantDominance01 = definition.PhysicalPlantDominance01,
                 priority = definition.Priority,
                 isEnabled = definition.IsEnabled,
                 key = definition.Key,

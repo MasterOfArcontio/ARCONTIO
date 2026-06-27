@@ -142,6 +142,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>minX/minY/maxX/maxY/z</b>: bounding box discreta.</item>
     ///   <item><b>centerX/centerY/radiusCells</b>: area circolare massima per biologia fisica.</item>
     ///   <item><b>irregularity01</b>: frastagliatura della maschera biologica organica.</item>
+    ///   <item><b>physicalPlantDominance01</b>: quota di area riservabile a piante fisiche rispetto alla vegetazione diffusa.</item>
     ///   <item><b>priority</b>: precedenza futura tra aree dello stesso layer.</item>
     ///   <item><b>isEnabled</b>: gate dichiarativo.</item>
     ///   <item><b>key</b>: chiave leggibile per debug/config.</item>
@@ -161,6 +162,7 @@ namespace Arcontio.Core.Environment
         public int centerY;
         public int radiusCells;
         public float irregularity01 = 0.5f;
+        public float physicalPlantDominance01 = 0.045f;
         public int priority;
         public bool isEnabled = true;
         public string key = string.Empty;
@@ -185,6 +187,7 @@ namespace Arcontio.Core.Environment
                 radiusCells > 0 ? centerY : (minY + maxY) / 2,
                 radiusCells,
                 irregularity01,
+                physicalPlantDominance01,
                 priority,
                 isEnabled,
                 key);

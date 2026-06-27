@@ -38,11 +38,6 @@ namespace Arcontio.Core.Environment
                 EnvironmentAreaId.None,
                 new EnvironmentSeedBankEntry[0]);
 
-        // Scala iniziale seed -> piante fisiche: il numero non rappresenta un target
-        // fisso, ma la quota di celle naturali libere che una seed pressure massima
-        // puo' occupare all'avvio. Con area raggio 14 e oak 0.95/0.95 produce circa
-        // il range di test richiesto senza scollegarsi da Amount/Viability.
-        private const float PhysicalPlantSeedPressurePlacementScale01 = 0.045f;
         private const float InitialPhysicalPlantVitalityMin01 = 0.70f;
         private const float InitialPhysicalPlantVitalityMax01 = 1.35f;
         private const float InitialPhysicalPlantHealthVitalityScale01 = 0.22f;
@@ -851,7 +846,8 @@ namespace Arcontio.Core.Environment
                 return;
 
             int availableCount = CountAvailableCells(freeCells, usedVegetationCells, usedPhysicalPlantCells);
-            int targetCount = ResolvePlacementCount(availableCount, vegetation.Density01, 1.0f);
+            float vegetationDominance01 = 1f - EnvironmentMath.Clamp01(area.PhysicalPlantDominance01);
+            int targetCount = ResolvePlacementCount(availableCount, vegetation.Density01, vegetationDominance01);
             var distributedCells = new List<EnvironmentCellCoord>(freeCells);
             SortCellsByDistributionScore(distributedCells, ResolveStableAreaSeed(area));
 
@@ -898,7 +894,7 @@ namespace Arcontio.Core.Environment
                 int targetForSpecies = ResolvePlacementCount(
                     freeCells.Count,
                     pressure,
-                    PhysicalPlantSeedPressurePlacementScale01);
+                    area.PhysicalPlantDominance01);
                 for (int i = 0; i < targetForSpecies; i++)
                 {
                     if (!TryPickPlantCell(freeCells, anchorCells, usedPlantCells, area, entryIndex, i, out EnvironmentCellCoord cell))
