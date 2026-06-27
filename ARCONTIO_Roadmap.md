@@ -71,7 +71,7 @@
 | v0.63.1 | Biological Area Organic Mask configurabile | Dentro v0.63 | ✅ Implementato |
 | v0.63.2 | Biological Area Overlap Resolution | Dentro v0.63 | ✅ Implementato |
 | v0.63.3 | Configurable Physical Plant Dominance | Dentro v0.63 | ✅ Implementato |
-| v0.64 | Environment Event / Listener Boundary | Post-v0.63 | ⏳ Prossimo step |
+| v0.64 | Environment Event / Listener Boundary | Post-v0.63 | ✅ Implementato |
 | v0.65 | Biosphere Runtime Save/Load Integration | Post-v0.64 | 🧊 Rinviata al save/load globale simulazione |
 | v0.66 | NPC Environment Query Integration | Post-v0.65 | ✅ Foundation query/prodotti biologici completata, job completo futuro |
 | v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⏳ Pending |
@@ -16596,7 +16596,7 @@ Blocchi previsti:
 | v0.63.1 | generare maschera organica deterministica configurabile per aree biologiche entro raggio massimo | ✅ Implementato |
 | v0.63.2 | risolvere sovrapposizione aree biologiche per piante, vegetazione diffusa e landmark biologici | ✅ Implementato |
 | v0.63.3 | rendere configurabile per area il bilanciamento vegetazione diffusa / piante fisiche | ✅ Implementato |
-| v0.64 | esporre eventi/listener ambiente per UI e sistemi | ⏳ Prossimo step |
+| v0.64 | esporre eventi/listener ambiente per UI e sistemi | ✅ Implementato |
 | v0.65 | integrare save/load biosfera runtime | 🧊 Rinviato: assorbito dal futuro save/load globale della simulazione |
 | v0.66 | integrare query NPC verso aree/risorse biologiche | ✅ Foundation query/prodotti biologici completata, belief/job completi futuri |
 | v0.67 | pannello debug/calibrazione runtime biosfera | ⏳ Pending |

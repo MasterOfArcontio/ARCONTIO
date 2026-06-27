@@ -554,6 +554,7 @@ namespace Arcontio.Core
         private EnvironmentPlantCatalog _environmentPlantCatalog =
             new EnvironmentPlantCatalogConfig().ToCatalog();
         private readonly EnvironmentHistoryBuffer _biosphereHistoryBuffer = new EnvironmentHistoryBuffer();
+        private readonly List<IEnvironmentRuntimeEventListener> _environmentRuntimeEventListeners = new();
         private EnvironmentRuntimeEvent _lastEnvironmentRuntimeEvent;
 
         // =============================================================================
@@ -610,6 +611,44 @@ namespace Arcontio.Core
         public EnvironmentRuntimeEvent LastEnvironmentRuntimeEvent => _lastEnvironmentRuntimeEvent;
 
         public event System.Action<EnvironmentRuntimeEvent> EnvironmentRuntimeEventPublished;
+
+        // =============================================================================
+        // RegisterEnvironmentRuntimeListener
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra un listener tipizzato per gli eventi runtime della Biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: iscrizione esplicita al boundary ambiente</b></para>
+        /// <para>
+        /// UI, ArcGraph e sistemi futuri possono ricevere notifiche ambiente senza
+        /// leggere direttamente <c>World.EnvironmentState</c> e senza agganciarsi a
+        /// eventi anonimi dispersi. Il metodo evita duplicati per mantenere stabile
+        /// il costo di pubblicazione.
+        /// </para>
+        /// </summary>
+        public bool RegisterEnvironmentRuntimeListener(IEnvironmentRuntimeEventListener listener)
+        {
+            if (listener == null || _environmentRuntimeEventListeners.Contains(listener))
+                return false;
+
+            _environmentRuntimeEventListeners.Add(listener);
+            return true;
+        }
+
+        // =============================================================================
+        // UnregisterEnvironmentRuntimeListener
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove un listener tipizzato dagli eventi runtime della Biosfera.
+        /// </para>
+        /// </summary>
+        public bool UnregisterEnvironmentRuntimeListener(IEnvironmentRuntimeEventListener listener)
+        {
+            return listener != null && _environmentRuntimeEventListeners.Remove(listener);
+        }
 
         public EnvironmentHistorySnapshot CreateBiosphereHistorySnapshot()
         {
@@ -2458,12 +2497,14 @@ namespace Arcontio.Core
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>LastEnvironmentRuntimeEvent</b>: ultimo evento consultabile in polling sicuro.</item>
+        ///   <item><b>IEnvironmentRuntimeEventListener</b>: listener tipizzati registrati esplicitamente.</item>
         ///   <item><b>EnvironmentRuntimeEventPublished</b>: notifica push per UI/sistemi.</item>
         /// </list>
         /// </summary>
         private void PublishEnvironmentRuntimeEvent(EnvironmentRuntimeEvent runtimeEvent)
         {
             _lastEnvironmentRuntimeEvent = runtimeEvent;
+            PublishEnvironmentRuntimeEventToTypedListeners(runtimeEvent);
             System.Action<EnvironmentRuntimeEvent> handlers = EnvironmentRuntimeEventPublished;
             if (handlers == null)
                 return;
@@ -2482,6 +2523,31 @@ namespace Arcontio.Core
                 catch (System.Exception ex)
                 {
                     Debug.LogError("[SimulationHost] Environment runtime listener failed: " + ex);
+                }
+            }
+        }
+
+        private void PublishEnvironmentRuntimeEventToTypedListeners(EnvironmentRuntimeEvent runtimeEvent)
+        {
+            if (_environmentRuntimeEventListeners.Count == 0)
+                return;
+
+            for (int i = _environmentRuntimeEventListeners.Count - 1; i >= 0; i--)
+            {
+                IEnvironmentRuntimeEventListener listener = _environmentRuntimeEventListeners[i];
+                if (listener == null)
+                {
+                    _environmentRuntimeEventListeners.RemoveAt(i);
+                    continue;
+                }
+
+                try
+                {
+                    listener.OnEnvironmentRuntimeEvent(runtimeEvent);
+                }
+                catch (System.Exception ex)
+                {
+                    Debug.LogError("[SimulationHost] Environment runtime typed listener failed: " + ex);
                 }
             }
         }

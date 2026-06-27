@@ -27,6 +27,58 @@ namespace Arcontio.Core.Environment
     }
 
     // =============================================================================
+    // EnvironmentRuntimeChangeMask
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Maschera compatta delle famiglie di dato ambientale potenzialmente cambiate
+    /// da un evento runtime.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: listener selettivi e non onniscienti</b></para>
+    /// <para>
+    /// UI, ArcGraph, World e sistemi futuri non devono interrogare tutta la Biosfera
+    /// a ogni notifica. La maschera permette di capire se e' utile aggiornare
+    /// calendario, clima, meteo, piante fisiche, vegetazione diffusa o riepiloghi
+    /// area senza esporre riferimenti mutabili allo stato ambientale.
+    /// </para>
+    /// </summary>
+    [System.Flags]
+    public enum EnvironmentRuntimeChangeMask
+    {
+        None = 0,
+        Calendar = 1 << 0,
+        Climate = 1 << 1,
+        Weather = 1 << 2,
+        PhysicalPlants = 1 << 3,
+        DiffuseVegetation = 1 << 4,
+        Areas = 1 << 5,
+        All = Calendar | Climate | Weather | PhysicalPlants | DiffuseVegetation | Areas
+    }
+
+    // =============================================================================
+    // IEnvironmentRuntimeEventListener
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Contratto esplicito per consumer che vogliono ricevere notifiche runtime
+    /// della Biosfera senza agganciarsi direttamente allo stato interno.
+    /// </para>
+    ///
+    /// <para><b>Boundary Biosfera -> consumer</b></para>
+    /// <para>
+    /// Il listener riceve solo <see cref="EnvironmentRuntimeEvent"/>, cioe' un DTO
+    /// read-only compatto. Eventuali query piu' ricche devono passare da contratti
+    /// dedicati del <c>World</c> o da snapshot, non da accesso globale alla
+    /// Biosfera.
+    /// </para>
+    /// </summary>
+    public interface IEnvironmentRuntimeEventListener
+    {
+        void OnEnvironmentRuntimeEvent(EnvironmentRuntimeEvent runtimeEvent);
+    }
+
+    // =============================================================================
     // EnvironmentRuntimeEvent
     // =============================================================================
     /// <summary>
@@ -54,6 +106,7 @@ namespace Arcontio.Core.Environment
     public readonly struct EnvironmentRuntimeEvent
     {
         public readonly EnvironmentRuntimeEventKind Kind;
+        public readonly EnvironmentRuntimeChangeMask ChangeMask;
         public readonly long EnvironmentTick;
         public readonly int AbsoluteDay;
         public readonly int Year;
@@ -82,6 +135,7 @@ namespace Arcontio.Core.Environment
         /// </summary>
         public EnvironmentRuntimeEvent(
             EnvironmentRuntimeEventKind kind,
+            EnvironmentRuntimeChangeMask changeMask,
             long environmentTick,
             int absoluteDay,
             int year,
@@ -100,6 +154,7 @@ namespace Arcontio.Core.Environment
             int appliedDiffuseVegetationDeltaCount)
         {
             Kind = kind;
+            ChangeMask = changeMask;
             EnvironmentTick = environmentTick < 0 ? 0 : environmentTick;
             AbsoluteDay = absoluteDay < 0 ? 0 : absoluteDay;
             Year = year < 0 ? 0 : year;
@@ -138,6 +193,7 @@ namespace Arcontio.Core.Environment
                 kind,
                 snapshot,
                 new EnvironmentSnapshotEvolutionReport(0, 0, 0, 0, 0),
+                EnvironmentRuntimeChangeMask.All,
                 0,
                 0,
                 0,
@@ -167,10 +223,17 @@ namespace Arcontio.Core.Environment
                 : new EnvironmentSnapshotEvolutionReport(0, 0, 0, 0, 0);
             int plantDeltaCount = result?.PhysicalPlantDeltas?.Count ?? 0;
             int vegetationDeltaCount = result?.DiffuseVegetationDeltas?.Count ?? 0;
+            EnvironmentRuntimeChangeMask changeMask = ResolveAdvanceChangeMask(
+                report,
+                plantDeltaCount,
+                appliedPlantDeltas,
+                vegetationDeltaCount,
+                appliedVegetationDeltas);
             return FromSnapshot(
                 kind,
                 snapshot,
                 report,
+                changeMask,
                 plantDeltaCount,
                 appliedPlantDeltas,
                 vegetationDeltaCount,
@@ -181,6 +244,7 @@ namespace Arcontio.Core.Environment
             EnvironmentRuntimeEventKind kind,
             EnvironmentSnapshot snapshot,
             EnvironmentSnapshotEvolutionReport report,
+            EnvironmentRuntimeChangeMask changeMask,
             int physicalPlantDeltaCount,
             int appliedPhysicalPlantDeltaCount,
             int diffuseVegetationDeltaCount,
@@ -191,6 +255,7 @@ namespace Arcontio.Core.Environment
             EnvironmentGlobalClimateState climate = snapshot.Climate;
             return new EnvironmentRuntimeEvent(
                 kind,
+                changeMask,
                 calendar.ElapsedEnvironmentTicks,
                 ResolveAbsoluteDay(date),
                 date.Year,
@@ -207,6 +272,33 @@ namespace Arcontio.Core.Environment
                 appliedPhysicalPlantDeltaCount,
                 diffuseVegetationDeltaCount,
                 appliedDiffuseVegetationDeltaCount);
+        }
+
+        private static EnvironmentRuntimeChangeMask ResolveAdvanceChangeMask(
+            EnvironmentSnapshotEvolutionReport report,
+            int physicalPlantDeltaCount,
+            int appliedPhysicalPlantDeltaCount,
+            int diffuseVegetationDeltaCount,
+            int appliedDiffuseVegetationDeltaCount)
+        {
+            // Ogni avanzamento della Biosfera muove il calendario e risolve di nuovo
+            // clima/meteo. Anche quando il valore numerico resta simile, i consumer
+            // che mostrano data, stagione o meteo devono poter aggiornare la vista.
+            EnvironmentRuntimeChangeMask mask =
+                EnvironmentRuntimeChangeMask.Calendar
+                | EnvironmentRuntimeChangeMask.Climate
+                | EnvironmentRuntimeChangeMask.Weather;
+
+            if (physicalPlantDeltaCount > 0 || appliedPhysicalPlantDeltaCount > 0)
+                mask |= EnvironmentRuntimeChangeMask.PhysicalPlants;
+
+            if (diffuseVegetationDeltaCount > 0 || appliedDiffuseVegetationDeltaCount > 0)
+                mask |= EnvironmentRuntimeChangeMask.DiffuseVegetation;
+
+            if (report.ChangedAreas > 0)
+                mask |= EnvironmentRuntimeChangeMask.Areas;
+
+            return mask;
         }
 
         private static int ResolveAbsoluteDay(EnvironmentDate date)
