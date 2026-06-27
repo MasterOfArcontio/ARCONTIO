@@ -1,6 +1,7 @@
 using Arcontio.Core.Logging;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 using UnityEngine.SceneManagement;
 
 namespace Arcontio.Core
@@ -10,29 +11,28 @@ namespace Arcontio.Core
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Modalita' con cui il bootstrap runtime decide quale vista caricare dopo
-    /// l'avvio persistente.
+    /// Modalita' con cui il bootstrap runtime decide se caricare la vista
+    /// ArcGraph dopo l'avvio persistente oppure restare nella scena corrente.
     /// </para>
     ///
     /// <para><b>Principio architetturale: bootstrap vista configurabile</b></para>
     /// <para>
-    /// La vista iniziale non deve piu' essere vincolata per sempre a MapGrid. Il
-    /// default resta MapGrid per compatibilita', ma ArcGraph puo' diventare la
-    /// vista iniziale appena esiste una scena autonoma dedicata.
+    /// Il bootstrap non deve piu' passare dalla scena MapGrid. La scena runtime
+    /// principale e' ArcGraph; l'opzione CurrentScene resta disponibile per
+    /// debug controllati nei quali l'operatore vuole aprire una scena specifica
+    /// senza caricamento automatico.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>MapGrid</b>: comportamento storico, carica la scena MapGrid.</item>
-    ///   <item><b>ArcGraph</b>: carica la futura scena autonoma ArcGraph.</item>
+    ///   <item><b>ArcGraph</b>: carica la scena runtime principale ArcGraph.</item>
     ///   <item><b>CurrentScene</b>: non cambia scena e lascia operare il bootstrap corrente.</item>
     /// </list>
     /// </summary>
     public enum StartupViewMode
     {
-        MapGrid = 0,
-        ArcGraph = 1,
-        CurrentScene = 2
+        ArcGraph = 0,
+        CurrentScene = 1
     }
 
     /// <summary>
@@ -43,12 +43,12 @@ namespace Arcontio.Core
     {
         [Header("Scene names (devono essere in Build Settings)")]
         [SerializeField] private string atomViewerSceneName = "Scene_AtomViewer";
-        [SerializeField] private string mapGridName = "Scene_MapGrid";
         [SerializeField] private string arcGraphSceneName = "Scene_ArcGraph";
 
         [Header("Startup View")]
-        [SerializeField] private StartupViewMode startupViewMode = StartupViewMode.MapGrid;
-        [SerializeField] private bool loadMapGridOnStart = true;
+        [SerializeField] private StartupViewMode startupViewMode = StartupViewMode.ArcGraph;
+        [FormerlySerializedAs("loadMapGridOnStart")]
+        [SerializeField] private bool loadStartupViewOnStart = true;
 
         // 1) QUI: sostituisci con il nome della classe generata dal tuo .inputactions
         private ArcontioInputActions _actions;
@@ -68,27 +68,27 @@ namespace Arcontio.Core
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Porta automaticamente la sessione runtime sulla scena MapGrid quando il
+        /// Porta automaticamente la sessione runtime sulla scena ArcGraph quando il
         /// bootstrap ha terminato l'inizializzazione iniziale.
         /// </para>
         ///
         /// <para><b>Principio architetturale: bootstrap della vista senza scelta manuale</b></para>
         /// <para>
         /// Il simulatore continua a nascere nel runtime persistente, ma la vista
-        /// operativa di default diventa MapGrid. L'utente conserva comunque gli input
+        /// operativa di default diventa ArcGraph. L'utente conserva comunque gli input
         /// di switch scena esistenti: questo metodo esegue solo la scelta iniziale.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>loadMapGridOnStart</b>: flag ispettore per disattivare il comportamento in debug speciali.</item>
-        ///   <item><b>mapGridName</b>: nome scena gia' usato dal comando F2/F-map esistente.</item>
+        ///   <item><b>loadStartupViewOnStart</b>: flag ispettore per disattivare il comportamento in debug speciali.</item>
+        ///   <item><b>arcGraphSceneName</b>: nome della scena runtime principale.</item>
         ///   <item><b>LoadIfNotActive</b>: percorso comune con validazione Build Settings.</item>
         /// </list>
         /// </summary>
         private void Start()
         {
-            if (!loadMapGridOnStart)
+            if (!loadStartupViewOnStart)
                 return;
 
             LoadStartupView();
@@ -101,7 +101,7 @@ namespace Arcontio.Core
 
             // 2) QUI: sostituisci "Global" e i nomi delle azioni se li hai chiamati diversamente
             _actions.Global.SwitchToAtomViewer.performed += OnSwitchToAtomViewer;
-            _actions.Global.SwitchToMap.performed += OnSwitchToMap;
+            _actions.Global.SwitchToMap.performed += OnSwitchToArcGraph;
         }
 
         private void OnDisable()
@@ -109,7 +109,7 @@ namespace Arcontio.Core
             if (_actions == null) return;
 
             _actions.Global.SwitchToAtomViewer.performed -= OnSwitchToAtomViewer;
-            _actions.Global.SwitchToMap.performed -= OnSwitchToMap;
+            _actions.Global.SwitchToMap.performed -= OnSwitchToArcGraph;
 
             _actions.Disable();
         }
@@ -148,7 +148,7 @@ namespace Arcontio.Core
         }
 
         private void OnSwitchToAtomViewer(InputAction.CallbackContext ctx) => LoadIfNotActive(atomViewerSceneName);
-        private void OnSwitchToMap(InputAction.CallbackContext ctx) => LoadIfNotActive(mapGridName);
+        private void OnSwitchToArcGraph(InputAction.CallbackContext ctx) => LoadIfNotActive(arcGraphSceneName);
 
         // =============================================================================
         // LoadStartupView
@@ -160,16 +160,15 @@ namespace Arcontio.Core
         ///
         /// <para><b>Compatibilita' progressiva</b></para>
         /// <para>
-        /// MapGrid resta il default finche' l'operatore non seleziona ArcGraph o
-        /// CurrentScene. Questo evita di rompere il bootstrap attuale e consente di
-        /// introdurre la futura scena ArcGraph in modo reversibile.
+        /// ArcGraph e' ora il percorso principale. CurrentScene resta come escape
+        /// hatch esplicita per debug o test nei quali non si vuole caricare una
+        /// scena additiva/sostitutiva dal bootstrap persistente.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>CurrentScene</b>: non carica scene aggiuntive.</item>
         ///   <item><b>ArcGraph</b>: tenta di caricare la scena ArcGraph configurata.</item>
-        ///   <item><b>MapGrid</b>: conserva il percorso storico.</item>
         /// </list>
         /// </summary>
         private void LoadStartupView()
@@ -179,11 +178,8 @@ namespace Arcontio.Core
                 case StartupViewMode.CurrentScene:
                     return;
                 case StartupViewMode.ArcGraph:
-                    LoadIfNotActive(arcGraphSceneName);
-                    return;
-                case StartupViewMode.MapGrid:
                 default:
-                    LoadIfNotActive(mapGridName);
+                    LoadIfNotActive(arcGraphSceneName);
                     return;
             }
         }

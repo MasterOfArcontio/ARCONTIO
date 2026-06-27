@@ -17229,7 +17229,8 @@ Sottostep operativi:
 | v0.70.08.10 | Rimozione fisica controllata dei residui F3 ArcGraph non piu' referenziati | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.11 | Audit cancellazione MapGrid/F3 legacy: dipendenze residue prima del delete fisico completo | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.12 | Bootstrap ArcGraph autonomo: togliere avvio obbligato da `Scene_MapGrid` | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.13 | Creazione/configurazione scena ArcGraph autonoma o switch bootstrap effettivo | Prossimo |
+| v0.70.08.13 | Creazione/configurazione scena ArcGraph autonoma o switch bootstrap effettivo | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.14 | Gate runtime Scene_ArcGraph e piano delete fisico MapGrid legacy | Prossimo |
 
 Esito `v0.70.08.04`:
 
@@ -17398,6 +17399,23 @@ Prossimo step `v0.70.08.13`:
 - collegare lo switch effettivo senza cancellare ancora `Scene_MapGrid`;
 - verificare in Unity che ArcGraph parta senza il vecchio F3 e senza dipendere da MapGrid come scena operativa;
 - solo dopo il test runtime, preparare il delete fisico dei componenti MapGrid/F3 rimasti.
+
+Esito `v0.70.08.13`:
+
+- la scena runtime principale e' stata rinominata dall'operatore in `Scene_ArcGraph`;
+- `ViewSwitcherInputActions` carica ora `Scene_ArcGraph` come startup view e non possiede piu' un percorso di avvio MapGrid;
+- l'azione input storica `SwitchToMap` viene mantenuta solo come binding esistente, ma ora porta ad ArcGraph;
+- `ArcGraphRuntimeSceneAutoInstaller` si installa solo in `Scene_ArcGraph`, non piu' in `Scene_MapGrid`;
+- `ProjectSettings/EditorBuildSettings.asset` punta al path `Assets/Scenes/Scene_ArcGraph.unity`;
+- i componenti legacy MapGrid possono essere ancora presenti dentro la scena rinominata, ma non sono piu' il nome/entrypoint della vista runtime principale;
+- build mirata `Assembly-CSharp` verificata con 0 errori; build completa bloccata da lock Unity su file in `Temp`, non da errore codice.
+
+Prossimo step `v0.70.08.14`:
+
+- validare in Play Mode che `Scene_Bootstrap` apra `Scene_ArcGraph`;
+- verificare camera, input, UI, placement, selezione, inspector, overlay LM/LOS/PF;
+- se il gate runtime passa, preparare la lista di delete fisico MapGrid/F3 legacy;
+- cancellare fisicamente MapGrid solo in uno step dedicato e dopo verifica dei riferimenti residui.
 
 ---
 

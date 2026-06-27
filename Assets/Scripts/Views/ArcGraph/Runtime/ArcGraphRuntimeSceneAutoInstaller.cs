@@ -13,8 +13,8 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// Installer runtime controllato che crea il cablaggio minimo ArcGraph
     /// nelle scene autorizzate quando la scena non contiene ancora i componenti
-    /// necessari alla vista ArcGraph runtime. Durante la transizione supporta
-    /// sia <c>Scene_MapGrid</c> sia la futura <c>Scene_ArcGraph</c>.
+    /// necessari alla vista ArcGraph runtime. Dopo la rinomina della scena
+    /// principale il punto di ingresso autorizzato e' <c>Scene_ArcGraph</c>.
     /// </para>
     ///
     /// <para><b>Principio architetturale: bootstrap visuale di bordo, non simulazione</b></para>
@@ -43,7 +43,6 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphRuntimeSceneAutoInstaller : MonoBehaviour
     {
-        private const string MapGridSceneName = "Scene_MapGrid";
         private const string ArcGraphSceneName = "Scene_ArcGraph";
         private const string ControllerRootName = "ArcGraphRuntimeController_Auto";
         private const string VisualRootName = "ArcGraphRuntimeVisualRoot_Auto";
@@ -113,10 +112,10 @@ namespace Arcontio.View.ArcGraph
         ///
         /// <para><b>Accensione confinata</b></para>
         /// <para>
-        /// L'hook installa ArcGraph solo nelle scene dichiarate come compatibili:
-        /// il vecchio <c>Scene_MapGrid</c> e la futura scena autonoma
+        /// L'hook installa ArcGraph solo nella scena runtime principale
         /// <c>Scene_ArcGraph</c>. Questo evita installazioni accidentali in
-        /// AtomViewer, SocialViewer o altre scene specialistiche.
+        /// AtomViewer, SocialViewer, bootstrap persistente o altre scene
+        /// specialistiche.
         /// </para>
         /// </summary>
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
@@ -190,16 +189,16 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Principio architetturale: installazione esplicita, non globale</b></para>
         /// <para>
         /// ArcGraph non deve comparire in ogni scena Unity solo perche' il dominio
-        /// C# e' attivo. In questa fase sono autorizzati due soli ingressi: la scena
-        /// legacy MapGrid, necessaria alla compatibilita', e la futura scena
-        /// ArcGraph autonoma, necessaria al pensionamento fisico di MapGrid.
+        /// C# e' attivo. In questa fase resta autorizzato un solo ingresso:
+        /// <c>Scene_ArcGraph</c>. I componenti legacy MapGrid possono ancora vivere
+        /// dentro la scena durante la migrazione, ma il bootstrap non deve piu'
+        /// dipendere dal nome scena MapGrid.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Scene validity</b>: le scene non valide vengono ignorate.</item>
-        ///   <item><b>Scene_MapGrid</b>: percorso legacy temporaneo.</item>
-        ///   <item><b>Scene_ArcGraph</b>: percorso autonomo nuovo.</item>
+        ///   <item><b>Scene_ArcGraph</b>: percorso runtime principale.</item>
         /// </list>
         /// </summary>
         private static bool IsArcGraphInstallScene(Scene scene)
@@ -207,8 +206,7 @@ namespace Arcontio.View.ArcGraph
             if (!scene.IsValid())
                 return false;
 
-            return string.Equals(scene.name, MapGridSceneName, StringComparison.Ordinal)
-                   || string.Equals(scene.name, ArcGraphSceneName, StringComparison.Ordinal);
+            return string.Equals(scene.name, ArcGraphSceneName, StringComparison.Ordinal);
         }
 
         // =============================================================================
