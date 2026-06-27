@@ -181,7 +181,8 @@ namespace Arcontio.View.ArcGraph
 
             if (_biosphereGraphCanvas != null
                 && _actionPanel != null
-                && _actionPanel.gameObject.activeSelf)
+                && _actionPanel.gameObject.activeSelf
+                && (_biosphereSnapshotProvider == null || _biosphereSnapshotProvider.HasPendingRuntimeRefresh))
                 RefreshBiosphereGraphPanel();
         }
 

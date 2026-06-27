@@ -175,6 +175,7 @@ Regola corrente:
 - aggiornamento biosfera runtime: scala temporale test impostata a `9000` tick SimulationHost per giorno, `375` tick per ora, orologio UI a ore piene (`HH:00`) e batch giornaliero biosfera/meteo allineato al cambio giorno;
 - validazione runtime biosfera: `v0.62` Dirty FOV/percezione e `v0.63` ArcGraph Environment Runtime Feed risultano validati dai test operatore; inclusi rendering piante/vegetazione, sorting, piante come blocco visuale/FOV, overlap aree biologiche e densita' foresta configurabile;
 - aggiornamento biosfera `v0.64`: introdotto boundary eventi/listener ambiente con `EnvironmentRuntimeChangeMask`, listener tipizzati registrabili su `SimulationHost` e compatibilita' mantenuta con l'evento legacy `EnvironmentRuntimeEventPublished`;
+- aggiornamento biosfera `v0.64.1`: TopBar e pannello grafici Biosfera consumano il boundary listener tipizzato; la TopBar usa l'evento come invalidazione ambiente e il clock display per l'ora, mentre i grafici non rigenerano piu' il ViewModel ogni frame senza eventi o richieste UI;
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;

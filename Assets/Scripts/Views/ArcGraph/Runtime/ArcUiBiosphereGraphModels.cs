@@ -150,14 +150,56 @@ namespace Arcontio.View.ArcGraph
         }
     }
 
-    public sealed class ArcUiBiosphereRuntimeSnapshotProvider
+    public sealed class ArcUiBiosphereRuntimeSnapshotProvider : IEnvironmentRuntimeEventListener
     {
         private readonly ArcUiBiosphereGraphViewModelFactory _factory = new();
         private SimulationHost _simulationHost;
+        private ArcUiBiosphereGraphViewModel _cachedViewModel =
+            ArcUiBiosphereGraphViewModel.Empty();
+        private ArcUiBiosphereGraphScope _cachedScope;
+        private ArcUiBiosphereGraphBucket _cachedBucket;
+        private int _cachedSelectedAreaId = -1;
+        private string _cachedHiddenSeriesSignature = string.Empty;
+        private bool _hasCachedViewModel;
+        private bool _runtimeGraphDirty = true;
+
+        public bool HasPendingRuntimeRefresh => _runtimeGraphDirty;
 
         public void SetSimulationHost(SimulationHost simulationHost)
         {
+            if (_simulationHost != null && _simulationHost != simulationHost)
+                _simulationHost.UnregisterEnvironmentRuntimeListener(this);
+
             _simulationHost = simulationHost;
+            _runtimeGraphDirty = true;
+
+            if (_simulationHost != null)
+                _simulationHost.RegisterEnvironmentRuntimeListener(this);
+        }
+
+        // =============================================================================
+        // OnEnvironmentRuntimeEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Marca sporco il ViewModel dei grafici quando il boundary ambiente pubblica
+        /// un cambiamento rilevante.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: graph view model derivato dagli eventi</b></para>
+        /// <para>
+        /// Il provider non possiede la Biosfera e non ascolta direttamente il
+        /// <c>World</c>. Riceve solo il DTO runtime gia' filtrato da
+        /// <c>SimulationHost</c> e usa la mask per sapere quando rigenerare lo
+        /// snapshot storico mostrato dal pannello debug.
+        /// </para>
+        /// </summary>
+        public void OnEnvironmentRuntimeEvent(EnvironmentRuntimeEvent runtimeEvent)
+        {
+            if (runtimeEvent.ChangeMask == EnvironmentRuntimeChangeMask.None)
+                return;
+
+            _runtimeGraphDirty = true;
         }
 
         public ArcUiBiosphereGraphViewModel BuildGraphViewModel(
@@ -169,12 +211,41 @@ namespace Arcontio.View.ArcGraph
             if (_simulationHost == null)
                 return ArcUiBiosphereGraphViewModel.Empty();
 
-            return _factory.Build(
+            string hiddenSeriesSignature = BuildHiddenSeriesSignature(hiddenSeriesKeys);
+            if (_hasCachedViewModel
+                && !_runtimeGraphDirty
+                && _cachedScope == scope
+                && _cachedBucket == bucket
+                && _cachedSelectedAreaId == selectedAreaId
+                && _cachedHiddenSeriesSignature == hiddenSeriesSignature)
+                return _cachedViewModel;
+
+            _cachedViewModel = _factory.Build(
                 _simulationHost.CreateBiosphereHistorySnapshot(),
                 scope,
                 bucket,
                 selectedAreaId,
                 hiddenSeriesKeys);
+            _cachedScope = scope;
+            _cachedBucket = bucket;
+            _cachedSelectedAreaId = selectedAreaId;
+            _cachedHiddenSeriesSignature = hiddenSeriesSignature;
+            _hasCachedViewModel = true;
+            _runtimeGraphDirty = false;
+            return _cachedViewModel;
+        }
+
+        private static string BuildHiddenSeriesSignature(ISet<string> hiddenSeriesKeys)
+        {
+            if (hiddenSeriesKeys == null || hiddenSeriesKeys.Count == 0)
+                return string.Empty;
+
+            var keys = new List<string>(hiddenSeriesKeys.Count);
+            foreach (string key in hiddenSeriesKeys)
+                keys.Add(ArcUiOperationDefinition.NormalizeKey(key));
+
+            keys.Sort(System.StringComparer.Ordinal);
+            return string.Join("|", keys);
         }
     }
 

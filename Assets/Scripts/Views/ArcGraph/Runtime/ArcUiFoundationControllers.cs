@@ -587,10 +587,13 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>BuildStateSnapshot</b>: snapshot letto dalla view.</item>
     /// </list>
     /// </summary>
-    public sealed class ArcUiSimulationControlController
+    public sealed class ArcUiSimulationControlController : IEnvironmentRuntimeEventListener
     {
         private SimulationHost _simulationHost;
         private ArcUiSimulationControlRequest _lastRequest;
+        private ArcUiEnvironmentStatusSnapshot _environmentStatusSnapshot =
+            ArcUiEnvironmentStatusSnapshot.Empty();
+        private bool _environmentStatusDirty = true;
         private int _speedMultiplier = 1;
         private int _biosphereDebugFastForwardMultiplier = 50;
 
@@ -616,13 +619,42 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         public void SetSimulationHost(SimulationHost host)
         {
+            if (_simulationHost != null && _simulationHost != host)
+                _simulationHost.UnregisterEnvironmentRuntimeListener(this);
+
             _simulationHost = host;
+            _environmentStatusDirty = true;
 
             if (_simulationHost != null)
             {
+                _simulationHost.RegisterEnvironmentRuntimeListener(this);
                 _simulationHost.SetRuntimeTickSpeedMultiplier(_speedMultiplier);
                 _simulationHost.SetBiosphereDebugFastForwardMultiplier(_biosphereDebugFastForwardMultiplier);
             }
+        }
+
+        // =============================================================================
+        // OnEnvironmentRuntimeEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riceve il contratto ambiente tipizzato pubblicato da <c>SimulationHost</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: evento come invalidazione, non come ownership</b></para>
+        /// <para>
+        /// La TopBar resta una view di snapshot: non conserva lo stato della Biosfera
+        /// e non legge <c>World</c>. L'evento segnala soltanto che calendario, clima o
+        /// meteo sono cambiati e che lo snapshot ambiente va ricostruito dal boundary
+        /// autorizzato del controller.
+        /// </para>
+        /// </summary>
+        public void OnEnvironmentRuntimeEvent(EnvironmentRuntimeEvent runtimeEvent)
+        {
+            if (!ShouldRefreshEnvironmentStatus(runtimeEvent.ChangeMask))
+                return;
+
+            _environmentStatusDirty = true;
         }
 
         // =============================================================================
@@ -767,7 +799,7 @@ namespace Arcontio.View.ArcGraph
             int biosphereDebugMultiplier = hasHost
                 ? _simulationHost.BiosphereDebugFastForwardMultiplier
                 : _biosphereDebugFastForwardMultiplier;
-            ArcUiEnvironmentStatusSnapshot environmentStatus = BuildEnvironmentStatusSnapshot();
+            ArcUiEnvironmentStatusSnapshot environmentStatus = ResolveEnvironmentStatusSnapshot();
 
             return new ArcUiSimulationControlState(
                 hasHost,
@@ -839,11 +871,11 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // BuildEnvironmentStatusSnapshot
+        // ResolveEnvironmentStatusSnapshot
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Produce lo snapshot ambiente letto dalla TopBar.
+        /// Restituisce lo snapshot ambiente letto dalla TopBar.
         /// </para>
         ///
         /// <para><b>Principio architetturale: boundary ambiente autorizzato</b></para>
@@ -853,12 +885,49 @@ namespace Arcontio.View.ArcGraph
         /// <c>World</c>, <c>EnvironmentState</c> o resolver della Biosfera.
         /// </para>
         /// </summary>
-        private ArcUiEnvironmentStatusSnapshot BuildEnvironmentStatusSnapshot()
+        private ArcUiEnvironmentStatusSnapshot ResolveEnvironmentStatusSnapshot()
+        {
+            if (_simulationHost == null)
+            {
+                _environmentStatusSnapshot = ArcUiEnvironmentStatusSnapshot.Empty();
+                _environmentStatusDirty = false;
+                return _environmentStatusSnapshot;
+            }
+
+            // L'evento ambiente invalida clima/meteo/giorno; il clock display invece
+            // puo' cambiare anche tra due update biologici giornalieri. Per questo
+            // controlliamo il calendario visibile a ogni snapshot TopBar, ma
+            // ricostruiamo tutto solo se cambia l'istante mostrato o se un evento
+            // tipizzato ha marcato dirty lo stato ambiente.
+            bool hasCalendar = _simulationHost.TryGetEnvironmentCalendarState(out EnvironmentCalendarState calendar);
+            if (!hasCalendar && !_environmentStatusDirty && _environmentStatusSnapshot.HasAnyStatus)
+                return _environmentStatusSnapshot;
+
+            if (!_environmentStatusDirty
+                && hasCalendar
+                && IsSameDisplayCalendar(_environmentStatusSnapshot, calendar))
+                return _environmentStatusSnapshot;
+
+            _environmentStatusSnapshot = BuildEnvironmentStatusSnapshot(hasCalendar, calendar);
+            _environmentStatusDirty = false;
+            return _environmentStatusSnapshot;
+        }
+
+        // =============================================================================
+        // BuildEnvironmentStatusSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce lo snapshot ambiente dal boundary autorizzato del runtime.
+        /// </para>
+        /// </summary>
+        private ArcUiEnvironmentStatusSnapshot BuildEnvironmentStatusSnapshot(
+            bool hasCalendar,
+            EnvironmentCalendarState calendar)
         {
             if (_simulationHost == null)
                 return ArcUiEnvironmentStatusSnapshot.Empty();
 
-            bool hasCalendar = _simulationHost.TryGetEnvironmentCalendarState(out EnvironmentCalendarState calendar);
             bool hasClimate = _simulationHost.TryGetEnvironmentClimateState(out EnvironmentGlobalClimateState climate);
             if (!hasCalendar && !hasClimate)
                 return ArcUiEnvironmentStatusSnapshot.Empty();
@@ -933,6 +1002,30 @@ namespace Arcontio.View.ArcGraph
                 timeLabel,
                 temperatureLabel,
                 humidityLabel);
+        }
+
+        private static bool ShouldRefreshEnvironmentStatus(EnvironmentRuntimeChangeMask changeMask)
+        {
+            if (changeMask == EnvironmentRuntimeChangeMask.None)
+                return false;
+
+            return (changeMask & EnvironmentRuntimeChangeMask.Calendar) != 0
+                   || (changeMask & EnvironmentRuntimeChangeMask.Climate) != 0
+                   || (changeMask & EnvironmentRuntimeChangeMask.Weather) != 0
+                   || changeMask == EnvironmentRuntimeChangeMask.All;
+        }
+
+        private static bool IsSameDisplayCalendar(
+            ArcUiEnvironmentStatusSnapshot snapshot,
+            EnvironmentCalendarState calendar)
+        {
+            return snapshot.HasCalendar
+                   && snapshot.Year == calendar.Date.Year
+                   && snapshot.Month == calendar.Date.Month + 1
+                   && snapshot.DayOfMonth == calendar.Date.DayOfMonth + 1
+                   && snapshot.DayOfYear == calendar.Date.DayOfYear + 1
+                   && snapshot.Hour == calendar.TimeOfDay.Hour
+                   && snapshot.Minute == calendar.TimeOfDay.Minute;
         }
 
         private static string ToSeasonLabel(EnvironmentSeasonKind season)
