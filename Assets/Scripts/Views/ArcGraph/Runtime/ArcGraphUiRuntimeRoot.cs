@@ -55,6 +55,7 @@ namespace Arcontio.View.ArcGraph
         private const float BiosphereColumnGap = 5f;
         private const float OuterMargin = 0f;
         private const float BiosphereToolbarHeight = 20f;
+        private const float BiosphereDiagnosticsHeight = 62f;
         private const float BiosphereChipHeight = 18f;
         private const string RuntimeUiSchemaMarkerName = "ArcUIRuntimeSchema_BiosphereGraphs_v4";
         private const string BiosphereWorldGraphsGroupKey = "biosphere_world_graphs";
@@ -100,6 +101,10 @@ namespace Arcontio.View.ArcGraph
         private TextMeshProUGUI _speedSimulationLabel;
         private TextMeshProUGUI _biosphereDebugMultiplierLabel;
         private TextMeshProUGUI _biosphereDebugGoStopLabel;
+        private TextMeshProUGUI _biosphereDiagnosticWorldLabel;
+        private TextMeshProUGUI _biosphereDiagnosticClimateLabel;
+        private TextMeshProUGUI _biosphereDiagnosticAreaLabel;
+        private TextMeshProUGUI _biosphereDiagnosticCountsLabel;
         private ArcUiSimulationControlController _simulationControlController;
         private ArcUiBiosphereRuntimeSnapshotProvider _biosphereSnapshotProvider;
         private ArcUiVisualOverlayController _visualOverlayController;
@@ -1109,6 +1114,7 @@ namespace Arcontio.View.ArcGraph
 
             BuildBiosphereLeftColumn(_actionPanelGroupRoot, viewModel);
             BuildBiosphereToolbar(_actionPanelContentRoot, viewModel);
+            BuildBiosphereDiagnosticsBlock(_actionPanelContentRoot, viewModel);
             BuildBiosphereGraphBlock(_actionPanelContentRoot, viewModel);
         }
 
@@ -1130,6 +1136,61 @@ namespace Arcontio.View.ArcGraph
                 Button area = CreateParameterChip(parent, ResolveBiosphereAreaLabel(viewModel), true, -1f, BiosphereChipHeight, 7);
                 area.onClick.AddListener(() => SelectNextBiosphereArea(viewModel));
             }
+        }
+
+        // =============================================================================
+        // BuildBiosphereDiagnosticsBlock
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la testata diagnostica compatta del pannello Biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug UI da ViewModel, non da World</b></para>
+        /// <para>
+        /// Le righe mostrate arrivano da <see cref="ArcUiBiosphereGraphViewModel"/> e
+        /// sono gia' state derivate dallo storico read-only della Biosfera. Questo
+        /// blocco quindi non conosce piante, aree o clima come strutture core: mostra
+        /// soltanto stringhe diagnostiche pronte.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>World</b>: data, stagione, meteo e numero campioni.</item>
+        ///   <item><b>Climate</b>: temperatura e umidita' correnti.</item>
+        ///   <item><b>Area</b>: area biologica selezionata o numero aree.</item>
+        ///   <item><b>Counts</b>: piante vive e vegetazione diffusa correnti.</item>
+        /// </list>
+        /// </summary>
+        private void BuildBiosphereDiagnosticsBlock(
+            RectTransform parent,
+            ArcUiBiosphereGraphViewModel viewModel)
+        {
+            RectTransform block = CreateRect("BiosphereDiagnosticsBlock", parent);
+            SetAnchors(
+                block,
+                new Vector2(0f, 1f),
+                new Vector2(1f, 1f),
+                new Vector2(0f, -(BiosphereToolbarHeight + BiosphereDiagnosticsHeight)),
+                new Vector2(0f, -BiosphereToolbarHeight));
+
+            Image image = block.gameObject.AddComponent<Image>();
+            image.raycastTarget = false;
+            image.color = ColorFromHex("#101820", 0.86f);
+
+            VerticalLayoutGroup layout = block.gameObject.AddComponent<VerticalLayoutGroup>();
+            layout.padding = new RectOffset(6, 6, 3, 3);
+            layout.spacing = 1f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = false;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+
+            _biosphereDiagnosticWorldLabel = CreateDiagnosticLine(block, "World");
+            _biosphereDiagnosticClimateLabel = CreateDiagnosticLine(block, "Climate");
+            _biosphereDiagnosticAreaLabel = CreateDiagnosticLine(block, "Area");
+            _biosphereDiagnosticCountsLabel = CreateDiagnosticLine(block, "Counts");
+            UpdateBiosphereDiagnosticsLabels(viewModel);
         }
 
         private void BuildBiosphereToolbar(RectTransform parent, ArcUiBiosphereGraphViewModel viewModel)
@@ -1187,7 +1248,7 @@ namespace Arcontio.View.ArcGraph
                 new Vector2(0f, 0f),
                 new Vector2(1f, 1f),
                 new Vector2(0f, 0f),
-                new Vector2(0f, -BiosphereToolbarHeight));
+                new Vector2(0f, -(BiosphereToolbarHeight + BiosphereDiagnosticsHeight)));
             Image image = block.gameObject.AddComponent<Image>();
             image.raycastTarget = false;
             image.color = ColorFromHex("#18222C", 0.82f);
@@ -1285,7 +1346,34 @@ namespace Arcontio.View.ArcGraph
                 return;
             }
 
+            UpdateBiosphereDiagnosticsLabels(viewModel);
             _biosphereGraphCanvas.SetViewModel(viewModel);
+        }
+
+        // =============================================================================
+        // UpdateBiosphereDiagnosticsLabels
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiorna le righe diagnostiche senza ricostruire l'intero pannello.
+        /// </para>
+        /// </summary>
+        private void UpdateBiosphereDiagnosticsLabels(ArcUiBiosphereGraphViewModel viewModel)
+        {
+            ArcUiBiosphereDiagnosticsSnapshot diagnostics =
+                viewModel?.Diagnostics ?? ArcUiBiosphereDiagnosticsSnapshot.Empty();
+
+            if (_biosphereDiagnosticWorldLabel != null)
+                _biosphereDiagnosticWorldLabel.text = diagnostics.WorldLine;
+
+            if (_biosphereDiagnosticClimateLabel != null)
+                _biosphereDiagnosticClimateLabel.text = diagnostics.ClimateLine;
+
+            if (_biosphereDiagnosticAreaLabel != null)
+                _biosphereDiagnosticAreaLabel.text = diagnostics.AreaLine;
+
+            if (_biosphereDiagnosticCountsLabel != null)
+                _biosphereDiagnosticCountsLabel.text = diagnostics.AreaCountsLine;
         }
 
         private static string ResolveBiosphereAreaLabel(ArcUiBiosphereGraphViewModel viewModel)
@@ -1350,9 +1438,10 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private static string ResolveBiosphereYUnitLabel(ArcUiBiosphereGraphViewModel viewModel)
         {
+            string range = FormatAxisRange(viewModel.MinY, viewModel.MaxY);
             return viewModel.Scope == ArcUiBiosphereGraphScope.BiologicalArea
-                ? "Y: conteggio piante / celle"
-                : "Y: indice normalizzato 0-1";
+                ? "Y: conteggio " + range
+                : "Y: indice 0-1 " + range;
         }
 
         // =============================================================================
@@ -1366,9 +1455,10 @@ namespace Arcontio.View.ArcGraph
         /// </summary>
         private static string ResolveBiosphereXUnitLabel(ArcUiBiosphereGraphViewModel viewModel)
         {
+            string range = FormatAxisRange(viewModel.MinX, viewModel.MaxX);
             return viewModel.Bucket == ArcUiBiosphereGraphBucket.Months
-                ? "X: mesi"
-                : "X: giorni";
+                ? "X: mesi " + range
+                : "X: giorni " + range;
         }
 
         private static string BuildBiosphereLegendSignature(ArcUiBiosphereGraphViewModel viewModel)
@@ -1382,6 +1472,19 @@ namespace Arcontio.View.ArcGraph
                 signature += "|world_weather";
 
             return signature;
+        }
+
+        private static string FormatAxisRange(float min, float max)
+        {
+            return FormatAxisValue(min) + "-" + FormatAxisValue(max);
+        }
+
+        private static string FormatAxisValue(float value)
+        {
+            if (Mathf.Abs(value) >= 10f)
+                return Mathf.RoundToInt(value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            return value.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private void BuildBottomActionBar()
@@ -1932,6 +2035,28 @@ namespace Arcontio.View.ArcGraph
             text.overflowMode = TextOverflowModes.Ellipsis;
             text.enableWordWrapping = false;
             text.color = ColorFromHex("#DDE6EE", 0.82f);
+            return text;
+        }
+
+        // =============================================================================
+        // CreateDiagnosticLine
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una riga compatta per la diagnostica Biosfera.
+        /// </para>
+        /// </summary>
+        private static TextMeshProUGUI CreateDiagnosticLine(RectTransform parent, string label)
+        {
+            RectTransform root = CreateRect("BiosphereDiag_" + SanitizeName(label), parent);
+            LayoutElement layout = root.gameObject.AddComponent<LayoutElement>();
+            layout.preferredHeight = 13f;
+            layout.minHeight = 13f;
+
+            TextMeshProUGUI text = CreateText(root, "--", 8, FontStyles.Bold, TextAlignmentOptions.MidlineLeft);
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            text.enableWordWrapping = false;
+            text.color = ColorFromHex("#DDE6EE", 0.86f);
             return text;
         }
 

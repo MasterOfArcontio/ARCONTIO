@@ -16600,7 +16600,8 @@ Blocchi previsti:
 | v0.64.1 | collegare TopBar e grafici Biosfera ai listener ambiente tipizzati | ✅ Implementato |
 | v0.65 | integrare save/load biosfera runtime | 🧊 Rinviato: assorbito dal futuro save/load globale della simulazione |
 | v0.66 | integrare query NPC verso aree/risorse biologiche | ✅ Foundation query/prodotti biologici completata, belief/job completi futuri |
-| v0.67 | pannello debug/calibrazione runtime biosfera | ⏳ Pending |
+| v0.67 | pannello debug/calibrazione runtime biosfera | ⚠️ Parziale: diagnostica runtime implementata, calibrazione avanzata pending |
+| v0.67.1 | aggiungere testata diagnostica compatta e range numerici ai grafici Biosfera | ✅ Implementato |
 | v0.68 | budget e batch processing produttivo | ✅ Core budget runtime completato, spreading multi-tick futuro |
 | v0.69 | QA closeout integrazione fisica biosfera | ⏳ Pending |
 

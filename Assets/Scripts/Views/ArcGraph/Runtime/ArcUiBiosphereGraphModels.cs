@@ -1,6 +1,7 @@
 using Arcontio.Core;
 using Arcontio.Core.Environment;
 using System.Collections.Generic;
+using System.Globalization;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -104,6 +105,7 @@ namespace Arcontio.View.ArcGraph
         public ArcUiBiosphereGraphSeries[] Series { get; }
         public ArcUiBiosphereWeatherBucket[] WeatherBuckets { get; }
         public ArcUiBiosphereAreaOption[] AreaOptions { get; }
+        public ArcUiBiosphereDiagnosticsSnapshot Diagnostics { get; }
 
         public bool HasData => Series.Length > 0 || WeatherBuckets.Length > 0;
 
@@ -118,7 +120,8 @@ namespace Arcontio.View.ArcGraph
             float maxY,
             ArcUiBiosphereGraphSeries[] series,
             ArcUiBiosphereWeatherBucket[] weatherBuckets,
-            ArcUiBiosphereAreaOption[] areaOptions)
+            ArcUiBiosphereAreaOption[] areaOptions,
+            ArcUiBiosphereDiagnosticsSnapshot diagnostics = null)
         {
             Scope = scope;
             Bucket = bucket;
@@ -131,6 +134,7 @@ namespace Arcontio.View.ArcGraph
             Series = series ?? EmptySeries;
             WeatherBuckets = weatherBuckets ?? EmptyWeather;
             AreaOptions = areaOptions ?? EmptyAreas;
+            Diagnostics = diagnostics ?? ArcUiBiosphereDiagnosticsSnapshot.Empty();
         }
 
         public static ArcUiBiosphereGraphViewModel Empty()
@@ -146,7 +150,63 @@ namespace Arcontio.View.ArcGraph
                 1f,
                 EmptySeries,
                 EmptyWeather,
-                EmptyAreas);
+                EmptyAreas,
+                ArcUiBiosphereDiagnosticsSnapshot.Empty());
+        }
+    }
+
+    // =============================================================================
+    // ArcUiBiosphereDiagnosticsSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Read model compatto per la testata diagnostica del pannello Biosfera.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: diagnostica derivata, non accesso al World</b></para>
+    /// <para>
+    /// La UI non deve contare piante, vegetazione o meteo interrogando lo stato
+    /// mutabile della simulazione. Questo oggetto trasporta solo stringhe gia'
+    /// derivate dallo storico read-only della Biosfera, cosi' il pannello runtime
+    /// puo' spiegare il grafico senza aprire un secondo canale dati.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>WorldLine</b>: data, stagione, meteo e numero campioni.</item>
+    ///   <item><b>ClimateLine</b>: temperatura e umidita' normalizzate.</item>
+    ///   <item><b>AreaLine</b>: area biologica selezionata.</item>
+    ///   <item><b>AreaCountsLine</b>: conteggi correnti di piante e vegetazione.</item>
+    /// </list>
+    /// </summary>
+    public sealed class ArcUiBiosphereDiagnosticsSnapshot
+    {
+        private static readonly ArcUiBiosphereDiagnosticsSnapshot EmptySnapshot =
+            new ArcUiBiosphereDiagnosticsSnapshot(false, "Biosfera: nessun campione", "--", "--", "--");
+
+        public bool HasData { get; }
+        public string WorldLine { get; }
+        public string ClimateLine { get; }
+        public string AreaLine { get; }
+        public string AreaCountsLine { get; }
+
+        public ArcUiBiosphereDiagnosticsSnapshot(
+            bool hasData,
+            string worldLine,
+            string climateLine,
+            string areaLine,
+            string areaCountsLine)
+        {
+            HasData = hasData;
+            WorldLine = string.IsNullOrWhiteSpace(worldLine) ? "Biosfera: --" : worldLine.Trim();
+            ClimateLine = string.IsNullOrWhiteSpace(climateLine) ? "--" : climateLine.Trim();
+            AreaLine = string.IsNullOrWhiteSpace(areaLine) ? "--" : areaLine.Trim();
+            AreaCountsLine = string.IsNullOrWhiteSpace(areaCountsLine) ? "--" : areaCountsLine.Trim();
+        }
+
+        public static ArcUiBiosphereDiagnosticsSnapshot Empty()
+        {
+            return EmptySnapshot;
         }
     }
 
@@ -289,6 +349,11 @@ namespace Arcontio.View.ArcGraph
                 : BuildDailyWeather(frames);
 
             ResolveBounds(series, weather, out float minX, out float maxX, out float minY, out float maxY);
+            ArcUiBiosphereDiagnosticsSnapshot diagnostics = BuildDiagnostics(
+                frames,
+                ArcUiBiosphereGraphScope.World,
+                0,
+                areas);
             return new ArcUiBiosphereGraphViewModel(
                 ArcUiBiosphereGraphScope.World,
                 bucket,
@@ -300,7 +365,8 @@ namespace Arcontio.View.ArcGraph
                 maxY,
                 series,
                 weather,
-                areas);
+                areas,
+                diagnostics);
         }
 
         private ArcUiBiosphereGraphViewModel BuildAreaGraph(
@@ -315,6 +381,11 @@ namespace Arcontio.View.ArcGraph
                 : BuildAreaDailySeries(frames, areaId, hiddenSeriesKeys);
 
             ResolveBounds(series, new ArcUiBiosphereWeatherBucket[0], out float minX, out float maxX, out float minY, out float maxY);
+            ArcUiBiosphereDiagnosticsSnapshot diagnostics = BuildDiagnostics(
+                frames,
+                ArcUiBiosphereGraphScope.BiologicalArea,
+                areaId,
+                areas);
             return new ArcUiBiosphereGraphViewModel(
                 ArcUiBiosphereGraphScope.BiologicalArea,
                 bucket,
@@ -326,7 +397,66 @@ namespace Arcontio.View.ArcGraph
                 maxY,
                 series,
                 new ArcUiBiosphereWeatherBucket[0],
-                areas);
+                areas,
+                diagnostics);
+        }
+
+        // =============================================================================
+        // BuildDiagnostics
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Deriva le righe diagnostiche correnti dallo storico Biosfera read-only.
+        /// </para>
+        /// </summary>
+        private static ArcUiBiosphereDiagnosticsSnapshot BuildDiagnostics(
+            EnvironmentHistoryFrame[] frames,
+            ArcUiBiosphereGraphScope scope,
+            int selectedAreaId,
+            ArcUiBiosphereAreaOption[] areas)
+        {
+            if (frames == null || frames.Length == 0)
+                return ArcUiBiosphereDiagnosticsSnapshot.Empty();
+
+            EnvironmentHistoryFrame latest = frames[frames.Length - 1];
+            EnvironmentWorldHistorySample world = latest.World;
+            string worldLine =
+                "Giorno " + world.AbsoluteDay.ToString(CultureInfo.InvariantCulture)
+                + " | Y" + world.Year.ToString(CultureInfo.InvariantCulture)
+                + " M" + (world.Month + 1).ToString(CultureInfo.InvariantCulture)
+                + " D" + (world.DayOfMonth + 1).ToString(CultureInfo.InvariantCulture)
+                + " | " + SeasonLabel(world.Season)
+                + " | " + WeatherLabel(world.WeatherKind)
+                + " | campioni " + frames.Length.ToString(CultureInfo.InvariantCulture);
+            string climateLine =
+                "Temp " + Percent(world.Temperature01)
+                + " | Umidita " + Percent(world.Humidity01);
+
+            if (scope != ArcUiBiosphereGraphScope.BiologicalArea)
+            {
+                string areaSummary = "Aree biologiche: " + (areas?.Length ?? 0).ToString(CultureInfo.InvariantCulture);
+                return new ArcUiBiosphereDiagnosticsSnapshot(true, worldLine, climateLine, areaSummary, "--");
+            }
+
+            if (!TryFindArea(latest, selectedAreaId, out EnvironmentAreaHistorySample area))
+            {
+                return new ArcUiBiosphereDiagnosticsSnapshot(
+                    true,
+                    worldLine,
+                    climateLine,
+                    "Area selezionata: --",
+                    "Piante 0 | Vegetazione 0");
+            }
+
+            string areaLine =
+                "Area " + area.AreaId.Value.ToString(CultureInfo.InvariantCulture)
+                + " | " + area.AreaKey;
+            string areaCountsLine =
+                "Piante " + Total(area.LivePlantsBySpecies).ToString(CultureInfo.InvariantCulture)
+                + " [" + CountsList(area.LivePlantsBySpecies) + "]"
+                + " | Vegetazione " + Total(area.VegetationCellsByKind).ToString(CultureInfo.InvariantCulture)
+                + " [" + CountsList(area.VegetationCellsByKind) + "]";
+            return new ArcUiBiosphereDiagnosticsSnapshot(true, worldLine, climateLine, areaLine, areaCountsLine);
         }
 
         private ArcUiBiosphereGraphSeries[] BuildWorldDailySeries(
@@ -760,6 +890,64 @@ namespace Arcontio.View.ArcGraph
                 return key.Substring("vegetation_".Length) + " vegetazione";
 
             return key;
+        }
+
+        private static string SeasonLabel(EnvironmentSeasonKind season)
+        {
+            return season switch
+            {
+                EnvironmentSeasonKind.Summer => "Estate",
+                EnvironmentSeasonKind.Autumn => "Autunno",
+                EnvironmentSeasonKind.Winter => "Inverno",
+                _ => "Primavera"
+            };
+        }
+
+        private static string WeatherLabel(EnvironmentWeatherKind weather)
+        {
+            return weather switch
+            {
+                EnvironmentWeatherKind.Rain => "Pioggia",
+                EnvironmentWeatherKind.Snow => "Neve",
+                EnvironmentWeatherKind.Wind => "Vento",
+                EnvironmentWeatherKind.HeatWave => "Caldo",
+                EnvironmentWeatherKind.Storm => "Tempesta",
+                _ => "Sereno"
+            };
+        }
+
+        private static string Percent(float value01)
+        {
+            int value = Mathf.RoundToInt(Mathf.Clamp01(value01) * 100f);
+            return value.ToString(CultureInfo.InvariantCulture) + "%";
+        }
+
+        private static int Total(EnvironmentHistoryCount[] counts)
+        {
+            int total = 0;
+            var safeCounts = counts ?? new EnvironmentHistoryCount[0];
+            for (int i = 0; i < safeCounts.Length; i++)
+                total += safeCounts[i].Count;
+
+            return total;
+        }
+
+        private static string CountsList(EnvironmentHistoryCount[] counts)
+        {
+            var safeCounts = counts ?? new EnvironmentHistoryCount[0];
+            if (safeCounts.Length == 0)
+                return "nessuna";
+
+            var parts = new List<string>(safeCounts.Length);
+            for (int i = 0; i < safeCounts.Length; i++)
+            {
+                parts.Add(
+                    safeCounts[i].Key
+                    + " "
+                    + safeCounts[i].Count.ToString(CultureInfo.InvariantCulture));
+            }
+
+            return string.Join(", ", parts);
         }
 
         private static EnvironmentWeatherKind ParseWeather(string key)
