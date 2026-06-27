@@ -300,18 +300,18 @@ namespace Arcontio.Core.Environment
             int before = outCandidates.Count;
             var freeCells = new List<EnvironmentCellCoord>(64);
             var selectedCells = new List<EnvironmentCellCoord>(8);
+            var globalSelectedCells = new List<EnvironmentCellCoord>(32);
+            var biologicalAreas = CollectSortedBiologicalAreas();
 
-            foreach (var pair in _areaDefinitions)
+            for (int areaIndex = 0; areaIndex < biologicalAreas.Count; areaIndex++)
             {
-                EnvironmentAreaDefinition area = pair.Value;
-                if (!IsBiologicalArea(area))
-                    continue;
+                EnvironmentAreaDefinition area = biologicalAreas[areaIndex];
 
                 freeCells.Clear();
                 selectedCells.Clear();
 
                 CollectBiologicalFreeCells(world, area, freeCells);
-                SelectBiologicalAnchorCells(area, freeCells, selectedCells);
+                SelectBiologicalAnchorCells(area, freeCells, selectedCells, globalSelectedCells);
 
                 for (int i = 0; i < selectedCells.Count; i++)
                 {
@@ -322,6 +322,7 @@ namespace Arcontio.Core.Environment
                         LandmarkRegistry.LandmarkKind.BiologicalAnchor,
                         1.0f,
                         area.AreaId.Value));
+                    AddCellIfMissing(globalSelectedCells, cell);
                 }
             }
 
@@ -478,24 +479,26 @@ namespace Arcontio.Core.Environment
             var freeCells = new List<EnvironmentCellCoord>(128);
             var physicalPlantCells = new List<EnvironmentCellCoord>(64);
             var anchorCells = new List<EnvironmentCellCoord>(8);
-            var plantUsedCells = new List<EnvironmentCellCoord>(32);
+            var globalAnchorCells = new List<EnvironmentCellCoord>(32);
+            var globalPlantUsedCells = new List<EnvironmentCellCoord>(32);
+            var globalVegetationUsedCells = new List<EnvironmentCellCoord>(128);
+            var biologicalAreas = CollectSortedBiologicalAreas();
 
-            foreach (var pair in _areaDefinitions)
+            for (int areaIndex = 0; areaIndex < biologicalAreas.Count; areaIndex++)
             {
-                EnvironmentAreaDefinition area = pair.Value;
-                if (!IsBiologicalArea(area))
-                    continue;
+                EnvironmentAreaDefinition area = biologicalAreas[areaIndex];
 
                 freeCells.Clear();
                 physicalPlantCells.Clear();
                 anchorCells.Clear();
-                plantUsedCells.Clear();
 
                 CollectBiologicalFreeCells(world, area, freeCells);
                 CollectPhysicalPlantFreeCells(world, area, physicalPlantCells);
-                SelectBiologicalAnchorCells(area, freeCells, anchorCells);
-                BuildVegetationCells(area, freeCells);
-                BuildPhysicalPlantCells(area, physicalPlantCells, anchorCells, plantUsedCells);
+                RemoveCells(freeCells, globalPlantUsedCells);
+                SelectBiologicalAnchorCells(area, freeCells, anchorCells, globalPlantUsedCells);
+                AddCellsIfMissing(globalAnchorCells, anchorCells);
+                BuildPhysicalPlantCells(area, physicalPlantCells, globalAnchorCells, globalPlantUsedCells);
+                BuildVegetationCells(area, freeCells, globalVegetationUsedCells, globalPlantUsedCells);
             }
 
             return _vegetationCellPlacements.Count + _physicalPlantPlacements.Count;
@@ -535,17 +538,9 @@ namespace Arcontio.Core.Environment
                 return 0;
 
             var freeCells = new List<EnvironmentCellCoord>(128);
-
-            foreach (var pair in _areaDefinitions)
-            {
-                EnvironmentAreaDefinition area = pair.Value;
-                if (!IsBiologicalArea(area))
-                    continue;
-
-                freeCells.Clear();
-                CollectBiologicalFreeCells(world, area, freeCells);
-                BuildVegetationCells(area, freeCells);
-            }
+            var globalPlantUsedCells = new List<EnvironmentCellCoord>(32);
+            var globalVegetationUsedCells = new List<EnvironmentCellCoord>(128);
+            var livePlants = new List<EnvironmentPlantInstance>(_plantInstances.Count);
 
             foreach (var pair in _plantInstances)
             {
@@ -553,11 +548,33 @@ namespace Arcontio.Core.Environment
                 if (!plant.IsAlive || !plant.PlantId.IsValid)
                     continue;
 
+                livePlants.Add(plant);
+            }
+
+            livePlants.Sort(ComparePlantInstancesForProjection);
+
+            for (int i = 0; i < livePlants.Count; i++)
+            {
+                EnvironmentPlantInstance plant = livePlants[i];
+                if (ContainsCell(globalPlantUsedCells, plant.Cell))
+                    continue;
+
                 _physicalPlantPlacements.Add(new EnvironmentPhysicalPlantPlacement(
                     plant.PlantId,
                     plant.SourceAreaId,
                     plant.Cell,
                     plant.SpeciesKey));
+                AddCellIfMissing(globalPlantUsedCells, plant.Cell);
+            }
+
+            var biologicalAreas = CollectSortedBiologicalAreas();
+            for (int areaIndex = 0; areaIndex < biologicalAreas.Count; areaIndex++)
+            {
+                EnvironmentAreaDefinition area = biologicalAreas[areaIndex];
+
+                freeCells.Clear();
+                CollectBiologicalFreeCells(world, area, freeCells);
+                BuildVegetationCells(area, freeCells, globalVegetationUsedCells, globalPlantUsedCells);
             }
 
             return _vegetationCellPlacements.Count + _physicalPlantPlacements.Count;
@@ -807,26 +824,51 @@ namespace Arcontio.Core.Environment
             return from + ((to - from) * safeT);
         }
 
+        // =============================================================================
+        // BuildVegetationCells
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Materializza la vegetazione diffusa di un'area rispettando le riserve gia'
+        /// assegnate da aree biologiche processate prima.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: overlap risolto nel placement, non nel catalogo</b></para>
+        /// <para>
+        /// Le aree biologiche possono sovrapporsi come informazione ecologica, ma la
+        /// proiezione cell-based verso World/ArcGraph deve restare univoca. Per
+        /// questo il metodo riceve celle di vegetazione gia' usate e celle occupate
+        /// da piante fisiche: una pianta vince sempre su vegetazione decorativa.
+        /// </para>
+        /// </summary>
         private void BuildVegetationCells(
             EnvironmentAreaDefinition area,
-            List<EnvironmentCellCoord> freeCells)
+            List<EnvironmentCellCoord> freeCells,
+            List<EnvironmentCellCoord> usedVegetationCells,
+            List<EnvironmentCellCoord> usedPhysicalPlantCells)
         {
             if (!_vegetationAreas.TryGetValue(area.AreaId, out EnvironmentVegetationAreaState vegetation))
                 return;
 
-            int targetCount = ResolvePlacementCount(freeCells.Count, vegetation.Density01, 1.0f);
+            int availableCount = CountAvailableCells(freeCells, usedVegetationCells, usedPhysicalPlantCells);
+            int targetCount = ResolvePlacementCount(availableCount, vegetation.Density01, 1.0f);
             var distributedCells = new List<EnvironmentCellCoord>(freeCells);
             SortCellsByDistributionScore(distributedCells, ResolveStableAreaSeed(area));
 
             int created = 0;
             for (int i = 0; i < distributedCells.Count && created < targetCount; i++)
             {
+                EnvironmentCellCoord cell = distributedCells[i];
+                if (ContainsCell(usedVegetationCells, cell) || ContainsCell(usedPhysicalPlantCells, cell))
+                    continue;
+
                 _vegetationCellPlacements.Add(new EnvironmentVegetationCellPlacement(
                     area.AreaId,
-                    distributedCells[i],
+                    cell,
                     vegetation.VegetationKind,
                     vegetation.Density01,
                     vegetation.Health01));
+                AddCellIfMissing(usedVegetationCells, cell);
                 created++;
             }
         }
@@ -887,7 +929,7 @@ namespace Arcontio.Core.Environment
                         area.AreaId,
                         cell,
                         entry.SpeciesKey));
-                    usedPlantCells.Add(cell);
+                    AddCellIfMissing(usedPlantCells, cell);
                     createdInArea++;
                 }
             }
@@ -1082,10 +1124,20 @@ namespace Arcontio.Core.Environment
             }
         }
 
+        // =============================================================================
+        // SelectBiologicalAnchorCells
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Seleziona le celle landmark biologiche evitando celle gia' riservate da
+        /// piante fisiche o da landmark biologici scelti per aree precedenti.
+        /// </para>
+        /// </summary>
         private static void SelectBiologicalAnchorCells(
             EnvironmentAreaDefinition area,
             List<EnvironmentCellCoord> freeCells,
-            List<EnvironmentCellCoord> outSelected)
+            List<EnvironmentCellCoord> outSelected,
+            List<EnvironmentCellCoord> reservedCells = null)
         {
             if (freeCells == null || outSelected == null || freeCells.Count == 0)
                 return;
@@ -1106,7 +1158,7 @@ namespace Arcontio.Core.Environment
                 int tx = area.CenterX + (dirs[i, 0] * System.Math.Max(1, radius));
                 int ty = area.CenterY + (dirs[i, 1] * System.Math.Max(1, radius));
 
-                if (TryFindNearestUnusedCell(freeCells, outSelected, tx, ty, out EnvironmentCellCoord selected))
+                if (TryFindNearestUnusedCell(freeCells, outSelected, reservedCells, tx, ty, out EnvironmentCellCoord selected))
                     outSelected.Add(selected);
             }
         }
@@ -1114,6 +1166,7 @@ namespace Arcontio.Core.Environment
         private static bool TryFindNearestUnusedCell(
             List<EnvironmentCellCoord> cells,
             List<EnvironmentCellCoord> used,
+            List<EnvironmentCellCoord> reserved,
             int targetX,
             int targetY,
             out EnvironmentCellCoord selected)
@@ -1125,7 +1178,7 @@ namespace Arcontio.Core.Environment
             for (int i = 0; i < cells.Count; i++)
             {
                 EnvironmentCellCoord cell = cells[i];
-                if (ContainsCell(used, cell))
+                if (ContainsCell(used, cell) || ContainsCell(reserved, cell))
                     continue;
 
                 int dx = cell.X - targetX;
@@ -1143,6 +1196,111 @@ namespace Arcontio.Core.Environment
 
             selected = cells[bestIndex];
             return true;
+        }
+
+        private List<EnvironmentAreaDefinition> CollectSortedBiologicalAreas()
+        {
+            var areas = new List<EnvironmentAreaDefinition>(_areaDefinitions.Count);
+            foreach (var pair in _areaDefinitions)
+            {
+                EnvironmentAreaDefinition area = pair.Value;
+                if (IsBiologicalArea(area))
+                    areas.Add(area);
+            }
+
+            areas.Sort(CompareBiologicalAreasForOccupancy);
+            return areas;
+        }
+
+        private static int CompareBiologicalAreasForOccupancy(
+            EnvironmentAreaDefinition left,
+            EnvironmentAreaDefinition right)
+        {
+            // Priorita' maggiore prima: in celle sovrapposte l'area piu' importante
+            // riserva per prima vegetazione, piante e anchor biologici.
+            int priorityCompare = right.Priority.CompareTo(left.Priority);
+            if (priorityCompare != 0)
+                return priorityCompare;
+
+            return left.AreaId.Value.CompareTo(right.AreaId.Value);
+        }
+
+        private int ComparePlantInstancesForProjection(
+            EnvironmentPlantInstance left,
+            EnvironmentPlantInstance right)
+        {
+            int leftPriority = ResolveAreaPriority(left.SourceAreaId);
+            int rightPriority = ResolveAreaPriority(right.SourceAreaId);
+            int priorityCompare = rightPriority.CompareTo(leftPriority);
+            if (priorityCompare != 0)
+                return priorityCompare;
+
+            int areaCompare = left.SourceAreaId.Value.CompareTo(right.SourceAreaId.Value);
+            if (areaCompare != 0)
+                return areaCompare;
+
+            return left.PlantId.Value.CompareTo(right.PlantId.Value);
+        }
+
+        private int ResolveAreaPriority(EnvironmentAreaId areaId)
+        {
+            return areaId.IsValid && _areaDefinitions.TryGetValue(areaId, out EnvironmentAreaDefinition area)
+                ? area.Priority
+                : int.MinValue;
+        }
+
+        private static int CountAvailableCells(
+            List<EnvironmentCellCoord> cells,
+            List<EnvironmentCellCoord> usedVegetationCells,
+            List<EnvironmentCellCoord> usedPhysicalPlantCells)
+        {
+            if (cells == null || cells.Count == 0)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < cells.Count; i++)
+            {
+                EnvironmentCellCoord cell = cells[i];
+                if (ContainsCell(usedVegetationCells, cell) || ContainsCell(usedPhysicalPlantCells, cell))
+                    continue;
+
+                count++;
+            }
+
+            return count;
+        }
+
+        private static void RemoveCells(
+            List<EnvironmentCellCoord> cells,
+            List<EnvironmentCellCoord> reservedCells)
+        {
+            if (cells == null || cells.Count == 0 || reservedCells == null || reservedCells.Count == 0)
+                return;
+
+            for (int i = cells.Count - 1; i >= 0; i--)
+                if (ContainsCell(reservedCells, cells[i]))
+                    cells.RemoveAt(i);
+        }
+
+        private static void AddCellsIfMissing(
+            List<EnvironmentCellCoord> target,
+            List<EnvironmentCellCoord> source)
+        {
+            if (target == null || source == null)
+                return;
+
+            for (int i = 0; i < source.Count; i++)
+                AddCellIfMissing(target, source[i]);
+        }
+
+        private static void AddCellIfMissing(
+            List<EnvironmentCellCoord> cells,
+            EnvironmentCellCoord cell)
+        {
+            if (cells == null || ContainsCell(cells, cell))
+                return;
+
+            cells.Add(cell);
         }
 
         private static bool ContainsCell(List<EnvironmentCellCoord> cells, EnvironmentCellCoord target)
