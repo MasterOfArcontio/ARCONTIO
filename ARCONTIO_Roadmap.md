@@ -16596,6 +16596,7 @@ Blocchi previsti:
 | v0.63.1 | generare maschera organica deterministica configurabile per aree biologiche entro raggio massimo | ✅ Implementato |
 | v0.63.2 | risolvere sovrapposizione aree biologiche per piante, vegetazione diffusa e landmark biologici | ✅ Implementato |
 | v0.63.3 | rendere configurabile per area il bilanciamento vegetazione diffusa / piante fisiche | ✅ Implementato |
+| v0.63.4 | allineare carrying capacity runtime piante fisiche a PhysicalPlantDominance01 per-area | ✅ Implementato |
 | v0.64 | esporre eventi/listener ambiente per UI e sistemi | ✅ Implementato |
 | v0.64.1 | collegare TopBar e grafici Biosfera ai listener ambiente tipizzati | ✅ Implementato |
 | v0.65 | integrare save/load biosfera runtime | 🧊 Rinviato: assorbito dal futuro save/load globale della simulazione |

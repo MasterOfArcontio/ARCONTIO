@@ -6,7 +6,6 @@
   "healthRecoveryStep01": 0.055,
   "healthStressStep01": 0.025,
   "removeDeadPlants": false,
-  "seedPressureDesiredPlantAreaScale01": 0.045,
   "plantVitalityMin01": 0.70,
   "plantVitalityMax01": 1.35,
   "initialPlantHealthVitalityScale01": 0.22,

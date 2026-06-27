@@ -47,10 +47,6 @@ namespace Arcontio.Core.Environment
         public bool removeDeadPlants = false;
         public float plantAridityHealthStressScale01 = 0.014f;
 
-        // Quota di area biologica che una seed pressure massima puo' sostenere come
-        // piante fisiche importanti. Il valore non e' "numero di alberi": il target
-        // resta candidateCells * Amount01 * Viability01 * scala.
-        public float seedPressureDesiredPlantAreaScale01 = 0.045f;
         public float plantVitalityMin01 = 0.70f;
         public float plantVitalityMax01 = 1.35f;
         public float initialPlantHealthVitalityScale01 = 0.22f;
@@ -952,11 +948,14 @@ namespace Arcontio.Core.Environment
             float seedPressure01,
             EnvironmentNaturalGrowthConfig config)
         {
-            // Il target popolazionale e' proporzionale alla pressione del seed bank,
-            // non a una costante per specie. Se il seed oak scende, scende anche il
-            // numero di oak sostenibile dall'area.
+            // Il target popolazionale usa lo stesso parametro per-area usato dal
+            // bootstrap fisico. In questo modo una foresta creata con
+            // PhysicalPlantDominance01 alta non viene poi "potata" dal runtime verso
+            // una seconda scala globale divergente. La seed pressure resta il freno
+            // biologico specie-specifico: se amount/viability scendono, scende anche
+            // il numero sostenibile della specie dentro l'area.
             int candidateCells = ResolveAreaCandidateCellCount(area);
-            float scale = EnvironmentMath.Clamp01(config.seedPressureDesiredPlantAreaScale01);
+            float scale = EnvironmentMath.Clamp01(area.PhysicalPlantDominance01);
             int desired = (int)Math.Round(candidateCells * EnvironmentMath.Clamp01(seedPressure01) * scale);
             if (desired < 0)
                 return 0;

@@ -1622,7 +1622,6 @@ namespace Arcontio.Core
                 healthStressStep01 = source.healthStressStep01,
                 removeDeadPlants = source.removeDeadPlants,
                 plantAridityHealthStressScale01 = source.plantAridityHealthStressScale01,
-                seedPressureDesiredPlantAreaScale01 = source.seedPressureDesiredPlantAreaScale01,
                 plantVitalityMin01 = source.plantVitalityMin01,
                 plantVitalityMax01 = source.plantVitalityMax01,
                 initialPlantHealthVitalityScale01 = source.initialPlantHealthVitalityScale01,
