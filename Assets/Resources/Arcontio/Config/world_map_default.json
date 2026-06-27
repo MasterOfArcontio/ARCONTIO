@@ -104,6 +104,33 @@
                                                      "Viability01":  0.95
                                                  }
                                              ]
+                            },
+                            {
+                                "AreaId":  2,
+                                "Key":  "debug_oak_forest",
+                                "BiomeKey":  "temperate_grassland",
+                                "VegetationKind":  "Grass",
+                                "SoilKind":  "Grassland",
+                                "CenterX":  17,
+                                "CenterY":  47,
+                                "RadiusCells":  20,
+                                "Z":  0,
+                                "Priority":  10,
+                                "IsEnabled":  true,
+                                "Intensity01":  1.0,
+                                "Irregularity01":  0.8,
+                                "BaseFertility01":  0.85,
+                                "CurrentFertility01":  0.85,
+                                "GrowthPotential01":  0.95,
+                                "Health01":  0.9,
+                                "Recovery01":  0.75,
+                                "SeedBank":  [
+                                                 {
+                                                     "SpeciesKey":  "oak_tree",
+                                                     "Amount01":  1.0,
+                                                     "Viability01":  1.0
+                                                 }
+                                             ]
                             }
                         ],
     "InitialObjects":  [
