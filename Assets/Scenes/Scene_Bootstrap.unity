@@ -206,8 +206,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   atomViewerSceneName: Scene_AtomViewer
-  mapGridName: Scene_MapGrid
-  loadMapGridOnStart: 1
+  arcGraphSceneName: Scene_ArcGraph
+  startupViewMode: 0
+  loadStartupViewOnStart: 1
 --- !u!114 &1110507249
 MonoBehaviour:
   m_ObjectHideFlags: 0

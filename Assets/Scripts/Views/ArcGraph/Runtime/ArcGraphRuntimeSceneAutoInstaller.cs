@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Arcontio.View.MapGrid;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -594,12 +593,12 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Prepara il controller vista con root MapGrid euristiche e root ArcGraph auto.
+        /// Prepara il controller vista con root ArcGraph auto.
         /// </para>
         /// </summary>
         private void ConfigureSwitcher()
         {
-            GameObject[] mapGridVisualRoots = FindMapGridVisualRoots();
+            GameObject[] mapGridVisualRoots = Array.Empty<GameObject>();
             GameObject[] arcGraphVisualRoots = FindArcGraphVisualRoots();
             _configuredMapGridRootCount = mapGridVisualRoots.Length;
 
@@ -641,13 +640,11 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Aggiorna i riferimenti runtime e legacy ancora necessari alla scena.
+        /// Aggiorna i riferimenti runtime ancora necessari alla scena.
         /// </para>
         /// </summary>
         private void RefreshRuntimeSceneBindings()
         {
-            MapGridCameraController cameraController = FindSceneComponent<MapGridCameraController>();
-            MapGridWorldView legacyWorldView = FindSceneComponent<MapGridWorldView>();
             MonoBehaviour placementPreviewSource = _uiPlacementPreviewSource;
             Arcontio.Core.SimulationHost simulationHost = Arcontio.Core.SimulationHost.Instance;
 
@@ -721,13 +718,6 @@ namespace Arcontio.View.ArcGraph
 
             ApplyUiMapViewportToMainCamera();
 
-            ConfigureLegacyMapGridCameraControllerForArcGraph(cameraController);
-            ConfigureLegacyMapGridWorldViewForArcGraph(legacyWorldView);
-
-            // Anche i root visuali MapGrid possono essere creati dal bootstrap
-            // legacy dopo l'installazione ArcGraph. Ricablare il controller per
-            // pochi frame mantiene il soft retirement stabile rispetto all'ordine
-            // di Start dei componenti legacy.
             if (_switcher != null && _visualRoot != null)
                 ConfigureSwitcher();
 
@@ -786,96 +776,6 @@ namespace Arcontio.View.ArcGraph
                 if (_cameraViewportController != null)
                     _interactionWrapper.SetViewState(_cameraViewportController.ViewState);
             }
-        }
-
-        // =============================================================================
-        // ConfigureLegacyMapGridCameraControllerForArcGraph
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Disabilita il controller camera legacy MapGrid quando ArcGraph controlla
-        /// la camera runtime.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: una sola sorgente pan/zoom</b></para>
-        /// <para>
-        /// ArcGraph usa il proprio controller camera ortografico continuo. Il
-        /// vecchio <c>MapGridCameraController</c> contiene pan fisico, zoom, target
-        /// interno e inerzia legacy. Quando ArcGraph diventa vista runtime, quel
-        /// componente viene spento per evitare due sorgenti concorrenti sullo stesso
-        /// transform camera.
-        /// </para>
-        /// </summary>
-        private static void ConfigureLegacyMapGridCameraControllerForArcGraph(
-            MapGridCameraController cameraController)
-        {
-            if (cameraController == null)
-                return;
-
-            cameraController.SetZoomInputEnabled(false);
-            cameraController.SetPanInputEnabled(false);
-            cameraController.enabled = false;
-        }
-
-        // =============================================================================
-        // ConfigureLegacyMapGridWorldViewForArcGraph
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Spegne gli overlay landmark/pathfinding legacy di MapGrid quando ArcGraph
-        /// possiede la UI visuale runtime.
-        /// </para>
-        /// </summary>
-        private static void ConfigureLegacyMapGridWorldViewForArcGraph(
-            MapGridWorldView worldView)
-        {
-            if (worldView == null)
-                return;
-
-            worldView.SetArcGraphOwnsLegacyLandmarkOverlays(true);
-        }
-
-        // =============================================================================
-        // FindMapGridVisualRoots
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Trova i root visuali legacy piu' comuni da spegnere quando ArcGraph e'
-        /// attivo.
-        /// </para>
-        ///
-        /// <para><b>Euristica confinata al gate visuale</b></para>
-        /// <para>
-        /// Non spegniamo <c>MapGridRoot</c> perche' puo' contenere componenti
-        /// runtime ancora necessari come sorgenti dati. Spegniamo invece root
-        /// grafici noti, se presenti. Le entry mancanti vengono ignorate.
-        /// </para>
-        /// </summary>
-        private static GameObject[] FindMapGridVisualRoots()
-        {
-            string[] names =
-            {
-                // MapGridBootstrap crea il terreno legacy sotto questo root.
-                // Se resta attivo mentre ArcGraph e' la vista principale, a zoom
-                // larghi possono riemergere vecchi chunk e layout diagnostici.
-                "TerrainChunks",
-                "GridRoot",
-                "NPCViews",
-                "ObjectViews",
-                "FovHeatmapOverlay",
-                "LandmarkOverlay",
-                "LandmarkLabelOverlay",
-                "DtValueOverlay",
-                "GvdDinOverlay"
-            };
-
-            var roots = new List<GameObject>();
-            for (int i = 0; i < names.Length; i++)
-            {
-                AddSceneGameObjectsByName(names[i], roots);
-            }
-
-            return roots.ToArray();
         }
 
         // =============================================================================

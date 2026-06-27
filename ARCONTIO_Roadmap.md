@@ -17230,7 +17230,8 @@ Sottostep operativi:
 | v0.70.08.11 | Audit cancellazione MapGrid/F3 legacy: dipendenze residue prima del delete fisico completo | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.12 | Bootstrap ArcGraph autonomo: togliere avvio obbligato da `Scene_MapGrid` | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.13 | Creazione/configurazione scena ArcGraph autonoma o switch bootstrap effettivo | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.14 | Gate runtime Scene_ArcGraph e piano delete fisico MapGrid legacy | Prossimo |
+| v0.70.08.14 | Gate runtime Scene_ArcGraph e delete fisico MapGrid legacy | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
+| v0.70.08.15 | Validazione Unity Editor post-delete e pulizia riferimenti testuali residui | Prossimo |
 
 Esito `v0.70.08.04`:
 
@@ -17416,6 +17417,31 @@ Prossimo step `v0.70.08.14`:
 - verificare camera, input, UI, placement, selezione, inspector, overlay LM/LOS/PF;
 - se il gate runtime passa, preparare la lista di delete fisico MapGrid/F3 legacy;
 - cancellare fisicamente MapGrid solo in uno step dedicato e dopo verifica dei riferimenti residui.
+
+Esito `v0.70.08.14`:
+
+- cancellata fisicamente la cartella legacy `Assets/Scripts/Views/MapGrid`;
+- cancellata fisicamente la cartella legacy `Assets/Resources/MapGrid`;
+- cancellati i due adapter/probe ArcGraph ancora dipendenti da MapGrid:
+  - `ArcGraphDebugRuntimeMapGridAdapter`;
+  - `ArcGraphTerrainRuntimeMapGridAdapter`;
+- `Scene_ArcGraph` e' stata ripulita dai root/componenti serializzati MapGrid:
+  - `InputBridge_MapGrid`;
+  - `MapGridRoot`;
+  - `MapViewBridge`;
+  - `MapGridRuntimeDevToolsOverlay`;
+  - vecchio controller camera MapGrid sulla `MainCamera`;
+- `Scene_Bootstrap` serializza ora `arcGraphSceneName: Scene_ArcGraph` e non piu' `mapGridName: Scene_MapGrid`;
+- `ArcGraphRuntimeSceneAutoInstaller` non cerca piu' classi MapGrid concrete e configura lo switcher con soli root ArcGraph;
+- build mirata `Assembly-CSharp` verificata con 0 errori dopo aggiornamento locale del `.csproj` generato;
+- non e' ancora stato eseguito il gate visuale umano in Unity Editor dopo il delete.
+
+Prossimo step `v0.70.08.15`:
+
+- aprire Unity e verificare che non compaiano Missing Script in `Scene_ArcGraph`;
+- eseguire Play Mode da `Scene_Bootstrap`;
+- verificare camera, UI, placement, selezione, inspector, LM/LOS/PF;
+- se il gate passa, rimuovere o aggiornare i soli commenti/testi storici che citano MapGrid come sistema ancora presente.
 
 ---
 

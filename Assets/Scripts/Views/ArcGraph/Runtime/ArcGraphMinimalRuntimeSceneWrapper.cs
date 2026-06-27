@@ -231,20 +231,6 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // SetRuntimeMapAdapter
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Compatibilita' temporanea per vecchi probe che passano ancora l'adapter
-        /// MapGrid concreto.
-        /// </para>
-        /// </summary>
-        public void SetRuntimeMapAdapter(ArcGraphTerrainRuntimeMapGridAdapter adapter)
-        {
-            runtimeContextProvider = adapter;
-        }
-
-        // =============================================================================
         // SetTerrainRenderer
         // =============================================================================
         /// <summary>

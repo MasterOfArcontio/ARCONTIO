@@ -183,20 +183,6 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
-        // SetRuntimeMapAdapter
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Compatibilita' temporanea per vecchi probe che passano ancora l'adapter
-        /// MapGrid concreto.
-        /// </para>
-        /// </summary>
-        public void SetRuntimeMapAdapter(ArcGraphTerrainRuntimeMapGridAdapter adapter)
-        {
-            runtimeContextProvider = adapter;
-        }
-
-        // =============================================================================
         // SetTerrainMaterial
         // =============================================================================
         /// <summary>
@@ -359,19 +345,6 @@ namespace Arcontio.View.ArcGraph
 
             runtime.Dispose();
             return diagnostics;
-        }
-
-        // =============================================================================
-        // RenderFromMapGridRuntime
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Alias legacy per vecchi context menu e probe MapGrid.
-        /// </para>
-        /// </summary>
-        public ArcGraphTerrainRuntimeSceneRendererDiagnostics RenderFromMapGridRuntime()
-        {
-            return RenderFromConfiguredRuntimeContext();
         }
 
         // =============================================================================
