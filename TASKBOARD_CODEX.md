@@ -173,6 +173,8 @@ Regola corrente:
 - aggiornamento biosfera `v0.66`: completata foundation query prodotti biologici per consumer futuri; da area/LM biologico si possono derivare prodotti potenziali e piante raccoglibili per prodotto, senza ancora creare belief, decision, job o inventario NPC;
 - aggiornamento biosfera `v0.68`: introdotti budget runtime configurabili per update piante, nascite, morti, celle vegetazione e aree processate; le entita' fuori budget vengono preservate immutate e non perse;
 - aggiornamento biosfera runtime: scala temporale test impostata a `9000` tick SimulationHost per giorno, `375` tick per ora, orologio UI a ore piene (`HH:00`) e batch giornaliero biosfera/meteo allineato al cambio giorno;
+- validazione runtime biosfera: `v0.62` Dirty FOV/percezione e `v0.63` ArcGraph Environment Runtime Feed risultano validati dai test operatore; inclusi rendering piante/vegetazione, sorting, piante come blocco visuale/FOV, overlap aree biologiche e densita' foresta configurabile;
+- prossimo step biosfera: `v0.64` Environment Event / Listener Boundary per formalizzare eventi/listener ambiente verso UI, World, ArcGraph e sistemi futuri;
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;
