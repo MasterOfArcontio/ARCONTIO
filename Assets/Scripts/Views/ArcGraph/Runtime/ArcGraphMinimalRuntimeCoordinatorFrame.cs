@@ -14,7 +14,7 @@ namespace Arcontio.View.ArcGraph
     /// Il frame contiene decisioni gia' prese dal chiamante: context runtime,
     /// abilitazione del coordinator, richiesta di refresh snapshot e richiesta di
     /// costruzione della queue actor/object. Il coordinator non deve
-    /// cercare <c>MapGridBootstrap</c>, non deve leggere <c>SimulationHost</c> e non
+    /// cercare bootstrap legacy, non deve leggere <c>SimulationHost</c> e non
     /// deve decidere da solo quali tool accendere.
     /// </para>
     ///

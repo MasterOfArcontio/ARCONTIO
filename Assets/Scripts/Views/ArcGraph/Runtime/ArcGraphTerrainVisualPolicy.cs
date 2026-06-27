@@ -23,7 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>FloorVariantCount</b>: numero varianti contigue del pavimento.</item>
     ///   <item><b>WallTileId</b>: tile muro pieno.</item>
     ///   <item><b>WallTopTileId</b>: tile muro con top visibile.</item>
-    ///   <item><b>UseLegacyFloorVariants</b>: replica la policy MapGrid corrente.</item>
+    ///   <item><b>UseLegacyFloorVariants</b>: conserva la policy visuale storica del terreno.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphTerrainVisualPolicy
@@ -68,12 +68,12 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Crea la policy default compatibile con il bootstrap MapGrid corrente.
+        /// Crea la policy default compatibile con la resa terrain storica.
         /// </para>
         ///
         /// <para><b>Compatibilita' iniziale</b></para>
         /// <para>
-        /// I valori replicano le costanti usate oggi da <c>MapGridBootstrap</c>:
+        /// I valori replicano le costanti storiche della prima resa terrain:
         /// floor base 0, quattro varianti, muro 10 e wall-top 11. Questa scelta
         /// serve solo per allineare la prima resa terrain; non definisce ancora il
         /// futuro catalogo terrain definitivo.

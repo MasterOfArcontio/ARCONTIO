@@ -14,7 +14,7 @@ namespace Arcontio.View.ArcGraph
     /// <para><b>Principio architetturale: adattatore scena, non sorgente dati</b></para>
     /// <para>
     /// Questo componente non cerca il <c>World</c>, non legge
-    /// <c>SimulationHost.Instance</c>, non consulta <c>MapGridWorldProvider</c>, non
+    /// <c>SimulationHost.Instance</c>, non consulta provider legacy, non
     /// legge input e non sceglie autonomamente l'NPC attivo. Riceve invece un
     /// <c>ArcGraphRuntimeContext</c> e un id NPC gia' risolti da un chiamante esterno.
     /// Il suo unico compito e' costruire un <c>ArcGraphDebugRuntimeWiringFrame</c>,

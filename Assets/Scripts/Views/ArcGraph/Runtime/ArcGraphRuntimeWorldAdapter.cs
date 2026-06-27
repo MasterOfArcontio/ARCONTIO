@@ -15,7 +15,7 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// La diagnostica espone se ArcGraph sta ricevendo davvero il <c>World</c> del
     /// runtime e se il layer superfici cella e' disponibile. Non contiene dati
-    /// MapGrid e non misura componenti legacy.
+    /// legacy e non misura componenti della vecchia vista.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -71,13 +71,12 @@ namespace Arcontio.View.ArcGraph
     /// <summary>
     /// <para>
     /// Provider runtime ArcGraph che costruisce il context dalla simulazione
-    /// corrente, senza passare da MapGrid.
+    /// corrente, senza passare da viste legacy.
     /// </para>
     ///
     /// <para><b>Principio architetturale: SimulationHost -> World -> snapshot</b></para>
     /// <para>
-    /// Questo componente non legge <c>MapGridBootstrap</c>, non legge
-    /// <c>MapGridWorldView</c> e non consulta <c>MapGridData</c>. Recupera il
+    /// Questo componente non legge bootstrap, view o buffer legacy. Recupera il
     /// <c>World</c> gia' orchestrato da <see cref="SimulationHost"/> e produce un
     /// <see cref="ArcGraphRuntimeContext"/> che il bootstrap ArcGraph usera' per
     /// copiare snapshot terrain, oggetti e attori. La direzione resta sola lettura:

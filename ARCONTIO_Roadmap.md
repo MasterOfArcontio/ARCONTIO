@@ -17231,7 +17231,7 @@ Sottostep operativi:
 | v0.70.08.12 | Bootstrap ArcGraph autonomo: togliere avvio obbligato da `Scene_MapGrid` | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.13 | Creazione/configurazione scena ArcGraph autonoma o switch bootstrap effettivo | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 | v0.70.08.14 | Gate runtime Scene_ArcGraph e delete fisico MapGrid legacy | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
-| v0.70.08.15 | Validazione Unity Editor post-delete e pulizia riferimenti testuali residui | Prossimo |
+| v0.70.08.15 | Validazione Unity Editor post-delete e pulizia riferimenti testuali residui | Fatto su branch `ai-task/v0.70.08-f3-progressive-migration` |
 
 Esito `v0.70.08.04`:
 
@@ -17442,6 +17442,19 @@ Prossimo step `v0.70.08.15`:
 - eseguire Play Mode da `Scene_Bootstrap`;
 - verificare camera, UI, placement, selezione, inspector, LM/LOS/PF;
 - se il gate passa, rimuovere o aggiornare i soli commenti/testi storici che citano MapGrid come sistema ancora presente.
+
+Esito `v0.70.08.15`:
+
+- gate Unity Editor confermato dall'operatore: `Scene_ArcGraph` funziona dopo il delete fisico MapGrid;
+- Play Mode e flusso runtime risultano operativi;
+- verificati lato operatore camera, UI, placement, selezione, inspector e overlay principali;
+- puliti i pochi riferimenti testuali residui nei commenti runtime ArcGraph che citavano MapGrid come componente ancora presente;
+- non sono stati toccati file `.meta` sporchi/untracked non correlati.
+
+Prossimo step consigliato:
+
+- preparare handoff/integrazione con Biosfera su branch dedicato;
+- oppure aprire il prossimo checkpoint UI post-F3, separando hardening UI da nuove feature.
 
 ---
 

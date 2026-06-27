@@ -12,7 +12,7 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// Questo coordinatore e' il contratto operativo minimo del futuro wiring. Non
     /// e' un <c>MonoBehaviour</c>, non cerca scene, non legge <c>SimulationHost</c>,
-    /// non usa <c>MapGridWorldProvider</c>, non legge input e non sceglie NPC. Se il
+    /// non usa provider legacy, non legge input e non sceglie NPC. Se il
     /// frame ricevuto e' valido, costruisce la queue tramite il feed e, solo se il
     /// chiamante lo richiede, la consegna a un consumer esplicito.
     /// </para>
