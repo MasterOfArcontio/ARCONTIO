@@ -101,6 +101,8 @@ namespace Arcontio.View.ArcGraph
         private Button _speedSimulationButton;
         private Button _biosphereDebugMultiplierButton;
         private Button _biosphereDebugGoStopButton;
+        private Button _insertBottomActionButton;
+        private Button _biosphereBottomActionButton;
         private TextMeshProUGUI _dayLabel;
         private TextMeshProUGUI _monthLabel;
         private TextMeshProUGUI _yearLabel;
@@ -857,6 +859,8 @@ namespace Arcontio.View.ArcGraph
             _speedSimulationButton = null;
             _biosphereDebugMultiplierButton = null;
             _biosphereDebugGoStopButton = null;
+            _insertBottomActionButton = null;
+            _biosphereBottomActionButton = null;
             _dayLabel = null;
             _monthLabel = null;
             _yearLabel = null;
@@ -1082,7 +1086,7 @@ namespace Arcontio.View.ArcGraph
                 new Vector2(0f, 0f),
                 new Vector2(1f, 0f),
                 new Vector2(0f, BottomActionBarHeight),
-                new Vector2(0f, BottomActionBarHeight + ActionPanelHeight));
+                new Vector2(-RightInspectorWidth, BottomActionBarHeight + ActionPanelHeight));
             _actionPanel = panel;
             panel.gameObject.AddComponent<RectMask2D>();
 
@@ -2049,10 +2053,10 @@ namespace Arcontio.View.ArcGraph
             layout.childForceExpandHeight = true;
 
             CreateBottomActionButton(panel, "Costruisci", active: false);
-            Button insertButton = CreateBottomActionButton(panel, "Inserisci", active: true);
-            insertButton.onClick.AddListener(ToggleInsertActionPanel);
-            Button biosphereButton = CreateBottomActionButton(panel, "Biosfera v0.63", active: false);
-            biosphereButton.onClick.AddListener(ToggleBiosphereActionPanel);
+            _insertBottomActionButton = CreateBottomActionButton(panel, "Inserisci", active: false);
+            _insertBottomActionButton.onClick.AddListener(ToggleInsertActionPanel);
+            _biosphereBottomActionButton = CreateBottomActionButton(panel, "Biosfera v0.63", active: false);
+            _biosphereBottomActionButton.onClick.AddListener(ToggleBiosphereActionPanel);
             CreateBottomActionButton(panel, "Gestisci lavori", active: false);
             CreateBottomActionButton(panel, "Zone", active: false);
             CreateBottomActionButton(panel, "Oggetti", active: false);
@@ -2075,6 +2079,7 @@ namespace Arcontio.View.ArcGraph
                 BuildConstructionActionPanelContent();
                 RefreshOperationGrid();
                 ClearOperationParams("Seleziona una operation.");
+                RefreshBottomActionButtonStates(insertActive: true, biosphereActive: false);
                 return;
             }
 
@@ -2084,6 +2089,7 @@ namespace Arcontio.View.ArcGraph
             _placementController?.Cancel();
             _npcSpawnPreviewSource?.ClearPreview();
             _npcSpawnController?.Cancel();
+            RefreshBottomActionButtonStates(insertActive: false, biosphereActive: false);
         }
 
         private void ToggleBiosphereActionPanel()
@@ -2104,11 +2110,19 @@ namespace Arcontio.View.ArcGraph
                 _npcSpawnPreviewSource?.ClearPreview();
                 _npcSpawnController?.Cancel();
                 RebuildBiosphereActionPanel();
+                RefreshBottomActionButtonStates(insertActive: false, biosphereActive: true);
             }
             else
             {
                 _biosphereGraphCanvas = null;
+                RefreshBottomActionButtonStates(insertActive: false, biosphereActive: false);
             }
+        }
+
+        private void RefreshBottomActionButtonStates(bool insertActive, bool biosphereActive)
+        {
+            ApplyButtonColor(_insertBottomActionButton, insertActive);
+            ApplyButtonColor(_biosphereBottomActionButton, biosphereActive);
         }
 
         private void BuildOverlayRoots()
