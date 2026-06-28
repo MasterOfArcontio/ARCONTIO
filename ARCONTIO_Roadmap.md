@@ -76,10 +76,14 @@
 | v0.66 | NPC Environment Query Integration | Post-v0.65 | ✅ Foundation query/prodotti biologici completata, belief/job completo futuro |
 | v0.66b | Biological Plant Product Contract | Post-v0.66 | ✅ Prodotti biologici estesi con tool, stadio minimo, stagionalita', quantita' base e regrow |
 | v0.66c | Biological Landmark Belief Hint Contract | Post-v0.66b | ✅ Contratti LM biologico -> hint potenziali/osservati completati, senza scrivere BeliefStore |
-| v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⏳ Pending |
+| v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⚠️ Parziale: diagnostica runtime implementata, calibrazione avanzata pending |
+| v0.67.1 | Biosphere Runtime Graph Diagnostics | Post-v0.67 | ✅ Testata diagnostica compatta e range numerici grafici implementati |
 | v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ✅ Core budget runtime completato, spreading multi-tick futuro |
-| v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ⏳ Pending |
-| v0.70 | ArcGraph Runtime UI Architecture | Post-v0.69 / track UI dedicata | 🔄 Pianificata |
+| v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ✅ Closeout tecnico completato, job risorse/NPC rimandato a roadmap dedicata |
+| v0.70 | ArcGraph Runtime UI Architecture | Post-v0.69 / track UI dedicata | ✅ Base runtime UI completata e integrata con Biosfera |
+| v0.71 | ArcGraph / Biosfera Stabilization & Visual Quality Pass | Post-v0.70 | 🔄 Prossimo blocco di stabilizzazione |
+| v0.72 | Fauna Biosfera | Post-v0.71 | ⏳ Futura |
+| v0.73 | Modulo GOAL | Post-v0.72 | ⏳ Futura |
 | v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ Pending |
 | v0.180 | Observer Layer Pubblico ed Explainability Esterna | Dopo observer prerequisites | ⏳ Pending |
 | v1.00 | Prima demo giocabile pubblica | TBD | 🎯 Target |
@@ -17476,6 +17480,192 @@ Prossimo step consigliato:
 
 - preparare handoff/integrazione con Biosfera su branch dedicato;
 - oppure aprire il prossimo checkpoint UI post-F3, separando hardening UI da nuove feature.
+
+---
+
+#### v0.71 - ArcGraph / Biosfera Stabilization & Visual Quality Pass
+
+## Stato
+🔄 PROSSIMA / PIANIFICATA
+
+## Obiettivo
+
+Chiudere i lavori sparsi di stabilizzazione visuale e runtime emersi dopo il merge UI + Biosfera, prima di aprire i due moduli maggiori successivi: Fauna Biosfera e Modulo GOAL.
+
+La fase `v0.71` non deve introdurre un nuovo macro-sistema simulativo. Deve rendere stabile, leggibile e verificabile la base appena integrata.
+
+## Checkpoint v0.71
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.71.01 | Trasparenza muri/porte alte che coprono oggetti, NPC o selezione | ⏳ Pending |
+| v0.71.02 | Correzione bug Biosfera: piante/vegetazione non devono crescere su acqua, stone o tile artificiali | ⏳ Pending |
+| v0.71.03 | Fix lineette/sfasamento terrain atlas tra celle e chunk | ⏳ Pending |
+| v0.71.04 | Gestione completa porte: verticali, orizzontali, aperte, chiuse e chiuse a chiave | ⏳ Pending |
+| v0.71.05 | Inserimento job mancante di raccolta risorse biologiche | ⏳ Pending |
+| v0.71.06 | Consolidamento finale config, asset atlas/sprite naming e verifica runtime UI + Biosfera | ⏳ Pending |
+
+## Note progettuali v0.71
+
+### Trasparenza muri
+
+La trasparenza deve restare una funzione del renderer ArcGraph, non della simulazione.
+
+Flusso desiderato:
+
+```text
+selezione / puntatore
+-> target visuale coperto
+-> ricerca muri/porte alte davanti al target
+-> alpha temporaneo solo sui renderer visuali
+-> ripristino quando target cambia
+```
+
+Vincoli:
+
+- non mutare `World`;
+- non cambiare FOV, pathfinding o blocchi fisici;
+- non correggere artificialmente la selezione;
+- rendere configurabili alpha, durata fade e criteri di attivazione.
+
+### Bug crescita Biosfera su superfici non naturali
+
+La Biosfera deve usare come filtro effettivo:
+
+```text
+World.CellSurfaces
+-> SurfaceDefs
+-> MacroSurface == Natural
+-> CanHostNaturalVegetation / CanHostPhysicalPlant
+```
+
+Acqua, `stone_floor` e `tile_floor` non devono ospitare piante fisiche o vegetazione diffusa. Lo screenshot operatore mostra una regressione visuale/runtime da auditare e correggere.
+
+### Lineette terrain atlas
+
+Il difetto visivo tra celle sembra compatibile con UV bleeding o cuciture tra chunk.
+
+Ipotesi tecniche da verificare:
+
+- UV calcolate esattamente sui bordi delle slice;
+- filtro texture / mipmap / compressione non adatti al pixel art;
+- mancanza di padding/bleed di 1-2 pixel nell'atlas;
+- precisione mesh/chunk durante zoom e pan.
+
+La correzione preferita e' introdurre un piccolo inset UV configurabile e verificare import texture `Point`, no mipmap, no compression.
+
+### Porte
+
+Le porte devono diventare un caso visuale completo, non un semplice oggetto generico.
+
+Stati minimi:
+
+- orientamento verticale;
+- orientamento orizzontale;
+- porta aperta;
+- porta chiusa;
+- porta chiusa a chiave.
+
+Il rendering deve restare derivato da stato/snapshot autorizzato. La UI non deve decidere direttamente la fisica della porta.
+
+### Job raccolta risorse biologiche
+
+La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolta risorse biologiche. In `v0.71` va recuperato almeno il job mancante necessario a rendere utilizzabili le risorse esposte dalla Biosfera.
+
+Flusso atteso:
+
+```text
+NPC
+-> belief/query autorizzata su LM biologico o area biologica
+-> job raccolta risorsa
+-> movimento tramite Job/MoveTo
+-> interazione con risorsa disponibile
+-> comando autorizzato di raccolta
+-> aggiornamento inventario/World secondo contratti esistenti
+```
+
+Vincoli:
+
+- non introdurre onniscienza NPC;
+- non far leggere alla UI lo stato interno della Biosfera;
+- non far mutare la Biosfera direttamente dal job senza boundary autorizzato;
+- usare i contratti gia' disponibili: prodotti biologici, hint belief, query World/Biosfera, piante/risorse locali harvestable;
+- tenere fuori da questo step Fauna Biosfera e Modulo GOAL.
+
+## Versioni successive
+
+Le due macro-fasi successive candidate sono:
+
+| Versione | Focus | Stato |
+|---|---|---|
+| v0.72 | Fauna Biosfera | ⏳ Futura |
+| v0.73 | Modulo GOAL | ⏳ Futura |
+
+---
+
+#### v0.72 - Fauna Biosfera
+
+## Stato
+⏳ FUTURA / PIANIFICATA
+
+## Obiettivo
+
+Introdurre il primo layer fauna sopra la Biosfera, mantenendo separati ambiente, mondo fisico, percezione NPC e rendering ArcGraph.
+
+La fauna non deve diventare un semplice oggetto decorativo. Deve essere una presenza biologica coerente con area, clima, risorse, percezione e interazioni future.
+
+## Checkpoint v0.72
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.72.01 | Audit contratti Biosfera esistenti riutilizzabili per fauna | ⏳ Pending |
+| v0.72.02 | Definizione dati fauna: specie, habitat, stato, posizione, ciclo vitale minimo | ⏳ Pending |
+| v0.72.03 | Spawn fauna da aree biologiche e vincoli superficie/habitat | ⏳ Pending |
+| v0.72.04 | Movimento fauna e presenza fisica nel `World` tramite boundary autorizzato | ⏳ Pending |
+| v0.72.05 | Proiezione visuale ArcGraph della fauna come consumer read-only | ⏳ Pending |
+| v0.72.06 | Interazioni minime NPC/fauna: percezione, hint belief e future risorse | ⏳ Pending |
+| v0.72.07 | QA runtime e tuning densita'/budget fauna | ⏳ Pending |
+
+## Vincoli v0.72
+
+- Biosfera resta owner dei dati biologici;
+- `World` resta boundary fisico/spaziale;
+- ArcGraph renderizza snapshot/proiezioni, non decide spawn o morte;
+- NPC non devono conoscere fauna non percepita o non ricordata;
+- niente caccia, allevamento o economia fauna completa se non introdotti da checkpoint dedicati.
+
+---
+
+#### v0.73 - Modulo GOAL
+
+## Stato
+⏳ FUTURA / PIANIFICATA
+
+## Obiettivo
+
+Introdurre un modulo GOAL capace di rappresentare obiettivi persistenti, priorita' e tensioni di lungo periodo degli NPC, senza sostituire brutalmente Decision Layer, Job System o bisogni.
+
+Il modulo GOAL deve stare sopra bisogni, belief e memoria, ma sotto il piano operativo dei job. Non deve diventare un nuovo decision manager onnisciente.
+
+## Checkpoint v0.73
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.73.01 | Audit Decision/Need/Belief/Job per individuare il punto corretto del GOAL layer | ⏳ Pending |
+| v0.73.02 | Contratti dati GoalDefinition, GoalState e GoalEvidence | ⏳ Pending |
+| v0.73.03 | Generazione goal da bisogni persistenti, memoria e belief soggettivi | ⏳ Pending |
+| v0.73.04 | Scoring goal e relazione con Decision Layer esistente | ⏳ Pending |
+| v0.73.05 | Traduzione goal selezionato in job request autorizzata | ⏳ Pending |
+| v0.73.06 | Explainability GOAL in RightInspector/EL senza accesso diretto al World dalla UI | ⏳ Pending |
+| v0.73.07 | QA scenari: fame persistente, sicurezza, risorsa biologica, fallback e rinuncia | ⏳ Pending |
+
+## Vincoli v0.73
+
+- non bypassare MBQD/Decision Layer;
+- non creare job direttamente dalla UI;
+- non leggere il `World` come verita' onnisciente dell'NPC;
+- ogni goal deve poter essere spiegato da bisogno, memoria, belief, evento o pressione ambientale;
+- il job resta il layer di esecuzione, il goal resta un layer motivazionale/intenzionale.
 
 ---
 

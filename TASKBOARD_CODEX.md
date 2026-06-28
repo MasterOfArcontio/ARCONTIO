@@ -25,59 +25,35 @@ L'unità primaria di governo non è il singolo micro-step, ma il macro job con i
 
 # 0. Stato operativo corrente
 
-## MACRO JOB ATTIVO: v0.38 - ArcGraph Legacy Absorption / Retirement
+## MACRO JOB ATTIVO: v0.71 - ArcGraph / Biosfera Stabilization & Visual Quality Pass
 
 CHECKPOINT CORRENTE:
-`v0.38o - MapGrid Dependency Audit Finale / ArcGraph Visual Asset Policy Alignment`
+`v0.71.01-v0.71.06 - stabilizzazione post merge UI + Biosfera`
 
 STATUS:
-TERRAIN VISUAL GATE SUPERATO; NPC BASE/F12 SUPERATO; GATE MURI/F3 ARCGRAPH SUPERATO; F12 RUNTIME SWITCH GATE SUPERATO; FOV ARCGRAPH ASSORBITO COME MODALITA' VIEWMODE DA VALIDARE; FALLBACK SPRITE MAPGRID ELIMINATO; PAN/ZOOM SCOLLEGATI DA MAPGRID; POLICY VISUAL ASSET ARCGRAPH FORMALIZZATA; PLACEMENT/F3 ARCGRAPH AUTONOMO INTRODOTTO; OBJECT_DEFS MIGRATO A PATH ARCGRAPH; CATALOGO VISUALE AMBIENTE INTRODOTTO; PROSSIMO BLOCCO: v0.38o.09 COLLEGARE VISUALSTATEKEY/PLANTVISUALSTATEKEY AL CATALOGO AMBIENTE
+MERGE UI + BIOSFERA COMPLETATO SU BRANCH DI INTEGRAZIONE; ARCGRAPH RUNTIME UI v0.70 BASE OPERATIVA; MAPGRID/F3 LEGACY RIMOSSI DAL PERCORSO RUNTIME; BIOSFERA FISICA v0.69 CLOSEOUT TECNICO INTEGRATO; PROSSIMO BLOCCO: STABILIZZAZIONE VISUALE/RUNTIME v0.71 PRIMA DI v0.72 FAUNA BIOSFERA E v0.73 MODULO GOAL.
 
 RAMO BASE CORRENTE:
-`ai-task/v0.38o-placement-catalog-env`
+`ai-task/integration-arcgraph-ui-biosphere`
 
 BASE DI INTEGRAZIONE:
 `ai/codex-main`
 
 OUTPUT ATTESO:
 
-- auditare le dipendenze residue prima del pensionamento MapGrid;
-- distinguere componenti assorbiti, componenti congelati da gate visuali e componenti non ancora migrati;
-- registrare i gate visuali gia' recuperati manualmente dall'operatore;
-- distinguere test data-only, test visuali e test interaction;
-- ordinare il backlog residuo prima di qualunque pensionamento reale;
-- registrare il superamento del gate interaction `wrapper -> router -> HUD + selection`;
-- aggiornare lo stato dei blocchi ancora non pensionabili dopo il recupero dei tre gate minimi;
-- auditare il percorso minimo stabile ArcGraph dopo gate terrain, actor/object e interaction validati;
-- distinguere probe temporanei da futuri componenti produttivi;
-- individuare il prossimo micro-step tecnico senza cancellare MapGrid;
-- introdurre un coordinator C# passivo e riusabile per il percorso runtime minimo;
-- introdurre un wrapper scena minimo, spento di default, come frontiera controllata del coordinator;
-- non agganciare automaticamente ArcGraph alla scena;
-- non cancellare componenti MapGrid;
-- non modificare codice runtime;
-- non salvare scene e non modificare prefab;
-- non dichiarare produttivo ArcGraph actor/object o interaction solo perche' i probe sono stati validati manualmente;
-- preparare il prossimo step operativo solo dopo avere chiarito quali gate sono passati e quali restano bloccanti;
-- non introdurre DevTools, top bar o comandi;
-- non leggere direttamente `MapGridWorldView`;
-- mantenere il wrapper `v0.38f.04` come frontiera input, non come tool host;
-- evitare di trasformare subito ArcGraph in gestore operativo UI;
-- evitare che ArcGraph possieda DevTools, top bar, summary cards o command tools;
-- evitare che i tool continuino a dipendere direttamente da `MapGridWorldView`;
-- mantenere `MapGridData` come sorgente legacy temporanea, non come modello mappa definitivo;
-- non creare renderer terrain produttivi permanenti;
-- non rimuovere legacy, non salvare scene e non creare renderer produttivi senza `go` esplicito;
-- non implementare simulazione produttiva di meteo, temperatura, umidita', precipitazioni, incendi, acqua, vegetazione o luce;
-- non creare renderer produttivi Unity, asset load o modifiche scena;
-- mantenere MapGrid come renderer produttivo finche' `v0.38` non avra' assorbito in modo controllato terrain, actor/object e debug minimo;
-- rispettare la policy LOD definita in `v0.33f`;
-- non migrare strumenti interattivi o dev tools prima dell'audit mirato;
-- collegare feed e renderer solo tramite context, NPC e consumer espliciti, senza accessi globali.
-- avviare il blocco `v0.38h` concentrandosi solo su terrain + NPC;
-- trasformare progressivamente i probe terrain/NPC in runtime renderer controllati;
-- non introdurre environment layers in questo blocco;
-- non pensionare MapGrid in questo blocco iniziale.
+- correggere il bug per cui piante/vegetazione Biosfera compaiono su acqua, `stone_floor` o superfici artificiali;
+- progettare e implementare la trasparenza visuale di muri/porte alte che coprono oggetti, NPC o selezione;
+- correggere le lineette/sfasamenti tra celle terrain dovuti a UV bleeding, import texture o cuciture chunk;
+- completare la gestione porte: orientamento verticale/orizzontale, aperta, chiusa, chiusa a chiave;
+- inserire il job mancante di raccolta risorse biologiche usando query/boundary autorizzati e senza onniscienza NPC;
+- consolidare config, naming e import degli asset visuali ArcGraph dopo merge UI+Biosfera, includendo le modifiche operatore ad atlas e file config quando validate;
+- non introdurre Fauna Biosfera dentro v0.71;
+- non introdurre Modulo GOAL dentro v0.71;
+- preparare `v0.72 - Fauna Biosfera` come macro-fase successiva;
+- preparare `v0.73 - Modulo GOAL` come macro-fase successiva;
+- mantenere ArcGraph come consumer visuale e UI runtime, non come authority della simulazione;
+- mantenere Biosfera owner dei dati ambientali/biologici, con `World` come boundary fisico/spaziale;
+- non toccare `.meta`, asset sporchi dell'operatore, `Library`, `Temp`, `Obj`.
 
 PROMPT OPERATIVO - ROADMAP RESIDUA ARCGRAPH:
 

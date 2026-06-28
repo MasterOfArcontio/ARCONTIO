@@ -92,6 +92,38 @@
                                              "BiomeAreaKey":  "debug_water_pocket_northwest"
                                          },
                                          {
+                                             "X":  20,
+                                             "Y":  40,
+                                             "W":  8,
+                                             "H":  2,
+                                             "SurfaceKey":  "stone_floor",
+                                             "BiomeAreaKey":  "debug_stone_ridge_test1"
+                                         },
+										 {
+                                             "X":  23,
+                                             "Y":  37,
+                                             "W":  7,
+                                             "H":  3,
+                                             "SurfaceKey":  "stone_floor",
+                                             "BiomeAreaKey":  "debug_stone_ridge_test2"
+                                         },
+                                         {
+                                             "X":  22,
+                                             "Y":  36,
+                                             "W":  4,
+                                             "H":  1,
+                                             "SurfaceKey":  "stone_floor",
+                                             "BiomeAreaKey":  "debug_stone_ridge_test3"
+                                         },
+										 {
+                                             "X":  25,
+                                             "Y":  37,
+                                             "W":  6,
+                                             "H":  2,
+                                             "SurfaceKey":  "stone_floor",
+                                             "BiomeAreaKey":  "debug_stone_ridge_test1"
+                                         },
+										 {
                                              "X":  47,
                                              "Y":  42,
                                              "W":  5,
@@ -166,8 +198,8 @@
                                          {
                                              "X":  46,
                                              "Y":  9,
-                                             "W":  12,
-                                             "H":  12,
+                                             "W":  13,
+                                             "H":  13,
                                              "SurfaceKey":  "tile_floor",
                                              "BiomeAreaKey":  "debug_house_tile_floor_southeast"
                                          }
