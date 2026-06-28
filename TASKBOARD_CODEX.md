@@ -170,6 +170,17 @@ Regola corrente:
 - il debito mini-tile 16x16 resta noto ma non blocca il passaggio a `v0.38k`, perche' riguarda la composizione futura dei pavimenti sotto muri sottili quando interno/esterno useranno floor diversi;
 - prima del pensionamento MapGrid, il mini-tile dovra' essere recuperato o esplicitamente trasformato in requisito del blocco object/floor avanzato;
 - il blocco biosfera `v0.39-v0.52` e' stato documentato in roadmap e diario Notion come foundation dati/snapshot/query/adapter; non e' ancora agganciato al tick runtime e non attiva simulazione produttiva automatica;
+- aggiornamento biosfera `v0.66`: completata foundation query prodotti biologici per consumer futuri; da area/LM biologico si possono derivare prodotti potenziali e piante raccoglibili per prodotto, senza ancora creare belief, decision, job o inventario NPC;
+- aggiornamento biosfera `v0.66b`: consolidato il contratto prodotti biologici per specie vegetale; i prodotti dichiarano tool richiesto, stadio minimo, stagionalita', quantita' base e regrow, mentre nutrizione e strumenti vivono come item/tool minimi in `object_defs.json`;
+- aggiornamento biosfera `v0.66c`: consolidato il contratto LM biologico -> hint belief potenziali/osservati; il World espone record data-only per il futuro layer cognitivo senza scrivere BeliefStore, decision, job o inventari;
+- aggiornamento biosfera `v0.68`: introdotti budget runtime configurabili per update piante, nascite, morti, celle vegetazione e aree processate; le entita' fuori budget vengono preservate immutate e non perse;
+- aggiornamento biosfera runtime: scala temporale test impostata a `9000` tick SimulationHost per giorno, `375` tick per ora, orologio UI a ore piene (`HH:00`) e batch giornaliero biosfera/meteo allineato al cambio giorno;
+- validazione runtime biosfera: `v0.62` Dirty FOV/percezione e `v0.63` ArcGraph Environment Runtime Feed risultano validati dai test operatore; inclusi rendering piante/vegetazione, sorting, piante come blocco visuale/FOV, overlap aree biologiche e densita' foresta configurabile;
+- aggiornamento biosfera `v0.63.4`: densita' iniziale e carrying capacity runtime delle piante fisiche usano entrambe `PhysicalPlantDominance01` per-area; rimossa la scala globale duplicata `seedPressureDesiredPlantAreaScale01` dal percorso runtime/config;
+- aggiornamento biosfera `v0.64`: introdotto boundary eventi/listener ambiente con `EnvironmentRuntimeChangeMask`, listener tipizzati registrabili su `SimulationHost` e compatibilita' mantenuta con l'evento legacy `EnvironmentRuntimeEventPublished`;
+- aggiornamento biosfera `v0.64.1`: TopBar e pannello grafici Biosfera consumano il boundary listener tipizzato; la TopBar usa l'evento come invalidazione ambiente e il clock display per l'ora, mentre i grafici non rigenerano piu' il ViewModel ogni frame senza eventi o richieste UI;
+- aggiornamento biosfera `v0.67.1`: pannello Biosfera arricchito con testata diagnostica compatta derivata dallo storico read-only, conteggi correnti per area e range numerici sugli assi dei grafici;
+- aggiornamento biosfera `v0.69`: closeout tecnico completato; la base fisica biosfera e' validata runtime/build, mentre job risorse, belief reali, inventario e consumo prodotti per-pianta restano esplicitamente rimandati a roadmap dedicata;
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;

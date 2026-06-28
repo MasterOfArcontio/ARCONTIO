@@ -38,6 +38,17 @@ namespace Arcontio.Core.Environment
                 EnvironmentAreaId.None,
                 new EnvironmentSeedBankEntry[0]);
 
+        private const float InitialPhysicalPlantVitalityMin01 = 0.70f;
+        private const float InitialPhysicalPlantVitalityMax01 = 1.35f;
+        private const float InitialPhysicalPlantHealthVitalityScale01 = 0.22f;
+        private const int BiologicalOrganicMaskCoarseCellSize = 3;
+        private const float BiologicalOrganicMaskBaseCoreRadius01 = 0.26f;
+        private const float BiologicalOrganicMaskIntensityCoreRadius01 = 0.18f;
+        private const float BiologicalOrganicMaskMinNoiseStrength01 = 0.18f;
+        private const float BiologicalOrganicMaskMaxNoiseStrength01 = 0.88f;
+        private const float BiologicalOrganicMaskMinEdgeThreshold01 = 0.02f;
+        private const float BiologicalOrganicMaskMaxEdgeThreshold01 = 0.16f;
+
         private readonly Dictionary<EnvironmentAreaId, EnvironmentAreaDefinition> _areaDefinitions = new();
         private readonly Dictionary<EnvironmentAreaId, EnvironmentFertilityAreaState> _fertilityAreas = new();
         private readonly Dictionary<EnvironmentAreaId, EnvironmentWaterAreaState> _waterAreas = new();
@@ -284,18 +295,18 @@ namespace Arcontio.Core.Environment
             int before = outCandidates.Count;
             var freeCells = new List<EnvironmentCellCoord>(64);
             var selectedCells = new List<EnvironmentCellCoord>(8);
+            var globalSelectedCells = new List<EnvironmentCellCoord>(32);
+            var biologicalAreas = CollectSortedBiologicalAreas();
 
-            foreach (var pair in _areaDefinitions)
+            for (int areaIndex = 0; areaIndex < biologicalAreas.Count; areaIndex++)
             {
-                EnvironmentAreaDefinition area = pair.Value;
-                if (!IsBiologicalArea(area))
-                    continue;
+                EnvironmentAreaDefinition area = biologicalAreas[areaIndex];
 
                 freeCells.Clear();
                 selectedCells.Clear();
 
                 CollectBiologicalFreeCells(world, area, freeCells);
-                SelectBiologicalAnchorCells(area, freeCells, selectedCells);
+                SelectBiologicalAnchorCells(area, freeCells, selectedCells, globalSelectedCells);
 
                 for (int i = 0; i < selectedCells.Count; i++)
                 {
@@ -306,6 +317,7 @@ namespace Arcontio.Core.Environment
                         LandmarkRegistry.LandmarkKind.BiologicalAnchor,
                         1.0f,
                         area.AreaId.Value));
+                    AddCellIfMissing(globalSelectedCells, cell);
                 }
             }
 
@@ -383,6 +395,56 @@ namespace Arcontio.Core.Environment
         }
 
         // =============================================================================
+        // TryResolveAreaIdForBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve l'area biologica collegata a un landmark biologico gia' registrato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: mapping laterale, landmark leggero</b></para>
+        /// <para>
+        /// Il <see cref="LandmarkRegistry"/> conserva solo nodi compatti. Il legame
+        /// semantico <c>landmark -> area biologica</c> resta nella biosfera, cosi'
+        /// NPC e World possono interrogare l'ambiente senza appesantire ogni nodo
+        /// landmark con payload ecologici.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>landmarkNodeId</b>: id del nodo visto o ricordato dall'NPC.</item>
+        ///   <item><b>areaId</b>: area biologica risolta, se il nodo appartiene alla biosfera.</item>
+        ///   <item><b>return</b>: false per id non validi, mapping assente o rebuild non ancora eseguita.</item>
+        /// </list>
+        /// </summary>
+        public bool TryResolveAreaIdForBiologicalLandmark(
+            int landmarkNodeId,
+            out EnvironmentAreaId areaId)
+        {
+            areaId = EnvironmentAreaId.None;
+            if (landmarkNodeId <= 0)
+                return false;
+
+            foreach (var pair in _biologicalLandmarkNodeIdsByArea)
+            {
+                int[] nodeIds = pair.Value;
+                if (nodeIds == null)
+                    continue;
+
+                for (int i = 0; i < nodeIds.Length; i++)
+                {
+                    if (nodeIds[i] != landmarkNodeId)
+                        continue;
+
+                    areaId = pair.Key;
+                    return areaId.IsValid;
+                }
+            }
+
+            return false;
+        }
+
+        // =============================================================================
         // BuildInitialBiologicalOccupancy
         // =============================================================================
         /// <summary>
@@ -412,27 +474,169 @@ namespace Arcontio.Core.Environment
             var freeCells = new List<EnvironmentCellCoord>(128);
             var physicalPlantCells = new List<EnvironmentCellCoord>(64);
             var anchorCells = new List<EnvironmentCellCoord>(8);
-            var plantUsedCells = new List<EnvironmentCellCoord>(32);
+            var globalAnchorCells = new List<EnvironmentCellCoord>(32);
+            var globalPlantUsedCells = new List<EnvironmentCellCoord>(32);
+            var globalVegetationUsedCells = new List<EnvironmentCellCoord>(128);
+            var biologicalAreas = CollectSortedBiologicalAreas();
 
-            foreach (var pair in _areaDefinitions)
+            for (int areaIndex = 0; areaIndex < biologicalAreas.Count; areaIndex++)
             {
-                EnvironmentAreaDefinition area = pair.Value;
-                if (!IsBiologicalArea(area))
-                    continue;
+                EnvironmentAreaDefinition area = biologicalAreas[areaIndex];
 
                 freeCells.Clear();
                 physicalPlantCells.Clear();
                 anchorCells.Clear();
-                plantUsedCells.Clear();
 
                 CollectBiologicalFreeCells(world, area, freeCells);
                 CollectPhysicalPlantFreeCells(world, area, physicalPlantCells);
-                SelectBiologicalAnchorCells(area, freeCells, anchorCells);
-                BuildVegetationCells(area, freeCells);
-                BuildPhysicalPlantCells(area, physicalPlantCells, anchorCells, plantUsedCells);
+                RemoveCells(freeCells, globalPlantUsedCells);
+                SelectBiologicalAnchorCells(area, freeCells, anchorCells, globalPlantUsedCells);
+                AddCellsIfMissing(globalAnchorCells, anchorCells);
+                BuildPhysicalPlantCells(area, physicalPlantCells, globalAnchorCells, globalPlantUsedCells);
+                BuildVegetationCells(area, freeCells, globalVegetationUsedCells, globalPlantUsedCells);
             }
 
             return _vegetationCellPlacements.Count + _physicalPlantPlacements.Count;
+        }
+
+        // =============================================================================
+        // RebuildRuntimeBiologicalPlacements
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce solo i placement runtime derivati da uno stato biologico gia'
+        /// esistente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: derivato fisico/visuale, biologia immutata</b></para>
+        /// <para>
+        /// Dopo un avanzamento giornaliero la biosfera puo' avere nuova densita'
+        /// vegetale, nuove condizioni e PlantInstance aggiornate. Questo metodo
+        /// riallinea le liste cell-based usate dai boundary World/ArcGraph senza
+        /// svuotare <c>_plantInstances</c>, senza rigenerare piante da seed bank e
+        /// senza modificare il catalogo biologico.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Vegetazione diffusa</b>: ricalcolata dalle aree e dalle celle naturali fornite dal World.</item>
+        ///   <item><b>Piante fisiche</b>: ricavate dalle PlantInstance vive gia' presenti nello stato.</item>
+        ///   <item><b>Nessuna mutazione biologica</b>: eta', salute, specie e seed bank restano quelli prodotti dal resolver.</item>
+        /// </list>
+        /// </summary>
+        public int RebuildRuntimeBiologicalPlacements(World world)
+        {
+            _vegetationCellPlacements.Clear();
+            _physicalPlantPlacements.Clear();
+
+            if (world == null)
+                return 0;
+
+            var freeCells = new List<EnvironmentCellCoord>(128);
+            var globalPlantUsedCells = new List<EnvironmentCellCoord>(32);
+            var globalVegetationUsedCells = new List<EnvironmentCellCoord>(128);
+            var livePlants = new List<EnvironmentPlantInstance>(_plantInstances.Count);
+
+            foreach (var pair in _plantInstances)
+            {
+                EnvironmentPlantInstance plant = pair.Value;
+                if (!plant.IsAlive || !plant.PlantId.IsValid)
+                    continue;
+
+                livePlants.Add(plant);
+            }
+
+            livePlants.Sort(ComparePlantInstancesForProjection);
+
+            for (int i = 0; i < livePlants.Count; i++)
+            {
+                EnvironmentPlantInstance plant = livePlants[i];
+                if (ContainsCell(globalPlantUsedCells, plant.Cell))
+                    continue;
+
+                _physicalPlantPlacements.Add(new EnvironmentPhysicalPlantPlacement(
+                    plant.PlantId,
+                    plant.SourceAreaId,
+                    plant.Cell,
+                    plant.SpeciesKey));
+                AddCellIfMissing(globalPlantUsedCells, plant.Cell);
+            }
+
+            var biologicalAreas = CollectSortedBiologicalAreas();
+            for (int areaIndex = 0; areaIndex < biologicalAreas.Count; areaIndex++)
+            {
+                EnvironmentAreaDefinition area = biologicalAreas[areaIndex];
+
+                freeCells.Clear();
+                CollectBiologicalFreeCells(world, area, freeCells);
+                BuildVegetationCells(area, freeCells, globalVegetationUsedCells, globalPlantUsedCells);
+            }
+
+            return _vegetationCellPlacements.Count + _physicalPlantPlacements.Count;
+        }
+
+        // =============================================================================
+        // ReplaceBiologicalPlacementsForSaveLoad
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce i placement cell-based della biosfera durante un load canonico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: restore del layout senza rigenerazione</b></para>
+        /// <para>
+        /// Le <c>PlantInstance</c> conservano biologia, eta', salute e specie; questi
+        /// placement conservano invece dove la biosfera aveva materializzato piante e
+        /// vegetazione diffusa. Il load non deve rilanciare il bootstrap naturale se
+        /// uno snapshot contiene gia' il layout vissuto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Vegetazione diffusa</b>: accettata se area e coordinate sono valide.</item>
+        ///   <item><b>Piante fisiche</b>: accettate solo se puntano a una PlantInstance viva esistente.</item>
+        ///   <item><b>Rejected</b>: conteggio record scartati senza mutare altri domini.</item>
+        /// </list>
+        /// </summary>
+        public int ReplaceBiologicalPlacementsForSaveLoad(
+            IReadOnlyList<EnvironmentVegetationCellPlacement> vegetationPlacements,
+            IReadOnlyList<EnvironmentPhysicalPlantPlacement> physicalPlantPlacements)
+        {
+            _vegetationCellPlacements.Clear();
+            _physicalPlantPlacements.Clear();
+
+            int rejected = 0;
+            var safeVegetation = vegetationPlacements ?? new EnvironmentVegetationCellPlacement[0];
+            for (int i = 0; i < safeVegetation.Count; i++)
+            {
+                EnvironmentVegetationCellPlacement placement = safeVegetation[i];
+                if (!placement.AreaId.IsValid || !_areaDefinitions.ContainsKey(placement.AreaId))
+                {
+                    rejected++;
+                    continue;
+                }
+
+                _vegetationCellPlacements.Add(placement);
+            }
+
+            var safePhysicalPlants = physicalPlantPlacements ?? new EnvironmentPhysicalPlantPlacement[0];
+            for (int i = 0; i < safePhysicalPlants.Count; i++)
+            {
+                EnvironmentPhysicalPlantPlacement placement = safePhysicalPlants[i];
+                if (!placement.PlantId.IsValid
+                    || !_plantInstances.TryGetValue(placement.PlantId, out EnvironmentPlantInstance plant)
+                    || !plant.IsAlive
+                    || !placement.AreaId.IsValid
+                    || !_areaDefinitions.ContainsKey(placement.AreaId))
+                {
+                    rejected++;
+                    continue;
+                }
+
+                _physicalPlantPlacements.Add(placement);
+            }
+
+            return rejected;
         }
 
         private bool IsBiologicalArea(EnvironmentAreaDefinition area)
@@ -444,7 +648,7 @@ namespace Arcontio.Core.Environment
                        || _seedBankAreas.ContainsKey(area.AreaId));
         }
 
-        private static void CollectBiologicalFreeCells(
+        private void CollectBiologicalFreeCells(
             World world,
             EnvironmentAreaDefinition area,
             List<EnvironmentCellCoord> outCells)
@@ -453,9 +657,10 @@ namespace Arcontio.Core.Environment
                 return;
 
             world.CollectEnvironmentNaturalCandidateCells(area, outCells);
+            ApplyBiologicalOrganicMask(area, outCells);
         }
 
-        private static void CollectPhysicalPlantFreeCells(
+        private void CollectPhysicalPlantFreeCells(
             World world,
             EnvironmentAreaDefinition area,
             List<EnvironmentCellCoord> outCells)
@@ -467,25 +672,199 @@ namespace Arcontio.Core.Environment
                 area,
                 outCells,
                 requirePhysicalPlantHost: true);
+            ApplyBiologicalOrganicMask(area, outCells);
         }
 
+        // =============================================================================
+        // ApplyBiologicalOrganicMask
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Filtra le celle naturali candidate di un'area biologica usando una
+        /// maschera organica deterministica.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: raggio massimo, forma biologica locale</b></para>
+        /// <para>
+        /// Il <see cref="World"/> continua a rispondere con tutte le celle naturali
+        /// dentro il raggio massimo dell'area. La biosfera, che e' proprietaria della
+        /// semantica biologica, decide poi quali celle appartengono davvero alla
+        /// macchia ecologica. In questo modo non introduciamo un sistema di forme
+        /// parallelo e non appesantiamo il file mappa: centro e raggio restano il
+        /// contratto spaziale minimo, mentre il bordo reale viene irregolarizzato con
+        /// hash stabile.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Compatibilita'</b>: aree non circolari e raggi minuscoli restano invariate.</item>
+        ///   <item><b>Intensita'</b>: ricavata dai payload esistenti di vegetazione, seed bank e fertilita'.</item>
+        ///   <item><b>Noise</b>: combinazione coarse/fine deterministica, senza Random runtime.</item>
+        ///   <item><b>Fallback</b>: se il filtro svuotasse l'area, conserva le celle originali.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyBiologicalOrganicMask(
+            EnvironmentAreaDefinition area,
+            List<EnvironmentCellCoord> cells)
+        {
+            if (cells == null || cells.Count <= 1 || !area.UsesCircularArea || area.RadiusCells <= 2)
+                return;
+
+            float intensity01 = ResolveBiologicalAreaMaskIntensity01(area);
+            int writeIndex = 0;
+
+            for (int readIndex = 0; readIndex < cells.Count; readIndex++)
+            {
+                EnvironmentCellCoord cell = cells[readIndex];
+                if (!IsInsideBiologicalOrganicMask(area, cell, intensity01))
+                    continue;
+
+                cells[writeIndex] = cell;
+                writeIndex++;
+            }
+
+            if (writeIndex <= 0)
+                return;
+
+            if (writeIndex < cells.Count)
+                cells.RemoveRange(writeIndex, cells.Count - writeIndex);
+        }
+
+        private float ResolveBiologicalAreaMaskIntensity01(EnvironmentAreaDefinition area)
+        {
+            float intensity01 = 0.5f;
+
+            if (_vegetationAreas.TryGetValue(area.AreaId, out EnvironmentVegetationAreaState vegetation))
+                intensity01 = System.Math.Max(intensity01, vegetation.Density01);
+
+            if (_seedBankAreas.TryGetValue(area.AreaId, out EnvironmentSeedBankAreaState seedBank))
+                intensity01 = System.Math.Max(
+                    intensity01,
+                    EnvironmentMath.Clamp01(seedBank.TotalAmount01 * seedBank.AverageViability01));
+
+            if (_fertilityAreas.TryGetValue(area.AreaId, out EnvironmentFertilityAreaState fertility))
+                intensity01 = System.Math.Max(intensity01, fertility.GrowthModifier01);
+
+            return EnvironmentMath.Clamp01(intensity01);
+        }
+
+        private static bool IsInsideBiologicalOrganicMask(
+            EnvironmentAreaDefinition area,
+            EnvironmentCellCoord cell,
+            float intensity01)
+        {
+            int dx = cell.X - area.CenterX;
+            int dy = cell.Y - area.CenterY;
+            int radius = area.RadiusCells;
+            int distanceSquared = (dx * dx) + (dy * dy);
+            if (distanceSquared > radius * radius)
+                return false;
+
+            float distance01 = (float)(System.Math.Sqrt(distanceSquared) / radius);
+            float coreRadius01 = BiologicalOrganicMaskBaseCoreRadius01
+                                  + (EnvironmentMath.Clamp01(intensity01) * BiologicalOrganicMaskIntensityCoreRadius01);
+            if (distance01 <= coreRadius01)
+                return true;
+
+            float edgePresence01 = 1f - distance01;
+            float noise01 = ResolveBiologicalOrganicMaskNoise01(area, cell);
+            float intensityBias01 = (EnvironmentMath.Clamp01(intensity01) - 0.5f) * 0.20f;
+            float irregularity01 = EnvironmentMath.Clamp01(area.Irregularity01);
+            float noiseStrength01 = Lerp(
+                BiologicalOrganicMaskMinNoiseStrength01,
+                BiologicalOrganicMaskMaxNoiseStrength01,
+                irregularity01);
+            float edgeThreshold01 = Lerp(
+                BiologicalOrganicMaskMinEdgeThreshold01,
+                BiologicalOrganicMaskMaxEdgeThreshold01,
+                irregularity01);
+            float presence01 = edgePresence01
+                                + ((noise01 - 0.5f) * noiseStrength01)
+                                + intensityBias01;
+
+            return presence01 >= edgeThreshold01;
+        }
+
+        private static float ResolveBiologicalOrganicMaskNoise01(
+            EnvironmentAreaDefinition area,
+            EnvironmentCellCoord cell)
+        {
+            int coarseX = cell.X / BiologicalOrganicMaskCoarseCellSize;
+            int coarseY = cell.Y / BiologicalOrganicMaskCoarseCellSize;
+            float coarse01 = ResolveBiologicalOrganicMaskHash01(area, coarseX, coarseY, 719);
+            float fine01 = ResolveBiologicalOrganicMaskHash01(area, cell.X, cell.Y, 421);
+            return (coarse01 * 0.75f) + (fine01 * 0.25f);
+        }
+
+        private static float ResolveBiologicalOrganicMaskHash01(
+            EnvironmentAreaDefinition area,
+            int x,
+            int y,
+            int salt)
+        {
+            unchecked
+            {
+                int hash = salt;
+                hash = (hash * 397) ^ ResolveStableAreaSeed(area);
+                hash = (hash * 397) ^ (x * 73856093);
+                hash = (hash * 397) ^ (y * 19349663);
+                hash = (hash * 397) ^ (area.Bounds.Z * 83492791);
+                return (hash & int.MaxValue) / (float)int.MaxValue;
+            }
+        }
+
+        private static float Lerp(float from, float to, float t)
+        {
+            float safeT = EnvironmentMath.Clamp01(t);
+            return from + ((to - from) * safeT);
+        }
+
+        // =============================================================================
+        // BuildVegetationCells
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Materializza la vegetazione diffusa di un'area rispettando le riserve gia'
+        /// assegnate da aree biologiche processate prima.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: overlap risolto nel placement, non nel catalogo</b></para>
+        /// <para>
+        /// Le aree biologiche possono sovrapporsi come informazione ecologica, ma la
+        /// proiezione cell-based verso World/ArcGraph deve restare univoca. Per
+        /// questo il metodo riceve celle di vegetazione gia' usate e celle occupate
+        /// da piante fisiche: una pianta vince sempre su vegetazione decorativa.
+        /// </para>
+        /// </summary>
         private void BuildVegetationCells(
             EnvironmentAreaDefinition area,
-            List<EnvironmentCellCoord> freeCells)
+            List<EnvironmentCellCoord> freeCells,
+            List<EnvironmentCellCoord> usedVegetationCells,
+            List<EnvironmentCellCoord> usedPhysicalPlantCells)
         {
             if (!_vegetationAreas.TryGetValue(area.AreaId, out EnvironmentVegetationAreaState vegetation))
                 return;
 
-            int targetCount = ResolvePlacementCount(freeCells.Count, vegetation.Density01, 1.0f);
+            int availableCount = CountAvailableCells(freeCells, usedVegetationCells, usedPhysicalPlantCells);
+            float vegetationDominance01 = 1f - EnvironmentMath.Clamp01(area.PhysicalPlantDominance01);
+            int targetCount = ResolvePlacementCount(availableCount, vegetation.Density01, vegetationDominance01);
+            var distributedCells = new List<EnvironmentCellCoord>(freeCells);
+            SortCellsByDistributionScore(distributedCells, ResolveStableAreaSeed(area));
+
             int created = 0;
-            for (int i = 0; i < freeCells.Count && created < targetCount; i++)
+            for (int i = 0; i < distributedCells.Count && created < targetCount; i++)
             {
+                EnvironmentCellCoord cell = distributedCells[i];
+                if (ContainsCell(usedVegetationCells, cell) || ContainsCell(usedPhysicalPlantCells, cell))
+                    continue;
+
                 _vegetationCellPlacements.Add(new EnvironmentVegetationCellPlacement(
                     area.AreaId,
-                    freeCells[i],
+                    cell,
                     vegetation.VegetationKind,
                     vegetation.Density01,
                     vegetation.Health01));
+                AddCellIfMissing(usedVegetationCells, cell);
                 created++;
             }
         }
@@ -503,7 +882,6 @@ namespace Arcontio.Core.Environment
                 return;
             }
 
-            int plantCapacity = System.Math.Max(1, freeCells.Count / 40);
             int createdInArea = 0;
 
             for (int entryIndex = 0; entryIndex < seedBank.Entries.Count; entryIndex++)
@@ -513,14 +891,21 @@ namespace Arcontio.Core.Environment
                     continue;
 
                 float pressure = entry.Amount01 * entry.Viability01;
-                int targetForSpecies = ResolvePlacementCount(plantCapacity, pressure, 0.25f);
+                int targetForSpecies = ResolvePlacementCount(
+                    freeCells.Count,
+                    pressure,
+                    area.PhysicalPlantDominance01);
                 for (int i = 0; i < targetForSpecies; i++)
                 {
-                    if (!TryPickPlantCell(freeCells, anchorCells, usedPlantCells, entryIndex, i, out EnvironmentCellCoord cell))
+                    if (!TryPickPlantCell(freeCells, anchorCells, usedPlantCells, area, entryIndex, i, out EnvironmentCellCoord cell))
                         return;
 
                     int plantOrdinal = createdInArea + 1;
                     var plantId = new EnvironmentPlantId(200000 + (area.AreaId.Value * 1000) + plantOrdinal);
+                    float initialHealth01 = ResolveInitialPhysicalPlantHealth01(
+                        entry,
+                        plantId,
+                        cell);
                     var plant = new EnvironmentPlantInstance(
                         plantId,
                         entry.SpeciesKey,
@@ -529,7 +914,7 @@ namespace Arcontio.Core.Environment
                         EnvironmentPlantGrowthStage.Seedling,
                         "seedling",
                         EnvironmentPlantHealthState.Healthy,
-                        entry.Viability01,
+                        initialHealth01,
                         0f,
                         false,
                         area.AreaId);
@@ -540,10 +925,53 @@ namespace Arcontio.Core.Environment
                         area.AreaId,
                         cell,
                         entry.SpeciesKey));
-                    usedPlantCells.Add(cell);
+                    AddCellIfMissing(usedPlantCells, cell);
                     createdInArea++;
                 }
             }
+        }
+
+        // =============================================================================
+        // ResolveInitialPhysicalPlantHealth01
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola una salute iniziale differenziata per le piante fisiche di bootstrap.
+        /// </para>
+        ///
+        /// <para><b>Coerenza con il modello naturale giornaliero</b></para>
+        /// <para>
+        /// Le piante create all'avvio usano lo stesso concetto di vigore individuale
+        /// poi applicato dal ciclo naturale: individui piu' robusti partono con piu'
+        /// margine, quelli fragili con meno. Il valore resta deterministico su
+        /// specie, id e cella, quindi non cambia tra due avvii identici.
+        /// </para>
+        /// </summary>
+        private static float ResolveInitialPhysicalPlantHealth01(
+            EnvironmentSeedBankEntry entry,
+            EnvironmentPlantId plantId,
+            EnvironmentCellCoord cell)
+        {
+            float vitality = ResolveInitialPhysicalPlantVitality01(
+                plantId,
+                entry.SpeciesKey,
+                cell);
+            float offset = (vitality - 1f) * InitialPhysicalPlantHealthVitalityScale01;
+            return EnvironmentMath.Clamp01(entry.Viability01 + offset);
+        }
+
+        private static float ResolveInitialPhysicalPlantVitality01(
+            EnvironmentPlantId plantId,
+            string speciesKey,
+            EnvironmentCellCoord cell)
+        {
+            float roll = ResolveInitialPhysicalPlantHash01(
+                plantId,
+                speciesKey,
+                cell,
+                431);
+            return InitialPhysicalPlantVitalityMin01
+                   + ((InitialPhysicalPlantVitalityMax01 - InitialPhysicalPlantVitalityMin01) * roll);
         }
 
         private static int ResolvePlacementCount(int availableCount, float intensity01, float scale)
@@ -563,6 +991,7 @@ namespace Arcontio.Core.Environment
             List<EnvironmentCellCoord> freeCells,
             List<EnvironmentCellCoord> anchorCells,
             List<EnvironmentCellCoord> usedPlantCells,
+            EnvironmentAreaDefinition area,
             int entryIndex,
             int localIndex,
             out EnvironmentCellCoord cell)
@@ -571,24 +1000,140 @@ namespace Arcontio.Core.Environment
             if (freeCells == null || freeCells.Count == 0)
                 return false;
 
-            int start = System.Math.Abs((entryIndex * 37) + (localIndex * 17)) % freeCells.Count;
-            for (int offset = 0; offset < freeCells.Count; offset++)
+            int bestScore = int.MinValue;
+            bool hasBest = false;
+            int areaSeed = ResolveStableAreaSeed(area);
+            int salt = (entryIndex * 1009) ^ (localIndex * 9176) ^ areaSeed;
+
+            for (int i = 0; i < freeCells.Count; i++)
             {
-                EnvironmentCellCoord candidate = freeCells[(start + offset) % freeCells.Count];
+                EnvironmentCellCoord candidate = freeCells[i];
                 if (ContainsCell(anchorCells, candidate) || ContainsCell(usedPlantCells, candidate))
                     continue;
 
+                int score = ResolveCellDistributionScore(candidate, salt);
+                if (hasBest && score <= bestScore)
+                    continue;
+
+                bestScore = score;
                 cell = candidate;
-                return true;
+                hasBest = true;
             }
 
-            return false;
+            return hasBest;
         }
 
+        // =============================================================================
+        // SortCellsByDistributionScore
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ordina le celle candidate con uno score pseudo-casuale deterministico.
+        /// </para>
+        ///
+        /// <para><b>Distribuzione spaziale stabile</b></para>
+        /// <para>
+        /// Il <c>World</c> consegna celle in ordine di scansione. Ordinare una copia
+        /// locale con hash evita pattern a righe senza introdurre random runtime:
+        /// la stessa mappa, la stessa area e la stessa configurazione producono
+        /// sempre la stessa distribuzione iniziale e gli stessi cambiamenti sparsi.
+        /// </para>
+        /// </summary>
+        private static void SortCellsByDistributionScore(
+            List<EnvironmentCellCoord> cells,
+            int salt)
+        {
+            if (cells == null || cells.Count <= 1)
+                return;
+
+            cells.Sort((left, right) =>
+            {
+                int rightScore = ResolveCellDistributionScore(right, salt);
+                int leftScore = ResolveCellDistributionScore(left, salt);
+                int scoreCompare = rightScore.CompareTo(leftScore);
+                if (scoreCompare != 0)
+                    return scoreCompare;
+
+                int yCompare = left.Y.CompareTo(right.Y);
+                if (yCompare != 0)
+                    return yCompare;
+
+                int xCompare = left.X.CompareTo(right.X);
+                if (xCompare != 0)
+                    return xCompare;
+
+                return left.Z.CompareTo(right.Z);
+            });
+        }
+
+        private static int ResolveStableAreaSeed(EnvironmentAreaDefinition area)
+        {
+            return (area.AreaId.Value * 73856093)
+                   ^ (area.CenterX * 19349663)
+                   ^ (area.CenterY * 83492791)
+                   ^ (area.RadiusCells * 265443576);
+        }
+
+        private static float ResolveInitialPhysicalPlantHash01(
+            EnvironmentPlantId plantId,
+            string speciesKey,
+            EnvironmentCellCoord cell,
+            int salt)
+        {
+            unchecked
+            {
+                int hash = 97 + salt;
+                hash = (hash * 397) ^ plantId.Value;
+                hash = (hash * 397) ^ ResolveStableSpeciesHash(speciesKey);
+                hash = (hash * 397) ^ (cell.X * 73856093);
+                hash = (hash * 397) ^ (cell.Y * 19349663);
+                hash = (hash * 397) ^ (cell.Z * 83492791);
+                return (hash & int.MaxValue) / (float)int.MaxValue;
+            }
+        }
+
+        private static int ResolveStableSpeciesHash(string speciesKey)
+        {
+            if (string.IsNullOrWhiteSpace(speciesKey))
+                return 17;
+
+            int hash = 23;
+            for (int i = 0; i < speciesKey.Length; i++)
+            {
+                // Hash stabile e minimale: serve a differenziare individui iniziali
+                // senza usare Random runtime o stato globale.
+                hash = (hash * 31) + speciesKey[i];
+            }
+
+            return hash;
+        }
+
+        private static int ResolveCellDistributionScore(EnvironmentCellCoord cell, int salt)
+        {
+            unchecked
+            {
+                int hash = salt;
+                hash = (hash * 397) ^ (cell.X * 73856093);
+                hash = (hash * 397) ^ (cell.Y * 19349663);
+                hash = (hash * 397) ^ (cell.Z * 83492791);
+                return hash & int.MaxValue;
+            }
+        }
+
+        // =============================================================================
+        // SelectBiologicalAnchorCells
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Seleziona le celle landmark biologiche evitando celle gia' riservate da
+        /// piante fisiche o da landmark biologici scelti per aree precedenti.
+        /// </para>
+        /// </summary>
         private static void SelectBiologicalAnchorCells(
             EnvironmentAreaDefinition area,
             List<EnvironmentCellCoord> freeCells,
-            List<EnvironmentCellCoord> outSelected)
+            List<EnvironmentCellCoord> outSelected,
+            List<EnvironmentCellCoord> reservedCells = null)
         {
             if (freeCells == null || outSelected == null || freeCells.Count == 0)
                 return;
@@ -609,7 +1154,7 @@ namespace Arcontio.Core.Environment
                 int tx = area.CenterX + (dirs[i, 0] * System.Math.Max(1, radius));
                 int ty = area.CenterY + (dirs[i, 1] * System.Math.Max(1, radius));
 
-                if (TryFindNearestUnusedCell(freeCells, outSelected, tx, ty, out EnvironmentCellCoord selected))
+                if (TryFindNearestUnusedCell(freeCells, outSelected, reservedCells, tx, ty, out EnvironmentCellCoord selected))
                     outSelected.Add(selected);
             }
         }
@@ -617,6 +1162,7 @@ namespace Arcontio.Core.Environment
         private static bool TryFindNearestUnusedCell(
             List<EnvironmentCellCoord> cells,
             List<EnvironmentCellCoord> used,
+            List<EnvironmentCellCoord> reserved,
             int targetX,
             int targetY,
             out EnvironmentCellCoord selected)
@@ -628,7 +1174,7 @@ namespace Arcontio.Core.Environment
             for (int i = 0; i < cells.Count; i++)
             {
                 EnvironmentCellCoord cell = cells[i];
-                if (ContainsCell(used, cell))
+                if (ContainsCell(used, cell) || ContainsCell(reserved, cell))
                     continue;
 
                 int dx = cell.X - targetX;
@@ -646,6 +1192,111 @@ namespace Arcontio.Core.Environment
 
             selected = cells[bestIndex];
             return true;
+        }
+
+        private List<EnvironmentAreaDefinition> CollectSortedBiologicalAreas()
+        {
+            var areas = new List<EnvironmentAreaDefinition>(_areaDefinitions.Count);
+            foreach (var pair in _areaDefinitions)
+            {
+                EnvironmentAreaDefinition area = pair.Value;
+                if (IsBiologicalArea(area))
+                    areas.Add(area);
+            }
+
+            areas.Sort(CompareBiologicalAreasForOccupancy);
+            return areas;
+        }
+
+        private static int CompareBiologicalAreasForOccupancy(
+            EnvironmentAreaDefinition left,
+            EnvironmentAreaDefinition right)
+        {
+            // Priorita' maggiore prima: in celle sovrapposte l'area piu' importante
+            // riserva per prima vegetazione, piante e anchor biologici.
+            int priorityCompare = right.Priority.CompareTo(left.Priority);
+            if (priorityCompare != 0)
+                return priorityCompare;
+
+            return left.AreaId.Value.CompareTo(right.AreaId.Value);
+        }
+
+        private int ComparePlantInstancesForProjection(
+            EnvironmentPlantInstance left,
+            EnvironmentPlantInstance right)
+        {
+            int leftPriority = ResolveAreaPriority(left.SourceAreaId);
+            int rightPriority = ResolveAreaPriority(right.SourceAreaId);
+            int priorityCompare = rightPriority.CompareTo(leftPriority);
+            if (priorityCompare != 0)
+                return priorityCompare;
+
+            int areaCompare = left.SourceAreaId.Value.CompareTo(right.SourceAreaId.Value);
+            if (areaCompare != 0)
+                return areaCompare;
+
+            return left.PlantId.Value.CompareTo(right.PlantId.Value);
+        }
+
+        private int ResolveAreaPriority(EnvironmentAreaId areaId)
+        {
+            return areaId.IsValid && _areaDefinitions.TryGetValue(areaId, out EnvironmentAreaDefinition area)
+                ? area.Priority
+                : int.MinValue;
+        }
+
+        private static int CountAvailableCells(
+            List<EnvironmentCellCoord> cells,
+            List<EnvironmentCellCoord> usedVegetationCells,
+            List<EnvironmentCellCoord> usedPhysicalPlantCells)
+        {
+            if (cells == null || cells.Count == 0)
+                return 0;
+
+            int count = 0;
+            for (int i = 0; i < cells.Count; i++)
+            {
+                EnvironmentCellCoord cell = cells[i];
+                if (ContainsCell(usedVegetationCells, cell) || ContainsCell(usedPhysicalPlantCells, cell))
+                    continue;
+
+                count++;
+            }
+
+            return count;
+        }
+
+        private static void RemoveCells(
+            List<EnvironmentCellCoord> cells,
+            List<EnvironmentCellCoord> reservedCells)
+        {
+            if (cells == null || cells.Count == 0 || reservedCells == null || reservedCells.Count == 0)
+                return;
+
+            for (int i = cells.Count - 1; i >= 0; i--)
+                if (ContainsCell(reservedCells, cells[i]))
+                    cells.RemoveAt(i);
+        }
+
+        private static void AddCellsIfMissing(
+            List<EnvironmentCellCoord> target,
+            List<EnvironmentCellCoord> source)
+        {
+            if (target == null || source == null)
+                return;
+
+            for (int i = 0; i < source.Count; i++)
+                AddCellIfMissing(target, source[i]);
+        }
+
+        private static void AddCellIfMissing(
+            List<EnvironmentCellCoord> cells,
+            EnvironmentCellCoord cell)
+        {
+            if (cells == null || ContainsCell(cells, cell))
+                return;
+
+            cells.Add(cell);
         }
 
         private static bool ContainsCell(List<EnvironmentCellCoord> cells, EnvironmentCellCoord target)

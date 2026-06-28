@@ -316,20 +316,64 @@ namespace Arcontio.Core.Environment
             float climateSupport = context.SeasonProfile.VegetationGrowthBias01
                                    * vegetation.ClimateInfluence01;
             float waterSupport = water.WaterLevel01 * 0.5f + context.Climate.Humidity01 * 0.5f;
-            float stress = context.Climate.Aridity01 * 0.045f
-                           + fertility.Exhaustion01 * 0.030f;
+            float stress = context.Climate.Aridity01 * 0.016f
+                           + fertility.Exhaustion01 * 0.012f;
             float growthPressure = (fertilitySupport + climateSupport + waterSupport) / 3f;
-            float densityDelta = (growthPressure * vegetation.GrowthPotential01 * 0.035f) - stress;
-            float healthDelta = ((growthPressure - 0.45f) * 0.050f) - (context.Climate.Aridity01 * 0.015f);
+            float densityDelta = (growthPressure * vegetation.GrowthPotential01 * 0.028f) - stress;
+            float healthDelta = ((growthPressure - 0.38f) * 0.040f) - (context.Climate.Aridity01 * 0.006f);
+            float nextDensity = vegetation.Density01 + densityDelta;
+            float nextHealth = vegetation.Health01 + healthDelta;
+
+            ApplyTemperateVegetationFloor(
+                vegetation,
+                context,
+                ref nextDensity,
+                ref nextHealth);
 
             return new EnvironmentVegetationAreaState(
                 vegetation.AreaId,
                 vegetation.VegetationKind,
-                vegetation.Density01 + densityDelta,
+                nextDensity,
                 vegetation.GrowthPotential01,
-                vegetation.Health01 + healthDelta,
+                nextHealth,
                 vegetation.FertilityInfluence01,
                 vegetation.ClimateInfluence01);
+        }
+
+        // =============================================================================
+        // ApplyTemperateVegetationFloor
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un pavimento ecologico minimo alla vegetazione erbosa temperata.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: persistenza del bioma</b></para>
+        /// <para>
+        /// La vegetazione diffusa non rappresenta singoli fili d'erba, ma copertura
+        /// media di area. In un prato temperato la copertura puo' diradarsi e
+        /// seccarsi, ma non deve collassare a zero dopo pochi mesi normali: quello
+        /// stato va riservato a disturbi forti o biomi estremi futuri. Il pavimento
+        /// e' quindi applicato solo quando l'aridita' non e' estrema.
+        /// </para>
+        /// </summary>
+        private static void ApplyTemperateVegetationFloor(
+            EnvironmentVegetationAreaState vegetation,
+            EnvironmentAreaEvolutionContext context,
+            ref float density01,
+            ref float health01)
+        {
+            if (vegetation.VegetationKind != EnvironmentVegetationKind.Grass)
+                return;
+
+            if (context.Climate.Aridity01 >= 0.72f)
+                return;
+
+            if (density01 < 0.34f)
+                density01 = 0.34f;
+
+            if (health01 < 0.32f)
+                health01 = 0.32f;
         }
 
         private static EnvironmentWaterDepthLevel ResolveDepthFromLevel(

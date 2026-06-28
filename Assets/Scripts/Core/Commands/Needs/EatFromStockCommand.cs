@@ -138,8 +138,14 @@ namespace Arcontio.Core
             }
 
             // 2) Mutazione hunger
+            // Il valore primario viene dal catalogo dell'oggetto consumato. Il vecchio
+            // eatSatietyGain resta fallback per dati legacy o definizioni incomplete.
             var cfg = world.Global.Needs;
-            needs.AddValue(NeedKind.Hunger, -cfg.eatSatietyGain);
+            float nutritionValue = ResolveFoodStockNutritionValue(
+                world,
+                _foodObjId,
+                cfg.eatSatietyGain);
+            needs.AddValue(NeedKind.Hunger, -nutritionValue);
             world.Needs[_npcId] = needs;
 
             bus?.Publish(new FoodConsumedEvent(
@@ -153,6 +159,50 @@ namespace Arcontio.Core
                 cellX: stockX,
                 cellY: stockY,
                 hungerAfter: needs.GetValue(NeedKind.Hunger)));
+        }
+
+        // =============================================================================
+        // ResolveFoodStockNutritionValue
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve quanto recupero fame produce una unita' dello stock consumato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: nutrizione data-driven con fallback legacy</b></para>
+        /// <para>
+        /// Il comando non deve decidere nel codice quanto nutre un cibo. Legge
+        /// <c>NutritionValue</c> dal catalogo oggetti; se il dato manca, usa il valore
+        /// legacy <c>eatSatietyGain</c> per preservare compatibilita' con salvataggi,
+        /// test e oggetti non ancora migrati.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>object lookup</b>: recupera il defId dello stock fisico.</item>
+        ///   <item><b>catalog lookup</b>: legge la proprieta' NutritionValue dal relativo ObjectDef.</item>
+        ///   <item><b>fallback</b>: ritorna il valore configurato in NeedsConfig se il dato non e' valido.</item>
+        /// </list>
+        /// </summary>
+        private static float ResolveFoodStockNutritionValue(
+            World world,
+            int foodObjectId,
+            float fallback)
+        {
+            float safeFallback = fallback > 0f ? fallback : 0.45f;
+            if (world == null
+                || !world.Objects.TryGetValue(foodObjectId, out var stockObject)
+                || stockObject == null
+                || !world.TryGetObjectDef(stockObject.DefId, out var def)
+                || def == null)
+            {
+                return safeFallback;
+            }
+
+            return def.TryGetPropertyValue("NutritionValue", out float nutritionValue)
+                   && nutritionValue > 0f
+                ? nutritionValue
+                : safeFallback;
         }
     }
 }

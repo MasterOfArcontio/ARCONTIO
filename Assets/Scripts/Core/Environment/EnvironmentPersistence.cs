@@ -136,13 +136,17 @@ namespace Arcontio.Core.Environment
     [Serializable]
     public sealed class EnvironmentSaveData
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
 
         public int schemaVersion = CurrentSchemaVersion;
         public long elapsedEnvironmentTicks;
         public EnvironmentClimateSaveRecord climate = new EnvironmentClimateSaveRecord();
         public EnvironmentAreaSaveRecord[] areas = new EnvironmentAreaSaveRecord[0];
         public EnvironmentPlantSaveRecord[] plants = new EnvironmentPlantSaveRecord[0];
+        public EnvironmentVegetationPlacementSaveRecord[] vegetationPlacements =
+            new EnvironmentVegetationPlacementSaveRecord[0];
+        public EnvironmentPhysicalPlantPlacementSaveRecord[] physicalPlantPlacements =
+            new EnvironmentPhysicalPlantPlacementSaveRecord[0];
 
         public int ResolveSchemaVersion()
         {
@@ -248,6 +252,11 @@ namespace Arcontio.Core.Environment
         public int maxX;
         public int maxY;
         public int z;
+        public int centerX;
+        public int centerY;
+        public int radiusCells;
+        public float irregularity01 = 0.5f;
+        public float physicalPlantDominance01 = 0.045f;
         public int priority;
         public bool isEnabled;
         public string key = string.Empty;
@@ -267,6 +276,11 @@ namespace Arcontio.Core.Environment
                 new EnvironmentAreaId(areaId),
                 kind,
                 new EnvironmentAreaBounds(minX, minY, maxX, maxY, z),
+                radiusCells > 0 ? centerX : (minX + maxX) / 2,
+                radiusCells > 0 ? centerY : (minY + maxY) / 2,
+                radiusCells,
+                irregularity01,
+                physicalPlantDominance01,
                 priority,
                 isEnabled,
                 key);
@@ -285,6 +299,11 @@ namespace Arcontio.Core.Environment
                 maxX = definition.Bounds.MaxX,
                 maxY = definition.Bounds.MaxY,
                 z = definition.Bounds.Z,
+                centerX = definition.CenterX,
+                centerY = definition.CenterY,
+                radiusCells = definition.RadiusCells,
+                irregularity01 = definition.Irregularity01,
+                physicalPlantDominance01 = definition.PhysicalPlantDominance01,
                 priority = definition.Priority,
                 isEnabled = definition.IsEnabled,
                 key = definition.Key,
@@ -574,6 +593,108 @@ namespace Arcontio.Core.Environment
     }
 
     // =============================================================================
+    // EnvironmentVegetationPlacementSaveRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Record serializzabile di una cella occupata da vegetazione diffusa.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: layout vegetale persistito senza sprite</b></para>
+    /// <para>
+    /// La vegetazione diffusa e' un dato cell-based della biosfera, non una tile
+    /// fisica del terreno e non uno sprite ArcGraph. Persistire il placement evita
+    /// che un load rigeneri una distribuzione diversa da quella gia' vissuta.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class EnvironmentVegetationPlacementSaveRecord
+    {
+        public int areaId;
+        public int x;
+        public int y;
+        public int z;
+        public EnvironmentVegetationKind vegetationKind;
+        public float density01;
+        public float health01;
+
+        public static EnvironmentVegetationPlacementSaveRecord FromPlacement(
+            EnvironmentVegetationCellPlacement placement)
+        {
+            return new EnvironmentVegetationPlacementSaveRecord
+            {
+                areaId = placement.AreaId.Value,
+                x = placement.Cell.X,
+                y = placement.Cell.Y,
+                z = placement.Cell.Z,
+                vegetationKind = placement.VegetationKind,
+                density01 = placement.Density01,
+                health01 = placement.Health01
+            };
+        }
+
+        public EnvironmentVegetationCellPlacement ToPlacement()
+        {
+            return new EnvironmentVegetationCellPlacement(
+                new EnvironmentAreaId(areaId),
+                new EnvironmentCellCoord(x, y, z),
+                vegetationKind,
+                density01,
+                health01);
+        }
+    }
+
+    // =============================================================================
+    // EnvironmentPhysicalPlantPlacementSaveRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Record serializzabile di una pianta fisica piazzata in mappa dalla biosfera.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: fisica derivata persistita come riferimento</b></para>
+    /// <para>
+    /// Il record non duplica salute, eta' o maturita': quei valori vivono nella
+    /// <see cref="EnvironmentPlantSaveRecord"/>. Qui si salva solo il riferimento
+    /// plantId/area/cella necessario al World per ricostruire occupazione, FOV e
+    /// feed visuale dopo load.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class EnvironmentPhysicalPlantPlacementSaveRecord
+    {
+        public int plantId;
+        public int areaId;
+        public int x;
+        public int y;
+        public int z;
+        public string speciesKey = string.Empty;
+
+        public static EnvironmentPhysicalPlantPlacementSaveRecord FromPlacement(
+            EnvironmentPhysicalPlantPlacement placement)
+        {
+            return new EnvironmentPhysicalPlantPlacementSaveRecord
+            {
+                plantId = placement.PlantId.Value,
+                areaId = placement.AreaId.Value,
+                x = placement.Cell.X,
+                y = placement.Cell.Y,
+                z = placement.Cell.Z,
+                speciesKey = placement.SpeciesKey ?? string.Empty
+            };
+        }
+
+        public EnvironmentPhysicalPlantPlacement ToPlacement()
+        {
+            return new EnvironmentPhysicalPlantPlacement(
+                new EnvironmentPlantId(plantId),
+                new EnvironmentAreaId(areaId),
+                new EnvironmentCellCoord(x, y, z),
+                speciesKey);
+        }
+    }
+
+    // =============================================================================
     // EnvironmentLoadReport
     // =============================================================================
     /// <summary>
@@ -668,8 +789,38 @@ namespace Arcontio.Core.Environment
                 elapsedEnvironmentTicks = snapshot.Calendar.ElapsedEnvironmentTicks,
                 climate = EnvironmentClimateSaveRecord.FromState(snapshot.Climate),
                 areas = CaptureAreas(snapshot.Areas),
-                plants = CapturePlants(snapshot.Plants)
+                plants = CapturePlants(snapshot.Plants),
+                vegetationPlacements = new EnvironmentVegetationPlacementSaveRecord[0],
+                physicalPlantPlacements = new EnvironmentPhysicalPlantPlacementSaveRecord[0]
             };
+        }
+
+        // =============================================================================
+        // Capture
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cattura lo stato persistente completo da <see cref="EnvironmentState"/>,
+        /// includendo anche i placement runtime cell-based.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: layout vissuto, non rigenerato</b></para>
+        /// <para>
+        /// Lo snapshot read-only espone aree e piante, ma non contiene le liste di
+        /// placement fisico/vegetale. Il save globale usa questo overload per
+        /// preservare anche la distribuzione concreta che il World e ArcGraph stanno
+        /// leggendo.
+        /// </para>
+        /// </summary>
+        public static EnvironmentSaveData Capture(EnvironmentState state)
+        {
+            if (state == null)
+                return new EnvironmentSaveData();
+
+            EnvironmentSaveData data = Capture(state.CreateSnapshot());
+            data.vegetationPlacements = CaptureVegetationPlacements(state.VegetationCellPlacements);
+            data.physicalPlantPlacements = CapturePhysicalPlantPlacements(state.PhysicalPlantPlacements);
+            return data;
         }
 
         // =============================================================================
@@ -745,6 +896,12 @@ namespace Arcontio.Core.Environment
                     rejected++;
             }
 
+            var vegetationPlacements = RestoreVegetationPlacements(safeData.vegetationPlacements, ref rejected);
+            var physicalPlantPlacements = RestorePhysicalPlantPlacements(safeData.physicalPlantPlacements, ref rejected);
+            rejected += state.ReplaceBiologicalPlacementsForSaveLoad(
+                vegetationPlacements,
+                physicalPlantPlacements);
+
             return new EnvironmentLoadResult(
                 state,
                 new EnvironmentLoadReport(areasLoaded, plantsLoaded, rejected));
@@ -774,6 +931,72 @@ namespace Arcontio.Core.Environment
                 records[i] = EnvironmentPlantSaveRecord.FromSnapshot(plants[i]);
 
             return records;
+        }
+
+        private static EnvironmentVegetationPlacementSaveRecord[] CaptureVegetationPlacements(
+            IReadOnlyList<EnvironmentVegetationCellPlacement> placements)
+        {
+            if (placements == null || placements.Count == 0)
+                return new EnvironmentVegetationPlacementSaveRecord[0];
+
+            var records = new EnvironmentVegetationPlacementSaveRecord[placements.Count];
+            for (int i = 0; i < placements.Count; i++)
+                records[i] = EnvironmentVegetationPlacementSaveRecord.FromPlacement(placements[i]);
+
+            return records;
+        }
+
+        private static EnvironmentPhysicalPlantPlacementSaveRecord[] CapturePhysicalPlantPlacements(
+            IReadOnlyList<EnvironmentPhysicalPlantPlacement> placements)
+        {
+            if (placements == null || placements.Count == 0)
+                return new EnvironmentPhysicalPlantPlacementSaveRecord[0];
+
+            var records = new EnvironmentPhysicalPlantPlacementSaveRecord[placements.Count];
+            for (int i = 0; i < placements.Count; i++)
+                records[i] = EnvironmentPhysicalPlantPlacementSaveRecord.FromPlacement(placements[i]);
+
+            return records;
+        }
+
+        private static EnvironmentVegetationCellPlacement[] RestoreVegetationPlacements(
+            EnvironmentVegetationPlacementSaveRecord[] records,
+            ref int rejected)
+        {
+            var safeRecords = records ?? new EnvironmentVegetationPlacementSaveRecord[0];
+            var placements = new List<EnvironmentVegetationCellPlacement>(safeRecords.Length);
+            for (int i = 0; i < safeRecords.Length; i++)
+            {
+                if (safeRecords[i] == null)
+                {
+                    rejected++;
+                    continue;
+                }
+
+                placements.Add(safeRecords[i].ToPlacement());
+            }
+
+            return placements.ToArray();
+        }
+
+        private static EnvironmentPhysicalPlantPlacement[] RestorePhysicalPlantPlacements(
+            EnvironmentPhysicalPlantPlacementSaveRecord[] records,
+            ref int rejected)
+        {
+            var safeRecords = records ?? new EnvironmentPhysicalPlantPlacementSaveRecord[0];
+            var placements = new List<EnvironmentPhysicalPlantPlacement>(safeRecords.Length);
+            for (int i = 0; i < safeRecords.Length; i++)
+            {
+                if (safeRecords[i] == null)
+                {
+                    rejected++;
+                    continue;
+                }
+
+                placements.Add(safeRecords[i].ToPlacement());
+            }
+
+            return placements.ToArray();
         }
     }
 }

@@ -66,13 +66,18 @@
 | v0.59 | Plant Physical Runtime Representation | Post-v0.58 | ✅ Core runtime representation iniziale completata |
 | v0.60 | Plant Lifecycle Delta Propagation | Post-v0.59 | ✅ Producer delta giornalieri data-only completato |
 | v0.61 | Decorative Vegetation Placement | Post-v0.60 | ✅ Contratto/delta vegetazione diffusa data-only completato, World projection pending |
-| v0.62 | Dirty Propagation / FOV & Perception | Post-v0.61 | ⏳ Pending |
-| v0.63 | ArcGraph Environment Runtime Feed | Post-v0.62 | ⏳ Pending |
-| v0.64 | Environment Event / Listener Boundary | Post-v0.63 | ⏳ Pending |
-| v0.65 | Biosphere Runtime Save/Load Integration | Post-v0.64 | ⏳ Pending |
-| v0.66 | NPC Environment Query Integration | Post-v0.65 | ⏳ Pending |
+| v0.62 | Dirty Propagation / FOV & Perception | Post-v0.61 | ✅ Validata runtime |
+| v0.63 | ArcGraph Environment Runtime Feed | Post-v0.62 | ✅ Validata runtime |
+| v0.63.1 | Biological Area Organic Mask configurabile | Dentro v0.63 | ✅ Implementato |
+| v0.63.2 | Biological Area Overlap Resolution | Dentro v0.63 | ✅ Implementato |
+| v0.63.3 | Configurable Physical Plant Dominance | Dentro v0.63 | ✅ Implementato |
+| v0.64 | Environment Event / Listener Boundary | Post-v0.63 | ✅ Implementato |
+| v0.65 | Biosphere Runtime Save/Load Integration | Post-v0.64 | 🧊 Rinviata al save/load globale simulazione |
+| v0.66 | NPC Environment Query Integration | Post-v0.65 | ✅ Foundation query/prodotti biologici completata, belief/job completo futuro |
+| v0.66b | Biological Plant Product Contract | Post-v0.66 | ✅ Prodotti biologici estesi con tool, stadio minimo, stagionalita', quantita' base e regrow |
+| v0.66c | Biological Landmark Belief Hint Contract | Post-v0.66b | ✅ Contratti LM biologico -> hint potenziali/osservati completati, senza scrivere BeliefStore |
 | v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⏳ Pending |
-| v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ⏳ Pending |
+| v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ✅ Core budget runtime completato, spreading multi-tick futuro |
 | v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ⏳ Pending |
 | v0.70 | ArcGraph Runtime UI Architecture | Post-v0.69 / track UI dedicata | 🔄 Pianificata |
 | v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ Pending |
@@ -15894,7 +15899,7 @@ Problemi progettuali da chiudere prima del runtime produttivo:
 
 | Nodo | Rischio | Decisione provvisoria |
 |---|---|---|
-| Scala tempo reale/simulato | La pagina BIOSFERA conteneva durate non coerenti tra loro | Decisione: `24 ore simulate = 20 minuti reali`; valori futuri in file di configurazione |
+| Scala tempo reale/simulato | La pagina BIOSFERA conteneva durate non coerenti tra loro | Decisione runtime aggiornata: `24 ore simulate = 9000 tick SimulationHost`, cioe' 10 minuti reali a 15 tick/sec; valori in file di configurazione |
 | Cella come contenitore unico | Saturazione del vincolo `1 oggetto per cella` | Cella come coordinata + layer sovrapposti |
 | Aree sovrapposte | Un solo `AreaId` non basta | Registry per layer: fertility/water/vegetation/room/territory |
 | Vegetazione diffusa | Troppe entita' se ogni filo d'erba diventa oggetto | `VegetationArea` + seedBank astratta |
@@ -15984,8 +15989,8 @@ definire il tempo ambientale canonico e derivare ora, giorno, mese, anno e stagi
 
 Decisione obbligatoria iniziale:
 
-- usare come baseline `24 ore simulate = 20 minuti reali`;
-- derivare da questa scala la durata dell'ora simulata: `1 ora simulata = 50 secondi reali`;
+- usare come baseline `24 ore simulate = 9000 tick SimulationHost`;
+- derivare da questa scala la durata dell'ora simulata: `1 ora simulata = 375 tick SimulationHost`, cioe' 25 secondi reali a 15 tick/sec;
 - dichiarare tutti questi valori come configurabili, non hardcoded;
 - collocare giorni per mese, mesi per anno, durata giorno, stagioni e profili luce in file di configurazione dedicati.
 
@@ -16003,8 +16008,8 @@ Valori baseline da configurare:
 | Parametro | Valore baseline | Stato |
 |---|---|---|
 | ore per giorno | 24 | ✅ Configurato come baseline |
-| durata giorno simulato | 20 minuti reali | ✅ Configurato come baseline |
-| durata ora simulata | 50 secondi reali | ✅ Derivato dalla baseline |
+| durata giorno simulato | 9000 tick SimulationHost / 10 minuti reali a 15 tick/sec | ✅ Configurato come baseline |
+| durata ora simulata | 375 tick SimulationHost / 25 secondi reali a 15 tick/sec | ✅ Derivato dalla baseline |
 | giorni per mese | 25 | ✅ Configurato come baseline |
 | mesi per anno | 12 | ✅ Configurato come baseline |
 | giorni per anno | 300 | ✅ Derivato dalla baseline |
@@ -16542,7 +16547,7 @@ Blocchi previsti:
 | LM system handoff | input manuale alla rebuild del LandmarkRegistry senza appesantire LandmarkNode | ✅ Implementato |
 | Area-to-LM reference | sidecar biosfera area biologica -> nodeIds risolti dal registry | ✅ Implementato |
 | Debug overlay kind/color | colore e tipo debug dedicato per LM biologici in MapGrid/ArcGraph debug | ✅ Implementato |
-| Harness | test senza MapGrid e senza ArcGraph | ⏳ Pending |
+| Harness | test senza MapGrid e senza ArcGraph | ✅ Implementato in `EnvironmentFoundationHarness` |
 
 Vincoli:
 
@@ -16575,7 +16580,7 @@ Blocchi previsti:
 | Biological occupancy output | vegetazione decorativa e piante fisiche come stato biosfera data-only | ✅ Implementato |
 | Map biological areas | aree biologiche minime in `world_map_default.json` | ✅ Implementato |
 | Sprite independence | nessun path sprite o PNG dentro biosfera | ✅ Implementato |
-| Harness | test senza MapGrid e senza ArcGraph | ⏳ Pending |
+| Harness | test senza MapGrid e senza ArcGraph | ✅ Implementato in `EnvironmentFoundationHarness` |
 
 ---
 
@@ -16588,14 +16593,30 @@ Blocchi previsti:
 | v0.59 | salvare rappresentazione runtime minima delle piante fisiche | ✅ Core runtime representation iniziale completata |
 | v0.60 | propagare nascita/morte/cambio stadio pianta come delta | ✅ Producer delta giornalieri data-only completato |
 | v0.61 | piazzare vegetazione decorativa non oggetto | ✅ Contratto/delta vegetazione diffusa data-only completato, World projection pending |
-| v0.62 | sporcare FOV/percezione quando cambiano celle fisiche | ⏳ Pending |
-| v0.63 | produrre feed runtime derivato per ArcGraph | ⏳ Pending |
-| v0.64 | esporre eventi/listener ambiente per UI e sistemi | ⏳ Pending |
-| v0.65 | integrare save/load biosfera runtime | ⏳ Pending |
-| v0.66 | integrare query NPC verso aree/risorse biologiche | ⏳ Pending |
-| v0.67 | pannello debug/calibrazione runtime biosfera | ⏳ Pending |
-| v0.68 | budget e batch processing produttivo | ⏳ Pending |
-| v0.69 | QA closeout integrazione fisica biosfera | ⏳ Pending |
+| v0.62 | sporcare FOV/percezione quando cambiano celle fisiche | ✅ Validata runtime |
+| v0.63 | produrre feed runtime derivato per ArcGraph | ✅ Validata runtime |
+| v0.63.1 | generare maschera organica deterministica configurabile per aree biologiche entro raggio massimo | ✅ Implementato |
+| v0.63.2 | risolvere sovrapposizione aree biologiche per piante, vegetazione diffusa e landmark biologici | ✅ Implementato |
+| v0.63.3 | rendere configurabile per area il bilanciamento vegetazione diffusa / piante fisiche | ✅ Implementato |
+| v0.63.4 | allineare carrying capacity runtime piante fisiche a PhysicalPlantDominance01 per-area | ✅ Implementato |
+| v0.64 | esporre eventi/listener ambiente per UI e sistemi | ✅ Implementato |
+| v0.64.1 | collegare TopBar e grafici Biosfera ai listener ambiente tipizzati | ✅ Implementato |
+| v0.65 | integrare save/load biosfera runtime | 🧊 Rinviato: assorbito dal futuro save/load globale della simulazione |
+| v0.66 | integrare query NPC verso aree/risorse biologiche | ✅ Foundation query/prodotti biologici completata, belief/job completi futuri |
+| v0.66b | consolidare catalogo prodotti biologici per specie vegetale | ✅ Implementato: tool, stadio minimo, stagionalita', quantita' base, regrow e item/tool minimi in object_defs |
+| v0.66c | consolidare contratto LM biologico -> belief hint | ✅ Implementato: hint potenziali da prodotti area e hint osservati da query locale, senza scrittura BeliefStore |
+| v0.67 | pannello debug/calibrazione runtime biosfera | ⚠️ Parziale: diagnostica runtime implementata, calibrazione avanzata pending |
+| v0.67.1 | aggiungere testata diagnostica compatta e range numerici ai grafici Biosfera | ✅ Implementato |
+| v0.68 | budget e batch processing produttivo | ✅ Core budget runtime completato, spreading multi-tick futuro |
+| v0.69 | QA closeout integrazione fisica biosfera | ✅ Closeout tecnico completato, job risorse/NPC rimandato a roadmap dedicata |
+
+Closeout tecnico v0.69:
+
+- validato dall'operatore in runtime: rendering piante e vegetazione, sorting visuale, blocco FOV da piante fisiche, overlap aree biologiche e densita' foresta configurabile;
+- verificato da build C#: `dotnet build Assembly-CSharp.csproj --no-restore /p:UseSharedCompilation=false -v:minimal`, 0 errori;
+- verificato staticamente: `git diff --check`, 0 errori whitespace;
+- coperto da harness data-only: calendario, clima, snapshot, crescita naturale, seed bank, proiezioni visuali neutrali, query consumer e scheduler runtime;
+- esplicitamente fuori scope v0.69: scrittura BeliefStore reale, decision/job completo di raccolta, inventario privato/comune, consumo risorse per pianta e save/load globale simulazione.
 
 Nota boundary piante fisiche:
 

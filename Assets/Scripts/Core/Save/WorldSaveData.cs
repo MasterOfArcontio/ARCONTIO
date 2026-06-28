@@ -1,4 +1,5 @@
 using System;
+using Arcontio.Core.Environment;
 
 namespace Arcontio.Core.Save
 {
@@ -101,6 +102,14 @@ namespace Arcontio.Core.Save
         /// Non e' un comando di reload: e' solo provenance, utile per debug e audit.
         /// </summary>
         public string scenarioResourceName;
+
+        /// <summary>
+        /// Sezione biosfera canonica. Contiene calendario ambientale, clima, aree,
+        /// piante vive e placement cell-based prodotti dalla biosfera. Non contiene
+        /// sprite, snapshot ArcGraph o cache visuali: quelle vengono ricostruite dal
+        /// World dopo il load.
+        /// </summary>
+        public EnvironmentSaveData environment = new EnvironmentSaveData();
 
         /// <summary>
         /// Sezione NPC. In v0.10.01 riusa intenzionalmente <see cref="NpcSaveEntry"/>

@@ -4,7 +4,7 @@
   "initialEnvironmentTicks": 0,
   "calendar": {
     "hoursPerDay": 24,
-    "calendarTicksPerSimulatedHour": 50,
+    "calendarTicksPerSimulatedHour": 375,
     "daysPerMonth": 25,
     "monthsPerYear": 12,
     "monthsPerSeason": 3,
@@ -46,6 +46,7 @@
   "climate": {
     "weatherPersistence01": 0.35,
     "hourlyTemperatureVariation01": 0.10,
+    "seasonClimateBlendDays": 75,
     "seasonClimateProfiles": [
       {
         "season": "Spring",

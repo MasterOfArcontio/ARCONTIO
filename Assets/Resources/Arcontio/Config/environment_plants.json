@@ -27,6 +27,28 @@
       "idealHumidity01": 0.65,
       "minimumFertility01": 0.55,
       "resourceOutputKey": "",
+      "products": [
+        {
+          "productKey": "wood_log",
+          "isFood": false,
+          "destroysPlantOnHarvest": true,
+          "requiresToolKey": "axe",
+          "minGrowthStageKey": "adult",
+          "availableSeasons": [ "Spring", "Summer", "Autumn", "Winter" ],
+          "baseMaxAmountUnits": 8,
+          "regrowDays": 0
+        },
+        {
+          "productKey": "acorn",
+          "isFood": true,
+          "destroysPlantOnHarvest": false,
+          "requiresToolKey": "",
+          "minGrowthStageKey": "adult",
+          "availableSeasons": [ "Autumn" ],
+          "baseMaxAmountUnits": 4,
+          "regrowDays": 365
+        }
+      ],
       "seasonalBehavior": "Deciduous"
     },
     {
@@ -41,6 +63,18 @@
       "idealHumidity01": 0.62,
       "minimumFertility01": 0.48,
       "resourceOutputKey": "",
+      "products": [
+        {
+          "productKey": "berry",
+          "isFood": true,
+          "destroysPlantOnHarvest": false,
+          "requiresToolKey": "",
+          "minGrowthStageKey": "fruiting",
+          "availableSeasons": [ "Summer", "Autumn" ],
+          "baseMaxAmountUnits": 6,
+          "regrowDays": 20
+        }
+      ],
       "seasonalBehavior": "Deciduous"
     },
     {

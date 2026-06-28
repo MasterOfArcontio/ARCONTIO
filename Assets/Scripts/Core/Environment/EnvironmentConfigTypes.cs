@@ -13,9 +13,10 @@ namespace Arcontio.Core.Environment
     /// <para><b>Principio architetturale: tempo ambientale configurabile</b></para>
     /// <para>
     /// La decisione progettuale corrente stabilisce la baseline
-    /// <c>24 ore simulate = 20 minuti reali</c>. Questo dato non deve diventare una
+    /// <c>24 ore simulate = 9000 tick SimulationHost</c>. A 15 tick al secondo,
+    /// questo equivale a 10 minuti reali per giorno simulato. Questo dato non deve diventare una
     /// costante sparsa nei sistemi: viene espresso qui come
-    /// <c>calendarTicksPerSimulatedHour = 50</c>, assumendo che un futuro adapter
+    /// <c>calendarTicksPerSimulatedHour = 375</c>, assumendo che un futuro adapter
     /// runtime decida come convertire tick simulativi o secondi reali in tick
     /// ambientali.
     /// </para>
@@ -34,7 +35,7 @@ namespace Arcontio.Core.Environment
     public sealed class EnvironmentCalendarConfig
     {
         public const int DefaultHoursPerDay = 24;
-        public const int DefaultCalendarTicksPerSimulatedHour = 50;
+        public const int DefaultCalendarTicksPerSimulatedHour = 375;
         public const int DefaultDaysPerMonth = 25;
         public const int DefaultMonthsPerYear = 12;
         public const int DefaultMonthsPerSeason = 3;
@@ -197,6 +198,7 @@ namespace Arcontio.Core.Environment
 
         public float weatherPersistence01 = 0.35f;
         public float hourlyTemperatureVariation01 = 0.10f;
+        public int seasonClimateBlendDays = 75;
 
         public float ResolveWeatherPersistence01()
         {
@@ -206,6 +208,11 @@ namespace Arcontio.Core.Environment
         public float ResolveHourlyTemperatureVariation01()
         {
             return EnvironmentMath.Clamp01(hourlyTemperatureVariation01);
+        }
+
+        public int ResolveSeasonClimateBlendDays()
+        {
+            return seasonClimateBlendDays < 0 ? 0 : seasonClimateBlendDays;
         }
     }
 

@@ -36,9 +36,10 @@ namespace Arcontio.Core.Environment
         ///
         /// <para><b>Baseline configurabile</b></para>
         /// <para>
-        /// Con i default correnti, <c>50</c> tick ambientali equivalgono a un'ora
-        /// simulata e <c>1200</c> tick equivalgono a un giorno simulato, cioe'
-        /// venti minuti reali nella scala progettuale.
+        /// Con i default correnti, <c>375</c> tick ambientali equivalgono a un'ora
+        /// simulata e <c>9000</c> tick equivalgono a un giorno simulato. A 15 tick
+        /// al secondo, la giornata dura 10 minuti reali e l'orologio pubblico viene
+        /// esposto solo a ore piene.
         /// </para>
         /// </summary>
         public static EnvironmentCalendarState Resolve(
@@ -123,11 +124,11 @@ namespace Arcontio.Core.Environment
 
         private static int ResolveMinute(int tickOfDay, int ticksPerHour)
         {
-            if (ticksPerHour <= 0)
-                return 0;
-
-            int tickInHour = tickOfDay % ticksPerHour;
-            return (int)((tickInHour / (float)ticksPerHour) * 60f);
+            // La UI/runtime corrente espone il tempo ambientale a granularita'
+            // oraria: ogni 375 tick cambia l'ora, mentre i minuti restano sempre
+            // :00. Il tick infra-orario continua comunque a vivere in
+            // NormalizedDay01, quindi luce e curva giornaliera non diventano a scatti.
+            return 0;
         }
 
         private static EnvironmentSeasonKind ResolveSeason(int month, int monthsPerSeason)

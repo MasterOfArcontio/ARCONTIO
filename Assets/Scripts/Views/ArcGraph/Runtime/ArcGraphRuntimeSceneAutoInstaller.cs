@@ -52,12 +52,14 @@ namespace Arcontio.View.ArcGraph
         private const string TerrainVisualCatalogPath = ArcGraphTerrainVisualCatalogJson.DefaultResourcePath;
         private const string NpcVisualCatalogPath = "ArcGraph/Config/ArcGraphNpcVisualCatalog";
         private const int LateBindFrameBudget = 240;
+        private const string DiagnosticsPrefix = "[ArcGraphRuntimeSceneAutoInstaller v0.63]";
 
         private ArcGraphRuntimeWorldAdapter _contextProvider;
         private ArcGraphMinimalRuntimeSceneWrapper _wrapper;
         private ArcGraphTerrainRuntimeSceneRenderer _terrainRenderer;
         private ArcGraphNpcRuntimeSceneRenderer _npcRenderer;
         private ArcGraphObjectRuntimeSceneRenderer _objectRenderer;
+        private ArcGraphVegetationRuntimeSceneRenderer _vegetationRenderer;
         private ArcGraphCameraViewportController _cameraViewportController;
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
@@ -79,6 +81,7 @@ namespace Arcontio.View.ArcGraph
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiEditSelectionController _editSelectionController;
         private ArcUiSimulationControlController _simulationControlController;
+        private ArcUiBiosphereRuntimeSnapshotProvider _biosphereSnapshotProvider;
         private ArcUiVisualOverlayController _visualOverlayController;
         private ArcUiPlacementController _placementController;
         private ArcUiNpcSpawnController _npcSpawnController;
@@ -172,6 +175,8 @@ namespace Arcontio.View.ArcGraph
             // durante lo stesso avvio.
             if (GameObject.Find(ControllerRootName) != null)
                 return;
+
+            Debug.Log(DiagnosticsPrefix + " installazione runtime richiesta su " + scene.name + ".");
 
             var controllerRoot = new GameObject(ControllerRootName);
             controllerRoot.AddComponent<ArcGraphRuntimeSceneAutoInstaller>();
@@ -289,6 +294,7 @@ namespace Arcontio.View.ArcGraph
             _terrainRenderer = _visualRoot.AddComponent<ArcGraphTerrainRuntimeSceneRenderer>();
             _npcRenderer = _visualRoot.AddComponent<ArcGraphNpcRuntimeSceneRenderer>();
             _objectRenderer = _visualRoot.AddComponent<ArcGraphObjectRuntimeSceneRenderer>();
+            _vegetationRenderer = _visualRoot.AddComponent<ArcGraphVegetationRuntimeSceneRenderer>();
             _cameraViewportController = _visualRoot.AddComponent<ArcGraphCameraViewportController>();
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
@@ -310,6 +316,7 @@ namespace Arcontio.View.ArcGraph
             _selectionActionController = new ArcUiSelectionActionController();
             _editSelectionController = new ArcUiEditSelectionController();
             _simulationControlController = new ArcUiSimulationControlController();
+            _biosphereSnapshotProvider = new ArcUiBiosphereRuntimeSnapshotProvider();
             _visualOverlayController = new ArcUiVisualOverlayController();
             _placementController = new ArcUiPlacementController();
             _npcSpawnController = new ArcUiNpcSpawnController();
@@ -336,6 +343,7 @@ namespace Arcontio.View.ArcGraph
             _lateBindFramesLeft = LateBindFrameBudget;
             _installed = true;
 
+            Debug.Log(DiagnosticsPrefix + " installazione completata; UI ArcGraph costruita e provider Biosfera collegato.");
         }
 
         // =============================================================================
@@ -382,6 +390,12 @@ namespace Arcontio.View.ArcGraph
             _objectRenderer.SetRuntimeWrapper(_wrapper);
             _objectRenderer.SetSpriteResolverBehaviour(_spriteResolver);
 
+            // La vegetazione usa lo stesso resolver Resources degli oggetti. Se un
+            // PNG reale manca, il renderer vegetazione mostra un fallback generato
+            // e lo dichiara in diagnostica senza fermare il runtime.
+            _vegetationRenderer.SetRuntimeWrapper(_wrapper);
+            _vegetationRenderer.SetSpriteResolverBehaviour(_spriteResolver);
+
             // Il probe NPC resta passivo: viene solo preparato con lo stesso
             // catalogo e lo stesso resolver del renderer. Non gira in Update, non
             // disegna e non modifica scena; serve al prossimo gate per capire
@@ -393,6 +407,7 @@ namespace Arcontio.View.ArcGraph
             _wrapper.SetTerrainRenderer(_terrainRenderer);
             _wrapper.SetNpcRenderer(_npcRenderer);
             _wrapper.SetObjectRenderer(_objectRenderer);
+            _wrapper.SetVegetationRenderer(_vegetationRenderer);
             _wrapper.SetInteractionWrapper(_interactionWrapper);
             _wrapper.SetCameraViewportController(_cameraViewportController);
             _wrapper.SetViewConfig(_viewConfig);
@@ -500,6 +515,7 @@ namespace Arcontio.View.ArcGraph
             _uiRoot.SetNpcSpawnPreviewSource(_uiNpcSpawnPreviewSource);
             _uiRoot.SetNpcSpawnController(_npcSpawnController);
             _uiRoot.SetNpcOptionProvider(_npcOptionProvider);
+            _uiRoot.SetBiosphereRuntimeSnapshotProvider(_biosphereSnapshotProvider);
         }
 
         // =============================================================================
@@ -608,7 +624,8 @@ namespace Arcontio.View.ArcGraph
                 _wrapper,
                 _terrainRenderer,
                 _npcRenderer,
-                _objectRenderer);
+                _objectRenderer,
+                _vegetationRenderer);
         }
 
         // =============================================================================
@@ -662,6 +679,9 @@ namespace Arcontio.View.ArcGraph
 
             if (_npcOptionProvider != null)
                 _npcOptionProvider.SetRuntimeContextProvider(_contextProvider);
+
+            if (_biosphereSnapshotProvider != null)
+                _biosphereSnapshotProvider.SetSimulationHost(simulationHost);
 
             if (_uiRoot != null)
                 _uiRoot.RefreshSimulationControlTopBar();

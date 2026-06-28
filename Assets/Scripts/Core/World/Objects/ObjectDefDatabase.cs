@@ -124,6 +124,50 @@ namespace Arcontio.Core
         public List<ObjectPropertyKV> Properties;
 
         // =============================================================================
+        // TryGetPropertyValue
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca una proprieta' numerica data-driven usando la chiave testuale
+        /// dichiarata in <c>object_defs.json</c>.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: catalogo oggetti come fonte del dato di consumo</b></para>
+        /// <para>
+        /// Alcuni valori, come <c>NutritionValue</c>, appartengono al tipo oggetto o
+        /// risorsa e non al comando che li consuma. Questo metodo permette ai sistemi
+        /// runtime di leggere quel dato senza duplicare string parsing o introdurre
+        /// costanti hardcoded nei comandi gameplay.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>key</b>: chiave testuale del JSON, confrontata senza distinguere maiuscole/minuscole.</item>
+        ///   <item><b>value</b>: valore numerico associato alla proprieta' trovata.</item>
+        ///   <item><b>return</b>: false se la lista proprieta' manca, la chiave e' vuota o non esiste.</item>
+        /// </list>
+        /// </summary>
+        public bool TryGetPropertyValue(string key, out float value)
+        {
+            value = 0f;
+
+            if (string.IsNullOrWhiteSpace(key) || Properties == null)
+                return false;
+
+            for (int i = 0; i < Properties.Count; i++)
+            {
+                ObjectPropertyKV property = Properties[i];
+                if (!string.Equals(property.Key, key, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                value = property.Value;
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
         // ResolveArcGraphSpritePath
         // =============================================================================
         /// <summary>

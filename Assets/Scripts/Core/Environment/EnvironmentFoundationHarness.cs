@@ -19,7 +19,7 @@ namespace Arcontio.Core.Environment
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>CalendarBaselineOk</b>: verifica scala 24 ore simulate in 20 minuti reali.</item>
+    ///   <item><b>CalendarBaselineOk</b>: verifica scala 24 ore simulate in 9000 tick SimulationHost.</item>
     ///   <item><b>SeasonBoundaryOk</b>: verifica cambio stagione con configurazione default.</item>
     ///   <item><b>ClimateResolutionOk</b>: verifica produzione clima globale normalizzato.</item>
     ///   <item><b>SnapshotOk</b>: verifica registry aree e snapshot read-only.</item>
@@ -276,8 +276,8 @@ namespace Arcontio.Core.Environment
                 * EnvironmentCalendarConfig.DefaultCalendarTicksPerSimulatedHour,
                 calendarConfig);
 
-            // Con la config default: tick 0 e' primavera giorno 0 ora 0, 50 tick sono
-            // un'ora simulata, 1200 tick sono un giorno simulato completo.
+            // Con la config default: tick 0 e' primavera giorno 0 ora 0, 375 tick
+            // sono un'ora simulata, 9000 tick sono un giorno simulato completo.
             return start.Date.Season == EnvironmentSeasonKind.Spring
                    && start.Date.DayOfYear == 0
                    && start.TimeOfDay.Hour == 0
@@ -619,8 +619,8 @@ namespace Arcontio.Core.Environment
                 10,
                 calendarConfig);
 
-            // I confini verificano la baseline progettuale: 50 tick sono un'ora,
-            // 1200 tick sono un giorno, 90000 tick sono tre mesi da venticinque giorni.
+            // I confini verificano la baseline progettuale: 375 tick sono un'ora,
+            // 9000 tick sono un giorno, 675000 tick sono tre mesi da venticinque giorni.
             return hourTransition.HourChanged
                    && !hourTransition.DayChanged
                    && hourTransition.ElapsedTicks == 1
@@ -1709,9 +1709,42 @@ namespace Arcontio.Core.Environment
             var cellPlants = EnvironmentSnapshotQuery.QueryPlantsAtCell(
                 snapshot,
                 new EnvironmentCellCoord(4, 4));
+            state.SetPlantInstance(EnvironmentPlantInstance.CreateFromSpecies(
+                new EnvironmentPlantId(501),
+                oak,
+                new EnvironmentCellCoord(7, 6),
+                240,
+                0.75f,
+                areaId));
+            var budgeted = EnvironmentNaturalGrowthResolver.Evolve(
+                state.CreateSnapshot(),
+                catalog,
+                transition,
+                climate,
+                seasonProfile,
+                new EnvironmentNaturalGrowthConfig
+                {
+                    allowNewPlantInstances = false,
+                    maxExistingPlantUpdatesPerDay = 1,
+                    maxAreasProcessedPerDay = 1,
+                    minimumGerminationScore01 = 0.50f
+                });
+            var budgetedSnapshot = budgeted.State.CreateSnapshot();
+            bool firstBudgetedPlantUpdated = EnvironmentSnapshotQuery.TryGetPlant(
+                budgetedSnapshot,
+                new EnvironmentPlantId(500),
+                out EnvironmentPlantSnapshot firstBudgetedPlant)
+                                            && firstBudgetedPlant.AgeDays == 241;
+            bool secondBudgetedPlantPreserved = EnvironmentSnapshotQuery.TryGetPlant(
+                budgetedSnapshot,
+                new EnvironmentPlantId(501),
+                out EnvironmentPlantSnapshot secondBudgetedPlant)
+                                                && secondBudgetedPlant.AgeDays == 240;
 
             // Il ciclo naturale deve collegare area, seed bank e piante in modo
             // esplicito e giornaliero: nessun tick frame-based e nessun consumer esterno.
+            // Il budget runtime deve limitare il lavoro senza cancellare le piante
+            // che non rientrano nel batch corrente.
             return transition.DayChanged
                    && result.Report.AreasVisited == 1
                    && result.Report.SeedBankEntriesVisited == 1
@@ -1726,7 +1759,13 @@ namespace Arcontio.Core.Environment
                    && oaks.Count == 2
                    && cellPlants.Count == 1
                    && cellPlants[0].AgeDays == 0
-                   && cellPlants[0].IsAlive;
+                   && cellPlants[0].IsAlive
+                   && budgeted.Report.ExistingPlantsVisited == 2
+                   && budgeted.Report.PlantInstancesUpdated == 1
+                   && budgeted.Report.PlantInstancesCreated == 0
+                   && budgetedSnapshot.Plants.Count == 2
+                   && firstBudgetedPlantUpdated
+                   && secondBudgetedPlantPreserved;
         }
 
         private static bool CheckAgricultureFoundation()
@@ -2228,6 +2267,12 @@ namespace Arcontio.Core.Environment
 
             var catalog = new EnvironmentPlantCatalogConfig().ToCatalog();
             catalog.TryGetSpecies("oak_tree", out EnvironmentPlantSpeciesDefinition oak);
+            bool oakHasWood = oak.TryGetProduct(
+                "wood_log",
+                out EnvironmentPlantProductDefinition oakWood);
+            bool oakHasAcorn = oak.TryGetProduct(
+                "acorn",
+                out EnvironmentPlantProductDefinition oakAcorn);
             state.SetPlantInstance(EnvironmentPlantInstance.CreateFromSpecies(
                 new EnvironmentPlantId(1000),
                 oak,
@@ -2255,9 +2300,88 @@ namespace Arcontio.Core.Environment
                 catalog,
                 new EnvironmentCellCoord(20, 20),
                 1);
+            var productFacts = EnvironmentConsumerQueryResolver.QueryPotentialProductsForArea(
+                full,
+                catalog,
+                areaId);
+            var acorns = EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                full,
+                catalog,
+                cell,
+                2,
+                "acorn");
+            var wood = EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                full,
+                catalog,
+                cell,
+                2,
+                "wood_log");
+            var impossible = EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                full,
+                catalog,
+                cell,
+                2,
+                "apple");
+            var potentialHints = EnvironmentConsumerQueryResolver.BuildPotentialBeliefHintsForLandmark(
+                77,
+                productFacts,
+                12);
+            var observedHints = EnvironmentConsumerQueryResolver.BuildObservedBeliefHintsForLandmark(
+                77,
+                areaId,
+                wood,
+                12);
+            bool productFactsExposeWood = false;
+            bool productFactsExposeAcorn = false;
+            for (int i = 0; i < productFacts.Count; i++)
+            {
+                EnvironmentConsumerProductCandidate product = productFacts[i];
+                if (product.ProductKey == "wood_log"
+                    && !product.IsFood
+                    && product.DestroysPlantOnHarvest
+                    && product.RequiresToolKey == "axe"
+                    && product.MinGrowthStageKey == "adult"
+                    && product.BaseMaxAmountUnits == 8
+                    && product.RegrowDays == 0
+                    && product.LivePlantCount == 2
+                    && product.HarvestablePlantCount == 2)
+                {
+                    productFactsExposeWood = true;
+                }
+
+                if (product.ProductKey == "acorn"
+                    && product.IsFood
+                    && !product.DestroysPlantOnHarvest
+                    && product.RequiresToolKey == string.Empty
+                    && product.MinGrowthStageKey == "adult"
+                    && product.BaseMaxAmountUnits == 4
+                    && product.RegrowDays == 365
+                    && product.LivePlantCount == 2
+                    && product.HarvestablePlantCount == 2)
+                {
+                    productFactsExposeAcorn = true;
+                }
+            }
+
+            bool nutritionPropertyOk = new Arcontio.Core.ObjectDef
+            {
+                Properties = new System.Collections.Generic.List<Arcontio.Core.ObjectPropertyKV>
+                {
+                    new Arcontio.Core.ObjectPropertyKV
+                    {
+                        Key = "NutritionValue",
+                        Value = 0.45f
+                    }
+                }
+            }.TryGetPropertyValue(
+                "nutritionvalue",
+                out float nutritionValue);
 
             // Il facade consumer deve condensare il read model in facts e candidate
             // risorsa, senza esporre EnvironmentState o avviare job/raccolte.
+            // v0.66 congela anche il contratto area/LM -> prodotti potenziali e
+            // query locale per prodotto, lasciando job, inventario e belief reali
+            // ai layer futuri.
             return facts.Cell.Equals(cell)
                    && facts.Season == EnvironmentSeasonKind.Spring
                    && facts.HasFertility
@@ -2272,10 +2396,50 @@ namespace Arcontio.Core.Environment
                    && facts.PlantCount == 1
                    && facts.HarvestablePlantCount == 1
                    && facts.HasHarvestableResource
-                   && facts.BestResourceOutputKey == "wood"
+                   && facts.BestResourceOutputKey == "wood_log"
+                   && oakHasWood
+                   && oakWood.DestroysPlantOnHarvest
+                   && oakWood.RequiresToolKey == "axe"
+                   && oakWood.MinGrowthStageKey == "adult"
+                   && oakWood.BaseMaxAmountUnits == 8
+                   && oakWood.RegrowDays == 0
+                   && !oakWood.IsFood
+                   && oakHasAcorn
+                   && oakAcorn.IsFood
+                   && !oakAcorn.DestroysPlantOnHarvest
                    && nearby.Count == 2
                    && nearby[0].IsAvailable
-                   && nearby[0].ResourceOutputKey == "wood"
+                   && nearby[0].ResourceOutputKey == "wood_log"
+                   && nearby[0].DestroysPlantOnHarvest
+                   && nearby[0].RequiresToolKey == "axe"
+                   && nearby[0].BaseMaxAmountUnits == 8
+                   && nearby[0].EstimatedAmountUnits > 0
+                   && productFacts.Count == 2
+                   && productFactsExposeWood
+                   && productFactsExposeAcorn
+                   && acorns.Count == 0
+                   && wood.Count == 2
+                   && wood[0].IsAvailable
+                   && wood[0].ResourceOutputKey == "wood_log"
+                   && wood[0].DestroysPlantOnHarvest
+                   && wood[0].RequiresToolKey == "axe"
+                   && wood[0].BaseMaxAmountUnits == 8
+                   && wood[0].EstimatedAmountUnits > 0
+                   && impossible.Count == 0
+                   && potentialHints.Count == 2
+                   && potentialHints[0].Kind == EnvironmentBiologicalResourceBeliefKind.Potential
+                   && potentialHints[0].LandmarkNodeId == 77
+                   && potentialHints[0].EstimatedAmount == 0
+                   && potentialHints[0].ObservedDay == 12
+                   && observedHints.Count == 1
+                   && observedHints[0].Kind == EnvironmentBiologicalResourceBeliefKind.Observed
+                   && observedHints[0].LandmarkNodeId == 77
+                   && observedHints[0].AreaId.Equals(areaId)
+                   && observedHints[0].ProductKey == "wood_log"
+                   && observedHints[0].EstimatedAmount > 0
+                   && observedHints[0].ObservedDay == 12
+                   && nutritionPropertyOk
+                   && nutritionValue == 0.45f
                    && far.Count == 0;
         }
 
@@ -2284,21 +2448,28 @@ namespace Arcontio.Core.Environment
             var disabled = new BiosphereRuntimeParams
             {
                 enabled = false,
-                simulationTicksPerDailyUpdate = 1200
+                simulationTicksPerDailyUpdate = BiosphereRuntimeParams.DefaultSimulationTicksPerDailyUpdate
             };
             var enabled = new BiosphereRuntimeParams
             {
                 enabled = true,
-                simulationTicksPerDailyUpdate = 1200,
+                simulationTicksPerDailyUpdate = BiosphereRuntimeParams.DefaultSimulationTicksPerDailyUpdate,
                 maxPlantMutationsPerUpdate = 0,
                 maxVegetationMutationsPerUpdate = -2,
+                maxPlantUpdatesPerDay = 12,
+                maxPlantBirthsPerDay = 4,
+                maxPlantBirthsPerAreaPerDay = 2,
+                maxPlantDeathsPerDay = -1,
+                maxVegetationCellsChangedPerDay = 64,
+                maxAreasProcessedPerDay = 3,
                 updateMode = string.Empty
             };
 
-            var disabledDecision = EnvironmentRuntimeScheduler.Evaluate(disabled, 0, 1200);
-            var beforeBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 1199);
-            var onBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 1200);
-            var skippedDays = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, 3600);
+            int dailyUpdateTicks = BiosphereRuntimeParams.DefaultSimulationTicksPerDailyUpdate;
+            var disabledDecision = EnvironmentRuntimeScheduler.Evaluate(disabled, 0, dailyUpdateTicks);
+            var beforeBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, dailyUpdateTicks - 1);
+            var onBoundary = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, dailyUpdateTicks);
+            var skippedDays = EnvironmentRuntimeScheduler.Evaluate(enabled, 0, dailyUpdateTicks * 3);
             var afterDecisionTick = EnvironmentRuntimeScheduler.ResolveProcessedTickAfterDecision(onBoundary);
             var normalized = BiosphereRuntimeParams.WithFallbackDefaults(enabled);
 
@@ -2306,21 +2477,27 @@ namespace Arcontio.Core.Environment
             // niente World, niente ArcGraph e niente mutazioni reali in questo step.
             return !disabledDecision.IsEnabled
                    && !disabledDecision.ShouldAdvance
-                   && disabledDecision.NextDueSimulationTick == 1200
+                   && disabledDecision.NextDueSimulationTick == dailyUpdateTicks
                    && beforeBoundary.IsEnabled
                    && !beforeBoundary.ShouldAdvance
-                   && beforeBoundary.NextDueSimulationTick == 1200
+                   && beforeBoundary.NextDueSimulationTick == dailyUpdateTicks
                    && onBoundary.ShouldAdvance
                    && onBoundary.DueUpdateCount == 1
                    && onBoundary.PreviousEnvironmentTicks == 0
-                   && onBoundary.CurrentEnvironmentTicks == 1200
-                   && onBoundary.NextDueSimulationTick == 2400
+                   && onBoundary.CurrentEnvironmentTicks == dailyUpdateTicks
+                   && onBoundary.NextDueSimulationTick == dailyUpdateTicks * 2
                    && skippedDays.ShouldAdvance
                    && skippedDays.DueUpdateCount == 3
-                   && skippedDays.CurrentEnvironmentTicks == 3600
-                   && afterDecisionTick == 1200
+                   && skippedDays.CurrentEnvironmentTicks == dailyUpdateTicks * 3
+                   && afterDecisionTick == dailyUpdateTicks
                    && normalized.ResolveMaxPlantMutationsPerUpdate() == 1
                    && normalized.ResolveMaxVegetationMutationsPerUpdate() == 1
+                   && normalized.ResolveMaxPlantUpdatesPerDay() == 12
+                   && normalized.ResolveMaxPlantBirthsPerDay() == 4
+                   && normalized.ResolveMaxPlantBirthsPerAreaPerDay() == 2
+                   && normalized.ResolveMaxPlantDeathsPerDay() == 0
+                   && normalized.ResolveMaxVegetationCellsChangedPerDay() == 64
+                   && normalized.ResolveMaxAreasProcessedPerDay() == 3
                    && normalized.ResolveUpdateMode() == BiosphereRuntimeParams.DefaultUpdateMode;
         }
     }

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Arcontio.Core;
+using Arcontio.Core.Environment;
 
 namespace Arcontio.View.ArcGraph
 {
@@ -27,6 +28,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>FillTerrainSnapshots</b>: converte <c>CellSurfaceLayer</c> in celle ArcGraph.</item>
     ///   <item><b>FillObjectSnapshots</b>: converte gli oggetti del World in snapshot visuali.</item>
     ///   <item><b>FillActorSnapshots</b>: converte gli NPC del World in snapshot actor e motion read-only.</item>
+    ///   <item><b>FillVegetationSnapshots</b>: converte piante fisiche e vegetazione diffusa in snapshot ArcGraph.</item>
     ///   <item><b>ResolveObjectSpriteKey</b>: copia solo sprite path ArcGraph espliciti.</item>
     /// </list>
     /// </summary>
@@ -262,6 +264,68 @@ namespace Arcontio.View.ArcGraph
             }
         }
 
+        // =============================================================================
+        // FillVegetationSnapshots
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte la proiezione runtime World della biosfera in snapshot
+        /// vegetazione ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: Biosfera -> World -> ArcGraph, sola lettura</b></para>
+        /// <para>
+        /// Il metodo non interroga <c>EnvironmentState</c> e non decide nascita,
+        /// morte o crescita. Legge solo le proiezioni gia' stabilizzate nel
+        /// <c>World</c>: vegetazione diffusa sparse-cell e piante fisiche. Le piante
+        /// vengono aggiunte dopo la vegetazione diffusa, cosi' se una cella contiene
+        /// entrambe, il layer ArcGraph conserva la pianta come dato visuale
+        /// prioritario.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>world</b>: sorgente read-only delle proiezioni biosfera.</item>
+        ///   <item><b>target</b>: lista snapshot riusabile da popolare.</item>
+        ///   <item><b>clearTarget</b>: se true, svuota il target prima della copia.</item>
+        /// </list>
+        /// </summary>
+        public void FillVegetationSnapshots(
+            World world,
+            IList<ArcGraphVegetationVisualSnapshot> target,
+            bool clearTarget = true)
+        {
+            if (target == null)
+                return;
+
+            if (clearTarget)
+                target.Clear();
+
+            if (world == null)
+                return;
+
+            foreach (var pair in world.DiffuseVegetation)
+            {
+                WorldDiffuseVegetationProjection projection = pair.Value;
+                if (projection.CoverageBand == EnvironmentVegetationCoverageBand.None
+                    || projection.VegetationKind == EnvironmentVegetationKind.None)
+                {
+                    continue;
+                }
+
+                target.Add(CreateDiffuseVegetationSnapshot(projection));
+            }
+
+            foreach (var pair in world.PhysicalPlants)
+            {
+                WorldPhysicalPlantProjection projection = pair.Value;
+                if (!projection.IsAlive || string.IsNullOrWhiteSpace(projection.SpeciesKey))
+                    continue;
+
+                target.Add(CreatePhysicalPlantSnapshot(projection));
+            }
+        }
+
         private static string ResolveActorFacingDirectionKey(World world, int actorId)
         {
             if (world == null || actorId <= 0)
@@ -369,6 +433,190 @@ namespace Arcontio.View.ArcGraph
                 toCell,
                 runningSnapshot.ElapsedTicks,
                 runningSnapshot.RequiredTicks);
+        }
+
+        // =============================================================================
+        // CreateDiffuseVegetationSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte una cella di vegetazione diffusa World-side in snapshot
+        /// vegetazione ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Overlay vegetale non fisico</b></para>
+        /// <para>
+        /// La vegetazione diffusa rimane distinta dalle piante fisiche: produce
+        /// densita', stadio visuale e chiave sprite, ma non entra nella queue degli
+        /// oggetti e non blocca movimento o visione.
+        /// </para>
+        /// </summary>
+        private static ArcGraphVegetationVisualSnapshot CreateDiffuseVegetationSnapshot(
+            WorldDiffuseVegetationProjection projection)
+        {
+            string vegetationKey = ToKeyPart(projection.VegetationKind.ToString());
+            string coverageKey = ToKeyPart(projection.CoverageBand.ToString());
+            string conditionKey = ToKeyPart(projection.ConditionBand.ToString());
+            string visualKey = "vegetation_" + vegetationKey + "_" + coverageKey + "_" + conditionKey;
+            string spriteKey = "ArcGraph/Environment/Vegetation/"
+                               + vegetationKey
+                               + "#"
+                               + coverageKey
+                               + "_"
+                               + conditionKey;
+
+            return new ArcGraphVegetationVisualSnapshot(
+                ConvertEnvironmentCell(projection.Cell),
+                visualKey,
+                ResolveDiffuseGrowthStage(projection.CoverageBand),
+                ResolveDiffuseDensity(projection.CoverageBand),
+                spriteKey);
+        }
+
+        // =============================================================================
+        // CreatePhysicalPlantSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte una pianta fisica World-side in uno snapshot vegetazione
+        /// ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Traduzione visuale semantica</b></para>
+        /// <para>
+        /// La proiezione resta data-only: specie, stadio e salute vengono compressi
+        /// in una chiave visuale e in uno sprite key derivato dal bordo ArcGraph. La
+        /// biosfera non riceve indietro queste chiavi e non diventa dipendente dal
+        /// catalogo grafico.
+        /// </para>
+        /// </summary>
+        private static ArcGraphVegetationVisualSnapshot CreatePhysicalPlantSnapshot(
+            WorldPhysicalPlantProjection projection)
+        {
+            string speciesKey = ToKeyPart(projection.SpeciesKey);
+            string growthKey = ToKeyPart(projection.GrowthStageKey);
+            string healthKey = ToKeyPart(projection.HealthState.ToString());
+            string visualKey = "plant_" + speciesKey + "_" + growthKey + "_" + healthKey;
+
+            // ARCONTIO non produce, per ora, una tavola completa di sprite per ogni
+            // combinazione crescita/salute della stessa pianta. La proiezione fisica
+            // conserva comunque lo stato reale per sorting, debug e futuro resolver,
+            // ma lo sprite iniziale cade sulla rappresentazione stabile della specie.
+            // Questo evita il fallback verde al bootstrap quando la pianta ha uno
+            // stato biologico come seedling, che non corrisponde a uno stato sprite
+            // definito nel catalogo visuale corrente.
+            string spriteKey = "ArcGraph/Environment/Plants/"
+                               + speciesKey
+                               + "#adult_healthy";
+
+            return new ArcGraphVegetationVisualSnapshot(
+                ConvertEnvironmentCell(projection.Cell),
+                visualKey,
+                ResolvePhysicalPlantGrowthStage(growthKey),
+                1f,
+                spriteKey);
+        }
+
+        // =============================================================================
+        // ConvertEnvironmentCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia una coordinata Environment/Core nella coordinata cella ArcGraph.
+        /// </para>
+        /// </summary>
+        private static ArcGraphCellCoord ConvertEnvironmentCell(EnvironmentCellCoord cell)
+        {
+            return new ArcGraphCellCoord(cell.X, cell.Y, cell.Z);
+        }
+
+        // =============================================================================
+        // ResolveDiffuseDensity
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Trasforma la banda discreta di copertura in una densita' normalizzata per
+        /// il layer vegetazione.
+        /// </para>
+        /// </summary>
+        private static float ResolveDiffuseDensity(EnvironmentVegetationCoverageBand coverageBand)
+        {
+            if (coverageBand == EnvironmentVegetationCoverageBand.Sparse)
+                return 0.35f;
+
+            if (coverageBand == EnvironmentVegetationCoverageBand.Medium)
+                return 0.65f;
+
+            if (coverageBand == EnvironmentVegetationCoverageBand.Dense)
+                return 1f;
+
+            return 0f;
+        }
+
+        // =============================================================================
+        // ResolveDiffuseGrowthStage
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricava uno stadio visuale compatto dalla copertura della vegetazione
+        /// diffusa.
+        /// </para>
+        /// </summary>
+        private static int ResolveDiffuseGrowthStage(EnvironmentVegetationCoverageBand coverageBand)
+        {
+            if (coverageBand == EnvironmentVegetationCoverageBand.Sparse)
+                return 0;
+
+            if (coverageBand == EnvironmentVegetationCoverageBand.Medium)
+                return 1;
+
+            if (coverageBand == EnvironmentVegetationCoverageBand.Dense)
+                return 2;
+
+            return 0;
+        }
+
+        // =============================================================================
+        // ResolvePhysicalPlantGrowthStage
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte lo stage key della pianta in un indice visuale compatto usato
+        /// dagli snapshot ArcGraph.
+        /// </para>
+        /// </summary>
+        private static int ResolvePhysicalPlantGrowthStage(string growthStageKey)
+        {
+            string key = ToKeyPart(growthStageKey);
+            if (key == "seedling" || key == "sprout")
+                return 0;
+
+            if (key == "young")
+                return 1;
+
+            if (key == "adult" || key == "mature")
+                return 2;
+
+            if (key == "dry" || key == "dead")
+                return 3;
+
+            return 0;
+        }
+
+        // =============================================================================
+        // ToKeyPart
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza una parte di chiave visuale in forma stabile e confrontabile.
+        /// </para>
+        /// </summary>
+        private static string ToKeyPart(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                return "unknown";
+
+            return value.Trim().ToLowerInvariant().Replace(' ', '_');
         }
 
         // =============================================================================

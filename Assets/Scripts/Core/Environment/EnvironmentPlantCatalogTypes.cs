@@ -121,6 +121,95 @@ namespace Arcontio.Core.Environment
     }
 
     // =============================================================================
+    // EnvironmentPlantProductDefinition
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Prodotto biologico potenziale dichiarato da una specie vegetale.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: la pianta produce chiavi, non oggetti concreti</b></para>
+    /// <para>
+    /// La biosfera deve sapere che una specie puo' generare <c>apple</c>,
+    /// <c>acorn</c> o <c>wood_log</c>, ma non deve creare inventario, food stock o item.
+    /// Questo record e' quindi un contratto semantico: collega specie e prodotto
+    /// futuro senza trasformare la pianta in un catalogo oggetti duplicato.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>ProductKey</b>: chiave stabile del prodotto ottenibile.</item>
+    ///   <item><b>IsFood</b>: indica se il prodotto e' alimentare per decisioni future.</item>
+    ///   <item><b>DestroysPlantOnHarvest</b>: true se ottenere il prodotto consuma la pianta.</item>
+    ///   <item><b>RequiresToolKey</b>: strumento futuro richiesto, vuoto se non necessario.</item>
+    ///   <item><b>MinGrowthStageKey</b>: stadio minimo richiesto per rendere il prodotto disponibile.</item>
+    ///   <item><b>AvailableSeasonMask</b>: stagioni in cui il prodotto puo' essere raccolto.</item>
+    ///   <item><b>BaseMaxAmountUnits</b>: quantita' base producibile da una pianta sana e matura.</item>
+    ///   <item><b>RegrowDays</b>: giorni indicativi di ricrescita dopo il prelievo.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct EnvironmentPlantProductDefinition
+    {
+        public readonly string ProductKey;
+        public readonly bool IsFood;
+        public readonly bool DestroysPlantOnHarvest;
+        public readonly string RequiresToolKey;
+        public readonly string MinGrowthStageKey;
+        public readonly int AvailableSeasonMask;
+        public readonly int BaseMaxAmountUnits;
+        public readonly int RegrowDays;
+
+        public bool IsValid => !string.IsNullOrWhiteSpace(ProductKey);
+
+        // =============================================================================
+        // EnvironmentPlantProductDefinition
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una definizione prodotto normalizzando chiavi null a stringhe vuote.
+        /// </para>
+        /// </summary>
+        public EnvironmentPlantProductDefinition(
+            string productKey,
+            bool isFood,
+            bool destroysPlantOnHarvest,
+            string requiresToolKey,
+            string minGrowthStageKey,
+            int availableSeasonMask,
+            int baseMaxAmountUnits,
+            int regrowDays)
+        {
+            ProductKey = string.IsNullOrWhiteSpace(productKey)
+                ? string.Empty
+                : productKey;
+            IsFood = isFood;
+            DestroysPlantOnHarvest = destroysPlantOnHarvest;
+            RequiresToolKey = requiresToolKey ?? string.Empty;
+            MinGrowthStageKey = minGrowthStageKey ?? string.Empty;
+            AvailableSeasonMask = availableSeasonMask == 0
+                ? EnvironmentPlantCatalogParsing.BuildAllSeasonMask()
+                : availableSeasonMask;
+            BaseMaxAmountUnits = baseMaxAmountUnits < 0 ? 0 : baseMaxAmountUnits;
+            RegrowDays = regrowDays < 0 ? 0 : regrowDays;
+        }
+
+        // =============================================================================
+        // IsSeasonAvailable
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se il prodotto e' biologicamente disponibile nella stagione
+        /// richiesta.
+        /// </para>
+        /// </summary>
+        public bool IsSeasonAvailable(EnvironmentSeasonKind season)
+        {
+            int bit = 1 << (int)season;
+            return (AvailableSeasonMask & bit) != 0;
+        }
+    }
+
+    // =============================================================================
     // EnvironmentPlantSpeciesDefinition
     // =============================================================================
     /// <summary>
@@ -152,10 +241,13 @@ namespace Arcontio.Core.Environment
     {
         private static readonly EnvironmentPlantGrowthStageDefinition[] EmptyStages =
             new EnvironmentPlantGrowthStageDefinition[0];
+        private static readonly EnvironmentPlantProductDefinition[] EmptyProducts =
+            new EnvironmentPlantProductDefinition[0];
 
         public string SpeciesKey { get; }
         public EnvironmentPlantCategory Category { get; }
         public IReadOnlyList<EnvironmentPlantGrowthStageDefinition> GrowthStages { get; }
+        public IReadOnlyList<EnvironmentPlantProductDefinition> Products { get; }
         public int FavorableSeasonMask { get; }
         public float IdealTemperature01 { get; }
         public float IdealHumidity01 { get; }
@@ -180,6 +272,7 @@ namespace Arcontio.Core.Environment
             float idealHumidity01,
             float minimumFertility01,
             string resourceOutputKey,
+            IReadOnlyList<EnvironmentPlantProductDefinition> products,
             EnvironmentPlantSeasonalBehavior seasonalBehavior)
         {
             SpeciesKey = string.IsNullOrWhiteSpace(speciesKey)
@@ -187,11 +280,12 @@ namespace Arcontio.Core.Environment
                 : speciesKey;
             Category = category;
             GrowthStages = CopyStages(growthStages);
+            Products = CopyProducts(products, resourceOutputKey);
             FavorableSeasonMask = favorableSeasonMask;
             IdealTemperature01 = EnvironmentMath.Clamp01(idealTemperature01);
             IdealHumidity01 = EnvironmentMath.Clamp01(idealHumidity01);
             MinimumFertility01 = EnvironmentMath.Clamp01(minimumFertility01);
-            ResourceOutputKey = resourceOutputKey ?? string.Empty;
+            ResourceOutputKey = ResolvePrimaryResourceOutputKey(resourceOutputKey, Products);
             SeasonalBehavior = seasonalBehavior;
         }
 
@@ -245,6 +339,60 @@ namespace Arcontio.Core.Environment
             return true;
         }
 
+        // =============================================================================
+        // TryGetProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca un prodotto biologico dichiarato dalla specie.
+        /// </para>
+        /// </summary>
+        public bool TryGetProduct(
+            string productKey,
+            out EnvironmentPlantProductDefinition product)
+        {
+            product = default;
+
+            if (string.IsNullOrWhiteSpace(productKey))
+                return false;
+
+            for (int i = 0; i < Products.Count; i++)
+            {
+                EnvironmentPlantProductDefinition candidate = Products[i];
+                if (!string.Equals(candidate.ProductKey, productKey, StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                product = candidate;
+                return true;
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // IsStageAtLeast
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se lo stadio corrente della pianta soddisfa uno stadio minimo
+        /// dichiarato dal prodotto biologico.
+        /// </para>
+        /// </summary>
+        public bool IsStageAtLeast(
+            string currentStageKey,
+            string minimumStageKey)
+        {
+            if (string.IsNullOrWhiteSpace(minimumStageKey))
+                return true;
+
+            int currentIndex = FindStageIndex(currentStageKey);
+            int minimumIndex = FindStageIndex(minimumStageKey);
+            if (currentIndex < 0 || minimumIndex < 0)
+                return false;
+
+            return currentIndex >= minimumIndex;
+        }
+
         private static IReadOnlyList<EnvironmentPlantGrowthStageDefinition> CopyStages(
             IReadOnlyList<EnvironmentPlantGrowthStageDefinition> stages)
         {
@@ -259,6 +407,78 @@ namespace Arcontio.Core.Environment
 
             Array.Sort(copy, CompareStages);
             return copy;
+        }
+
+        private static IReadOnlyList<EnvironmentPlantProductDefinition> CopyProducts(
+            IReadOnlyList<EnvironmentPlantProductDefinition> products,
+            string legacyResourceOutputKey)
+        {
+            var accepted = new List<EnvironmentPlantProductDefinition>();
+            if (products != null)
+            {
+                for (int i = 0; i < products.Count; i++)
+                {
+                    EnvironmentPlantProductDefinition product = products[i];
+                    if (!product.IsValid || ContainsProduct(accepted, product.ProductKey))
+                        continue;
+
+                    accepted.Add(product);
+                }
+            }
+
+            if (accepted.Count == 0 && !string.IsNullOrWhiteSpace(legacyResourceOutputKey))
+            {
+                accepted.Add(new EnvironmentPlantProductDefinition(
+                    legacyResourceOutputKey,
+                    false,
+                    false,
+                    string.Empty,
+                    string.Empty,
+                    EnvironmentPlantCatalogParsing.BuildAllSeasonMask(),
+                    0,
+                    0));
+            }
+
+            return accepted.Count == 0 ? EmptyProducts : accepted.ToArray();
+        }
+
+        private static bool ContainsProduct(
+            IReadOnlyList<EnvironmentPlantProductDefinition> products,
+            string productKey)
+        {
+            for (int i = 0; i < products.Count; i++)
+            {
+                if (string.Equals(products[i].ProductKey, productKey, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static string ResolvePrimaryResourceOutputKey(
+            string resourceOutputKey,
+            IReadOnlyList<EnvironmentPlantProductDefinition> products)
+        {
+            if (!string.IsNullOrWhiteSpace(resourceOutputKey))
+                return resourceOutputKey;
+
+            return products != null && products.Count > 0
+                ? products[0].ProductKey
+                : string.Empty;
+        }
+
+        private int FindStageIndex(string stageKey)
+        {
+            if (string.IsNullOrWhiteSpace(stageKey))
+                return -1;
+
+            for (int i = 0; i < GrowthStages.Count; i++)
+            {
+                if (string.Equals(GrowthStages[i].StageKey, stageKey, StringComparison.OrdinalIgnoreCase))
+                    return i;
+            }
+
+            return -1;
         }
 
         private static int CompareStages(

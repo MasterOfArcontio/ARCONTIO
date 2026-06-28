@@ -66,6 +66,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>SpeciesKey</b>: specie, categoria o prefab visuale futuro.</item>
     ///   <item><b>GrowthStage</b>: stadio visuale astratto.</item>
     ///   <item><b>Density01</b>: densita' normalizzata per overlay o tile blend.</item>
+    ///   <item><b>SpriteKey</b>: chiave visuale ArcGraph opzionale gia' risolta dal bordo View.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphVegetationVisualSnapshot
@@ -74,17 +75,29 @@ namespace Arcontio.View.ArcGraph
         public readonly string SpeciesKey;
         public readonly int GrowthStage;
         public readonly float Density01;
+        public readonly string SpriteKey;
 
         public ArcGraphVegetationVisualSnapshot(
             ArcGraphCellCoord cell,
             string speciesKey,
             int growthStage,
             float density01)
+            : this(cell, speciesKey, growthStage, density01, string.Empty)
+        {
+        }
+
+        public ArcGraphVegetationVisualSnapshot(
+            ArcGraphCellCoord cell,
+            string speciesKey,
+            int growthStage,
+            float density01,
+            string spriteKey)
         {
             Cell = cell;
             SpeciesKey = speciesKey ?? string.Empty;
             GrowthStage = growthStage < 0 ? 0 : growthStage;
             Density01 = Clamp01(density01);
+            SpriteKey = spriteKey ?? string.Empty;
         }
 
         private static float Clamp01(float value)

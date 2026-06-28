@@ -222,10 +222,13 @@ namespace Arcontio.Core
         public EnvironmentState EnvironmentState { get; private set; }
         public EnvironmentAreaSetConfig InitialEnvironmentAreaSetConfig { get; private set; }
         public IReadOnlyDictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> PhysicalPlants => _physicalPlants;
+        public IReadOnlyDictionary<EnvironmentCellCoord, WorldDiffuseVegetationProjection> DiffuseVegetation =>
+            _diffuseVegetation;
 
         private readonly List<LandmarkRegistry.ManualLandmarkCandidate> _environmentLandmarkCandidates = new(64);
         private readonly List<LandmarkRegistry.ManualLandmarkResolution> _environmentLandmarkResolutions = new(64);
         private readonly Dictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> _physicalPlants = new();
+        private readonly Dictionary<EnvironmentCellCoord, WorldDiffuseVegetationProjection> _diffuseVegetation = new();
 
         /// <summary>
         /// Debug token logs (Patch 0.01P2):
@@ -1315,6 +1318,359 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // TryBuildEnvironmentCellFacts
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce facts ambientali read-only per una cella, destinati a NPC,
+        /// Decision Layer o debug.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: NPC interrogano World, non EnvironmentState</b></para>
+        /// <para>
+        /// Il <see cref="World"/> resta il confine pubblico della simulazione. Gli
+        /// NPC non ricevono accesso al registry mutabile della biosfera: il World
+        /// crea uno snapshot read-only e delega l'aggregazione al resolver Environment.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Bounds</b>: rifiuta celle fuori mappa.</item>
+        ///   <item><b>Snapshot</b>: materializza una vista read-only della biosfera corrente.</item>
+        ///   <item><b>Resolver</b>: produce facts compatti senza side effect.</item>
+        /// </list>
+        /// </summary>
+        public bool TryBuildEnvironmentCellFacts(
+            int x,
+            int y,
+            EnvironmentPlantCatalog catalog,
+            out EnvironmentConsumerCellFacts facts)
+        {
+            var cell = new EnvironmentCellCoord(x, y, 0);
+            if (EnvironmentState == null || !InBounds(x, y))
+            {
+                facts = default;
+                return false;
+            }
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            facts = EnvironmentConsumerQueryResolver.BuildCellFacts(
+                snapshot,
+                cell,
+                catalog);
+            return true;
+        }
+
+        // =============================================================================
+        // QueryEnvironmentHarvestableResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interroga la biosfera per risorse vegetali harvestable entro un raggio.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query senza job impliciti</b></para>
+        /// <para>
+        /// Il metodo non crea richieste job, non prenota piante e non scrive belief.
+        /// Restituisce soltanto candidate data-only che un sistema decisionale potra'
+        /// valutare in un checkpoint successivo.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerResourceCandidate> QueryEnvironmentHarvestableResources(
+            int centerX,
+            int centerY,
+            int radius,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (EnvironmentState == null || !InBounds(centerX, centerY))
+                return new EnvironmentConsumerResourceCandidate[0];
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryHarvestableResources(
+                snapshot,
+                catalog,
+                new EnvironmentCellCoord(centerX, centerY, 0),
+                radius);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentHarvestableResourcesForProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interroga la biosfera per piante vicine capaci di fornire uno specifico
+        /// prodotto biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query locale, non decisione onnisciente</b></para>
+        /// <para>
+        /// Questo facade non deve essere usato per far conoscere a distanza la
+        /// disponibilita' puntuale a un NPC. Serve al futuro job quando l'NPC e'
+        /// gia' vicino all'area/landmark e puo' cercare localmente una risorsa.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerResourceCandidate> QueryEnvironmentHarvestableResourcesForProduct(
+            int centerX,
+            int centerY,
+            int radius,
+            string productKey,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (EnvironmentState == null || !InBounds(centerX, centerY))
+                return new EnvironmentConsumerResourceCandidate[0];
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                snapshot,
+                catalog,
+                new EnvironmentCellCoord(centerX, centerY, 0),
+                radius,
+                productKey);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentBiologicalAreasForSpeciesOrResource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interroga la biosfera per aree biologiche in cui cercare una specie o una
+        /// risorsa prodotta da una specie.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ricerca per luogo stabile</b></para>
+        /// <para>
+        /// Le piante decorative e la seed bank non devono diventare migliaia di memory
+        /// trace puntuali. Questa query restituisce aree/centri/raggi: l'NPC potra'
+        /// ricordare o raggiungere il landmark biologico e poi cercare localmente.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerAreaCandidate> QueryEnvironmentBiologicalAreasForSpeciesOrResource(
+            int requesterX,
+            int requesterY,
+            string speciesOrResourceKey,
+            EnvironmentPlantCatalog catalog,
+            int maxResults = 8)
+        {
+            if (EnvironmentState == null || !InBounds(requesterX, requesterY))
+                return new EnvironmentConsumerAreaCandidate[0];
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryBiologicalAreasForSpeciesOrResource(
+                snapshot,
+                catalog,
+                new EnvironmentCellCoord(requesterX, requesterY, 0),
+                speciesOrResourceKey,
+                maxResults);
+        }
+
+        // =============================================================================
+        // TryResolveEnvironmentAreaFromBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve l'area biologica collegata a un landmark biologico visto o
+        /// ricordato da un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: landmark come indizio, biosfera come mapping</b></para>
+        /// <para>
+        /// Il landmark registry resta leggero e non conserva payload ecologici. Il
+        /// <see cref="World"/> espone solo una query read-only che delega alla
+        /// biosfera il mapping laterale <c>landmarkNodeId -> areaId</c>.
+        /// </para>
+        /// </summary>
+        public bool TryResolveEnvironmentAreaFromBiologicalLandmark(
+            int landmarkNodeId,
+            out EnvironmentAreaId areaId)
+        {
+            areaId = EnvironmentAreaId.None;
+            return EnvironmentState != null
+                   && EnvironmentState.TryResolveAreaIdForBiologicalLandmark(
+                       landmarkNodeId,
+                       out areaId);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentPotentialProductsForArea
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce i prodotti biologici potenziali associati a una specifica
+        /// area biologica.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: belief potenziale senza quantita' reali</b></para>
+        /// <para>
+        /// La query e' adatta a costruire credenze come "questa area puo' offrire
+        /// acorn". Non restituisce una disponibilita' garantita e non muta piante,
+        /// stock o inventari.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerProductCandidate> QueryEnvironmentPotentialProductsForArea(
+            EnvironmentAreaId areaId,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (EnvironmentState == null || !areaId.IsValid)
+                return new EnvironmentConsumerProductCandidate[0];
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryPotentialProductsForArea(
+                snapshot,
+                catalog,
+                areaId);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentPotentialProductsForBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce i prodotti potenziali dell'area collegata a un landmark
+        /// biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: percorso futuro Memory -> Belief</b></para>
+        /// <para>
+        /// Un NPC puo' ricordare un landmark biologico. Questa query consente al
+        /// layer cognitivo futuro di trasformare quel ricordo in belief potenziali
+        /// sulle risorse dell'area, senza leggere direttamente registry ambientali.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerProductCandidate> QueryEnvironmentPotentialProductsForBiologicalLandmark(
+            int landmarkNodeId,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (!TryResolveEnvironmentAreaFromBiologicalLandmark(landmarkNodeId, out EnvironmentAreaId areaId))
+                return new EnvironmentConsumerProductCandidate[0];
+
+            return QueryEnvironmentPotentialProductsForArea(areaId, catalog);
+        }
+
+        // =============================================================================
+        // BuildEnvironmentPotentialProductBeliefHintsForBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce hint belief potenziali per i prodotti biologici collegati a un
+        /// landmark biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: facade cognitivo senza BeliefStore</b></para>
+        /// <para>
+        /// Il <see cref="World"/> resta il confine leggibile dagli NPC: risolve il
+        /// landmark tramite biosfera, chiede i prodotti potenziali e restituisce
+        /// record data-only. Nessun belief reale viene scritto qui.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentBiologicalResourceBeliefHint> BuildEnvironmentPotentialProductBeliefHintsForBiologicalLandmark(
+            int landmarkNodeId,
+            EnvironmentPlantCatalog catalog,
+            int observedDay)
+        {
+            // Prima recuperiamo il contratto area/LM gia' stabile, cosi' un solo
+            // percorso decide se il landmark e' davvero biologico.
+            IReadOnlyList<EnvironmentConsumerProductCandidate> products =
+                QueryEnvironmentPotentialProductsForBiologicalLandmark(
+                    landmarkNodeId,
+                    catalog);
+
+            // La trasformazione in hint resta nel resolver Environment: World non
+            // conosce scoring, stagionalita' o dettagli prodotto.
+            return EnvironmentConsumerQueryResolver.BuildPotentialBeliefHintsForLandmark(
+                landmarkNodeId,
+                products,
+                observedDay);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentHarvestableResourcesForBiologicalLandmarkProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca localmente, attorno alla cella reale di un landmark biologico, piante
+        /// capaci di fornire un prodotto specifico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: landmark visto come punto di ricerca locale</b></para>
+        /// <para>
+        /// Questa query non usa il centro dell'area e non concede conoscenza globale
+        /// della foresta. Se l'NPC conosce un landmark di bordo, il futuro job potra'
+        /// cercare risorse vicino a quel nodo e allargare il raggio in modo esplicito.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerResourceCandidate> QueryEnvironmentHarvestableResourcesForBiologicalLandmarkProduct(
+            int landmarkNodeId,
+            int radius,
+            string productKey,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (!TryResolveEnvironmentAreaFromBiologicalLandmark(landmarkNodeId, out _)
+                || LandmarkRegistry == null
+                || !LandmarkRegistry.TryGetActiveNodeById(landmarkNodeId, out LandmarkRegistry.LandmarkNode node)
+                || node == null)
+            {
+                return new EnvironmentConsumerResourceCandidate[0];
+            }
+
+            // Il lookup finale resta la query locale esistente: cambia solo il modo
+            // in cui recuperiamo il centro della ricerca dal landmark registry.
+            return QueryEnvironmentHarvestableResourcesForProduct(
+                node.CellX,
+                node.CellY,
+                radius,
+                productKey,
+                catalog);
+        }
+
+        // =============================================================================
+        // BuildEnvironmentObservedProductBeliefHintsForBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce hint belief osservati usando le risorse harvestable trovate
+        /// vicino a un landmark biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: osservazione locale aggregata</b></para>
+        /// <para>
+        /// Il risultato puo' rappresentare una credenza del tipo "in questa zona ho
+        /// visto ancora 12 ghiande". La stima deriva solo da piante nel raggio
+        /// richiesto, quindi non sostituisce un futuro inventario risorse per albero.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentBiologicalResourceBeliefHint> BuildEnvironmentObservedProductBeliefHintsForBiologicalLandmark(
+            int landmarkNodeId,
+            int radius,
+            string productKey,
+            EnvironmentPlantCatalog catalog,
+            int observedDay)
+        {
+            if (!TryResolveEnvironmentAreaFromBiologicalLandmark(landmarkNodeId, out EnvironmentAreaId areaId))
+                return new EnvironmentBiologicalResourceBeliefHint[0];
+
+            IReadOnlyList<EnvironmentConsumerResourceCandidate> resources =
+                QueryEnvironmentHarvestableResourcesForBiologicalLandmarkProduct(
+                    landmarkNodeId,
+                    radius,
+                    productKey,
+                    catalog);
+
+            return EnvironmentConsumerQueryResolver.BuildObservedBeliefHintsForLandmark(
+                landmarkNodeId,
+                areaId,
+                resources,
+                observedDay);
+        }
+
+        private EnvironmentFullSnapshot BuildEnvironmentFullSnapshot()
+        {
+            EnvironmentSnapshot snapshot = EnvironmentState != null
+                ? EnvironmentState.CreateSnapshot()
+                : new EnvironmentState().CreateSnapshot();
+            return EnvironmentReadOnlySnapshotResolver.BuildFullSnapshot(snapshot);
+        }
+
+        // =============================================================================
         // ApplyEnvironmentPhysicalPlantProjections
         // =============================================================================
         /// <summary>
@@ -1474,6 +1830,90 @@ namespace Arcontio.Core
             }
 
             return applied;
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentDiffuseVegetationProjections
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sincronizza nel <see cref="World"/> la vegetazione diffusa cell-based
+        /// prodotta dalla biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: proiezione decorativa senza fisica</b></para>
+        /// <para>
+        /// La vegetazione diffusa non blocca movimento o vista e non crea oggetti
+        /// world-level. Il metodo costruisce solo uno store read-only per futuri
+        /// consumer visuali/debug, evitando che ArcGraph debba leggere direttamente
+        /// <see cref="EnvironmentState"/>.
+        /// </para>
+        /// </summary>
+        public int ApplyEnvironmentDiffuseVegetationProjections()
+        {
+            _diffuseVegetation.Clear();
+
+            if (EnvironmentState == null)
+                return 0;
+
+            var deltas = EnvironmentDiffuseVegetationDeltaProducer.BuildFullRefresh(
+                EnvironmentState.VegetationCellPlacements);
+            return ApplyEnvironmentDiffuseVegetationDeltas(deltas);
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentDiffuseVegetationDeltas
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica delta incrementali di vegetazione diffusa prodotti dalla biosfera.
+        /// </para>
+        /// </summary>
+        public int ApplyEnvironmentDiffuseVegetationDeltas(IReadOnlyList<EnvironmentDiffuseVegetationDelta> deltas)
+        {
+            if (deltas == null || deltas.Count == 0)
+                return 0;
+
+            int applied = 0;
+            for (int i = 0; i < deltas.Count; i++)
+            {
+                if (ApplyEnvironmentDiffuseVegetationDelta(deltas[i]))
+                    applied++;
+            }
+
+            return applied;
+        }
+
+        // =============================================================================
+        // ApplyEnvironmentDiffuseVegetationDelta
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un singolo delta di vegetazione diffusa.
+        /// </para>
+        /// </summary>
+        public bool ApplyEnvironmentDiffuseVegetationDelta(EnvironmentDiffuseVegetationDelta delta)
+        {
+            if (!delta.IsValid)
+                return false;
+
+            EnvironmentCellCoord cell = delta.Cell;
+            if (!InBounds(cell.X, cell.Y))
+                return false;
+
+            if (delta.Kind == EnvironmentDiffuseVegetationDeltaKind.Disappeared
+                || delta.CoverageBand == EnvironmentVegetationCoverageBand.None)
+            {
+                return _diffuseVegetation.Remove(cell);
+            }
+
+            _diffuseVegetation[cell] = new WorldDiffuseVegetationProjection(
+                delta.AreaId,
+                cell,
+                delta.VegetationKind,
+                delta.CoverageBand,
+                delta.ConditionBand);
+            return true;
         }
 
         // =============================================================================
