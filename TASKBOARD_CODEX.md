@@ -180,6 +180,7 @@ Regola corrente:
 - aggiornamento biosfera `v0.64`: introdotto boundary eventi/listener ambiente con `EnvironmentRuntimeChangeMask`, listener tipizzati registrabili su `SimulationHost` e compatibilita' mantenuta con l'evento legacy `EnvironmentRuntimeEventPublished`;
 - aggiornamento biosfera `v0.64.1`: TopBar e pannello grafici Biosfera consumano il boundary listener tipizzato; la TopBar usa l'evento come invalidazione ambiente e il clock display per l'ora, mentre i grafici non rigenerano piu' il ViewModel ogni frame senza eventi o richieste UI;
 - aggiornamento biosfera `v0.67.1`: pannello Biosfera arricchito con testata diagnostica compatta derivata dallo storico read-only, conteggi correnti per area e range numerici sugli assi dei grafici;
+- aggiornamento biosfera `v0.69`: closeout tecnico completato; la base fisica biosfera e' validata runtime/build, mentre job risorse, belief reali, inventario e consumo prodotti per-pianta restano esplicitamente rimandati a roadmap dedicata;
 
 - il test visuale `v0.36.03v.02` ha sbloccato la prosecuzione;
 - `v0.36.04` ha completato il builder effetti passivo;

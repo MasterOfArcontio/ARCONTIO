@@ -16547,7 +16547,7 @@ Blocchi previsti:
 | LM system handoff | input manuale alla rebuild del LandmarkRegistry senza appesantire LandmarkNode | ✅ Implementato |
 | Area-to-LM reference | sidecar biosfera area biologica -> nodeIds risolti dal registry | ✅ Implementato |
 | Debug overlay kind/color | colore e tipo debug dedicato per LM biologici in MapGrid/ArcGraph debug | ✅ Implementato |
-| Harness | test senza MapGrid e senza ArcGraph | ⏳ Pending |
+| Harness | test senza MapGrid e senza ArcGraph | ✅ Implementato in `EnvironmentFoundationHarness` |
 
 Vincoli:
 
@@ -16580,7 +16580,7 @@ Blocchi previsti:
 | Biological occupancy output | vegetazione decorativa e piante fisiche come stato biosfera data-only | ✅ Implementato |
 | Map biological areas | aree biologiche minime in `world_map_default.json` | ✅ Implementato |
 | Sprite independence | nessun path sprite o PNG dentro biosfera | ✅ Implementato |
-| Harness | test senza MapGrid e senza ArcGraph | ⏳ Pending |
+| Harness | test senza MapGrid e senza ArcGraph | ✅ Implementato in `EnvironmentFoundationHarness` |
 
 ---
 
@@ -16608,7 +16608,15 @@ Blocchi previsti:
 | v0.67 | pannello debug/calibrazione runtime biosfera | ⚠️ Parziale: diagnostica runtime implementata, calibrazione avanzata pending |
 | v0.67.1 | aggiungere testata diagnostica compatta e range numerici ai grafici Biosfera | ✅ Implementato |
 | v0.68 | budget e batch processing produttivo | ✅ Core budget runtime completato, spreading multi-tick futuro |
-| v0.69 | QA closeout integrazione fisica biosfera | ⏳ Pending |
+| v0.69 | QA closeout integrazione fisica biosfera | ✅ Closeout tecnico completato, job risorse/NPC rimandato a roadmap dedicata |
+
+Closeout tecnico v0.69:
+
+- validato dall'operatore in runtime: rendering piante e vegetazione, sorting visuale, blocco FOV da piante fisiche, overlap aree biologiche e densita' foresta configurabile;
+- verificato da build C#: `dotnet build Assembly-CSharp.csproj --no-restore /p:UseSharedCompilation=false -v:minimal`, 0 errori;
+- verificato staticamente: `git diff --check`, 0 errori whitespace;
+- coperto da harness data-only: calendario, clima, snapshot, crescita naturale, seed bank, proiezioni visuali neutrali, query consumer e scheduler runtime;
+- esplicitamente fuori scope v0.69: scrittura BeliefStore reale, decision/job completo di raccolta, inventario privato/comune, consumo risorse per pianta e save/load globale simulazione.
 
 Nota boundary piante fisiche:
 
