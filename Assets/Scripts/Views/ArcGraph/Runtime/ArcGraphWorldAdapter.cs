@@ -459,11 +459,16 @@ namespace Arcontio.View.ArcGraph
             string conditionKey = ToKeyPart(projection.ConditionBand.ToString());
             string visualKey = "vegetation_" + vegetationKey + "_" + coverageKey + "_" + conditionKey;
 
-            // La sprite key resta agganciata all'asset base disponibile in
-            // Resources. Stadio, copertura e condizione rimangono nel visualKey,
-            // ma non vengono usati come nome sub-sprite finche' il catalogo asset
-            // v0.71 non avra' varianti nominate in modo stabile.
-            string spriteKey = "ArcGraph/Environment/Vegetation/" + vegetationKey;
+            // Il PNG grass e' una sheet Unity con sub-sprite semantiche nominate
+            // dense_healthy, medium_dry, sparse_dead, ecc. La chiave mantiene il
+            // contratto sheet#subSprite cosi' il resolver puo' usare Resources.LoadAll
+            // senza dipendere da riferimenti diretti a componenti o asset scena.
+            string spriteKey = "ArcGraph/Environment/Vegetation/"
+                               + vegetationKey
+                               + "#"
+                               + coverageKey
+                               + "_"
+                               + conditionKey;
 
             return new ArcGraphVegetationVisualSnapshot(
                 ConvertEnvironmentCell(projection.Cell),
@@ -498,10 +503,19 @@ namespace Arcontio.View.ArcGraph
             string healthKey = ToKeyPart(projection.HealthState.ToString());
             string visualKey = "plant_" + speciesKey + "_" + growthKey + "_" + healthKey;
 
-            // Per ora ArcGraph usa l'asset base della specie. La distinzione
-            // stadio/salute resta nel visualKey e nel dato snapshot, evitando che
-            // Unity cerchi sub-sprite non ancora nominati come seedling_healthy.
-            string spriteKey = "ArcGraph/Environment/Plants/" + speciesKey;
+            string spriteStageKey = ResolvePhysicalPlantSpriteStageKey(growthKey);
+
+            // Il PNG oak_tree e' una sheet Unity con sub-sprite semantiche nominate
+            // sapling_healthy, young_stressed, adult_dead, ecc. La Biosfera puo'
+            // usare termini biologici come seedling/mature; l'adapter li traduce
+            // qui nel vocabolario grafico ArcGraph senza rimandare dipendenze verso
+            // il Core Environment.
+            string spriteKey = "ArcGraph/Environment/Plants/"
+                               + speciesKey
+                               + "#"
+                               + spriteStageKey
+                               + "_"
+                               + healthKey;
 
             return new ArcGraphVegetationVisualSnapshot(
                 ConvertEnvironmentCell(projection.Cell),
@@ -595,6 +609,42 @@ namespace Arcontio.View.ArcGraph
                 return 3;
 
             return 0;
+        }
+
+        // =============================================================================
+        // ResolvePhysicalPlantSpriteStageKey
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Traduce lo stadio biologico della pianta nel nome sub-sprite disponibile
+        /// nella sheet ArcGraph delle piante.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: adattamento visuale al bordo ViewModel</b></para>
+        /// <para>
+        /// Il Core Environment puo' parlare di <c>seedling</c> o <c>mature</c>,
+        /// mentre la sheet grafica usa <c>sapling</c>, <c>young</c> e
+        /// <c>adult</c>. La traduzione resta qui, nel World -> ArcGraph adapter,
+        /// evitando che la Biosfera conosca il naming degli asset.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>sapling</b>: seedling, sprout o sapling.</item>
+        ///   <item><b>young</b>: piante giovani.</item>
+        ///   <item><b>adult</b>: mature, adult, dry, dead e fallback conservativo.</item>
+        /// </list>
+        /// </summary>
+        private static string ResolvePhysicalPlantSpriteStageKey(string growthStageKey)
+        {
+            string key = ToKeyPart(growthStageKey);
+            if (key == "seedling" || key == "sprout" || key == "sapling")
+                return "sapling";
+
+            if (key == "young")
+                return "young";
+
+            return "adult";
         }
 
         // =============================================================================
