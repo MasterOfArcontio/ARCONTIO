@@ -1546,6 +1546,122 @@ namespace Arcontio.Core
             return QueryEnvironmentPotentialProductsForArea(areaId, catalog);
         }
 
+        // =============================================================================
+        // BuildEnvironmentPotentialProductBeliefHintsForBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce hint belief potenziali per i prodotti biologici collegati a un
+        /// landmark biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: facade cognitivo senza BeliefStore</b></para>
+        /// <para>
+        /// Il <see cref="World"/> resta il confine leggibile dagli NPC: risolve il
+        /// landmark tramite biosfera, chiede i prodotti potenziali e restituisce
+        /// record data-only. Nessun belief reale viene scritto qui.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentBiologicalResourceBeliefHint> BuildEnvironmentPotentialProductBeliefHintsForBiologicalLandmark(
+            int landmarkNodeId,
+            EnvironmentPlantCatalog catalog,
+            int observedDay)
+        {
+            // Prima recuperiamo il contratto area/LM gia' stabile, cosi' un solo
+            // percorso decide se il landmark e' davvero biologico.
+            IReadOnlyList<EnvironmentConsumerProductCandidate> products =
+                QueryEnvironmentPotentialProductsForBiologicalLandmark(
+                    landmarkNodeId,
+                    catalog);
+
+            // La trasformazione in hint resta nel resolver Environment: World non
+            // conosce scoring, stagionalita' o dettagli prodotto.
+            return EnvironmentConsumerQueryResolver.BuildPotentialBeliefHintsForLandmark(
+                landmarkNodeId,
+                products,
+                observedDay);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentHarvestableResourcesForBiologicalLandmarkProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca localmente, attorno alla cella reale di un landmark biologico, piante
+        /// capaci di fornire un prodotto specifico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: landmark visto come punto di ricerca locale</b></para>
+        /// <para>
+        /// Questa query non usa il centro dell'area e non concede conoscenza globale
+        /// della foresta. Se l'NPC conosce un landmark di bordo, il futuro job potra'
+        /// cercare risorse vicino a quel nodo e allargare il raggio in modo esplicito.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentConsumerResourceCandidate> QueryEnvironmentHarvestableResourcesForBiologicalLandmarkProduct(
+            int landmarkNodeId,
+            int radius,
+            string productKey,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (!TryResolveEnvironmentAreaFromBiologicalLandmark(landmarkNodeId, out _)
+                || LandmarkRegistry == null
+                || !LandmarkRegistry.TryGetActiveNodeById(landmarkNodeId, out LandmarkRegistry.LandmarkNode node)
+                || node == null)
+            {
+                return new EnvironmentConsumerResourceCandidate[0];
+            }
+
+            // Il lookup finale resta la query locale esistente: cambia solo il modo
+            // in cui recuperiamo il centro della ricerca dal landmark registry.
+            return QueryEnvironmentHarvestableResourcesForProduct(
+                node.CellX,
+                node.CellY,
+                radius,
+                productKey,
+                catalog);
+        }
+
+        // =============================================================================
+        // BuildEnvironmentObservedProductBeliefHintsForBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce hint belief osservati usando le risorse harvestable trovate
+        /// vicino a un landmark biologico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: osservazione locale aggregata</b></para>
+        /// <para>
+        /// Il risultato puo' rappresentare una credenza del tipo "in questa zona ho
+        /// visto ancora 12 ghiande". La stima deriva solo da piante nel raggio
+        /// richiesto, quindi non sostituisce un futuro inventario risorse per albero.
+        /// </para>
+        /// </summary>
+        public IReadOnlyList<EnvironmentBiologicalResourceBeliefHint> BuildEnvironmentObservedProductBeliefHintsForBiologicalLandmark(
+            int landmarkNodeId,
+            int radius,
+            string productKey,
+            EnvironmentPlantCatalog catalog,
+            int observedDay)
+        {
+            if (!TryResolveEnvironmentAreaFromBiologicalLandmark(landmarkNodeId, out EnvironmentAreaId areaId))
+                return new EnvironmentBiologicalResourceBeliefHint[0];
+
+            IReadOnlyList<EnvironmentConsumerResourceCandidate> resources =
+                QueryEnvironmentHarvestableResourcesForBiologicalLandmarkProduct(
+                    landmarkNodeId,
+                    radius,
+                    productKey,
+                    catalog);
+
+            return EnvironmentConsumerQueryResolver.BuildObservedBeliefHintsForLandmark(
+                landmarkNodeId,
+                areaId,
+                resources,
+                observedDay);
+        }
+
         private EnvironmentFullSnapshot BuildEnvironmentFullSnapshot()
         {
             EnvironmentSnapshot snapshot = EnvironmentState != null

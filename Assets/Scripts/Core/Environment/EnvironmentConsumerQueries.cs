@@ -853,6 +853,137 @@ namespace Arcontio.Core.Environment
             return EmptyProductCandidates;
         }
 
+        // =============================================================================
+        // BuildPotentialBeliefHintsForLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Trasforma i prodotti potenziali di un'area biologica in hint cognitivi
+        /// ancorati a un landmark biologico noto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: contratto Memory -> Belief senza scrittura</b></para>
+        /// <para>
+        /// La biosfera prepara record data-only che un futuro layer cognitivo potra'
+        /// convertire in belief soggettivi. Il metodo non scrive nel BeliefStore,
+        /// non muta memoria NPC e non assegna job: rende solo esplicito il passaggio
+        /// "ho visto un landmark biologico" -> "questa area puo' produrre X".
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Input</b>: prodotti potenziali gia' risolti da area o landmark.</item>
+        ///   <item><b>Filtro</b>: scarta candidate non valide o prive di score.</item>
+        ///   <item><b>Output</b>: hint potenziali, senza quantita' reale stimata.</item>
+        /// </list>
+        /// </summary>
+        public static IReadOnlyList<EnvironmentBiologicalResourceBeliefHint> BuildPotentialBeliefHintsForLandmark(
+            int landmarkNodeId,
+            IReadOnlyList<EnvironmentConsumerProductCandidate> products,
+            int observedDay)
+        {
+            if (landmarkNodeId <= 0 || products == null || products.Count == 0)
+                return Array.Empty<EnvironmentBiologicalResourceBeliefHint>();
+
+            var hints = new List<EnvironmentBiologicalResourceBeliefHint>(products.Count);
+            for (int i = 0; i < products.Count; i++)
+            {
+                EnvironmentConsumerProductCandidate product = products[i];
+                if (!product.IsValid)
+                    continue;
+
+                // Lo score del prodotto e' la migliore confidence neutra disponibile
+                // oggi: combina pressione seed, piante vive e piante harvestable.
+                hints.Add(new EnvironmentBiologicalResourceBeliefHint(
+                    EnvironmentBiologicalResourceBeliefKind.Potential,
+                    landmarkNodeId,
+                    product.AreaId,
+                    product.ProductKey,
+                    0,
+                    product.Score01,
+                    observedDay));
+            }
+
+            return hints.Count == 0
+                ? Array.Empty<EnvironmentBiologicalResourceBeliefHint>()
+                : hints.ToArray();
+        }
+
+        // =============================================================================
+        // BuildObservedBeliefHintsForLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggrega risorse realmente osservabili vicino a un landmark biologico in
+        /// hint cognitivi osservati.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: osservazione locale, non onniscienza area</b></para>
+        /// <para>
+        /// Il chiamante deve fornire candidate raccolte tramite una query locale
+        /// attorno alla posizione effettiva dell'NPC o del landmark. Il metodo
+        /// somma solo cio' che e' stato osservato in quel raggio, evitando di
+        /// trasformare l'intera area biologica in una quantita' globale perfetta.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Grouping</b>: raggruppa per prodotto biologico.</item>
+        ///   <item><b>Amount</b>: somma le unita' stimate dalle piante candidate.</item>
+        ///   <item><b>Confidence</b>: usa la migliore qualita'/availability osservata.</item>
+        /// </list>
+        /// </summary>
+        public static IReadOnlyList<EnvironmentBiologicalResourceBeliefHint> BuildObservedBeliefHintsForLandmark(
+            int landmarkNodeId,
+            EnvironmentAreaId areaId,
+            IReadOnlyList<EnvironmentConsumerResourceCandidate> resources,
+            int observedDay)
+        {
+            if (landmarkNodeId <= 0 || !areaId.IsValid || resources == null || resources.Count == 0)
+                return Array.Empty<EnvironmentBiologicalResourceBeliefHint>();
+
+            var accumulators = new List<ObservedBeliefAccumulator>();
+            for (int i = 0; i < resources.Count; i++)
+            {
+                EnvironmentConsumerResourceCandidate resource = resources[i];
+                if (!resource.IsAvailable)
+                    continue;
+
+                ObservedBeliefAccumulator accumulator = FindObservedBeliefAccumulator(
+                    accumulators,
+                    resource.ResourceOutputKey);
+                if (accumulator == null)
+                {
+                    accumulator = new ObservedBeliefAccumulator(resource.ResourceOutputKey);
+                    accumulators.Add(accumulator);
+                }
+
+                accumulator.EstimatedAmount += resource.EstimatedAmountUnits;
+                accumulator.Confidence01 = System.Math.Max(
+                    accumulator.Confidence01,
+                    EnvironmentMath.Clamp01((resource.Availability01 * 0.55f) + (resource.Quality01 * 0.45f)));
+            }
+
+            if (accumulators.Count == 0)
+                return Array.Empty<EnvironmentBiologicalResourceBeliefHint>();
+
+            var hints = new EnvironmentBiologicalResourceBeliefHint[accumulators.Count];
+            for (int i = 0; i < accumulators.Count; i++)
+            {
+                ObservedBeliefAccumulator accumulator = accumulators[i];
+                hints[i] = new EnvironmentBiologicalResourceBeliefHint(
+                    EnvironmentBiologicalResourceBeliefKind.Observed,
+                    landmarkNodeId,
+                    areaId,
+                    accumulator.ProductKey,
+                    accumulator.EstimatedAmount,
+                    accumulator.Confidence01,
+                    observedDay);
+            }
+
+            return hints;
+        }
+
         private static bool IsBiologicalSearchArea(EnvironmentAreaSnapshot area)
         {
             return area.HasSeedBank
@@ -956,6 +1087,20 @@ namespace Arcontio.Core.Environment
                 {
                     return accumulator;
                 }
+            }
+
+            return null;
+        }
+
+        private static ObservedBeliefAccumulator FindObservedBeliefAccumulator(
+            List<ObservedBeliefAccumulator> accumulators,
+            string productKey)
+        {
+            for (int i = 0; i < accumulators.Count; i++)
+            {
+                ObservedBeliefAccumulator accumulator = accumulators[i];
+                if (string.Equals(accumulator.ProductKey, productKey, StringComparison.OrdinalIgnoreCase))
+                    return accumulator;
             }
 
             return null;
@@ -1212,6 +1357,18 @@ namespace Arcontio.Core.Environment
                     LivePlantCount,
                     HarvestablePlantCount,
                     score);
+            }
+        }
+
+        private sealed class ObservedBeliefAccumulator
+        {
+            public readonly string ProductKey;
+            public int EstimatedAmount;
+            public float Confidence01;
+
+            public ObservedBeliefAccumulator(string productKey)
+            {
+                ProductKey = productKey ?? string.Empty;
             }
         }
     }

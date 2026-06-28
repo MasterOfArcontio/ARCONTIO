@@ -2322,6 +2322,15 @@ namespace Arcontio.Core.Environment
                 cell,
                 2,
                 "apple");
+            var potentialHints = EnvironmentConsumerQueryResolver.BuildPotentialBeliefHintsForLandmark(
+                77,
+                productFacts,
+                12);
+            var observedHints = EnvironmentConsumerQueryResolver.BuildObservedBeliefHintsForLandmark(
+                77,
+                areaId,
+                wood,
+                12);
             bool productFactsExposeWood = false;
             bool productFactsExposeAcorn = false;
             for (int i = 0; i < productFacts.Count; i++)
@@ -2417,6 +2426,18 @@ namespace Arcontio.Core.Environment
                    && wood[0].BaseMaxAmountUnits == 8
                    && wood[0].EstimatedAmountUnits > 0
                    && impossible.Count == 0
+                   && potentialHints.Count == 2
+                   && potentialHints[0].Kind == EnvironmentBiologicalResourceBeliefKind.Potential
+                   && potentialHints[0].LandmarkNodeId == 77
+                   && potentialHints[0].EstimatedAmount == 0
+                   && potentialHints[0].ObservedDay == 12
+                   && observedHints.Count == 1
+                   && observedHints[0].Kind == EnvironmentBiologicalResourceBeliefKind.Observed
+                   && observedHints[0].LandmarkNodeId == 77
+                   && observedHints[0].AreaId.Equals(areaId)
+                   && observedHints[0].ProductKey == "wood_log"
+                   && observedHints[0].EstimatedAmount > 0
+                   && observedHints[0].ObservedDay == 12
                    && nutritionPropertyOk
                    && nutritionValue == 0.45f
                    && far.Count == 0;
