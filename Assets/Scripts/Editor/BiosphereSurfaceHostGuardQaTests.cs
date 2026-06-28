@@ -26,8 +26,8 @@ namespace Arcontio.Tests
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>World minimale</b>: mappa piccola con catalogo superfici locale.</item>
-    ///   <item><b>Piante fisiche</b>: delta Born e full refresh accettano solo erba.</item>
-    ///   <item><b>Vegetazione diffusa</b>: delta Appeared accettato solo su erba.</item>
+    ///   <item><b>Piante fisiche</b>: delta Born e full refresh accettano solo erba lontana da superfici non host.</item>
+    ///   <item><b>Vegetazione diffusa</b>: delta Appeared accettato solo su erba lontana da superfici non host.</item>
     /// </list>
     /// </summary>
     public sealed class BiosphereSurfaceHostGuardQaTests
@@ -47,19 +47,19 @@ namespace Arcontio.Tests
             World world = MakeWorldWithSurfaceCatalog();
 
             SetSurface(world, 1, 1, CellSurfaceMacro.Natural, "grass");
-            SetSurface(world, 2, 1, CellSurfaceMacro.Water, "water");
-            SetSurface(world, 3, 1, CellSurfaceMacro.Artificial, "stone_floor");
-            SetSurface(world, 4, 1, CellSurfaceMacro.Artificial, "tile_floor");
+            SetSurface(world, 3, 1, CellSurfaceMacro.Water, "water");
+            SetSurface(world, 5, 1, CellSurfaceMacro.Artificial, "stone_floor");
+            SetSurface(world, 7, 1, CellSurfaceMacro.Artificial, "tile_floor");
 
             Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(1, 1, 1)), Is.True);
-            Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(2, 2, 1)), Is.False);
-            Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(3, 3, 1)), Is.False);
-            Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(4, 4, 1)), Is.False);
+            Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(2, 3, 1)), Is.False);
+            Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(3, 5, 1)), Is.False);
+            Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(4, 7, 1)), Is.False);
 
             Assert.That(world.HasPhysicalPlantAt(1, 1), Is.True);
-            Assert.That(world.HasPhysicalPlantAt(2, 1), Is.False);
             Assert.That(world.HasPhysicalPlantAt(3, 1), Is.False);
-            Assert.That(world.HasPhysicalPlantAt(4, 1), Is.False);
+            Assert.That(world.HasPhysicalPlantAt(5, 1), Is.False);
+            Assert.That(world.HasPhysicalPlantAt(7, 1), Is.False);
         }
 
         // =============================================================================
@@ -77,9 +77,9 @@ namespace Arcontio.Tests
             World world = MakeWorldWithSurfaceCatalog();
 
             SetSurface(world, 1, 3, CellSurfaceMacro.Natural, "grass");
-            SetSurface(world, 2, 3, CellSurfaceMacro.Water, "water");
-            SetSurface(world, 3, 3, CellSurfaceMacro.Artificial, "stone_floor");
-            SetSurface(world, 4, 3, CellSurfaceMacro.Artificial, "tile_floor");
+            SetSurface(world, 3, 3, CellSurfaceMacro.Water, "water");
+            SetSurface(world, 5, 3, CellSurfaceMacro.Artificial, "stone_floor");
+            SetSurface(world, 7, 3, CellSurfaceMacro.Artificial, "tile_floor");
 
             var state = new EnvironmentState();
             var areaId = new EnvironmentAreaId(1);
@@ -96,9 +96,9 @@ namespace Arcontio.Tests
             var placements = new List<EnvironmentPhysicalPlantPlacement>
             {
                 MakePlantPlacement(state, areaId, 11, 1, 3),
-                MakePlantPlacement(state, areaId, 12, 2, 3),
-                MakePlantPlacement(state, areaId, 13, 3, 3),
-                MakePlantPlacement(state, areaId, 14, 4, 3)
+                MakePlantPlacement(state, areaId, 12, 3, 3),
+                MakePlantPlacement(state, areaId, 13, 5, 3),
+                MakePlantPlacement(state, areaId, 14, 7, 3)
             };
 
             Assert.That(
@@ -109,9 +109,34 @@ namespace Arcontio.Tests
 
             Assert.That(world.ApplyEnvironmentPhysicalPlantProjections(), Is.EqualTo(1));
             Assert.That(world.HasPhysicalPlantAt(1, 3), Is.True);
-            Assert.That(world.HasPhysicalPlantAt(2, 3), Is.False);
             Assert.That(world.HasPhysicalPlantAt(3, 3), Is.False);
-            Assert.That(world.HasPhysicalPlantAt(4, 3), Is.False);
+            Assert.That(world.HasPhysicalPlantAt(5, 3), Is.False);
+            Assert.That(world.HasPhysicalPlantAt(7, 3), Is.False);
+        }
+
+        // =============================================================================
+        // PhysicalPlantDeltaIsRejectedOnNaturalBorderAroundBlockedSurface
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che una cella prato adiacente ad acqua venga trattata come bordo
+        /// visuale non ospitante per piante fisiche.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void PhysicalPlantDeltaIsRejectedOnNaturalBorderAroundBlockedSurface()
+        {
+            World world = MakeWorldWithSurfaceCatalog();
+
+            SetSurface(world, 1, 1, CellSurfaceMacro.Natural, "grass");
+            SetSurface(world, 2, 2, CellSurfaceMacro.Water, "water");
+            SetSurface(world, 6, 6, CellSurfaceMacro.Natural, "grass");
+
+            Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(21, 1, 1)), Is.False);
+            Assert.That(world.ApplyEnvironmentPhysicalPlantDelta(MakePlantDelta(22, 6, 6)), Is.True);
+
+            Assert.That(world.HasPhysicalPlantAt(1, 1), Is.False);
+            Assert.That(world.HasPhysicalPlantAt(6, 6), Is.True);
         }
 
         // =============================================================================
@@ -128,15 +153,37 @@ namespace Arcontio.Tests
         {
             World world = MakeWorldWithSurfaceCatalog();
 
-            SetSurface(world, 1, 2, CellSurfaceMacro.Natural, "grass");
-            SetSurface(world, 2, 2, CellSurfaceMacro.Water, "water");
-            SetSurface(world, 3, 2, CellSurfaceMacro.Artificial, "stone_floor");
-            SetSurface(world, 4, 2, CellSurfaceMacro.Artificial, "tile_floor");
+            SetSurface(world, 1, 5, CellSurfaceMacro.Natural, "grass");
+            SetSurface(world, 3, 5, CellSurfaceMacro.Water, "water");
+            SetSurface(world, 5, 5, CellSurfaceMacro.Artificial, "stone_floor");
+            SetSurface(world, 7, 5, CellSurfaceMacro.Artificial, "tile_floor");
 
-            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(1, 2)), Is.True);
-            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(2, 2)), Is.False);
-            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(3, 2)), Is.False);
-            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(4, 2)), Is.False);
+            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(1, 5)), Is.True);
+            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(3, 5)), Is.False);
+            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(5, 5)), Is.False);
+            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(7, 5)), Is.False);
+        }
+
+        // =============================================================================
+        // DiffuseVegetationDeltaIsRejectedOnNaturalBorderAroundBlockedSurface
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che una cella prato adiacente a pavimento artificiale venga
+        /// trattata come bordo visuale non ospitante per vegetazione diffusa.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DiffuseVegetationDeltaIsRejectedOnNaturalBorderAroundBlockedSurface()
+        {
+            World world = MakeWorldWithSurfaceCatalog();
+
+            SetSurface(world, 1, 1, CellSurfaceMacro.Natural, "grass");
+            SetSurface(world, 2, 1, CellSurfaceMacro.Artificial, "stone_floor");
+            SetSurface(world, 6, 6, CellSurfaceMacro.Natural, "grass");
+
+            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(1, 1)), Is.False);
+            Assert.That(world.ApplyEnvironmentDiffuseVegetationDelta(MakeVegetationDelta(6, 6)), Is.True);
         }
 
         // =============================================================================
@@ -150,7 +197,7 @@ namespace Arcontio.Tests
         private static World MakeWorldWithSurfaceCatalog()
         {
             var world = new World(new WorldConfig(new SimulationParams()));
-            world.InitMap(8, 8);
+            world.InitMap(10, 10);
 
             // Il test costruisce il catalogo in memoria per restare indipendente da
             // Resources/Unity import e verificare solo il contratto Core.

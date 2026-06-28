@@ -2161,7 +2161,8 @@ namespace Arcontio.Core
         /// <para><b>Principio architetturale: contratto data-driven, niente fallback permissivo</b></para>
         /// <para>
         /// Il filtro segue la catena esplicita <c>World.CellSurfaces</c> ->
-        /// <c>SurfaceDefs</c> -> <c>MacroSurface == Natural</c> -> flag host. Se la
+        /// <c>SurfaceDefs</c> -> <c>MacroSurface == Natural</c> -> flag host, e poi
+        /// richiede una cintura di una cella senza superfici non ospitanti. Se la
         /// definizione manca, il World rifiuta la proiezione: una superficie ignota
         /// non deve diventare biologicamente valida per fallback.
         /// </para>
@@ -2169,11 +2170,47 @@ namespace Arcontio.Core
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Bounds</b>: respinge coordinate fuori mappa.</item>
-        ///   <item><b>Snapshot superficie</b>: legge la superficie cella dal layer autoritativo.</item>
-        ///   <item><b>Catalogo</b>: richiede la definizione e controlla macro/flag.</item>
+        ///   <item><b>Cella centrale</b>: deve essere direttamente ospitante.</item>
+        ///   <item><b>Bordo visuale</b>: le otto celle vicine non devono essere acqua, pavimenti o superfici non host.</item>
         /// </list>
         /// </summary>
         private bool CanEnvironmentSurfaceHostBiology(
+            int x,
+            int y,
+            bool requirePhysicalPlantHost)
+        {
+            if (!IsEnvironmentSurfaceDirectBiologyHost(x, y, requirePhysicalPlantHost))
+                return false;
+
+            return !HasAdjacentEnvironmentSurfaceBlockingBiology(
+                x,
+                y,
+                requirePhysicalPlantHost);
+        }
+
+        // =============================================================================
+        // IsEnvironmentSurfaceDirectBiologyHost
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica la sola cella centrale, senza considerare il bordo visuale.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: regola host atomica riusabile</b></para>
+        /// <para>
+        /// Questo metodo contiene la lettura autoritativa superficie/catalogo. Viene
+        /// usato sia per validare la cella candidata sia per ispezionare le celle
+        /// vicine senza ricorsione e senza duplicare la semantica delle superfici.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Bounds</b>: respinge celle fuori mappa.</item>
+        ///   <item><b>Snapshot superficie</b>: richiede una superficie assegnata.</item>
+        ///   <item><b>Catalogo</b>: richiede MacroSurface naturale e flag host coerente.</item>
+        /// </list>
+        /// </summary>
+        private bool IsEnvironmentSurfaceDirectBiologyHost(
             int x,
             int y,
             bool requirePhysicalPlantHost)
@@ -2196,6 +2233,60 @@ namespace Arcontio.Core
             return requirePhysicalPlantHost
                 ? def.CanHostPhysicalPlant
                 : def.CanHostNaturalVegetation;
+        }
+
+        // =============================================================================
+        // HasAdjacentEnvironmentSurfaceBlockingBiology
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Controlla la cintura visuale di una cella candidata cercando superfici
+        /// non ospitanti nelle otto celle vicine.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: separazione tra dato formale e resa visuale</b></para>
+        /// <para>
+        /// Alcune celle di confine risultano formalmente prato, ma graficamente sono
+        /// mezzo prato e mezzo acqua/pietra per via del terrain blending. Questo
+        /// guard conserva il dato World invariato e impedisce solo alla Biosfera di
+        /// proiettare piante o vegetazione su quella fascia ambigua.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Vicini in bounds</b>: le celle fuori mappa non creano bordo artificiale.</item>
+        ///   <item><b>Otto direzioni</b>: include diagonali per coprire angoli acqua/pietra.</item>
+        ///   <item><b>Host atomico</b>: riusa la stessa regola superficie/catalogo della cella centrale.</item>
+        /// </list>
+        /// </summary>
+        private bool HasAdjacentEnvironmentSurfaceBlockingBiology(
+            int x,
+            int y,
+            bool requirePhysicalPlantHost)
+        {
+            for (int offsetY = -1; offsetY <= 1; offsetY++)
+            {
+                for (int offsetX = -1; offsetX <= 1; offsetX++)
+                {
+                    if (offsetX == 0 && offsetY == 0)
+                        continue;
+
+                    int neighborX = x + offsetX;
+                    int neighborY = y + offsetY;
+                    if (!InBounds(neighborX, neighborY))
+                        continue;
+
+                    if (!IsEnvironmentSurfaceDirectBiologyHost(
+                            neighborX,
+                            neighborY,
+                            requirePhysicalPlantHost))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
         }
 
         // ============================================================

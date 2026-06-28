@@ -458,12 +458,12 @@ namespace Arcontio.View.ArcGraph
             string coverageKey = ToKeyPart(projection.CoverageBand.ToString());
             string conditionKey = ToKeyPart(projection.ConditionBand.ToString());
             string visualKey = "vegetation_" + vegetationKey + "_" + coverageKey + "_" + conditionKey;
-            string spriteKey = "ArcGraph/Environment/Vegetation/"
-                               + vegetationKey
-                               + "#"
-                               + coverageKey
-                               + "_"
-                               + conditionKey;
+
+            // La sprite key resta agganciata all'asset base disponibile in
+            // Resources. Stadio, copertura e condizione rimangono nel visualKey,
+            // ma non vengono usati come nome sub-sprite finche' il catalogo asset
+            // v0.71 non avra' varianti nominate in modo stabile.
+            string spriteKey = "ArcGraph/Environment/Vegetation/" + vegetationKey;
 
             return new ArcGraphVegetationVisualSnapshot(
                 ConvertEnvironmentCell(projection.Cell),
@@ -498,12 +498,10 @@ namespace Arcontio.View.ArcGraph
             string healthKey = ToKeyPart(projection.HealthState.ToString());
             string visualKey = "plant_" + speciesKey + "_" + growthKey + "_" + healthKey;
 
-            string spriteKey = "ArcGraph/Environment/Plants/"
-                               + speciesKey
-                               + "#"
-                               + growthKey
-                               + "_"
-                               + healthKey;
+            // Per ora ArcGraph usa l'asset base della specie. La distinzione
+            // stadio/salute resta nel visualKey e nel dato snapshot, evitando che
+            // Unity cerchi sub-sprite non ancora nominati come seedling_healthy.
+            string spriteKey = "ArcGraph/Environment/Plants/" + speciesKey;
 
             return new ArcGraphVegetationVisualSnapshot(
                 ConvertEnvironmentCell(projection.Cell),
