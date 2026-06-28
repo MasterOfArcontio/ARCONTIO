@@ -108,6 +108,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphNpcPrivateFoodCommandBridge _npcPrivateFoodCommandBridge;
         private ArcGraphNpcDnaEditCommandBridge _npcDnaEditCommandBridge;
         private ArcGraphObjectFoodStockCommandBridge _objectFoodStockCommandBridge;
+        private ArcGraphObjectEditCommandBridge _objectEditCommandBridge;
         private readonly ArcUiInspectorViewModelFactory _viewModelFactory = new();
         private readonly ArcUiInspectorRuntimeSnapshotProvider _runtimeSnapshotProvider = new();
         private RectTransform _panelRoot;
@@ -300,6 +301,32 @@ namespace Arcontio.View.ArcGraph
         public void SetObjectFoodStockCommandBridge(ArcGraphObjectFoodStockCommandBridge bridge)
         {
             _objectFoodStockCommandBridge = bridge;
+        }
+
+        // =============================================================================
+        // SetObjectEditCommandBridge
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega il RightInspector al bridge autorizzato per modificare proprieta'
+        /// oggetto generiche e stato porta.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bottoni come intenti controllati</b></para>
+        /// <para>
+        /// La view conserva solo il riferimento al bridge. I controlli di owner e
+        /// porta non scrivono direttamente <c>WorldObjectInstance</c>, ma inviano
+        /// una richiesta piccola che il comando Core rivalida.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>bridge</b>: componente runtime creato dall'auto-installer ArcGraph.</item>
+        /// </list>
+        /// </summary>
+        public void SetObjectEditCommandBridge(ArcGraphObjectEditCommandBridge bridge)
+        {
+            _objectEditCommandBridge = bridge;
         }
 
         // =============================================================================
@@ -624,6 +651,12 @@ namespace Arcontio.View.ArcGraph
             if (ShouldShowObjectFoodStockActions(viewModel, activeTab))
                 CreateObjectFoodStockActions(rowsRoot, viewModel.Target);
 
+            if (ShouldShowObjectOwnerActions(viewModel, activeTab))
+                CreateObjectOwnerActions(rowsRoot, viewModel.Target);
+
+            if (ShouldShowObjectDoorActions(viewModel, activeTab))
+                CreateObjectDoorActions(rowsRoot, viewModel.Target, IsDoorLockAvailable(activeTab));
+
             FinalizeScrollContentLayout(rowsRoot, resetScrollToTop);
         }
 
@@ -730,6 +763,80 @@ namespace Arcontio.View.ArcGraph
                    && (viewModel.Target.Kind == ArcUiSelectionTargetKind.Object
                        || viewModel.Target.Kind == ArcUiSelectionTargetKind.Wall)
                    && string.Equals(activeTab.TabKey, "edit_storage", System.StringComparison.Ordinal);
+        }
+
+        // =============================================================================
+        // ShouldShowObjectOwnerActions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Decide se mostrare i controlli operativi per la proprieta' oggetto
+        /// generica.
+        /// </para>
+        ///
+        /// <para><b>Separazione food stock / oggetto generico</b></para>
+        /// <para>
+        /// Il tab Storage dei food stock ha un bridge dedicato, perche' deve tenere
+        /// allineati <c>FoodStockComponent</c>, owner oggetto e pinned belief. Qui
+        /// mostriamo i bottoni solo nel tab Parametri degli altri oggetti.
+        /// </para>
+        /// </summary>
+        private bool ShouldShowObjectOwnerActions(
+            ArcUiInspectorViewModel viewModel,
+            ArcUiInspectorTab activeTab)
+        {
+            return _lastMode == ArcGraphRightInspectorMode.EditRequested
+                   && (viewModel.Target.Kind == ArcUiSelectionTargetKind.Object
+                       || viewModel.Target.Kind == ArcUiSelectionTargetKind.Wall)
+                   && string.Equals(activeTab.TabKey, "edit_params", System.StringComparison.Ordinal)
+                   && !HasActiveTabRowValue(activeTab, "Quantita' e owner food stock");
+        }
+
+        // =============================================================================
+        // ShouldShowObjectDoorActions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Decide se mostrare i controlli operativi porta nel tab di modifica porta.
+        /// </para>
+        /// </summary>
+        private bool ShouldShowObjectDoorActions(
+            ArcUiInspectorViewModel viewModel,
+            ArcUiInspectorTab activeTab)
+        {
+            return _lastMode == ArcGraphRightInspectorMode.EditRequested
+                   && (viewModel.Target.Kind == ArcUiSelectionTargetKind.Object
+                       || viewModel.Target.Kind == ArcUiSelectionTargetKind.Wall)
+                   && string.Equals(activeTab.TabKey, "edit_door", System.StringComparison.Ordinal);
+        }
+
+        private static bool HasActiveTabRowValue(ArcUiInspectorTab activeTab, string value)
+        {
+            if (activeTab.Rows == null || string.IsNullOrWhiteSpace(value))
+                return false;
+
+            for (int i = 0; i < activeTab.Rows.Length; i++)
+            {
+                if (string.Equals(activeTab.Rows[i].Value, value, System.StringComparison.Ordinal))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool IsDoorLockAvailable(ArcUiInspectorTab activeTab)
+        {
+            if (activeTab.Rows == null)
+                return false;
+
+            for (int i = 0; i < activeTab.Rows.Length; i++)
+            {
+                ArcUiInspectorRow row = activeTab.Rows[i];
+                if (string.Equals(row.Label, "Lockable", System.StringComparison.Ordinal))
+                    return string.Equals(row.Value, "Si", System.StringComparison.Ordinal);
+            }
+
+            return false;
         }
 
         // =============================================================================
@@ -941,6 +1048,131 @@ namespace Arcontio.View.ArcGraph
                 {
                     _lastRuntimeRefreshTime = -999f;
                 }
+            });
+        }
+
+        // =============================================================================
+        // CreateObjectOwnerActions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna i controlli operativi per assegnare owner a oggetti non
+        /// food-stock.
+        /// </para>
+        ///
+        /// <para><b>Bottoni come richieste autorizzate</b></para>
+        /// <para>
+        /// Il pannello usa lo stesso elenco NPC value-only gia' preparato dal
+        /// provider runtime, ma non legge dizionari World e non cambia owner in
+        /// locale. Ogni click passa dal bridge oggetto generico.
+        /// </para>
+        /// </summary>
+        private void CreateObjectOwnerActions(
+            RectTransform parent,
+            ArcUiSelectionTarget target)
+        {
+            _runtimeSnapshotProvider.FillNpcOwnerOptions(_objectFoodStockOwnerOptions);
+
+            RectTransform root = CreateActionRow(parent, "ObjectOwnerRow");
+            CreateTextActionLabel(root, "Owner oggetto");
+            CreateObjectOwnerCommunityButton(root, target);
+
+            for (int i = 0; i < _objectFoodStockOwnerOptions.Count; i++)
+            {
+                ArcGraphObjectFoodStockOwnerOption option = _objectFoodStockOwnerOptions[i];
+                if (option.IsValid)
+                    CreateObjectOwnerNpcButton(root, target, option);
+            }
+        }
+
+        private void CreateObjectOwnerCommunityButton(
+            RectTransform parent,
+            ArcUiSelectionTarget target)
+        {
+            Button button = CreateSmallActionButton(parent, "Community");
+            button.interactable = _objectEditCommandBridge != null;
+            button.onClick.AddListener(() =>
+            {
+                if (_objectEditCommandBridge != null
+                    && _objectEditCommandBridge.RequestSetOwnerCommunity(target))
+                {
+                    _lastRuntimeRefreshTime = -999f;
+                }
+            });
+        }
+
+        private void CreateObjectOwnerNpcButton(
+            RectTransform parent,
+            ArcUiSelectionTarget target,
+            ArcGraphObjectFoodStockOwnerOption option)
+        {
+            string label = option.Label;
+            if (label.Length > 12)
+                label = "NPC " + option.NpcId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            Button button = CreateSmallActionButton(parent, label);
+            button.interactable = _objectEditCommandBridge != null;
+            int npcId = option.NpcId;
+            button.onClick.AddListener(() =>
+            {
+                if (_objectEditCommandBridge != null
+                    && _objectEditCommandBridge.RequestSetOwnerNpc(target, npcId))
+                {
+                    _lastRuntimeRefreshTime = -999f;
+                }
+            });
+        }
+
+        // =============================================================================
+        // CreateObjectDoorActions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna i controlli operativi per lo stato porta selezionata.
+        /// </para>
+        ///
+        /// <para><b>Stato porta tramite comando Core</b></para>
+        /// <para>
+        /// I pulsanti non scrivono <c>IsOpen</c> o <c>IsLocked</c>. Il comando Core
+        /// usera' <c>World.SetDoorOpen</c> per mantenere coerenti movimento,
+        /// visione e cache occlusione.
+        /// </para>
+        /// </summary>
+        private void CreateObjectDoorActions(
+            RectTransform parent,
+            ArcUiSelectionTarget target,
+            bool lockAvailable)
+        {
+            RectTransform root = CreateActionRow(parent, "ObjectDoorStateRow");
+            CreateTextActionLabel(root, "Stato porta");
+            CreateObjectDoorButton(root, target, "Chiusa", 0, true);
+            CreateObjectDoorButton(root, target, "Aperta", 1, true);
+            CreateObjectDoorButton(root, target, "Locked", 2, lockAvailable);
+        }
+
+        private void CreateObjectDoorButton(
+            RectTransform parent,
+            ArcUiSelectionTarget target,
+            string label,
+            int state,
+            bool stateAvailable)
+        {
+            Button button = CreateSmallActionButton(parent, label);
+            button.interactable = stateAvailable && _objectEditCommandBridge != null;
+            button.onClick.AddListener(() =>
+            {
+                bool accepted = false;
+                if (_objectEditCommandBridge != null)
+                {
+                    accepted = state == 0
+                        ? _objectEditCommandBridge.RequestSetDoorClosed(target)
+                        : state == 1
+                            ? _objectEditCommandBridge.RequestSetDoorOpen(target)
+                            : _objectEditCommandBridge.RequestSetDoorLocked(target);
+                }
+
+                if (accepted)
+                    _lastRuntimeRefreshTime = -999f;
             });
         }
 

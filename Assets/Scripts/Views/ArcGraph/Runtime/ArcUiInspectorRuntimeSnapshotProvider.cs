@@ -778,7 +778,7 @@ namespace Arcontio.View.ArcGraph
             var rows = new List<ArcUiInspectorRow>(28)
             {
                 ArcUiInspectorRow.Section("Shell modifica"),
-                new ArcUiInspectorRow("Stato", "Modifica stock preparata"),
+                new ArcUiInspectorRow("Stato", "Modifica oggetto preparata"),
                 new ArcUiInspectorRow("Effetto", "Scrittura solo da controlli autorizzati"),
                 new ArcUiInspectorRow("Oggetto", instance.ObjectId.ToString(CultureInfo.InvariantCulture)),
                 new ArcUiInspectorRow("Def", ReadString(instance.DefId, EmptyValue)),
@@ -801,7 +801,7 @@ namespace Arcontio.View.ArcGraph
             }
             else if (isDoor)
             {
-                rows.Add(new ArcUiInspectorRow("Parametro futuro", "Apertura / blocco porta"));
+                rows.Add(new ArcUiInspectorRow("Parametro operativo", "Apertura / blocco porta"));
                 rows.Add(new ArcUiInspectorRow("Aperta", instance.IsOpen ? "Si" : "No"));
                 rows.Add(new ArcUiInspectorRow("Bloccata", instance.IsLocked ? "Si" : "No"));
             }
@@ -809,14 +809,15 @@ namespace Arcontio.View.ArcGraph
             {
                 rows.Add(new ArcUiInspectorRow("Parametro futuro", "Variante materiale muro"));
                 rows.Add(new ArcUiInspectorRow("Materiale attuale", def == null ? EmptyValue : ReadString(def.DisplayName, EmptyValue)));
+                rows.Add(new ArcUiInspectorRow("Parametro operativo", "Owner oggetto"));
             }
             else
             {
-                rows.Add(new ArcUiInspectorRow("Parametro futuro", "Nessun parametro runtime noto"));
-                rows.Add(new ArcUiInspectorRow("Modifica possibile", "Solo sostituzione variante futura"));
+                rows.Add(new ArcUiInspectorRow("Parametro operativo", "Owner oggetto"));
+                rows.Add(new ArcUiInspectorRow("Parametro futuro", "Sostituzione variante/catalogo"));
             }
 
-            rows.Add(ArcUiInspectorRow.Section("Ownership oggetto food"));
+            rows.Add(ArcUiInspectorRow.Section(hasFoodStock ? "Ownership oggetto food" : "Ownership oggetto"));
             rows.Add(new ArcUiInspectorRow("Owner oggetto", FormatOwner(instance.OwnerKind, instance.OwnerId)));
             rows.Add(new ArcUiInspectorRow("Trasportato", instance.IsHeld ? "Si" : "No"));
             return rows.ToArray();
@@ -863,20 +864,20 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Prepara la tab porta per la shell di modifica oggetto.
+        /// Prepara la tab porta per la modifica oggetto.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: stato porta senza comando diretto</b></para>
+        /// <para><b>Principio architetturale: stato porta via comando autorizzato</b></para>
         /// <para>
-        /// Apertura e blocco sono stati runtime sensibili per movimento e visione.
-        /// Qui vengono solo letti: un futuro toggle dovra' produrre una richiesta
-        /// autorizzata, non modificare direttamente l'istanza.
+        /// Apertura e blocco sono stati runtime sensibili per movimento e visione:
+        /// la tab mostra lo snapshot corrente, mentre i bottoni operativi vengono
+        /// disegnati dalla view e passano dal bridge/comando Core.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Stato porta</b>: aperta, bloccata, lockable e key.</item>
-        ///   <item><b>Controlli futuri</b>: toggle autorizzati non ancora operativi.</item>
+        ///   <item><b>Controlli operativi</b>: toggle autorizzati disegnati dalla view.</item>
         /// </list>
         /// </summary>
         private static ArcUiInspectorRow[] BuildObjectEditDoorRows(
@@ -890,10 +891,10 @@ namespace Arcontio.View.ArcGraph
                 new ArcUiInspectorRow("Bloccata", instance.IsLocked ? "Si" : "No"),
                 new ArcUiInspectorRow("Lockable", BoolText(def != null && def.IsLockable)),
                 new ArcUiInspectorRow("Key", def == null ? EmptyValue : ReadString(def.KeyId, EmptyValue)),
-                ArcUiInspectorRow.Section("Controlli futuri"),
-                new ArcUiInspectorRow("Apertura", "Toggle autorizzato"),
-                new ArcUiInspectorRow("Blocco", "Toggle autorizzato se lockable"),
-                new ArcUiInspectorRow("Effetto attuale", "Nessun comando porta inviato")
+                ArcUiInspectorRow.Section("Controlli operativi"),
+                new ArcUiInspectorRow("Apertura", "Comando autorizzato"),
+                new ArcUiInspectorRow("Blocco", def != null && def.IsLockable ? "Locked disponibile" : "Locked non disponibile"),
+                new ArcUiInspectorRow("Effetto", "Accoda comando runtime autorizzato")
             };
         }
 
@@ -943,14 +944,14 @@ namespace Arcontio.View.ArcGraph
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Prepara la tab di conferma futura per modifica oggetto.
+        /// Prepara la tab di conferma per modifica oggetto.
         /// </para>
         ///
         /// <para><b>Principio architetturale: richiesta prima del comando</b></para>
         /// <para>
-        /// Questa tab rende esplicito quale tipo di richiesta dovra' essere emessa
-        /// in futuro. Non contiene ancora il pulsante operativo e non produce alcun
-        /// command request.
+        /// Questa tab rende esplicito quale tipo di richiesta e' stata aperta. I
+        /// controlli operativi vivono nei tab specifici, cosi' la conferma resta un
+        /// riepilogo e non un secondo punto di mutazione.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -978,14 +979,14 @@ namespace Arcontio.View.ArcGraph
 
             return new[]
             {
-                ArcUiInspectorRow.Section("Conferma futura"),
+                ArcUiInspectorRow.Section("Conferma modifica"),
                 new ArcUiInspectorRow("Stato", "Richiesta modifica pronta"),
                 new ArcUiInspectorRow("Target", "Oggetto " + instance.ObjectId.ToString(CultureInfo.InvariantCulture)),
                 new ArcUiInspectorRow("Nome", ResolveObjectTitle(request.Target, instance, def)),
                 new ArcUiInspectorRow("Tipo modifica", editKind),
                 new ArcUiInspectorRow("Sorgente", ReadString(request.Source, EmptyValue)),
                 new ArcUiInspectorRow("Draft request", "ArcUiEditSelectionRequest attiva"),
-                new ArcUiInspectorRow("Effetto attuale", "Nessuna mutazione"),
+                new ArcUiInspectorRow("Effetto", "Solo dai controlli autorizzati"),
                 new ArcUiInspectorRow("Prossimo ponte", "Command Gateway autorizzato")
             };
         }
