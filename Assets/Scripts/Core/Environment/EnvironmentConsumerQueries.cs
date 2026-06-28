@@ -120,6 +120,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>SpeciesKey</b>: specie vegetale.</item>
     ///   <item><b>Cell</b>: posizione della pianta.</item>
     ///   <item><b>ResourceOutputKey</b>: risorsa potenziale.</item>
+    ///   <item><b>EstimatedAmountUnits</b>: stima leggera delle unita' oggi disponibili.</item>
     ///   <item><b>Availability01</b>: quantita' normalizzata.</item>
     ///   <item><b>Quality01</b>: qualita' normalizzata.</item>
     /// </list>
@@ -133,6 +134,10 @@ namespace Arcontio.Core.Environment
         public readonly bool IsFood;
         public readonly bool DestroysPlantOnHarvest;
         public readonly string RequiresToolKey;
+        public readonly string MinGrowthStageKey;
+        public readonly int BaseMaxAmountUnits;
+        public readonly int EstimatedAmountUnits;
+        public readonly int RegrowDays;
         public readonly float Availability01;
         public readonly float Quality01;
 
@@ -158,7 +163,11 @@ namespace Arcontio.Core.Environment
             float quality01,
             bool isFood = false,
             bool destroysPlantOnHarvest = false,
-            string requiresToolKey = "")
+            string requiresToolKey = "",
+            string minGrowthStageKey = "",
+            int baseMaxAmountUnits = 0,
+            int estimatedAmountUnits = 0,
+            int regrowDays = 0)
         {
             PlantId = plantId;
             SpeciesKey = speciesKey ?? string.Empty;
@@ -167,6 +176,10 @@ namespace Arcontio.Core.Environment
             IsFood = isFood;
             DestroysPlantOnHarvest = destroysPlantOnHarvest;
             RequiresToolKey = requiresToolKey ?? string.Empty;
+            MinGrowthStageKey = minGrowthStageKey ?? string.Empty;
+            BaseMaxAmountUnits = baseMaxAmountUnits < 0 ? 0 : baseMaxAmountUnits;
+            EstimatedAmountUnits = estimatedAmountUnits < 0 ? 0 : estimatedAmountUnits;
+            RegrowDays = regrowDays < 0 ? 0 : regrowDays;
             Availability01 = EnvironmentMath.Clamp01(availability01);
             Quality01 = EnvironmentMath.Clamp01(quality01);
         }
@@ -193,6 +206,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>Area</b>: id, key, centro e raggio del luogo biologico.</item>
     ///   <item><b>Product</b>: chiave prodotto e specie sorgente.</item>
     ///   <item><b>Flags</b>: food, distruzione pianta e strumento richiesto.</item>
+    ///   <item><b>Production</b>: stadio minimo, stagionalita', quantita' base e ricrescita.</item>
     ///   <item><b>Evidence</b>: pressione seed, piante vive e harvestable note al Core.</item>
     /// </list>
     /// </summary>
@@ -207,6 +221,10 @@ namespace Arcontio.Core.Environment
         public readonly bool IsFood;
         public readonly bool DestroysPlantOnHarvest;
         public readonly string RequiresToolKey;
+        public readonly string MinGrowthStageKey;
+        public readonly int AvailableSeasonMask;
+        public readonly int BaseMaxAmountUnits;
+        public readonly int RegrowDays;
         public readonly float SeedPressure01;
         public readonly int LivePlantCount;
         public readonly int HarvestablePlantCount;
@@ -235,6 +253,10 @@ namespace Arcontio.Core.Environment
             bool isFood,
             bool destroysPlantOnHarvest,
             string requiresToolKey,
+            string minGrowthStageKey,
+            int availableSeasonMask,
+            int baseMaxAmountUnits,
+            int regrowDays,
             float seedPressure01,
             int livePlantCount,
             int harvestablePlantCount,
@@ -249,6 +271,10 @@ namespace Arcontio.Core.Environment
             IsFood = isFood;
             DestroysPlantOnHarvest = destroysPlantOnHarvest;
             RequiresToolKey = requiresToolKey ?? string.Empty;
+            MinGrowthStageKey = minGrowthStageKey ?? string.Empty;
+            AvailableSeasonMask = availableSeasonMask;
+            BaseMaxAmountUnits = baseMaxAmountUnits < 0 ? 0 : baseMaxAmountUnits;
+            RegrowDays = regrowDays < 0 ? 0 : regrowDays;
             SeedPressure01 = EnvironmentMath.Clamp01(seedPressure01);
             LivePlantCount = livePlantCount < 0 ? 0 : livePlantCount;
             HarvestablePlantCount = harvestablePlantCount < 0 ? 0 : harvestablePlantCount;
@@ -540,6 +566,7 @@ namespace Arcontio.Core.Environment
                 if (!EnvironmentAgricultureFoundationResolver.TryBuildHarvestOutput(
                     plant,
                     catalog,
+                    snapshot.Calendar.Season,
                     out EnvironmentHarvestOutput output))
                 {
                     continue;
@@ -601,6 +628,7 @@ namespace Arcontio.Core.Environment
                 if (!EnvironmentAgricultureFoundationResolver.TryBuildHarvestOutput(
                     plant,
                     catalog,
+                    snapshot.Calendar.Season,
                     out EnvironmentHarvestOutput output))
                 {
                     continue;
@@ -615,7 +643,11 @@ namespace Arcontio.Core.Environment
                     output.Quality01,
                     output.IsFood,
                     output.DestroysPlantOnHarvest,
-                    output.RequiresToolKey));
+                    output.RequiresToolKey,
+                    output.MinGrowthStageKey,
+                    output.BaseMaxAmountUnits,
+                    output.EstimatedAmountUnits,
+                    output.RegrowDays));
             }
 
             return candidates.Count == 0 ? EmptyCandidates : candidates.ToArray();
@@ -659,6 +691,7 @@ namespace Arcontio.Core.Environment
                     plant,
                     catalog,
                     productKey,
+                    snapshot.Calendar.Season,
                     out EnvironmentHarvestOutput output))
                 {
                     continue;
@@ -673,7 +706,11 @@ namespace Arcontio.Core.Environment
                     output.Quality01,
                     output.IsFood,
                     output.DestroysPlantOnHarvest,
-                    output.RequiresToolKey));
+                    output.RequiresToolKey,
+                    output.MinGrowthStageKey,
+                    output.BaseMaxAmountUnits,
+                    output.EstimatedAmountUnits,
+                    output.RegrowDays));
             }
 
             return candidates.Count == 0 ? EmptyCandidates : candidates.ToArray();
@@ -987,6 +1024,7 @@ namespace Arcontio.Core.Environment
                 if (EnvironmentAgricultureFoundationResolver.TryBuildHarvestOutput(
                     plant,
                     catalog,
+                    snapshot.Calendar.Season,
                     out EnvironmentHarvestOutput harvest)
                     && harvest.IsAvailable)
                 {
@@ -1166,6 +1204,10 @@ namespace Arcontio.Core.Environment
                     Product.IsFood,
                     Product.DestroysPlantOnHarvest,
                     Product.RequiresToolKey,
+                    Product.MinGrowthStageKey,
+                    Product.AvailableSeasonMask,
+                    Product.BaseMaxAmountUnits,
+                    Product.RegrowDays,
                     SeedPressure01,
                     LivePlantCount,
                     HarvestablePlantCount,

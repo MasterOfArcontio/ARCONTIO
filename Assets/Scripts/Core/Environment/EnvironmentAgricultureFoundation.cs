@@ -214,6 +214,9 @@ namespace Arcontio.Core.Environment
     ///   <item><b>PlantId</b>: pianta sorgente.</item>
     ///   <item><b>SpeciesKey</b>: specie della pianta.</item>
     ///   <item><b>ResourceOutputKey</b>: risorsa prodotta dal catalogo.</item>
+    ///   <item><b>BaseMaxAmountUnits/EstimatedAmountUnits</b>: quantita' configurata e stima corrente.</item>
+    ///   <item><b>MinGrowthStageKey</b>: stadio minimo richiesto dal prodotto.</item>
+    ///   <item><b>RegrowDays</b>: giorni indicativi di ricrescita futura.</item>
     ///   <item><b>Amount01</b>: quantita' normalizzata potenziale.</item>
     ///   <item><b>Quality01</b>: qualita' normalizzata potenziale.</item>
     ///   <item><b>IsAvailable</b>: true se il raccolto e' leggibile da hook futuri.</item>
@@ -227,6 +230,11 @@ namespace Arcontio.Core.Environment
         public readonly bool IsFood;
         public readonly bool DestroysPlantOnHarvest;
         public readonly string RequiresToolKey;
+        public readonly string MinGrowthStageKey;
+        public readonly int BaseMaxAmountUnits;
+        public readonly int EstimatedAmountUnits;
+        public readonly int RegrowDays;
+        public readonly bool IsSeasonallyAvailable;
         public readonly float Amount01;
         public readonly float Quality01;
         public readonly bool IsAvailable;
@@ -248,7 +256,12 @@ namespace Arcontio.Core.Environment
             bool isAvailable,
             bool isFood = false,
             bool destroysPlantOnHarvest = false,
-            string requiresToolKey = "")
+            string requiresToolKey = "",
+            string minGrowthStageKey = "",
+            int baseMaxAmountUnits = 0,
+            int estimatedAmountUnits = 0,
+            int regrowDays = 0,
+            bool isSeasonallyAvailable = true)
         {
             PlantId = plantId;
             SpeciesKey = speciesKey ?? string.Empty;
@@ -256,11 +269,17 @@ namespace Arcontio.Core.Environment
             IsFood = isFood;
             DestroysPlantOnHarvest = destroysPlantOnHarvest;
             RequiresToolKey = requiresToolKey ?? string.Empty;
+            MinGrowthStageKey = minGrowthStageKey ?? string.Empty;
+            BaseMaxAmountUnits = baseMaxAmountUnits < 0 ? 0 : baseMaxAmountUnits;
+            EstimatedAmountUnits = estimatedAmountUnits < 0 ? 0 : estimatedAmountUnits;
+            RegrowDays = regrowDays < 0 ? 0 : regrowDays;
+            IsSeasonallyAvailable = isSeasonallyAvailable;
             Amount01 = EnvironmentMath.Clamp01(amount01);
             Quality01 = EnvironmentMath.Clamp01(quality01);
             IsAvailable = isAvailable
                           && plantId.IsValid
-                          && !string.IsNullOrWhiteSpace(ResourceOutputKey);
+                          && !string.IsNullOrWhiteSpace(ResourceOutputKey)
+                          && IsSeasonallyAvailable;
         }
     }
 
@@ -385,6 +404,35 @@ namespace Arcontio.Core.Environment
             EnvironmentPlantCatalog catalog,
             out EnvironmentHarvestOutput output)
         {
+            return TryBuildHarvestOutput(
+                plant,
+                catalog,
+                EnvironmentSeasonKind.Spring,
+                false,
+                out output);
+        }
+
+        public static bool TryBuildHarvestOutput(
+            EnvironmentPlantSnapshot plant,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentSeasonKind season,
+            out EnvironmentHarvestOutput output)
+        {
+            return TryBuildHarvestOutput(
+                plant,
+                catalog,
+                season,
+                true,
+                out output);
+        }
+
+        private static bool TryBuildHarvestOutput(
+            EnvironmentPlantSnapshot plant,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentSeasonKind season,
+            bool enforceSeason,
+            out EnvironmentHarvestOutput output)
+        {
             output = default;
 
             if (!plant.IsAlive
@@ -398,7 +446,13 @@ namespace Arcontio.Core.Environment
                 return false;
             }
 
-            return TryBuildHarvestOutputFromProduct(plant, product, out output);
+            return TryBuildHarvestOutputFromProduct(
+                plant,
+                species,
+                product,
+                season,
+                enforceSeason,
+                out output);
         }
 
         // =============================================================================
@@ -412,7 +466,7 @@ namespace Arcontio.Core.Environment
         /// <para><b>Principio architetturale: query locale senza job implicito</b></para>
         /// <para>
         /// Il metodo permette a un futuro job di chiedere <c>apple</c>, <c>acorn</c>
-        /// o <c>wood</c> senza trasformare questa query in una raccolta reale. Se la
+        /// o <c>wood_log</c> senza trasformare questa query in una raccolta reale. Se la
         /// specie non dichiara quel prodotto, la pianta non e' candidata.
         /// </para>
         /// </summary>
@@ -420,6 +474,39 @@ namespace Arcontio.Core.Environment
             EnvironmentPlantSnapshot plant,
             EnvironmentPlantCatalog catalog,
             string productKey,
+            out EnvironmentHarvestOutput output)
+        {
+            return TryBuildHarvestOutputForProduct(
+                plant,
+                catalog,
+                productKey,
+                EnvironmentSeasonKind.Spring,
+                false,
+                out output);
+        }
+
+        public static bool TryBuildHarvestOutputForProduct(
+            EnvironmentPlantSnapshot plant,
+            EnvironmentPlantCatalog catalog,
+            string productKey,
+            EnvironmentSeasonKind season,
+            out EnvironmentHarvestOutput output)
+        {
+            return TryBuildHarvestOutputForProduct(
+                plant,
+                catalog,
+                productKey,
+                season,
+                true,
+                out output);
+        }
+
+        private static bool TryBuildHarvestOutputForProduct(
+            EnvironmentPlantSnapshot plant,
+            EnvironmentPlantCatalog catalog,
+            string productKey,
+            EnvironmentSeasonKind season,
+            bool enforceSeason,
             out EnvironmentHarvestOutput output)
         {
             output = default;
@@ -436,20 +523,34 @@ namespace Arcontio.Core.Environment
                 return false;
             }
 
-            return TryBuildHarvestOutputFromProduct(plant, product, out output);
+            return TryBuildHarvestOutputFromProduct(
+                plant,
+                species,
+                product,
+                season,
+                enforceSeason,
+                out output);
         }
 
         private static bool TryBuildHarvestOutputFromProduct(
             EnvironmentPlantSnapshot plant,
+            EnvironmentPlantSpeciesDefinition species,
             EnvironmentPlantProductDefinition product,
+            EnvironmentSeasonKind season,
+            bool enforceSeason,
             out EnvironmentHarvestOutput output)
         {
             output = default;
             if (!product.IsValid)
                 return false;
 
+            if (species == null || !species.IsStageAtLeast(plant.GrowthStageKey, product.MinGrowthStageKey))
+                return false;
+
+            bool seasonAvailable = !enforceSeason || product.IsSeasonAvailable(season);
             float amount = plant.Maturity01 * plant.Health01;
             float quality = (plant.Maturity01 + plant.Health01) * 0.5f;
+            int estimatedUnits = ResolveEstimatedAmountUnits(product.BaseMaxAmountUnits, amount);
             output = new EnvironmentHarvestOutput(
                 plant.PlantId,
                 plant.SpeciesKey,
@@ -459,8 +560,24 @@ namespace Arcontio.Core.Environment
                 true,
                 product.IsFood,
                 product.DestroysPlantOnHarvest,
-                product.RequiresToolKey);
+                product.RequiresToolKey,
+                product.MinGrowthStageKey,
+                product.BaseMaxAmountUnits,
+                estimatedUnits,
+                product.RegrowDays,
+                seasonAvailable);
             return output.IsAvailable;
+        }
+
+        private static int ResolveEstimatedAmountUnits(
+            int baseMaxAmountUnits,
+            float amount01)
+        {
+            if (baseMaxAmountUnits <= 0 || amount01 <= 0f)
+                return 0;
+
+            int units = (int)System.Math.Round(baseMaxAmountUnits * EnvironmentMath.Clamp01(amount01));
+            return units <= 0 ? 1 : units;
         }
 
         private static bool TryResolvePrimaryProduct(

@@ -2268,7 +2268,7 @@ namespace Arcontio.Core.Environment
             var catalog = new EnvironmentPlantCatalogConfig().ToCatalog();
             catalog.TryGetSpecies("oak_tree", out EnvironmentPlantSpeciesDefinition oak);
             bool oakHasWood = oak.TryGetProduct(
-                "wood",
+                "wood_log",
                 out EnvironmentPlantProductDefinition oakWood);
             bool oakHasAcorn = oak.TryGetProduct(
                 "acorn",
@@ -2315,7 +2315,7 @@ namespace Arcontio.Core.Environment
                 catalog,
                 cell,
                 2,
-                "wood");
+                "wood_log");
             var impossible = EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
                 full,
                 catalog,
@@ -2327,10 +2327,13 @@ namespace Arcontio.Core.Environment
             for (int i = 0; i < productFacts.Count; i++)
             {
                 EnvironmentConsumerProductCandidate product = productFacts[i];
-                if (product.ProductKey == "wood"
+                if (product.ProductKey == "wood_log"
                     && !product.IsFood
                     && product.DestroysPlantOnHarvest
                     && product.RequiresToolKey == "axe"
+                    && product.MinGrowthStageKey == "adult"
+                    && product.BaseMaxAmountUnits == 8
+                    && product.RegrowDays == 0
                     && product.LivePlantCount == 2
                     && product.HarvestablePlantCount == 2)
                 {
@@ -2341,6 +2344,9 @@ namespace Arcontio.Core.Environment
                     && product.IsFood
                     && !product.DestroysPlantOnHarvest
                     && product.RequiresToolKey == string.Empty
+                    && product.MinGrowthStageKey == "adult"
+                    && product.BaseMaxAmountUnits == 4
+                    && product.RegrowDays == 365
                     && product.LivePlantCount == 2
                     && product.HarvestablePlantCount == 2)
                 {
@@ -2381,32 +2387,35 @@ namespace Arcontio.Core.Environment
                    && facts.PlantCount == 1
                    && facts.HarvestablePlantCount == 1
                    && facts.HasHarvestableResource
-                   && facts.BestResourceOutputKey == "wood"
+                   && facts.BestResourceOutputKey == "wood_log"
                    && oakHasWood
                    && oakWood.DestroysPlantOnHarvest
                    && oakWood.RequiresToolKey == "axe"
+                   && oakWood.MinGrowthStageKey == "adult"
+                   && oakWood.BaseMaxAmountUnits == 8
+                   && oakWood.RegrowDays == 0
                    && !oakWood.IsFood
                    && oakHasAcorn
                    && oakAcorn.IsFood
                    && !oakAcorn.DestroysPlantOnHarvest
                    && nearby.Count == 2
                    && nearby[0].IsAvailable
-                   && nearby[0].ResourceOutputKey == "wood"
+                   && nearby[0].ResourceOutputKey == "wood_log"
                    && nearby[0].DestroysPlantOnHarvest
                    && nearby[0].RequiresToolKey == "axe"
+                   && nearby[0].BaseMaxAmountUnits == 8
+                   && nearby[0].EstimatedAmountUnits > 0
                    && productFacts.Count == 2
                    && productFactsExposeWood
                    && productFactsExposeAcorn
-                   && acorns.Count == 2
-                   && acorns[0].IsAvailable
-                   && acorns[0].ResourceOutputKey == "acorn"
-                   && acorns[0].IsFood
-                   && !acorns[0].DestroysPlantOnHarvest
+                   && acorns.Count == 0
                    && wood.Count == 2
                    && wood[0].IsAvailable
-                   && wood[0].ResourceOutputKey == "wood"
+                   && wood[0].ResourceOutputKey == "wood_log"
                    && wood[0].DestroysPlantOnHarvest
                    && wood[0].RequiresToolKey == "axe"
+                   && wood[0].BaseMaxAmountUnits == 8
+                   && wood[0].EstimatedAmountUnits > 0
                    && impossible.Count == 0
                    && nutritionPropertyOk
                    && nutritionValue == 0.45f

@@ -94,6 +94,66 @@
       ]
     },
     {
+      "Id": "wood_log",
+      "DisplayName": "Wood Log",
+      "SpriteKey": "",
+      "FootprintWidth": 1,
+      "FootprintHeight": 1,
+      "IsOccluder": false,
+      "IsInteractable": true,
+      "Properties": [
+        { "Key": "Item", "Value": 1.0 },
+        { "Key": "Material", "Value": 1.0 },
+        { "Key": "BiologicalProduct", "Value": 1.0 },
+        { "Key": "NutritionValue", "Value": 0.0 }
+      ]
+    },
+    {
+      "Id": "acorn",
+      "DisplayName": "Acorn",
+      "SpriteKey": "",
+      "FootprintWidth": 1,
+      "FootprintHeight": 1,
+      "IsOccluder": false,
+      "IsInteractable": true,
+      "Properties": [
+        { "Key": "Item", "Value": 1.0 },
+        { "Key": "FoodItem", "Value": 1.0 },
+        { "Key": "SeedItem", "Value": 1.0 },
+        { "Key": "BiologicalProduct", "Value": 1.0 },
+        { "Key": "NutritionValue", "Value": 0.18 }
+      ]
+    },
+    {
+      "Id": "berry",
+      "DisplayName": "Berry",
+      "SpriteKey": "",
+      "FootprintWidth": 1,
+      "FootprintHeight": 1,
+      "IsOccluder": false,
+      "IsInteractable": true,
+      "Properties": [
+        { "Key": "Item", "Value": 1.0 },
+        { "Key": "FoodItem", "Value": 1.0 },
+        { "Key": "BiologicalProduct", "Value": 1.0 },
+        { "Key": "NutritionValue", "Value": 0.32 }
+      ]
+    },
+    {
+      "Id": "axe",
+      "DisplayName": "Axe",
+      "SpriteKey": "",
+      "FootprintWidth": 1,
+      "FootprintHeight": 1,
+      "IsOccluder": false,
+      "IsInteractable": true,
+      "Properties": [
+        { "Key": "Item", "Value": 1.0 },
+        { "Key": "Tool", "Value": 1.0 },
+        { "Key": "Tool.Axe", "Value": 1.0 }
+      ]
+    },
+    {
       "Id": "door_wood",
       "DisplayName": "Wood Door",
       "SpriteKey": "ArcGraph/Objects/Door_Wood_Good",

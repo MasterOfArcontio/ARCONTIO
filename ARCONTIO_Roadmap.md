@@ -74,6 +74,7 @@
 | v0.64 | Environment Event / Listener Boundary | Post-v0.63 | ✅ Implementato |
 | v0.65 | Biosphere Runtime Save/Load Integration | Post-v0.64 | 🧊 Rinviata al save/load globale simulazione |
 | v0.66 | NPC Environment Query Integration | Post-v0.65 | ✅ Foundation query/prodotti biologici completata, job completo futuro |
+| v0.66b | Biological Plant Product Contract | Post-v0.66 | ✅ Prodotti biologici estesi con tool, stadio minimo, stagionalita', quantita' base e regrow |
 | v0.67 | Biosphere Runtime Debug & Calibration Panel | Post-v0.66 | ⏳ Pending |
 | v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ✅ Core budget runtime completato, spreading multi-tick futuro |
 | v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ⏳ Pending |
@@ -16601,6 +16602,7 @@ Blocchi previsti:
 | v0.64.1 | collegare TopBar e grafici Biosfera ai listener ambiente tipizzati | ✅ Implementato |
 | v0.65 | integrare save/load biosfera runtime | 🧊 Rinviato: assorbito dal futuro save/load globale della simulazione |
 | v0.66 | integrare query NPC verso aree/risorse biologiche | ✅ Foundation query/prodotti biologici completata, belief/job completi futuri |
+| v0.66b | consolidare catalogo prodotti biologici per specie vegetale | ✅ Implementato: tool, stadio minimo, stagionalita', quantita' base, regrow e item/tool minimi in object_defs |
 | v0.67 | pannello debug/calibrazione runtime biosfera | ⚠️ Parziale: diagnostica runtime implementata, calibrazione avanzata pending |
 | v0.67.1 | aggiungere testata diagnostica compatta e range numerici ai grafici Biosfera | ✅ Implementato |
 | v0.68 | budget e batch processing produttivo | ✅ Core budget runtime completato, spreading multi-tick futuro |

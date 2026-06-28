@@ -122,10 +122,14 @@ namespace Arcontio.Core.Environment
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>productKey</b>: chiave del prodotto futuro, per esempio apple, acorn o wood.</item>
+    ///   <item><b>productKey</b>: chiave del prodotto futuro, per esempio apple, acorn o wood_log.</item>
     ///   <item><b>isFood</b>: indizio per decisioni alimentari future.</item>
     ///   <item><b>destroysPlantOnHarvest</b>: true se il raccolto abbatte o consuma la pianta.</item>
     ///   <item><b>requiresToolKey</b>: strumento richiesto dal job futuro, vuoto se non serve.</item>
+    ///   <item><b>minGrowthStageKey</b>: stadio minimo richiesto per raccogliere il prodotto.</item>
+    ///   <item><b>availableSeasons</b>: stagioni in cui il prodotto e' biologicamente disponibile.</item>
+    ///   <item><b>baseMaxAmountUnits</b>: quantita' base producibile da una pianta sana e matura.</item>
+    ///   <item><b>regrowDays</b>: giorni indicativi di ricrescita dopo il prelievo.</item>
     /// </list>
     /// </summary>
     [Serializable]
@@ -135,6 +139,10 @@ namespace Arcontio.Core.Environment
         public bool isFood;
         public bool destroysPlantOnHarvest;
         public string requiresToolKey = string.Empty;
+        public string minGrowthStageKey = string.Empty;
+        public string[] availableSeasons = { "Spring", "Summer", "Autumn", "Winter" };
+        public int baseMaxAmountUnits;
+        public int regrowDays;
 
         // =============================================================================
         // ToDefinition
@@ -150,7 +158,11 @@ namespace Arcontio.Core.Environment
                 productKey,
                 isFood,
                 destroysPlantOnHarvest,
-                requiresToolKey);
+                requiresToolKey,
+                minGrowthStageKey,
+                EnvironmentPlantCatalogParsing.ParseSeasonMask(availableSeasons),
+                baseMaxAmountUnits,
+                regrowDays);
         }
     }
 
@@ -283,19 +295,27 @@ namespace Arcontio.Core.Environment
                     idealTemperature01 = 0.50f,
                     idealHumidity01 = 0.65f,
                     minimumFertility01 = 0.55f,
-                    resourceOutputKey = "wood",
+                    resourceOutputKey = "wood_log",
                     products = new[]
                     {
                         new EnvironmentPlantProductConfig
                         {
-                            productKey = "wood",
+                            productKey = "wood_log",
                             destroysPlantOnHarvest = true,
-                            requiresToolKey = "axe"
+                            requiresToolKey = "axe",
+                            minGrowthStageKey = "adult",
+                            availableSeasons = new[] { "Spring", "Summer", "Autumn", "Winter" },
+                            baseMaxAmountUnits = 8,
+                            regrowDays = 0
                         },
                         new EnvironmentPlantProductConfig
                         {
                             productKey = "acorn",
-                            isFood = true
+                            isFood = true,
+                            minGrowthStageKey = "adult",
+                            availableSeasons = new[] { "Autumn" },
+                            baseMaxAmountUnits = 4,
+                            regrowDays = 365
                         }
                     },
                     seasonalBehavior = "Deciduous"
@@ -347,7 +367,11 @@ namespace Arcontio.Core.Environment
                     legacyResourceOutputKey,
                     false,
                     false,
-                    string.Empty));
+                    string.Empty,
+                    string.Empty,
+                    EnvironmentPlantCatalogParsing.BuildAllSeasonMask(),
+                    0,
+                    0));
             }
 
             return definitions.ToArray();
@@ -437,7 +461,7 @@ namespace Arcontio.Core.Environment
             return mask == 0 ? BuildAllSeasonMask() : mask;
         }
 
-        private static int BuildAllSeasonMask()
+        public static int BuildAllSeasonMask()
         {
             return (1 << (int)EnvironmentSeasonKind.Spring)
                    | (1 << (int)EnvironmentSeasonKind.Summer)
