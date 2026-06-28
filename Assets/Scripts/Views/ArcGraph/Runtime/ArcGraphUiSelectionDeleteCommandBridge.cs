@@ -120,14 +120,39 @@ namespace Arcontio.View.ArcGraph
 
                 case ArcUiSelectionTargetKind.Object:
                 case ArcUiSelectionTargetKind.Wall:
-                    host.EnqueueExternalCommand(new DevEraseObjectCommand(
-                        target.Cell.X,
-                        target.Cell.Y));
+                    host.EnqueueExternalCommand(TryParseTargetObjectId(target, out int objectId)
+                        ? new DevEraseObjectCommand(objectId)
+                        : new DevEraseObjectCommand(
+                            target.Cell.X,
+                            target.Cell.Y));
                     return true;
 
                 default:
                     return false;
             }
+        }
+
+        // =============================================================================
+        // TryParseTargetObjectId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Estrae l'id World dell'oggetto dal target UI selezionato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: selezione per identita', non per cella visuale</b></para>
+        /// <para>
+        /// Muri e porte hanno sprite che possono estendersi oltre la cella base. La
+        /// X del menu hover deve quindi cancellare l'oggetto selezionato, non
+        /// l'eventuale cella visuale premuta dal puntatore. La cella resta solo
+        /// fallback per target vecchi o incompleti.
+        /// </para>
+        /// </summary>
+        private static bool TryParseTargetObjectId(
+            ArcUiSelectionTarget target,
+            out int objectId)
+        {
+            return int.TryParse(target.Id, out objectId) && objectId > 0;
         }
     }
 }

@@ -912,7 +912,7 @@ namespace Arcontio.Core.Environment
                         cell,
                         0,
                         EnvironmentPlantGrowthStage.Seedling,
-                        "seedling",
+                        ResolveInitialPhysicalPlantGrowthStageKey(entry.SpeciesKey),
                         EnvironmentPlantHealthState.Healthy,
                         initialHealth01,
                         0f,
@@ -958,6 +958,55 @@ namespace Arcontio.Core.Environment
                 cell);
             float offset = (vitality - 1f) * InitialPhysicalPlantHealthVitalityScale01;
             return EnvironmentMath.Clamp01(entry.Viability01 + offset);
+        }
+
+        // =============================================================================
+        // ResolveInitialPhysicalPlantGrowthStageKey
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la chiave di crescita iniziale da usare per una pianta fisica
+        /// nata dalla seed bank al bootstrap.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: stage biologico semantico, non sprite generico</b></para>
+        /// <para>
+        /// Le piante fisiche vengono create prima che ArcGraph scelga una sprite, ma
+        /// il loro <c>GrowthStageKey</c> deve comunque restare coerente con il
+        /// catalogo specie. Usare sempre <c>seedling</c> produce chiavi visuali come
+        /// <c>oak_tree#seedling_healthy</c>, mentre il catalogo della quercia usa
+        /// <c>sapling</c>. Questa mappa conserva un fallback generico per specie
+        /// future, evitando dipendenze dal renderer.
+        /// </para>
+        /// </summary>
+        private static string ResolveInitialPhysicalPlantGrowthStageKey(string speciesKey)
+        {
+            string key = string.IsNullOrWhiteSpace(speciesKey)
+                ? string.Empty
+                : speciesKey.Trim().ToLowerInvariant();
+
+            switch (key)
+            {
+                case "wild_grass":
+                    return "sprout";
+                case "oak_tree":
+                case "jungle_tree":
+                    return "sapling";
+                case "berry_bush":
+                    return "shoot";
+                case "desert_shrub":
+                    return "young";
+                case "cactus":
+                    return "small";
+                case "jungle_fern":
+                    return "frond";
+                case "tundra_moss":
+                    return "patch";
+                case "lichen":
+                    return "colony";
+                default:
+                    return "seedling";
+            }
         }
 
         private static float ResolveInitialPhysicalPlantVitality01(
