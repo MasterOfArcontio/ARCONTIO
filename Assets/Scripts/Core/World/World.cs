@@ -1690,7 +1690,7 @@ namespace Arcontio.Core
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Clear</b>: rimuove dalle cache le vecchie proiezioni biologiche.</item>
-        ///   <item><b>Filtro</b>: scarta plant id invalidi, celle fuori mappa o celle gia' occupate.</item>
+        ///   <item><b>Filtro</b>: scarta plant id invalidi, celle fuori mappa, celle occupate o superfici non ospitanti.</item>
         ///   <item><b>Cache</b>: registra la pianta in <c>_physicalPlants</c> e nella cache occlusione.</item>
         ///   <item><b>Dirty</b>: invalida la percezione degli NPC vicini alle celle modificate.</item>
         /// </list>
@@ -1721,6 +1721,12 @@ namespace Arcontio.Core
                 // Il World resta l'authority fisica: bounds e occupazione reale
                 // vengono ricontrollati qui anche se la biosfera ha gia' filtrato.
                 if (!InBounds(cell.X, cell.Y) || HasAnyObjectAt(cell.X, cell.Y) || HasPhysicalPlantAt(cell.X, cell.Y))
+                    continue;
+
+                // La full refresh passa dallo stesso guard dei delta incrementali:
+                // una PlantInstance puo' esistere nel dato biologico, ma non deve
+                // diventare occlusione/movimento su acqua o pavimenti artificiali.
+                if (!CanEnvironmentSurfaceHostPhysicalPlant(cell.X, cell.Y))
                     continue;
 
                 if (!TryCreatePhysicalPlantProjection(placement, out var projection))
@@ -1907,6 +1913,13 @@ namespace Arcontio.Core
                 return _diffuseVegetation.Remove(cell);
             }
 
+            // Il World e' il boundary spaziale autorizzato: anche se la biosfera
+            // produce un delta valido sul piano biologico, la proiezione cell-based
+            // non deve comparire su acqua, pavimenti artificiali o superfici che il
+            // catalogo non abilita alla vegetazione naturale.
+            if (!CanEnvironmentSurfaceHostNaturalVegetation(cell.X, cell.Y))
+                return _diffuseVegetation.Remove(cell);
+
             _diffuseVegetation[cell] = new WorldDiffuseVegetationProjection(
                 delta.AreaId,
                 cell,
@@ -1946,6 +1959,12 @@ namespace Arcontio.Core
             int y = delta.Cell.Y;
             if (!InBounds(x, y) || HasAnyObjectAt(x, y))
                 return false;
+
+            // Le piante fisiche occupano e occludono: prima di creare cache World
+            // verifichiamo la superficie autoritativa, cosi' una crescita runtime
+            // data-only non puo' trasformare acqua o pavimenti in host biologici.
+            if (!CanEnvironmentSurfaceHostPhysicalPlant(x, y))
+                return RemovePhysicalPlantProjection(delta.PlantId);
 
             if (TryGetPhysicalPlantAt(x, y, out var existing)
                 && !existing.PlantId.Equals(delta.PlantId))
@@ -2062,18 +2081,121 @@ namespace Arcontio.Core
             if (IsMovementBlocked(x, y) || HasAnyObjectAt(x, y))
                 return false;
 
+            return requirePhysicalPlantHost
+                ? CanEnvironmentSurfaceHostPhysicalPlant(x, y)
+                : CanEnvironmentSurfaceHostNaturalVegetation(x, y);
+        }
+
+        // =============================================================================
+        // CanEnvironmentSurfaceHostNaturalVegetation
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se la superficie autoritativa di una cella puo' ospitare
+        /// vegetazione naturale diffusa.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: filtro World/Superfici prima della proiezione</b></para>
+        /// <para>
+        /// La biosfera resta proprietaria dei dati ecologici, ma non deve decidere
+        /// da sola quali superfici fisiche del mondo siano valide. Questo guard legge
+        /// <see cref="CellSurfaces"/> e <see cref="SurfaceDefs"/> per impedire che
+        /// acqua, stone floor, tile floor o altre superfici non naturali ricevano
+        /// vegetazione diffusa.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Bounds/layer</b>: la cella deve esistere e avere una superficie assegnata.</item>
+        ///   <item><b>MacroSurface</b>: solo <see cref="CellSurfaceMacro.Natural"/> passa.</item>
+        ///   <item><b>SurfaceDef</b>: il catalogo deve confermare <c>CanHostNaturalVegetation</c>.</item>
+        /// </list>
+        /// </summary>
+        private bool CanEnvironmentSurfaceHostNaturalVegetation(int x, int y)
+        {
+            return CanEnvironmentSurfaceHostBiology(
+                x,
+                y,
+                requirePhysicalPlantHost: false);
+        }
+
+        // =============================================================================
+        // CanEnvironmentSurfaceHostPhysicalPlant
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se la superficie autoritativa di una cella puo' ospitare una
+        /// pianta fisica proiettata dalla biosfera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: World decide la compatibilita' fisica</b></para>
+        /// <para>
+        /// Una <c>PlantInstance</c> puo' esistere nello stato biologico, ma diventa
+        /// occupazione/occlusione del World solo se la cella e' naturale e il
+        /// catalogo superfici consente esplicitamente piante fisiche.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Delegazione</b>: riusa il guard comune per non duplicare regole.</item>
+        ///   <item><b>Flag richiesto</b>: abilita il controllo <c>CanHostPhysicalPlant</c>.</item>
+        /// </list>
+        /// </summary>
+        private bool CanEnvironmentSurfaceHostPhysicalPlant(int x, int y)
+        {
+            return CanEnvironmentSurfaceHostBiology(
+                x,
+                y,
+                requirePhysicalPlantHost: true);
+        }
+
+        // =============================================================================
+        // CanEnvironmentSurfaceHostBiology
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Implementa il filtro comune superficie-catalogo usato dai boundary
+        /// Biosfera -> World.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: contratto data-driven, niente fallback permissivo</b></para>
+        /// <para>
+        /// Il filtro segue la catena esplicita <c>World.CellSurfaces</c> ->
+        /// <c>SurfaceDefs</c> -> <c>MacroSurface == Natural</c> -> flag host. Se la
+        /// definizione manca, il World rifiuta la proiezione: una superficie ignota
+        /// non deve diventare biologicamente valida per fallback.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Bounds</b>: respinge coordinate fuori mappa.</item>
+        ///   <item><b>Snapshot superficie</b>: legge la superficie cella dal layer autoritativo.</item>
+        ///   <item><b>Catalogo</b>: richiede la definizione e controlla macro/flag.</item>
+        /// </list>
+        /// </summary>
+        private bool CanEnvironmentSurfaceHostBiology(
+            int x,
+            int y,
+            bool requirePhysicalPlantHost)
+        {
+            if (!InBounds(x, y))
+                return false;
+
             if (CellSurfaces == null || !CellSurfaces.TryGetSurface(x, y, out var surface))
                 return false;
 
-            if (surface.MacroSurface != CellSurfaceMacro.Natural)
+            if (!TryGetSurfaceDef(surface.SurfaceKey, out var def) || def == null)
                 return false;
 
-            if (TryGetSurfaceDef(surface.SurfaceKey, out var def) && def != null)
-                return requirePhysicalPlantHost
-                    ? def.CanHostPhysicalPlant
-                    : def.CanHostNaturalVegetation;
+            if (surface.MacroSurface != CellSurfaceMacro.Natural
+                || def.ResolveMacroSurface() != CellSurfaceMacro.Natural)
+            {
+                return false;
+            }
 
-            return true;
+            return requirePhysicalPlantHost
+                ? def.CanHostPhysicalPlant
+                : def.CanHostNaturalVegetation;
         }
 
         // ============================================================
