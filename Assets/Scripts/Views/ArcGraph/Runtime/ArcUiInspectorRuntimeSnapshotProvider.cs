@@ -778,8 +778,8 @@ namespace Arcontio.View.ArcGraph
             var rows = new List<ArcUiInspectorRow>(28)
             {
                 ArcUiInspectorRow.Section("Shell modifica"),
-                new ArcUiInspectorRow("Stato", "Modifica provvisoria"),
-                new ArcUiInspectorRow("Effetto", "Nessuna scrittura sul World"),
+                new ArcUiInspectorRow("Stato", "Modifica stock preparata"),
+                new ArcUiInspectorRow("Effetto", "Scrittura solo da controlli autorizzati"),
                 new ArcUiInspectorRow("Oggetto", instance.ObjectId.ToString(CultureInfo.InvariantCulture)),
                 new ArcUiInspectorRow("Def", ReadString(instance.DefId, EmptyValue)),
                 new ArcUiInspectorRow("Nome", ResolveObjectTitle(request.Target, instance, def)),
@@ -797,7 +797,7 @@ namespace Arcontio.View.ArcGraph
                         new ArcUiInspectorMetric("food_units", "Unita'", stock.Units.ToString(CultureInfo.InvariantCulture), stock.Units > 0 ? ArcUiInspectorSeverity.Good : ArcUiInspectorSeverity.Muted),
                         new ArcUiInspectorMetric("food_owner", "Owner", FormatOwner(stock.OwnerKind, stock.OwnerId), ArcUiInspectorSeverity.Info)
                     }));
-                rows.Add(new ArcUiInspectorRow("Parametro futuro", "Quantita' food stock"));
+                rows.Add(new ArcUiInspectorRow("Parametro operativo", "Quantita' e owner food stock"));
             }
             else if (isDoor)
             {
@@ -816,8 +816,8 @@ namespace Arcontio.View.ArcGraph
                 rows.Add(new ArcUiInspectorRow("Modifica possibile", "Solo sostituzione variante futura"));
             }
 
-            rows.Add(ArcUiInspectorRow.Section("Ownership"));
-            rows.Add(new ArcUiInspectorRow("Owner", FormatOwner(instance.OwnerKind, instance.OwnerId)));
+            rows.Add(ArcUiInspectorRow.Section("Ownership oggetto food"));
+            rows.Add(new ArcUiInspectorRow("Owner oggetto", FormatOwner(instance.OwnerKind, instance.OwnerId)));
             rows.Add(new ArcUiInspectorRow("Trasportato", instance.IsHeld ? "Si" : "No"));
             return rows.ToArray();
         }
@@ -830,17 +830,17 @@ namespace Arcontio.View.ArcGraph
         /// Prepara la tab storage per oggetti che possiedono un FoodStockComponent.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: quantita' visualizzata, non applicata</b></para>
+        /// <para><b>Principio architetturale: snapshot visuale, comando separato</b></para>
         /// <para>
-        /// La quantita' viene mostrata come dato candidato alla modifica futura, ma
-        /// non viene cambiata. Il range, gli step e la validazione saranno parte del
-        /// controller autorizzato, non di questa shell.
+        /// La quantita' e l'owner vengono mostrati come snapshot corrente. I bottoni
+        /// operativi vengono disegnati dalla view, ma la validazione e la mutazione
+        /// restano nel comando Core autorizzato.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Food stock</b>: unita', owner e stato vuoto.</item>
-        ///   <item><b>Controllo futuro</b>: descrive lo stepper/slider non ancora operativo.</item>
+        ///   <item><b>Controllo operativo</b>: descrive stepper e owner routing autorizzati.</item>
         /// </list>
         /// </summary>
         private static ArcUiInspectorRow[] BuildObjectEditStorageRows(FoodStockComponent stock)
@@ -849,7 +849,7 @@ namespace Arcontio.View.ArcGraph
             {
                 ArcUiInspectorRow.Section("Food stock"),
                 new ArcUiInspectorRow("Unita' attuali", stock.Units.ToString(CultureInfo.InvariantCulture)),
-                new ArcUiInspectorRow("Owner", FormatOwner(stock.OwnerKind, stock.OwnerId)),
+                new ArcUiInspectorRow("Owner stock/oggetto", FormatOwner(stock.OwnerKind, stock.OwnerId)),
                 new ArcUiInspectorRow("Vuoto", stock.IsEmpty ? "Si" : "No"),
                 ArcUiInspectorRow.Section("Controllo operativo"),
                 new ArcUiInspectorRow("Quantita'", "Stepper autorizzato nel pannello"),
