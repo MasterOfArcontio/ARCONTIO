@@ -107,6 +107,7 @@ namespace Arcontio.View.ArcGraph
         private ArcUiInspectionController _inspectionController;
         private ArcGraphNpcPrivateFoodCommandBridge _npcPrivateFoodCommandBridge;
         private ArcGraphNpcDnaEditCommandBridge _npcDnaEditCommandBridge;
+        private ArcGraphObjectFoodStockCommandBridge _objectFoodStockCommandBridge;
         private readonly ArcUiInspectorViewModelFactory _viewModelFactory = new();
         private readonly ArcUiInspectorRuntimeSnapshotProvider _runtimeSnapshotProvider = new();
         private RectTransform _panelRoot;
@@ -125,6 +126,7 @@ namespace Arcontio.View.ArcGraph
         private float _lastRuntimeRefreshTime = -999f;
         private readonly Dictionary<string, bool> _expandedRows = new();
         private readonly Dictionary<string, float> _npcDnaDraftValues = new();
+        private readonly List<ArcGraphObjectFoodStockOwnerOption> _objectFoodStockOwnerOptions = new();
         private string _npcDnaDraftTargetKey = string.Empty;
         private bool _npcDnaDraftDirty;
 
@@ -272,6 +274,32 @@ namespace Arcontio.View.ArcGraph
         public void SetNpcDnaEditCommandBridge(ArcGraphNpcDnaEditCommandBridge bridge)
         {
             _npcDnaEditCommandBridge = bridge;
+        }
+
+        // =============================================================================
+        // SetObjectFoodStockCommandBridge
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Collega il RightInspector al bridge autorizzato per modificare lo stock
+        /// alimentare dell'oggetto selezionato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: view senza mutazione diretta</b></para>
+        /// <para>
+        /// Il pannello conserva solo il riferimento al bridge. I click sui bottoni
+        /// non scrivono <c>World.FoodStocks</c>: inviano una richiesta normalizzata
+        /// che verra' trasformata in comando Core.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>bridge</b>: componente runtime installato dall'auto-installer ArcGraph.</item>
+        /// </list>
+        /// </summary>
+        public void SetObjectFoodStockCommandBridge(ArcGraphObjectFoodStockCommandBridge bridge)
+        {
+            _objectFoodStockCommandBridge = bridge;
         }
 
         // =============================================================================
@@ -593,6 +621,9 @@ namespace Arcontio.View.ArcGraph
             if (ShouldShowNpcPrivateFoodActions(viewModel, activeTab))
                 CreateNpcPrivateFoodActions(rowsRoot, viewModel.Target);
 
+            if (ShouldShowObjectFoodStockActions(viewModel, activeTab))
+                CreateObjectFoodStockActions(rowsRoot, viewModel.Target);
+
             FinalizeScrollContentLayout(rowsRoot, resetScrollToTop);
         }
 
@@ -670,6 +701,38 @@ namespace Arcontio.View.ArcGraph
         }
 
         // =============================================================================
+        // ShouldShowObjectFoodStockActions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Decide se aggiungere i controlli operativi per lo stock oggetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: azione solo nel tab storage editabile</b></para>
+        /// <para>
+        /// I bottoni compaiono solo dopo una richiesta esplicita di modifica e solo
+        /// nella tab <c>edit_storage</c>, cioe' quando il ViewModel ha gia' confermato
+        /// che l'oggetto possiede un <c>FoodStockComponent</c>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Mode</b>: deve essere EditRequested.</item>
+        ///   <item><b>Target</b>: Object o Wall con id oggetto.</item>
+        ///   <item><b>Tab</b>: solo edit_storage.</item>
+        /// </list>
+        /// </summary>
+        private bool ShouldShowObjectFoodStockActions(
+            ArcUiInspectorViewModel viewModel,
+            ArcUiInspectorTab activeTab)
+        {
+            return _lastMode == ArcGraphRightInspectorMode.EditRequested
+                   && (viewModel.Target.Kind == ArcUiSelectionTargetKind.Object
+                       || viewModel.Target.Kind == ArcUiSelectionTargetKind.Wall)
+                   && string.Equals(activeTab.TabKey, "edit_storage", System.StringComparison.Ordinal);
+        }
+
+        // =============================================================================
         // CreateNpcPrivateFoodActions
         // =============================================================================
         /// <summary>
@@ -727,6 +790,154 @@ namespace Arcontio.View.ArcGraph
             {
                 if (_npcPrivateFoodCommandBridge != null
                     && _npcPrivateFoodCommandBridge.RequestAddPrivateFood(target, units))
+                {
+                    _lastRuntimeRefreshTime = -999f;
+                }
+            });
+        }
+
+        // =============================================================================
+        // CreateObjectFoodStockActions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Disegna i controlli operativi dello stock alimentare oggetto: stepper
+        /// quantita' e proprietario Community/NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bottoni come intenti, non come scritture</b></para>
+        /// <para>
+        /// Ogni bottone chiama <see cref="ArcGraphObjectFoodStockCommandBridge"/>.
+        /// Il pannello non legge <c>World.FoodStocks</c> per calcolare il risultato
+        /// finale e non assegna owner direttamente: il comando Core rivalida tutto.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Quantita'</b>: bottoni -1, +1, +5 e reset a 0.</item>
+        ///   <item><b>Owner</b>: bottone Community e pulsanti per NPC esistenti.</item>
+        ///   <item><b>Refresh</b>: dopo un comando accodato forza il prossimo snapshot.</item>
+        /// </list>
+        /// </summary>
+        private void CreateObjectFoodStockActions(
+            RectTransform parent,
+            ArcUiSelectionTarget target)
+        {
+            _runtimeSnapshotProvider.FillNpcOwnerOptions(_objectFoodStockOwnerOptions);
+
+            RectTransform root = CreateRect("ObjectFoodStockActions", parent);
+            LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
+            rootLayout.preferredHeight = 60f + Mathf.Max(1, Mathf.CeilToInt((_objectFoodStockOwnerOptions.Count + 1) / 3f)) * 28f;
+
+            VerticalLayoutGroup rootGroup = root.gameObject.AddComponent<VerticalLayoutGroup>();
+            rootGroup.spacing = 4f;
+            rootGroup.childControlWidth = true;
+            rootGroup.childControlHeight = true;
+            rootGroup.childForceExpandWidth = true;
+            rootGroup.childForceExpandHeight = false;
+
+            RectTransform unitsRow = CreateActionRow(root, "StockUnitsRow");
+            CreateTextActionLabel(unitsRow, "Unita' stock");
+            CreateObjectFoodStockDeltaButton(unitsRow, target, "-1", -1);
+            CreateObjectFoodStockDeltaButton(unitsRow, target, "+1", 1);
+            CreateObjectFoodStockDeltaButton(unitsRow, target, "+5", 5);
+            CreateObjectFoodStockSetUnitsButton(unitsRow, target, "0", 0);
+
+            RectTransform ownerRow = CreateActionRow(root, "StockOwnerRow");
+            CreateTextActionLabel(ownerRow, "Owner");
+            CreateObjectFoodStockCommunityButton(ownerRow, target);
+
+            for (int i = 0; i < _objectFoodStockOwnerOptions.Count; i++)
+            {
+                ArcGraphObjectFoodStockOwnerOption option = _objectFoodStockOwnerOptions[i];
+                if (option.IsValid)
+                    CreateObjectFoodStockNpcOwnerButton(ownerRow, target, option);
+            }
+        }
+
+        private static RectTransform CreateActionRow(RectTransform parent, string name)
+        {
+            RectTransform row = CreateRect(name, parent);
+            LayoutElement rowLayout = row.gameObject.AddComponent<LayoutElement>();
+            rowLayout.preferredHeight = 26f;
+
+            HorizontalLayoutGroup group = row.gameObject.AddComponent<HorizontalLayoutGroup>();
+            group.spacing = 4f;
+            group.childControlWidth = true;
+            group.childControlHeight = true;
+            group.childForceExpandWidth = false;
+            group.childForceExpandHeight = true;
+            return row;
+        }
+
+        private void CreateObjectFoodStockDeltaButton(
+            RectTransform parent,
+            ArcUiSelectionTarget target,
+            string label,
+            int deltaUnits)
+        {
+            Button button = CreateSmallActionButton(parent, label);
+            button.interactable = _objectFoodStockCommandBridge != null;
+            button.onClick.AddListener(() =>
+            {
+                if (_objectFoodStockCommandBridge != null
+                    && _objectFoodStockCommandBridge.RequestAdjustUnits(target, deltaUnits))
+                {
+                    _lastRuntimeRefreshTime = -999f;
+                }
+            });
+        }
+
+        private void CreateObjectFoodStockSetUnitsButton(
+            RectTransform parent,
+            ArcUiSelectionTarget target,
+            string label,
+            int units)
+        {
+            Button button = CreateSmallActionButton(parent, label);
+            button.interactable = _objectFoodStockCommandBridge != null;
+            button.onClick.AddListener(() =>
+            {
+                if (_objectFoodStockCommandBridge != null
+                    && _objectFoodStockCommandBridge.RequestSetUnits(target, units))
+                {
+                    _lastRuntimeRefreshTime = -999f;
+                }
+            });
+        }
+
+        private void CreateObjectFoodStockCommunityButton(
+            RectTransform parent,
+            ArcUiSelectionTarget target)
+        {
+            Button button = CreateSmallActionButton(parent, "Community");
+            button.interactable = _objectFoodStockCommandBridge != null;
+            button.onClick.AddListener(() =>
+            {
+                if (_objectFoodStockCommandBridge != null
+                    && _objectFoodStockCommandBridge.RequestSetOwnerCommunity(target))
+                {
+                    _lastRuntimeRefreshTime = -999f;
+                }
+            });
+        }
+
+        private void CreateObjectFoodStockNpcOwnerButton(
+            RectTransform parent,
+            ArcUiSelectionTarget target,
+            ArcGraphObjectFoodStockOwnerOption option)
+        {
+            string label = option.Label;
+            if (label.Length > 12)
+                label = "NPC " + option.NpcId.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+            Button button = CreateSmallActionButton(parent, label);
+            button.interactable = _objectFoodStockCommandBridge != null;
+            int npcId = option.NpcId;
+            button.onClick.AddListener(() =>
+            {
+                if (_objectFoodStockCommandBridge != null
+                    && _objectFoodStockCommandBridge.RequestSetOwnerNpc(target, npcId))
                 {
                     _lastRuntimeRefreshTime = -999f;
                 }
@@ -1060,11 +1271,15 @@ namespace Arcontio.View.ArcGraph
 
         private bool ShouldRefreshRuntimeInspector(ArcUiSelectionTarget target)
         {
-            // Per ora solo la scheda NPC legge dati runtime che cambiano nel tempo
-            // mentre la selezione resta la stessa: bisogni, azione corrente, job ed
-            // explainability. Oggetti e muri restano statici finche' non colleghiamo
-            // i rispettivi snapshot nello step successivo.
-            if (target.Kind != ArcUiSelectionTargetKind.Npc)
+            // NPC e stock oggetto sono le due aree che in questo pannello possono
+            // cambiare mentre la selezione resta identica: NPC per bisogni/job, oggetti
+            // per i comandi edit storage appena accodati dal bridge autorizzato.
+            bool refreshableObjectEdit =
+                _lastMode == ArcGraphRightInspectorMode.EditRequested
+                && (target.Kind == ArcUiSelectionTargetKind.Object
+                    || target.Kind == ArcUiSelectionTargetKind.Wall);
+
+            if (target.Kind != ArcUiSelectionTargetKind.Npc && !refreshableObjectEdit)
                 return false;
 
             float interval = string.Equals(_activeTabKey, "info", System.StringComparison.Ordinal)

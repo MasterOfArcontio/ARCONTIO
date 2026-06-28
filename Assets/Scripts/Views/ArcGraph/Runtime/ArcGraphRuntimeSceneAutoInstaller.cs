@@ -77,6 +77,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphUiSelectionDeleteCommandBridge _selectionDeleteCommandBridge;
         private ArcGraphNpcPrivateFoodCommandBridge _npcPrivateFoodCommandBridge;
         private ArcGraphNpcDnaEditCommandBridge _npcDnaEditCommandBridge;
+        private ArcGraphObjectFoodStockCommandBridge _objectFoodStockCommandBridge;
         private ArcGraphUiNpcOptionProvider _npcOptionProvider;
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiEditSelectionController _editSelectionController;
@@ -312,6 +313,7 @@ namespace Arcontio.View.ArcGraph
             _selectionDeleteCommandBridge = _visualRoot.AddComponent<ArcGraphUiSelectionDeleteCommandBridge>();
             _npcPrivateFoodCommandBridge = _visualRoot.AddComponent<ArcGraphNpcPrivateFoodCommandBridge>();
             _npcDnaEditCommandBridge = _visualRoot.AddComponent<ArcGraphNpcDnaEditCommandBridge>();
+            _objectFoodStockCommandBridge = _visualRoot.AddComponent<ArcGraphObjectFoodStockCommandBridge>();
             _npcOptionProvider = _visualRoot.AddComponent<ArcGraphUiNpcOptionProvider>();
             _selectionActionController = new ArcUiSelectionActionController();
             _editSelectionController = new ArcUiEditSelectionController();
@@ -450,6 +452,7 @@ namespace Arcontio.View.ArcGraph
             _selectionDeleteCommandBridge.SetSelectionConsumer(_uiSelectionConsumer);
             _npcPrivateFoodCommandBridge.SetSimulationHost(Arcontio.Core.SimulationHost.Instance);
             _npcDnaEditCommandBridge.SetSimulationHost(Arcontio.Core.SimulationHost.Instance);
+            _objectFoodStockCommandBridge.SetSimulationHost(Arcontio.Core.SimulationHost.Instance);
             _npcOptionProvider.SetRuntimeContextProvider(_contextProvider);
             _rightInspectorView.SetUiRoot(_uiRoot);
             _rightInspectorView.SetSelectionConsumer(_uiSelectionConsumer);
@@ -458,6 +461,7 @@ namespace Arcontio.View.ArcGraph
             _rightInspectorView.SetInspectionController(_inspectionController);
             _rightInspectorView.SetNpcPrivateFoodCommandBridge(_npcPrivateFoodCommandBridge);
             _rightInspectorView.SetNpcDnaEditCommandBridge(_npcDnaEditCommandBridge);
+            _rightInspectorView.SetObjectFoodStockCommandBridge(_objectFoodStockCommandBridge);
             _rightInspectorView.SetInspectorEnabled(true);
             _selectionConsumer.SetSelectionEnabled(false);
 
@@ -735,6 +739,7 @@ namespace Arcontio.View.ArcGraph
             {
                 _rightInspectorView.SetNpcPrivateFoodCommandBridge(_npcPrivateFoodCommandBridge);
                 _rightInspectorView.SetNpcDnaEditCommandBridge(_npcDnaEditCommandBridge);
+                _rightInspectorView.SetObjectFoodStockCommandBridge(_objectFoodStockCommandBridge);
             }
 
             ApplyUiMapViewportToMainCamera();

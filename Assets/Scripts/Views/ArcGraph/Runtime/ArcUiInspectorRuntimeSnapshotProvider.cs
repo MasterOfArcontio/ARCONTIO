@@ -7,6 +7,44 @@ using UnityEngine;
 namespace Arcontio.View.ArcGraph
 {
     // =============================================================================
+    // ArcGraphObjectFoodStockOwnerOption
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Opzione value-only usata dal RightInspector per mostrare gli NPC candidati a
+    /// proprietari di uno stock oggetto.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: opzioni UI come snapshot, non dizionario World</b></para>
+    /// <para>
+    /// La view non deve conservare <c>NpcDnaProfile</c> o leggere direttamente
+    /// <c>World.NpcDna</c>. Il provider autorizzato prepara solo id e label stabile,
+    /// abbastanza per disegnare un pulsante che il bridge trasformera' in comando.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>NpcId</b>: identificatore runtime dell'NPC.</item>
+    ///   <item><b>Label</b>: testo compatto per il bottone UI.</item>
+    ///   <item><b>IsValid</b>: guardia minima contro opzioni vuote.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ArcGraphObjectFoodStockOwnerOption
+    {
+        public readonly int NpcId;
+        public readonly string Label;
+        public bool IsValid => NpcId > 0;
+
+        public ArcGraphObjectFoodStockOwnerOption(int npcId, string label)
+        {
+            NpcId = npcId;
+            Label = string.IsNullOrWhiteSpace(label)
+                ? "NPC " + npcId.ToString(CultureInfo.InvariantCulture)
+                : label.Trim();
+        }
+    }
+
+    // =============================================================================
     // ArcUiInspectorRuntimeSnapshotProvider
     // =============================================================================
     /// <summary>
@@ -50,6 +88,54 @@ namespace Arcontio.View.ArcGraph
         public void SetRuntimeContextProvider(ArcGraphRuntimeContextProvider provider)
         {
             _runtimeContextProvider = provider;
+        }
+
+        // =============================================================================
+        // FillNpcOwnerOptions
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riempie una lista chiamante con gli NPC attualmente selezionabili come
+        /// owner di uno stock oggetto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: elenco NPC come snapshot autorizzato</b></para>
+        /// <para>
+        /// Il metodo legge il <c>World</c> soltanto dentro il provider runtime e
+        /// restituisce alla UI oggetti valore minimali. Non espone dizionari, profili
+        /// mutabili o riferimenti alla simulazione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Clear</b>: la lista chiamante viene sempre riallineata.</item>
+        ///   <item><b>Sort</b>: l'ordine e' stabile per id crescente.</item>
+        ///   <item><b>Label</b>: usa nome DNA se disponibile, altrimenti NPC #id.</item>
+        /// </list>
+        /// </summary>
+        public void FillNpcOwnerOptions(List<ArcGraphObjectFoodStockOwnerOption> target)
+        {
+            if (target == null)
+                return;
+
+            target.Clear();
+
+            if (!TryGetWorld(out World world) || world.NpcDna == null || world.NpcDna.Count == 0)
+                return;
+
+            var ids = new List<int>(world.NpcDna.Keys);
+            ids.Sort();
+
+            for (int i = 0; i < ids.Count; i++)
+            {
+                int npcId = ids[i];
+                if (npcId <= 0)
+                    continue;
+
+                target.Add(new ArcGraphObjectFoodStockOwnerOption(
+                    npcId,
+                    ResolveNpcOwnerOptionLabel(world, npcId)));
+            }
         }
 
         // =============================================================================
@@ -765,9 +851,10 @@ namespace Arcontio.View.ArcGraph
                 new ArcUiInspectorRow("Unita' attuali", stock.Units.ToString(CultureInfo.InvariantCulture)),
                 new ArcUiInspectorRow("Owner", FormatOwner(stock.OwnerKind, stock.OwnerId)),
                 new ArcUiInspectorRow("Vuoto", stock.IsEmpty ? "Si" : "No"),
-                ArcUiInspectorRow.Section("Controllo futuro"),
-                new ArcUiInspectorRow("Tipo controllo", "Stepper / input numerico autorizzato"),
-                new ArcUiInspectorRow("Effetto attuale", "Nessuna modifica applicata")
+                ArcUiInspectorRow.Section("Controllo operativo"),
+                new ArcUiInspectorRow("Quantita'", "Stepper autorizzato nel pannello"),
+                new ArcUiInspectorRow("Proprieta'", "Community oppure NPC esistente"),
+                new ArcUiInspectorRow("Effetto", "Accoda comando runtime autorizzato")
             };
         }
 
@@ -2005,6 +2092,20 @@ namespace Arcontio.View.ArcGraph
 
             if (!string.IsNullOrWhiteSpace(target.DisplayName))
                 return target.DisplayName.Trim();
+
+            return "NPC " + npcId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string ResolveNpcOwnerOptionLabel(World world, int npcId)
+        {
+            if (world != null
+                && world.NpcDna != null
+                && world.NpcDna.TryGetValue(npcId, out NpcDnaProfile dna)
+                && dna != null
+                && !string.IsNullOrWhiteSpace(dna.Identity.Name))
+            {
+                return dna.Identity.Name.Trim();
+            }
 
             return "NPC " + npcId.ToString(CultureInfo.InvariantCulture);
         }
