@@ -23,19 +23,25 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphInteractionTargetKind ActorTargetKind;
         public readonly ArcGraphInteractionTargetKind CellTargetKind;
         public readonly ArcGraphInteractionTargetKind UiTargetKind;
+        public readonly ArcGraphInteractionTargetKind PlantTargetKind;
+        public readonly ArcGraphInteractionTargetKind DiffuseTargetKind;
 
         public ArcGraphInteractionBoundaryHarnessResult(
             bool passed,
             string reason,
             ArcGraphInteractionTargetKind actorTargetKind,
             ArcGraphInteractionTargetKind cellTargetKind,
-            ArcGraphInteractionTargetKind uiTargetKind)
+            ArcGraphInteractionTargetKind uiTargetKind,
+            ArcGraphInteractionTargetKind plantTargetKind,
+            ArcGraphInteractionTargetKind diffuseTargetKind)
         {
             Passed = passed;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
             ActorTargetKind = actorTargetKind;
             CellTargetKind = cellTargetKind;
             UiTargetKind = uiTargetKind;
+            PlantTargetKind = plantTargetKind;
+            DiffuseTargetKind = diffuseTargetKind;
         }
     }
 
@@ -49,10 +55,10 @@ namespace Arcontio.View.ArcGraph
     ///
     /// <para><b>Principio architetturale: contract-first</b></para>
     /// <para>
-    /// Lo smoke test costruisce una view 250x250, una queue actor/object minima e
-    /// tre frame input: uno su actor, uno su cella vuota e uno bloccato dalla UI.
-    /// Questo verifica il comportamento del boundary senza introdurre renderer,
-    /// input fisico, scene, DevTools o accessi globali.
+    /// Lo smoke test costruisce una view 250x250, una queue actor/object minima,
+    /// item vegetazione fisica e diffusa, e frame input per actor, cella, UI,
+    /// pianta e priorita'. Questo verifica il comportamento del boundary senza
+    /// introdurre renderer, input fisico, scene, DevTools o accessi globali.
     /// </para>
     /// </summary>
     public static class ArcGraphInteractionBoundaryHarness
@@ -72,6 +78,12 @@ namespace Arcontio.View.ArcGraph
                 CreateObject(20, 121, 120)
             };
 
+            var vegetationItems = new List<ArcGraphVegetationRenderItem>
+            {
+                CreatePlant(30, 122, 120),
+                CreateDiffuseVegetation(123, 120)
+            };
+
             var builder = new ArcGraphInteractionBoundaryBuilder();
 
             ArcGraphInteractionFrame actorFrame = builder.Build(
@@ -81,7 +93,8 @@ namespace Arcontio.View.ArcGraph
                 20,
                 20,
                 actorItems,
-                objectItems);
+                objectItems,
+                vegetationItems);
 
             ArcGraphInteractionFrame cellFrame = builder.Build(
                 config,
@@ -90,7 +103,8 @@ namespace Arcontio.View.ArcGraph
                 20,
                 20,
                 actorItems,
-                objectItems);
+                objectItems,
+                vegetationItems);
 
             ArcGraphInteractionFrame uiFrame = builder.Build(
                 config,
@@ -99,20 +113,72 @@ namespace Arcontio.View.ArcGraph
                 20,
                 20,
                 actorItems,
-                objectItems);
+                objectItems,
+                vegetationItems);
+
+            ArcGraphInteractionFrame plantFrame = builder.BuildFromResolvedCell(
+                config,
+                state,
+                CreatePointerFrame(10f, 10f, false),
+                20,
+                20,
+                actorItems,
+                objectItems,
+                vegetationItems,
+                ArcGraphZLevelPolicy.CreateRuntimeCell(122, 120));
+
+            ArcGraphInteractionFrame diffuseFrame = builder.BuildFromResolvedCell(
+                config,
+                state,
+                CreatePointerFrame(10f, 10f, false),
+                20,
+                20,
+                actorItems,
+                objectItems,
+                vegetationItems,
+                ArcGraphZLevelPolicy.CreateRuntimeCell(123, 120));
+
+            ArcGraphInteractionFrame actorPriorityFrame = builder.BuildFromResolvedCell(
+                config,
+                state,
+                CreatePointerFrame(10f, 10f, false),
+                20,
+                20,
+                actorItems,
+                objectItems,
+                new[] { CreatePlant(31, 120, 120) },
+                ArcGraphZLevelPolicy.CreateRuntimeCell(120, 120));
+
+            ArcGraphInteractionFrame objectPriorityFrame = builder.BuildFromResolvedCell(
+                config,
+                state,
+                CreatePointerFrame(10f, 10f, false),
+                20,
+                20,
+                new List<ArcGraphActorRenderItem>(),
+                objectItems,
+                new[] { CreatePlant(32, 121, 120) },
+                ArcGraphZLevelPolicy.CreateRuntimeCell(121, 120));
 
             bool passed = actorFrame.TargetKind == ArcGraphInteractionTargetKind.Actor
                           && actorFrame.ActorId == 10
                           && actorFrame.HasObject == false
                           && cellFrame.TargetKind == ArcGraphInteractionTargetKind.Cell
-                          && uiFrame.TargetKind == ArcGraphInteractionTargetKind.UiBlocked;
+                          && uiFrame.TargetKind == ArcGraphInteractionTargetKind.UiBlocked
+                          && plantFrame.TargetKind == ArcGraphInteractionTargetKind.Plant
+                          && plantFrame.PlantId == 30
+                          && diffuseFrame.TargetKind == ArcGraphInteractionTargetKind.Cell
+                          && actorPriorityFrame.TargetKind == ArcGraphInteractionTargetKind.Actor
+                          && objectPriorityFrame.TargetKind == ArcGraphInteractionTargetKind.Object;
 
             return new ArcGraphInteractionBoundaryHarnessResult(
                 passed,
                 passed ? "InteractionBoundarySmokePassed" : "InteractionBoundarySmokeFailed",
                 actorFrame.TargetKind,
                 cellFrame.TargetKind,
-                uiFrame.TargetKind);
+                uiFrame.TargetKind,
+                plantFrame.TargetKind,
+                diffuseFrame.TargetKind);
         }
 
         private static ArcGraphViewInputFrame CreatePointerFrame(
@@ -167,6 +233,44 @@ namespace Arcontio.View.ArcGraph
                 true,
                 "None",
                 ArcGraphRenderSortKey.FromCell(cell, 50, ArcGraphRenderItemKind.Object, objectId));
+        }
+
+        private static ArcGraphVegetationRenderItem CreatePlant(int plantId, int x, int y)
+        {
+            var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(x, y);
+            return new ArcGraphVegetationRenderItem(
+                cell,
+                "oak",
+                2,
+                1f,
+                "ArcGraph/Environment/Plants/oak_tree#young_healthy",
+                ArcGraphVegetationLodMode.IndividualAnimatedSprite,
+                true,
+                false,
+                true,
+                "None",
+                ArcGraphRenderSortKey.FromCell(cell, 4, ArcGraphRenderItemKind.Vegetation, plantId),
+                plantId,
+                true);
+        }
+
+        private static ArcGraphVegetationRenderItem CreateDiffuseVegetation(int x, int y)
+        {
+            var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(x, y);
+            return new ArcGraphVegetationRenderItem(
+                cell,
+                "grass",
+                1,
+                0.5f,
+                "ArcGraph/Environment/Vegetation/grass#medium_healthy",
+                ArcGraphVegetationLodMode.IndividualAnimatedSprite,
+                true,
+                false,
+                true,
+                "None",
+                ArcGraphRenderSortKey.FromCell(cell, 4, ArcGraphRenderItemKind.Vegetation, 3300),
+                -1,
+                false);
         }
     }
 }

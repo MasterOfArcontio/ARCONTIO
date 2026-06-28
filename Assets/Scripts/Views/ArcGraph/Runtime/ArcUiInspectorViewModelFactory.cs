@@ -90,6 +90,13 @@ namespace Arcontio.View.ArcGraph
                 return objectViewModel;
             }
 
+            if (target.Kind == ArcUiSelectionTargetKind.Plant
+                && _runtimeSnapshotProvider != null
+                && _runtimeSnapshotProvider.TryBuildPlantViewModel(target, out ArcUiInspectorViewModel plantViewModel))
+            {
+                return plantViewModel;
+            }
+
             ArcUiInspectorTab[] tabs = target.Kind switch
             {
                 ArcUiSelectionTargetKind.Npc => BuildNpcTabs(target),

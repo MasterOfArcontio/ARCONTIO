@@ -475,7 +475,9 @@ namespace Arcontio.View.ArcGraph
                 visualKey,
                 ResolveDiffuseGrowthStage(projection.CoverageBand),
                 ResolveDiffuseDensity(projection.CoverageBand),
-                spriteKey);
+                spriteKey,
+                -1,
+                false);
         }
 
         // =============================================================================
@@ -522,7 +524,9 @@ namespace Arcontio.View.ArcGraph
                 visualKey,
                 ResolvePhysicalPlantGrowthStage(growthKey),
                 1f,
-                spriteKey);
+                spriteKey,
+                projection.PlantId.Value,
+                true);
         }
 
         // =============================================================================

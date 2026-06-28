@@ -85,6 +85,7 @@ namespace Arcontio.View.ArcGraph
                     cameraCell,
                     interactionFrame.ActorId,
                     interactionFrame.ObjectId,
+                    interactionFrame.PlantId,
                     true,
                     interactionFrame.IsPointerOverUi,
                     interactionFrame.Reason);

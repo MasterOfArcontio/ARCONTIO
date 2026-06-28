@@ -26,6 +26,8 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>SpriteKey</b>: chiave sprite/atlas futura, non asset caricato.</item>
     ///   <item><b>VegetationMode</b>: LOD vegetazione risolto.</item>
     ///   <item><b>AllowsSpriteAnimation</b>: abilita futura scelta frame ArcGraph.</item>
+    ///   <item><b>PlantId</b>: id stabile della pianta fisica quando presente.</item>
+    ///   <item><b>IsPhysicalPlant</b>: distingue piante selezionabili da overlay diffusi.</item>
     ///   <item><b>IsVisible/HiddenReason</b>: decisione visuale del builder.</item>
     ///   <item><b>SortKey</b>: ordinamento deterministico.</item>
     /// </list>
@@ -40,6 +42,8 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphVegetationLodMode VegetationMode;
         public readonly bool AllowsSpriteAnimation;
         public readonly bool IsAreaAggregate;
+        public readonly int PlantId;
+        public readonly bool IsPhysicalPlant;
         public readonly bool IsVisible;
         public readonly string HiddenReason;
         public readonly ArcGraphRenderSortKey SortKey;
@@ -70,7 +74,9 @@ namespace Arcontio.View.ArcGraph
             bool isAreaAggregate,
             bool isVisible,
             string hiddenReason,
-            ArcGraphRenderSortKey sortKey)
+            ArcGraphRenderSortKey sortKey,
+            int plantId = -1,
+            bool isPhysicalPlant = false)
         {
             Cell = cell;
             SpeciesKey = speciesKey ?? string.Empty;
@@ -80,6 +86,8 @@ namespace Arcontio.View.ArcGraph
             VegetationMode = vegetationMode;
             AllowsSpriteAnimation = allowsSpriteAnimation;
             IsAreaAggregate = isAreaAggregate;
+            PlantId = plantId > 0 ? plantId : -1;
+            IsPhysicalPlant = isPhysicalPlant && PlantId > 0;
             IsVisible = isVisible;
             HiddenReason = string.IsNullOrWhiteSpace(hiddenReason) ? "None" : hiddenReason;
             SortKey = sortKey;

@@ -23,7 +23,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Coordinate</b>: risultato schermo/viewport -> cella.</item>
     ///   <item><b>TargetKind</b>: tipo di bersaglio prioritario.</item>
     ///   <item><b>Cell</b>: cella valida quando disponibile.</item>
-    ///   <item><b>ActorId/ObjectId</b>: entita' visuali sotto il puntatore.</item>
+    ///   <item><b>ActorId/ObjectId/PlantId</b>: entita' visuali sotto il puntatore.</item>
     ///   <item><b>Reason</b>: esito sintetico spiegabile.</item>
     /// </list>
     /// </summary>
@@ -35,9 +35,11 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphCellCoord Cell;
         public readonly int ActorId;
         public readonly int ObjectId;
+        public readonly int PlantId;
         public readonly bool HasValidCell;
         public readonly bool HasActor;
         public readonly bool HasObject;
+        public readonly bool HasPlant;
         public readonly bool IsPointerOverUi;
         public readonly string Reason;
 
@@ -63,6 +65,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphCellCoord cell,
             int actorId,
             int objectId,
+            int plantId,
             bool hasValidCell,
             bool isPointerOverUi,
             string reason)
@@ -73,9 +76,11 @@ namespace Arcontio.View.ArcGraph
             Cell = cell;
             ActorId = actorId > 0 ? actorId : -1;
             ObjectId = objectId > 0 ? objectId : -1;
+            PlantId = plantId > 0 ? plantId : -1;
             HasValidCell = hasValidCell;
             HasActor = ActorId > 0;
             HasObject = ObjectId > 0;
+            HasPlant = PlantId > 0;
             IsPointerOverUi = isPointerOverUi;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
         }
@@ -95,6 +100,7 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphViewCoordinateResult.Invalid(reason),
                 ArcGraphInteractionTargetKind.None,
                 new ArcGraphCellCoord(0, 0, 0),
+                -1,
                 -1,
                 -1,
                 false,

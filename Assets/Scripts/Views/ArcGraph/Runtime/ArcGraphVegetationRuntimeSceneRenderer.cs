@@ -452,10 +452,7 @@ namespace Arcontio.View.ArcGraph
 
         private static bool IsPhysicalPlantItem(ArcGraphVegetationRenderItem item)
         {
-            return !string.IsNullOrWhiteSpace(item.SpriteKey)
-                   && item.SpriteKey.StartsWith(
-                       "ArcGraph/Environment/Plants/",
-                       System.StringComparison.OrdinalIgnoreCase);
+            return item.IsPhysicalPlant;
         }
 
         private static float ResolveSpritePivotOffsetFromBottom(Sprite sprite)
@@ -666,6 +663,9 @@ namespace Arcontio.View.ArcGraph
 
         private static int ResolveEntityId(ArcGraphVegetationRenderItem item)
         {
+            if (item.IsPhysicalPlant && item.PlantId > 0)
+                return item.PlantId;
+
             return item.SortKey.EntityId;
         }
 

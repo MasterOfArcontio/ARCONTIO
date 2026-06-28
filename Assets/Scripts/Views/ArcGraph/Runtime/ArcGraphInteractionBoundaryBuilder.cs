@@ -25,6 +25,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Build</b>: produce frame e diagnostica da input/view/queue.</item>
     ///   <item><b>TryPickActor</b>: cerca actor visibili sulla cella risolta.</item>
     ///   <item><b>TryPickObject</b>: cerca oggetti visibili sulla cella risolta usando il footprint.</item>
+    ///   <item><b>TryPickPlant</b>: cerca piante fisiche visuali sulla cella risolta.</item>
     ///   <item><b>CreateFrame</b>: normalizza priorita' e reason finale.</item>
     /// </list>
     /// </summary>
@@ -64,7 +65,8 @@ namespace Arcontio.View.ArcGraph
                 viewportPixelWidth,
                 viewportPixelHeight,
                 renderQueue != null ? renderQueue.ActorItems : null,
-                renderQueue != null ? renderQueue.ObjectItems : null);
+                renderQueue != null ? renderQueue.ObjectItems : null,
+                null);
         }
 
         // =============================================================================
@@ -93,6 +95,43 @@ namespace Arcontio.View.ArcGraph
             IReadOnlyList<ArcGraphActorRenderItem> actorItems,
             IReadOnlyList<ArcGraphObjectRenderItem> objectItems)
         {
+            return Build(
+                config,
+                viewState,
+                input,
+                viewportPixelWidth,
+                viewportPixelHeight,
+                actorItems,
+                objectItems,
+                null);
+        }
+
+        // =============================================================================
+        // Build
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un frame interazione partendo da liste actor/object/pianta gia'
+        /// preparate dal percorso visuale ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Boundary unico di picking</b></para>
+        /// <para>
+        /// Le piante fisiche entrano nel picking come dati visuali derivati, non
+        /// come oggetti World. Il boundary mantiene una priorita' esplicita:
+        /// actor, poi oggetto, poi pianta fisica, poi cella.
+        /// </para>
+        /// </summary>
+        public ArcGraphInteractionFrame Build(
+            ArcGraphMapViewConfig config,
+            ArcGraphViewState viewState,
+            ArcGraphViewInputFrame input,
+            int viewportPixelWidth,
+            int viewportPixelHeight,
+            IReadOnlyList<ArcGraphActorRenderItem> actorItems,
+            IReadOnlyList<ArcGraphObjectRenderItem> objectItems,
+            IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems)
+        {
             if (input.IsPointerOverUi)
                 return StoreAndReturn(CreateUiBlockedFrame(input));
 
@@ -115,7 +154,8 @@ namespace Arcontio.View.ArcGraph
                 input,
                 coordinate,
                 actorItems,
-                objectItems);
+                objectItems,
+                vegetationItems);
         }
 
         // =============================================================================
@@ -146,6 +186,38 @@ namespace Arcontio.View.ArcGraph
             IReadOnlyList<ArcGraphObjectRenderItem> objectItems,
             ArcGraphCellCoord resolvedCell)
         {
+            return BuildFromResolvedCell(
+                config,
+                viewState,
+                input,
+                viewportPixelWidth,
+                viewportPixelHeight,
+                actorItems,
+                objectItems,
+                null,
+                resolvedCell);
+        }
+
+        // =============================================================================
+        // BuildFromResolvedCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un frame interazione usando una cella scena gia' risolta e
+        /// includendo le piante fisiche nella stessa decisione di picking.
+        /// </para>
+        /// </summary>
+        public ArcGraphInteractionFrame BuildFromResolvedCell(
+            ArcGraphMapViewConfig config,
+            ArcGraphViewState viewState,
+            ArcGraphViewInputFrame input,
+            int viewportPixelWidth,
+            int viewportPixelHeight,
+            IReadOnlyList<ArcGraphActorRenderItem> actorItems,
+            IReadOnlyList<ArcGraphObjectRenderItem> objectItems,
+            IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems,
+            ArcGraphCellCoord resolvedCell)
+        {
             if (input.IsPointerOverUi)
                 return StoreAndReturn(CreateUiBlockedFrame(input));
 
@@ -173,19 +245,25 @@ namespace Arcontio.View.ArcGraph
                 input,
                 resolvedCoordinate,
                 actorItems,
-                objectItems);
+                objectItems,
+                vegetationItems);
         }
 
         private ArcGraphInteractionFrame BuildFromCoordinate(
             ArcGraphViewInputFrame input,
             ArcGraphViewCoordinateResult coordinate,
             IReadOnlyList<ArcGraphActorRenderItem> actorItems,
-            IReadOnlyList<ArcGraphObjectRenderItem> objectItems)
+            IReadOnlyList<ArcGraphObjectRenderItem> objectItems,
+            IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems)
         {
             PickResult actorPick = TryPickActor(actorItems, coordinate.Cell);
             PickResult objectPick = TryPickObject(objectItems, coordinate.Cell);
+            PickResult plantPick = TryPickPlant(vegetationItems, coordinate.Cell);
 
-            ArcGraphInteractionTargetKind kind = ResolveTargetKind(actorPick.EntityId, objectPick.EntityId);
+            ArcGraphInteractionTargetKind kind = ResolveTargetKind(
+                actorPick.EntityId,
+                objectPick.EntityId,
+                plantPick.EntityId);
             string reason = ResolveReason(kind);
 
             return StoreAndReturn(new ArcGraphInteractionFrame(
@@ -195,17 +273,20 @@ namespace Arcontio.View.ArcGraph
                 coordinate.Cell,
                 actorPick.EntityId,
                 objectPick.EntityId,
+                plantPick.EntityId,
                 true,
                 false,
                 reason),
                 actorPick.CandidateCount,
-                objectPick.CandidateCount);
+                objectPick.CandidateCount,
+                plantPick.CandidateCount);
         }
 
         private ArcGraphInteractionFrame StoreAndReturn(
             ArcGraphInteractionFrame frame,
             int actorCandidateCount = 0,
-            int objectCandidateCount = 0)
+            int objectCandidateCount = 0,
+            int plantCandidateCount = 0)
         {
             LastDiagnostics = new ArcGraphInteractionBoundaryDiagnostics(
                 frame.Input.HasPointerScreenPosition,
@@ -213,6 +294,7 @@ namespace Arcontio.View.ArcGraph
                 frame.HasValidCell,
                 actorCandidateCount,
                 objectCandidateCount,
+                plantCandidateCount,
                 frame.TargetKind,
                 frame.Reason);
 
@@ -226,6 +308,7 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphViewCoordinateResult.Invalid("PointerOverUi"),
                 ArcGraphInteractionTargetKind.UiBlocked,
                 new ArcGraphCellCoord(0, 0, 0),
+                -1,
                 -1,
                 -1,
                 false,
@@ -242,6 +325,7 @@ namespace Arcontio.View.ArcGraph
                 coordinate,
                 ArcGraphInteractionTargetKind.None,
                 new ArcGraphCellCoord(0, 0, 0),
+                -1,
                 -1,
                 -1,
                 false,
@@ -307,6 +391,36 @@ namespace Arcontio.View.ArcGraph
             }
 
             return new PickResult(selectedObjectId, candidateCount);
+        }
+
+        private static PickResult TryPickPlant(
+            IReadOnlyList<ArcGraphVegetationRenderItem> vegetation,
+            ArcGraphCellCoord cell)
+        {
+            if (vegetation == null || vegetation.Count == 0)
+                return PickResult.Empty();
+
+            int selectedPlantId = -1;
+            ArcGraphRenderSortKey selectedSortKey = default;
+            int candidateCount = 0;
+            bool hasSelected = false;
+
+            for (int i = 0; i < vegetation.Count; i++)
+            {
+                ArcGraphVegetationRenderItem item = vegetation[i];
+                if (!item.IsVisible || !item.IsPhysicalPlant || !IsPlantHitCell(item, cell))
+                    continue;
+
+                candidateCount++;
+                if (!hasSelected || item.SortKey.CompareTo(selectedSortKey) >= 0)
+                {
+                    selectedPlantId = item.PlantId;
+                    selectedSortKey = item.SortKey;
+                    hasSelected = true;
+                }
+            }
+
+            return new PickResult(selectedPlantId, candidateCount);
         }
 
         // =============================================================================
@@ -386,13 +500,40 @@ namespace Arcontio.View.ArcGraph
             return pointerCell.Y >= actorCell.Y && pointerCell.Y <= actorCell.Y + 1;
         }
 
-        private static ArcGraphInteractionTargetKind ResolveTargetKind(int actorId, int objectId)
+        // =============================================================================
+        // IsPlantHitCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se la cella puntata coincide con la base fisica della pianta.
+        /// </para>
+        ///
+        /// <para><b>Hitbox visuale minimale</b></para>
+        /// <para>
+        /// Le piante alte possono estendersi graficamente sopra la cella, ma in
+        /// questa prima patch il picking resta sulla cella base per evitare che uno
+        /// sprite alto rubi click ad actor o oggetti dietro di lui.
+        /// </para>
+        /// </summary>
+        private static bool IsPlantHitCell(
+            ArcGraphVegetationRenderItem item,
+            ArcGraphCellCoord pointerCell)
+        {
+            return item.Cell.Z == pointerCell.Z
+                   && item.Cell.X == pointerCell.X
+                   && item.Cell.Y == pointerCell.Y;
+        }
+
+        private static ArcGraphInteractionTargetKind ResolveTargetKind(int actorId, int objectId, int plantId)
         {
             if (actorId > 0)
                 return ArcGraphInteractionTargetKind.Actor;
 
             if (objectId > 0)
                 return ArcGraphInteractionTargetKind.Object;
+
+            if (plantId > 0)
+                return ArcGraphInteractionTargetKind.Plant;
 
             return ArcGraphInteractionTargetKind.Cell;
         }
@@ -405,6 +546,8 @@ namespace Arcontio.View.ArcGraph
                     return "ActorPicked";
                 case ArcGraphInteractionTargetKind.Object:
                     return "ObjectPicked";
+                case ArcGraphInteractionTargetKind.Plant:
+                    return "PlantPicked";
                 case ArcGraphInteractionTargetKind.Cell:
                     return "CellPicked";
                 case ArcGraphInteractionTargetKind.UiBlocked:

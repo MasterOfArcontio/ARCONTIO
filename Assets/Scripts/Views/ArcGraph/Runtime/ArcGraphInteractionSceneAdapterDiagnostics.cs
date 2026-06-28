@@ -27,6 +27,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>DidBuildInteractionFrame</b>: boundary interattivo eseguito.</item>
     ///   <item><b>DidDispatchToConsumer</b>: frame consegnato a tool esterno.</item>
     ///   <item><b>TargetKind</b>: bersaglio prioritario finale.</item>
+    ///   <item><b>PlantId</b>: id pianta fisica quando il target e' una pianta.</item>
     ///   <item><b>Reason</b>: motivo sintetico dell'esito.</item>
     /// </list>
     /// </summary>
@@ -47,6 +48,7 @@ namespace Arcontio.View.ArcGraph
         public readonly ArcGraphInteractionTargetKind TargetKind;
         public readonly int ActorId;
         public readonly int ObjectId;
+        public readonly int PlantId;
         public readonly bool HasValidCell;
         public readonly long SourceFrameIndex;
         public readonly string Reason;
@@ -67,6 +69,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphInteractionTargetKind targetKind,
             int actorId,
             int objectId,
+            int plantId,
             bool hasValidCell,
             long sourceFrameIndex,
             string reason)
@@ -86,6 +89,7 @@ namespace Arcontio.View.ArcGraph
             TargetKind = targetKind;
             ActorId = actorId > 0 ? actorId : -1;
             ObjectId = objectId > 0 ? objectId : -1;
+            PlantId = plantId > 0 ? plantId : -1;
             HasValidCell = hasValidCell;
             SourceFrameIndex = sourceFrameIndex;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;

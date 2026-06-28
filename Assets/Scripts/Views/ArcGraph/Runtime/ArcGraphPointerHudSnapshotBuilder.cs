@@ -143,6 +143,8 @@ namespace Arcontio.View.ArcGraph
                     return cellText + " | Actor #" + frame.ActorId;
                 case ArcGraphInteractionTargetKind.Object:
                     return cellText + " | Object #" + frame.ObjectId;
+                case ArcGraphInteractionTargetKind.Plant:
+                    return cellText + " | Plant #" + frame.PlantId;
                 case ArcGraphInteractionTargetKind.Cell:
                     return cellText;
                 default:

@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using Arcontio.Core;
+using Arcontio.Core.Environment;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -198,6 +199,52 @@ namespace Arcontio.View.ArcGraph
 
             viewModel = new ArcUiInspectorViewModel(
                 ResolveObjectTitle(target, instance, def),
+                target,
+                tabs,
+                InfoTabKey);
+            return true;
+        }
+
+        // =============================================================================
+        // TryBuildPlantViewModel
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il ViewModel read-only del RightInspector per una pianta
+        /// fisica proiettata nel World.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: World projection -> Snapshot -> UI</b></para>
+        /// <para>
+        /// Il provider non legge lo stato interno della Biosfera. Usa soltanto
+        /// <c>World.PhysicalPlants</c>, cioe' la proiezione autorizzata gia' copiata
+        /// nel boundary fisico/spaziale, e produce righe UI value-only.
+        /// </para>
+        /// </summary>
+        public bool TryBuildPlantViewModel(
+            ArcUiSelectionTarget target,
+            out ArcUiInspectorViewModel viewModel)
+        {
+            viewModel = ArcUiInspectorViewModel.Empty();
+
+            if (target.Kind != ArcUiSelectionTargetKind.Plant || !TryParsePlantId(target, out int plantId))
+                return false;
+
+            if (!TryGetWorld(out World world)
+                || !world.TryGetPhysicalPlant(new EnvironmentPlantId(plantId), out WorldPhysicalPlantProjection plant))
+            {
+                return false;
+            }
+
+            var tabs = new[]
+            {
+                new ArcUiInspectorTab(InfoTabKey, "Info", BuildPlantInfoRows(target, plant)),
+                new ArcUiInspectorTab("physical", "Fisica", BuildPlantPhysicalRows(plant)),
+                new ArcUiInspectorTab("boundary", "Boundary", BuildPlantBoundaryRows(target, plant))
+            };
+
+            viewModel = new ArcUiInspectorViewModel(
+                ResolvePlantTitle(target, plant),
                 target,
                 tabs,
                 InfoTabKey);
@@ -1097,6 +1144,80 @@ namespace Arcontio.View.ArcGraph
             };
         }
 
+        // =============================================================================
+        // BuildPlantInfoRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe informative principali per una pianta fisica.
+        /// </para>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildPlantInfoRows(
+            ArcUiSelectionTarget target,
+            WorldPhysicalPlantProjection plant)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Pianta fisica"),
+                new ArcUiInspectorRow("Plant id", plant.PlantId.Value.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Specie", ReadString(plant.SpeciesKey, EmptyValue)),
+                new ArcUiInspectorRow("Stadio", ReadString(plant.GrowthStageKey, EmptyValue)),
+                new ArcUiInspectorRow("Salute", plant.HealthState.ToString()),
+                new ArcUiInspectorRow("Viva", BoolText(plant.IsAlive)),
+                new ArcUiInspectorRow("Area", plant.AreaId.ToString()),
+                new ArcUiInspectorRow("Cella", FormatCell(plant.Cell.X, plant.Cell.Y, plant.Cell.Z)),
+                new ArcUiInspectorRow("Sorgente", ReadString(target.SourceView, EmptyValue))
+            };
+        }
+
+        // =============================================================================
+        // BuildPlantPhysicalRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe dell'impatto fisico della pianta nel World.
+        /// </para>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildPlantPhysicalRows(
+            WorldPhysicalPlantProjection plant)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Impatto World"),
+                new ArcUiInspectorRow("Blocca movimento", BoolText(plant.BlocksMovement)),
+                new ArcUiInspectorRow("Blocca visione", BoolText(plant.BlocksVision)),
+                new ArcUiInspectorRow("Vision cost", FormatDecimal(plant.VisionCost)),
+                ArcUiInspectorRow.Section("Contratto"),
+                new ArcUiInspectorRow("Owner dati biologici", "Biosfera"),
+                new ArcUiInspectorRow("Owner spazio/fisica", "World projection"),
+                new ArcUiInspectorRow("Mutazione UI", "Non consentita")
+            };
+        }
+
+        // =============================================================================
+        // BuildPlantBoundaryRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara righe di debug leggero sul boundary visuale della selezione.
+        /// </para>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildPlantBoundaryRows(
+            ArcUiSelectionTarget target,
+            WorldPhysicalPlantProjection plant)
+        {
+            return new[]
+            {
+                ArcUiInspectorRow.Section("Selection target"),
+                new ArcUiInspectorRow("Tipo UI", "Pianta"),
+                new ArcUiInspectorRow("Target id", ReadString(target.Id, EmptyValue)),
+                new ArcUiInspectorRow("Target cell", FormatCell(target.Cell.X, target.Cell.Y, target.Cell.Z)),
+                ArcUiInspectorRow.Section("Proiezione"),
+                new ArcUiInspectorRow("Projection cell", FormatCell(plant.Cell.X, plant.Cell.Y, plant.Cell.Z)),
+                new ArcUiInspectorRow("Harvest job", "Fuori scope v0.71.08")
+            };
+        }
+
         private static ArcUiInspectorTab[] BuildObjectTabs(
             World world,
             ArcUiSelectionTarget target,
@@ -1869,6 +1990,11 @@ namespace Arcontio.View.ArcGraph
             return int.TryParse(target.Id, NumberStyles.Integer, CultureInfo.InvariantCulture, out objectId) && objectId > 0;
         }
 
+        private static bool TryParsePlantId(ArcUiSelectionTarget target, out int plantId)
+        {
+            return int.TryParse(target.Id, NumberStyles.Integer, CultureInfo.InvariantCulture, out plantId) && plantId > 0;
+        }
+
         private static string ResolveNpcTitle(
             ArcUiSelectionTarget target,
             NpcDnaProfile dna,
@@ -1898,6 +2024,19 @@ namespace Arcontio.View.ArcGraph
                 return instance.DefId.Trim() + " #" + instance.ObjectId.ToString(CultureInfo.InvariantCulture);
 
             return "Oggetto " + instance.ObjectId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string ResolvePlantTitle(
+            ArcUiSelectionTarget target,
+            WorldPhysicalPlantProjection plant)
+        {
+            if (!string.IsNullOrWhiteSpace(target.DisplayName))
+                return target.DisplayName.Trim();
+
+            if (!string.IsNullOrWhiteSpace(plant.SpeciesKey))
+                return "Pianta " + plant.SpeciesKey.Trim() + " #" + plant.PlantId.Value.ToString(CultureInfo.InvariantCulture);
+
+            return "Pianta #" + plant.PlantId.Value.ToString(CultureInfo.InvariantCulture);
         }
 
         private static void AddObjectProperties(

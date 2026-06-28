@@ -25,6 +25,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>Cell</b>: cella valida senza actor o oggetto prioritario.</item>
     ///   <item><b>Actor</b>: actor visibile risolto sulla cella.</item>
     ///   <item><b>Object</b>: oggetto visibile risolto sulla cella.</item>
+    ///   <item><b>Plant</b>: pianta fisica visuale risolta sulla cella.</item>
     /// </list>
     /// </summary>
     public enum ArcGraphInteractionTargetKind
@@ -33,6 +34,7 @@ namespace Arcontio.View.ArcGraph
         UiBlocked = 1,
         Cell = 2,
         Actor = 3,
-        Object = 4
+        Object = 4,
+        Plant = 5
     }
 }

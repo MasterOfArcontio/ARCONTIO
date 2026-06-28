@@ -436,6 +436,7 @@ namespace Arcontio.View.ArcGraph
             _placementHighlightConsumer.SetSpriteResolverBehaviour(_spriteResolver);
             _placementHighlightConsumer.SetSceneCamera(Camera.main);
             _uiSelectionConsumer.SetRenderQueue(_wrapper.RenderQueue);
+            _uiSelectionConsumer.SetVegetationItems(_wrapper.VegetationItems);
             _uiSelectionConsumer.SetSelectionEnabled(true);
             _selectionActionMenu.SetUiRoot(_uiRoot);
             _selectionActionMenu.SetSelectionConsumer(_uiSelectionConsumer);

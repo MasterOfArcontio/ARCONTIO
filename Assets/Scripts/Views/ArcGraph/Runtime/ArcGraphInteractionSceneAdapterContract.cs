@@ -58,6 +58,7 @@ namespace Arcontio.View.ArcGraph
                 sceneFrame,
                 renderQueue != null ? renderQueue.ActorItems : null,
                 renderQueue != null ? renderQueue.ObjectItems : null,
+                null,
                 hasRenderQueue: renderQueue != null,
                 consumer);
         }
@@ -91,7 +92,36 @@ namespace Arcontio.View.ArcGraph
                 sceneFrame,
                 actorItems,
                 objectItems,
-                hasRenderQueue: actorItems != null || objectItems != null,
+                null,
+                consumer);
+        }
+
+        // =============================================================================
+        // ProcessFrame
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Processa un frame scena includendo gli item vegetazione fisica nel
+        /// boundary di picking ArcGraph.
+        /// </para>
+        /// </summary>
+        public ArcGraphInteractionSceneAdapterDiagnostics ProcessFrame(
+            ArcGraphMapViewConfig config,
+            ArcGraphViewState viewState,
+            ArcGraphInteractionSceneFrame sceneFrame,
+            IReadOnlyList<ArcGraphActorRenderItem> actorItems,
+            IReadOnlyList<ArcGraphObjectRenderItem> objectItems,
+            IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems,
+            IArcGraphInteractionFrameConsumer consumer = null)
+        {
+            return ProcessFrame(
+                config,
+                viewState,
+                sceneFrame,
+                actorItems,
+                objectItems,
+                vegetationItems,
+                hasRenderQueue: actorItems != null || objectItems != null || vegetationItems != null,
                 consumer);
         }
 
@@ -101,6 +131,7 @@ namespace Arcontio.View.ArcGraph
             ArcGraphInteractionSceneFrame sceneFrame,
             IReadOnlyList<ArcGraphActorRenderItem> actorItems,
             IReadOnlyList<ArcGraphObjectRenderItem> objectItems,
+            IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems,
             bool hasRenderQueue,
             IArcGraphInteractionFrameConsumer consumer)
         {
@@ -152,6 +183,7 @@ namespace Arcontio.View.ArcGraph
                     sceneFrame.ViewportPixelHeight,
                     actorItems,
                     objectItems,
+                    vegetationItems,
                     sceneFrame.SceneResolvedCell)
                 : _boundaryBuilder.Build(
                     config,
@@ -160,7 +192,8 @@ namespace Arcontio.View.ArcGraph
                     sceneFrame.ViewportPixelWidth,
                     sceneFrame.ViewportPixelHeight,
                     actorItems,
-                    objectItems);
+                    objectItems,
+                    vegetationItems);
 
             bool shouldDispatch = sceneFrame.ShouldDispatchToConsumer && consumer != null;
             LastDiagnostics = CreateDiagnostics(
@@ -211,6 +244,7 @@ namespace Arcontio.View.ArcGraph
                 interactionFrame.TargetKind,
                 interactionFrame.ActorId,
                 interactionFrame.ObjectId,
+                interactionFrame.PlantId,
                 interactionFrame.HasValidCell,
                 sceneFrame.SourceFrameIndex,
                 reason);

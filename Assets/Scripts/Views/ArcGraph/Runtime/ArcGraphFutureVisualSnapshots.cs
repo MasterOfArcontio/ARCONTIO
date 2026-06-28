@@ -67,6 +67,8 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>GrowthStage</b>: stadio visuale astratto.</item>
     ///   <item><b>Density01</b>: densita' normalizzata per overlay o tile blend.</item>
     ///   <item><b>SpriteKey</b>: chiave visuale ArcGraph opzionale gia' risolta dal bordo View.</item>
+    ///   <item><b>PlantId</b>: id della pianta fisica quando lo snapshot rappresenta una pianta selezionabile.</item>
+    ///   <item><b>IsPhysicalPlant</b>: distingue piante fisiche da vegetazione diffusa non selezionabile.</item>
     /// </list>
     /// </summary>
     public readonly struct ArcGraphVegetationVisualSnapshot
@@ -76,13 +78,15 @@ namespace Arcontio.View.ArcGraph
         public readonly int GrowthStage;
         public readonly float Density01;
         public readonly string SpriteKey;
+        public readonly int PlantId;
+        public readonly bool IsPhysicalPlant;
 
         public ArcGraphVegetationVisualSnapshot(
             ArcGraphCellCoord cell,
             string speciesKey,
             int growthStage,
             float density01)
-            : this(cell, speciesKey, growthStage, density01, string.Empty)
+            : this(cell, speciesKey, growthStage, density01, string.Empty, -1, false)
         {
         }
 
@@ -92,12 +96,42 @@ namespace Arcontio.View.ArcGraph
             int growthStage,
             float density01,
             string spriteKey)
+            : this(cell, speciesKey, growthStage, density01, spriteKey, -1, false)
+        {
+        }
+
+        // =============================================================================
+        // ArcGraphVegetationVisualSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce uno snapshot vegetazione completo distinguendo overlay diffuso
+        /// e pianta fisica selezionabile.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: identita' visuale senza mutabilita'</b></para>
+        /// <para>
+        /// L'id pianta resta un intero copiato dalla proiezione World. Non espone
+        /// l'istanza Biosfera, non consente mutazioni e serve solo a stabilizzare
+        /// picking, label e inspector read-only.
+        /// </para>
+        /// </summary>
+        public ArcGraphVegetationVisualSnapshot(
+            ArcGraphCellCoord cell,
+            string speciesKey,
+            int growthStage,
+            float density01,
+            string spriteKey,
+            int plantId,
+            bool isPhysicalPlant)
         {
             Cell = cell;
             SpeciesKey = speciesKey ?? string.Empty;
             GrowthStage = growthStage < 0 ? 0 : growthStage;
             Density01 = Clamp01(density01);
             SpriteKey = spriteKey ?? string.Empty;
+            PlantId = plantId > 0 ? plantId : -1;
+            IsPhysicalPlant = isPhysicalPlant && PlantId > 0;
         }
 
         private static float Clamp01(float value)

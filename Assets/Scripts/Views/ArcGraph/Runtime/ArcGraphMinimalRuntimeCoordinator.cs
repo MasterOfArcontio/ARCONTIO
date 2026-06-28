@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+
 namespace Arcontio.View.ArcGraph
 {
     // =============================================================================
@@ -12,7 +14,8 @@ namespace Arcontio.View.ArcGraph
     /// <para>
     /// Il coordinator riceve un <c>ArcGraphRuntimeContext</c> gia' costruito da un
     /// adapter esterno, inizializza o riusa un <c>ArcGraphBootstrapRuntime</c>,
-    /// aggiorna snapshot e costruisce una <c>ArcGraphRenderQueue</c> actor/object.
+    /// aggiorna snapshot, costruisce una <c>ArcGraphRenderQueue</c> actor/object e
+    /// conserva gli item vegetazione necessari al picking delle piante fisiche.
     /// Non e' un <c>MonoBehaviour</c>, non crea <c>GameObject</c>, non carica asset,
     /// non legge <c>SimulationHost</c>, non cerca <c>MapGridWorldView</c>, non invia
     /// comandi e non possiede UI o DevTools.
@@ -22,6 +25,7 @@ namespace Arcontio.View.ArcGraph
     /// <list type="bullet">
     ///   <item><b>_runtime</b>: bootstrap ArcGraph riusabile tra frame coerenti.</item>
     ///   <item><b>_renderQueue</b>: queue actor/object riusata e leggibile dal chiamante.</item>
+    ///   <item><b>_vegetationItems</b>: item vegetazione derivati per rendering e picking.</item>
     ///   <item><b>Process</b>: valida gate, context, runtime e queue.</item>
     ///   <item><b>EnsureRuntime</b>: inizializza o ricrea il runtime se cambiano sorgenti.</item>
     ///   <item><b>BuildActorObjectQueue</b>: compone actor/object tramite builder esistenti.</item>
@@ -31,6 +35,8 @@ namespace Arcontio.View.ArcGraph
     {
         private readonly ArcGraphRenderQueue _renderQueue = new();
         private readonly ArcGraphRenderQueueBuilder _queueBuilder = new();
+        private readonly List<ArcGraphVegetationRenderItem> _vegetationItems = new();
+        private readonly ArcGraphVegetationRenderQueueBuilder _vegetationQueueBuilder = new();
 
         private ArcGraphBootstrapRuntime _runtime;
         private ArcGraphRuntimeContext _runtimeContext;
@@ -38,6 +44,7 @@ namespace Arcontio.View.ArcGraph
 
         public ArcGraphBootstrapRuntime Runtime => _runtime;
         public ArcGraphRenderQueue RenderQueue => _renderQueue;
+        public IReadOnlyList<ArcGraphVegetationRenderItem> VegetationItems => _vegetationItems;
         public ArcGraphMinimalRuntimeCoordinatorDiagnostics LastDiagnostics => _lastDiagnostics;
 
         // =============================================================================
@@ -52,7 +59,7 @@ namespace Arcontio.View.ArcGraph
         /// <para>
         /// Il metodo prima verifica gate e context, poi assicura il bootstrap
         /// riusabile, poi opzionalmente rinfresca gli snapshot e infine costruisce
-        /// la queue actor/object se richiesta. Ogni uscita anticipata produce
+        /// la queue actor/object e gli item vegetazione se richiesto. Ogni uscita anticipata produce
         /// diagnostica piatta e leggibile.
         /// </para>
         /// </summary>
@@ -61,25 +68,25 @@ namespace Arcontio.View.ArcGraph
         {
             if (frame == null)
             {
-                _renderQueue.Clear();
+                ClearDerivedQueues();
                 return StoreDiagnostics(null, false, false, false, false, false, false, "FrameMissing");
             }
 
             if (!frame.IsCoordinatorEnabled)
             {
-                _renderQueue.Clear();
+                ClearDerivedQueues();
                 return StoreDiagnostics(frame, false, false, false, false, false, false, "CoordinatorDisabled");
             }
 
             if (!frame.HasContext)
             {
-                _renderQueue.Clear();
+                ClearDerivedQueues();
                 return StoreDiagnostics(frame, false, false, false, false, false, false, "RuntimeContextMissing");
             }
 
             if (!frame.HasAnyRuntimeData)
             {
-                _renderQueue.Clear();
+                ClearDerivedQueues();
                 return StoreDiagnostics(frame, false, false, false, false, false, false, "RuntimeContextEmpty");
             }
 
@@ -87,7 +94,7 @@ namespace Arcontio.View.ArcGraph
             bool initialized = EnsureRuntime(frame.Context, out recreatedRuntime);
             if (!initialized)
             {
-                _renderQueue.Clear();
+                ClearDerivedQueues();
                 return StoreDiagnostics(frame, false, recreatedRuntime, false, false, false, false, "RuntimeInitializeFailed");
             }
 
@@ -104,17 +111,19 @@ namespace Arcontio.View.ArcGraph
             bool hasTerrainLayer = HasLayer<ArcGraphTerrainLayer>();
             bool hasActorLayer = TryGetLayer(out ArcGraphActorLayer actorLayer);
             bool hasObjectLayer = TryGetLayer(out ArcGraphObjectLayer objectLayer);
+            bool hasVegetationLayer = TryGetLayer(out ArcGraphVegetationLayer vegetationLayer);
 
             bool builtQueue = false;
             if (frame.ShouldBuildActorObjectQueue)
             {
                 if (!hasActorLayer || !hasObjectLayer)
                 {
-                    _renderQueue.Clear();
+                    ClearDerivedQueues();
                     return StoreDiagnostics(frame, true, recreatedRuntime, refreshed, hasTerrainLayer, hasActorLayer, hasObjectLayer, "ActorObjectLayersMissing");
                 }
 
                 BuildActorObjectQueue(actorLayer, objectLayer);
+                BuildVegetationItems(vegetationLayer, hasVegetationLayer);
                 builtQueue = true;
             }
             else
@@ -151,7 +160,7 @@ namespace Arcontio.View.ArcGraph
             _runtime?.Dispose();
             _runtime = null;
             _runtimeContext = null;
-            _renderQueue.Clear();
+            ClearDerivedQueues();
         }
 
         private bool EnsureRuntime(
@@ -185,6 +194,28 @@ namespace Arcontio.View.ArcGraph
         {
             ArcGraphZoomLodProfile lodProfile = ArcGraphZoomLodPolicy.ResolveFullDetail();
             _queueBuilder.Build(actorLayer, objectLayer, lodProfile, _renderQueue);
+        }
+
+        private void BuildVegetationItems(
+            ArcGraphVegetationLayer vegetationLayer,
+            bool hasVegetationLayer)
+        {
+            // Gli item vegetazione servono anche al picking. Li costruiamo dallo
+            // stesso runtime ArcGraph gia' popolato, evitando letture World-side nel
+            // wrapper interattivo o nella UI.
+            _vegetationItems.Clear();
+
+            if (!hasVegetationLayer || vegetationLayer == null)
+                return;
+
+            ArcGraphZoomLodProfile lodProfile = ArcGraphZoomLodPolicy.ResolveFullDetail();
+            _vegetationQueueBuilder.Build(vegetationLayer, lodProfile, _vegetationItems);
+        }
+
+        private void ClearDerivedQueues()
+        {
+            _renderQueue.Clear();
+            _vegetationItems.Clear();
         }
 
         // =============================================================================

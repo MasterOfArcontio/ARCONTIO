@@ -927,6 +927,7 @@ namespace Arcontio.View.ArcGraph
                 cell,
                 -1,
                 -1,
+                -1,
                 true,
                 false,
                 "SceneCameraFallback");

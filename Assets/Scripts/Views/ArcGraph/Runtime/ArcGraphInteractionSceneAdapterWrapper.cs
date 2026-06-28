@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem;
@@ -122,6 +123,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphMapViewConfig _config;
         private ArcGraphViewState _viewState;
         private ArcGraphRenderQueue _renderQueue;
+        private IReadOnlyList<ArcGraphVegetationRenderItem> _vegetationItems;
         private IArcGraphInteractionFrameConsumer _consumer;
         private long _sourceFrameIndex;
         private ArcGraphInteractionSceneAdapterWrapperDiagnostics _lastWrapperDiagnostics;
@@ -260,6 +262,26 @@ namespace Arcontio.View.ArcGraph
         public void SetRenderQueue(ArcGraphRenderQueue renderQueue)
         {
             _renderQueue = renderQueue;
+        }
+
+        // =============================================================================
+        // SetVegetationItems
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Imposta gli item vegetazione prodotti dal percorso ArcGraph corrente.
+        /// </para>
+        ///
+        /// <para><b>Contratto read-only</b></para>
+        /// <para>
+        /// Il wrapper non costruisce e non filtra la Biosfera. Conserva solo la
+        /// lista value-only ricevuta dal coordinator per permettere al boundary di
+        /// riconoscere piante fisiche selezionabili.
+        /// </para>
+        /// </summary>
+        public void SetVegetationItems(IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems)
+        {
+            _vegetationItems = vegetationItems;
         }
 
         // =============================================================================
@@ -415,7 +437,9 @@ namespace Arcontio.View.ArcGraph
                     config,
                     viewState,
                     sceneFrame,
-                    _renderQueue,
+                    _renderQueue != null ? _renderQueue.ActorItems : null,
+                    _renderQueue != null ? _renderQueue.ObjectItems : null,
+                    _vegetationItems,
                     consumer);
 
             ApplySceneCameraZoomIfEnabled(

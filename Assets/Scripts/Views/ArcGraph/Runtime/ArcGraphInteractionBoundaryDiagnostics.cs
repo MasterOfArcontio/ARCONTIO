@@ -22,6 +22,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>HasValidCell</b>: conversione coordinate riuscita.</item>
     ///   <item><b>ActorCandidateCount</b>: actor visibili sulla cella.</item>
     ///   <item><b>ObjectCandidateCount</b>: oggetti visibili sulla cella.</item>
+    ///   <item><b>PlantCandidateCount</b>: piante fisiche visibili sulla cella.</item>
     ///   <item><b>TargetKind</b>: bersaglio prioritario finale.</item>
     ///   <item><b>Reason</b>: esito sintetico.</item>
     /// </list>
@@ -33,6 +34,7 @@ namespace Arcontio.View.ArcGraph
         public readonly bool HasValidCell;
         public readonly int ActorCandidateCount;
         public readonly int ObjectCandidateCount;
+        public readonly int PlantCandidateCount;
         public readonly ArcGraphInteractionTargetKind TargetKind;
         public readonly string Reason;
 
@@ -42,6 +44,7 @@ namespace Arcontio.View.ArcGraph
             bool hasValidCell,
             int actorCandidateCount,
             int objectCandidateCount,
+            int plantCandidateCount,
             ArcGraphInteractionTargetKind targetKind,
             string reason)
         {
@@ -50,6 +53,7 @@ namespace Arcontio.View.ArcGraph
             HasValidCell = hasValidCell;
             ActorCandidateCount = actorCandidateCount < 0 ? 0 : actorCandidateCount;
             ObjectCandidateCount = objectCandidateCount < 0 ? 0 : objectCandidateCount;
+            PlantCandidateCount = plantCandidateCount < 0 ? 0 : plantCandidateCount;
             TargetKind = targetKind;
             Reason = string.IsNullOrWhiteSpace(reason) ? "None" : reason;
         }

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Arcontio.View.ArcGraph
@@ -79,6 +80,7 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphObjectRuntimeSceneRendererDiagnostics LastObjectRendererDiagnostics => _lastObjectRendererDiagnostics;
         public ArcGraphVegetationRuntimeSceneRendererDiagnostics LastVegetationRendererDiagnostics => _lastVegetationRendererDiagnostics;
         public ArcGraphRenderQueue RenderQueue => _coordinator.RenderQueue;
+        public IReadOnlyList<ArcGraphVegetationRenderItem> VegetationItems => _coordinator.VegetationItems;
         public ArcGraphBootstrapRuntime Runtime => _coordinator.Runtime;
         public bool WrapperEnabled => wrapperEnabled;
 
@@ -670,6 +672,7 @@ namespace Arcontio.View.ArcGraph
             if (cameraViewportController != null)
                 interactionWrapper.SetViewState(cameraViewportController.ViewState);
             interactionWrapper.SetRenderQueue(_coordinator.RenderQueue);
+            interactionWrapper.SetVegetationItems(_coordinator.VegetationItems);
 
             if (enableInteractionWrapperAfterPush)
             {

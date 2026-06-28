@@ -94,6 +94,7 @@ namespace Arcontio.View.ArcGraph
                 cell,
                 7,
                 -1,
+                -1,
                 true,
                 false,
                 "ActorPicked");
@@ -109,6 +110,7 @@ namespace Arcontio.View.ArcGraph
                 cell,
                 -1,
                 -1,
+                -1,
                 true,
                 false,
                 "CellPicked");
@@ -121,6 +123,7 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphViewCoordinateResult.Invalid("PointerOverUi"),
                 ArcGraphInteractionTargetKind.UiBlocked,
                 new ArcGraphCellCoord(0, 0, 0),
+                -1,
                 -1,
                 -1,
                 false,

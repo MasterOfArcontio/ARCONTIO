@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using SocialViewer.UI;
 using UnityEngine;
 
@@ -36,6 +37,7 @@ namespace Arcontio.View.ArcGraph
 
         private readonly ArcUiSelectionController _selectionController = new();
         private ArcGraphRenderQueue _renderQueue;
+        private IReadOnlyList<ArcGraphVegetationRenderItem> _vegetationItems;
 
         public ArcUiSelectionTarget CurrentSelection => _selectionController.Current;
         public bool SelectionEnabled => selectionEnabled;
@@ -88,9 +90,11 @@ namespace Arcontio.View.ArcGraph
             bool hasSelectableTarget =
                 interactionFrame.TargetKind == ArcGraphInteractionTargetKind.Actor ||
                 interactionFrame.TargetKind == ArcGraphInteractionTargetKind.Object ||
+                interactionFrame.TargetKind == ArcGraphInteractionTargetKind.Plant ||
                 (interactionFrame.HasValidCell &&
                     (TryFindActorByCell(queue, interactionFrame.Cell, out _) ||
-                     TryFindObjectByCell(queue, interactionFrame.Cell, out _)));
+                     TryFindObjectByCell(queue, interactionFrame.Cell, out _) ||
+                     TryFindPlantByCell(_vegetationItems, interactionFrame.Cell, out _)));
 
             if (hasSelectableTarget)
                 ClearSelection();
@@ -120,6 +124,20 @@ namespace Arcontio.View.ArcGraph
         public void SetRenderQueue(ArcGraphRenderQueue renderQueue)
         {
             _renderQueue = renderQueue;
+        }
+
+        // =============================================================================
+        // SetVegetationItems
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Assegna gli item vegetazione ArcGraph correnti per arricchire la
+        /// selezione delle piante fisiche.
+        /// </para>
+        /// </summary>
+        public void SetVegetationItems(IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems)
+        {
+            _vegetationItems = vegetationItems;
         }
 
         // =============================================================================
@@ -184,6 +202,17 @@ namespace Arcontio.View.ArcGraph
                 return true;
             }
 
+            if (interactionFrame.TargetKind == ArcGraphInteractionTargetKind.Plant &&
+                interactionFrame.HasPlant)
+            {
+                if (TryFindPlantById(_vegetationItems, interactionFrame.PlantId, out ArcGraphVegetationRenderItem plant))
+                    SelectPlant(plant);
+                else
+                    SelectPlantId(interactionFrame.PlantId, interactionFrame.Cell);
+
+                return true;
+            }
+
             if (interactionFrame.HasValidCell &&
                 TryFindActorByCell(queue, interactionFrame.Cell, out ArcGraphActorRenderItem actorInCell))
             {
@@ -195,6 +224,13 @@ namespace Arcontio.View.ArcGraph
                 TryFindObjectByCell(queue, interactionFrame.Cell, out ArcGraphObjectRenderItem objectInCell))
             {
                 SelectObject(objectInCell, interactionFrame.Cell);
+                return true;
+            }
+
+            if (interactionFrame.HasValidCell &&
+                TryFindPlantByCell(_vegetationItems, interactionFrame.Cell, out ArcGraphVegetationRenderItem plantInCell))
+            {
+                SelectPlant(plantInCell);
                 return true;
             }
 
@@ -254,6 +290,37 @@ namespace Arcontio.View.ArcGraph
             {
                 ArcGraphObjectRenderItem item = queue.ObjectItems[i];
                 if (item.ObjectId == objectId && item.IsVisible && !item.IsHeld)
+                {
+                    selected = item;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryFindPlantById
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca una pianta fisica selezionabile nella lista vegetazione derivata.
+        /// </para>
+        /// </summary>
+        private static bool TryFindPlantById(
+            IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems,
+            int plantId,
+            out ArcGraphVegetationRenderItem selected)
+        {
+            selected = default;
+
+            if (vegetationItems == null || plantId <= 0)
+                return false;
+
+            for (int i = 0; i < vegetationItems.Count; i++)
+            {
+                ArcGraphVegetationRenderItem item = vegetationItems[i];
+                if (item.IsVisible && item.IsPhysicalPlant && item.PlantId == plantId)
                 {
                     selected = item;
                     return true;
@@ -336,6 +403,40 @@ namespace Arcontio.View.ArcGraph
                     cell.X < item.Cell.X + item.FootprintWidth &&
                     cell.Y >= item.Cell.Y &&
                     cell.Y < item.Cell.Y + item.FootprintHeight)
+                {
+                    selected = item;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        // =============================================================================
+        // TryFindPlantByCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca una pianta fisica visibile sulla cella gia' risolta dal boundary.
+        /// </para>
+        /// </summary>
+        private static bool TryFindPlantByCell(
+            IReadOnlyList<ArcGraphVegetationRenderItem> vegetationItems,
+            ArcGraphCellCoord cell,
+            out ArcGraphVegetationRenderItem selected)
+        {
+            selected = default;
+
+            if (vegetationItems == null)
+                return false;
+
+            for (int i = 0; i < vegetationItems.Count; i++)
+            {
+                ArcGraphVegetationRenderItem item = vegetationItems[i];
+                if (!item.IsVisible || !item.IsPhysicalPlant)
+                    continue;
+
+                if (item.Cell.Z == cell.Z && item.Cell.X == cell.X && item.Cell.Y == cell.Y)
                 {
                     selected = item;
                     return true;
@@ -444,6 +545,49 @@ namespace Arcontio.View.ArcGraph
                 objectId.ToString(),
                 cell,
                 "Oggetto " + objectId,
+                "ArcGraphUiSelectionSceneConsumer");
+
+            _selectionController.Select(target);
+        }
+
+        // =============================================================================
+        // SelectPlant
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Converte un item pianta fisica in selection target UI read-only.
+        /// </para>
+        /// </summary>
+        private void SelectPlant(ArcGraphVegetationRenderItem plant)
+        {
+            var target = new ArcUiSelectionTarget(
+                ArcUiSelectionTargetKind.Plant,
+                plant.PlantId.ToString(),
+                plant.Cell,
+                "Pianta #" + plant.PlantId,
+                "ArcGraphUiSelectionSceneConsumer");
+
+            _selectionController.Select(target);
+        }
+
+        // =============================================================================
+        // SelectPlantId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea una selezione pianta minimale quando il frame contiene l'id ma la
+        /// lista vegetazione corrente non permette di recuperare l'item completo.
+        /// </para>
+        /// </summary>
+        private void SelectPlantId(
+            int plantId,
+            ArcGraphCellCoord cell)
+        {
+            var target = new ArcUiSelectionTarget(
+                ArcUiSelectionTargetKind.Plant,
+                plantId.ToString(),
+                cell,
+                "Pianta #" + plantId,
                 "ArcGraphUiSelectionSceneConsumer");
 
             _selectionController.Select(target);

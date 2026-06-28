@@ -171,7 +171,11 @@ namespace Arcontio.View.ArcGraph
                 hiddenReason = "EmptyVegetationDensity";
             }
 
-            bool isAreaAggregate = lodProfile.VegetationMode == ArcGraphVegetationLodMode.AreaAggregate;
+            // Le piante fisiche restano entita' visuali singole anche quando il LOD
+            // aggrega la vegetazione diffusa. Questo mantiene selezione e sorting
+            // coerenti senza promuoverle a WorldObject.
+            bool isAreaAggregate = !snapshot.IsPhysicalPlant
+                                  && lodProfile.VegetationMode == ArcGraphVegetationLodMode.AreaAggregate;
             bool allowsAnimation = contract.AllowsArcGraphSpriteAnimation
                                    && lodProfile.AllowsSpriteAnimation
                                    && lodProfile.VegetationMode == ArcGraphVegetationLodMode.IndividualAnimatedSprite;
@@ -197,7 +201,9 @@ namespace Arcontio.View.ArcGraph
                 isAreaAggregate,
                 isVisible,
                 hiddenReason,
-                sortKey);
+                sortKey,
+                snapshot.PlantId,
+                snapshot.IsPhysicalPlant);
         }
 
         private static string ResolveSpriteKey(
@@ -217,6 +223,9 @@ namespace Arcontio.View.ArcGraph
 
         private static int ResolveStableEntityId(ArcGraphVegetationVisualSnapshot snapshot)
         {
+            if (snapshot.IsPhysicalPlant && snapshot.PlantId > 0)
+                return snapshot.PlantId;
+
             unchecked
             {
                 int hash = 17;
