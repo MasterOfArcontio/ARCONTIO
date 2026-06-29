@@ -17501,8 +17501,8 @@ La fase `v0.71` non deve introdurre un nuovo macro-sistema simulativo. Deve rend
 | v0.71.01 | Trasparenza e sagome ArcGraph dietro muri alti | ✅ |
 | v0.71.02 | Correzione bug Biosfera: piante/vegetazione non devono crescere su acqua, stone o tile artificiali | ✅ |
 | v0.71.03 | Fix lineette/sfasamento terrain atlas tra celle e chunk | ✅ |
-| v0.71.04 | Gestione completa porte: verticali, orizzontali, aperte, chiuse e chiuse a chiave | ⏳ |
-| v0.71.05 | Inserimento job mancante di raccolta risorse biologiche | ⏳ |
+| v0.71.04 | Gestione completa porte: verticali, orizzontali, aperte, chiuse e chiuse a chiave | ✅ |
+| v0.71.05 | Raccolta risorse biologiche: cataloghi, nutrizione, inventario, landmark, memory, belief, decision e job | 🔄 |
 | v0.71.06 | Consolidamento finale config, asset atlas/sprite naming e verifica runtime UI + Biosfera | ⏳ |
 | v0.71.07 | Modifica oggetti completa: food stock, owner oggetto e stato porta autorizzati | ✅ |
 | v0.71.08 | Selezione mouse piante fisiche ArcGraph con inspector read-only | ✅ |
@@ -17572,7 +17572,31 @@ Il rendering deve restare derivato da stato/snapshot autorizzato. La UI non deve
 
 ### Job raccolta risorse biologiche
 
-La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolta risorse biologiche. In `v0.71` va recuperato almeno il job mancante necessario a rendere utilizzabili le risorse esposte dalla Biosfera.
+La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolta risorse biologiche. In `v0.71` la feature viene riaperta come macro-step articolato, per evitare di comprimere cataloghi, nutrizione, inventario, landmark, memory, belief, decision e job in una sola patch fragile.
+
+### Sotto-step v0.71.05
+
+| Checkpoint | Task | Stato |
+|---|---|---|
+| v0.71.05.A | Catalogo prodotti biologici separato + coerenza object catalog | ✅ |
+| v0.71.05.B | Nutrizione typed e revisione fame per prodotti alimentari | ⏳ |
+| v0.71.05.C | Inventario typed basilare NPC, isolato e compatibile legacy | ⏳ |
+| v0.71.05.D | Stato reale risorse per singola pianta | ⏳ |
+| v0.71.05.E | Ricrescita risorse biologiche nel tempo | ⏳ |
+| v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ⏳ |
+| v0.71.05.G | Query operativa job: pianta piu' vicina che fornisce risorsa X | ⏳ |
+| v0.71.05.H | Landmark provider centralizzato per moduli | ⏳ |
+| v0.71.05.I | Landmark di supporto in spazi aperti privi di landmark | ⏳ |
+| v0.71.05.J | Memory trace percezione landmark biologico | ⏳ |
+| v0.71.05.K | Memory trace ricerca risorsa da landmark biologico | ⏳ |
+| v0.71.05.L | Belief potenziale: qui puo' esserci risorsa X | ⏳ |
+| v0.71.05.M | Belief osservato: qui esistono circa N risorse X | ⏳ |
+| v0.71.05.N | Decisioni: cerca cibo, cerca non-cibo, cerca area biologica con risorsa | ⏳ |
+| v0.71.05.O | Costo stanchezza per step job e scoring decisionale | ⏳ |
+| v0.71.05.P | Nuovi step job: search biological landmark, query resource, harvest | ⏳ |
+| v0.71.05.Q | Revisione `EatPrivateFood` su inventario typed e chiusura compatibilita' legacy | ⏳ |
+
+La `v0.71.05.A` separa il catalogo prodotti biologici dal catalogo specie vegetali. La Biosfera continua a dichiarare quali `productKey` una specie puo' produrre; il nuovo catalogo prodotti definisce il contratto semantico del prodotto; il catalogo oggetti resta owner di item, proprieta' e nutrizione concreta.
 
 Flusso atteso:
 

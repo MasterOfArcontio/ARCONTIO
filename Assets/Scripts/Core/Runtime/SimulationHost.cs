@@ -527,6 +527,7 @@ namespace Arcontio.Core
         [SerializeField] private int maxBiosphereDebugEnvironmentDaysPerUnityFrame = 2;
 
         private const string EnvironmentPlantCatalogResourcePath = "Arcontio/Config/environment_plants";
+        private const string EnvironmentBiologicalProductCatalogResourcePath = "Arcontio/Config/environment_biological_products";
         private const string EnvironmentNaturalGrowthConfigResourcePath = "Arcontio/Config/environment_natural_growth";
 
         private int _runtimeTickSpeedMultiplier = 1;
@@ -553,6 +554,8 @@ namespace Arcontio.Core
         private EnvironmentNaturalGrowthConfig _environmentNaturalGrowthConfig = new();
         private EnvironmentPlantCatalog _environmentPlantCatalog =
             new EnvironmentPlantCatalogConfig().ToCatalog();
+        private EnvironmentBiologicalProductCatalog _environmentBiologicalProductCatalog =
+            new EnvironmentBiologicalProductCatalogConfig().ToCatalog();
         private readonly EnvironmentHistoryBuffer _biosphereHistoryBuffer = new EnvironmentHistoryBuffer();
         private readonly List<IEnvironmentRuntimeEventListener> _environmentRuntimeEventListeners = new();
         private EnvironmentRuntimeEvent _lastEnvironmentRuntimeEvent;
@@ -1048,6 +1051,7 @@ namespace Arcontio.Core
             // 4.1) Carichiamo definizioni oggetti da JSON (Resources/Config/object_defs.json).
             // ******************************************************************************************************************************
             LoadWorldRuntimeJsonConfig(_world);
+            LoadAndValidateEnvironmentBiologicalProductCatalog(_world);
 
             // ******************************************************************************************************************************
             // 4.2) Carica parametri fame/sonno da JSON
@@ -2421,6 +2425,10 @@ namespace Arcontio.Core
 
             EnvironmentPlantCatalogConfig plantCatalogConfig =
                 LoadEnvironmentPlantCatalogConfigFromResources();
+            EnvironmentBiologicalProductCatalogConfig biologicalProductCatalogConfig =
+                LoadAndValidateEnvironmentBiologicalProductCatalog(
+                    loadedWorld,
+                    plantCatalogConfig);
             _environmentPlantCatalog = plantCatalogConfig.ToCatalog();
 
             if (!HasPersistedEnvironmentSection(data))
@@ -2434,6 +2442,7 @@ namespace Arcontio.Core
             EnvironmentFoundationConfig environmentConfig =
                 EnvironmentFoundationBootstrap.CreateDefaultConfig();
             environmentConfig.plantCatalog = plantCatalogConfig;
+            environmentConfig.biologicalProductCatalog = biologicalProductCatalogConfig;
 
             EnvironmentLoadResult loadResult =
                 EnvironmentPersistenceResolver.Restore(
@@ -2583,9 +2592,17 @@ namespace Arcontio.Core
             EnvironmentFoundationConfig config = EnvironmentFoundationBootstrap.CreateDefaultConfig();
             config.areas = world.InitialEnvironmentAreaSetConfig ?? new EnvironmentAreaSetConfig();
             config.plantCatalog = LoadEnvironmentPlantCatalogConfigFromResources();
+            config.biologicalProductCatalog = LoadEnvironmentBiologicalProductCatalogConfigFromResources();
 
             EnvironmentFoundationBootstrapResult bootstrap =
                 EnvironmentFoundationBootstrap.Bootstrap(config);
+            _environmentPlantCatalog = bootstrap.PlantCatalog;
+            _environmentBiologicalProductCatalog = bootstrap.BiologicalProductCatalog;
+            LogEnvironmentBiologicalProductCatalogValidation(
+                EnvironmentBiologicalProductCatalogValidator.Validate(
+                    config.plantCatalog,
+                    config.biologicalProductCatalog,
+                    world.ObjectDefs));
 
             world.SetEnvironmentState(bootstrap.Build.State);
             world.EnvironmentState?.BuildInitialBiologicalOccupancy(world);
@@ -2635,6 +2652,117 @@ namespace Arcontio.Core
                     "[SimulationHost] Environment plant catalog config failed to load. " +
                     $"path={EnvironmentPlantCatalogResourcePath} error={ex.Message}");
                 return new EnvironmentPlantCatalogConfig();
+            }
+        }
+
+        // =============================================================================
+        // LoadAndValidateEnvironmentBiologicalProductCatalog
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica il catalogo prodotti biologici e valida la coerenza con specie e
+        /// catalogo oggetti gia' installato nel World.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: contratti biologici verificati ai bordi</b></para>
+        /// <para>
+        /// Il prodotto biologico non deve essere inventato dal job o dalla UI. Questo
+        /// metodo concentra il caricamento nel runtime host, vicino agli altri
+        /// cataloghi, e lascia ai sistemi futuri un catalogo read-only gia'
+        /// normalizzato. La validazione produce diagnostica, ma non muta World e non
+        /// attiva raccolte automatiche.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Load</b>: legge il JSON prodotti biologici da Resources.</item>
+        ///   <item><b>Catalog</b>: aggiorna il campo read-only dell'host.</item>
+        ///   <item><b>Validation</b>: controlla specie -> prodotto -> ObjectDef.</item>
+        /// </list>
+        /// </summary>
+        private EnvironmentBiologicalProductCatalogConfig LoadAndValidateEnvironmentBiologicalProductCatalog(
+            World world,
+            EnvironmentPlantCatalogConfig plantCatalogConfig = null)
+        {
+            EnvironmentBiologicalProductCatalogConfig biologicalProductCatalogConfig =
+                LoadEnvironmentBiologicalProductCatalogConfigFromResources();
+
+            _environmentBiologicalProductCatalog =
+                biologicalProductCatalogConfig.ToCatalog();
+
+            EnvironmentPlantCatalogConfig safePlantCatalogConfig =
+                plantCatalogConfig ?? LoadEnvironmentPlantCatalogConfigFromResources();
+            LogEnvironmentBiologicalProductCatalogValidation(
+                EnvironmentBiologicalProductCatalogValidator.Validate(
+                    safePlantCatalogConfig,
+                    biologicalProductCatalogConfig,
+                    world?.ObjectDefs));
+
+            return biologicalProductCatalogConfig;
+        }
+
+        // =============================================================================
+        // LoadEnvironmentBiologicalProductCatalogConfigFromResources
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Carica da Resources il catalogo prodotti biologici separato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: fallback data-only, nessun job implicito</b></para>
+        /// <para>
+        /// Se il file manca o non e' leggibile, il runtime usa il catalogo default
+        /// tipizzato. Questo mantiene avviabile la simulazione, ma non crea risorse
+        /// reali, non riempie inventari e non modifica lo stato della Biosfera.
+        /// </para>
+        /// </summary>
+        private static EnvironmentBiologicalProductCatalogConfig LoadEnvironmentBiologicalProductCatalogConfigFromResources()
+        {
+            TextAsset asset = Resources.Load<TextAsset>(EnvironmentBiologicalProductCatalogResourcePath);
+            if (asset == null || string.IsNullOrWhiteSpace(asset.text))
+                return new EnvironmentBiologicalProductCatalogConfig();
+
+            try
+            {
+                EnvironmentBiologicalProductCatalogConfig config =
+                    JsonUtility.FromJson<EnvironmentBiologicalProductCatalogConfig>(asset.text);
+
+                return config ?? new EnvironmentBiologicalProductCatalogConfig();
+            }
+            catch (System.Exception ex)
+            {
+                Debug.LogWarning(
+                    "[SimulationHost] Environment biological product catalog config failed to load. " +
+                    $"path={EnvironmentBiologicalProductCatalogResourcePath} error={ex.Message}");
+                return new EnvironmentBiologicalProductCatalogConfig();
+            }
+        }
+
+        // =============================================================================
+        // LogEnvironmentBiologicalProductCatalogValidation
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Scrive su log le diagnostiche del catalogo prodotti biologici.
+        /// </para>
+        /// </summary>
+        private static void LogEnvironmentBiologicalProductCatalogValidation(
+            EnvironmentConfigValidationResult validation)
+        {
+            if (validation == null || validation.Issues == null || validation.Issues.Count == 0)
+                return;
+
+            for (int i = 0; i < validation.Issues.Count; i++)
+            {
+                EnvironmentConfigValidationIssue issue = validation.Issues[i];
+                string message =
+                    $"[SimulationHost] Biological product catalog validation {issue.Severity}: " +
+                    $"{issue.Code} - {issue.Message}";
+
+                if (issue.Severity == EnvironmentConfigValidationSeverity.Error)
+                    Debug.LogError(message);
+                else
+                    Debug.LogWarning(message);
             }
         }
 

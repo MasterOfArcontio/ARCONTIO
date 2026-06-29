@@ -26,6 +26,7 @@ namespace Arcontio.Core.Environment
     ///   <item><b>climate</b>: configurazione clima globale.</item>
     ///   <item><b>areas</b>: set aree ambientali.</item>
     ///   <item><b>plantCatalog</b>: catalogo specie vegetali importanti.</item>
+    ///   <item><b>biologicalProductCatalog</b>: catalogo prodotti biologici condivisi.</item>
     /// </list>
     /// </summary>
     [Serializable]
@@ -40,6 +41,8 @@ namespace Arcontio.Core.Environment
         public EnvironmentClimateConfig climate = new EnvironmentClimateConfig();
         public EnvironmentAreaSetConfig areas = new EnvironmentAreaSetConfig();
         public EnvironmentPlantCatalogConfig plantCatalog = new EnvironmentPlantCatalogConfig();
+        public EnvironmentBiologicalProductCatalogConfig biologicalProductCatalog =
+            new EnvironmentBiologicalProductCatalogConfig();
 
         // =============================================================================
         // ResolveInitialEnvironmentTicks
@@ -112,6 +115,7 @@ namespace Arcontio.Core.Environment
         public EnvironmentFoundationBuildResult Build { get; }
         public EnvironmentSnapshot Snapshot { get; }
         public EnvironmentPlantCatalog PlantCatalog { get; }
+        public EnvironmentBiologicalProductCatalog BiologicalProductCatalog { get; }
         public bool IsValid => Validation == null || Validation.IsValid;
 
         // =============================================================================
@@ -126,7 +130,8 @@ namespace Arcontio.Core.Environment
             EnvironmentConfigValidationResult validation,
             EnvironmentFoundationBuildResult build,
             EnvironmentSnapshot snapshot,
-            EnvironmentPlantCatalog plantCatalog)
+            EnvironmentPlantCatalog plantCatalog,
+            EnvironmentBiologicalProductCatalog biologicalProductCatalog = null)
         {
             Validation = validation;
             Build = build ?? new EnvironmentFoundationBuildResult(
@@ -134,6 +139,8 @@ namespace Arcontio.Core.Environment
                 new EnvironmentFoundationBuildReport(0, 0, 0, 0, 0, 0));
             Snapshot = snapshot ?? Build.State.CreateSnapshot();
             PlantCatalog = plantCatalog ?? new EnvironmentPlantCatalog(null);
+            BiologicalProductCatalog =
+                biologicalProductCatalog ?? new EnvironmentBiologicalProductCatalog(null);
         }
     }
 
@@ -182,12 +189,16 @@ namespace Arcontio.Core.Environment
             var plantCatalog = safeConfig.plantCatalog != null
                 ? safeConfig.plantCatalog.ToCatalog()
                 : new EnvironmentPlantCatalogConfig().ToCatalog();
+            var biologicalProductCatalog = safeConfig.biologicalProductCatalog != null
+                ? safeConfig.biologicalProductCatalog.ToCatalog()
+                : new EnvironmentBiologicalProductCatalogConfig().ToCatalog();
 
             return new EnvironmentFoundationBootstrapResult(
                 validation,
                 build,
                 snapshot,
-                plantCatalog);
+                plantCatalog,
+                biologicalProductCatalog);
         }
 
         // =============================================================================
@@ -208,7 +219,8 @@ namespace Arcontio.Core.Environment
                 calendar = new EnvironmentCalendarConfig(),
                 climate = new EnvironmentClimateConfig(),
                 areas = new EnvironmentAreaSetConfig(),
-                plantCatalog = new EnvironmentPlantCatalogConfig()
+                plantCatalog = new EnvironmentPlantCatalogConfig(),
+                biologicalProductCatalog = new EnvironmentBiologicalProductCatalogConfig()
             };
         }
     }

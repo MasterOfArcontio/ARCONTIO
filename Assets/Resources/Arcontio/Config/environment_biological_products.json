@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "products": [
+    {
+      "productKey": "wood_log",
+      "objectDefId": "wood_log",
+      "categories": [ "Material" ],
+      "isFood": false,
+      "isTransportable": true,
+      "recommendedToolKey": "axe",
+      "defaultHarvestEffort": 0.65,
+      "defaultCarryUnits": 1
+    },
+    {
+      "productKey": "acorn",
+      "objectDefId": "acorn",
+      "categories": [ "Food", "Seed" ],
+      "isFood": true,
+      "isTransportable": true,
+      "recommendedToolKey": "",
+      "defaultHarvestEffort": 0.20,
+      "defaultCarryUnits": 1
+    },
+    {
+      "productKey": "berry",
+      "objectDefId": "berry",
+      "categories": [ "Food" ],
+      "isFood": true,
+      "isTransportable": true,
+      "recommendedToolKey": "",
+      "defaultHarvestEffort": 0.15,
+      "defaultCarryUnits": 1
+    }
+  ]
+}
