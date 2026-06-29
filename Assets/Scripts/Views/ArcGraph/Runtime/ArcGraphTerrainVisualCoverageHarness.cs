@@ -145,6 +145,7 @@ namespace Arcontio.View.ArcGraph
                 tilePixels: 32,
                 atlasWidthPixels: 128,
                 atlasHeightPixels: 32,
+                uvInsetPixels: 0f,
                 includeAllTiles
                     ? new[]
                     {

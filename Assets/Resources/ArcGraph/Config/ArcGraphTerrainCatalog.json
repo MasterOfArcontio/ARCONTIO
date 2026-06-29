@@ -1,6 +1,7 @@
 {
   "terrainAtlasResourcePath": "ArcGraph/Atlas/TerrainAtlas",
   "tilePixels": 32,
+  "uvInsetPixels": 0.5,
   "atlasWidthPixels": 512,
   "atlasHeightPixels": 512,
   "tiles": [

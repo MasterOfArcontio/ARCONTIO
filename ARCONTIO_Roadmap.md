@@ -17500,7 +17500,7 @@ La fase `v0.71` non deve introdurre un nuovo macro-sistema simulativo. Deve rend
 |---|---|---|
 | v0.71.01 | Trasparenza e sagome ArcGraph dietro muri alti | ✅ |
 | v0.71.02 | Correzione bug Biosfera: piante/vegetazione non devono crescere su acqua, stone o tile artificiali | ✅ |
-| v0.71.03 | Fix lineette/sfasamento terrain atlas tra celle e chunk | ⏳ |
+| v0.71.03 | Fix lineette/sfasamento terrain atlas tra celle e chunk | ✅ |
 | v0.71.04 | Gestione completa porte: verticali, orizzontali, aperte, chiuse e chiuse a chiave | ⏳ |
 | v0.71.05 | Inserimento job mancante di raccolta risorse biologiche | ⏳ |
 | v0.71.06 | Consolidamento finale config, asset atlas/sprite naming e verifica runtime UI + Biosfera | ⏳ |

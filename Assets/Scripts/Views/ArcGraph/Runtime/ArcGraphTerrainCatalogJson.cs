@@ -94,6 +94,7 @@ namespace Arcontio.View.ArcGraph
                 tilePixels: 32,
                 atlasWidthPixels: 32,
                 atlasHeightPixels: 32,
+                uvInsetPixels: 0.5f,
                 new[]
                 {
                     new ArcGraphTerrainCatalogEntry(0, "fallback", 0, 0)
@@ -121,6 +122,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>terrainAtlasResourcePath</b>: path descrittiva dell'atlas.</item>
     ///   <item><b>tilePixels</b>: dimensione tile atlas.</item>
     ///   <item><b>atlasWidthPixels/atlasHeightPixels</b>: dimensioni fallback.</item>
+    ///   <item><b>uvInsetPixels</b>: rientro UV anti-bleeding, disattivabile con zero.</item>
     ///   <item><b>tiles</b>: elenco tile id -> UV.</item>
     /// </list>
     /// </summary>
@@ -131,6 +133,7 @@ namespace Arcontio.View.ArcGraph
         public int tilePixels = 32;
         public int atlasWidthPixels;
         public int atlasHeightPixels;
+        public float uvInsetPixels = 0.5f;
         public ArcGraphTerrainCatalogTileDto[] tiles;
 
         // =============================================================================
@@ -150,6 +153,7 @@ namespace Arcontio.View.ArcGraph
                 tilePixels,
                 atlasWidthPixels,
                 atlasHeightPixels,
+                uvInsetPixels,
                 entries);
         }
 

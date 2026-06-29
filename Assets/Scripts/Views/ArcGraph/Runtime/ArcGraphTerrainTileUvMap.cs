@@ -31,11 +31,13 @@ namespace Arcontio.View.ArcGraph
     /// </summary>
     public sealed class ArcGraphTerrainTileUvMap
     {
+        private const float MinimumInsetSafetyPixels = 0.0001f;
         private readonly Dictionary<int, Vector2Int> _tileUv = new();
 
         public int AtlasWidthPixels { get; }
         public int AtlasHeightPixels { get; }
         public int TilePixels { get; }
+        public float UvInsetPixels { get; }
         public int TilesPerRow { get; }
         public int TilesPerColumn { get; }
         public bool IsValid => TilesPerRow > 0 && TilesPerColumn > 0;
@@ -59,11 +61,13 @@ namespace Arcontio.View.ArcGraph
         public ArcGraphTerrainTileUvMap(
             int atlasWidthPixels,
             int atlasHeightPixels,
-            int tilePixels)
+            int tilePixels,
+            float uvInsetPixels = 0.5f)
         {
             AtlasWidthPixels = atlasWidthPixels > 0 ? atlasWidthPixels : 1;
             AtlasHeightPixels = atlasHeightPixels > 0 ? atlasHeightPixels : 1;
             TilePixels = tilePixels > 0 ? tilePixels : 1;
+            UvInsetPixels = NormalizeInsetPixels(uvInsetPixels, TilePixels);
 
             TilesPerRow = Mathf.Max(1, AtlasWidthPixels / TilePixels);
             TilesPerColumn = Mathf.Max(1, AtlasHeightPixels / TilePixels);
@@ -139,15 +143,17 @@ namespace Arcontio.View.ArcGraph
             if (!found)
                 cell = Vector2Int.zero;
 
-            float invW = 1f / TilesPerRow;
-            float invH = 1f / TilesPerColumn;
-
             int yFromBottom = (TilesPerColumn - 1) - cell.y;
 
-            float uMin = cell.x * invW;
-            float vMin = yFromBottom * invH;
-            float uMax = uMin + invW;
-            float vMax = vMin + invH;
+            // L'inset sposta le UV appena dentro la cella atlas. Questo evita che
+            // il campionamento del materiale terrain legga esattamente il bordo fra
+            // due slice adiacenti durante zoom/pan, senza cambiare geometria mesh,
+            // tile id, asset PNG o import settings.
+            float inset = UvInsetPixels;
+            float uMin = ((cell.x * TilePixels) + inset) / AtlasWidthPixels;
+            float vMin = ((yFromBottom * TilePixels) + inset) / AtlasHeightPixels;
+            float uMax = (((cell.x + 1) * TilePixels) - inset) / AtlasWidthPixels;
+            float vMax = (((yFromBottom + 1) * TilePixels) - inset) / AtlasHeightPixels;
 
             uv0 = new Vector2(uMin, vMin);
             uv1 = new Vector2(uMax, vMin);
@@ -155,6 +161,17 @@ namespace Arcontio.View.ArcGraph
             uv3 = new Vector2(uMin, vMax);
 
             return found;
+        }
+
+        private static float NormalizeInsetPixels(
+            float requestedInsetPixels,
+            int tilePixels)
+        {
+            if (requestedInsetPixels <= 0f)
+                return 0f;
+
+            float maxInset = Mathf.Max(0f, (tilePixels * 0.5f) - MinimumInsetSafetyPixels);
+            return Mathf.Min(requestedInsetPixels, maxInset);
         }
     }
 }

@@ -76,6 +76,7 @@ namespace Arcontio.View.ArcGraph
     ///   <item><b>AtlasResourcePath</b>: path descrittiva dell'atlas usato dal catalogo.</item>
     ///   <item><b>TilePixels</b>: dimensione in pixel di una tile atlas.</item>
     ///   <item><b>AtlasWidthPixels/AtlasHeightPixels</b>: dimensioni fallback dell'atlas.</item>
+    ///   <item><b>UvInsetPixels</b>: rientro UV anti-bleeding applicato dentro ogni slice.</item>
     ///   <item><b>Entries</b>: entry normalizzate ordinate come nel JSON.</item>
     ///   <item><b>BuildUvMap</b>: crea la UV map consumata dal mesh builder terrain.</item>
     /// </list>
@@ -88,6 +89,7 @@ namespace Arcontio.View.ArcGraph
         public int TilePixels { get; }
         public int AtlasWidthPixels { get; }
         public int AtlasHeightPixels { get; }
+        public float UvInsetPixels { get; }
         public int EntryCount => _entries.Length;
         public IReadOnlyList<ArcGraphTerrainCatalogEntry> Entries => _entries;
 
@@ -104,10 +106,12 @@ namespace Arcontio.View.ArcGraph
             int tilePixels,
             int atlasWidthPixels,
             int atlasHeightPixels,
+            float uvInsetPixels,
             ArcGraphTerrainCatalogEntry[] entries)
         {
             AtlasResourcePath = atlasResourcePath ?? string.Empty;
             TilePixels = tilePixels > 0 ? tilePixels : 32;
+            UvInsetPixels = uvInsetPixels < 0f ? 0f : uvInsetPixels;
             _entries = entries != null ? CopyEntries(entries) : new ArcGraphTerrainCatalogEntry[0];
             AtlasWidthPixels = ResolveAtlasPixels(atlasWidthPixels, useX: true);
             AtlasHeightPixels = ResolveAtlasPixels(atlasHeightPixels, useX: false);
@@ -134,7 +138,11 @@ namespace Arcontio.View.ArcGraph
             int atlasWidth = texture != null ? texture.width : AtlasWidthPixels;
             int atlasHeight = texture != null ? texture.height : AtlasHeightPixels;
 
-            var uvMap = new ArcGraphTerrainTileUvMap(atlasWidth, atlasHeight, TilePixels);
+            var uvMap = new ArcGraphTerrainTileUvMap(
+                atlasWidth,
+                atlasHeight,
+                TilePixels,
+                UvInsetPixels);
             for (int i = 0; i < _entries.Length; i++)
             {
                 ArcGraphTerrainCatalogEntry entry = _entries[i];
