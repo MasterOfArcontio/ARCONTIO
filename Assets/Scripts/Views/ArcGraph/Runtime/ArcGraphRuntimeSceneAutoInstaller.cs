@@ -404,6 +404,7 @@ namespace Arcontio.View.ArcGraph
             _objectOcclusionFadeController.SetInteractionWrapper(_interactionWrapper);
             _objectOcclusionFadeController.SetSelectionConsumer(_uiSelectionConsumer);
             _objectOcclusionFadeController.SetObjectRenderer(_objectRenderer);
+            _objectOcclusionFadeController.SetNpcRenderer(_npcRenderer);
             _objectOcclusionFadeController.SetSpriteResolverBehaviour(_spriteResolver);
             _objectOcclusionFadeController.SetControllerEnabled(true);
             _objectOcclusionFadeController.SetProcessInUpdate(true);

@@ -73,8 +73,11 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private string runtimeRootName = "ArcGraphNpcRuntimeRoot";
 
         private readonly Dictionary<int, ActorHandle> _actorPool = new();
+        private readonly Dictionary<int, int> _occlusionSilhouetteActorSortingCeilings = new();
         private readonly ArcGraphActorObjectSceneRenderPlan _plan = new();
         private readonly ArcGraphActorObjectSceneRenderPlanBuilder _planBuilder = new();
+        private Color _occlusionSilhouetteTint = new Color(0.7f, 0.9f, 1f, 0.34f);
+        private int _occlusionSilhouetteSortingOffset = 240;
         private Transform _root;
         private Sprite _generatedFallbackSprite;
         private Sprite _generatedShadowSprite;
@@ -118,7 +121,9 @@ namespace Arcontio.View.ArcGraph
             public SpriteRenderer Renderer;
             public SpriteRenderer ShadowRenderer;
             public SpriteRenderer SelectionMarkerRenderer;
+            public SpriteRenderer OcclusionSilhouetteRenderer;
             public readonly Dictionary<string, SpriteRenderer> PartRenderers = new();
+            public readonly Dictionary<string, SpriteRenderer> OcclusionPartRenderers = new();
             public string LastDirection = "south";
             public int LastSortingOrder;
             public bool WasTouchedThisFrame;
@@ -193,6 +198,67 @@ namespace Arcontio.View.ArcGraph
         public void SetRendererEnabled(bool enabled)
         {
             rendererEnabled = enabled;
+        }
+
+        // =============================================================================
+        // ReplaceActorOcclusionSilhouettes
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sostituisce l'insieme degli NPC che devono mostrare una sagoma leggera
+        /// sopra gli occluder visuali ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: overlay actor dentro il renderer actor</b></para>
+        /// <para>
+        /// Il controller muri decide quali actor sono coperti, ma non deve inventare
+        /// una seconda forma NPC. La copia trasparente viene prodotta qui, dove sono
+        /// gia' disponibili sprite, parti anatomiche, frame animato, posizione locale
+        /// e sorting dell'NPC reale. In questo modo la sagoma resta identica
+        /// all'actor corrente e non introduce accessi a <c>World</c> o scorciatoie UI.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>actorSortingCeilings</b>: actor coperti e sorting order massimo del muro che li copre.</item>
+        ///   <item><b>tint</b>: colore alpha applicato alle copie sprite.</item>
+        ///   <item><b>sortingOffset</b>: offset sopra il muro, senza cambiare il sorting reale dell'NPC.</item>
+        /// </list>
+        /// </summary>
+        public void ReplaceActorOcclusionSilhouettes(
+            IReadOnlyDictionary<int, int> actorSortingCeilings,
+            Color tint,
+            int sortingOffset)
+        {
+            _occlusionSilhouetteActorSortingCeilings.Clear();
+
+            if (actorSortingCeilings != null)
+            {
+                foreach (var pair in actorSortingCeilings)
+                {
+                    if (pair.Key > 0)
+                        _occlusionSilhouetteActorSortingCeilings[pair.Key] = pair.Value;
+                }
+            }
+
+            _occlusionSilhouetteTint = tint;
+            _occlusionSilhouetteSortingOffset = sortingOffset;
+            RefreshOcclusionSilhouettesForActiveHandles();
+        }
+
+        // =============================================================================
+        // ClearActorOcclusionSilhouettes
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Spegne tutte le sagome NPC di occlusione senza toccare renderer principali,
+        /// selezione, ombre, dati simulativi o queue ArcGraph.
+        /// </para>
+        /// </summary>
+        public void ClearActorOcclusionSilhouettes()
+        {
+            _occlusionSilhouetteActorSortingCeilings.Clear();
+            RefreshOcclusionSilhouettesForActiveHandles();
         }
 
         // =============================================================================
@@ -643,6 +709,7 @@ namespace Arcontio.View.ArcGraph
             SetPartRenderersEnabled(handle, false);
             ApplyActorShadow(handle, entry, contract, spriteResolver);
             ApplySelectionMarker(handle);
+            ApplyActorOcclusionSilhouette(handle);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
         }
@@ -757,6 +824,7 @@ namespace Arcontio.View.ArcGraph
             handle.LastSortingOrder = entry.SortingOrder;
             ApplySelectionMarker(handle);
             handle.Renderer.enabled = false;
+            ApplyActorOcclusionSilhouette(handle);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
             return true;
@@ -1063,6 +1131,216 @@ namespace Arcontio.View.ArcGraph
         private void HandleNpcSelectionChanged(int selectedNpcId)
         {
             RefreshSelectionMarkersForActiveHandles();
+        }
+
+        // =============================================================================
+        // RefreshOcclusionSilhouettesForActiveHandles
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riallinea le sagome di occlusione con gli handle NPC gia' materializzati.
+        /// </para>
+        ///
+        /// <para>
+        /// Il metodo e' volutamente scene-side: non ricostruisce snapshot e non
+        /// chiede dati nuovi alla simulazione. Copia solo lo stato dei renderer
+        /// gia' presenti, cosi' l'overlay segue animazione, facing e offset locali
+        /// dell'ultimo frame ArcGraph.
+        /// </para>
+        /// </summary>
+        private void RefreshOcclusionSilhouettesForActiveHandles()
+        {
+            foreach (var pair in _actorPool)
+            {
+                ActorHandle handle = pair.Value;
+                if (handle == null || handle.GameObject == null)
+                    continue;
+
+                ApplyActorOcclusionSilhouette(handle);
+            }
+        }
+
+        // =============================================================================
+        // ApplyActorOcclusionSilhouette
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica o spegne la copia trasparente dell'NPC usando i renderer reali
+        /// come sorgente visuale.
+        /// </para>
+        ///
+        /// <para><b>Dettaglio importante</b></para>
+        /// <para>
+        /// Gli NPC ArcGraph possono essere flat oppure layered. Nel caso flat si
+        /// copia il renderer principale; nel caso layered si copiano tutte le parti
+        /// attive. Non viene mai creato uno sprite sintetico: la sagoma deve avere
+        /// la stessa forma dell'NPC corrente, inclusa l'animazione.
+        /// </para>
+        /// </summary>
+        private void ApplyActorOcclusionSilhouette(ActorHandle handle)
+        {
+            int coveredSortingOrder = int.MinValue;
+            bool shouldShow =
+                handle != null &&
+                handle.ActorId > 0 &&
+                handle.GameObject != null &&
+                _occlusionSilhouetteActorSortingCeilings.TryGetValue(
+                    handle.ActorId,
+                    out coveredSortingOrder);
+
+            if (!shouldShow)
+            {
+                DisableActorOcclusionSilhouette(handle);
+                return;
+            }
+
+            bool hasLayeredParts = HasEnabledLayeredParts(handle);
+            if (hasLayeredParts)
+            {
+                if (handle.OcclusionSilhouetteRenderer != null)
+                    handle.OcclusionSilhouetteRenderer.enabled = false;
+
+                DisableOcclusionPartRenderers(handle);
+                bool copiedAnyPart = false;
+                foreach (var pair in handle.PartRenderers)
+                {
+                    SpriteRenderer source = pair.Value;
+                    if (source == null || !source.enabled || source.sprite == null)
+                        continue;
+
+                    SpriteRenderer target = GetOrCreateOcclusionPartRenderer(handle, pair.Key);
+                    copiedAnyPart |= CopyRendererVisualState(
+                        source,
+                        target,
+                        copyLocalTransform: true,
+                        coveredSortingOrder);
+                }
+
+                if (!copiedAnyPart)
+                    DisableOcclusionPartRenderers(handle);
+
+                return;
+            }
+
+            DisableOcclusionPartRenderers(handle);
+            SpriteRenderer flatRenderer = GetOrCreateOcclusionSilhouetteRenderer(handle);
+            CopyRendererVisualState(
+                handle.Renderer,
+                flatRenderer,
+                copyLocalTransform: false,
+                coveredSortingOrder);
+        }
+
+        private bool HasEnabledLayeredParts(ActorHandle handle)
+        {
+            if (handle == null)
+                return false;
+
+            foreach (var pair in handle.PartRenderers)
+            {
+                SpriteRenderer renderer = pair.Value;
+                if (renderer != null && renderer.enabled && renderer.sprite != null)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private void DisableActorOcclusionSilhouette(ActorHandle handle)
+        {
+            if (handle == null)
+                return;
+
+            if (handle.OcclusionSilhouetteRenderer != null)
+                handle.OcclusionSilhouetteRenderer.enabled = false;
+
+            DisableOcclusionPartRenderers(handle);
+        }
+
+        private void DisableOcclusionPartRenderers(ActorHandle handle)
+        {
+            if (handle == null)
+                return;
+
+            foreach (var pair in handle.OcclusionPartRenderers)
+            {
+                if (pair.Value != null)
+                    pair.Value.enabled = false;
+            }
+        }
+
+        private SpriteRenderer GetOrCreateOcclusionSilhouetteRenderer(ActorHandle handle)
+        {
+            if (handle.OcclusionSilhouetteRenderer != null)
+                return handle.OcclusionSilhouetteRenderer;
+
+            var go = new GameObject("ArcGraphNpcOcclusionSilhouette_" + handle.ActorId);
+            go.transform.SetParent(handle.GameObject.transform, false);
+            handle.OcclusionSilhouetteRenderer = go.AddComponent<SpriteRenderer>();
+            return handle.OcclusionSilhouetteRenderer;
+        }
+
+        private SpriteRenderer GetOrCreateOcclusionPartRenderer(
+            ActorHandle handle,
+            string partKey)
+        {
+            string safePartKey = string.IsNullOrWhiteSpace(partKey) ? "part" : partKey;
+            if (handle.OcclusionPartRenderers.TryGetValue(safePartKey, out SpriteRenderer renderer)
+                && renderer != null)
+            {
+                return renderer;
+            }
+
+            var go = new GameObject("ArcGraphNpcOcclusionPart_" + handle.ActorId + "_" + safePartKey);
+            go.transform.SetParent(handle.GameObject.transform, false);
+            renderer = go.AddComponent<SpriteRenderer>();
+            handle.OcclusionPartRenderers[safePartKey] = renderer;
+            return renderer;
+        }
+
+        private bool CopyRendererVisualState(
+            SpriteRenderer source,
+            SpriteRenderer target,
+            bool copyLocalTransform,
+            int coveredSortingOrder)
+        {
+            if (target == null)
+                return false;
+
+            if (source == null
+                || !source.enabled
+                || source.sprite == null
+                || source.sortingOrder > coveredSortingOrder)
+            {
+                target.enabled = false;
+                return false;
+            }
+
+            // La copia eredita coordinate locali, scala e rotazione del renderer
+            // sorgente solo per le parti realmente coperte dal muro nel sorting.
+            // Se una parte e' gia' sopra il muro resta normale: non viene duplicata,
+            // evitando il doppio NPC azzurro e rispettando la copertura parziale.
+            if (copyLocalTransform)
+            {
+                target.transform.localPosition = source.transform.localPosition;
+                target.transform.localScale = source.transform.localScale;
+                target.transform.localRotation = source.transform.localRotation;
+            }
+            else
+            {
+                target.transform.localPosition = Vector3.zero;
+                target.transform.localScale = Vector3.one;
+                target.transform.localRotation = Quaternion.identity;
+            }
+
+            target.sprite = source.sprite;
+            target.color = _occlusionSilhouetteTint;
+            target.flipX = source.flipX;
+            target.flipY = source.flipY;
+            target.sortingLayerID = source.sortingLayerID;
+            target.sortingOrder = source.sortingOrder + _occlusionSilhouetteSortingOffset;
+            target.enabled = true;
+            return true;
         }
 
         // =============================================================================
