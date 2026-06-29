@@ -60,6 +60,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphNpcRuntimeSceneRenderer _npcRenderer;
         private ArcGraphObjectRuntimeSceneRenderer _objectRenderer;
         private ArcGraphVegetationRuntimeSceneRenderer _vegetationRenderer;
+        private ArcGraphObjectOcclusionFadeController _objectOcclusionFadeController;
         private ArcGraphCameraViewportController _cameraViewportController;
         private ArcGraphInteractionSceneAdapterWrapper _interactionWrapper;
         private ArcGraphInteractionConsumerRouter _interactionRouter;
@@ -297,6 +298,7 @@ namespace Arcontio.View.ArcGraph
             _npcRenderer = _visualRoot.AddComponent<ArcGraphNpcRuntimeSceneRenderer>();
             _objectRenderer = _visualRoot.AddComponent<ArcGraphObjectRuntimeSceneRenderer>();
             _vegetationRenderer = _visualRoot.AddComponent<ArcGraphVegetationRuntimeSceneRenderer>();
+            _objectOcclusionFadeController = _visualRoot.AddComponent<ArcGraphObjectOcclusionFadeController>();
             _cameraViewportController = _visualRoot.AddComponent<ArcGraphCameraViewportController>();
             _interactionWrapper = _visualRoot.AddComponent<ArcGraphInteractionSceneAdapterWrapper>();
             _interactionRouter = _visualRoot.AddComponent<ArcGraphInteractionConsumerRouter>();
@@ -393,6 +395,18 @@ namespace Arcontio.View.ArcGraph
             // sheet#subSprite necessaria alla striscia muro 32x83 sliced.
             _objectRenderer.SetRuntimeWrapper(_wrapper);
             _objectRenderer.SetSpriteResolverBehaviour(_spriteResolver);
+
+            // La trasparenza/sagoma muri resta un controller visual-only separato:
+            // consuma queue, frame puntatore e selezione UI locale, poi applica
+            // solo alpha e overlay scene-side. Non riceve World, SimulationHost o
+            // gateway comandi.
+            _objectOcclusionFadeController.SetRuntimeWrapper(_wrapper);
+            _objectOcclusionFadeController.SetInteractionWrapper(_interactionWrapper);
+            _objectOcclusionFadeController.SetSelectionConsumer(_uiSelectionConsumer);
+            _objectOcclusionFadeController.SetObjectRenderer(_objectRenderer);
+            _objectOcclusionFadeController.SetSpriteResolverBehaviour(_spriteResolver);
+            _objectOcclusionFadeController.SetControllerEnabled(true);
+            _objectOcclusionFadeController.SetProcessInUpdate(true);
 
             // La vegetazione usa lo stesso resolver Resources degli oggetti. Se un
             // PNG reale manca, il renderer vegetazione mostra un fallback generato

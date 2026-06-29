@@ -44,6 +44,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private string runtimeRootName = "ArcGraphObjectRuntimeRoot";
 
         private readonly Dictionary<int, ObjectHandle> _objectPool = new();
+        private readonly Dictionary<int, float> _objectAlphaOverrides = new();
         private readonly ArcGraphActorObjectSceneRenderPlan _plan = new();
         private readonly ArcGraphActorObjectSceneRenderPlanBuilder _planBuilder = new();
         private Transform _root;
@@ -129,6 +130,79 @@ namespace Arcontio.View.ArcGraph
         public void SetSpriteResolverBehaviour(MonoBehaviour resolverBehaviour)
         {
             spriteResolverBehaviour = resolverBehaviour;
+        }
+
+        // =============================================================================
+        // SetObjectAlphaOverride
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica un alpha visuale temporaneo a un singolo oggetto materializzato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: effetto renderer-only</b></para>
+        /// <para>
+        /// L'override non entra nella render queue, non modifica object snapshot e
+        /// non cambia lo stato del <c>World</c>. E' un attributo di scena usato da
+        /// controller visuali come la trasparenza muri. Quando il renderer aggiorna
+        /// lo sprite dell'oggetto, riapplica lo stesso alpha senza perdere il fade.
+        /// </para>
+        /// </summary>
+        public void SetObjectAlphaOverride(
+            int objectId,
+            float alpha)
+        {
+            if (objectId <= 0)
+                return;
+
+            float safeAlpha = Mathf.Clamp01(alpha);
+            if (safeAlpha >= 0.999f)
+            {
+                ClearObjectAlphaOverride(objectId);
+                return;
+            }
+
+            _objectAlphaOverrides[objectId] = safeAlpha;
+
+            if (_objectPool.TryGetValue(objectId, out ObjectHandle handle))
+                ApplyObjectAlpha(handle);
+        }
+
+        // =============================================================================
+        // ClearObjectAlphaOverride
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove l'override alpha visuale di un oggetto e ripristina opacita'
+        /// piena sul renderer esistente.
+        /// </para>
+        /// </summary>
+        public void ClearObjectAlphaOverride(int objectId)
+        {
+            if (objectId <= 0)
+                return;
+
+            _objectAlphaOverrides.Remove(objectId);
+
+            if (_objectPool.TryGetValue(objectId, out ObjectHandle handle))
+                ApplyObjectAlpha(handle);
+        }
+
+        // =============================================================================
+        // ClearObjectAlphaOverrides
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cancella tutti gli alpha visuali temporanei applicati dal controller
+        /// esterno.
+        /// </para>
+        /// </summary>
+        public void ClearObjectAlphaOverrides()
+        {
+            _objectAlphaOverrides.Clear();
+
+            foreach (var pair in _objectPool)
+                ApplyObjectAlpha(pair.Value);
         }
 
         [ContextMenu("ArcGraph/Render Object Runtime From Wrapper Queue")]
@@ -226,6 +300,7 @@ namespace Arcontio.View.ArcGraph
         public void ClearRuntimeRenderer()
         {
             _objectPool.Clear();
+            _objectAlphaOverrides.Clear();
 
             if (_root == null)
                 return;
@@ -377,8 +452,38 @@ namespace Arcontio.View.ArcGraph
             handle.Renderer.sprite = sprite;
             handle.Renderer.sortingOrder = entry.SortingOrder;
             handle.Renderer.enabled = true;
+            ApplyObjectAlpha(handle);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
+        }
+
+        // =============================================================================
+        // ApplyObjectAlpha
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Applica al renderer Unity il colore derivato dall'override alpha
+        /// corrente.
+        /// </para>
+        /// </summary>
+        private void ApplyObjectAlpha(ObjectHandle handle)
+        {
+            if (handle == null || handle.Renderer == null)
+                return;
+
+            float alpha = ResolveObjectAlpha(handle.ObjectId);
+            handle.Renderer.color = new Color(1f, 1f, 1f, alpha);
+        }
+
+        private float ResolveObjectAlpha(int objectId)
+        {
+            if (objectId > 0
+                && _objectAlphaOverrides.TryGetValue(objectId, out float alpha))
+            {
+                return Mathf.Clamp01(alpha);
+            }
+
+            return 1f;
         }
 
         private static Vector3 ResolveSpritePivotCompensation(

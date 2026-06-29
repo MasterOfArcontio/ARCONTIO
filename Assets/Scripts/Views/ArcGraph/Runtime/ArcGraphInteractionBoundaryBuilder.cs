@@ -260,6 +260,26 @@ namespace Arcontio.View.ArcGraph
             PickResult objectPick = TryPickObject(objectItems, coordinate.Cell);
             PickResult plantPick = TryPickPlant(vegetationItems, coordinate.Cell);
 
+            // Prima di normalizzare la priorita' finale verifichiamo il caso
+            // specifico dei muri alti: il puntatore puo' cadere sulla base fisica
+            // del muro, mentre l'intenzione reale dell'operatore e' selezionare
+            // l'NPC/oggetto coperto dalla parte alta dello sprite. Questa resta una
+            // correzione di picking view-side: non cambia FOV, pathfinding,
+            // collisioni o occupazione del World.
+            if (actorPick.EntityId <= 0
+                && objectPick.EntityId > 0
+                && TryPickTargetBehindOccluder(
+                    objectItems,
+                    actorItems,
+                    objectPick.EntityId,
+                    out ArcGraphOcclusionTarget coveredTarget))
+            {
+                if (coveredTarget.Kind == ArcGraphOcclusionTargetKind.Actor)
+                    actorPick = new PickResult(coveredTarget.EntityId, actorPick.CandidateCount + 1);
+                else if (coveredTarget.Kind == ArcGraphOcclusionTargetKind.Object)
+                    objectPick = new PickResult(coveredTarget.EntityId, objectPick.CandidateCount + 1);
+            }
+
             ArcGraphInteractionTargetKind kind = ResolveTargetKind(
                 actorPick.EntityId,
                 objectPick.EntityId,
@@ -391,6 +411,51 @@ namespace Arcontio.View.ArcGraph
             }
 
             return new PickResult(selectedObjectId, candidateCount);
+        }
+
+        // =============================================================================
+        // TryPickTargetBehindOccluder
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Se il puntatore ha colpito un muro/oggetto alto, cerca un actor o un
+        /// oggetto fisico nella fascia visuale coperta dalla sua altezza.
+        /// </para>
+        ///
+        /// <para><b>Boundary di picking, non simulazione</b></para>
+        /// <para>
+        /// La ricerca usa soltanto la render queue ricevuta dal boundary. Non legge
+        /// il <c>World</c>, non modifica selezione direttamente e non crea scorciatoie
+        /// di conoscenza NPC: serve solo a non far rubare il click dalla parte alta
+        /// visuale di un muro.
+        /// </para>
+        /// </summary>
+        private static bool TryPickTargetBehindOccluder(
+            IReadOnlyList<ArcGraphObjectRenderItem> objects,
+            IReadOnlyList<ArcGraphActorRenderItem> actors,
+            int occluderObjectId,
+            out ArcGraphOcclusionTarget target)
+        {
+            target = ArcGraphOcclusionTarget.None();
+
+            if (objects == null || objects.Count == 0 || occluderObjectId <= 0)
+                return false;
+
+            for (int i = 0; i < objects.Count; i++)
+            {
+                ArcGraphObjectRenderItem objectItem = objects[i];
+                if (objectItem.ObjectId != occluderObjectId)
+                    continue;
+
+                return ArcGraphOcclusionPolicy.TryPickCoveredTarget(
+                    objectItem,
+                    actors,
+                    objects,
+                    ArcGraphOcclusionPolicy.DefaultMaximumDepthCells,
+                    out target);
+            }
+
+            return false;
         }
 
         private static PickResult TryPickPlant(

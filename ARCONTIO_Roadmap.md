@@ -81,11 +81,11 @@
 | v0.68 | Biosphere Runtime Budget & Batch Processing | Post-v0.67 | ✅ Core budget runtime completato, spreading multi-tick futuro |
 | v0.69 | Biosphere Physical Integration QA Closeout | Post-v0.68 | ✅ Closeout tecnico completato, job risorse/NPC rimandato a roadmap dedicata |
 | v0.70 | ArcGraph Runtime UI Architecture | Post-v0.69 / track UI dedicata | ✅ Base runtime UI completata e integrata con Biosfera |
-| v0.71 | ArcGraph / Biosfera Stabilization & Visual Quality Pass | Post-v0.70 | 🔄 Prossimo blocco di stabilizzazione |
-| v0.72 | Fauna Biosfera | Post-v0.71 | ⏳ Futura |
-| v0.73 | Modulo GOAL | Post-v0.72 | ⏳ Futura |
-| v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ Pending |
-| v0.180 | Observer Layer Pubblico ed Explainability Esterna | Dopo observer prerequisites | ⏳ Pending |
+| v0.71 | ArcGraph / Biosfera Stabilization & Visual Quality Pass | Post-v0.70 | 🔄 |
+| v0.72 | Fauna Biosfera | Post-v0.71 | ⏳ |
+| v0.73 | Modulo GOAL | Post-v0.72 | ⏳ |
+| v0.170 | Conseguenze Sociali Emergenti | Dopo biosfera foundation minima | ⏳ |
+| v0.180 | Observer Layer Pubblico ed Explainability Esterna | Dopo observer prerequisites | ⏳ |
 | v1.00 | Prima demo giocabile pubblica | TBD | 🎯 Target |
 
 ---
@@ -17486,7 +17486,7 @@ Prossimo step consigliato:
 #### v0.71 - ArcGraph / Biosfera Stabilization & Visual Quality Pass
 
 ## Stato
-🔄 PROSSIMA / PIANIFICATA
+🔄
 
 ## Obiettivo
 
@@ -17498,12 +17498,14 @@ La fase `v0.71` non deve introdurre un nuovo macro-sistema simulativo. Deve rend
 
 | Checkpoint | Task | Stato |
 |---|---|---|
-| v0.71.01 | Trasparenza muri/porte alte che coprono oggetti, NPC o selezione | ⏳ Pending |
-| v0.71.02 | Correzione bug Biosfera: piante/vegetazione non devono crescere su acqua, stone o tile artificiali | ⏳ Pending |
-| v0.71.03 | Fix lineette/sfasamento terrain atlas tra celle e chunk | ⏳ Pending |
-| v0.71.04 | Gestione completa porte: verticali, orizzontali, aperte, chiuse e chiuse a chiave | ⏳ Pending |
-| v0.71.05 | Inserimento job mancante di raccolta risorse biologiche | ⏳ Pending |
-| v0.71.06 | Consolidamento finale config, asset atlas/sprite naming e verifica runtime UI + Biosfera | ⏳ Pending |
+| v0.71.01 | Trasparenza e sagome ArcGraph dietro muri alti | ✅ |
+| v0.71.02 | Correzione bug Biosfera: piante/vegetazione non devono crescere su acqua, stone o tile artificiali | ✅ |
+| v0.71.03 | Fix lineette/sfasamento terrain atlas tra celle e chunk | ⏳ |
+| v0.71.04 | Gestione completa porte: verticali, orizzontali, aperte, chiuse e chiuse a chiave | ⏳ |
+| v0.71.05 | Inserimento job mancante di raccolta risorse biologiche | ⏳ |
+| v0.71.06 | Consolidamento finale config, asset atlas/sprite naming e verifica runtime UI + Biosfera | ⏳ |
+| v0.71.07 | Modifica oggetti completa: food stock, owner oggetto e stato porta autorizzati | ✅ |
+| v0.71.08 | Selezione mouse piante fisiche ArcGraph con inspector read-only | ✅ |
 
 ## Note progettuali v0.71
 
@@ -17598,15 +17600,15 @@ Le due macro-fasi successive candidate sono:
 
 | Versione | Focus | Stato |
 |---|---|---|
-| v0.72 | Fauna Biosfera | ⏳ Futura |
-| v0.73 | Modulo GOAL | ⏳ Futura |
+| v0.72 | Fauna Biosfera | ⏳ |
+| v0.73 | Modulo GOAL | ⏳ |
 
 ---
 
 #### v0.72 - Fauna Biosfera
 
 ## Stato
-⏳ FUTURA / PIANIFICATA
+⏳
 
 ## Obiettivo
 
