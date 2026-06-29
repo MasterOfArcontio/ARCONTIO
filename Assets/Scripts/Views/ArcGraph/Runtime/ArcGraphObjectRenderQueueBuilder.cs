@@ -283,6 +283,7 @@ namespace Arcontio.View.ArcGraph
             objectLayer.CopySnapshotsTo(snapshots);
             Dictionary<string, HashSet<ArcGraphCellCoord>> wallCellsByFamily =
                 ArcGraphWallCardinalResolver.BuildWallCellIndex(snapshots);
+            AddDoorConnectorCellsToWallFamilies(snapshots, wallCellsByFamily);
             HashSet<ArcGraphCellCoord> doorContextCells =
                 ArcGraphDoorVisualResolver.BuildSolidDoorContextCellIndex(snapshots);
 
@@ -314,6 +315,47 @@ namespace Arcontio.View.ArcGraph
                 visibleCount,
                 hiddenCount,
                 "ObjectQueueBuilt");
+        }
+
+        // =============================================================================
+        // AddDoorConnectorCellsToWallFamilies
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiunge le celle porta agli indici dei muri come connettori visuali.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: continuita' grafica senza mutazione fisica</b></para>
+        /// <para>
+        /// Le porte restano oggetti porta e mantengono sprite, stato open/close/lock
+        /// e cache fisiche gestite dal <c>World</c>. Qui vengono copiate nelle sole
+        /// mappe usate dal resolver muri, cosi' un muro accanto a una porta non
+        /// sceglie la variante terminale ma quella di prosecuzione.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Filtro porte</b>: usa il resolver porta visual-only.</item>
+        ///   <item><b>Famiglie muro</b>: la porta collega tutte le famiglie presenti.</item>
+        ///   <item><b>Nessun World</b>: lavora solo su snapshot ArcGraph.</item>
+        /// </list>
+        /// </summary>
+        private static void AddDoorConnectorCellsToWallFamilies(
+            IReadOnlyList<ArcGraphObjectVisualSnapshot> snapshots,
+            Dictionary<string, HashSet<ArcGraphCellCoord>> wallCellsByFamily)
+        {
+            if (snapshots == null || wallCellsByFamily == null || wallCellsByFamily.Count == 0)
+                return;
+
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                ArcGraphObjectVisualSnapshot snapshot = snapshots[i];
+                if (!ArcGraphDoorVisualResolver.IsDoorSnapshot(snapshot))
+                    continue;
+
+                foreach (var pair in wallCellsByFamily)
+                    pair.Value.Add(snapshot.Cell);
+            }
         }
 
         private static ArcGraphObjectRenderItem CreateItem(

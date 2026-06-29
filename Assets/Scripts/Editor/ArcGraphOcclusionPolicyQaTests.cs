@@ -395,6 +395,39 @@ namespace Arcontio.Tests
             Assert.That(door.DoorVisualOrientation, Is.EqualTo(ArcGraphDoorVisualOrientation.Horizontal));
         }
 
+        [Test]
+        public void DoorCellConnectsAdjacentWallVariants()
+        {
+            var renderState = new ArcGraphRenderState(
+                visibleZLevel: ArcGraphZLevelPolicy.DefaultVisibleZLevel,
+                tileSizeWorld: 1f,
+                chunkSizeCells: 4);
+
+            var objectLayer = new ArcGraphObjectLayer();
+            objectLayer.Initialize(renderState);
+            objectLayer.ReplaceSnapshots(
+                new[]
+                {
+                    CreateWallSnapshot(1, 3, 4),
+                    CreateDoorSnapshot(2, 4, 4, isOpen: false, isLocked: false),
+                    CreateWallSnapshot(3, 5, 4)
+                },
+                renderState);
+
+            var items = new List<ArcGraphObjectRenderItem>();
+            var builder = new ArcGraphObjectRenderQueueBuilder();
+            builder.Build(
+                objectLayer,
+                ArcGraphZoomLodPolicy.ResolveFullDetail(),
+                items);
+
+            ArcGraphObjectRenderItem leftWall = FindObject(items, 1);
+            ArcGraphObjectRenderItem rightWall = FindObject(items, 3);
+
+            Assert.That(leftWall.SpriteKey, Is.EqualTo("ArcGraph/Objects/wall_stone#wall_stone_0001"));
+            Assert.That(rightWall.SpriteKey, Is.EqualTo("ArcGraph/Objects/wall_stone#wall_stone_0100"));
+        }
+
         private static string ResolveDoorSpriteKey(
             IReadOnlyList<ArcGraphObjectVisualSnapshot> snapshots,
             out ArcGraphDoorVisualState state,
