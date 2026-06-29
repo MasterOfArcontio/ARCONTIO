@@ -60,6 +60,12 @@ namespace Arcontio.View.ArcGraph
         public readonly int VisualOffsetY;
         public readonly bool FadeWhenActorBehind;
         public readonly bool UseShadow;
+        public readonly bool IsDoor;
+        public readonly bool IsDoorOpen;
+        public readonly bool IsDoorLocked;
+        public readonly bool IsDoorLockable;
+        public readonly ArcGraphDoorVisualState DoorVisualState;
+        public readonly ArcGraphDoorVisualOrientation DoorVisualOrientation;
         public readonly bool IsVisible;
         public readonly string HiddenReason;
         public readonly ArcGraphRenderSortKey SortKey;
@@ -225,7 +231,13 @@ namespace Arcontio.View.ArcGraph
             bool useShadow,
             bool isVisible,
             string hiddenReason,
-            ArcGraphRenderSortKey sortKey)
+            ArcGraphRenderSortKey sortKey,
+            bool isDoor = false,
+            bool isDoorOpen = false,
+            bool isDoorLocked = false,
+            bool isDoorLockable = false,
+            ArcGraphDoorVisualState doorVisualState = ArcGraphDoorVisualState.None,
+            ArcGraphDoorVisualOrientation doorVisualOrientation = ArcGraphDoorVisualOrientation.Horizontal)
         {
             ObjectId = objectId;
             DefId = defId ?? string.Empty;
@@ -251,6 +263,12 @@ namespace Arcontio.View.ArcGraph
             VisualOffsetY = visualOffsetY;
             FadeWhenActorBehind = fadeWhenActorBehind;
             UseShadow = useShadow;
+            IsDoor = isDoor;
+            IsDoorOpen = isDoor && isDoorOpen;
+            IsDoorLocked = isDoor && isDoorLocked;
+            IsDoorLockable = isDoor && isDoorLockable;
+            DoorVisualState = isDoor ? doorVisualState : ArcGraphDoorVisualState.None;
+            DoorVisualOrientation = doorVisualOrientation;
             IsVisible = isVisible;
             HiddenReason = string.IsNullOrWhiteSpace(hiddenReason) ? "None" : hiddenReason;
             SortKey = sortKey;

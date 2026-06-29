@@ -48,6 +48,7 @@ namespace Arcontio.View.ArcGraph
         private readonly ArcGraphActorObjectSceneRenderPlan _plan = new();
         private readonly ArcGraphActorObjectSceneRenderPlanBuilder _planBuilder = new();
         private Transform _root;
+        private Sprite _generatedDoorFallbackSprite;
         private ArcGraphObjectRuntimeSceneRendererDiagnostics _lastDiagnostics;
 
         public ArcGraphObjectRuntimeSceneRendererDiagnostics LastDiagnostics => _lastDiagnostics;
@@ -74,6 +75,7 @@ namespace Arcontio.View.ArcGraph
             public int ObjectId;
             public GameObject GameObject;
             public SpriteRenderer Renderer;
+            public bool IsDoorLocked;
             public bool WasTouchedThisFrame;
         }
 
@@ -301,6 +303,7 @@ namespace Arcontio.View.ArcGraph
         {
             _objectPool.Clear();
             _objectAlphaOverrides.Clear();
+            DestroyGeneratedDoorFallbackSprite();
 
             if (_root == null)
                 return;
@@ -392,10 +395,43 @@ namespace Arcontio.View.ArcGraph
                 && spriteResolver.TryResolveSprite(entry.SpriteRequest, out Sprite resolved)
                 && resolved != null)
             {
+                if (entry.IsDoor
+                    && IsSheetSpriteRequest(entry.SpriteRequest.SpriteKey)
+                    && !ResolvedDoorSliceMatchesRequest(entry.SpriteRequest.SpriteKey, resolved))
+                {
+                    return GetOrCreateDoorFallbackSprite();
+                }
+
                 return resolved;
             }
 
+            if (entry.IsDoor)
+                return GetOrCreateDoorFallbackSprite();
+
             return null;
+        }
+
+        private static bool IsSheetSpriteRequest(string spriteKey)
+        {
+            return !string.IsNullOrWhiteSpace(spriteKey) && spriteKey.IndexOf('#') >= 0;
+        }
+
+        private static bool ResolvedDoorSliceMatchesRequest(
+            string spriteKey,
+            Sprite resolved)
+        {
+            if (resolved == null || string.IsNullOrWhiteSpace(spriteKey))
+                return false;
+
+            int separator = spriteKey.LastIndexOf('#');
+            if (separator < 0 || separator >= spriteKey.Length - 1)
+                return true;
+
+            string expected = spriteKey.Substring(separator + 1);
+            return string.Equals(
+                resolved.name ?? string.Empty,
+                expected,
+                System.StringComparison.Ordinal);
         }
 
         private ObjectHandle GetOrCreateObjectHandle(
@@ -452,6 +488,9 @@ namespace Arcontio.View.ArcGraph
             handle.Renderer.sprite = sprite;
             handle.Renderer.sortingOrder = entry.SortingOrder;
             handle.Renderer.enabled = true;
+            handle.IsDoorLocked = sprite != _generatedDoorFallbackSprite
+                                  && (entry.IsDoorLocked
+                                      || entry.DoorVisualState == ArcGraphDoorVisualState.Locked);
             ApplyObjectAlpha(handle);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
@@ -472,7 +511,10 @@ namespace Arcontio.View.ArcGraph
                 return;
 
             float alpha = ResolveObjectAlpha(handle.ObjectId);
-            handle.Renderer.color = new Color(1f, 1f, 1f, alpha);
+            Color baseColor = handle.IsDoorLocked
+                ? new Color(1f, 0.7f, 0.7f, alpha)
+                : new Color(1f, 1f, 1f, alpha);
+            handle.Renderer.color = baseColor;
         }
 
         private float ResolveObjectAlpha(int objectId)
@@ -540,6 +582,72 @@ namespace Arcontio.View.ArcGraph
             var go = new GameObject(contract.RootName);
             go.transform.SetParent(transform, false);
             _root = go.transform;
+        }
+
+        // =============================================================================
+        // GetOrCreateDoorFallbackSprite
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea il fallback verde runtime per porte prive della slice richiesta.
+        /// </para>
+        ///
+        /// <para><b>Fallback diagnostico visuale</b></para>
+        /// <para>
+        /// Il fallback e' deliberatamente verde e limitato alle porte. In questo modo
+        /// una slice mancante resta evidente durante il test runtime, senza cambiare
+        /// il comportamento degli altri oggetti e senza modificare asset o meta file.
+        /// </para>
+        /// </summary>
+        private Sprite GetOrCreateDoorFallbackSprite()
+        {
+            if (_generatedDoorFallbackSprite != null)
+                return _generatedDoorFallbackSprite;
+
+            const int width = 32;
+            const int height = 83;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, mipChain: false)
+            {
+                name = "ArcGraphDoorGeneratedFallbackTexture",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    bool border = x == 0 || y == 0 || x == width - 1 || y == height - 1;
+                    texture.SetPixel(
+                        x,
+                        y,
+                        border
+                            ? new Color(0.02f, 0.22f, 0.04f, 1f)
+                            : new Color(0.18f, 0.85f, 0.18f, 0.9f));
+                }
+            }
+
+            texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+
+            _generatedDoorFallbackSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, width, height),
+                new Vector2(0.5f, 0f),
+                pixelsPerUnit: 32f);
+            _generatedDoorFallbackSprite.name = "ArcGraphDoorGeneratedFallbackSprite";
+            return _generatedDoorFallbackSprite;
+        }
+
+        private void DestroyGeneratedDoorFallbackSprite()
+        {
+            if (_generatedDoorFallbackSprite == null)
+                return;
+
+            Texture2D texture = _generatedDoorFallbackSprite.texture;
+            DestroyUnityObject(_generatedDoorFallbackSprite);
+            if (texture != null)
+                DestroyUnityObject(texture);
+            _generatedDoorFallbackSprite = null;
         }
 
         private void MarkAllHandlesUntouched()

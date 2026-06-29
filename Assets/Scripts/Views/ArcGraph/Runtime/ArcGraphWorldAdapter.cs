@@ -197,7 +197,11 @@ namespace Arcontio.View.ArcGraph
                     visual?.OffsetX ?? 0,
                     visual?.OffsetY ?? 0,
                     visual?.FadeWhenActorBehind ?? false,
-                    visual?.UseShadow ?? false));
+                    visual?.UseShadow ?? false,
+                    def != null && def.IsDoor,
+                    instance.IsOpen,
+                    instance.IsLocked,
+                    def != null && def.IsLockable));
             }
         }
 

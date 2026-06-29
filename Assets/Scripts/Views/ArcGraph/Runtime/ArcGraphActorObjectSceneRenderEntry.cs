@@ -55,6 +55,10 @@ namespace Arcontio.View.ArcGraph
         public readonly int VisualOffsetY;
         public readonly bool FadeWhenActorBehind;
         public readonly bool UseShadow;
+        public readonly bool IsDoor;
+        public readonly bool IsDoorLocked;
+        public readonly ArcGraphDoorVisualState DoorVisualState;
+        public readonly ArcGraphDoorVisualOrientation DoorVisualOrientation;
 
         public bool HasObjectVisualMetadata =>
             Kind == ArcGraphRenderItemKind.Object
@@ -154,7 +158,11 @@ namespace Arcontio.View.ArcGraph
             int visualOffsetY,
             bool fadeWhenActorBehind,
             bool useShadow,
-            string facingDirectionKey = "")
+            string facingDirectionKey = "",
+            bool isDoor = false,
+            bool isDoorLocked = false,
+            ArcGraphDoorVisualState doorVisualState = ArcGraphDoorVisualState.None,
+            ArcGraphDoorVisualOrientation doorVisualOrientation = ArcGraphDoorVisualOrientation.Horizontal)
         {
             Kind = kind;
             EntityId = entityId;
@@ -177,6 +185,10 @@ namespace Arcontio.View.ArcGraph
             VisualOffsetY = visualOffsetY;
             FadeWhenActorBehind = fadeWhenActorBehind;
             UseShadow = useShadow;
+            IsDoor = isDoor;
+            IsDoorLocked = isDoor && isDoorLocked;
+            DoorVisualState = isDoor ? doorVisualState : ArcGraphDoorVisualState.None;
+            DoorVisualOrientation = doorVisualOrientation;
         }
 
         private static string NormalizeDirectionKey(string value)

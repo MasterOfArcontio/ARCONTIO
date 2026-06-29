@@ -3,6 +3,200 @@ using System.Collections.Generic;
 namespace Arcontio.View.ArcGraph
 {
     // =============================================================================
+    // ArcGraphDoorVisualState
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Stato visuale normalizzato di una porta ArcGraph.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: stato porta copiato, non deciso dalla UI</b></para>
+    /// <para>
+    /// Questo enum non apre, chiude o blocca porte. Rappresenta soltanto la lettura
+    /// value-only dello stato gia' autorizzato dal <c>World</c>, cosi' il renderer
+    /// puo' scegliere una slice grafica senza introdurre una seconda authority.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>None</b>: oggetto non porta o stato assente.</item>
+    ///   <item><b>Closed</b>: porta chiusa non locked.</item>
+    ///   <item><b>Open</b>: porta aperta.</item>
+    ///   <item><b>Locked</b>: porta chiusa con lock visuale.</item>
+    /// </list>
+    /// </summary>
+    public enum ArcGraphDoorVisualState
+    {
+        None = 0,
+        Closed = 1,
+        Open = 2,
+        Locked = 3
+    }
+
+    // =============================================================================
+    // ArcGraphDoorVisualOrientation
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Orientamento visuale derivato per una porta ArcGraph.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: orientamento visual-only</b></para>
+    /// <para>
+    /// L'orientamento non viene salvato nel <c>WorldObjectInstance</c>. Viene dedotto
+    /// dalla topologia visuale attorno alla porta e serve solo a scegliere fra slice
+    /// orizzontali e verticali dello spritesheet.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Horizontal</b>: usa le slice <c>horizontal_*</c>.</item>
+    ///   <item><b>Vertical</b>: usa le slice <c>vertical_*</c>.</item>
+    /// </list>
+    /// </summary>
+    public enum ArcGraphDoorVisualOrientation
+    {
+        Horizontal = 0,
+        Vertical = 1
+    }
+
+    // =============================================================================
+    // ArcGraphDoorVisualResolver
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Resolver passivo delle varianti visuali porta ArcGraph.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: porta visuale senza nuova simulazione</b></para>
+    /// <para>
+    /// Il resolver riceve solo snapshot oggetto gia' copiati dal boundary ArcGraph.
+    /// Non legge <c>World</c>, non apre porte, non modifica lock, non carica sprite
+    /// Unity e non decide blocchi fisici. Produce soltanto la sprite key sliced
+    /// corretta e i due valori visuali necessari al renderer.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>BuildSolidDoorContextCellIndex</b>: indicizza muri e porte vicine.</item>
+    ///   <item><b>ResolveSpriteKey</b>: sceglie una slice porta 32x83.</item>
+    ///   <item><b>ResolveOrientation</b>: deduce orizzontale/verticale dalla topologia.</item>
+    ///   <item><b>ResolveState</b>: traduce <c>IsOpen/IsLocked</c> in stato visuale.</item>
+    /// </list>
+    /// </summary>
+    public static class ArcGraphDoorVisualResolver
+    {
+        private const string DoorVisualKind = "door";
+        private const char SpriteSheetSeparator = '#';
+
+        public static HashSet<ArcGraphCellCoord> BuildSolidDoorContextCellIndex(
+            IReadOnlyList<ArcGraphObjectVisualSnapshot> snapshots)
+        {
+            var cells = new HashSet<ArcGraphCellCoord>();
+            if (snapshots == null)
+                return cells;
+
+            for (int i = 0; i < snapshots.Count; i++)
+            {
+                ArcGraphObjectVisualSnapshot snapshot = snapshots[i];
+                if (!IsDoorSnapshot(snapshot) && !ArcGraphWallCardinalResolver.IsWallSnapshot(snapshot))
+                    continue;
+
+                cells.Add(snapshot.Cell);
+            }
+
+            return cells;
+        }
+
+        public static string ResolveSpriteKey(
+            ArcGraphObjectVisualSnapshot snapshot,
+            HashSet<ArcGraphCellCoord> solidDoorContextCells,
+            out ArcGraphDoorVisualState state,
+            out ArcGraphDoorVisualOrientation orientation)
+        {
+            state = ResolveState(snapshot);
+            orientation = ResolveOrientation(snapshot, solidDoorContextCells);
+
+            string baseSpriteKey = snapshot.SpriteKey ?? string.Empty;
+            if (!IsDoorSnapshot(snapshot) || string.IsNullOrWhiteSpace(baseSpriteKey))
+                return baseSpriteKey;
+
+            string sliceName = ResolveSliceName(state, orientation);
+            if (string.IsNullOrWhiteSpace(sliceName))
+                return baseSpriteKey;
+
+            return baseSpriteKey + SpriteSheetSeparator + sliceName;
+        }
+
+        public static bool IsDoorSnapshot(ArcGraphObjectVisualSnapshot snapshot)
+        {
+            if (snapshot.IsDoor)
+                return true;
+
+            return string.Equals(
+                snapshot.VisualKind ?? string.Empty,
+                DoorVisualKind,
+                System.StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static ArcGraphDoorVisualState ResolveState(
+            ArcGraphObjectVisualSnapshot snapshot)
+        {
+            if (!IsDoorSnapshot(snapshot))
+                return ArcGraphDoorVisualState.None;
+
+            if (snapshot.IsDoorLocked)
+                return ArcGraphDoorVisualState.Locked;
+
+            return snapshot.IsDoorOpen
+                ? ArcGraphDoorVisualState.Open
+                : ArcGraphDoorVisualState.Closed;
+        }
+
+        public static ArcGraphDoorVisualOrientation ResolveOrientation(
+            ArcGraphObjectVisualSnapshot snapshot,
+            HashSet<ArcGraphCellCoord> solidDoorContextCells)
+        {
+            if (solidDoorContextCells == null || solidDoorContextCells.Count == 0)
+                return ArcGraphDoorVisualOrientation.Horizontal;
+
+            ArcGraphCellCoord cell = snapshot.Cell;
+            int horizontal = CountNeighbor(solidDoorContextCells, cell.X - 1, cell.Y, cell.Z)
+                             + CountNeighbor(solidDoorContextCells, cell.X + 1, cell.Y, cell.Z);
+            int vertical = CountNeighbor(solidDoorContextCells, cell.X, cell.Y - 1, cell.Z)
+                           + CountNeighbor(solidDoorContextCells, cell.X, cell.Y + 1, cell.Z);
+
+            if (vertical > horizontal)
+                return ArcGraphDoorVisualOrientation.Vertical;
+
+            return ArcGraphDoorVisualOrientation.Horizontal;
+        }
+
+        private static int CountNeighbor(
+            HashSet<ArcGraphCellCoord> cells,
+            int x,
+            int y,
+            int z)
+        {
+            return cells.Contains(new ArcGraphCellCoord(x, y, z)) ? 1 : 0;
+        }
+
+        private static string ResolveSliceName(
+            ArcGraphDoorVisualState state,
+            ArcGraphDoorVisualOrientation orientation)
+        {
+            bool vertical = orientation == ArcGraphDoorVisualOrientation.Vertical;
+            if (state == ArcGraphDoorVisualState.Open)
+                return vertical ? "vertical_open" : "horizontal_open";
+
+            if (state == ArcGraphDoorVisualState.Closed || state == ArcGraphDoorVisualState.Locked)
+                return vertical ? "vertical_close" : "horizontal_close";
+
+            return string.Empty;
+        }
+    }
+
+    // =============================================================================
     // ArcGraphObjectRenderQueueBuilder
     // =============================================================================
     /// <summary>
@@ -89,6 +283,8 @@ namespace Arcontio.View.ArcGraph
             objectLayer.CopySnapshotsTo(snapshots);
             Dictionary<string, HashSet<ArcGraphCellCoord>> wallCellsByFamily =
                 ArcGraphWallCardinalResolver.BuildWallCellIndex(snapshots);
+            HashSet<ArcGraphCellCoord> doorContextCells =
+                ArcGraphDoorVisualResolver.BuildSolidDoorContextCellIndex(snapshots);
 
             int visibleCount = 0;
             int hiddenCount = 0;
@@ -98,7 +294,8 @@ namespace Arcontio.View.ArcGraph
                 ArcGraphObjectRenderItem item = CreateItem(
                     snapshots[i],
                     lodProfile,
-                    wallCellsByFamily);
+                    wallCellsByFamily,
+                    doorContextCells);
 
                 if (item.IsVisible)
                     visibleCount++;
@@ -122,13 +319,25 @@ namespace Arcontio.View.ArcGraph
         private static ArcGraphObjectRenderItem CreateItem(
             ArcGraphObjectVisualSnapshot snapshot,
             ArcGraphZoomLodProfile lodProfile,
-            IReadOnlyDictionary<string, HashSet<ArcGraphCellCoord>> wallCellsByFamily)
+            IReadOnlyDictionary<string, HashSet<ArcGraphCellCoord>> wallCellsByFamily,
+            HashSet<ArcGraphCellCoord> doorContextCells)
         {
             bool isVisible = true;
             string hiddenReason = "None";
             string spriteKey = ArcGraphWallCardinalResolver.ResolveSpriteKey(
                 snapshot,
                 wallCellsByFamily);
+            ArcGraphDoorVisualState doorVisualState = ArcGraphDoorVisualState.None;
+            ArcGraphDoorVisualOrientation doorVisualOrientation = ArcGraphDoorVisualOrientation.Horizontal;
+
+            if (ArcGraphDoorVisualResolver.IsDoorSnapshot(snapshot))
+            {
+                spriteKey = ArcGraphDoorVisualResolver.ResolveSpriteKey(
+                    snapshot,
+                    doorContextCells,
+                    out doorVisualState,
+                    out doorVisualOrientation);
+            }
 
             if (snapshot.ObjectId <= 0)
             {
@@ -178,7 +387,13 @@ namespace Arcontio.View.ArcGraph
                 snapshot.UseShadow,
                 isVisible,
                 hiddenReason,
-                sortKey);
+                sortKey,
+                ArcGraphDoorVisualResolver.IsDoorSnapshot(snapshot),
+                snapshot.IsDoorOpen,
+                snapshot.IsDoorLocked,
+                snapshot.IsDoorLockable,
+                doorVisualState,
+                doorVisualOrientation);
         }
 
         private static void Sort(IList<ArcGraphObjectRenderItem> target)

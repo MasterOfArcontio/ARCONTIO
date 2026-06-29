@@ -60,6 +60,10 @@ namespace Arcontio.View.ArcGraph
         public readonly int VisualOffsetY;
         public readonly bool FadeWhenActorBehind;
         public readonly bool UseShadow;
+        public readonly bool IsDoor;
+        public readonly bool IsDoorOpen;
+        public readonly bool IsDoorLocked;
+        public readonly bool IsDoorLockable;
 
         public bool HasFoodStock => FoodStockUnits >= 0;
 
@@ -220,7 +224,11 @@ namespace Arcontio.View.ArcGraph
             int visualOffsetX,
             int visualOffsetY,
             bool fadeWhenActorBehind,
-            bool useShadow)
+            bool useShadow,
+            bool isDoor = false,
+            bool isDoorOpen = false,
+            bool isDoorLocked = false,
+            bool isDoorLockable = false)
         {
             ObjectId = objectId;
             DefId = defId ?? string.Empty;
@@ -243,6 +251,10 @@ namespace Arcontio.View.ArcGraph
             VisualOffsetY = visualOffsetY;
             FadeWhenActorBehind = fadeWhenActorBehind;
             UseShadow = useShadow;
+            IsDoor = isDoor;
+            IsDoorOpen = isDoor && isDoorOpen;
+            IsDoorLocked = isDoor && isDoorLocked;
+            IsDoorLockable = isDoor && isDoorLockable;
         }
 
         // =============================================================================

@@ -257,4 +257,234 @@ namespace Arcontio.Tests
                 ArcGraphRenderSortKey.FromCell(cell, 10, ArcGraphRenderItemKind.Object, objectId));
         }
     }
+
+    // =============================================================================
+    // ArcGraphDoorVisualResolverQaTests
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Test QA EditMode per la risoluzione visuale delle porte ArcGraph.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: porta visuale senza World diretto</b></para>
+    /// <para>
+    /// Questi test costruiscono snapshot ArcGraph in memoria e verificano che la
+    /// scelta delle slice porta resti data-only. Non leggono il <c>World</c>, non
+    /// caricano PNG, non interrogano import settings e non creano GameObject.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Sprite state</b>: open/close/locked risolvono la slice corretta.</item>
+    ///   <item><b>Orientation</b>: i vicini visuali decidono horizontal/vertical.</item>
+    ///   <item><b>Queue</b>: la render queue conserva stato locked e orientamento.</item>
+    /// </list>
+    /// </summary>
+    public sealed class ArcGraphDoorVisualResolverQaTests
+    {
+        private const string DoorBaseSpriteKey = "ArcGraph/Objects/Door_Wood_Good";
+
+        [Test]
+        public void HorizontalOpenDoorUsesHorizontalOpenSlice()
+        {
+            var snapshots = new List<ArcGraphObjectVisualSnapshot>
+            {
+                CreateWallSnapshot(1, 3, 4),
+                CreateDoorSnapshot(2, 4, 4, isOpen: true, isLocked: false),
+                CreateWallSnapshot(3, 5, 4)
+            };
+
+            string spriteKey = ResolveDoorSpriteKey(
+                snapshots,
+                out ArcGraphDoorVisualState state,
+                out ArcGraphDoorVisualOrientation orientation);
+
+            Assert.That(spriteKey, Is.EqualTo(DoorBaseSpriteKey + "#horizontal_open"));
+            Assert.That(state, Is.EqualTo(ArcGraphDoorVisualState.Open));
+            Assert.That(orientation, Is.EqualTo(ArcGraphDoorVisualOrientation.Horizontal));
+        }
+
+        [Test]
+        public void VerticalClosedDoorUsesVerticalCloseSlice()
+        {
+            var snapshots = new List<ArcGraphObjectVisualSnapshot>
+            {
+                CreateWallSnapshot(1, 4, 3),
+                CreateDoorSnapshot(2, 4, 4, isOpen: false, isLocked: false),
+                CreateWallSnapshot(3, 4, 5)
+            };
+
+            string spriteKey = ResolveDoorSpriteKey(
+                snapshots,
+                out ArcGraphDoorVisualState state,
+                out ArcGraphDoorVisualOrientation orientation);
+
+            Assert.That(spriteKey, Is.EqualTo(DoorBaseSpriteKey + "#vertical_close"));
+            Assert.That(state, Is.EqualTo(ArcGraphDoorVisualState.Closed));
+            Assert.That(orientation, Is.EqualTo(ArcGraphDoorVisualOrientation.Vertical));
+        }
+
+        [Test]
+        public void LockedDoorUsesCloseSliceAndLockedState()
+        {
+            var snapshots = new List<ArcGraphObjectVisualSnapshot>
+            {
+                CreateWallSnapshot(1, 3, 4),
+                CreateDoorSnapshot(2, 4, 4, isOpen: false, isLocked: true),
+                CreateWallSnapshot(3, 5, 4)
+            };
+
+            string spriteKey = ResolveDoorSpriteKey(
+                snapshots,
+                out ArcGraphDoorVisualState state,
+                out ArcGraphDoorVisualOrientation orientation);
+
+            Assert.That(spriteKey, Is.EqualTo(DoorBaseSpriteKey + "#horizontal_close"));
+            Assert.That(state, Is.EqualTo(ArcGraphDoorVisualState.Locked));
+            Assert.That(orientation, Is.EqualTo(ArcGraphDoorVisualOrientation.Horizontal));
+        }
+
+        [Test]
+        public void IsolatedDoorDefaultsToHorizontal()
+        {
+            var snapshots = new List<ArcGraphObjectVisualSnapshot>
+            {
+                CreateDoorSnapshot(2, 4, 4, isOpen: false, isLocked: false)
+            };
+
+            string spriteKey = ResolveDoorSpriteKey(
+                snapshots,
+                out _,
+                out ArcGraphDoorVisualOrientation orientation);
+
+            Assert.That(spriteKey, Is.EqualTo(DoorBaseSpriteKey + "#horizontal_close"));
+            Assert.That(orientation, Is.EqualTo(ArcGraphDoorVisualOrientation.Horizontal));
+        }
+
+        [Test]
+        public void QueueKeepsLockedDoorVisualData()
+        {
+            var renderState = new ArcGraphRenderState(
+                visibleZLevel: ArcGraphZLevelPolicy.DefaultVisibleZLevel,
+                tileSizeWorld: 1f,
+                chunkSizeCells: 4);
+
+            var objectLayer = new ArcGraphObjectLayer();
+            objectLayer.Initialize(renderState);
+            objectLayer.ReplaceSnapshots(
+                new[]
+                {
+                    CreateWallSnapshot(1, 3, 4),
+                    CreateDoorSnapshot(2, 4, 4, isOpen: false, isLocked: true),
+                    CreateWallSnapshot(3, 5, 4)
+                },
+                renderState);
+
+            var items = new List<ArcGraphObjectRenderItem>();
+            var builder = new ArcGraphObjectRenderQueueBuilder();
+            builder.Build(
+                objectLayer,
+                ArcGraphZoomLodPolicy.ResolveFullDetail(),
+                items);
+
+            ArcGraphObjectRenderItem door = FindObject(items, 2);
+            Assert.That(door.SpriteKey, Is.EqualTo(DoorBaseSpriteKey + "#horizontal_close"));
+            Assert.That(door.IsDoor, Is.True);
+            Assert.That(door.IsDoorLocked, Is.True);
+            Assert.That(door.DoorVisualState, Is.EqualTo(ArcGraphDoorVisualState.Locked));
+            Assert.That(door.DoorVisualOrientation, Is.EqualTo(ArcGraphDoorVisualOrientation.Horizontal));
+        }
+
+        private static string ResolveDoorSpriteKey(
+            IReadOnlyList<ArcGraphObjectVisualSnapshot> snapshots,
+            out ArcGraphDoorVisualState state,
+            out ArcGraphDoorVisualOrientation orientation)
+        {
+            HashSet<ArcGraphCellCoord> context =
+                ArcGraphDoorVisualResolver.BuildSolidDoorContextCellIndex(snapshots);
+            return ArcGraphDoorVisualResolver.ResolveSpriteKey(
+                snapshots[1 < snapshots.Count ? 1 : 0],
+                context,
+                out state,
+                out orientation);
+        }
+
+        private static ArcGraphObjectRenderItem FindObject(
+            IReadOnlyList<ArcGraphObjectRenderItem> items,
+            int objectId)
+        {
+            for (int i = 0; i < items.Count; i++)
+            {
+                if (items[i].ObjectId == objectId)
+                    return items[i];
+            }
+
+            Assert.Fail("Object not found: " + objectId);
+            return default;
+        }
+
+        private static ArcGraphObjectVisualSnapshot CreateDoorSnapshot(
+            int objectId,
+            int x,
+            int y,
+            bool isOpen,
+            bool isLocked)
+        {
+            return new ArcGraphObjectVisualSnapshot(
+                objectId,
+                "door_wood",
+                new ArcGraphCellCoord(x, y, 0),
+                DoorBaseSpriteKey,
+                isHeld: false,
+                holderActorId: 0,
+                foodStockUnits: -1,
+                footprintWidth: 1,
+                footprintHeight: 1,
+                visualKind: "door",
+                visualResolverKey: "door_wood_state",
+                visualWidthPixels: 32,
+                visualHeightPixels: 83,
+                visualBaseWidthPixels: 32,
+                visualBaseHeightPixels: 32,
+                visualBaseMiniTileMask: string.Empty,
+                visualPivot: "bottom_center",
+                visualOffsetX: 0,
+                visualOffsetY: 0,
+                fadeWhenActorBehind: false,
+                useShadow: false,
+                isDoor: true,
+                isDoorOpen: isOpen,
+                isDoorLocked: isLocked,
+                isDoorLockable: true);
+        }
+
+        private static ArcGraphObjectVisualSnapshot CreateWallSnapshot(
+            int objectId,
+            int x,
+            int y)
+        {
+            return new ArcGraphObjectVisualSnapshot(
+                objectId,
+                "wall_stone",
+                new ArcGraphCellCoord(x, y, 0),
+                "ArcGraph/Objects/wall_stone",
+                isHeld: false,
+                holderActorId: 0,
+                foodStockUnits: -1,
+                footprintWidth: 1,
+                footprintHeight: 1,
+                visualKind: "wall",
+                visualResolverKey: "wall_stone_cardinal",
+                visualWidthPixels: 32,
+                visualHeightPixels: 83,
+                visualBaseWidthPixels: 32,
+                visualBaseHeightPixels: 32,
+                visualBaseMiniTileMask: "0110",
+                visualPivot: "bottom_center",
+                visualOffsetX: 0,
+                visualOffsetY: 0,
+                fadeWhenActorBehind: true,
+                useShadow: false);
+        }
+    }
 }

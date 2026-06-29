@@ -225,7 +225,11 @@ namespace Arcontio.View.ArcGraph
                 item.VisualOffsetX,
                 item.VisualOffsetY,
                 item.FadeWhenActorBehind,
-                item.UseShadow);
+                item.UseShadow,
+                isDoor: item.IsDoor,
+                isDoorLocked: item.IsDoorLocked,
+                doorVisualState: item.DoorVisualState,
+                doorVisualOrientation: item.DoorVisualOrientation);
             return true;
         }
 
