@@ -677,6 +677,31 @@ namespace Arcontio.Core
         // NON Ã¨ memoria percettiva, e non Ã¨ "veritÃ  del mondo": Ã¨ il promemoria interno "quel cibo Ã¨ mio e sta lÃ¬".
         public readonly Dictionary<int, List<PinnedFoodStockBelief>> NpcPinnedFoodStockBeliefs = new();
 
+        // =============================================================================
+        // NpcInventories
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Inventario typed oggettivo degli NPC, indicizzato per npcId.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: World owner dello stato fisico trasportato</b></para>
+        /// <para>
+        /// Questo store rappresenta cosa un NPC porta davvero addosso. Non e' una
+        /// belief, non e' UI e non e' una scorciatoia decisionale: i layer cognitivi
+        /// dovranno leggerlo solo tramite query autorizzate nei sotto-step futuri.
+        /// In C1 viene usato per capienza e API base, senza sostituire ancora tutti
+        /// i flussi legacy di fame, furto e save/load.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Chiave</b>: npcId runtime del proprietario fisico.</item>
+        ///   <item><b>Valore</b>: stato inventario con entry typed e slot MVP.</item>
+        /// </list>
+        /// </summary>
+        public readonly Dictionary<int, NpcInventoryState> NpcInventories = new();
+
 
         // Cibo privato per NPC (inventario v0)
         public readonly Dictionary<int, int> NpcPrivateFood = new();
@@ -5348,55 +5373,87 @@ namespace Arcontio.Core
                 NpcPinnedFoodStockBeliefs.Remove(npcId);
         }
 
-        // ============================================================
-        //
-        // Obiettivo:
-        // - centralizzare la logica di capienza dell'inventario dell'NPC
-        // - evitare duplicazioni in Rule/System/CommandHandler
-        //
-        // Nota:
-        // - Oggi contiamo solo NpcPrivateFood (unitÃ  di cibo portate addosso).
-        // - In futuro, quando introdurremo altri oggetti trasportati, questo metodo
-        //   dovrÃ  includere anche quelle collezioni (es: NpcCarriedItems, ecc.).
-        // - Importante: il World Ã¨ "source of truth" dello stato globale; la view legge soltanto.
-
+        // =============================================================================
+        // GetInventoryMaxUnits
+        // =============================================================================
         /// <summary>
-        /// Capienza massima dell'inventario di questo NPC (in unitÃ ).
+        /// <para>
+        /// Restituisce la capienza massima dell'inventario personale di un NPC.
+        /// </para>
         ///
-        /// Oggi Ã¨ globale (uguale per tutti gli NPC).
-        /// In futuro potremo introdurre override per archetipo/ruolo.
+        /// <para><b>Principio architetturale: query centrale della capienza</b></para>
+        /// <para>
+        /// Tutti i comandi che devono aggiungere o trasferire risorse devono passare
+        /// da questa API invece di duplicare il limite. In C1 la capienza e' ancora
+        /// globale e data-driven da <c>inventory_max_units</c>; override per ruolo,
+        /// corporatura o contenitori verranno aggiunti solo quando serviranno.
+        /// </para>
         /// </summary>
         public int GetInventoryMaxUnits(int npcId)
         {
-            // npcId non Ã¨ ancora usato (perchÃ© la capienza Ã¨ globale),
-            // ma lo teniamo per compatibilitÃ  futura con override per archetipo.
+            // npcId non e' ancora usato per override individuali. Tenerlo nella
+            // firma evita di cambiare tutti i call-site quando arriveranno zaini,
+            // tratti fisici o contenitori indossati.
             return Global.InventoryMaxUnits;
         }
 
+        // =============================================================================
+        // GetInventoryUsedUnits
+        // =============================================================================
         /// <summary>
-        /// UnitÃ  giÃ  occupate nell'inventario dell'NPC.
+        /// <para>
+        /// Calcola quante unita' di capienza sono occupate dall'inventario typed.
+        /// </para>
         ///
-        /// ATTUALE:
-        /// - cibo privato trasportato (NpcPrivateFood)
-        ///
-        /// FUTURO:
-        /// - altri oggetti trasportati da aggiungere qui.
+        /// <para><b>Principio architetturale: C1 sposta la capienza sul nuovo store</b></para>
+        /// <para>
+        /// Da questo checkpoint la capienza operativa inizia a guardare
+        /// <see cref="NpcInventories"/>. Finche' i sotto-step C4-C7 non avranno
+        /// migrato fame e furto, somma anche <c>NpcPrivateFood</c> come ponte
+        /// legacy, cosi i comandi esistenti non possono sovraccaricare l'NPC.
+        /// </para>
         /// </summary>
         public int GetInventoryUsedUnits(int npcId)
         {
-            // Food carried (private).
-            NpcPrivateFood.TryGetValue(npcId, out int food);
-            if (food < 0) food = 0;
+            int used = 0;
+            if (NpcInventories.TryGetValue(npcId, out var inventory) && inventory != null)
+            {
+                for (int i = 0; i < inventory.Entries.Count; i++)
+                {
+                    var entry = inventory.Entries[i];
+                    if (entry == null || entry.Quantity <= 0)
+                        continue;
 
-            // TODO (futuro): sommare altre categorie di item carried.
-            // Esempio:
-            // int other = NpcCarriedItems.TryGetValue(npcId, out var list) ? list.Count : 0;
+                    // In C1 ogni unita' di quantita' consuma una unita' di capienza.
+                    // Gli oggetti fisici unici useranno Quantity=1 nei sotto-step pickup.
+                    used += entry.Quantity;
+                }
+            }
 
-            return food;
+            if (NpcPrivateFood.TryGetValue(npcId, out int legacyFood) && legacyFood > 0)
+            {
+                // Ponte temporaneo: i comandi legacy non sono ancora migrati ma
+                // devono continuare a rispettare la stessa capienza fisica.
+                used += legacyFood;
+            }
+
+            return used < 0 ? 0 : used;
         }
 
+        // =============================================================================
+        // GetInventoryFreeCapacity
+        // =============================================================================
         /// <summary>
-        /// Quante unitÃ  libere restano nell'inventario dell'NPC.
+        /// <para>
+        /// Restituisce la capienza residua dell'inventario personale dell'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: singola porta per i limiti di carico</b></para>
+        /// <para>
+        /// I comandi di aggiunta, furto, raccolta e trasferimento devono usare questa
+        /// funzione per rispettare il limite typed. La UI puo' mostrarla tramite
+        /// snapshot/view model, ma non deve mutare direttamente lo store.
+        /// </para>
         /// </summary>
         public int GetInventoryFreeCapacity(int npcId)
         {
@@ -5406,6 +5463,455 @@ namespace Arcontio.Core
             int free = max - used;
             if (free < 0) free = 0;
             return free;
+        }
+
+        // =============================================================================
+        // TryAddInventoryItem
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiunge una quantita' typed all'inventario oggettivo di un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: mutazione inventario autorizzata dal World</b></para>
+        /// <para>
+        /// Questa API e' il primo confine operativo dell'inventario C1. I comandi
+        /// futuri dichiareranno l'intenzione di aggiungere risorse, ma sara' il
+        /// World a validare NPC, catalogo oggetti, trasportabilita' e capienza.
+        /// In questo modo ne' UI ne' job possono scrivere direttamente negli store.
+        /// </para>
+        /// </summary>
+        public bool TryAddInventoryItem(
+            int npcId,
+            string defId,
+            int quantity,
+            out int addedQuantity,
+            out string reason)
+        {
+            return TryAddInventoryItem(npcId, defId, quantity, NpcInventorySlotKind.Pack, 0, out addedQuantity, out reason);
+        }
+
+        // =============================================================================
+        // TryAddInventoryItem
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiunge item typed o un oggetto fisico unico all'inventario di un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: stack e oggetti fisici nello stesso contratto</b></para>
+        /// <para>
+        /// Gli stack senza <c>objectId</c> rappresentano risorse typed come berry,
+        /// acorn e wood_log. Le entry con <c>objectId</c> rappresentano oggetti
+        /// concreti del World e vengono tenute separate per non perdere identita',
+        /// ownership e stato fisico quando C5 colleghera' pickup/drop.
+        /// </para>
+        /// </summary>
+        public bool TryAddInventoryItem(
+            int npcId,
+            string defId,
+            int quantity,
+            NpcInventorySlotKind preferredSlot,
+            int objectId,
+            out int addedQuantity,
+            out string reason)
+        {
+            addedQuantity = 0;
+            reason = string.Empty;
+
+            if (!ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(defId))
+            {
+                reason = "DefIdMissing";
+                return false;
+            }
+
+            if (!TryGetObjectDef(defId, out var def) || def == null)
+            {
+                reason = "ObjectDefMissing";
+                return false;
+            }
+
+            if (!IsInventoryTransportableDef(def, objectId))
+            {
+                reason = "ObjectDefNotTransportable";
+                return false;
+            }
+
+            int normalizedQuantity = quantity <= 0 ? 0 : quantity;
+            if (objectId > 0 && normalizedQuantity > 1)
+                normalizedQuantity = 1;
+
+            if (normalizedQuantity <= 0)
+            {
+                reason = "QuantityInvalid";
+                return false;
+            }
+
+            int freeCapacity = GetInventoryFreeCapacity(npcId);
+            if (freeCapacity <= 0)
+            {
+                reason = "InventoryFull";
+                return false;
+            }
+
+            int quantityToAdd = normalizedQuantity > freeCapacity ? freeCapacity : normalizedQuantity;
+            var inventory = EnsureNpcInventory(npcId);
+            var slot = NormalizeInventorySlot(preferredSlot);
+
+            if (objectId > 0)
+            {
+                if (FindInventoryEntryByObjectId(inventory, objectId) != null)
+                {
+                    reason = "ObjectAlreadyInInventory";
+                    return false;
+                }
+
+                if (IsHandSlot(slot) && IsInventorySlotOccupied(inventory, slot))
+                {
+                    reason = "InventorySlotOccupied";
+                    return false;
+                }
+            }
+
+            if (objectId <= 0 && slot == NpcInventorySlotKind.Pack)
+            {
+                var stack = FindStackEntry(inventory, defId, slot);
+                if (stack != null)
+                {
+                    stack.Quantity += quantityToAdd;
+                    addedQuantity = quantityToAdd;
+                    reason = quantityToAdd == normalizedQuantity ? "InventoryItemStacked" : "InventoryPartiallyStacked";
+                    return true;
+                }
+            }
+
+            inventory.Entries.Add(new NpcInventoryEntry
+            {
+                EntryId = inventory.AllocateEntryId(),
+                DefId = defId,
+                Quantity = quantityToAdd,
+                SlotKind = slot,
+                ObjectId = objectId > 0 ? objectId : 0
+            });
+
+            addedQuantity = quantityToAdd;
+            reason = quantityToAdd == normalizedQuantity ? "InventoryItemAdded" : "InventoryPartiallyAdded";
+            return true;
+        }
+
+        // =============================================================================
+        // TryRemoveInventoryItem
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove una quantita' typed dall'inventario di un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: rimozione controllata senza conoscenza implicita</b></para>
+        /// <para>
+        /// Il metodo lavora su <c>defId</c> e quantita', non su desideri decisionali.
+        /// Se la quantita' richiesta non e' disponibile, fallisce senza rimuovere
+        /// parzialmente: i comandi chiamanti devono decidere esplicitamente se una
+        /// rimozione parziale sia accettabile.
+        /// </para>
+        /// </summary>
+        public bool TryRemoveInventoryItem(
+            int npcId,
+            string defId,
+            int quantity,
+            out int removedQuantity,
+            out string reason)
+        {
+            removedQuantity = 0;
+            reason = string.Empty;
+
+            if (!ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(defId))
+            {
+                reason = "DefIdMissing";
+                return false;
+            }
+
+            if (quantity <= 0)
+            {
+                reason = "QuantityInvalid";
+                return false;
+            }
+
+            if (GetInventoryQuantity(npcId, defId) < quantity)
+            {
+                reason = "InventoryItemInsufficient";
+                return false;
+            }
+
+            var inventory = EnsureNpcInventory(npcId);
+            int remaining = quantity;
+            for (int i = inventory.Entries.Count - 1; i >= 0 && remaining > 0; i--)
+            {
+                var entry = inventory.Entries[i];
+                if (entry == null
+                    || entry.HasObject
+                    || !string.Equals(entry.DefId, defId, StringComparison.OrdinalIgnoreCase)
+                    || entry.Quantity <= 0)
+                {
+                    continue;
+                }
+
+                int take = entry.Quantity > remaining ? remaining : entry.Quantity;
+                entry.Quantity -= take;
+                remaining -= take;
+                removedQuantity += take;
+
+                if (entry.Quantity <= 0)
+                    inventory.Entries.RemoveAt(i);
+            }
+
+            reason = "InventoryItemRemoved";
+            return removedQuantity == quantity;
+        }
+
+        // =============================================================================
+        // GetInventoryQuantity
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Conta quante unita' typed di un <c>defId</c> sono presenti addosso a un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query read-only minimale</b></para>
+        /// <para>
+        /// Questa e' una query oggettiva del World, non una belief. I layer cognitivi
+        /// non dovranno usarla direttamente per decidere, ma i comandi e i test
+        /// possono usarla per validare la coerenza dello store C1.
+        /// </para>
+        /// </summary>
+        public int GetInventoryQuantity(int npcId, string defId)
+        {
+            if (string.IsNullOrWhiteSpace(defId)
+                || !NpcInventories.TryGetValue(npcId, out var inventory)
+                || inventory == null)
+            {
+                return 0;
+            }
+
+            int total = 0;
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (entry == null
+                    || entry.Quantity <= 0
+                    || !string.Equals(entry.DefId, defId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                total += entry.Quantity;
+            }
+
+            return total < 0 ? 0 : total;
+        }
+
+        // =============================================================================
+        // HasEdibleFoodOnSelf
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se l'inventario typed contiene almeno un alimento consumabile.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query autorizzata preparatoria</b></para>
+        /// <para>
+        /// In C1 questa query resta una lettura oggettiva del World, utile a comandi
+        /// e test. Nei sotto-step decisionali verra' incapsulata dietro belief/query
+        /// soggettive per evitare che la Decision legga direttamente lo stato reale.
+        /// </para>
+        /// </summary>
+        public bool HasEdibleFoodOnSelf(int npcId)
+        {
+            return SelectBestFoodOnSelf(npcId, out _, out _, out _);
+        }
+
+        // =============================================================================
+        // SelectBestFoodOnSelf
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Seleziona l'alimento typed piu' nutriente presente nell'inventario NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: scelta tecnica, non decisione cognitiva</b></para>
+        /// <para>
+        /// Il metodo non decide che l'NPC debba mangiare. Ordina solo gli alimenti
+        /// gia' posseduti per valore nutrizionale, cosi il futuro comando
+        /// <c>ConsumeInventoryItemCommand</c> potra' ricevere un target coerente.
+        /// </para>
+        /// </summary>
+        public bool SelectBestFoodOnSelf(
+            int npcId,
+            out string foodDefId,
+            out int quantity,
+            out float nutritionValue)
+        {
+            foodDefId = string.Empty;
+            quantity = 0;
+            nutritionValue = 0f;
+
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+                return false;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (entry == null || entry.Quantity <= 0 || string.IsNullOrWhiteSpace(entry.DefId))
+                    continue;
+
+                ObjectFoodNutritionResult resolved = ObjectFoodNutritionResolver.Resolve(
+                    this,
+                    entry.DefId,
+                    Global.Needs.eatSatietyGain,
+                    allowLegacyFallbackWhenDefinitionMissing: false);
+
+                if (!resolved.IsConsumableFood || resolved.NutritionValue <= nutritionValue)
+                    continue;
+
+                foodDefId = entry.DefId;
+                quantity = entry.Quantity;
+                nutritionValue = resolved.NutritionValue;
+            }
+
+            return !string.IsNullOrWhiteSpace(foodDefId);
+        }
+
+        // =============================================================================
+        // EnsureNpcInventory
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce lo store inventario di un NPC, creandolo se manca.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bootstrap locale esplicito</b></para>
+        /// <para>
+        /// La creazione lazy protegge vecchi test e path di load parziali, ma resta
+        /// confinata nel World. Nessun layer esterno deve creare direttamente
+        /// <see cref="NpcInventoryState"/>.
+        /// </para>
+        /// </summary>
+        public NpcInventoryState EnsureNpcInventory(int npcId)
+        {
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+            {
+                inventory = new NpcInventoryState();
+                NpcInventories[npcId] = inventory;
+            }
+
+            return inventory;
+        }
+
+        private static NpcInventorySlotKind NormalizeInventorySlot(NpcInventorySlotKind preferredSlot)
+        {
+            if (preferredSlot == NpcInventorySlotKind.HandLeft
+                || preferredSlot == NpcInventorySlotKind.HandRight
+                || preferredSlot == NpcInventorySlotKind.Pack)
+            {
+                return preferredSlot;
+            }
+
+            // In C1 gli stack typed vanno nel Pack. Anche gli oggetti fisici senza
+            // preferenza esplicita partono dal Pack per evitare scelte UI nascoste.
+            return NpcInventorySlotKind.Pack;
+        }
+
+        private static bool IsHandSlot(NpcInventorySlotKind slot)
+        {
+            return slot == NpcInventorySlotKind.HandLeft || slot == NpcInventorySlotKind.HandRight;
+        }
+
+        private static bool IsInventorySlotOccupied(NpcInventoryState inventory, NpcInventorySlotKind slot)
+        {
+            if (inventory == null)
+                return false;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (entry != null && entry.Quantity > 0 && entry.SlotKind == slot)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static NpcInventoryEntry FindStackEntry(NpcInventoryState inventory, string defId, NpcInventorySlotKind slot)
+        {
+            if (inventory == null || string.IsNullOrWhiteSpace(defId))
+                return null;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (entry == null
+                    || entry.HasObject
+                    || entry.SlotKind != slot
+                    || !string.Equals(entry.DefId, defId, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return entry;
+            }
+
+            return null;
+        }
+
+        private static NpcInventoryEntry FindInventoryEntryByObjectId(NpcInventoryState inventory, int objectId)
+        {
+            if (inventory == null || objectId <= 0)
+                return null;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (entry != null && entry.ObjectId == objectId)
+                    return entry;
+            }
+
+            return null;
+        }
+
+        private static bool IsInventoryTransportableDef(ObjectDef def, int objectId)
+        {
+            if (def == null)
+                return false;
+
+            if (objectId > 0)
+                return true;
+
+            return HasPositiveObjectProperty(def, "Item")
+                || HasPositiveObjectProperty(def, "FoodItem")
+                || HasPositiveObjectProperty(def, "FoodStock")
+                || HasPositiveObjectProperty(def, "Material")
+                || HasPositiveObjectProperty(def, "SeedItem")
+                || HasPositiveObjectProperty(def, "Tool")
+                || HasPositiveObjectProperty(def, "BiologicalProduct");
+        }
+
+        private static bool HasPositiveObjectProperty(ObjectDef def, string key)
+        {
+            return def != null
+                && def.TryGetPropertyValue(key, out float value)
+                && value > 0f;
         }
 
 
@@ -5457,6 +5963,8 @@ namespace Arcontio.Core
             // Tick consumo privato
             if (!NpcLastPrivateFoodConsumeTick.ContainsKey(id))
                 NpcLastPrivateFoodConsumeTick[id] = -999999;
+
+            EnsureNpcInventory(id);
 
             // Movement intent init (se non presente)
             if (!NpcMoveIntents.ContainsKey(id))
@@ -5602,6 +6110,8 @@ if (!NpcAction.ContainsKey(id))
 
             if (!NpcLastPrivateFoodConsumeTick.ContainsKey(npcId))
                 NpcLastPrivateFoodConsumeTick[npcId] = -999999;
+
+            EnsureNpcInventory(npcId);
 
             if (!NpcMoveIntents.ContainsKey(npcId))
                 NpcMoveIntents[npcId] = default;

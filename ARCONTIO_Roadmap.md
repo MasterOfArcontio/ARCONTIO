@@ -17580,7 +17580,13 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 |---|---|---|
 | v0.71.05.A | Catalogo prodotti biologici separato + coerenza object catalog | ✅ |
 | v0.71.05.B | Nutrizione typed e revisione fame per prodotti alimentari | ✅ |
-| v0.71.05.C | Inventario typed basilare NPC, isolato e compatibile legacy | ⏳ |
+| v0.71.05.C1 | Modello inventario typed nel World + API e capienza compatibile legacy | ✅ |
+| v0.71.05.C2 | Comandi ed eventi inventario typed | ⏳ |
+| v0.71.05.C3 | Save/load inventario typed nel WorldSave canonico | ⏳ |
+| v0.71.05.C4 | Consumo da inventario typed e ponte EatPrivateFood | ⏳ |
+| v0.71.05.C5 | Pickup/drop oggetti fisici dentro inventario | ⏳ |
+| v0.71.05.C6 | Furto e stock verso inventario typed | ⏳ |
+| v0.71.05.C7 | Rimozione operativa NpcPrivateFood dai flussi runtime | ⏳ |
 | v0.71.05.D | Stato reale risorse per singola pianta | ⏳ |
 | v0.71.05.E | Ricrescita risorse biologiche nel tempo | ⏳ |
 | v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ⏳ |
@@ -17594,7 +17600,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.N | Decisioni: cerca cibo, cerca non-cibo, cerca area biologica con risorsa | ⏳ |
 | v0.71.05.O | Costo stanchezza per step job e scoring decisionale | ⏳ |
 | v0.71.05.P | Nuovi step job: search biological landmark, query resource, harvest | ⏳ |
-| v0.71.05.Q | Revisione `EatPrivateFood` su inventario typed e chiusura compatibilita' legacy | ⏳ |
+| v0.71.05.Q | Verifica rimozione legacy cibo privato e chiusura compatibilita' finale | ⏳ |
 
 La `v0.71.05.A` separa il catalogo prodotti biologici dal catalogo specie vegetali. La Biosfera continua a dichiarare quali `productKey` una specie puo' produrre; il nuovo catalogo prodotti definisce il contratto semantico del prodotto; il catalogo oggetti resta owner di item, proprieta' e nutrizione concreta.
 
