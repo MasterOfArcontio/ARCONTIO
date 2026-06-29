@@ -173,6 +173,95 @@ namespace Arcontio.Tests
             Assert.That(occluder.ObjectId, Is.EqualTo(wall.ObjectId));
         }
 
+        // =============================================================================
+        // WallBehindWallDoesNotTriggerCoveredObjectTarget
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che un muro dietro un altro muro non venga trattato come target
+        /// coperto. La trasparenza deve aiutare a vedere NPC/oggetti dietro il
+        /// muro, non propagarsi lungo una fila di muri.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void WallBehindWallDoesNotTriggerCoveredObjectTarget()
+        {
+            ArcGraphObjectRenderItem frontWall = CreateWall(100, 4, 4);
+            ArcGraphObjectRenderItem rearWall = CreateWall(101, 4, 5);
+
+            bool picked = ArcGraphOcclusionPolicy.TryPickCoveredTarget(
+                frontWall,
+                new ArcGraphActorRenderItem[0],
+                new[] { frontWall, rearWall },
+                2,
+                out ArcGraphOcclusionTarget target);
+
+            Assert.That(picked, Is.False);
+            Assert.That(target.IsValid, Is.False);
+        }
+
+        // =============================================================================
+        // DoorBehindWallDoesNotTriggerCoveredObjectTarget
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che una porta dietro un muro non diventi il motivo per rendere
+        /// trasparente il muro davanti. La porta resta parte della struttura
+        /// visuale, non un target di occlusione equivalente a un oggetto ispezionabile.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DoorBehindWallDoesNotTriggerCoveredObjectTarget()
+        {
+            ArcGraphObjectRenderItem wall = CreateWall(100, 4, 4);
+            ArcGraphObjectRenderItem door = CreateDoor(201, 4, 5);
+
+            bool picked = ArcGraphOcclusionPolicy.TryPickCoveredTarget(
+                wall,
+                new ArcGraphActorRenderItem[0],
+                new[] { wall, door },
+                2,
+                out ArcGraphOcclusionTarget target);
+
+            Assert.That(picked, Is.False);
+            Assert.That(target.IsValid, Is.False);
+        }
+
+        // =============================================================================
+        // NormalObjectBehindWallStillTriggersCoveredObjectTarget
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il comportamento positivo rimasto valido: un oggetto normale
+        /// dietro un muro continua a essere un target coperto selezionabile e puo'
+        /// ancora attivare trasparenza/sagoma.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void NormalObjectBehindWallStillTriggersCoveredObjectTarget()
+        {
+            ArcGraphObjectRenderItem wall = CreateWall(100, 4, 4);
+            ArcGraphObjectRenderItem crate = CreateObject(
+                200,
+                "crate",
+                4,
+                5,
+                visualHeightPixels: 32,
+                visualBaseHeightPixels: 32,
+                fadeWhenActorBehind: false);
+
+            bool picked = ArcGraphOcclusionPolicy.TryPickCoveredTarget(
+                wall,
+                new ArcGraphActorRenderItem[0],
+                new[] { wall, crate },
+                2,
+                out ArcGraphOcclusionTarget target);
+
+            Assert.That(picked, Is.True);
+            Assert.That(target.Kind, Is.EqualTo(ArcGraphOcclusionTargetKind.Object));
+            Assert.That(target.EntityId, Is.EqualTo(crate.ObjectId));
+        }
+
         private static ArcGraphViewInputFrame CreatePointerInput(bool isPointerOverUi)
         {
             return new ArcGraphViewInputFrame(
@@ -215,7 +304,24 @@ namespace Arcontio.Tests
                 y,
                 visualHeightPixels: 83,
                 visualBaseHeightPixels: 32,
-                fadeWhenActorBehind: true);
+                fadeWhenActorBehind: true,
+                visualKind: "wall",
+                visualResolverKey: "wall_stone_cardinal");
+        }
+
+        private static ArcGraphObjectRenderItem CreateDoor(int objectId, int x, int y)
+        {
+            return CreateObject(
+                objectId,
+                "door_wood_good",
+                x,
+                y,
+                visualHeightPixels: 83,
+                visualBaseHeightPixels: 32,
+                fadeWhenActorBehind: true,
+                visualKind: "door",
+                visualResolverKey: "door_wood_state",
+                isDoor: true);
         }
 
         private static ArcGraphObjectRenderItem CreateObject(
@@ -225,7 +331,10 @@ namespace Arcontio.Tests
             int y,
             int visualHeightPixels,
             int visualBaseHeightPixels,
-            bool fadeWhenActorBehind)
+            bool fadeWhenActorBehind,
+            string visualKind = "object",
+            string visualResolverKey = "qa_object",
+            bool isDoor = false)
         {
             var cell = new ArcGraphCellCoord(x, y, 0);
             return new ArcGraphObjectRenderItem(
@@ -240,8 +349,8 @@ namespace Arcontio.Tests
                 foodStockUnits: -1,
                 footprintWidth: 1,
                 footprintHeight: 1,
-                visualKind: "wall",
-                visualResolverKey: "wall_stone_cardinal",
+                visualKind: visualKind,
+                visualResolverKey: visualResolverKey,
                 visualWidthPixels: 32,
                 visualHeightPixels: visualHeightPixels,
                 visualBaseWidthPixels: 32,
@@ -254,7 +363,13 @@ namespace Arcontio.Tests
                 useShadow: false,
                 isVisible: true,
                 hiddenReason: "None",
-                ArcGraphRenderSortKey.FromCell(cell, 10, ArcGraphRenderItemKind.Object, objectId));
+                ArcGraphRenderSortKey.FromCell(cell, 10, ArcGraphRenderItemKind.Object, objectId),
+                isDoor: isDoor,
+                isDoorOpen: false,
+                isDoorLocked: false,
+                isDoorLockable: isDoor,
+                doorVisualState: isDoor ? ArcGraphDoorVisualState.Closed : ArcGraphDoorVisualState.None,
+                doorVisualOrientation: ArcGraphDoorVisualOrientation.Horizontal);
         }
     }
 

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 
 namespace Arcontio.View.ArcGraph
@@ -174,6 +175,48 @@ namespace Arcontio.View.ArcGraph
                    && cell.X < item.Cell.X + width
                    && cell.Y >= item.Cell.Y
                    && cell.Y < item.Cell.Y + height;
+        }
+
+        // =============================================================================
+        // IsCoveredObjectTarget
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se un oggetto dietro un muro puo' essere trattato come target
+        /// coperto, quindi come motivo valido per attivare picking assistito,
+        /// trasparenza del muro davanti o sagoma leggera.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: occluder e target restano ruoli diversi</b></para>
+        /// <para>
+        /// Muri e porte possono coprire altri elementi, ma non devono a loro volta
+        /// far diventare trasparente un muro antecedente. Questo evita catene
+        /// visuali nelle file di muri o porte: la trasparenza resta al servizio di
+        /// NPC e oggetti realmente ispezionabili dietro il muro, non della continuita'
+        /// grafica della muratura.
+        /// </para>
+        /// </summary>
+        public static bool IsCoveredObjectTarget(ArcGraphObjectRenderItem item)
+        {
+            if (!item.IsVisible || item.IsHeld)
+                return false;
+
+            if (item.IsDoor)
+                return false;
+
+            // Un oggetto che e' gia' un occluder alto non deve diventare il target
+            // di un altro occluder: altrimenti una fila verticale di muri/porte
+            // produrrebbe fade a catena senza NPC o oggetti realmente nascosti.
+            if (IsFadeableOccluder(item))
+                return false;
+
+            if (string.Equals(item.VisualKind, "wall", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(item.VisualKind, "door", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         // =============================================================================
@@ -375,7 +418,10 @@ namespace Arcontio.View.ArcGraph
             for (int i = 0; i < objects.Count; i++)
             {
                 ArcGraphObjectRenderItem item = objects[i];
-                if (!item.IsVisible || item.IsHeld || item.ObjectId == occluder.ObjectId)
+                if (item.ObjectId == occluder.ObjectId)
+                    continue;
+
+                if (!IsCoveredObjectTarget(item))
                     continue;
 
                 if (!IsTargetBehindOccluder(occluder, item.Cell, maximumDepthCells))
