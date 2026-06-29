@@ -17579,7 +17579,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | Checkpoint | Task | Stato |
 |---|---|---|
 | v0.71.05.A | Catalogo prodotti biologici separato + coerenza object catalog | ✅ |
-| v0.71.05.B | Nutrizione typed e revisione fame per prodotti alimentari | ⏳ |
+| v0.71.05.B | Nutrizione typed e revisione fame per prodotti alimentari | ✅ |
 | v0.71.05.C | Inventario typed basilare NPC, isolato e compatibile legacy | ⏳ |
 | v0.71.05.D | Stato reale risorse per singola pianta | ⏳ |
 | v0.71.05.E | Ricrescita risorse biologiche nel tempo | ⏳ |

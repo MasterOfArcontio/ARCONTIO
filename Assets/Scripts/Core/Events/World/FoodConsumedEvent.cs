@@ -23,6 +23,7 @@ namespace Arcontio.Core
     ///   <item><b>FoodObjectId</b>: oggetto stock quando esiste, zero per cibo privato.</item>
     ///   <item><b>Cell</b>: cella osservabile del consumo o posizione dell'NPC.</item>
     ///   <item><b>RemainingUnits/HungerAfter</b>: stato gia' risultante dalla mutazione.</item>
+    ///   <item><b>FoodDefId/NutritionValue</b>: dato alimentare risolto dal catalogo o dal fallback legacy.</item>
     /// </list>
     /// </summary>
     public sealed class FoodConsumedEvent : IWorldEvent
@@ -37,6 +38,9 @@ namespace Arcontio.Core
         public readonly int CellX;
         public readonly int CellY;
         public readonly float HungerAfter;
+        public readonly string FoodDefId;
+        public readonly float NutritionValue;
+        public readonly bool UsedNutritionFallback;
 
         public FoodConsumedEvent(
             long tick,
@@ -48,7 +52,10 @@ namespace Arcontio.Core
             bool depleted,
             int cellX,
             int cellY,
-            float hungerAfter)
+            float hungerAfter,
+            string foodDefId = "",
+            float nutritionValue = 0f,
+            bool usedNutritionFallback = false)
         {
             Tick = tick;
             NpcId = npcId;
@@ -60,9 +67,12 @@ namespace Arcontio.Core
             CellX = cellX;
             CellY = cellY;
             HungerAfter = hungerAfter;
+            FoodDefId = foodDefId ?? string.Empty;
+            NutritionValue = nutritionValue;
+            UsedNutritionFallback = usedNutritionFallback;
         }
 
         public string Describe()
-            => $"FoodConsumed tick={Tick} npc={NpcId} source={SourceKind} foodObj={FoodObjectId} units={Units} left={RemainingUnits} at=({CellX},{CellY})";
+            => $"FoodConsumed tick={Tick} npc={NpcId} source={SourceKind} foodObj={FoodObjectId} foodDef={FoodDefId} nutrition={NutritionValue:0.###} fallback={UsedNutritionFallback} units={Units} left={RemainingUnits} at=({CellX},{CellY})";
     }
 }

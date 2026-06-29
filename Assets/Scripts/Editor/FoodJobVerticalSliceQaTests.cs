@@ -823,6 +823,80 @@ namespace Arcontio.Tests
         }
 
 
+        [Test]
+        public void ObjectFoodNutritionResolverResolvesTypedAndLegacyFoods()
+        {
+            var world = MakeWorldWithNpcOnly(1, 1, out _);
+            AddObjectDef(world, "food_stock", nutritionValue: 0.45f, foodItem: true, foodStock: true);
+            AddObjectDef(world, "berry", nutritionValue: 0.32f, foodItem: true, foodStock: false);
+            AddObjectDef(world, "acorn", nutritionValue: 0.18f, foodItem: true, foodStock: false);
+            AddObjectDef(world, "wood_log", nutritionValue: 0f, foodItem: false, foodStock: false);
+
+            ObjectFoodNutritionResult stock = ObjectFoodNutritionResolver.Resolve(
+                world,
+                "food_stock",
+                legacyFallback: 0.99f,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+            ObjectFoodNutritionResult berry = ObjectFoodNutritionResolver.Resolve(
+                world,
+                "berry",
+                legacyFallback: 0.99f,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+            ObjectFoodNutritionResult acorn = ObjectFoodNutritionResolver.Resolve(
+                world,
+                "acorn",
+                legacyFallback: 0.99f,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+            ObjectFoodNutritionResult wood = ObjectFoodNutritionResolver.Resolve(
+                world,
+                "wood_log",
+                legacyFallback: 0.99f,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+
+            Assert.That(stock.IsConsumableFood, Is.True);
+            Assert.That(stock.IsTypedFoodItem, Is.True);
+            Assert.That(stock.IsLegacyFoodStock, Is.True);
+            Assert.That(stock.NutritionValue, Is.EqualTo(0.45f).Within(0.0001f));
+            Assert.That(stock.UsedNutritionFallback, Is.False);
+
+            Assert.That(berry.IsConsumableFood, Is.True);
+            Assert.That(berry.NutritionValue, Is.EqualTo(0.32f).Within(0.0001f));
+            Assert.That(berry.IsLegacyFoodStock, Is.False);
+
+            Assert.That(acorn.IsConsumableFood, Is.True);
+            Assert.That(acorn.NutritionValue, Is.EqualTo(0.18f).Within(0.0001f));
+
+            Assert.That(wood.IsConsumableFood, Is.False);
+            Assert.That(wood.FailureReason, Is.EqualTo("ObjectDefIsNotFood"));
+        }
+
+        [Test]
+        public void ObjectFoodNutritionResolverUsesFallbackOnlyForLegacyFoodStock()
+        {
+            var world = MakeWorldWithNpcOnly(1, 1, out _);
+            AddObjectDef(world, "legacy_bad_stock", nutritionValue: 0f, foodItem: false, foodStock: true);
+            AddObjectDef(world, "typed_bad_food", nutritionValue: 0f, foodItem: true, foodStock: false);
+
+            ObjectFoodNutritionResult legacy = ObjectFoodNutritionResolver.Resolve(
+                world,
+                "legacy_bad_stock",
+                legacyFallback: 0.77f,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+            ObjectFoodNutritionResult typed = ObjectFoodNutritionResolver.Resolve(
+                world,
+                "typed_bad_food",
+                legacyFallback: 0.77f,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+
+            Assert.That(legacy.IsConsumableFood, Is.True);
+            Assert.That(legacy.NutritionValue, Is.EqualTo(0.77f).Within(0.0001f));
+            Assert.That(legacy.UsedNutritionFallback, Is.True);
+
+            Assert.That(typed.IsConsumableFood, Is.False);
+            Assert.That(typed.UsedNutritionFallback, Is.False);
+            Assert.That(typed.FailureReason, Is.EqualTo("NutritionValueMissingOrInvalid"));
+        }
+
 
 
 
@@ -836,17 +910,22 @@ namespace Arcontio.Tests
         public void EatFromStockCommandPublishesFoodConsumedEventAfterMutation()
         {
             var world = MakeWorldWithNpcAndCommunityFood(5, 5, 5, 5, out int npcId, out int foodId);
+            AddObjectDef(world, "food_stock", nutritionValue: 0.25f, foodItem: true, foodStock: true);
             var bus = new MessageBus();
 
             new EatFromStockCommand(npcId, foodId).Execute(world, bus);
 
             Assert.That(world.FoodStocks[foodId].Units, Is.EqualTo(2));
+            Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(0.70f).Within(0.0001f));
             Assert.That(bus.TryDequeue(out var simEvent), Is.True);
             var consumed = simEvent as FoodConsumedEvent;
             Assert.That(consumed, Is.Not.Null);
             Assert.That(consumed.NpcId, Is.EqualTo(npcId));
             Assert.That(consumed.FoodObjectId, Is.EqualTo(foodId));
             Assert.That(consumed.SourceKind, Is.EqualTo("Stock"));
+            Assert.That(consumed.FoodDefId, Is.EqualTo("food_stock"));
+            Assert.That(consumed.NutritionValue, Is.EqualTo(0.25f).Within(0.0001f));
+            Assert.That(consumed.UsedNutritionFallback, Is.False);
             Assert.That(consumed.RemainingUnits, Is.EqualTo(2));
             Assert.That(consumed.CellX, Is.EqualTo(5));
             Assert.That(consumed.CellY, Is.EqualTo(5));
@@ -893,18 +972,23 @@ namespace Arcontio.Tests
         public void EatPrivateFoodCommandPublishesFoodConsumedEventAfterMutation()
         {
             var world = MakeWorldWithNpcOnly(4, 6, out int npcId);
+            AddObjectDef(world, "food_stock", nutritionValue: 0.20f, foodItem: true, foodStock: true);
             world.NpcPrivateFood[npcId] = 2;
             var bus = new MessageBus();
 
             new EatPrivateFoodCommand(npcId).Execute(world, bus);
 
             Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(1));
+            Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(0.75f).Within(0.0001f));
             Assert.That(bus.TryDequeue(out var simEvent), Is.True);
             var consumed = simEvent as FoodConsumedEvent;
             Assert.That(consumed, Is.Not.Null);
             Assert.That(consumed.NpcId, Is.EqualTo(npcId));
             Assert.That(consumed.SourceKind, Is.EqualTo("PrivateFood"));
             Assert.That(consumed.FoodObjectId, Is.EqualTo(0));
+            Assert.That(consumed.FoodDefId, Is.EqualTo("food_stock"));
+            Assert.That(consumed.NutritionValue, Is.EqualTo(0.20f).Within(0.0001f));
+            Assert.That(consumed.UsedNutritionFallback, Is.False);
             Assert.That(consumed.RemainingUnits, Is.EqualTo(1));
             Assert.That(consumed.CellX, Is.EqualTo(4));
             Assert.That(consumed.CellY, Is.EqualTo(6));
@@ -1185,6 +1269,49 @@ namespace Arcontio.Tests
                 new Arcontio.Core.Social { JusticePerception01 = 0.9f },
                 npcX,
                 npcY);
+        }
+
+        private static void AddObjectDef(
+            World world,
+            string defId,
+            float nutritionValue,
+            bool foodItem,
+            bool foodStock)
+        {
+            var properties = new List<ObjectPropertyKV>();
+            if (foodItem)
+            {
+                properties.Add(new ObjectPropertyKV
+                {
+                    Key = "FoodItem",
+                    Value = 1f
+                });
+            }
+
+            if (foodStock)
+            {
+                properties.Add(new ObjectPropertyKV
+                {
+                    Key = "FoodStock",
+                    Value = 1f
+                });
+            }
+
+            properties.Add(new ObjectPropertyKV
+            {
+                Key = "NutritionValue",
+                Value = nutritionValue
+            });
+
+            world.ObjectDefs[defId] = new ObjectDef
+            {
+                Id = defId,
+                DisplayName = defId,
+                FootprintWidth = 1,
+                FootprintHeight = 1,
+                IsInteractable = true,
+                Properties = properties
+            };
         }
 
         private static int AddPrivateFoodStock(World world, int ownerNpcId, int x, int y)

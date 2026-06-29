@@ -142,4 +142,218 @@ namespace Arcontio.Core
             States[(int)k] = s;
         }
     }
+
+    // =============================================================================
+    // ObjectFoodNutritionResult
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Risultato normalizzato della lettura nutrizionale di una definizione oggetto.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: nutrizione come dato, non come decisione del command</b></para>
+    /// <para>
+    /// I comandi di consumo devono applicare una mutazione autorizzata, non decidere
+    /// localmente quali oggetti siano cibo e quanto nutrano. Questa struct trasporta
+    /// quindi il responso data-driven gia' risolto dal catalogo oggetti, includendo
+    /// il marker di fallback necessario ai percorsi legacy ancora presenti.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>ObjectDefId</b>: definizione oggetto richiesta dal consumer.</item>
+    ///   <item><b>IsConsumableFood</b>: indica se il catalogo/fallback consente il consumo.</item>
+    ///   <item><b>IsTypedFoodItem</b>: vero per oggetti con proprieta' <c>FoodItem</c>.</item>
+    ///   <item><b>IsLegacyFoodStock</b>: vero per oggetti con proprieta' <c>FoodStock</c> o fallback legacy.</item>
+    ///   <item><b>NutritionValue</b>: recupero fame da applicare al bisogno Hunger.</item>
+    ///   <item><b>UsedNutritionFallback</b>: vero quando e' stato usato <c>NeedsConfig.eatSatietyGain</c>.</item>
+    ///   <item><b>FailureReason</b>: diagnostica sintetica per definizioni non consumabili.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ObjectFoodNutritionResult
+    {
+        public readonly string ObjectDefId;
+        public readonly bool IsConsumableFood;
+        public readonly bool IsTypedFoodItem;
+        public readonly bool IsLegacyFoodStock;
+        public readonly float NutritionValue;
+        public readonly bool UsedNutritionFallback;
+        public readonly string FailureReason;
+
+        public ObjectFoodNutritionResult(
+            string objectDefId,
+            bool isConsumableFood,
+            bool isTypedFoodItem,
+            bool isLegacyFoodStock,
+            float nutritionValue,
+            bool usedNutritionFallback,
+            string failureReason)
+        {
+            ObjectDefId = objectDefId ?? string.Empty;
+            IsConsumableFood = isConsumableFood;
+            IsTypedFoodItem = isTypedFoodItem;
+            IsLegacyFoodStock = isLegacyFoodStock;
+            NutritionValue = nutritionValue;
+            UsedNutritionFallback = usedNutritionFallback;
+            FailureReason = failureReason ?? string.Empty;
+        }
+    }
+
+    // =============================================================================
+    // ObjectFoodNutritionResolver
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Resolver read-only per stabilire se una definizione oggetto rappresenta cibo
+    /// consumabile e quale valore nutrizionale deve applicare al bisogno Fame.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: ponte controllato tra legacy food_stock e item typed</b></para>
+    /// <para>
+    /// La v0.71.05 introduce prodotti biologici e prepara l'inventario typed, ma non
+    /// rimuove ancora <c>NpcPrivateFood</c> o il consumo da <c>FoodStockComponent</c>.
+    /// Questo resolver centralizza la regola comune: <c>FoodItem</c> indica cibo
+    /// typed, <c>FoodStock</c> indica cibo legacy/generico, <c>NutritionValue</c>
+    /// resta il dato primario e <c>NeedsConfig.eatSatietyGain</c> e' solo fallback
+    /// dichiarato per i percorsi legacy.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>catalog lookup</b>: legge la definizione dal <c>World.ObjectDefs</c>.</item>
+    ///   <item><b>classificazione</b>: distingue <c>FoodItem</c>, <c>FoodStock</c> e non-cibo.</item>
+    ///   <item><b>nutrizione</b>: usa <c>NutritionValue</c> se positivo.</item>
+    ///   <item><b>fallback legacy</b>: usa il fallback solo per food stock o per esplicita compatibilita' privata.</item>
+    /// </list>
+    /// </summary>
+    public static class ObjectFoodNutritionResolver
+    {
+        private const string FoodItemPropertyKey = "FoodItem";
+        private const string FoodStockPropertyKey = "FoodStock";
+        private const string NutritionValuePropertyKey = "NutritionValue";
+        private const float HardSafeLegacyFallback = 0.45f;
+
+        // =============================================================================
+        // Resolve
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la nutrizione di una definizione oggetto usando il catalogo del
+        /// mondo, con un fallback legacy opzionale per i percorsi storici.
+        /// </para>
+        ///
+        /// <para><b>Compatibilita' controllata</b></para>
+        /// <para>
+        /// I world di test o vecchi salvataggi possono non avere ancora il catalogo
+        /// oggetti caricato. In quei casi il chiamante puo' indicare che il defId e'
+        /// un cibo legacy noto; il resolver restituisce un risultato consumabile ma
+        /// marca <c>UsedNutritionFallback</c>, cosi' il debito resta osservabile.
+        /// </para>
+        /// </summary>
+        public static ObjectFoodNutritionResult Resolve(
+            World world,
+            string objectDefId,
+            float legacyFallback,
+            bool allowLegacyFallbackWhenDefinitionMissing)
+        {
+            string safeDefId = objectDefId ?? string.Empty;
+            float safeFallback = legacyFallback > 0f ? legacyFallback : HardSafeLegacyFallback;
+
+            // Se il catalogo non e' disponibile ma il chiamante sta attraversando un
+            // percorso legacy dichiarato, manteniamo compatibilita' senza fingere che
+            // il dato arrivi dal catalogo.
+            if (world == null
+                || string.IsNullOrWhiteSpace(safeDefId)
+                || !world.TryGetObjectDef(safeDefId, out ObjectDef def)
+                || def == null)
+            {
+                if (allowLegacyFallbackWhenDefinitionMissing)
+                {
+                    return new ObjectFoodNutritionResult(
+                        safeDefId,
+                        isConsumableFood: true,
+                        isTypedFoodItem: false,
+                        isLegacyFoodStock: true,
+                        nutritionValue: safeFallback,
+                        usedNutritionFallback: true,
+                        failureReason: string.Empty);
+                }
+
+                return new ObjectFoodNutritionResult(
+                    safeDefId,
+                    isConsumableFood: false,
+                    isTypedFoodItem: false,
+                    isLegacyFoodStock: false,
+                    nutritionValue: 0f,
+                    usedNutritionFallback: false,
+                    failureReason: "ObjectDefMissing");
+            }
+
+            bool isTypedFoodItem = HasPositiveFlag(def, FoodItemPropertyKey);
+            bool isLegacyFoodStock = HasPositiveFlag(def, FoodStockPropertyKey);
+            if (!isTypedFoodItem && !isLegacyFoodStock)
+            {
+                return new ObjectFoodNutritionResult(
+                    safeDefId,
+                    isConsumableFood: false,
+                    isTypedFoodItem: false,
+                    isLegacyFoodStock: false,
+                    nutritionValue: 0f,
+                    usedNutritionFallback: false,
+                    failureReason: "ObjectDefIsNotFood");
+            }
+
+            if (def.TryGetPropertyValue(NutritionValuePropertyKey, out float nutritionValue)
+                && nutritionValue > 0f)
+            {
+                return new ObjectFoodNutritionResult(
+                    safeDefId,
+                    isConsumableFood: true,
+                    isTypedFoodItem: isTypedFoodItem,
+                    isLegacyFoodStock: isLegacyFoodStock,
+                    nutritionValue: nutritionValue,
+                    usedNutritionFallback: false,
+                    failureReason: string.Empty);
+            }
+
+            // Il fallback e' ammesso solo per il cibo legacy/generico. Un FoodItem
+            // typed senza NutritionValue positivo deve emergere come dato incompleto,
+            // perche' in futuro berry/acorn/etc. non devono nutrire per magia.
+            if (isLegacyFoodStock)
+            {
+                return new ObjectFoodNutritionResult(
+                    safeDefId,
+                    isConsumableFood: true,
+                    isTypedFoodItem: isTypedFoodItem,
+                    isLegacyFoodStock: true,
+                    nutritionValue: safeFallback,
+                    usedNutritionFallback: true,
+                    failureReason: string.Empty);
+            }
+
+            return new ObjectFoodNutritionResult(
+                safeDefId,
+                isConsumableFood: false,
+                isTypedFoodItem: isTypedFoodItem,
+                isLegacyFoodStock: false,
+                nutritionValue: 0f,
+                usedNutritionFallback: false,
+                failureReason: "NutritionValueMissingOrInvalid");
+        }
+
+        // =============================================================================
+        // HasPositiveFlag
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Legge una proprieta' numerica come flag data-driven positivo.
+        /// </para>
+        /// </summary>
+        private static bool HasPositiveFlag(ObjectDef def, string key)
+        {
+            return def != null
+                   && def.TryGetPropertyValue(key, out float value)
+                   && value > 0f;
+        }
+    }
 }

@@ -31,6 +31,19 @@ namespace Arcontio.Core
             if (!world.NpcPrivateFood.TryGetValue(_npcId, out int priv) || priv <= 0)
                 return;
 
+            // NpcPrivateFood e' il ponte temporaneo pre-inventario: non contiene
+            // ancora stack typed, quindi ogni unita' privata viene risolta come
+            // food_stock legacy/generico tramite lo stesso resolver usato dagli
+            // altri consumi alimentari.
+            var cfg = world.Global.Needs;
+            ObjectFoodNutritionResult nutrition = ObjectFoodNutritionResolver.Resolve(
+                world,
+                "food_stock",
+                cfg.eatSatietyGain,
+                allowLegacyFallbackWhenDefinitionMissing: true);
+            if (!nutrition.IsConsumableFood)
+                return;
+
             // ACTION TRACE (debug/overlay): consumo cibo privato (inventario v0).
             world.SetNpcAction(_npcId, NpcActionState.Eat("EatPrivateFood"));
 
@@ -45,13 +58,7 @@ namespace Arcontio.Core
             world.NpcLastPrivateFoodConsumeTick[_npcId] = world.Global.CurrentTickIndex;
             
             // 2) Mutazione hunger
-            // Il cibo privato e' ancora un aggregato generico: finche' non esiste un
-            // inventario typed, ogni unita' privata usa il NutritionValue di food_stock.
-            var cfg = world.Global.Needs;
-            float nutritionValue = ResolvePrivateFoodNutritionValue(
-                world,
-                cfg.eatSatietyGain);
-            needs.AddValue(NeedKind.Hunger, -nutritionValue);
+            needs.AddValue(NeedKind.Hunger, -nutrition.NutritionValue);
 
             world.Needs[_npcId] = needs;
 
@@ -73,48 +80,10 @@ namespace Arcontio.Core
                 depleted: remainingPrivateFood <= 0,
                 cellX: cellX,
                 cellY: cellY,
-                hungerAfter: needs.GetValue(NeedKind.Hunger)));
-        }
-
-        // =============================================================================
-        // ResolvePrivateFoodNutritionValue
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Risolve il valore nutritivo del cibo privato generico trasportato da un NPC.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: cibo privato come food_stock aggregato</b></para>
-        /// <para>
-        /// <c>NpcPrivateFood</c> oggi conserva solo un conteggio intero, non una lista
-        /// typed di alimenti. Per non anticipare il refactor inventario, ogni unita'
-        /// privata viene trattata come una porzione di <c>food_stock</c> aggregato e
-        /// legge da li' il proprio <c>NutritionValue</c>.
-        /// </para>
-        ///
-        /// <para><b>Struttura interna:</b></para>
-        /// <list type="bullet">
-        ///   <item><b>catalog lookup</b>: cerca la definizione oggetto food_stock.</item>
-        ///   <item><b>NutritionValue</b>: usa il valore dichiarato nel JSON oggetti.</item>
-        ///   <item><b>fallback</b>: usa eatSatietyGain solo se il dato catalogo manca o non e' valido.</item>
-        /// </list>
-        /// </summary>
-        private static float ResolvePrivateFoodNutritionValue(
-            World world,
-            float fallback)
-        {
-            float safeFallback = fallback > 0f ? fallback : 0.45f;
-            if (world == null
-                || !world.TryGetObjectDef("food_stock", out var def)
-                || def == null)
-            {
-                return safeFallback;
-            }
-
-            return def.TryGetPropertyValue("NutritionValue", out float nutritionValue)
-                   && nutritionValue > 0f
-                ? nutritionValue
-                : safeFallback;
+                hungerAfter: needs.GetValue(NeedKind.Hunger),
+                foodDefId: nutrition.ObjectDefId,
+                nutritionValue: nutrition.NutritionValue,
+                usedNutritionFallback: nutrition.UsedNutritionFallback));
         }
     }
 }
