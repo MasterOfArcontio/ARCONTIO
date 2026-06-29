@@ -39,12 +39,14 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private bool enablePointerFade = true;
         [SerializeField] private bool enableSelectionFade = true;
         [SerializeField] private bool enableSilhouettes = true;
-        [SerializeField] private float fadedAlpha = 0.35f;
+        [SerializeField] private float fadedAlpha = 0.45f;
         [SerializeField] private float fadeDurationSeconds = 0.12f;
         [SerializeField] private int maximumOcclusionDepthCells = ArcGraphOcclusionPolicy.DefaultMaximumDepthCells;
         [SerializeField] private Color silhouetteTint = new Color(0.7f, 0.9f, 1f, 0.34f);
         [SerializeField] private int silhouetteSortingOffset = 240;
         [SerializeField] private Vector3 silhouetteWorldOffset = new Vector3(0f, 0f, -0.04f);
+        [SerializeField] private Vector2 actorSilhouetteLocalScale = new Vector2(0.75f, 1.25f);
+        [SerializeField] private Vector3 actorSilhouetteLocalOffset = new Vector3(0f, 0.25f, 0f);
         [SerializeField] private string silhouetteRootName = "ArcGraphOcclusionSilhouetteRoot";
 
         [SerializeField] private ArcGraphMinimalRuntimeSceneWrapper runtimeWrapper;
@@ -62,6 +64,7 @@ namespace Arcontio.View.ArcGraph
         private readonly ArcGraphActorObjectSceneRenderPlanBuilder _scenePlanBuilder = new();
 
         private Transform _silhouetteRoot;
+        private Sprite _generatedActorSilhouetteSprite;
 
         // =============================================================================
         // SilhouetteHandle
@@ -104,6 +107,17 @@ namespace Arcontio.View.ArcGraph
         private void OnDisable()
         {
             ClearVisualState();
+        }
+
+        private void OnDestroy()
+        {
+            if (_generatedActorSilhouetteSprite == null)
+                return;
+
+            Texture2D texture = _generatedActorSilhouetteSprite.texture;
+            DestroyUnityObject(_generatedActorSilhouetteSprite);
+            DestroyUnityObject(texture);
+            _generatedActorSilhouetteSprite = null;
         }
 
         // =============================================================================
@@ -215,6 +229,24 @@ namespace Arcontio.View.ArcGraph
                 out ArcGraphObjectRenderItem occluder))
             {
                 _desiredFadedObjectIds.Add(occluder.ObjectId);
+            }
+
+            // Se il puntatore o il click cadono direttamente sulla cella del target
+            // dietro il muro, il muro deve comunque reagire come quando si punta la
+            // sua base. Questo copre il caso operativo segnalato dall'operatore:
+            // la cella target resta formalmente dietro l'occluder visuale, quindi
+            // il fade deve partire anche senza passare dalla cella del muro.
+            int ignoredObjectId = frame.TargetKind == ArcGraphInteractionTargetKind.Object && frame.HasObject
+                ? frame.ObjectId
+                : -1;
+            if (ArcGraphOcclusionPolicy.TryFindOccluderCoveringTargetCell(
+                queue.ObjectItems,
+                frame.Cell,
+                maximumOcclusionDepthCells,
+                ignoredObjectId,
+                out ArcGraphObjectRenderItem coveringOccluder))
+            {
+                _desiredFadedObjectIds.Add(coveringOccluder.ObjectId);
             }
         }
 
@@ -400,7 +432,8 @@ namespace Arcontio.View.ArcGraph
             if (!TryFindSceneEntry(target, out ArcGraphActorObjectSceneRenderEntry entry))
                 return false;
 
-            if (!spriteResolver.TryResolveSprite(entry.SpriteRequest, out Sprite sprite) || sprite == null)
+            Sprite sprite = ResolveSilhouetteSprite(target, entry, spriteResolver);
+            if (sprite == null)
                 return false;
 
             string key = CreateSilhouetteKey(target);
@@ -409,9 +442,13 @@ namespace Arcontio.View.ArcGraph
             SilhouetteHandle handle = GetOrCreateSilhouetteHandle(key);
             Vector3 localPosition = new Vector3(entry.WorldX, entry.WorldY, entry.WorldZ) + silhouetteWorldOffset;
             localPosition += ResolveSpritePivotCompensation(entry, sprite);
+            if (target.Kind == ArcGraphOcclusionTargetKind.Actor)
+                localPosition += actorSilhouetteLocalOffset;
 
             handle.GameObject.transform.localPosition = localPosition;
-            handle.GameObject.transform.localScale = Vector3.one;
+            handle.GameObject.transform.localScale = target.Kind == ArcGraphOcclusionTargetKind.Actor
+                ? new Vector3(actorSilhouetteLocalScale.x, actorSilhouetteLocalScale.y, 1f)
+                : Vector3.one;
             handle.Renderer.sprite = sprite;
             handle.Renderer.color = silhouetteTint;
             handle.Renderer.sortingOrder = entry.SortingOrder + silhouetteSortingOffset;
@@ -449,6 +486,110 @@ namespace Arcontio.View.ArcGraph
             }
 
             return false;
+        }
+
+        // =============================================================================
+        // ResolveSilhouetteSprite
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve lo sprite della sagoma senza usare parti anatomiche parziali per
+        /// gli NPC layered.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: sagoma come overlay, non duplicato actor</b></para>
+        /// <para>
+        /// Gli NPC ArcGraph sono spesso composti da layer separati. Se la sagoma
+        /// usa la stessa richiesta sprite dell'actor, puo' risolversi solo a gambe,
+        /// busto o altra parte singola. Per questo gli actor usano una sagoma
+        /// sintetica piena, mentre gli oggetti continuano a usare lo sprite reale.
+        /// </para>
+        /// </summary>
+        private Sprite ResolveSilhouetteSprite(
+            ArcGraphOcclusionTarget target,
+            ArcGraphActorObjectSceneRenderEntry entry,
+            IArcGraphSpriteResolver spriteResolver)
+        {
+            if (target.Kind == ArcGraphOcclusionTargetKind.Actor)
+                return GetOrCreateActorSilhouetteSprite();
+
+            return spriteResolver.TryResolveSprite(entry.SpriteRequest, out Sprite resolved) && resolved != null
+                ? resolved
+                : null;
+        }
+
+        private Sprite GetOrCreateActorSilhouetteSprite()
+        {
+            if (_generatedActorSilhouetteSprite != null)
+                return _generatedActorSilhouetteSprite;
+
+            const int width = 32;
+            const int height = 48;
+            var texture = new Texture2D(width, height, TextureFormat.RGBA32, mipChain: false)
+            {
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            Color clear = new Color(1f, 1f, 1f, 0f);
+            Color fill = Color.white;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                    texture.SetPixel(x, y, clear);
+            }
+
+            // Testa, torso e gambe sono volutamente pieni e semplici: questa non e'
+            // una seconda resa dell'NPC, ma un indicatore leggibile del volume
+            // occupato dietro al muro.
+            FillEllipse(texture, 16, 36, 6, 6, fill);
+            FillRect(texture, 12, 19, 20, 33, fill);
+            FillRect(texture, 10, 8, 15, 20, fill);
+            FillRect(texture, 17, 8, 22, 20, fill);
+            FillRect(texture, 8, 22, 13, 30, fill);
+            FillRect(texture, 19, 22, 24, 30, fill);
+
+            texture.Apply(updateMipmaps: false, makeNoLongerReadable: false);
+            _generatedActorSilhouetteSprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, width, height),
+                new Vector2(0.5f, 0f),
+                32f);
+            _generatedActorSilhouetteSprite.name = "ArcGraphGeneratedActorOcclusionSilhouette";
+            return _generatedActorSilhouetteSprite;
+        }
+
+        private static void FillRect(Texture2D texture, int minX, int minY, int maxX, int maxY, Color color)
+        {
+            for (int y = minY; y <= maxY; y++)
+            {
+                for (int x = minX; x <= maxX; x++)
+                    texture.SetPixel(x, y, color);
+            }
+        }
+
+        private static void FillEllipse(
+            Texture2D texture,
+            int centerX,
+            int centerY,
+            int radiusX,
+            int radiusY,
+            Color color)
+        {
+            int radiusXSquared = radiusX * radiusX;
+            int radiusYSquared = radiusY * radiusY;
+            int limit = radiusXSquared * radiusYSquared;
+
+            for (int y = centerY - radiusY; y <= centerY + radiusY; y++)
+            {
+                for (int x = centerX - radiusX; x <= centerX + radiusX; x++)
+                {
+                    int dx = x - centerX;
+                    int dy = y - centerY;
+                    if ((dx * dx * radiusYSquared) + (dy * dy * radiusXSquared) <= limit)
+                        texture.SetPixel(x, y, color);
+                }
+            }
         }
 
         private SilhouetteHandle GetOrCreateSilhouetteHandle(string key)
@@ -569,6 +710,17 @@ namespace Arcontio.View.ArcGraph
 
             result = parsed;
             return true;
+        }
+
+        private static void DestroyUnityObject(UnityEngine.Object unityObject)
+        {
+            if (unityObject == null)
+                return;
+
+            if (Application.isPlaying)
+                Destroy(unityObject);
+            else
+                DestroyImmediate(unityObject);
         }
     }
 }

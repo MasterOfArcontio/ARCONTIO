@@ -140,6 +140,39 @@ namespace Arcontio.Tests
             Assert.That(frame.TargetKind, Is.EqualTo(ArcGraphInteractionTargetKind.UiBlocked));
         }
 
+        // =============================================================================
+        // TargetCellBehindWallFindsCoveringOccluder
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che anche la cella del target dietro il muro possa trovare il
+        /// muro coprente, non solo la cella base del muro stesso.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void TargetCellBehindWallFindsCoveringOccluder()
+        {
+            ArcGraphObjectRenderItem wall = CreateWall(100, 4, 4);
+            ArcGraphObjectRenderItem crate = CreateObject(
+                200,
+                "crate",
+                4,
+                5,
+                visualHeightPixels: 32,
+                visualBaseHeightPixels: 32,
+                fadeWhenActorBehind: false);
+
+            bool found = ArcGraphOcclusionPolicy.TryFindOccluderCoveringTargetCell(
+                new[] { wall, crate },
+                crate.Cell,
+                2,
+                ignoredObjectId: crate.ObjectId,
+                out ArcGraphObjectRenderItem occluder);
+
+            Assert.That(found, Is.True);
+            Assert.That(occluder.ObjectId, Is.EqualTo(wall.ObjectId));
+        }
+
         private static ArcGraphViewInputFrame CreatePointerInput(bool isPointerOverUi)
         {
             return new ArcGraphViewInputFrame(
