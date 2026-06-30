@@ -17588,6 +17588,17 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C5 | Pickup/drop oggetti fisici dentro inventario | ✅ |
 | v0.71.05.C6 | Furto legacy sterilizzato; modulo furto dedicato rimandato | ✅ |
 | v0.71.05.C7 | Rimozione operativa NpcPrivateFood dai flussi runtime | ✅ |
+| v0.71.05.C8.1 | Audit fondazione fisica inventario typed: stato reale di ObjectId, stack, bulk, peso e slot MVP | ✅ |
+| v0.71.05.C8.2 | Consolidamento catalogo oggetti inventario fisico: peso, ingombro, stackability, collocazioni e contratto contenitori | ✅ |
+| v0.71.05.C8.3 | Enum e contratti typed per collocazioni inventory e contenitori | ⏳ |
+| v0.71.05.C8.4 | Resolver capacita' fisica inventario: bulk, peso, mano, pack e forza NPC | ⏳ |
+| v0.71.05.C8.5 | Sostituzione progressiva di inventory_max_units con freeBulk/freeWeight | ⏳ |
+| v0.71.05.C8.6 | Stackability reale: fusione solo per oggetti equivalenti e limite da bulk/peso | ⏳ |
+| v0.71.05.C8.7 | Validazione pickup/drop/move su collocazioni ammesse, bulk, peso e stackability | ⏳ |
+| v0.71.05.C8.8 | Verifica save/load rispetto al modello fisico inventario | ⏳ |
+| v0.71.05.C8.9 | Visualizzazione UI read-only degli oggetti in inventario NPC | ⏳ |
+| v0.71.05.C8.10 | Test regressivi C8 inventario fisico e inspector inventario | ⏳ |
+| v0.71.05.C8.11 | Chiusura roadmap C8 e note su macro-slot/contenitori/equipaggiamento futuro | ⏳ |
 | v0.71.05.D | Stato reale risorse per singola pianta | ⏳ |
 | v0.71.05.E | Ricrescita risorse biologiche nel tempo | ⏳ |
 | v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ⏳ |
@@ -17608,6 +17619,8 @@ La `v0.71.05.A` separa il catalogo prodotti biologici dal catalogo specie vegeta
 La `v0.71.05.C6` sterilizza il furto legacy Day9/Day10: i command e gli audit storici restano compilabili ma non producono piu' mutazioni o eventi. Il modulo furto viene rimandato a una feature dedicata, da progettare dentro Decision -> Job -> Step -> Command -> Event con furtivita', visibilita', illegalita', trauma e conseguenze sociali.
 
 La `v0.71.05.C7` chiude il ponte operativo `NpcPrivateFood`: il cibo personale dell'NPC e' ora rappresentato esclusivamente da oggetti alimentari nell'inventario typed. I vecchi campi save restano solo compatibilita' passiva dei DTO storici e non ricreano stato runtime.
+
+La `v0.71.05.C8.2` consolida il catalogo oggetti rispetto alla fondazione fisica inventario gia' emersa in C1.1-C7: gli oggetti dichiarano esplicitamente peso, ingombro, stackability, durabilita', collocazioni ammesse e contratto contenitore. Lo step non introduce ancora macro-slot configurabili, zaini fisici operativi o equipaggiamento indossabile.
 
 Flusso atteso:
 

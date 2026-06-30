@@ -155,6 +155,12 @@ namespace Arcontio.Core
         public bool CanEquipSidearm;
         public bool CanEquipBack;
 
+        // Classificazione contenitore. Il tipo resta stringa per il bordo
+        // authoring JSON; i sistemi runtime la convertiranno in enum/contratti
+        // quando arrivera' lo step dei macro-slot configurabili.
+        public bool IsContainer;
+        public string ContainerKind;
+
         // Capacita' eventuale degli oggetti contenitore, per esempio zaini.
         public int ContainerBulkCapacityUnits;
         public int ContainerWeightCapacityUnits;
