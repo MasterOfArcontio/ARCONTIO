@@ -128,15 +128,15 @@ namespace Arcontio.Core.Save
 
             var inventoryData = data.inventory;
             if (inventoryData == null)
-            {
-                error = string.Empty;
-                return true;
-            }
+                return ValidateHeldObjectsHaveInventoryEntries(world, data, null, out error);
 
             if (!ValidateObjectStacks(world, data, inventoryData, out error))
                 return false;
 
-            return ValidateNpcInventories(world, data, inventoryData, out error);
+            if (!ValidateNpcInventories(world, data, inventoryData, out error))
+                return false;
+
+            return ValidateHeldObjectsHaveInventoryEntries(world, data, inventoryData, out error);
         }
 
         private static bool ValidateObjectStacks(
@@ -338,6 +338,116 @@ namespace Arcontio.Core.Save
                 if (entry.containerObjectId > 0 && !WillObjectExistAfterLoad(world, data, entry.containerObjectId))
                 {
                     error = $"WorldInventorySaveLoader: containerObjectId {entry.containerObjectId} inesistente per objectId {entry.objectId}.";
+                    return false;
+                }
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool ValidateHeldObjectsHaveInventoryEntries(
+            World world,
+            WorldSaveData data,
+            WorldInventorySaveData inventoryData,
+            out string error)
+        {
+            var inventoryOwnerByObjectId = new Dictionary<int, int>();
+            var inventories = inventoryData != null ? inventoryData.npcInventories : null;
+            if (inventories != null)
+            {
+                for (int i = 0; i < inventories.Length; i++)
+                {
+                    var inventory = inventories[i];
+                    if (inventory == null || inventory.entries == null)
+                        continue;
+
+                    for (int j = 0; j < inventory.entries.Length; j++)
+                    {
+                        var entry = inventory.entries[j];
+                        if (entry == null || entry.objectId <= 0)
+                            continue;
+
+                        inventoryOwnerByObjectId[entry.objectId] = inventory.npcId;
+                    }
+                }
+            }
+
+            if (data != null && data.objects != null)
+                return ValidateHeldSavedObjectsHaveInventoryEntries(data.objects, inventoryOwnerByObjectId, out error);
+
+            if (world != null)
+                return ValidateHeldLoadedObjectsHaveInventoryEntries(world, inventoryOwnerByObjectId, out error);
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool ValidateHeldSavedObjectsHaveInventoryEntries(
+            WorldObjectSaveData[] objects,
+            Dictionary<int, int> inventoryOwnerByObjectId,
+            out string error)
+        {
+            for (int i = 0; i < objects.Length; i++)
+            {
+                var dto = objects[i];
+                if (dto == null)
+                    continue;
+
+                if (dto.isHeld)
+                {
+                    if (!inventoryOwnerByObjectId.TryGetValue(dto.objectId, out int inventoryNpcId))
+                    {
+                        error = $"WorldInventorySaveLoader: oggetto held objectId {dto.objectId} senza entry inventario.";
+                        return false;
+                    }
+
+                    if (inventoryNpcId != dto.holderNpcId)
+                    {
+                        error = $"WorldInventorySaveLoader: oggetto held objectId {dto.objectId} holderNpcId {dto.holderNpcId} ma entry in inventario npcId {inventoryNpcId}.";
+                        return false;
+                    }
+                }
+                else if (inventoryOwnerByObjectId.ContainsKey(dto.objectId))
+                {
+                    error = $"WorldInventorySaveLoader: oggetto grounded objectId {dto.objectId} presente in inventario.";
+                    return false;
+                }
+            }
+
+            error = string.Empty;
+            return true;
+        }
+
+        private static bool ValidateHeldLoadedObjectsHaveInventoryEntries(
+            World world,
+            Dictionary<int, int> inventoryOwnerByObjectId,
+            out string error)
+        {
+            foreach (var kv in world.Objects)
+            {
+                var obj = kv.Value;
+                if (obj == null)
+                    continue;
+
+                int objectId = kv.Key;
+                if (obj.IsHeld)
+                {
+                    if (!inventoryOwnerByObjectId.TryGetValue(objectId, out int inventoryNpcId))
+                    {
+                        error = $"WorldInventorySaveLoader: oggetto held objectId {objectId} senza entry inventario.";
+                        return false;
+                    }
+
+                    if (inventoryNpcId != obj.HolderNpcId)
+                    {
+                        error = $"WorldInventorySaveLoader: oggetto held objectId {objectId} holderNpcId {obj.HolderNpcId} ma entry in inventario npcId {inventoryNpcId}.";
+                        return false;
+                    }
+                }
+                else if (inventoryOwnerByObjectId.ContainsKey(objectId))
+                {
+                    error = $"WorldInventorySaveLoader: oggetto grounded objectId {objectId} presente in inventario.";
                     return false;
                 }
             }
