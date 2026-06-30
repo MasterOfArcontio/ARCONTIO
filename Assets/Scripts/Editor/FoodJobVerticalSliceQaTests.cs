@@ -33,14 +33,15 @@ namespace Arcontio.Tests
     public sealed class FoodJobVerticalSliceQaTests
     {
         private const string TemplateJson =
-            "{\"templates\":[{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"take_and_consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"pickup_food_to_hand\",\"kind\":\"PickUp\",\"payloadKey\":\"HandLeft\"},{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\"}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
+            "{\"templates\":[{\"templateId\":\"food.eat_carried_inventory.v1\",\"phases\":[{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"ready_carried_food\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"ready_inventory_food\",\"kind\":\"ReadyInventoryFood\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"consume_carried_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"consume_carried_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\"}]}]},{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"take_and_consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"pickup_food_to_hand\",\"kind\":\"PickUp\",\"payloadKey\":\"HandLeft\"},{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\"}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
 
         [Test]
         public void RegistryLoadsFoodAndMoveTemplates()
         {
             var registry = MakeRegistry();
 
-            Assert.That(registry.Count, Is.EqualTo(2));
+            Assert.That(registry.Count, Is.EqualTo(3));
+            Assert.That(registry.TryGetTemplate(JobTemplateRegistry.FoodCarriedInventoryTemplateId, out _), Is.True);
             Assert.That(registry.TryGetTemplate(JobTemplateRegistry.FoodKnownCommunityStockTemplateId, out _), Is.True);
             Assert.That(registry.TryGetTemplate(JobTemplateRegistry.GenericMoveToCellTemplateId, out _), Is.True);
         }
@@ -96,6 +97,32 @@ namespace Arcontio.Tests
             Assert.That(job, Is.Not.Null);
             AssertFoodBoundaryFields(job.Request, request);
             Assert.That(job.Plan.PlanId, Is.EqualTo(JobTemplateRegistry.FoodKnownCommunityStockTemplateId));
+        }
+
+        [Test]
+        public void FoodFactoryCreatesCarriedInventoryFoodPlan()
+        {
+            var registry = MakeRegistry();
+            var request = MakeCarriedFoodJobRequest(npcId: 1, tick: 2, urgency01: 0.92f);
+
+            bool created = FoodJobFactory.TryCreateCarriedInventoryFoodJob(
+                registry,
+                request,
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            Assert.That(job.Plan.PlanId, Is.EqualTo(JobTemplateRegistry.FoodCarriedInventoryTemplateId));
+            Assert.That(job.Plan.PhaseCount, Is.EqualTo(3));
+            Assert.That(job.Plan.TryGetPhase(0, out var prepare), Is.True);
+            Assert.That(prepare.TryGetAction(0, out var prepareHand), Is.True);
+            Assert.That(prepareHand.Kind, Is.EqualTo(JobActionKind.PrepareHand));
+            Assert.That(job.Plan.TryGetPhase(1, out var ready), Is.True);
+            Assert.That(ready.TryGetAction(0, out var readyFood), Is.True);
+            Assert.That(readyFood.Kind, Is.EqualTo(JobActionKind.ReadyInventoryFood));
+            Assert.That(job.Plan.TryGetPhase(2, out var consume), Is.True);
+            Assert.That(consume.TryGetAction(0, out var consumeFood), Is.True);
+            Assert.That(consumeFood.Kind, Is.EqualTo(JobActionKind.Consume));
         }
 
         [Test]
@@ -838,6 +865,44 @@ namespace Arcontio.Tests
             Assert.That(world.GetInventoryQuantity(npcId, "food_stock", NpcInventorySlotKind.HandLeft), Is.EqualTo(1));
         }
 
+        [Test]
+        public void JobExecutionEatCarriedFoodMovesOneStackUnitToHandThenConsumes()
+        {
+            var world = MakeWorldWithNpcOnly(npcX: 5, npcY: 5, out int npcId);
+            AddObjectDef(world, "berry", nutritionValue: 0.32f, foodItem: true, foodStock: false);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 5, out _, out string addReason), Is.True, addReason);
+            AssignCarriedFoodJob(world, npcId);
+            var system = new JobExecutionSystem();
+            var bus = new MessageBus();
+            float hungerBefore = world.Needs[npcId].GetValue(NeedKind.Hunger);
+
+            system.Update(world, new Tick(0, 1f), bus, new Telemetry());
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            system.Update(world, new Tick(1, 1f), bus, new Telemetry());
+            var commands = world.JobRuntimeState.CommandBuffer.Snapshot();
+            Assert.That(commands.Length, Is.EqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<MoveInventoryObjectCommand>());
+            commands[0].Execute(world, bus);
+            world.JobRuntimeState.CommandBuffer.Clear();
+
+            Assert.That(world.GetInventoryQuantity(npcId, "berry", NpcInventorySlotKind.HandLeft), Is.EqualTo(1));
+            Assert.That(world.GetInventoryQuantity(npcId, "berry", NpcInventorySlotKind.Pack), Is.EqualTo(4));
+
+            system.Update(world, new Tick(2, 1f), bus, new Telemetry());
+            commands = world.JobRuntimeState.CommandBuffer.Snapshot();
+            Assert.That(commands.Length, Is.EqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<ConsumeInventoryItemCommand>());
+            commands[0].Execute(world, bus);
+
+            Assert.That(world.GetInventoryQuantity(npcId, "berry"), Is.EqualTo(4));
+            Assert.That(world.GetInventoryQuantity(npcId, "berry", NpcInventorySlotKind.HandLeft), Is.EqualTo(0));
+            Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(hungerBefore - 0.32f).Within(0.0001f));
+            Assert.That(bus.TryDequeue(out var firstEvent), Is.True);
+            Assert.That(firstEvent, Is.TypeOf<InventoryItemMovedEvent>());
+            Assert.That(bus.TryDequeue(out var secondEvent), Is.True);
+            Assert.That(secondEvent, Is.TypeOf<FoodConsumedEvent>());
+        }
+
 
         [Test]
         public void ObjectFoodNutritionResolverResolvesTypedAndLegacyFoods()
@@ -1114,6 +1179,18 @@ namespace Arcontio.Tests
                 foodObjectId,
                 beliefKey,
                 "FoodJobVerticalSlice");
+        }
+
+        private static JobRequest MakeCarriedFoodJobRequest(int npcId, int tick, float urgency01)
+        {
+            return JobRequest.WithoutTarget(
+                $"jobreq_carried_food_{npcId}_{tick}",
+                npcId,
+                DecisionIntentKind.EatCarriedFood,
+                urgency01 >= 0.85f ? JobPriorityClass.Critical : JobPriorityClass.Important,
+                urgency01,
+                tick,
+                "EatCarriedFoodQa");
         }
 
         private static void AssertFoodBoundaryFields(JobRequest actual, JobRequest expected)
@@ -1499,6 +1576,14 @@ namespace Arcontio.Tests
             return job;
         }
 
+        private static Job AssignCarriedFoodJob(World world, int npcId)
+        {
+            var job = CreateCarriedFoodJob(npcId, urgency01: 0.95f);
+            string reason;
+            Assert.That(world.JobRuntimeState.TryAssignJob(npcId, job, 0, out reason), Is.True, reason);
+            return job;
+        }
+
         private static Job AssignMoveJob(World world, int npcId, int targetX, int targetY)
         {
             return AssignMoveJob(world, npcId, targetX, targetY, urgency01: 0.25f);
@@ -1538,6 +1623,18 @@ namespace Arcontio.Tests
                 0,
                 urgency01,
                 "Food:1",
+                out var job,
+                out var reason);
+
+            Assert.That(created, Is.True, reason);
+            return job;
+        }
+
+        private static Job CreateCarriedFoodJob(int npcId, float urgency01)
+        {
+            bool created = FoodJobFactory.TryCreateCarriedInventoryFoodJob(
+                MakeRegistry(),
+                MakeCarriedFoodJobRequest(npcId, tick: 0, urgency01: urgency01),
                 out var job,
                 out var reason);
 

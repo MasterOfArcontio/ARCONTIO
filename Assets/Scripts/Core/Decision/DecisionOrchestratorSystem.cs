@@ -227,6 +227,33 @@ namespace Arcontio.Core
             if (selection.IsEmpty)
                 return DecisionJobStartResult.NoExecutableCandidate;
 
+            if (selection.Candidate.Kind == DecisionIntentKind.EatCarriedFood)
+            {
+                bool assigned = _foodDecisionJobOrchestrator.TryStartCarriedInventoryFoodJob(
+                    world,
+                    npcId,
+                    nowTick,
+                    selection.Candidate,
+                    _enableFoodJobVerticalSlice,
+                    _jobTemplateRegistry,
+                    _intentExecutionRouter,
+                    _explainabilityBridge,
+                    telemetry,
+                    out _);
+                if (assigned)
+                    _explainabilityBridge.TryEmitDecisionTrace(
+                        world.Config?.Sim?.memory_belief_decision_explainability,
+                        world.MemoryBeliefDecisionExplainability,
+                        in context,
+                        auditValid: true,
+                        _decisionCandidates,
+                        selection,
+                        selectionConfig);
+                return assigned
+                    ? DecisionJobStartResult.JobStarted
+                    : DecisionJobStartResult.RouteRejected;
+            }
+
             if (selection.Candidate.Kind == DecisionIntentKind.EatKnownFood)
             {
                 bool assigned = _foodDecisionJobOrchestrator.TryStartKnownCommunityFoodJob(
@@ -414,7 +441,8 @@ namespace Arcontio.Core
             if (!world.JobRuntimeState.TryGetActiveJob(npcId, out _, out var activeJob) || activeJob == null)
                 return false;
 
-            return activeJob.Request.IntentKind == DecisionIntentKind.EatKnownFood
+            return activeJob.Request.IntentKind == DecisionIntentKind.EatCarriedFood
+                || activeJob.Request.IntentKind == DecisionIntentKind.EatKnownFood
                 || activeJob.Request.IntentKind == DecisionIntentKind.SearchFood;
         }
 
@@ -455,7 +483,7 @@ namespace Arcontio.Core
 
             // Il catalogo decisionale contiene gia' intenzioni MVP future come riposo,
             // azioni sociali e altri domini, ma questo orchestratore oggi possiede solo
-            // route operative verso Job per EatKnownFood, SearchFood e WaitAndObserve. Lasciare vincere
+            // route operative verso Job per EatCarriedFood, EatKnownFood, SearchFood e WaitAndObserve. Lasciare vincere
             // un'intenzione senza route consuma la cadenza decisionale senza aprire un
             // incarico, producendo NPC apparentemente fermi dopo la chiusura del job
             // precedente. Il filtro e' quindi behavior-preserving rispetto all'esecuzione:
@@ -470,7 +498,8 @@ namespace Arcontio.Core
 
         private static bool IsJobRoutableIntent(DecisionIntentKind kind)
         {
-            return kind == DecisionIntentKind.EatKnownFood
+            return kind == DecisionIntentKind.EatCarriedFood
+                || kind == DecisionIntentKind.EatKnownFood
                 || kind == DecisionIntentKind.SearchFood
                 || kind == DecisionIntentKind.WaitAndObserve;
         }

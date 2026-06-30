@@ -66,6 +66,91 @@ namespace Arcontio.Core
         private static readonly List<Vector2Int> SearchFoodPathScratch = new(128);
 
         // =============================================================================
+        // TryStartCarriedInventoryFoodJob
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prova ad avviare il job <c>EatCarriedFood</c>, cioe' consumo di cibo gia'
+        /// posseduto dall'NPC nel proprio inventario typed.
+        /// </para>
+        ///
+        /// <para><b>Inventario personale senza target esterno</b></para>
+        /// <para>
+        /// Questo ramo non risolve celle, non cerca oggetti a terra e non interroga
+        /// belief di cibo. Assume che il candidato sia gia' passato dal gate
+        /// <c>HasCarriedFood</c> nel contesto decisionale e materializza soltanto il
+        /// job inventario dichiarato nel registry.
+        /// </para>
+        /// </summary>
+        public bool TryStartCarriedInventoryFoodJob(
+            World world,
+            int npcId,
+            int nowTick,
+            DecisionCandidate candidate,
+            bool gateEnabled,
+            JobTemplateRegistry jobTemplateRegistry,
+            IntentExecutionRouter intentExecutionRouter,
+            DecisionExplainabilityBridge explainabilityBridge,
+            Telemetry telemetry,
+            out string reason)
+        {
+            reason = string.Empty;
+
+            if (!gateEnabled)
+            {
+                reason = "GateDisabled";
+                return false;
+            }
+
+            if (world?.JobRuntimeState == null)
+            {
+                reason = "JobRuntimeMissing";
+                return false;
+            }
+
+            if (!world.HasEdibleFoodOnSelf(npcId))
+            {
+                reason = "CarriedFoodMissing";
+                return false;
+            }
+
+            if (intentExecutionRouter == null)
+            {
+                reason = "IntentExecutionRouterMissing";
+                return false;
+            }
+
+            if (!intentExecutionRouter.TryRouteEatCarriedFood(nowTick, npcId, candidate, out var route))
+            {
+                reason = route.Reason;
+                return false;
+            }
+
+            var request = route.Request;
+            bool created = FoodJobFactory.TryCreateCarriedInventoryFoodJob(
+                jobTemplateRegistry,
+                request,
+                out var job,
+                out reason);
+
+            if (!created)
+                return false;
+
+            explainabilityBridge?.TryEmitJobRequestTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                world.MemoryBeliefDecisionExplainability,
+                nowTick,
+                npcId,
+                request,
+                job.JobId,
+                legacyBridgeStillUsed: false);
+
+            bool assigned = world.JobRuntimeState.TryAssignJob(npcId, job, nowTick, out reason);
+            telemetry?.Counter(assigned ? "CarriedFoodJob.Assigned" : "CarriedFoodJob.AssignFailed", 1);
+            return assigned;
+        }
+
+        // =============================================================================
         // TryStartSearchFoodJob
         // =============================================================================
         /// <summary>

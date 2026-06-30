@@ -31,12 +31,23 @@ namespace Arcontio.Core
         private readonly int _npcId;
         private readonly int _objectId;
         private readonly NpcInventorySlotKind _targetSlot;
+        private readonly InventoryMoveQuantityPolicy _quantityPolicy;
 
         public MoveInventoryObjectCommand(int npcId, int objectId, NpcInventorySlotKind targetSlot)
+            : this(npcId, objectId, targetSlot, InventoryMoveQuantityPolicy.WholeObject)
+        {
+        }
+
+        public MoveInventoryObjectCommand(
+            int npcId,
+            int objectId,
+            NpcInventorySlotKind targetSlot,
+            InventoryMoveQuantityPolicy quantityPolicy)
         {
             _npcId = npcId;
             _objectId = objectId;
             _targetSlot = targetSlot;
+            _quantityPolicy = quantityPolicy;
         }
 
         public void Execute(World world, MessageBus bus)
@@ -48,10 +59,11 @@ namespace Arcontio.Core
                     _npcId,
                     _objectId,
                     _targetSlot,
+                    _quantityPolicy,
                     out InventoryMutationResult result,
                     out string reason))
             {
-                Debug.LogWarning($"[Inventory] Move failed npc={_npcId} object={_objectId} target={_targetSlot} reason={reason}");
+                Debug.LogWarning($"[Inventory] Move failed npc={_npcId} object={_objectId} target={_targetSlot} policy={_quantityPolicy} reason={reason}");
                 return;
             }
 

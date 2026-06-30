@@ -31,12 +31,57 @@ namespace Arcontio.Core
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>EatKnownFood</b>: richiede belief target e object id operativo.</item>
+    ///   <item><b>EatCarriedFood</b>: richiede solo fame e cibo gia' posseduto nel contesto.</item>
     ///   <item><b>SearchFood</b>: richiede una probe cell locale gia' scelta dal bridge.</item>
     ///   <item><b>Priority mapping</b>: conserva la mappatura conservativa preesistente.</item>
     /// </list>
     /// </summary>
     public sealed class JobRequestBuilder
     {
+        // =============================================================================
+        // TryBuildEatCarriedFoodRequest
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce la richiesta job per l'intent <c>EatCarriedFood</c>.
+        /// </para>
+        ///
+        /// <para><b>Inventario personale, nessun target esterno</b></para>
+        /// <para>
+        /// Il job di consumo da inventario non ha bisogno di belief, target cella o
+        /// object id grounded. L'oggetto alimentare concreto verra' selezionato dal
+        /// World nello step autorizzato che prepara la mano.
+        /// </para>
+        /// </summary>
+        public bool TryBuildEatCarriedFoodRequest(
+            int tick,
+            int npcId,
+            DecisionCandidate candidate,
+            out JobRequest request,
+            out string reason)
+        {
+            request = default;
+            reason = string.Empty;
+
+            if (candidate.Kind != DecisionIntentKind.EatCarriedFood)
+            {
+                reason = "UnsupportedJobRequestIntent";
+                return false;
+            }
+
+            request = JobRequest.WithoutTarget(
+                $"jobreq_eat_carried_food_{npcId}_{tick}",
+                npcId,
+                DecisionIntentKind.EatCarriedFood,
+                ResolveJobPriorityClass(candidate),
+                candidate.NeedUrgency01,
+                tick,
+                "EatCarriedFood");
+
+            reason = "JobRequestBuilt";
+            return true;
+        }
+
         // =============================================================================
         // TryBuildEatKnownFoodRequest
         // =============================================================================

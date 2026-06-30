@@ -26,6 +26,7 @@ namespace Arcontio.Core
     /// <list type="bullet">
     ///   <item><b>MoveToCell</b>: usa solo running action e route possedute dal Job Layer; se non esiste una route autorizzata fallisce nel Job Layer.</item>
     ///   <item><b>PrepareHand</b>: libera la mano richiesta spostando l'oggetto nel Pack tramite command.</item>
+    ///   <item><b>ReadyInventoryFood</b>: porta in mano una singola unita' di cibo gia' posseduto.</item>
     ///   <item><b>Consume</b>: accoda consumo inventario solo quando il cibo e' nella mano richiesta.</item>
     ///   <item><b>StateMachine</b>: applica <c>StepResult</c> e completa/fallisce il job.</item>
     /// </list>
@@ -641,10 +642,18 @@ namespace Arcontio.Core
             }
 
             if (action.Kind == JobActionKind.Consume)
+            {
+                if (job.Request.IntentKind == DecisionIntentKind.EatCarriedFood)
+                    return ExecuteConsumeCarriedFood(world, runtime, npcId, job, action, tick, explainabilityConfig, explainabilityRegistry);
+
                 return ExecuteConsumeKnownFood(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
+            }
 
             if (action.Kind == JobActionKind.PrepareHand)
                 return ExecutePrepareHand(world, runtime, npcId, job, action, tick, explainabilityConfig, explainabilityRegistry);
+
+            if (action.Kind == JobActionKind.ReadyInventoryFood)
+                return ExecuteReadyInventoryFood(world, runtime, npcId, job, action, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.PickUp)
                 return ExecutePickUpObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
@@ -980,6 +989,34 @@ namespace Arcontio.Core
             return StepResult.Succeeded("ConsumeInventoryHandCommandEnqueued");
         }
 
+        private static StepResult ExecuteConsumeCarriedFood(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
+            Job job,
+            JobAction action,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            NpcInventorySlotKind requiredSlot = ResolveInventorySlotPayload(action.PayloadKey, NpcInventorySlotKind.HandLeft);
+            if (!IsHandInventorySlot(requiredSlot))
+                return StepResult.Failed(JobFailureReason.InvalidRequest, "ConsumeCarriedFoodRequiresHandSlot");
+
+            if (!world.SelectBestFoodOnSelf(npcId, requiredSlot, out _, out _, out _))
+                return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeCarriedFoodMissingInHand");
+
+            runtime.CommandBuffer.Enqueue(
+                new ConsumeInventoryItemCommand(npcId, string.Empty, 0, requiredSlot),
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job.JobId,
+                "ConsumeCarriedInventoryFoodCommandEnqueued");
+            return StepResult.Succeeded("ConsumeCarriedInventoryFoodCommandEnqueued");
+        }
+
         private static StepResult ExecutePrepareHand(
             World world,
             JobRuntimeState runtime,
@@ -993,6 +1030,12 @@ namespace Arcontio.Core
             NpcInventorySlotKind handSlot = ResolveInventorySlotPayload(action.PayloadKey, NpcInventorySlotKind.HandLeft);
             if (!IsHandInventorySlot(handSlot))
                 return StepResult.Failed(JobFailureReason.InvalidRequest, "PrepareHandRequiresHandSlot");
+
+            if (job.Request.IntentKind == DecisionIntentKind.EatCarriedFood
+                && world.SelectBestFoodOnSelf(npcId, handSlot, out _, out _, out _))
+            {
+                return StepResult.Succeeded("PrepareHandAlreadyHasFood");
+            }
 
             if (!world.TryGetFirstInventoryObjectInSlot(npcId, handSlot, out int objectId))
                 return StepResult.Succeeded("PrepareHandAlreadyFree");
@@ -1009,6 +1052,52 @@ namespace Arcontio.Core
                 job.JobId,
                 "PrepareHandMoveToPackCommandEnqueued");
             return StepResult.Succeeded("PrepareHandMoveToPackCommandEnqueued");
+        }
+
+        private static StepResult ExecuteReadyInventoryFood(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
+            Job job,
+            JobAction action,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            NpcInventorySlotKind handSlot = ResolveInventorySlotPayload(action.PayloadKey, NpcInventorySlotKind.HandLeft);
+            if (!IsHandInventorySlot(handSlot))
+                return StepResult.Failed(JobFailureReason.InvalidRequest, "ReadyInventoryFoodRequiresHandSlot");
+
+            if (world.SelectBestFoodOnSelf(npcId, handSlot, out _, out _, out _))
+                return StepResult.Succeeded("ReadyInventoryFoodAlreadyInHand");
+
+            if (!world.TrySelectBestFoodObjectOnSelf(
+                    npcId,
+                    out int objectId,
+                    out _,
+                    out NpcInventorySlotKind sourceSlot,
+                    out _,
+                    out _))
+            {
+                return StepResult.Failed(JobFailureReason.MissingTarget, "ReadyInventoryFoodMissing");
+            }
+
+            if (sourceSlot == handSlot)
+                return StepResult.Succeeded("ReadyInventoryFoodAlreadyInHand");
+
+            runtime.CommandBuffer.Enqueue(
+                new MoveInventoryObjectCommand(
+                    npcId,
+                    objectId,
+                    handSlot,
+                    InventoryMoveQuantityPolicy.SingleUnitFromStack),
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job.JobId,
+                "ReadyInventoryFoodMoveToHandCommandEnqueued");
+            return StepResult.Succeeded("ReadyInventoryFoodMoveToHandCommandEnqueued");
         }
 
         private static StepResult ExecutePickUpObject(

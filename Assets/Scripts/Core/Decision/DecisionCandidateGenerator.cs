@@ -31,6 +31,7 @@ namespace Arcontio.Core
         private const float MinimumObligationForWorkIntent01 = 0.01f;
         private static readonly DecisionIntentKind[] RuntimeJobIntentSubset =
         {
+            DecisionIntentKind.EatCarriedFood,
             DecisionIntentKind.EatKnownFood,
             DecisionIntentKind.SearchFood,
             DecisionIntentKind.WaitAndObserve
@@ -133,6 +134,9 @@ namespace Arcontio.Core
             // Le intenzioni non MVP restano nel catalogo, ma non entrano ancora nel
             // set operativo: cosi' il catalogo e' completo senza promettere esecuzione.
             if (!metadata.IsMvpAvailable)
+                return false;
+
+            if (metadata.Kind == DecisionIntentKind.EatCarriedFood && !context.HasCarriedFood)
                 return false;
 
             // WaitAndObserve e' il fallback minimo: deve poter esistere anche quando

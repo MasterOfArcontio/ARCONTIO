@@ -120,6 +120,94 @@ namespace Arcontio.Tests
         }
 
         // =============================================================================
+        // HungryNpcWithCarriedFoodGeneratesEatCarriedFood
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica che il Decision Layer possa proporre il consumo di cibo gia'
+        /// posseduto dall'NPC senza richiedere una belief su cibo esterno.
+        /// </para>
+        ///
+        /// <para><b>Inventario personale come input autorizzato</b></para>
+        /// <para>
+        /// <c>HasCarriedFood</c> e' un dato personale dell'NPC costruito dal
+        /// boundary decisionale; non e' una lettura onnisciente di oggetti a terra,
+        /// Biosfera o stock comunitari.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void HungryNpcWithCarriedFoodGeneratesEatCarriedFood()
+        {
+            var context = MakeContext(
+                hunger01: 0.90f,
+                rest01: 0.10f,
+                addFoodBelief: false,
+                hasCarriedFood: true);
+            var candidates = new List<DecisionCandidate>();
+            var generator = new DecisionCandidateGenerator();
+
+            generator.GeneratePhase1Candidates(context, candidates);
+
+            Assert.That(candidates.Exists(candidate => candidate.Kind == DecisionIntentKind.EatCarriedFood), Is.True);
+        }
+
+        // =============================================================================
+        // HungryNpcWithoutCarriedFoodDoesNotGenerateEatCarriedFood
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica il gate negativo: senza cibo addosso, il nuovo intent non deve
+        /// comparire anche se la fame e' alta.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void HungryNpcWithoutCarriedFoodDoesNotGenerateEatCarriedFood()
+        {
+            var context = MakeContext(
+                hunger01: 0.90f,
+                rest01: 0.10f,
+                addFoodBelief: false,
+                hasCarriedFood: false);
+            var candidates = new List<DecisionCandidate>();
+            var generator = new DecisionCandidateGenerator();
+
+            generator.GeneratePhase1Candidates(context, candidates);
+
+            Assert.That(candidates.Exists(candidate => candidate.Kind == DecisionIntentKind.EatCarriedFood), Is.False);
+        }
+
+        // =============================================================================
+        // CarriedFoodWinsOverKnownFoodWithDeterministicTop1
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica l'ordine operativo desiderato: se l'NPC ha cibo addosso e
+        /// conosce anche cibo esterno, il consumo personale vince in selezione
+        /// deterministica top-1.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void CarriedFoodWinsOverKnownFoodWithDeterministicTop1()
+        {
+            var context = MakeContext(
+                hunger01: 0.95f,
+                rest01: 0.10f,
+                addFoodBelief: true,
+                hasCarriedFood: true);
+            var candidates = new List<DecisionCandidate>();
+            var generator = new DecisionCandidateGenerator();
+            var scoring = new DecisionScoringService();
+            var selection = new DecisionSelectionService();
+
+            generator.GeneratePhase1Candidates(context, candidates);
+            scoring.ScoreCandidates(context, candidates, DecisionScoringConfig.Default());
+            var result = selection.Select(context, candidates, TopOneSelection(), new System.Random(11));
+
+            Assert.That(result.IsEmpty, Is.False);
+            Assert.That(result.Candidate.Kind, Is.EqualTo(DecisionIntentKind.EatCarriedFood));
+        }
+
+        // =============================================================================
         // IntentSpecificConfigChangesScoreWithoutChangingCandidateGeneration
         // =============================================================================
         /// <summary>
@@ -240,7 +328,11 @@ namespace Arcontio.Tests
         ///   <item><b>Norms</b>: filtro attivo per escludere azioni ad alto social risk.</item>
         /// </list>
         /// </summary>
-        private static DecisionEvaluationContext MakeContext(float hunger01, float rest01, bool addFoodBelief)
+        private static DecisionEvaluationContext MakeContext(
+            float hunger01,
+            float rest01,
+            bool addFoodBelief,
+            bool hasCarriedFood = false)
         {
             // I dati individuali sono creati localmente: nessun registry globale e'
             // necessario per valutare il Decision Layer.
@@ -272,8 +364,11 @@ namespace Arcontio.Tests
                 beliefs: beliefs,
                 beliefQueryConfig: BeliefQueryConfig.Default(),
                 explainabilityConfig: null,
+                explainabilityRegistry: null,
+                runtimeCostObserver: null,
                 scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
-                normContext: new DecisionNormContext(true, 0.50f, false));
+                normContext: new DecisionNormContext(true, 0.50f, false),
+                hasCarriedFood: hasCarriedFood);
         }
 
         // =============================================================================

@@ -30,6 +30,57 @@ namespace Arcontio.Core
     public static class FoodJobFactory
     {
         // =============================================================================
+        // TryCreateCarriedInventoryFoodJob
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea il job food che consuma cibo gia' presente nell'inventario dell'NPC.
+        /// </para>
+        ///
+        /// <para><b>Inventario come target implicito autorizzato</b></para>
+        /// <para>
+        /// La factory non sceglie quale oggetto mangiare e non legge il World. Verifica
+        /// solo che la request rappresenti <c>EatCarriedFood</c> e materializza il
+        /// template dedicato. La scelta dell'entry alimentare resta nello step runtime
+        /// che passa dal gateway del World.
+        /// </para>
+        /// </summary>
+        public static bool TryCreateCarriedInventoryFoodJob(
+            JobTemplateRegistry registry,
+            JobRequest request,
+            out Job job,
+            out string reason)
+        {
+            job = null;
+            reason = string.Empty;
+
+            if (registry == null)
+            {
+                reason = "RegistryMissing";
+                return false;
+            }
+
+            if (request.NpcId <= 0)
+            {
+                reason = "InvalidNpcId";
+                return false;
+            }
+
+            if (request.IntentKind != DecisionIntentKind.EatCarriedFood)
+            {
+                reason = "InvalidCarriedFoodJobIntent";
+                return false;
+            }
+
+            if (!registry.TryBuildPlan(JobTemplateRegistry.FoodCarriedInventoryTemplateId, request, out var plan, out reason))
+                return false;
+
+            job = new Job($"job_food_carried_{request.NpcId}_{request.CreatedTick}", request, plan);
+            reason = "CarriedFoodJobCreated";
+            return true;
+        }
+
+        // =============================================================================
         // TryCreateKnownCommunityFoodJob
         // =============================================================================
         /// <summary>

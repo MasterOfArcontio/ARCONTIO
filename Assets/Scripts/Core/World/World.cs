@@ -6611,6 +6611,23 @@ namespace Arcontio.Core
             out InventoryMutationResult result,
             out string reason)
         {
+            return TryMoveInventoryObject(
+                npcId,
+                objectId,
+                targetSlot,
+                InventoryMoveQuantityPolicy.WholeObject,
+                out result,
+                out reason);
+        }
+
+        public bool TryMoveInventoryObject(
+            int npcId,
+            int objectId,
+            NpcInventorySlotKind targetSlot,
+            InventoryMoveQuantityPolicy quantityPolicy,
+            out InventoryMutationResult result,
+            out string reason)
+        {
             result = InventoryMutationResult.None;
             reason = string.Empty;
 
@@ -6665,10 +6682,17 @@ namespace Arcontio.Core
 
             int slotBulkFree = ResolveSlotBulkCapacityUnits(npcId, normalizedTarget) - GetInventoryUsedBulkUnits(npcId, normalizedTarget);
             int slotWeightFree = ResolveSlotWeightCapacityUnits(npcId, normalizedTarget) - GetInventoryUsedWeightUnits(npcId, normalizedTarget);
+            ObjectStackComponent stack = null;
+            bool splitSingleUnit = quantityPolicy == InventoryMoveQuantityPolicy.SingleUnitFromStack
+                && ObjectStacks.TryGetValue(objectId, out stack)
+                && stack != null
+                && stack.Quantity > 1
+                && ObjectInventoryStackResolver.CanUseStackComponent(def);
+            int quantityToMove = splitSingleUnit ? 1 : quantity;
 
             bool fits = ObjectInventoryCapacityResolver.CanFitQuantityInSlot(
                 def,
-                quantity,
+                quantityToMove,
                 slotBulkFree,
                 slotWeightFree,
                 out bool bulkFits,
@@ -6690,6 +6714,36 @@ namespace Arcontio.Core
             {
                 reason = "InventoryTargetSlotFull";
                 return false;
+            }
+
+            if (splitSingleUnit)
+            {
+                int splitObjectId = CreateHeldInventoryObject(npcId, obj.DefId, obj.OwnerKind, obj.OwnerId);
+                if (splitObjectId <= 0)
+                {
+                    reason = "InventorySplitObjectCreateFailed";
+                    return false;
+                }
+
+                stack.Quantity -= 1;
+                ObjectStacks[splitObjectId] = new ObjectStackComponent(1);
+                inventory.Entries.Add(new NpcInventoryEntry
+                {
+                    EntryId = inventory.AllocateEntryId(),
+                    ObjectId = splitObjectId,
+                    SlotKind = normalizedTarget,
+                    ContainerObjectId = 0
+                });
+
+                result = new InventoryMutationResult(
+                    npcId,
+                    splitObjectId,
+                    obj.DefId,
+                    1,
+                    normalizedTarget,
+                    entry.SlotKind);
+                reason = "InventoryStackSingleUnitMoved";
+                return true;
             }
 
             var previousSlot = entry.SlotKind;
@@ -6891,6 +6945,95 @@ namespace Arcontio.Core
             }
 
             return !string.IsNullOrWhiteSpace(foodDefId);
+        }
+
+        // =============================================================================
+        // TrySelectBestFoodObjectOnSelf
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Seleziona l'oggetto fisico alimentare piu' nutriente presente
+        /// nell'inventario di un NPC, restituendo anche slot e objectId sorgente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query autorizzata per job inventario</b></para>
+        /// <para>
+        /// Il job <c>EatCarriedFood</c> deve preparare una specifica pila o un
+        /// oggetto reale in mano. Questa query evita che il Job Layer legga
+        /// direttamente <c>NpcInventories</c>, <c>Objects</c> o <c>ObjectStacks</c>:
+        /// il World resta il gateway unico e restituisce solo il record operativo
+        /// minimo necessario.
+        /// </para>
+        /// </summary>
+        public bool TrySelectBestFoodObjectOnSelf(
+            int npcId,
+            out int objectId,
+            out string foodDefId,
+            out NpcInventorySlotKind slotKind,
+            out int quantity,
+            out float nutritionValue)
+        {
+            return TrySelectBestFoodObjectOnSelf(
+                npcId,
+                NpcInventorySlotKind.None,
+                out objectId,
+                out foodDefId,
+                out slotKind,
+                out quantity,
+                out nutritionValue);
+        }
+
+        public bool TrySelectBestFoodObjectOnSelf(
+            int npcId,
+            NpcInventorySlotKind requiredSlot,
+            out int objectId,
+            out string foodDefId,
+            out NpcInventorySlotKind slotKind,
+            out int quantity,
+            out float nutritionValue)
+        {
+            objectId = 0;
+            foodDefId = string.Empty;
+            slotKind = NpcInventorySlotKind.None;
+            quantity = 0;
+            nutritionValue = 0f;
+
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+                return false;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (entry == null)
+                    continue;
+
+                if (requiredSlot != NpcInventorySlotKind.None && entry.SlotKind != requiredSlot)
+                    continue;
+
+                if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int entryQuantity)
+                    || entryQuantity <= 0
+                    || string.IsNullOrWhiteSpace(obj.DefId))
+                {
+                    continue;
+                }
+
+                ObjectFoodNutritionResult resolved = ObjectFoodNutritionResolver.Resolve(
+                    this,
+                    obj.DefId,
+                    Global.Needs.eatSatietyGain,
+                    allowLegacyFallbackWhenDefinitionMissing: false);
+
+                if (!resolved.IsConsumableFood || resolved.NutritionValue <= nutritionValue)
+                    continue;
+
+                objectId = entry.ObjectId;
+                foodDefId = obj.DefId;
+                slotKind = entry.SlotKind;
+                quantity = entryQuantity;
+                nutritionValue = resolved.NutritionValue;
+            }
+
+            return objectId > 0;
         }
 
         // =============================================================================

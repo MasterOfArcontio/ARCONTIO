@@ -101,7 +101,8 @@ namespace Arcontio.Core
                 explainabilityRegistry: world.MemoryBeliefDecisionExplainability,
                 runtimeCostObserver: world.RuntimeCostObserver,
                 scheduleFrame: new DecisionScheduleFrame(false, DomainKind.None, true),
-                normContext: new DecisionNormContext(false, 1f, true));
+                normContext: new DecisionNormContext(false, 1f, true),
+                hasCarriedFood: world.HasEdibleFoodOnSelf(npcId));
 
             return true;
         }

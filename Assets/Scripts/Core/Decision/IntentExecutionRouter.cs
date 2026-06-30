@@ -20,6 +20,7 @@ namespace Arcontio.Core
     public enum IntentExecutionRouteKind
     {
         None = 0,
+        EatCarriedFoodJobRequest = 5,
         EatKnownFoodJobRequest = 10,
         SearchFoodJobRequest = 20,
         WaitAndObserveJobRequest = 30
@@ -106,6 +107,34 @@ namespace Arcontio.Core
         public IntentExecutionRouter(JobRequestBuilder jobRequestBuilder)
         {
             _jobRequestBuilder = jobRequestBuilder ?? new JobRequestBuilder();
+        }
+
+        // =============================================================================
+        // TryRouteEatCarriedFood
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Tenta la route dati <c>EatCarriedFood -> JobRequest</c>.
+        /// </para>
+        /// </summary>
+        public bool TryRouteEatCarriedFood(
+            int tick,
+            int npcId,
+            DecisionCandidate selectedCandidate,
+            out IntentExecutionRouteResult result)
+        {
+            bool built = _jobRequestBuilder.TryBuildEatCarriedFoodRequest(
+                tick,
+                npcId,
+                selectedCandidate,
+                out var request,
+                out string reason);
+
+            result = built
+                ? IntentExecutionRouteResult.Accepted(IntentExecutionRouteKind.EatCarriedFoodJobRequest, request, reason)
+                : IntentExecutionRouteResult.Rejected(IntentExecutionRouteKind.EatCarriedFoodJobRequest, reason);
+
+            return built;
         }
 
         // =============================================================================

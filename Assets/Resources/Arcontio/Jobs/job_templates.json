@@ -1,6 +1,51 @@
 {
   "templates": [
     {
+      "templateId": "food.eat_carried_inventory.v1",
+      "exitPerceptionState": "idle",
+      "phases": [
+        {
+          "phaseId": "prepare_food_hand",
+          "kind": "Prepare",
+          "PerceptionState": "idle",
+          "isInterruptible": false,
+          "actions": [
+            {
+              "actionId": "prepare_left_hand",
+              "kind": "PrepareHand",
+              "payloadKey": "HandLeft"
+            }
+          ]
+        },
+        {
+          "phaseId": "ready_carried_food",
+          "kind": "Prepare",
+          "PerceptionState": "idle",
+          "isInterruptible": false,
+          "actions": [
+            {
+              "actionId": "ready_inventory_food",
+              "kind": "ReadyInventoryFood",
+              "payloadKey": "HandLeft"
+            }
+          ]
+        },
+        {
+          "phaseId": "consume_carried_food",
+          "kind": "Execute",
+          "PerceptionState": "idle",
+          "isInterruptible": false,
+          "actions": [
+            {
+              "actionId": "consume_carried_food",
+              "kind": "Consume",
+              "payloadKey": "HandLeft"
+            }
+          ]
+        }
+      ]
+    },
+    {
       "templateId": "food.eat_known_community_stock.v1",
       "exitPerceptionState": "idle",
       "phases": [

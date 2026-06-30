@@ -162,6 +162,7 @@ namespace Arcontio.Core
         public readonly RuntimeCostObserver RuntimeCostObserver;
         public readonly DecisionScheduleFrame ScheduleFrame;
         public readonly DecisionNormContext NormContext;
+        public readonly bool HasCarriedFood;
 
         public DecisionEvaluationContext(
             int npcId,
@@ -233,7 +234,8 @@ namespace Arcontio.Core
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry,
             RuntimeCostObserver runtimeCostObserver,
             DecisionScheduleFrame scheduleFrame,
-            DecisionNormContext normContext)
+            DecisionNormContext normContext,
+            bool hasCarriedFood = false)
         {
             NpcId = npcId;
             Tick = tick;
@@ -248,6 +250,7 @@ namespace Arcontio.Core
             RuntimeCostObserver = runtimeCostObserver;
             ScheduleFrame = scheduleFrame;
             NormContext = normContext;
+            HasCarriedFood = hasCarriedFood;
         }
     }
 

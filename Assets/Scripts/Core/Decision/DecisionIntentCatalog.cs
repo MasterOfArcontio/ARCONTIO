@@ -48,7 +48,8 @@ namespace Arcontio.Core
         ManageStorage = 19,
         GovernColony = 20,
         ExploreArea = 21,
-        WaitAndObserve = 22
+        WaitAndObserve = 22,
+        EatCarriedFood = 23
     }
 
     // =============================================================================
@@ -171,6 +172,7 @@ namespace Arcontio.Core
     {
         public static readonly DecisionIntentKind[] All =
         {
+            DecisionIntentKind.EatCarriedFood,
             DecisionIntentKind.EatKnownFood,
             DecisionIntentKind.SearchFood,
             DecisionIntentKind.DrinkKnownWater,
@@ -213,6 +215,8 @@ namespace Arcontio.Core
             // e' piu' leggibile di una tabella mutabile inizializzata a runtime.
             switch (kind)
             {
+                case DecisionIntentKind.EatCarriedFood:
+                    return new DecisionIntentMetadata(kind, DomainKind.Agriculture, NeedKind.Hunger, BeliefCategory.Food, false, true, true, "EatCarriedFood");
                 case DecisionIntentKind.EatKnownFood:
                     return new DecisionIntentMetadata(kind, DomainKind.Agriculture, NeedKind.Hunger, BeliefCategory.Food, true, true, true, "EatKnownFood");
                 case DecisionIntentKind.SearchFood:

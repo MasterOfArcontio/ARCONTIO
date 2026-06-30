@@ -179,6 +179,33 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void MoveInventoryObjectCommandSingleUnitPolicySplitsOneUnitFromPackStackToHand()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 5, out _, out string addReason), Is.True, addReason);
+            int packObjectId = world.NpcInventories[npcId].Entries[0].ObjectId;
+            var bus = new MessageBus();
+
+            new MoveInventoryObjectCommand(
+                npcId,
+                packObjectId,
+                NpcInventorySlotKind.HandLeft,
+                InventoryMoveQuantityPolicy.SingleUnitFromStack).Execute(world, bus);
+
+            Assert.That(bus.Count, Is.EqualTo(1));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var moved = simEvent as InventoryItemMovedEvent;
+            Assert.That(moved, Is.Not.Null);
+            Assert.That(moved.ObjectId, Is.Not.EqualTo(packObjectId));
+            Assert.That(moved.Quantity, Is.EqualTo(1));
+            Assert.That(moved.PreviousSlotKind, Is.EqualTo(NpcInventorySlotKind.Pack));
+            Assert.That(moved.SlotKind, Is.EqualTo(NpcInventorySlotKind.HandLeft));
+            Assert.That(world.ObjectStacks[packObjectId].Quantity, Is.EqualTo(4));
+            Assert.That(world.GetInventoryQuantity(npcId, "berry", NpcInventorySlotKind.HandLeft), Is.EqualTo(1));
+            Assert.That(world.GetInventoryQuantity(npcId, "berry", NpcInventorySlotKind.Pack), Is.EqualTo(4));
+        }
+
+        [Test]
         public void ConsumeInventoryItemCommandConsumesTypedFoodAndPublishesSingleFoodEvent()
         {
             var world = MakeWorld(out int npcId);

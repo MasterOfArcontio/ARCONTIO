@@ -205,6 +205,7 @@ namespace Arcontio.Core
                 highObligationThreshold = global.highObligationThreshold,
                 intents = new[]
                 {
+                    CreateEntry(DecisionIntentKind.EatCarriedFood, 0.25f, 1.15f),
                     CreateEntry(DecisionIntentKind.EatKnownFood, 0f, 1f),
                     CreateEntry(DecisionIntentKind.SearchFood, 0f, 1f),
                     CreateEntry(DecisionIntentKind.WaitAndObserve, 0.05f, 0.25f),

@@ -37,6 +37,36 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // InventoryMoveQuantityPolicy
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Specifica quanta parte di un oggetto inventariato deve essere spostata tra
+    /// macro-slot personali.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: policy esplicita, niente boolean opachi</b></para>
+    /// <para>
+    /// Il movimento inventario ordinario conserva il comportamento storico: sposta
+    /// l'intero oggetto fisico o l'intera pila. Alcuni job d'uso, come mangiare una
+    /// bacca dallo zaino, devono invece preparare una sola unita' in mano senza
+    /// muovere tutta la pila. Questa enum rende visibile quella scelta nel command
+    /// e nel World, senza introdurre un secondo comando parallelo.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>WholeObject</b>: sposta l'oggetto o la pila intera.</item>
+    ///   <item><b>SingleUnitFromStack</b>: se possibile separa una sola unita' da una pila.</item>
+    /// </list>
+    /// </summary>
+    public enum InventoryMoveQuantityPolicy
+    {
+        WholeObject = 0,
+        SingleUnitFromStack = 10
+    }
+
+    // =============================================================================
     // InventoryPlacementFlags
     // =============================================================================
     /// <summary>

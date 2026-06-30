@@ -11,6 +11,16 @@
     "highObligationThreshold": 0.75,
     "intents": [
       {
+        "intent": "EatCarriedFood",
+        "enabled": true,
+        "baseScore": 0.25,
+        "needMultiplier": 1.15,
+        "beliefMultiplier": 1.0,
+        "memoryMultiplier": 1.0,
+        "riskPenalty": 0.0,
+        "cooldownTicks": 0
+      },
+      {
         "intent": "EatKnownFood",
         "enabled": true,
         "baseScore": 0.0,
