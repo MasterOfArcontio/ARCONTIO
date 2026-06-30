@@ -6348,6 +6348,91 @@ namespace Arcontio.Core
             return null;
         }
 
+        // =============================================================================
+        // FindAnyInventoryEntryByObjectId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Cerca una entry inventario riferita a un oggetto fisico in tutti gli
+        /// inventari NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: un oggetto fisico ha un solo corpo</b></para>
+        /// <para>
+        /// Prima di trasformare un oggetto grounded in held, il World deve verificare
+        /// che lo stesso <c>ObjectId</c> non sia gia' presente in un inventario. La
+        /// query resta privata per evitare che layer esterni usino l'inventario come
+        /// scorciatoia globale invece di passare da comandi autorizzati.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>ObjectId</b>: identita' fisica cercata.</item>
+        ///   <item><b>OwnerNpcId</b>: NPC proprietario dell'entry trovata, oppure 0.</item>
+        ///   <item><b>Return</b>: entry trovata o null.</item>
+        /// </list>
+        /// </summary>
+        private NpcInventoryEntry FindAnyInventoryEntryByObjectId(int objectId, out int ownerNpcId)
+        {
+            ownerNpcId = 0;
+            if (objectId <= 0)
+                return null;
+
+            foreach (var kv in NpcInventories)
+            {
+                var entry = FindInventoryEntryByObjectId(kv.Value, objectId);
+                if (entry == null)
+                    continue;
+
+                ownerNpcId = kv.Key;
+                return entry;
+            }
+
+            return null;
+        }
+
+        // =============================================================================
+        // RemoveInventoryEntryByObjectId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove da uno stato inventario la entry collegata a un oggetto fisico.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: drop come transizione spaziale atomica</b></para>
+        /// <para>
+        /// Il drop C5 non e' una rimozione inventory-only e non deve passare da
+        /// <c>RemoveInventoryItemCommand</c>. Questa utility privata permette al
+        /// World di togliere la collocazione personale nello stesso punto in cui
+        /// riporta l'oggetto a terra, mantenendo un solo fatto canonico:
+        /// <see cref="ObjectDroppedEvent"/>.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Inventory</b>: stato inventario posseduto dal World.</item>
+        ///   <item><b>ObjectId</b>: oggetto fisico da scollegare.</item>
+        ///   <item><b>Return</b>: true se una entry coerente e' stata rimossa.</item>
+        /// </list>
+        /// </summary>
+        private static bool RemoveInventoryEntryByObjectId(NpcInventoryState inventory, int objectId)
+        {
+            if (inventory == null || objectId <= 0)
+                return false;
+
+            for (int i = inventory.Entries.Count - 1; i >= 0; i--)
+            {
+                var entry = inventory.Entries[i];
+                if (entry == null || entry.ObjectId != objectId)
+                    continue;
+
+                inventory.Entries.RemoveAt(i);
+                return true;
+            }
+
+            return false;
+        }
+
         private static bool IsInventoryTransportableDef(ObjectDef def, int objectId)
         {
             if (def == null)
@@ -7341,13 +7426,12 @@ if (!NpcAction.ContainsKey(id))
         /// dalla griglia senza distruggerne l'istanza runtime.
         /// </para>
         ///
-        /// <para><b>Holder fisico MVP, non inventario completo</b></para>
+        /// <para><b>Holder fisico dentro inventario typed</b></para>
         /// <para>
-        /// Questa API esiste per il job debug <c>transport.object_to_cell.v1</c>. La
-        /// mutazione resta world-authoritative e non passa da Transform Unity: il
-        /// rendering vedra' semplicemente che l'oggetto non e' piu' grounded. Non
-        /// modifica <c>OwnerKind</c>/<c>OwnerId</c>, non crea stacking, non introduce
-        /// peso, slot, equipaggiamento o ownership sociale.
+        /// Da C5 la transizione grounded -> held deve creare anche una entry in
+        /// <see cref="NpcInventories"/>. La mutazione resta world-authoritative e
+        /// non passa da Transform Unity: il rendering vede l'oggetto come held, il
+        /// save/load vede l'entry inventario e la ownership logica resta invariata.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -7397,6 +7481,34 @@ if (!NpcAction.ContainsKey(id))
                 return false;
             }
 
+            if (!TryGetObjectDef(obj.DefId, out var def) || def == null)
+            {
+                reason = "ObjectDefMissing";
+                return false;
+            }
+
+            var slot = NpcInventorySlotKind.Pack;
+            if (!IsInventoryTransportableDef(def, objectId) || !CanObjectBePlacedInSlot(def, slot))
+            {
+                reason = "ObjectDefNotTransportable";
+                return false;
+            }
+
+            if (FindAnyInventoryEntryByObjectId(objectId, out _) != null)
+            {
+                reason = "ObjectAlreadyInInventory";
+                return false;
+            }
+
+            int addable = ResolveAddableInventoryQuantity(npcId, def, slot, 1);
+            if (addable < 1)
+            {
+                reason = "InventoryFull";
+                return false;
+            }
+
+            var inventory = EnsureNpcInventory(npcId);
+
             if (_objIdByCell != null && _objIdByCell.Length == MapWidth * MapHeight && InBounds(fromX, fromY))
             {
                 int idx = CellIndex(fromX, fromY);
@@ -7408,11 +7520,23 @@ if (!NpcAction.ContainsKey(id))
             MarkNearbyNpcPerceptionDirty(fromX, fromY);
             ClearObjectPerceptionRelations(objectId);
 
-            if (TryGetObjectDef(obj.DefId, out var def) && def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
+            if (def.IsOccluder || def.BlocksVision || def.BlocksMovement)
                 ClearOccluderFromCache(objectId, fromX, fromY);
 
             obj.IsHeld = true;
             obj.HolderNpcId = npcId;
+
+            if (def.Stackable && !ObjectStacks.ContainsKey(objectId))
+                ObjectStacks[objectId] = new ObjectStackComponent(1);
+
+            inventory.Entries.Add(new NpcInventoryEntry
+            {
+                EntryId = inventory.AllocateEntryId(),
+                ObjectId = objectId,
+                SlotKind = slot,
+                ContainerObjectId = 0
+            });
+
             reason = "ObjectPickedUp";
             return true;
         }
@@ -7464,6 +7588,18 @@ if (!NpcAction.ContainsKey(id))
                 return false;
             }
 
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+            {
+                reason = "InventoryMissing";
+                return false;
+            }
+
+            if (FindInventoryEntryByObjectId(inventory, objectId) == null)
+            {
+                reason = "InventoryObjectMissing";
+                return false;
+            }
+
             if (!InBounds(targetX, targetY))
             {
                 reason = "DropCellOutOfBounds";
@@ -7474,6 +7610,12 @@ if (!NpcAction.ContainsKey(id))
             if (existing >= 0 && existing != objectId)
             {
                 reason = "DropCellOccupied";
+                return false;
+            }
+
+            if (!RemoveInventoryEntryByObjectId(inventory, objectId))
+            {
+                reason = "InventoryObjectMissing";
                 return false;
             }
 

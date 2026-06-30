@@ -150,7 +150,10 @@ namespace Arcontio.Tests
                 IsInteractable = true,
                 IsOccluder = false,
                 BlocksMovement = false,
-                BlocksVision = false
+                BlocksVision = false,
+                BulkUnits = 1,
+                WeightUnits = 1,
+                CanPlaceInContainer = true
             };
             int objectId = world.CreateObject("qa_food_stock", 2, 2, OwnerKind.Community, 0);
             Assert.That(objectId, Is.GreaterThan(0));
@@ -223,7 +226,10 @@ namespace Arcontio.Tests
                 IsInteractable = true,
                 IsOccluder = false,
                 BlocksMovement = false,
-                BlocksVision = false
+                BlocksVision = false,
+                BulkUnits = 1,
+                WeightUnits = 1,
+                CanPlaceInContainer = true
             };
 
             int nearNpc = world.CreateNpc(
@@ -361,7 +367,10 @@ namespace Arcontio.Tests
                 IsInteractable = true,
                 IsOccluder = false,
                 BlocksMovement = false,
-                BlocksVision = false
+                BlocksVision = false,
+                BulkUnits = 1,
+                WeightUnits = 1,
+                CanPlaceInContainer = true
             };
 
             int observer = world.CreateNpc(
