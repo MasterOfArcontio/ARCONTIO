@@ -26,7 +26,8 @@
             {
               "actionId": "ready_inventory_food",
               "kind": "ReadyInventoryFood",
-              "payloadKey": "HandLeft"
+              "payloadKey": "HandLeft",
+              "durationTicks": 6
             }
           ]
         },
@@ -39,7 +40,8 @@
             {
               "actionId": "consume_carried_food",
               "kind": "Consume",
-              "payloadKey": "HandLeft"
+              "payloadKey": "HandLeft",
+              "durationTicks": 12
             }
           ]
         }
@@ -88,7 +90,8 @@
             {
               "actionId": "consume_known_food",
               "kind": "Consume",
-              "payloadKey": "HandLeft"
+              "payloadKey": "HandLeft",
+              "durationTicks": 12
             }
           ]
         }

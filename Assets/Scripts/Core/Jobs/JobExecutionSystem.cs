@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using Arcontio.Core.Config;
@@ -644,16 +645,16 @@ namespace Arcontio.Core
             if (action.Kind == JobActionKind.Consume)
             {
                 if (job.Request.IntentKind == DecisionIntentKind.EatCarriedFood)
-                    return ExecuteConsumeCarriedFood(world, runtime, npcId, job, action, tick, explainabilityConfig, explainabilityRegistry);
+                    return ExecuteConsumeCarriedFood(world, runtime, runningActionExecutor, npcId, in npcState, job, phase, action, tick, explainabilityConfig, explainabilityRegistry);
 
-                return ExecuteConsumeKnownFood(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
+                return ExecuteConsumeKnownFood(world, runtime, runningActionExecutor, npcId, in npcState, job, phase, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
             }
 
             if (action.Kind == JobActionKind.PrepareHand)
                 return ExecutePrepareHand(world, runtime, npcId, job, action, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.ReadyInventoryFood)
-                return ExecuteReadyInventoryFood(world, runtime, npcId, job, action, tick, explainabilityConfig, explainabilityRegistry);
+                return ExecuteReadyInventoryFood(world, runtime, runningActionExecutor, npcId, in npcState, job, phase, action, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.PickUp)
                 return ExecutePickUpObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
@@ -949,8 +950,11 @@ namespace Arcontio.Core
         private static StepResult ExecuteConsumeKnownFood(
             World world,
             JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
             int npcId,
+            in NpcJobState npcState,
             Job job,
+            JobPhase phase,
             JobAction action,
             GridPosition npcCell,
             int tick,
@@ -978,22 +982,44 @@ namespace Arcontio.Core
             if (world.GetInventoryQuantity(npcId, foodObject.DefId, requiredSlot) <= 0)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeFoodMissingInHand");
 
-            runtime.CommandBuffer.Enqueue(
-                new ConsumeInventoryItemCommand(npcId, foodObject.DefId, 0, requiredSlot),
-                explainabilityConfig,
-                explainabilityRegistry,
+            return ExecuteTimedCommandAction(
+                runtime,
+                runningActionExecutor,
                 npcId,
+                in npcState,
+                job,
+                phase,
+                action,
                 tick,
-                job.JobId,
-                "ConsumeInventoryHandCommandEnqueued");
-            return StepResult.Succeeded("ConsumeInventoryHandCommandEnqueued");
+                "consume",
+                "ConsumeKnownFoodTimedActionStarted",
+                "ConsumeKnownFoodTimedActionTick",
+                "ConsumeKnownFoodTimedActionRunning",
+                () => ValidateKnownFoodInHand(world, npcId, foodObject.DefId, requiredSlot, "ConsumeFoodMissingInHand"),
+                () =>
+                {
+                    runtime.CommandBuffer.Enqueue(
+                        new ConsumeInventoryItemCommand(npcId, foodObject.DefId, 0, requiredSlot),
+                        explainabilityConfig,
+                        explainabilityRegistry,
+                        npcId,
+                        tick,
+                        job.JobId,
+                        "ConsumeInventoryHandCommandEnqueued");
+                    return StepResult.Succeeded("ConsumeInventoryHandCommandEnqueued");
+                },
+                explainabilityConfig,
+                explainabilityRegistry);
         }
 
         private static StepResult ExecuteConsumeCarriedFood(
             World world,
             JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
             int npcId,
+            in NpcJobState npcState,
             Job job,
+            JobPhase phase,
             JobAction action,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
@@ -1006,15 +1032,34 @@ namespace Arcontio.Core
             if (!world.SelectBestFoodOnSelf(npcId, requiredSlot, out _, out _, out _))
                 return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeCarriedFoodMissingInHand");
 
-            runtime.CommandBuffer.Enqueue(
-                new ConsumeInventoryItemCommand(npcId, string.Empty, 0, requiredSlot),
-                explainabilityConfig,
-                explainabilityRegistry,
+            return ExecuteTimedCommandAction(
+                runtime,
+                runningActionExecutor,
                 npcId,
+                in npcState,
+                job,
+                phase,
+                action,
                 tick,
-                job.JobId,
-                "ConsumeCarriedInventoryFoodCommandEnqueued");
-            return StepResult.Succeeded("ConsumeCarriedInventoryFoodCommandEnqueued");
+                "consume",
+                "ConsumeCarriedFoodTimedActionStarted",
+                "ConsumeCarriedFoodTimedActionTick",
+                "ConsumeCarriedFoodTimedActionRunning",
+                () => ValidateCarriedFoodInHand(world, npcId, requiredSlot, "ConsumeCarriedFoodMissingInHand"),
+                () =>
+                {
+                    runtime.CommandBuffer.Enqueue(
+                        new ConsumeInventoryItemCommand(npcId, string.Empty, 0, requiredSlot),
+                        explainabilityConfig,
+                        explainabilityRegistry,
+                        npcId,
+                        tick,
+                        job.JobId,
+                        "ConsumeCarriedInventoryFoodCommandEnqueued");
+                    return StepResult.Succeeded("ConsumeCarriedInventoryFoodCommandEnqueued");
+                },
+                explainabilityConfig,
+                explainabilityRegistry);
         }
 
         private static StepResult ExecutePrepareHand(
@@ -1057,8 +1102,11 @@ namespace Arcontio.Core
         private static StepResult ExecuteReadyInventoryFood(
             World world,
             JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
             int npcId,
+            in NpcJobState npcState,
             Job job,
+            JobPhase phase,
             JobAction action,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
@@ -1070,6 +1118,236 @@ namespace Arcontio.Core
 
             if (world.SelectBestFoodOnSelf(npcId, handSlot, out _, out _, out _))
                 return StepResult.Succeeded("ReadyInventoryFoodAlreadyInHand");
+
+            if (!world.TrySelectBestFoodObjectOnSelf(
+                    npcId,
+                    out int objectId,
+                    out _,
+                    out NpcInventorySlotKind sourceSlot,
+                    out _,
+                    out _))
+            {
+                return StepResult.Failed(JobFailureReason.MissingTarget, "ReadyInventoryFoodMissing");
+            }
+
+            if (sourceSlot == handSlot)
+                return StepResult.Succeeded("ReadyInventoryFoodAlreadyInHand");
+
+            return ExecuteTimedCommandAction(
+                runtime,
+                runningActionExecutor,
+                npcId,
+                in npcState,
+                job,
+                phase,
+                action,
+                tick,
+                "ready_inventory_food",
+                "ReadyInventoryFoodTimedActionStarted",
+                "ReadyInventoryFoodTimedActionTick",
+                "ReadyInventoryFoodTimedActionRunning",
+                () => ValidateInventoryFoodAvailable(world, npcId, handSlot),
+                () => CompleteReadyInventoryFood(
+                    world,
+                    runtime,
+                    npcId,
+                    job,
+                    handSlot,
+                    tick,
+                    explainabilityConfig,
+                    explainabilityRegistry),
+                explainabilityConfig,
+                explainabilityRegistry);
+        }
+
+        // =============================================================================
+        // ExecuteTimedCommandAction
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue uno step atomico temporizzato che non muta il World durante il
+        /// progress e produce al massimo un command finale alla completion.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: tempo nel Job Layer, mutazione nel Command Gateway</b></para>
+        /// <para>
+        /// Questo helper non sostituisce running action specializzate come movimento,
+        /// orientamento o wait esplicito. Serve solo agli step mono-command come
+        /// preparare cibo in mano o consumarlo: lo stato <c>RunningAction</c> rende
+        /// osservabile il progresso, mentre il World cambia solo quando il command
+        /// autorizzato viene accodato alla fine.
+        /// </para>
+        /// </summary>
+        private static StepResult ExecuteTimedCommandAction(
+            JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
+            int npcId,
+            in NpcJobState npcState,
+            Job job,
+            JobPhase phase,
+            JobAction action,
+            int tick,
+            string actionInstancePrefix,
+            string startedReason,
+            string tickReason,
+            string runningReason,
+            Func<StepResult> validateStillPossible,
+            Func<StepResult> completeAction,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            if (runtime == null || runningActionExecutor == null || job == null)
+                return StepResult.Failed(JobFailureReason.StepFailed, "TimedCommandRuntimeMissing");
+
+            var key = new RunningActionKey(npcId, job.JobId, npcState.ActivePhaseIndex, npcState.ActiveActionIndex);
+            StepResult validation = validateStillPossible != null
+                ? validateStillPossible()
+                : StepResult.Succeeded("TimedCommandValidationSkipped");
+
+            if (validation.Status == StepResultStatus.Failed)
+            {
+                if (runtime.RunningActions.TryGet(key, out var invalidRunningAction) && invalidRunningAction != null)
+                {
+                    var failedResult = runningActionExecutor.Tick(
+                        invalidRunningAction,
+                        RunningActionExecutorTickRequest.Fail(tick, validation.FailureReason, validation.DiagnosticMessage));
+                    EmitRunningActionExecutionTrace(explainabilityConfig, explainabilityRegistry, npcId, tick, in key, failedResult);
+                    runtime.RunningActions.Clear(key);
+                }
+
+                return validation;
+            }
+
+            if (!runtime.RunningActions.TryGet(key, out var runningAction) || runningAction == null)
+            {
+                int requiredTicks = Mathf.Max(1, action.DurationTicks);
+                var policy = new RunningActionCompletionPolicy(
+                    requiredTicks,
+                    timeoutTicks: 0,
+                    failureReason: JobFailureReason.StepFailed,
+                    interruptionReason: JobFailureReason.Cancelled);
+
+                runningAction = RunningActionRuntimeState.Start(
+                    $"{actionInstancePrefix}_{job.JobId}_{npcState.ActivePhaseIndex}_{npcState.ActiveActionIndex}",
+                    RunningActionKind.UseObject,
+                    npcId,
+                    job.JobId,
+                    phase.PhaseId,
+                    action.ActionId,
+                    tick,
+                    policy);
+
+                if (!runtime.RunningActions.Register(key, runningAction, out var registerReason))
+                    return StepResult.Failed(JobFailureReason.StepFailed, registerReason);
+
+                MemoryBeliefDecisionExplainabilityEmitter.TryWriteRunningActionTrace(
+                    explainabilityConfig,
+                    explainabilityRegistry,
+                    npcId,
+                    tick,
+                    MemoryBeliefDecisionRunningActionOperation.Started,
+                    in key,
+                    runningAction.ToSnapshot(),
+                    startedReason);
+            }
+
+            var executorResult = runningActionExecutor.Tick(
+                runningAction,
+                RunningActionExecutorTickRequest.Advance(1, tick, tickReason));
+
+            EmitRunningActionExecutionTrace(
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                in key,
+                executorResult);
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.Completed)
+            {
+                runtime.RunningActions.Clear(key);
+                return completeAction != null
+                    ? completeAction()
+                    : StepResult.Succeeded("TimedCommandActionCompleted");
+            }
+
+            if (executorResult.Kind == RunningActionExecutorResultKind.Advanced
+                || executorResult.Kind == RunningActionExecutorResultKind.NoProgress)
+            {
+                return StepResult.Running(runningReason);
+            }
+
+            runtime.RunningActions.Clear(key);
+            return StepResult.Failed(JobFailureReason.StepFailed, executorResult.Reason);
+        }
+
+        private static StepResult ValidateKnownFoodInHand(
+            World world,
+            int npcId,
+            string foodDefId,
+            NpcInventorySlotKind requiredSlot,
+            string missingReason)
+        {
+            if (world == null || world.GetInventoryQuantity(npcId, foodDefId, requiredSlot) <= 0)
+                return StepResult.Failed(JobFailureReason.MissingTarget, missingReason);
+
+            return StepResult.Succeeded("KnownFoodStillInHand");
+        }
+
+        private static StepResult ValidateCarriedFoodInHand(
+            World world,
+            int npcId,
+            NpcInventorySlotKind requiredSlot,
+            string missingReason)
+        {
+            if (world == null || !world.SelectBestFoodOnSelf(npcId, requiredSlot, out _, out _, out _))
+                return StepResult.Failed(JobFailureReason.MissingTarget, missingReason);
+
+            return StepResult.Succeeded("CarriedFoodStillInHand");
+        }
+
+        private static StepResult ValidateInventoryFoodAvailable(World world, int npcId, NpcInventorySlotKind handSlot)
+        {
+            if (world == null)
+                return StepResult.Failed(JobFailureReason.StepFailed, "ReadyInventoryFoodWorldMissing");
+
+            if (world.SelectBestFoodOnSelf(npcId, handSlot, out _, out _, out _))
+                return StepResult.Succeeded("ReadyInventoryFoodAlreadyInHand");
+
+            if (world.TryGetFirstInventoryObjectInSlot(npcId, handSlot, out _))
+                return StepResult.Failed(JobFailureReason.StepFailed, "ReadyInventoryFoodHandOccupied");
+
+            if (!world.TrySelectBestFoodObjectOnSelf(
+                    npcId,
+                    out _,
+                    out _,
+                    out NpcInventorySlotKind sourceSlot,
+                    out _,
+                    out _))
+            {
+                return StepResult.Failed(JobFailureReason.MissingTarget, "ReadyInventoryFoodMissing");
+            }
+
+            return sourceSlot == handSlot
+                ? StepResult.Succeeded("ReadyInventoryFoodAlreadyInHand")
+                : StepResult.Succeeded("ReadyInventoryFoodAvailable");
+        }
+
+        private static StepResult CompleteReadyInventoryFood(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
+            Job job,
+            NpcInventorySlotKind handSlot,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            if (world.SelectBestFoodOnSelf(npcId, handSlot, out _, out _, out _))
+                return StepResult.Succeeded("ReadyInventoryFoodAlreadyInHand");
+
+            if (world.TryGetFirstInventoryObjectInSlot(npcId, handSlot, out _))
+                return StepResult.Failed(JobFailureReason.StepFailed, "ReadyInventoryFoodHandOccupied");
 
             if (!world.TrySelectBestFoodObjectOnSelf(
                     npcId,
