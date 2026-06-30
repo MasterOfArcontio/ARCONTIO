@@ -285,6 +285,95 @@ namespace Arcontio.Core
             return true;
         }
 
+        // =============================================================================
+        // TryGetActiveSnapshotForNpc
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Recupera uno snapshot read-only della running action attiva di un NPC,
+        /// privilegiando il movimento quando esiste un segmento movement valido.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: osservabilita' visuale senza authority</b></para>
+        /// <para>
+        /// ArcGraph puo' mostrare un overlay operativo sopra l'NPC senza ricevere lo
+        /// store mutabile e senza leggere job, command buffer o sistemi produttivi.
+        /// Lo snapshot copiato espone solo valori primitivi e non permette di
+        /// avanzare, completare o cancellare la running action.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Movement first</b>: usa l'indice O(1) gia' mantenuto per ArcGraph.</item>
+        ///   <item><b>Fallback stabile</b>: sceglie una action non terminale dello stesso NPC.</item>
+        ///   <item><b>Snapshot</b>: restituisce una copia value-only dello stato.</item>
+        /// </list>
+        /// </summary>
+        public bool TryGetActiveSnapshotForNpc(
+            int npcId,
+            out RunningActionProgressSnapshot snapshot)
+        {
+            snapshot = default;
+
+            if (npcId <= 0)
+                return false;
+
+            if (TryGetActiveMovementSnapshotForNpc(npcId, out snapshot))
+                return true;
+
+            bool hasCandidate = false;
+            RunningActionKey selectedKey = default;
+            RunningActionRuntimeState selectedState = null;
+
+            foreach (var pair in _states)
+            {
+                RunningActionRuntimeState state = pair.Value;
+                if (state == null
+                    || state.IsTerminal
+                    || pair.Key.NpcId != npcId)
+                {
+                    continue;
+                }
+
+                if (!hasCandidate || CompareActiveActionCandidate(pair.Key, state, selectedKey, selectedState) < 0)
+                {
+                    selectedKey = pair.Key;
+                    selectedState = state;
+                    hasCandidate = true;
+                }
+            }
+
+            if (!hasCandidate || selectedState == null)
+                return false;
+
+            snapshot = selectedState.ToSnapshot();
+            return true;
+        }
+
+        private static int CompareActiveActionCandidate(
+            RunningActionKey leftKey,
+            RunningActionRuntimeState leftState,
+            RunningActionKey rightKey,
+            RunningActionRuntimeState rightState)
+        {
+            if (rightState == null)
+                return -1;
+
+            int startedCompare = leftState.StartedTick.CompareTo(rightState.StartedTick);
+            if (startedCompare != 0)
+                return startedCompare;
+
+            int phaseCompare = leftKey.PhaseIndex.CompareTo(rightKey.PhaseIndex);
+            if (phaseCompare != 0)
+                return phaseCompare;
+
+            int actionCompare = leftKey.ActionIndex.CompareTo(rightKey.ActionIndex);
+            if (actionCompare != 0)
+                return actionCompare;
+
+            return string.Compare(leftKey.JobId, rightKey.JobId, StringComparison.Ordinal);
+        }
+
         private int RemoveKeys(List<RunningActionKey> keysToRemove)
         {
             int removed = 0;

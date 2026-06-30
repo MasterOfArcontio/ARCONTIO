@@ -1,5 +1,151 @@
+using Arcontio.Core;
+
 namespace Arcontio.View.ArcGraph
 {
+    // =============================================================================
+    // ArcGraphActorRunningActionOverlaySnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot visuale read-only dell'attivita' temporizzata mostrabile sopra un
+    /// NPC ArcGraph.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: progresso job copiato, non comandabile</b></para>
+    /// <para>
+    /// Il dato nasce dal <c>RunningActionStore</c>, ma qui diventa una proiezione
+    /// visuale fatta di soli valori primitivi: label, kind e percentuali. Il
+    /// renderer puo' disegnare una barra senza conoscere job, command buffer,
+    /// sistemi o store mutabili.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>IsActive</b>: indica se l'overlay va mostrato.</item>
+    ///   <item><b>ActionKind/JobActionId</b>: identita' minima della running action.</item>
+    ///   <item><b>Elapsed/Required</b>: contatori tick copiati e normalizzati.</item>
+    ///   <item><b>Progress/Remaining</b>: valori 0-1 gia' pronti per la barra.</item>
+    ///   <item><b>Label</b>: testo compatto gia' normalizzato per la UI ArcGraph.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ArcGraphActorRunningActionOverlaySnapshot
+    {
+        public readonly bool IsActive;
+        public readonly RunningActionKind ActionKind;
+        public readonly string JobActionId;
+        public readonly int ElapsedTicks;
+        public readonly int RequiredTicks;
+        public readonly float Progress01;
+        public readonly float Remaining01;
+        public readonly string Label;
+
+        public ArcGraphActorRunningActionOverlaySnapshot(
+            bool isActive,
+            RunningActionKind actionKind,
+            string jobActionId,
+            int elapsedTicks,
+            int requiredTicks,
+            string label)
+        {
+            IsActive = isActive;
+            ActionKind = actionKind;
+            JobActionId = jobActionId ?? string.Empty;
+            ElapsedTicks = elapsedTicks < 0 ? 0 : elapsedTicks;
+            RequiredTicks = requiredTicks < 0 ? 0 : requiredTicks;
+            Progress01 = ResolveProgress01(ElapsedTicks, RequiredTicks);
+            Remaining01 = Clamp01(1f - Progress01);
+            Label = string.IsNullOrWhiteSpace(label)
+                ? ResolveFallbackLabel(actionKind)
+                : label.Trim();
+        }
+
+        public static ArcGraphActorRunningActionOverlaySnapshot None()
+        {
+            return new ArcGraphActorRunningActionOverlaySnapshot(
+                false,
+                RunningActionKind.None,
+                string.Empty,
+                0,
+                0,
+                string.Empty);
+        }
+
+        public static ArcGraphActorRunningActionOverlaySnapshot FromRunningAction(
+            RunningActionProgressSnapshot snapshot)
+        {
+            if (snapshot.IsTerminal)
+                return None();
+
+            return new ArcGraphActorRunningActionOverlaySnapshot(
+                true,
+                snapshot.Kind,
+                snapshot.JobActionId,
+                snapshot.ElapsedTicks,
+                snapshot.RequiredTicks,
+                ResolveLabel(snapshot.Kind, snapshot.JobActionId));
+        }
+
+        private static string ResolveLabel(
+            RunningActionKind kind,
+            string jobActionId)
+        {
+            string action = string.IsNullOrWhiteSpace(jobActionId)
+                ? string.Empty
+                : jobActionId.Trim().ToLowerInvariant();
+
+            if (action.Contains("pickup"))
+                return "Raccoglie";
+
+            if (action.Contains("consume") || action.Contains("eat"))
+                return "Mangia";
+
+            if (action.Contains("ready"))
+                return "Prepara";
+
+            if (action.Contains("look"))
+                return "Osserva";
+
+            if (action.Contains("wait"))
+                return "Attende";
+
+            return ResolveFallbackLabel(kind);
+        }
+
+        private static string ResolveFallbackLabel(RunningActionKind kind)
+        {
+            switch (kind)
+            {
+                case RunningActionKind.Movement:
+                    return "Si muove";
+                case RunningActionKind.UseObject:
+                    return "Usa";
+                case RunningActionKind.Wait:
+                    return "Attende";
+                default:
+                    return "Azione";
+            }
+        }
+
+        private static float ResolveProgress01(int elapsedTicks, int requiredTicks)
+        {
+            if (requiredTicks <= 0)
+                return 1f;
+
+            return Clamp01((float)elapsedTicks / requiredTicks);
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value <= 0f)
+                return 0f;
+
+            if (value >= 1f)
+                return 1f;
+
+            return value;
+        }
+    }
+
     // =============================================================================
     // ArcGraphActorVisualSnapshot
     // =============================================================================
@@ -35,6 +181,7 @@ namespace Arcontio.View.ArcGraph
         public readonly string FacingDirectionKey;
         public readonly bool HasHungerValue;
         public readonly float Hunger01;
+        public readonly ArcGraphActorRunningActionOverlaySnapshot RunningActionOverlay;
 
         public bool HasMotion => Motion.IsActive;
 
@@ -67,7 +214,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphActorMotionSnapshot motion,
             bool hasHungerValue = false,
             float hunger01 = 0f,
-            string facingDirectionKey = "")
+            string facingDirectionKey = "",
+            ArcGraphActorRunningActionOverlaySnapshot runningActionOverlay = default)
         {
             ActorId = actorId;
             Cell = cell;
@@ -76,6 +224,7 @@ namespace Arcontio.View.ArcGraph
             FacingDirectionKey = NormalizeDirectionKey(facingDirectionKey);
             HasHungerValue = hasHungerValue;
             Hunger01 = Clamp01(hunger01);
+            RunningActionOverlay = runningActionOverlay;
         }
 
         // =============================================================================

@@ -60,6 +60,14 @@ namespace Arcontio.View.ArcGraph
         // usa -2, quindi -1 lascia il marker sopra l'ombra ma dietro gambe, corpo,
         // braccia e testa, evitando che attraversi alcuni layer anatomici.
         [SerializeField] private int selectionMarkerSortingOffset = -1;
+        [SerializeField] private bool renderRunningActionOverlay = true;
+        [SerializeField] private Vector3 runningActionOverlayLocalOffset = new Vector3(0f, 0.98f, 0f);
+        [SerializeField] private Vector2 runningActionOverlaySize = new Vector2(0.96f, 0.26f);
+        [SerializeField] private Color runningActionOverlayBackgroundTint = new Color(0.04f, 0.06f, 0.08f, 0.82f);
+        [SerializeField] private Color runningActionOverlayTrackTint = new Color(1f, 1f, 1f, 0.22f);
+        [SerializeField] private Color runningActionOverlayFillTint = new Color(0.35f, 0.85f, 1f, 0.9f);
+        [SerializeField] private Color runningActionOverlayTextTint = new Color(0.94f, 0.98f, 1f, 1f);
+        [SerializeField] private int runningActionOverlaySortingOffset = 90;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
         [SerializeField] private float tileWorldSize = 1f;
         [SerializeField] private float actorZOffset = -0.02f;
@@ -82,6 +90,8 @@ namespace Arcontio.View.ArcGraph
         private Sprite _generatedFallbackSprite;
         private Sprite _generatedShadowSprite;
         private Sprite _generatedSelectionMarkerSprite;
+        private Sprite _generatedRunningActionOverlaySprite;
+        private Font _runningActionOverlayFont;
         private ArcGraphNpcVisualCatalog _npcVisualCatalog;
         private string _npcVisualCatalogSourceText;
         private ArcGraphNpcRuntimeSceneRendererDiagnostics _lastDiagnostics;
@@ -121,6 +131,11 @@ namespace Arcontio.View.ArcGraph
             public SpriteRenderer Renderer;
             public SpriteRenderer ShadowRenderer;
             public SpriteRenderer SelectionMarkerRenderer;
+            public GameObject RunningActionOverlayRoot;
+            public SpriteRenderer RunningActionOverlayBackgroundRenderer;
+            public SpriteRenderer RunningActionOverlayTrackRenderer;
+            public SpriteRenderer RunningActionOverlayFillRenderer;
+            public TextMesh RunningActionOverlayText;
             public SpriteRenderer OcclusionSilhouetteRenderer;
             public readonly Dictionary<string, SpriteRenderer> PartRenderers = new();
             public readonly Dictionary<string, SpriteRenderer> OcclusionPartRenderers = new();
@@ -511,6 +526,14 @@ namespace Arcontio.View.ArcGraph
                 DestroyUnityObject(texture);
                 _generatedSelectionMarkerSprite = null;
             }
+
+            if (_generatedRunningActionOverlaySprite != null)
+            {
+                Texture2D texture = _generatedRunningActionOverlaySprite.texture;
+                DestroyUnityObject(_generatedRunningActionOverlaySprite);
+                DestroyUnityObject(texture);
+                _generatedRunningActionOverlaySprite = null;
+            }
         }
 
         // =============================================================================
@@ -709,6 +732,7 @@ namespace Arcontio.View.ArcGraph
             SetPartRenderersEnabled(handle, false);
             ApplyActorShadow(handle, entry, contract, spriteResolver);
             ApplySelectionMarker(handle);
+            ApplyRunningActionOverlay(handle, entry);
             ApplyActorOcclusionSilhouette(handle);
             handle.GameObject.SetActive(true);
             handle.WasTouchedThisFrame = true;
@@ -823,6 +847,7 @@ namespace Arcontio.View.ArcGraph
             ApplyActorShadow(handle, entry, contract, spriteResolver);
             handle.LastSortingOrder = entry.SortingOrder;
             ApplySelectionMarker(handle);
+            ApplyRunningActionOverlay(handle, entry);
             handle.Renderer.enabled = false;
             ApplyActorOcclusionSilhouette(handle);
             handle.GameObject.SetActive(true);
@@ -1118,6 +1143,217 @@ namespace Arcontio.View.ArcGraph
             return selectionMarkerSortingOffset < 0
                 ? selectionMarkerSortingOffset
                 : -1;
+        }
+
+        // =============================================================================
+        // ApplyRunningActionOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mostra sopra l'NPC una piccola etichetta con la running action attiva e
+        /// una barra che rappresenta il tempo residuo.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: overlay ArcGraph da dato gia' derivato</b></para>
+        /// <para>
+        /// Il renderer non legge il <c>World</c> e non interroga il Job Layer. Riceve
+        /// una scene entry gia' preparata dalla pipeline ArcGraph e la materializza
+        /// in GameObject locali posseduti dall'handle NPC. Se il dato non e'
+        /// presente, l'overlay viene semplicemente spento.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Root</b>: figlio locale dell'NPC, quindi segue posizione e scala.</item>
+        ///   <item><b>Text</b>: label compatta gia' normalizzata dallo snapshot.</item>
+        ///   <item><b>Barra</b>: track fisso e fill ancorato a sinistra su <c>Remaining01</c>.</item>
+        /// </list>
+        /// </summary>
+        private void ApplyRunningActionOverlay(
+            ActorHandle handle,
+            ArcGraphActorObjectSceneRenderEntry entry)
+        {
+            if (handle == null)
+                return;
+
+            ArcGraphActorRunningActionOverlaySnapshot overlay = entry.RunningActionOverlay;
+            bool isVisible =
+                renderRunningActionOverlay &&
+                overlay.IsActive &&
+                handle.ActorId > 0;
+
+            if (!isVisible)
+            {
+                SetRunningActionOverlayEnabled(handle, false);
+                return;
+            }
+
+            EnsureRunningActionOverlay(handle);
+            handle.RunningActionOverlayRoot.transform.localPosition = runningActionOverlayLocalOffset;
+            handle.RunningActionOverlayRoot.transform.localScale = Vector3.one;
+
+            float panelWidth = Mathf.Max(0.2f, runningActionOverlaySize.x);
+            float panelHeight = Mathf.Max(0.12f, runningActionOverlaySize.y);
+            float barWidth = panelWidth * 0.78f;
+            float barHeight = Mathf.Max(0.025f, panelHeight * 0.18f);
+            float remainingWidth = Mathf.Max(0.001f, barWidth * Mathf.Clamp01(overlay.Remaining01));
+            int sortingOrder = handle.LastSortingOrder + ResolveRunningActionOverlaySortingOffset();
+
+            ApplyOverlaySprite(
+                handle.RunningActionOverlayBackgroundRenderer,
+                Vector3.zero,
+                new Vector3(panelWidth, panelHeight, 1f),
+                runningActionOverlayBackgroundTint,
+                sortingOrder);
+
+            ApplyOverlaySprite(
+                handle.RunningActionOverlayTrackRenderer,
+                new Vector3(0f, -panelHeight * 0.22f, 0f),
+                new Vector3(barWidth, barHeight, 1f),
+                runningActionOverlayTrackTint,
+                sortingOrder + 1);
+
+            ApplyOverlaySprite(
+                handle.RunningActionOverlayFillRenderer,
+                new Vector3((-barWidth * 0.5f) + (remainingWidth * 0.5f), -panelHeight * 0.22f, 0f),
+                new Vector3(remainingWidth, barHeight, 1f),
+                runningActionOverlayFillTint,
+                sortingOrder + 2);
+
+            ApplyOverlayText(
+                handle.RunningActionOverlayText,
+                overlay.Label,
+                new Vector3(0f, panelHeight * 0.17f, 0f),
+                sortingOrder + 3);
+
+            SetRunningActionOverlayEnabled(handle, true);
+        }
+
+        private void ApplyOverlaySprite(
+            SpriteRenderer renderer,
+            Vector3 localPosition,
+            Vector3 localScale,
+            Color tint,
+            int sortingOrder)
+        {
+            if (renderer == null)
+                return;
+
+            renderer.sprite = GetOrCreateRunningActionOverlaySprite();
+            renderer.transform.localPosition = localPosition;
+            renderer.transform.localScale = localScale;
+            renderer.color = tint;
+            renderer.sortingOrder = sortingOrder;
+            renderer.enabled = true;
+        }
+
+        private void ApplyOverlayText(
+            TextMesh text,
+            string label,
+            Vector3 localPosition,
+            int sortingOrder)
+        {
+            if (text == null)
+                return;
+
+            text.text = string.IsNullOrWhiteSpace(label) ? "Azione" : label.Trim();
+            text.anchor = TextAnchor.MiddleCenter;
+            text.alignment = TextAlignment.Center;
+            text.characterSize = 0.042f;
+            text.fontSize = 32;
+            text.color = runningActionOverlayTextTint;
+            text.transform.localPosition = localPosition;
+            text.transform.localRotation = Quaternion.identity;
+            text.transform.localScale = Vector3.one;
+
+            Font font = ResolveRunningActionOverlayFont();
+            if (font != null)
+                text.font = font;
+
+            var renderer = text.GetComponent<MeshRenderer>();
+            if (renderer != null)
+            {
+                if (font != null)
+                    renderer.sharedMaterial = font.material;
+
+                renderer.sortingOrder = sortingOrder;
+                renderer.enabled = true;
+            }
+        }
+
+        private void EnsureRunningActionOverlay(ActorHandle handle)
+        {
+            if (handle.RunningActionOverlayRoot == null)
+            {
+                handle.RunningActionOverlayRoot = new GameObject("ArcGraphNpcRunningActionOverlay_" + handle.ActorId);
+                handle.RunningActionOverlayRoot.transform.SetParent(handle.GameObject.transform, false);
+            }
+
+            handle.RunningActionOverlayBackgroundRenderer = GetOrCreateRunningActionOverlayRenderer(
+                handle,
+                ref handle.RunningActionOverlayBackgroundRenderer,
+                "Background");
+            handle.RunningActionOverlayTrackRenderer = GetOrCreateRunningActionOverlayRenderer(
+                handle,
+                ref handle.RunningActionOverlayTrackRenderer,
+                "Track");
+            handle.RunningActionOverlayFillRenderer = GetOrCreateRunningActionOverlayRenderer(
+                handle,
+                ref handle.RunningActionOverlayFillRenderer,
+                "Fill");
+
+            if (handle.RunningActionOverlayText == null)
+            {
+                var textGo = new GameObject("ArcGraphNpcRunningActionOverlay_" + handle.ActorId + "_Text");
+                textGo.transform.SetParent(handle.RunningActionOverlayRoot.transform, false);
+                handle.RunningActionOverlayText = textGo.AddComponent<TextMesh>();
+            }
+        }
+
+        private SpriteRenderer GetOrCreateRunningActionOverlayRenderer(
+            ActorHandle handle,
+            ref SpriteRenderer renderer,
+            string suffix)
+        {
+            if (renderer != null)
+                return renderer;
+
+            var go = new GameObject("ArcGraphNpcRunningActionOverlay_" + handle.ActorId + "_" + suffix);
+            go.transform.SetParent(handle.RunningActionOverlayRoot.transform, false);
+            renderer = go.AddComponent<SpriteRenderer>();
+            return renderer;
+        }
+
+        private void SetRunningActionOverlayEnabled(ActorHandle handle, bool enabled)
+        {
+            if (handle == null)
+                return;
+
+            if (handle.RunningActionOverlayRoot != null)
+                handle.RunningActionOverlayRoot.SetActive(enabled);
+
+            if (handle.RunningActionOverlayBackgroundRenderer != null)
+                handle.RunningActionOverlayBackgroundRenderer.enabled = enabled;
+
+            if (handle.RunningActionOverlayTrackRenderer != null)
+                handle.RunningActionOverlayTrackRenderer.enabled = enabled;
+
+            if (handle.RunningActionOverlayFillRenderer != null)
+                handle.RunningActionOverlayFillRenderer.enabled = enabled;
+
+            if (handle.RunningActionOverlayText != null)
+            {
+                var renderer = handle.RunningActionOverlayText.GetComponent<MeshRenderer>();
+                if (renderer != null)
+                    renderer.enabled = enabled;
+            }
+        }
+
+        private int ResolveRunningActionOverlaySortingOffset()
+        {
+            return runningActionOverlaySortingOffset > 0
+                ? runningActionOverlaySortingOffset
+                : 90;
         }
 
         // =============================================================================
@@ -1540,6 +1776,41 @@ namespace Arcontio.View.ArcGraph
                 pixelsPerUnit: 32f);
             _generatedSelectionMarkerSprite.name = "ArcGraphNpcSelectionMarkerSprite";
             return _generatedSelectionMarkerSprite;
+        }
+
+        private Sprite GetOrCreateRunningActionOverlaySprite()
+        {
+            if (_generatedRunningActionOverlaySprite != null)
+                return _generatedRunningActionOverlaySprite;
+
+            var texture = new Texture2D(1, 1, TextureFormat.RGBA32, mipChain: false)
+            {
+                name = "ArcGraphNpcRunningActionOverlayTexture",
+                filterMode = FilterMode.Point,
+                wrapMode = TextureWrapMode.Clamp
+            };
+            texture.SetPixel(0, 0, Color.white);
+            texture.Apply(updateMipmaps: false, makeNoLongerReadable: true);
+
+            _generatedRunningActionOverlaySprite = Sprite.Create(
+                texture,
+                new Rect(0f, 0f, 1f, 1f),
+                new Vector2(0.5f, 0.5f),
+                pixelsPerUnit: 1f);
+            _generatedRunningActionOverlaySprite.name = "ArcGraphNpcRunningActionOverlaySprite";
+            return _generatedRunningActionOverlaySprite;
+        }
+
+        private Font ResolveRunningActionOverlayFont()
+        {
+            if (_runningActionOverlayFont != null)
+                return _runningActionOverlayFont;
+
+            _runningActionOverlayFont = Resources.Load<Font>("ArcGraph/UI/fonts/IBMPlex/IBMPlexSans-Medium");
+            if (_runningActionOverlayFont == null)
+                _runningActionOverlayFont = Resources.Load<Font>("ArcGraph/UI/fonts/IBMPlex/IBMPlexSans-Regular");
+
+            return _runningActionOverlayFont;
         }
 
         private ArcGraphNpcRuntimeSceneRendererDiagnostics StoreAndLogDiagnostics(

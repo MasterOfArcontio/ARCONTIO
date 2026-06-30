@@ -45,6 +45,7 @@ namespace Arcontio.View.ArcGraph
         public readonly string FacingDirectionKey;
         public readonly bool HasHungerValue;
         public readonly float Hunger01;
+        public readonly ArcGraphActorRunningActionOverlaySnapshot RunningActionOverlay;
         public readonly bool IsVisible;
         public readonly string HiddenReason;
         public readonly ArcGraphRenderSortKey SortKey;
@@ -81,7 +82,8 @@ namespace Arcontio.View.ArcGraph
             ArcGraphRenderSortKey sortKey,
             bool hasHungerValue = false,
             float hunger01 = 0f,
-            string facingDirectionKey = "")
+            string facingDirectionKey = "",
+            ArcGraphActorRunningActionOverlaySnapshot runningActionOverlay = default)
         {
             ActorId = actorId;
             DiscreteCell = discreteCell;
@@ -97,6 +99,7 @@ namespace Arcontio.View.ArcGraph
             FacingDirectionKey = NormalizeDirectionKey(facingDirectionKey);
             HasHungerValue = hasHungerValue;
             Hunger01 = Clamp01(hunger01);
+            RunningActionOverlay = runningActionOverlay;
             IsVisible = isVisible;
             HiddenReason = string.IsNullOrWhiteSpace(hiddenReason) ? "None" : hiddenReason;
             SortKey = sortKey;

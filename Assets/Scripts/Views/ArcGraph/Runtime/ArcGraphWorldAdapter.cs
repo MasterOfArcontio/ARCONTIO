@@ -254,6 +254,7 @@ namespace Arcontio.View.ArcGraph
                 var position = pair.Value;
                 var cell = ArcGraphZLevelPolicy.CreateRuntimeCell(position.X, position.Y);
                 var motion = ResolveActorMotion(world, actorId, cell);
+                var runningActionOverlay = ResolveActorRunningActionOverlay(world, actorId);
                 string facingDirectionKey = ResolveActorFacingDirectionKey(world, actorId);
                 bool hasHungerValue = TryResolveActorHunger(world, actorId, out float hunger01);
 
@@ -264,7 +265,8 @@ namespace Arcontio.View.ArcGraph
                     motion,
                     hasHungerValue,
                     hunger01,
-                    facingDirectionKey));
+                    facingDirectionKey,
+                    runningActionOverlay));
             }
         }
 
@@ -437,6 +439,45 @@ namespace Arcontio.View.ArcGraph
                 toCell,
                 runningSnapshot.ElapsedTicks,
                 runningSnapshot.RequiredTicks);
+        }
+
+        // =============================================================================
+        // ResolveActorRunningActionOverlay
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Copia lo stato running action attivo di un NPC in un DTO visuale ArcGraph.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: Job Layer osservato tramite snapshot</b></para>
+        /// <para>
+        /// L'adapter non consegna alla UI il <c>RunningActionStore</c> e non legge
+        /// trace dell'Explainability Layer. Usa solo la query read-only del Job
+        /// Layer e converte il risultato in una label e due percentuali gia'
+        /// normalizzate per il renderer.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Gate</b>: richiede World, JobRuntimeState e actor id validi.</item>
+        ///   <item><b>Query</b>: usa <c>TryGetActiveSnapshotForNpc</c>.</item>
+        ///   <item><b>Output</b>: restituisce overlay attivo oppure <c>None</c>.</item>
+        /// </list>
+        /// </summary>
+        private static ArcGraphActorRunningActionOverlaySnapshot ResolveActorRunningActionOverlay(
+            World world,
+            int actorId)
+        {
+            if (world?.JobRuntimeState == null
+                || actorId <= 0
+                || !world.JobRuntimeState.RunningActions.TryGetActiveSnapshotForNpc(
+                    actorId,
+                    out var runningSnapshot))
+            {
+                return ArcGraphActorRunningActionOverlaySnapshot.None();
+            }
+
+            return ArcGraphActorRunningActionOverlaySnapshot.FromRunningAction(runningSnapshot);
         }
 
         // =============================================================================

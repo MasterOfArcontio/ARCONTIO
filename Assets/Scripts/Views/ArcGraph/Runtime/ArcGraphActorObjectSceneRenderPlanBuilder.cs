@@ -174,7 +174,8 @@ namespace Arcontio.View.ArcGraph
                 ResolveSortingOrder(contract, queueIndex),
                 item.HasMotion,
                 item.MotionProgress01,
-                item.FacingDirectionKey);
+                item.FacingDirectionKey,
+                item.RunningActionOverlay);
             return true;
         }
 

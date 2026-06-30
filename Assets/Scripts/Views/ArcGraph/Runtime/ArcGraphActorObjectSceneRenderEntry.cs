@@ -45,6 +45,7 @@ namespace Arcontio.View.ArcGraph
         public readonly bool HasMotion;
         public readonly float MotionProgress01;
         public readonly string FacingDirectionKey;
+        public readonly ArcGraphActorRunningActionOverlaySnapshot RunningActionOverlay;
         public readonly int VisualWidthPixels;
         public readonly int VisualHeightPixels;
         public readonly int VisualBaseWidthPixels;
@@ -94,7 +95,8 @@ namespace Arcontio.View.ArcGraph
             int sortingOrder,
             bool hasMotion,
             float motionProgress01,
-            string facingDirectionKey = "")
+            string facingDirectionKey = "",
+            ArcGraphActorRunningActionOverlaySnapshot runningActionOverlay = default)
             : this(
                 kind,
                 entityId,
@@ -116,7 +118,12 @@ namespace Arcontio.View.ArcGraph
                 0,
                 false,
                 false,
-                facingDirectionKey)
+                facingDirectionKey,
+                false,
+                false,
+                ArcGraphDoorVisualState.None,
+                ArcGraphDoorVisualOrientation.Horizontal,
+                runningActionOverlay)
         {
         }
 
@@ -162,7 +169,8 @@ namespace Arcontio.View.ArcGraph
             bool isDoor = false,
             bool isDoorLocked = false,
             ArcGraphDoorVisualState doorVisualState = ArcGraphDoorVisualState.None,
-            ArcGraphDoorVisualOrientation doorVisualOrientation = ArcGraphDoorVisualOrientation.Horizontal)
+            ArcGraphDoorVisualOrientation doorVisualOrientation = ArcGraphDoorVisualOrientation.Horizontal,
+            ArcGraphActorRunningActionOverlaySnapshot runningActionOverlay = default)
         {
             Kind = kind;
             EntityId = entityId;
@@ -175,6 +183,7 @@ namespace Arcontio.View.ArcGraph
             HasMotion = hasMotion;
             MotionProgress01 = Clamp01(motionProgress01);
             FacingDirectionKey = NormalizeDirectionKey(facingDirectionKey);
+            RunningActionOverlay = runningActionOverlay;
             VisualWidthPixels = visualWidthPixels < 0 ? 0 : visualWidthPixels;
             VisualHeightPixels = visualHeightPixels < 0 ? 0 : visualHeightPixels;
             VisualBaseWidthPixels = visualBaseWidthPixels < 0 ? 0 : visualBaseWidthPixels;

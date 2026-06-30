@@ -157,7 +157,8 @@ namespace Arcontio.View.ArcGraph
                 sortKey,
                 snapshot.HasHungerValue,
                 snapshot.Hunger01,
-                snapshot.FacingDirectionKey);
+                snapshot.FacingDirectionKey,
+                snapshot.RunningActionOverlay);
         }
 
         private static void Sort(IList<ArcGraphActorRenderItem> target)

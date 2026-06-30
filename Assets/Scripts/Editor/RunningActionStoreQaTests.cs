@@ -268,6 +268,42 @@ namespace Arcontio.Tests
             Assert.That(foundAfterClear, Is.False);
         }
 
+        [Test]
+        public void ActiveSnapshotLookupPrefersMovementAndFallsBackToAnyRunningAction()
+        {
+            var store = new RunningActionStore();
+            var useKey = MakeKey(3, "job-use", 0, 1);
+            var moveKey = MakeKey(3, "job-move", 0, 0);
+            Assert.That(store.Register(useKey, MakeUseObjectState(3, "job-use", "consume_known_food"), out var useReason), Is.True, useReason);
+            Assert.That(store.Register(
+                moveKey,
+                MakeMovementState(3, "job-move", 1, 1, 2, 1),
+                out var moveReason), Is.True, moveReason);
+
+            bool foundMovement = store.TryGetActiveSnapshotForNpc(3, out var movementSnapshot);
+            Assert.That(foundMovement, Is.True);
+            Assert.That(movementSnapshot.Kind, Is.EqualTo(RunningActionKind.Movement));
+
+            Assert.That(store.Clear(moveKey), Is.True);
+            bool foundFallback = store.TryGetActiveSnapshotForNpc(3, out var fallbackSnapshot);
+            Assert.That(foundFallback, Is.True);
+            Assert.That(fallbackSnapshot.Kind, Is.EqualTo(RunningActionKind.UseObject));
+            Assert.That(fallbackSnapshot.JobActionId, Is.EqualTo("consume_known_food"));
+        }
+
+        [Test]
+        public void ActiveSnapshotLookupIgnoresMissingNpcAndTerminalActions()
+        {
+            var store = new RunningActionStore();
+            var key = MakeKey(4, "job-use", 0, 0);
+            var terminal = MakeUseObjectState(4, "job-use", "pickup_food_to_hand");
+            Assert.That(terminal.MarkFailed(JobFailureReason.StepFailed, tick: 2), Is.True);
+            Assert.That(store.Register(key, terminal, out var reason), Is.True, reason);
+
+            Assert.That(store.TryGetActiveSnapshotForNpc(4, out _), Is.False);
+            Assert.That(store.TryGetActiveSnapshotForNpc(99, out _), Is.False);
+        }
+
         // =============================================================================
         // RunningActionStoreIsNotPartOfSaveLoadContracts
         // =============================================================================
@@ -358,6 +394,28 @@ namespace Arcontio.Tests
                 fromCellY: fromCellY,
                 toCellX: toCellX,
                 toCellY: toCellY);
+        }
+
+        private static RunningActionRuntimeState MakeUseObjectState(
+            int npcId,
+            string jobId,
+            string actionId)
+        {
+            var policy = new RunningActionCompletionPolicy(
+                requiredTicks: 6,
+                timeoutTicks: 0,
+                failureReason: JobFailureReason.StepFailed,
+                interruptionReason: JobFailureReason.Preempted);
+
+            return RunningActionRuntimeState.Start(
+                actionInstanceId: "use-" + jobId,
+                kind: RunningActionKind.UseObject,
+                npcId: npcId,
+                jobId: jobId,
+                phaseId: "phase-0",
+                jobActionId: actionId,
+                startedTick: 0,
+                completionPolicy: policy);
         }
 
         private static Job MakeJob(string jobId, JobPriorityClass priorityClass, float urgency01)
