@@ -147,8 +147,8 @@ namespace Arcontio.Core.Save
 
         /// <summary>
         /// Sezione legacy disattivata dal formato canonico v2.
-        /// <c>NpcPrivateFood</c> resta runtime temporaneo fino a C7, ma non viene
-        /// piu' serializzato dal salvataggio globale.
+        /// Il vecchio private food non ha piu' store runtime dalla C7 e non viene
+        /// serializzato dal salvataggio globale.
         /// </summary>
         [NonSerialized]
         public NpcPrivateFoodSaveData[] npcPrivateFood = Array.Empty<NpcPrivateFoodSaveData>();

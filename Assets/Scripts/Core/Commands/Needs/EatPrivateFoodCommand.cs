@@ -5,16 +5,15 @@ namespace Arcontio.Core
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Bridge temporaneo per i call-site storici che chiedono di mangiare cibo
-    /// personale.
+    /// Alias compatibile per i call-site storici che chiedono di mangiare cibo
+    /// personale dall'inventario typed.
     /// </para>
     ///
     /// <para><b>Principio architetturale: legacy spento, contratto conservato</b></para>
     /// <para>
-    /// Da C4 il cibo personale operativo vive nell'inventario typed. Questa classe
-    /// non legge e non scrive piu' <c>World.NpcPrivateFood</c>: inoltra la richiesta
-    /// al comando canonico <see cref="ConsumeInventoryItemCommand"/> e verra'
-    /// rimossa quando C7 eliminera' i residui runtime legacy.
+    /// Da C7 il cibo personale operativo vive soltanto nell'inventario typed. Questa
+    /// classe conserva il nome storico, ma inoltra subito al comando canonico
+    /// <see cref="ConsumeInventoryItemCommand"/> senza possedere logica propria.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>

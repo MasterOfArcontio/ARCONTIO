@@ -1554,9 +1554,7 @@ namespace Arcontio.View.ArcGraph
             int npcId,
             List<ArcUiInspectorRow> rows)
         {
-            int carriedFood = world.NpcPrivateFood.TryGetValue(npcId, out int privateFood)
-                ? privateFood
-                : 0;
+            int carriedFood = world.GetCarriedFoodQuantity(npcId);
 
             int ownedStockUnits = 0;
             if (world.FoodStocks != null)
@@ -1573,7 +1571,7 @@ namespace Arcontio.View.ArcGraph
 
             rows.Add(ArcUiInspectorRow.IconMetrics(
                 "npc_private_food",
-                "Cibo privato",
+                "Cibo personale",
                 new[]
                 {
                     new ArcUiInspectorMetric("food_carried", "Portato", carriedFood.ToString(CultureInfo.InvariantCulture)),

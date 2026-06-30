@@ -323,7 +323,7 @@ namespace Arcontio.Core.Save
         /// <summary>
         /// <para>
         /// Estrae il cibo privato trasportato dagli NPC dal component store
-        /// <see cref="World.NpcPrivateFood"/>.
+        /// legacy non piu' presente nel runtime C7.
         /// </para>
         ///
         /// <para><b>Principio architetturale: inventario MVP come fatto oggettivo</b></para>
@@ -347,14 +347,14 @@ namespace Arcontio.Core.Save
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Estrae i marker <see cref="World.NpcLastPrivateFoodConsumeTick"/> che
+        /// Estrae i marker legacy disattivati che
         /// distinguono consumo volontario e mancanza sospetta di cibo privato.
         /// </para>
         ///
         /// <para><b>Principio architetturale: marker runtime non ricostruibile</b></para>
         /// <para>
         /// Questo tick non si deduce in modo affidabile dalla quantità corrente di
-        /// <see cref="World.NpcPrivateFood"/>. Se perso durante il save/load, i sistemi
+        /// vecchio cibo privato. Se perso durante il save/load, i sistemi
         /// needs/theft possono interpretare diversamente il primo tick successivo al
         /// restore.
         /// </para>

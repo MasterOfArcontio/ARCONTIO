@@ -714,8 +714,9 @@ namespace Arcontio.Core
         /// Questo store rappresenta cosa un NPC porta davvero addosso. Non e' una
         /// belief, non e' UI e non e' una scorciatoia decisionale: i layer cognitivi
         /// dovranno leggerlo solo tramite query autorizzate nei sotto-step futuri.
-        /// In C1 viene usato per capienza e API base, senza sostituire ancora tutti
-        /// i flussi legacy di fame, furto e save/load.
+        /// Dalla v0.71.05.C7 e' l'unica fonte operativa per il cibo personale
+        /// trasportato dagli NPC: non esiste piu' un contatore separato di private
+        /// food fuori dagli oggetti inventariati.
         /// </para>
         ///
         /// <para><b>Struttura interna:</b></para>
@@ -726,13 +727,6 @@ namespace Arcontio.Core
         /// </summary>
         public readonly Dictionary<int, NpcInventoryState> NpcInventories = new();
 
-
-        // Cibo privato per NPC (inventario v0)
-        public readonly Dictionary<int, int> NpcPrivateFood = new();
-
-        // Marker per distinguere "ho mangiato io" vs "mi manca cibo"
-        // npcId -> ultimo tick in cui ha consumato cibo privato
-        public readonly Dictionary<int, long> NpcLastPrivateFoodConsumeTick = new();
 
         // (Day10) Occluder component store per oggetti ?muro/porta?
         // Nota: un muro Ã¨ un oggetto, e qui mettiamo i suoi flags runtime (vision/movement + cost).
@@ -1250,10 +1244,9 @@ namespace Arcontio.Core
             // ============================================================
             // Inventory params (data-driven via game_params.json)
             // ============================================================
-            // Capienza inventario globale.
-            // NOTA: oggi l'inventario Ã¨ rappresentato principalmente da NpcPrivateFood (cibo trasportato),
-            // ma la query World.GetInventoryFreeCapacity Ã¨ pensata per diventare la fonte unica
-            // anche quando introdurremo altri oggetti trasportabili.
+            // Capienza inventario globale. Dalla C7 il cibo personale passa solo
+            // dagli oggetti typed in NpcInventories: non esiste piu' un contatore
+            // separato di cibo privato addosso all'NPC.
             var invCfg = Config?.Sim != null ? Config.Sim.inventory : null;
             int invMax = invCfg != null ? invCfg.inventory_max_units : 3;
             if (invMax < 0) invMax = 0; // "0" Ã¨ valido: significa che non puÃ² trasportare nulla.
@@ -5487,24 +5480,16 @@ namespace Arcontio.Core
         /// Calcola quante unita' di capienza sono occupate dall'inventario typed.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: C1 sposta la capienza sul nuovo store</b></para>
+        /// <para><b>Principio architetturale: inventario typed come unica fonte fisica</b></para>
         /// <para>
         /// Da questo checkpoint la capienza operativa guarda <see cref="NpcInventories"/>.
-        /// Fino alla rimozione C7 somma anche <c>NpcPrivateFood</c> come ponte
-        /// legacy, cosi i flussi non ancora migrati non possono sovraccaricare l'NPC.
+        /// Il cibo personale non e' piu' un contatore separato: deve esistere come
+        /// oggetto fisico inventariato, con bulk, peso e stack risolti dal catalogo.
         /// </para>
         /// </summary>
         public int GetInventoryUsedUnits(int npcId)
         {
             int used = GetInventoryUsedBulkUnits(npcId);
-
-            if (NpcPrivateFood.TryGetValue(npcId, out int legacyFood) && legacyFood > 0)
-            {
-                // Ponte temporaneo: i comandi legacy non sono ancora migrati ma
-                // devono continuare a rispettare la stessa capienza fisica.
-                used += legacyFood;
-            }
-
             return used < 0 ? 0 : used;
         }
 
@@ -6117,14 +6102,6 @@ namespace Arcontio.Core
             int slotBulkFree = ResolveSlotBulkCapacityUnits(npcId, normalizedTarget) - GetInventoryUsedBulkUnits(npcId, normalizedTarget);
             int slotWeightFree = ResolveSlotWeightCapacityUnits(npcId, normalizedTarget) - GetInventoryUsedWeightUnits(npcId, normalizedTarget);
 
-            if (normalizedTarget == NpcInventorySlotKind.Pack && NpcPrivateFood.TryGetValue(npcId, out int legacyFood) && legacyFood > 0)
-            {
-                // Ponte legacy identico alla logica di add: finche' C7 non rimuove
-                // NpcPrivateFood, lo spazio del Pack deve tenerne conto.
-                slotBulkFree -= legacyFood;
-                slotWeightFree -= legacyFood;
-            }
-
             if (requiredBulk > slotBulkFree)
             {
                 reason = "InventoryTargetSlotBulkFull";
@@ -6208,6 +6185,49 @@ namespace Arcontio.Core
         public bool HasEdibleFoodOnSelf(int npcId)
         {
             return SelectBestFoodOnSelf(npcId, out _, out _, out _);
+        }
+
+        // =============================================================================
+        // GetCarriedFoodQuantity
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Conta le unita' alimentari consumabili portate realmente dall'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query typed, non contatore legacy</b></para>
+        /// <para>
+        /// Dalla C7 il cibo personale non viene piu' letto da uno store separato:
+        /// questa query attraversa l'inventario fisico, risolve le definizioni
+        /// oggetto e conta soltanto gli item che il resolver nutrizionale considera
+        /// consumabili.
+        /// </para>
+        /// </summary>
+        public int GetCarriedFoodQuantity(int npcId)
+        {
+            int total = 0;
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+                return 0;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int entryQuantity)
+                    || entryQuantity <= 0
+                    || string.IsNullOrWhiteSpace(obj.DefId))
+                    continue;
+
+                ObjectFoodNutritionResult resolved = ObjectFoodNutritionResolver.Resolve(
+                    this,
+                    obj.DefId,
+                    Global.Needs.eatSatietyGain,
+                    allowLegacyFallbackWhenDefinitionMissing: false);
+
+                if (resolved.IsConsumableFood)
+                    total += entryQuantity;
+            }
+
+            return total < 0 ? 0 : total;
         }
 
         // =============================================================================
@@ -6508,15 +6528,6 @@ namespace Arcontio.Core
             int slotBulkFree = ResolveSlotBulkCapacityUnits(npcId, slot) - GetInventoryUsedBulkUnits(npcId, slot);
             int slotWeightFree = ResolveSlotWeightCapacityUnits(npcId, slot) - GetInventoryUsedWeightUnits(npcId, slot);
 
-            if (slot == NpcInventorySlotKind.Pack && NpcPrivateFood.TryGetValue(npcId, out int legacyFood) && legacyFood > 0)
-            {
-                // Ponte legacy fino alla rimozione di NpcPrivateFood: il cibo
-                // privato vecchio continua a occupare spazio/peso nello zaino MVP.
-                slotBulkFree -= legacyFood;
-                slotWeightFree -= legacyFood;
-                totalWeightFree -= legacyFood;
-            }
-
             if (totalWeightFree <= 0 || slotBulkFree <= 0 || slotWeightFree <= 0)
                 return 0;
 
@@ -6653,14 +6664,6 @@ namespace Arcontio.Core
             // deve poter scrivere una credenza appena una trace viene accettata,
             // senza allocazioni o lookup globali nel Decision Layer futuro.
             Beliefs[id] = new BeliefStore();
-
-            // Private food init (se non presente)
-            if (!NpcPrivateFood.ContainsKey(id))
-                NpcPrivateFood[id] = 0;
-
-            // Tick consumo privato
-            if (!NpcLastPrivateFoodConsumeTick.ContainsKey(id))
-                NpcLastPrivateFoodConsumeTick[id] = -999999;
 
             EnsureNpcInventory(id);
 
@@ -6800,14 +6803,6 @@ if (!NpcAction.ContainsKey(id))
             // qui. I futuri checkpoint applicheranno le sezioni dedicate.
             Beliefs[npcId] = new BeliefStore();
             EnsureNpcLandmarkMemory(npcId);
-
-            // Store runtime/diagnostici inizializzati come in CreateNpc per
-            // evitare null/missing entry nei sistemi gia' esistenti dopo load.
-            if (!NpcPrivateFood.ContainsKey(npcId))
-                NpcPrivateFood[npcId] = 0;
-
-            if (!NpcLastPrivateFoodConsumeTick.ContainsKey(npcId))
-                NpcLastPrivateFoodConsumeTick[npcId] = -999999;
 
             EnsureNpcInventory(npcId);
 

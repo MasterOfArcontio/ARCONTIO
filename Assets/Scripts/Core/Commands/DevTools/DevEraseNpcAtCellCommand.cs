@@ -80,11 +80,10 @@ namespace Arcontio.Core.Commands.DevTools
             world.NpcPinnedFoodStockBeliefs.Remove(npcId);
 
             // ============================================================
-            // PRIVATE FOOD / MARKERS
+            // INVENTORY
             // ============================================================
 
-            world.NpcPrivateFood.Remove(npcId);
-            world.NpcLastPrivateFoodConsumeTick.Remove(npcId);
+            world.NpcInventories.Remove(npcId);
 
             // ============================================================
             // MOVEMENT

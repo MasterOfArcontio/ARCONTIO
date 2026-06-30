@@ -105,7 +105,6 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphUiSelectionSceneConsumer _selectionConsumer;
         private ArcUiSelectionActionController _selectionActionController;
         private ArcUiInspectionController _inspectionController;
-        private ArcGraphNpcPrivateFoodCommandBridge _npcPrivateFoodCommandBridge;
         private ArcGraphNpcDnaEditCommandBridge _npcDnaEditCommandBridge;
         private ArcGraphObjectFoodStockCommandBridge _objectFoodStockCommandBridge;
         private ArcGraphObjectEditCommandBridge _objectEditCommandBridge;
@@ -248,20 +247,6 @@ namespace Arcontio.View.ArcGraph
         public void SetInspectionController(ArcUiInspectionController controller)
         {
             _inspectionController = controller;
-        }
-
-        // =============================================================================
-        // SetNpcPrivateFoodCommandBridge
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Collega il RightInspector al bridge autorizzato per aggiungere cibo
-        /// privato addosso all'NPC selezionato.
-        /// </para>
-        /// </summary>
-        public void SetNpcPrivateFoodCommandBridge(ArcGraphNpcPrivateFoodCommandBridge bridge)
-        {
-            _npcPrivateFoodCommandBridge = bridge;
         }
 
         // =============================================================================
@@ -645,9 +630,6 @@ namespace Arcontio.View.ArcGraph
             if (npcDnaEdit)
                 CreateNpcDnaEditActions(rowsRoot, viewModel.Target);
 
-            if (ShouldShowNpcPrivateFoodActions(viewModel, activeTab))
-                CreateNpcPrivateFoodActions(rowsRoot, viewModel.Target);
-
             if (ShouldShowObjectFoodStockActions(viewModel, activeTab))
                 CreateObjectFoodStockActions(rowsRoot, viewModel.Target);
 
@@ -707,30 +689,6 @@ namespace Arcontio.View.ArcGraph
         private static string BuildDnaDraftTargetKey(ArcUiSelectionTarget target)
         {
             return target.Kind.ToString() + ":" + target.Id;
-        }
-
-        // =============================================================================
-        // ShouldShowNpcPrivateFoodActions
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Decide se aggiungere i controlli operativi di inventario NPC.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: azione solo nel contesto edit</b></para>
-        /// <para>
-        /// I bottoni non compaiono durante la semplice ispezione. Sono visibili solo
-        /// nella tab inventario della richiesta Modifica NPC, cioe' nel punto in cui
-        /// l'operatore ha gia' esplicitato di voler cambiare l'inventario.
-        /// </para>
-        /// </summary>
-        private bool ShouldShowNpcPrivateFoodActions(
-            ArcUiInspectorViewModel viewModel,
-            ArcUiInspectorTab activeTab)
-        {
-            return _lastMode == ArcGraphRightInspectorMode.EditRequested
-                   && viewModel.Target.Kind == ArcUiSelectionTargetKind.Npc
-                   && string.Equals(activeTab.TabKey, "edit_inventory", System.StringComparison.Ordinal);
         }
 
         // =============================================================================
@@ -839,43 +797,6 @@ namespace Arcontio.View.ArcGraph
             return false;
         }
 
-        // =============================================================================
-        // CreateNpcPrivateFoodActions
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Disegna i pulsanti provvisori per aggiungere cibo trasportato all'NPC.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: bottone -> bridge, non bottone -> World</b></para>
-        /// <para>
-        /// Ogni pulsante invia una richiesta al bridge. Il pannello non conosce
-        /// <c>DevAddNpcPrivateFoodCommand</c>, non legge capienza inventario e non
-        /// scrive <c>NpcPrivateFood</c>. Queste responsabilita' restano nel comando
-        /// Core gia' esistente.
-        /// </para>
-        /// </summary>
-        private void CreateNpcPrivateFoodActions(
-            RectTransform parent,
-            ArcUiSelectionTarget target)
-        {
-            RectTransform root = CreateRect("NpcPrivateFoodActions", parent);
-            LayoutElement rootLayout = root.gameObject.AddComponent<LayoutElement>();
-            rootLayout.preferredHeight = 28f;
-
-            HorizontalLayoutGroup group = root.gameObject.AddComponent<HorizontalLayoutGroup>();
-            group.spacing = 4f;
-            group.childControlWidth = true;
-            group.childControlHeight = true;
-            group.childForceExpandWidth = false;
-            group.childForceExpandHeight = true;
-
-            CreateTextActionLabel(root, "Aggiungi cibo");
-            CreatePrivateFoodButton(root, target, "+1", 1);
-            CreatePrivateFoodButton(root, target, "+5", 5);
-            CreatePrivateFoodButton(root, target, "+10", 10);
-        }
-
         private static void CreateTextActionLabel(RectTransform parent, string label)
         {
             RectTransform labelRoot = CreateRect("ActionLabel", parent);
@@ -883,24 +804,6 @@ namespace Arcontio.View.ArcGraph
             layout.flexibleWidth = 1f;
             TextMeshProUGUI text = CreateText(labelRoot, label, 10, FontStyles.Bold, TextAlignmentOptions.Left);
             text.color = ColorFromHex("#A9B8C4", 1f);
-        }
-
-        private void CreatePrivateFoodButton(
-            RectTransform parent,
-            ArcUiSelectionTarget target,
-            string label,
-            int units)
-        {
-            Button button = CreateSmallActionButton(parent, label);
-            button.interactable = _npcPrivateFoodCommandBridge != null;
-            button.onClick.AddListener(() =>
-            {
-                if (_npcPrivateFoodCommandBridge != null
-                    && _npcPrivateFoodCommandBridge.RequestAddPrivateFood(target, units))
-                {
-                    _lastRuntimeRefreshTime = -999f;
-                }
-            });
         }
 
         // =============================================================================

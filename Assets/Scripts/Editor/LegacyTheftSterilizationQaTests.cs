@@ -32,15 +32,13 @@ namespace Arcontio.Tests
         public void StealPrivateFoodCommandIsNoOpAndPublishesNoEvent()
         {
             var world = MakeWorld(out int thiefNpcId, out int victimNpcId);
-            world.NpcPrivateFood[thiefNpcId] = 1;
-            world.NpcPrivateFood[victimNpcId] = 5;
+            Assert.That(world.TryAddInventoryItem(victimNpcId, "berry", 5, out _, out _), Is.True);
             var bus = new MessageBus();
 
             new StealPrivateFoodCommand(thiefNpcId, victimNpcId, 99).Execute(world, bus);
 
-            Assert.That(world.NpcPrivateFood[thiefNpcId], Is.EqualTo(1));
-            Assert.That(world.NpcPrivateFood[victimNpcId], Is.EqualTo(5));
-            Assert.That(world.GetInventoryUsedUnits(thiefNpcId), Is.EqualTo(1));
+            Assert.That(world.GetInventoryQuantity(thiefNpcId, "berry"), Is.EqualTo(0));
+            Assert.That(world.GetInventoryQuantity(victimNpcId, "berry"), Is.EqualTo(5));
             Assert.That(bus.Count, Is.EqualTo(0));
         }
 
@@ -61,7 +59,7 @@ namespace Arcontio.Tests
 
             Assert.That(world.FoodStocks[stockObjectId].Units, Is.EqualTo(4));
             Assert.That(world.Objects.ContainsKey(stockObjectId), Is.True);
-            Assert.That(world.NpcPrivateFood[thiefNpcId], Is.EqualTo(0));
+            Assert.That(world.GetInventoryQuantity(thiefNpcId, "food_stock"), Is.EqualTo(0));
             Assert.That(world.NpcInventories.ContainsKey(thiefNpcId), Is.False);
             Assert.That(bus.Count, Is.EqualTo(0));
         }
@@ -73,9 +71,7 @@ namespace Arcontio.Tests
             var audit = new FoodInventoryAuditSystem();
             var bus = new MessageBus();
 
-            world.NpcPrivateFood[thiefNpcId] = 5;
             audit.Update(world, new Tick(1, 1f), bus, null);
-            world.NpcPrivateFood[thiefNpcId] = 1;
             audit.Update(world, new Tick(2, 1f), bus, null);
 
             Assert.That(bus.Count, Is.EqualTo(0));
@@ -88,9 +84,7 @@ namespace Arcontio.Tests
             var audit = new PrivateFoodAuditSystem(auditEveryTicks: 1);
             var bus = new MessageBus();
 
-            world.NpcPrivateFood[thiefNpcId] = 5;
             audit.Update(world, new Tick(1, 1f), bus, null);
-            world.NpcPrivateFood[thiefNpcId] = 1;
             audit.Update(world, new Tick(2, 1f), bus, null);
 
             Assert.That(bus.Count, Is.EqualTo(0));
@@ -134,6 +128,24 @@ namespace Arcontio.Tests
 
         private static void AddObjectDefs(World world)
         {
+            world.ObjectDefs["berry"] = new ObjectDef
+            {
+                Id = "berry",
+                DisplayName = "Berry",
+                BulkUnits = 1,
+                WeightUnits = 1,
+                Stackable = true,
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
+                IsInteractable = true,
+                Properties = new System.Collections.Generic.List<ObjectPropertyKV>
+                {
+                    new ObjectPropertyKV { Key = "Item", Value = 1f },
+                    new ObjectPropertyKV { Key = "FoodItem", Value = 1f },
+                    new ObjectPropertyKV { Key = "NutritionValue", Value = 0.32f }
+                }
+            };
+
             world.ObjectDefs["food_stock"] = new ObjectDef
             {
                 Id = "food_stock",

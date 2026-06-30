@@ -18,8 +18,8 @@ namespace Arcontio.Tests
     /// <para><b>Principio architetturale: persistenza modulare senza legacy</b></para>
     /// <para>
     /// Questi test verificano che C3 salvi e carichi soltanto inventari typed e
-    /// componenti stack. Il vecchio <c>NpcPrivateFood</c> non deve essere letto,
-    /// scritto o migrato dal nuovo modulo save/load.
+    /// componenti stack. I vecchi campi save del cibo privato restano solo come
+    /// compatibilita' passiva dei DTO storici e non devono creare stato runtime.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
@@ -54,8 +54,6 @@ namespace Arcontio.Tests
         public void WorldSaveJsonDoesNotSerializeLegacyPrivateFood()
         {
             var world = MakeWorld(out int npcId);
-            world.NpcPrivateFood[npcId] = 7;
-            world.NpcLastPrivateFoodConsumeTick[npcId] = 99;
             Assert.That(world.TryAddInventoryItem(npcId, "berry", 2, out _, out _), Is.True);
 
             WorldSaveData data = WorldSaveBuilder.BuildFromWorld(world, savedAtTick: 42);
@@ -99,7 +97,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void ApplyWorldSaveIgnoresLegacyPrivateFoodEvenIfDtoContainsIt()
+        public void ApplyWorldSaveIgnoresLegacyPrivateFoodDtoWithoutCreatingRuntimeStore()
         {
             var source = MakeWorld(out int sourceNpcId);
             Assert.That(source.TryAddInventoryItem(sourceNpcId, "berry", 2, out _, out _), Is.True);
@@ -111,10 +109,8 @@ namespace Arcontio.Tests
             bool applied = WorldSaveLoader.TryApplyObjectiveWorld(target, data, out string error);
 
             Assert.That(applied, Is.True, error);
-            Assert.That(target.NpcPrivateFood.TryGetValue(sourceNpcId, out int privateFood), Is.True);
-            Assert.That(privateFood, Is.EqualTo(0));
-            Assert.That(target.NpcLastPrivateFoodConsumeTick.TryGetValue(sourceNpcId, out long consumeTick), Is.True);
-            Assert.That(consumeTick, Is.EqualTo(-999999));
+            Assert.That(target.GetInventoryQuantity(sourceNpcId, "berry"), Is.EqualTo(2));
+            Assert.That(target.GetCarriedFoodQuantity(sourceNpcId), Is.EqualTo(2));
         }
 
         [Test]

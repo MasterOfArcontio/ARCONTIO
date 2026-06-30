@@ -969,17 +969,15 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void EatPrivateFoodCommandConsumesTypedInventoryWithoutMutatingLegacyPrivateFood()
+        public void EatPrivateFoodCommandConsumesTypedInventoryAlias()
         {
             var world = MakeWorldWithNpcOnly(4, 6, out int npcId);
             AddObjectDef(world, "berry", nutritionValue: 0.20f, foodItem: true, foodStock: false);
-            world.NpcPrivateFood[npcId] = 2;
             Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, out _, out string addReason), Is.True, addReason);
             var bus = new MessageBus();
 
             new EatPrivateFoodCommand(npcId).Execute(world, bus);
 
-            Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(2));
             Assert.That(world.GetInventoryQuantity(npcId, "berry"), Is.EqualTo(0));
             Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(0.75f).Within(0.0001f));
             Assert.That(bus.TryDequeue(out var simEvent), Is.True);

@@ -3486,11 +3486,10 @@ namespace Arcontio.Core
                    .AddField("obj", "food_stock hidden")
                    .AddField("units", 3));
 
-            // --- Cibo privato NPC2 ---
-            _world.NpcPrivateFood[npc2] = 4;
-
-            // --- Cibo privato NPC3 ---
-            _world.NpcPrivateFood[npc3] = 4;
+            // --- Cibo personale NPC2/NPC3 ---
+            // Dalla C7 il cibo addosso e' un item typed nell'inventario fisico.
+            _world.TryAddInventoryItem(npc2, "berry", 4, out _, out _);
+            _world.TryAddInventoryItem(npc3, "berry", 4, out _, out _);
 
             ArcontioLogger.Info(new LogContext(0, "T9"),
                 new LogBlock(LogLevel.Info, "log.t9.seed.setup_done"));
@@ -3509,7 +3508,7 @@ namespace Arcontio.Core
                     .AddField("id", npc2)
                     .AddField("pos", "(0,2)")
                     .AddField("law", _world.Social[npc2].JusticePerception01.ToString("0.00"))
-                    .AddField("privateFood", _world.NpcPrivateFood[npc2])
+                    .AddField("carriedFood", _world.GetCarriedFoodQuantity(npc2))
                     .AddField("hunger", _world.Needs[npc2].GetValue(NeedKind.Hunger).ToString("0.00"))
             );
 
@@ -3604,8 +3603,8 @@ namespace Arcontio.Core
             int foodPrivateHidden = _world.CreateObject(defId: "food_stock", x: 12, y: 9, ownerKind: OwnerKind.Npc, ownerId: npc2);
             _world.SetFoodStock(foodPrivateHidden, new FoodStockComponent { Units = 2, OwnerKind = OwnerKind.Npc, OwnerId = npc2 });
            
-            // --- Cibo privato NPC5 ---
-            _world.NpcPrivateFood[npc5] = _world.Global.InventoryMaxUnits;
+            // --- Cibo personale NPC5 ---
+            _world.TryAddInventoryItem(npc5, "berry", _world.Global.InventoryMaxUnits, out _, out _);
 
 
             ArcontioLogger.Info(
@@ -3757,8 +3756,8 @@ namespace Arcontio.Core
             int foodPrivateHidden = _world.CreateObject(defId: "food_stock", x: 12, y: 9, ownerKind: OwnerKind.Npc, ownerId: npc2);
             _world.SetFoodStock(foodPrivateHidden, new FoodStockComponent { Units = 2, OwnerKind = OwnerKind.Npc, OwnerId = npc2 });
 
-            // --- Cibo privato NPC5 ---
-            _world.NpcPrivateFood[npc5] = _world.Global.InventoryMaxUnits;
+            // --- Cibo personale NPC5 ---
+            _world.TryAddInventoryItem(npc5, "berry", _world.Global.InventoryMaxUnits, out _, out _);
    */
 
      /*       ArcontioLogger.Info(

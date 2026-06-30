@@ -443,7 +443,8 @@ namespace Arcontio.Core
                 NpcObjectMemoryStore.ObservedFlags flags = NpcObjectMemoryStore.ObservedFlags.None;
                 int carriedFoodApprox = 0;
 
-                if (world.NpcPrivateFood.TryGetValue(ne.ObservedNpcId, out int realFood) && realFood > 0)
+                int realFood = world.GetCarriedFoodQuantity(ne.ObservedNpcId);
+                if (realFood > 0)
                 {
                     flags |= NpcObjectMemoryStore.ObservedFlags.HasCarriedFood;
 

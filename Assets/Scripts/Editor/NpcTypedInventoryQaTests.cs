@@ -135,15 +135,14 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void LegacyPrivateFoodStillCountsAgainstCapacityUntilMigrationCompletes()
+        public void TypedInventoryAloneControlsCapacityAfterLegacyRemoval()
         {
             var world = MakeWorld(out int npcId);
-            world.NpcPrivateFood[npcId] = 2;
 
             bool added = world.TryAddInventoryItem(npcId, "berry", 3, out int addedQuantity, out string reason);
 
             Assert.That(added, Is.True, reason);
-            Assert.That(addedQuantity, Is.EqualTo(1));
+            Assert.That(addedQuantity, Is.EqualTo(3));
             Assert.That(world.GetInventoryUsedUnits(npcId), Is.EqualTo(3));
             Assert.That(world.GetInventoryFreeCapacity(npcId), Is.EqualTo(0));
         }

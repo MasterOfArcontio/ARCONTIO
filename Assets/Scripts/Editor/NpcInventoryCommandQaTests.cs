@@ -241,16 +241,14 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void EatPrivateFoodCommandUsesTypedInventoryAndDoesNotTouchLegacyPrivateFood()
+        public void EatPrivateFoodCommandUsesTypedInventoryAlias()
         {
             var world = MakeWorld(out int npcId);
-            world.NpcPrivateFood[npcId] = 3;
             Assert.That(world.TryAddInventoryItem(npcId, "acorn", 1, out _, out _), Is.True);
             var bus = new MessageBus();
 
             new EatPrivateFoodCommand(npcId).Execute(world, bus);
 
-            Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(3));
             Assert.That(world.GetInventoryQuantity(npcId, "acorn"), Is.EqualTo(0));
             Assert.That(bus.TryDequeue(out var simEvent), Is.True);
             var consumed = simEvent as FoodConsumedEvent;
@@ -260,16 +258,14 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void EatPrivateFoodCommandDoesNotConsumeLegacyPrivateFoodWithoutTypedFood()
+        public void EatPrivateFoodCommandEmptyInventoryDoesNotMutate()
         {
             var world = MakeWorld(out int npcId);
-            world.NpcPrivateFood[npcId] = 3;
             float hungerBefore = world.Needs[npcId].GetValue(NeedKind.Hunger);
             var bus = new MessageBus();
 
             new EatPrivateFoodCommand(npcId).Execute(world, bus);
 
-            Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(3));
             Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(hungerBefore).Within(0.0001f));
             Assert.That(bus.Count, Is.EqualTo(0));
         }
