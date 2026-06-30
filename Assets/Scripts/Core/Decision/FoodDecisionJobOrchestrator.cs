@@ -436,18 +436,19 @@ namespace Arcontio.Core
             if (world == null)
                 return 0;
 
-            foreach (var kv in world.FoodStocks)
+            foreach (var kv in world.Objects)
             {
                 int objId = kv.Key;
-                var stock = kv.Value;
-                if (stock.Units <= 0)
+                if (!world.TryGetAvailableFoodObjectFacts(
+                        objId,
+                        requireCommunityOwner: true,
+                        out _,
+                        out _,
+                        out int ox,
+                        out int oy))
+                {
                     continue;
-
-                if (stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
-                    continue;
-
-                if (!TryGetObjectCell(world, objId, out int ox, out int oy))
-                    continue;
+                }
 
                 if (ox == x && oy == y)
                     return objId;
@@ -649,18 +650,19 @@ namespace Arcontio.Core
             if (!world.NpcFacing.TryGetValue(npcId, out var facing))
                 facing = CardinalDirection.North;
 
-            foreach (var kv in world.FoodStocks)
+            foreach (var kv in world.Objects)
             {
                 int objId = kv.Key;
-                var stock = kv.Value;
-                if (stock.Units <= 0)
+                if (!world.TryGetAvailableFoodObjectFacts(
+                        objId,
+                        requireCommunityOwner: true,
+                        out _,
+                        out _,
+                        out int ox,
+                        out int oy))
+                {
                     continue;
-
-                if (stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
-                    continue;
-
-                if (!TryGetObjectCell(world, objId, out int ox, out int oy))
-                    continue;
+                }
 
                 if (FovUtils.IsVisible(world, nx, ny, facing, ox, oy, visionRange, useCone, coneSlope))
                     return true;
@@ -732,16 +734,20 @@ namespace Arcontio.Core
                 int ox = e.CellX;
                 int oy = e.CellY;
 
-                if (world.FoodStocks.TryGetValue(objId, out var st))
+                if (world.TryGetAvailableFoodObjectFacts(
+                        objId,
+                        requireCommunityOwner: true,
+                        out _,
+                        out _,
+                        out int currentX,
+                        out int currentY))
                 {
-                    if (st.Units <= 0)
-                        continue;
-
-                    if (world.Objects.TryGetValue(objId, out var inst) && inst != null)
-                    {
-                        ox = inst.CellX;
-                        oy = inst.CellY;
-                    }
+                    ox = currentX;
+                    oy = currentY;
+                }
+                else
+                {
+                    continue;
                 }
 
                 int manhattan = Mathf.Abs(ox - nx) + Mathf.Abs(oy - ny);
@@ -771,19 +777,19 @@ namespace Arcontio.Core
             if (!TryGetNpcCell(world, npcId, out int nx, out int ny))
                 return 0;
 
-            foreach (var kv in world.FoodStocks)
+            foreach (var kv in world.Objects)
             {
                 int objId = kv.Key;
-                var st = kv.Value;
-
-                if (st.Units <= 0)
+                if (!world.TryGetAvailableFoodObjectFacts(
+                        objId,
+                        requireCommunityOwner: true,
+                        out _,
+                        out _,
+                        out int ox,
+                        out int oy))
+                {
                     continue;
-
-                if (st.OwnerKind != OwnerKind.Community || st.OwnerId != 0)
-                    continue;
-
-                if (!TryGetObjectCell(world, objId, out int ox, out int oy))
-                    continue;
+                }
 
                 int manhattan = Mathf.Abs(ox - nx) + Mathf.Abs(oy - ny);
                 if (manhattan > maxRangeCells)

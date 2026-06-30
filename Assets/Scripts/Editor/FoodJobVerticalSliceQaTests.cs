@@ -33,7 +33,7 @@ namespace Arcontio.Tests
     public sealed class FoodJobVerticalSliceQaTests
     {
         private const string TemplateJson =
-            "{\"templates\":[{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\"}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
+            "{\"templates\":[{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"take_and_consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"pickup_food_to_hand\",\"kind\":\"PickUp\",\"payloadKey\":\"HandLeft\"},{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\"}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
 
         [Test]
         public void RegistryLoadsFoodAndMoveTemplates()
@@ -46,7 +46,7 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void FoodFactoryCreatesTwoPhasePlan()
+        public void FoodFactoryCreatesThreePhasePlan()
         {
             var registry = MakeRegistry();
 
@@ -62,12 +62,16 @@ namespace Arcontio.Tests
                 out var reason);
 
             Assert.That(created, Is.True, reason);
-            Assert.That(job.Plan.PhaseCount, Is.EqualTo(2));
+            Assert.That(job.Plan.PhaseCount, Is.EqualTo(3));
             Assert.That(job.Plan.TryGetPhase(0, out var reach), Is.True);
             Assert.That(reach.Kind, Is.EqualTo(JobPhaseKind.ReachTarget));
             Assert.That(reach.TryGetAction(0, out var move), Is.True);
             Assert.That(move.Kind, Is.EqualTo(JobActionKind.MoveToCell));
             Assert.That(move.TargetObjectId, Is.EqualTo(10));
+            Assert.That(job.Plan.TryGetPhase(1, out var prepare), Is.True);
+            Assert.That(prepare.Kind, Is.EqualTo(JobPhaseKind.Prepare));
+            Assert.That(prepare.TryGetAction(0, out var prepareHand), Is.True);
+            Assert.That(prepareHand.Kind, Is.EqualTo(JobActionKind.PrepareHand));
         }
 
         [Test]
@@ -394,12 +398,12 @@ namespace Arcontio.Tests
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId, enableMbdExplainability: true);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
-            world.FoodStocks[foodId] = new FoodStockComponent
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = 0,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
             var system = new JobExecutionSystem();
 
             Assert.That(world.JobRuntimeState.Reservations.Count, Is.EqualTo(1));
@@ -417,12 +421,12 @@ namespace Arcontio.Tests
             AddFoodBelief(world, npcId, 5, 5);
             EnableMbdBridgeExplainability(world);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
-            world.FoodStocks[foodId] = new FoodStockComponent
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = 0,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
             var system = new JobExecutionSystem();
 
             // Il primo tick attraversa la fase ReachTarget gia' soddisfatta; il
@@ -452,12 +456,12 @@ namespace Arcontio.Tests
 
             AddFoodBelief(world, npcId, 5, 5);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
-            world.FoodStocks[foodId] = new FoodStockComponent
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = 0,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
 
             var system = new JobExecutionSystem();
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
@@ -494,12 +498,12 @@ namespace Arcontio.Tests
             AddFoodBelief(world, npcId, 5, 5);
             EnableMbdBridgeExplainability(world);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
-            world.FoodStocks[foodId] = new FoodStockComponent
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = 0,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
 
             var system = new JobExecutionSystem();
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
@@ -673,12 +677,12 @@ namespace Arcontio.Tests
 
             AddFoodBelief(world, npcId, 5, 5);
             AssignFoodJob(world, npcId, foodId, 5, 5, urgency01: 0.95f);
-            world.FoodStocks[foodId] = new FoodStockComponent
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = 0,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
             var system = new JobExecutionSystem();
 
             system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
@@ -807,19 +811,31 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void JobExecutionWhenOnFoodTargetEnqueuesEatFromStockCommand()
+        public void JobExecutionWhenOnFoodTargetPicksUpThenConsumesFromHand()
         {
             var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
             AssignFoodJob(world, npcId, foodId, 5, 5);
             var system = new JobExecutionSystem();
+            var bus = new MessageBus();
 
-            system.Update(world, new Tick(0, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(0, 1f), bus, new Telemetry());
             world.JobRuntimeState.CommandBuffer.Clear();
-            system.Update(world, new Tick(1, 1f), new MessageBus(), new Telemetry());
+            system.Update(world, new Tick(1, 1f), bus, new Telemetry());
+            world.JobRuntimeState.CommandBuffer.Clear();
+            system.Update(world, new Tick(2, 1f), bus, new Telemetry());
 
             var commands = world.JobRuntimeState.CommandBuffer.Snapshot();
             Assert.That(commands.Length, Is.EqualTo(1));
-            Assert.That(commands[0], Is.TypeOf<EatFromStockCommand>());
+            Assert.That(commands[0], Is.TypeOf<PickUpObjectCommand>());
+
+            commands[0].Execute(world, bus);
+            world.JobRuntimeState.CommandBuffer.Clear();
+            system.Update(world, new Tick(3, 1f), bus, new Telemetry());
+
+            commands = world.JobRuntimeState.CommandBuffer.Snapshot();
+            Assert.That(commands.Length, Is.EqualTo(1));
+            Assert.That(commands[0], Is.TypeOf<ConsumeInventoryItemCommand>());
+            Assert.That(world.GetInventoryQuantity(npcId, "food_stock", NpcInventorySlotKind.HandLeft), Is.EqualTo(1));
         }
 
 
@@ -936,12 +952,12 @@ namespace Arcontio.Tests
         public void EatFromStockCommandDepletedStockDiscardsVisibleFoodBelief()
         {
             var world = MakeWorldWithNpcAndCommunityFood(5, 5, 5, 5, out int npcId, out int foodId);
-            world.FoodStocks[foodId] = new FoodStockComponent
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = 1,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
             AddFoodBelief(world, npcId, 5, 5);
             AddRememberedWorldObject(world, npcId, foodId, 5, 5, OwnerKind.Community, ownerId: 0);
 
@@ -1207,6 +1223,7 @@ namespace Arcontio.Tests
         private static World MakeWorldWithNpcAndCommunityFood(int npcX, int npcY, int foodX, int foodY, out int npcId, out int foodId, bool enableMbdExplainability = false)
         {
             var world = MakeWorldWithNpcOnly(npcX, npcY, out npcId, enableMbdExplainability);
+            AddObjectDef(world, "food_stock", nutritionValue: 0.45f, foodItem: true, foodStock: true);
 
             foodId = 77;
             world.Objects[foodId] = new WorldObjectInstance
@@ -1219,12 +1236,12 @@ namespace Arcontio.Tests
                 OwnerId = 0
             };
 
-            world.FoodStocks[foodId] = new FoodStockComponent
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = 3,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
 
             return world;
         }
@@ -1310,6 +1327,12 @@ namespace Arcontio.Tests
                 FootprintWidth = 1,
                 FootprintHeight = 1,
                 IsInteractable = true,
+                WeightUnits = 1,
+                BulkUnits = 1,
+                Stackable = foodItem || foodStock,
+                HasDurability = false,
+                CanPlaceInHand = foodItem || foodStock,
+                CanPlaceInContainer = foodItem || foodStock,
                 Properties = properties
             };
         }
@@ -1327,12 +1350,13 @@ namespace Arcontio.Tests
                 OwnerId = ownerNpcId
             };
 
-            world.FoodStocks[foodId] = new FoodStockComponent
+            AddObjectDef(world, "food_stock_private", nutritionValue: 0.45f, foodItem: true, foodStock: true);
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = 3,
                 OwnerKind = OwnerKind.Npc,
                 OwnerId = ownerNpcId
-            };
+            });
 
             return foodId;
         }
@@ -1349,12 +1373,13 @@ namespace Arcontio.Tests
                 OwnerId = 0
             };
 
-            world.FoodStocks[foodId] = new FoodStockComponent
+            AddObjectDef(world, "food_stock", nutritionValue: 0.45f, foodItem: true, foodStock: true);
+            world.SetFoodStock(foodId, new FoodStockComponent
             {
                 Units = units,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
 
             return foodId;
         }

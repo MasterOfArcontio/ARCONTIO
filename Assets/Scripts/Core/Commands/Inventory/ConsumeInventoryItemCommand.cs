@@ -22,7 +22,8 @@ namespace Arcontio.Core
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>NpcId</b>: NPC che consuma il cibo posseduto.</item>
-    ///   <item><b>FoodDefId</b>: alimento richiesto; vuoto significa miglior cibo disponibile.</item>
+    ///   <item><b>FoodDefId</b>: alimento richiesto; vuoto significa miglior cibo disponibile nella mano valida.</item>
+    ///   <item><b>RequiredSlot</b>: mano o slot da cui il cibo deve essere consumato.</item>
     ///   <item><b>Execute</b>: consuma una unita', aggiorna Fame e pubblica evento food-only.</item>
     /// </list>
     /// </summary>
@@ -30,6 +31,8 @@ namespace Arcontio.Core
     {
         private readonly int _npcId;
         private readonly string _foodDefId;
+        private readonly int _objectId;
+        private readonly NpcInventorySlotKind _requiredSlot;
 
         // =============================================================================
         // ConsumeInventoryItemCommand
@@ -41,9 +44,20 @@ namespace Arcontio.Core
         /// </para>
         /// </summary>
         public ConsumeInventoryItemCommand(int npcId, string foodDefId = "")
+            : this(npcId, foodDefId, 0, NpcInventorySlotKind.None)
+        {
+        }
+
+        public ConsumeInventoryItemCommand(
+            int npcId,
+            string foodDefId,
+            int objectId,
+            NpcInventorySlotKind requiredSlot)
         {
             _npcId = npcId;
             _foodDefId = foodDefId ?? string.Empty;
+            _objectId = objectId;
+            _requiredSlot = requiredSlot;
         }
 
         // =============================================================================
@@ -65,6 +79,8 @@ namespace Arcontio.Core
             if (!world.TryConsumeInventoryFood(
                     _npcId,
                     _foodDefId,
+                    _objectId,
+                    _requiredSlot,
                     out InventoryMutationResult result,
                     out ObjectFoodNutritionResult nutrition,
                     out string reason))

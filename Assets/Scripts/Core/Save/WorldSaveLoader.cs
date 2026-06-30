@@ -648,6 +648,15 @@ namespace Arcontio.Core.Save
                         OwnerKind = (OwnerKind)dto.ownerKind,
                         OwnerId = dto.ownerId
                     };
+
+                    if (dto.units > 0
+                        && world.Objects.TryGetValue(dto.objectId, out var obj)
+                        && obj != null
+                        && world.TryGetObjectDef(obj.DefId, out var def)
+                        && ObjectInventoryStackResolver.CanUseStackComponent(def))
+                    {
+                        world.ObjectStacks[dto.objectId] = new ObjectStackComponent(dto.units);
+                    }
                 }
             }
 

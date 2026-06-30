@@ -25,7 +25,8 @@ namespace Arcontio.Core
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>MoveToCell</b>: usa solo running action e route possedute dal Job Layer; se non esiste una route autorizzata fallisce nel Job Layer.</item>
-    ///   <item><b>Consume</b>: accoda <c>EatFromStockCommand</c> solo quando l'NPC e' sul target.</item>
+    ///   <item><b>PrepareHand</b>: libera la mano richiesta spostando l'oggetto nel Pack tramite command.</item>
+    ///   <item><b>Consume</b>: accoda consumo inventario solo quando il cibo e' nella mano richiesta.</item>
     ///   <item><b>StateMachine</b>: applica <c>StepResult</c> e completa/fallisce il job.</item>
     /// </list>
     /// </summary>
@@ -540,29 +541,33 @@ namespace Arcontio.Core
                 return false;
 
             int bestDistance = int.MaxValue;
-            foreach (var pair in world.FoodStocks)
+            foreach (var pair in world.Objects)
             {
                 int objectId = pair.Key;
                 if (objectId == job.Request.TargetObjectId)
                     continue;
 
-                var stock = pair.Value;
-                if (stock.Units <= 0 || stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
+                if (!world.TryGetAvailableFoodObjectFacts(
+                        objectId,
+                        requireCommunityOwner: true,
+                        out _,
+                        out _,
+                        out int foodX,
+                        out int foodY))
+                {
                     continue;
+                }
 
-                if (!world.Objects.TryGetValue(objectId, out var obj) || obj == null)
-                    continue;
-
-                int distance = Mathf.Abs(obj.CellX - npcCell.X) + Mathf.Abs(obj.CellY - npcCell.Y);
+                int distance = Mathf.Abs(foodX - npcCell.X) + Mathf.Abs(foodY - npcCell.Y);
                 if (distance > maxSearchRadius || distance >= bestDistance)
                     continue;
 
-                if (!world.HasLineOfSight(npcCell.X, npcCell.Y, obj.CellX, obj.CellY))
+                if (!world.HasLineOfSight(npcCell.X, npcCell.Y, foodX, foodY))
                     continue;
 
                 bestDistance = distance;
                 replacementFoodObjectId = objectId;
-                replacementCell = new Vector2Int(obj.CellX, obj.CellY);
+                replacementCell = new Vector2Int(foodX, foodY);
             }
 
             return replacementFoodObjectId > 0;
@@ -637,6 +642,9 @@ namespace Arcontio.Core
 
             if (action.Kind == JobActionKind.Consume)
                 return ExecuteConsumeKnownFood(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
+
+            if (action.Kind == JobActionKind.PrepareHand)
+                return ExecutePrepareHand(world, runtime, npcId, job, action, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.PickUp)
                 return ExecutePickUpObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
@@ -943,34 +951,64 @@ namespace Arcontio.Core
             if (action.TargetObjectId <= 0)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeMissingFoodObject");
 
-            if (!world.FoodStocks.TryGetValue(action.TargetObjectId, out var stock) || stock.Units <= 0)
-                return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeFoodUnavailable");
-
-            if (stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
-                return StepResult.Failed(JobFailureReason.InvalidRequest, "ConsumeFoodNotCommunityStock");
-
             if (!world.Objects.TryGetValue(action.TargetObjectId, out var foodObject) || foodObject == null)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeFoodObjectMissing");
 
-            if (npcCell.X != foodObject.CellX || npcCell.Y != foodObject.CellY)
-            {
-                // Il consume step dovrebbe essere raggiunto solo dopo il MoveToCell.
-                // Se il target non e' piu' sulla cella dell'NPC, il piano e' diventato
-                // stale: falliamo il job invece di lasciare l'NPC in Running senza
-                // command. Al tick decisionale successivo il ponte legacy/job potra'
-                // ricostruire una nuova intenzione da needs e beliefs.
-                return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeTargetNoLongerCoLocated");
-            }
+            ObjectFoodNutritionResult nutrition = ObjectFoodNutritionResolver.Resolve(
+                world,
+                foodObject.DefId,
+                world.Global.Needs.eatSatietyGain,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+            if (!nutrition.IsConsumableFood)
+                return StepResult.Failed(JobFailureReason.InvalidRequest, "ConsumeTargetNotFood");
+
+            NpcInventorySlotKind requiredSlot = ResolveInventorySlotPayload(action.PayloadKey, NpcInventorySlotKind.HandLeft);
+            if (!IsHandInventorySlot(requiredSlot))
+                return StepResult.Failed(JobFailureReason.InvalidRequest, "ConsumeFoodRequiresHandSlot");
+
+            if (world.GetInventoryQuantity(npcId, foodObject.DefId, requiredSlot) <= 0)
+                return StepResult.Failed(JobFailureReason.MissingTarget, "ConsumeFoodMissingInHand");
 
             runtime.CommandBuffer.Enqueue(
-                new EatFromStockCommand(npcId, action.TargetObjectId),
+                new ConsumeInventoryItemCommand(npcId, foodObject.DefId, 0, requiredSlot),
                 explainabilityConfig,
                 explainabilityRegistry,
                 npcId,
                 tick,
                 job.JobId,
-                "ConsumeCommandEnqueued");
-            return StepResult.Succeeded("ConsumeCommandEnqueued");
+                "ConsumeInventoryHandCommandEnqueued");
+            return StepResult.Succeeded("ConsumeInventoryHandCommandEnqueued");
+        }
+
+        private static StepResult ExecutePrepareHand(
+            World world,
+            JobRuntimeState runtime,
+            int npcId,
+            Job job,
+            JobAction action,
+            int tick,
+            MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
+            MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            NpcInventorySlotKind handSlot = ResolveInventorySlotPayload(action.PayloadKey, NpcInventorySlotKind.HandLeft);
+            if (!IsHandInventorySlot(handSlot))
+                return StepResult.Failed(JobFailureReason.InvalidRequest, "PrepareHandRequiresHandSlot");
+
+            if (!world.TryGetFirstInventoryObjectInSlot(npcId, handSlot, out int objectId))
+                return StepResult.Succeeded("PrepareHandAlreadyFree");
+
+            if (!world.CanMoveInventoryObjectToSlot(npcId, objectId, NpcInventorySlotKind.Pack, out string reason))
+                return StepResult.Failed(JobFailureReason.StepFailed, "PrepareHandPackUnavailable:" + reason);
+
+            runtime.CommandBuffer.Enqueue(
+                new MoveInventoryObjectCommand(npcId, objectId, NpcInventorySlotKind.Pack),
+                explainabilityConfig,
+                explainabilityRegistry,
+                npcId,
+                tick,
+                job.JobId,
+                "PrepareHandMoveToPackCommandEnqueued");
+            return StepResult.Succeeded("PrepareHandMoveToPackCommandEnqueued");
         }
 
         private static StepResult ExecutePickUpObject(
@@ -996,8 +1034,9 @@ namespace Arcontio.Core
             if (npcCell.X != obj.CellX || npcCell.Y != obj.CellY)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "PickUpObjectNoLongerCoLocated");
 
+            NpcInventorySlotKind preferredSlot = ResolveInventorySlotPayload(action.PayloadKey, NpcInventorySlotKind.None);
             runtime.CommandBuffer.Enqueue(
-                new PickUpObjectCommand(npcId, action.TargetObjectId),
+                new PickUpObjectCommand(npcId, action.TargetObjectId, preferredSlot),
                 explainabilityConfig,
                 explainabilityRegistry,
                 npcId,
@@ -1049,6 +1088,22 @@ namespace Arcontio.Core
                 job.JobId,
                 "DropCommandEnqueued");
             return StepResult.Succeeded("DropCommandEnqueued");
+        }
+
+        private static NpcInventorySlotKind ResolveInventorySlotPayload(string payloadKey, NpcInventorySlotKind fallback)
+        {
+            if (string.IsNullOrWhiteSpace(payloadKey))
+                return fallback;
+
+            if (System.Enum.TryParse(payloadKey.Trim(), ignoreCase: true, out NpcInventorySlotKind parsed))
+                return parsed;
+
+            return fallback;
+        }
+
+        private static bool IsHandInventorySlot(NpcInventorySlotKind slot)
+        {
+            return slot == NpcInventorySlotKind.HandLeft || slot == NpcInventorySlotKind.HandRight;
         }
 
         // =============================================================================
@@ -1151,6 +1206,8 @@ namespace Arcontio.Core
                 || string.Equals(diagnosticMessage, "ConsumeFoodObjectMissing", System.StringComparison.Ordinal)
                 || string.Equals(diagnosticMessage, "ConsumeTargetNoLongerCoLocated", System.StringComparison.Ordinal)
                 || string.Equals(diagnosticMessage, "ConsumeMissingFoodObject", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "ConsumeFoodMissingInHand", System.StringComparison.Ordinal)
+                || string.Equals(diagnosticMessage, "ConsumeTargetNotFood", System.StringComparison.Ordinal)
                 || string.Equals(diagnosticMessage, "MoveFoodUnavailable", System.StringComparison.Ordinal)
                 || string.Equals(diagnosticMessage, "MoveFoodObjectMissing", System.StringComparison.Ordinal)
                 || string.Equals(diagnosticMessage, "MoveFoodStockMissing", System.StringComparison.Ordinal)

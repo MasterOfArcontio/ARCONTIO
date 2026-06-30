@@ -27,6 +27,7 @@ namespace Arcontio.Core
     ///   <item><b>Observe</b>: lettura percettiva locale futura.</item>
     ///   <item><b>LookDirection</b>: orientamento esplicito verso una direzione cardinale.</item>
     ///   <item><b>Search</b>: esplorazione o ricerca senza target certo.</item>
+    ///   <item><b>PrepareHand</b>: liberazione controllata di una mano prima di usare un oggetto.</item>
     ///   <item><b>PickUp</b>: acquisizione oggetto o stock.</item>
     ///   <item><b>Drop</b>: deposito oggetto o stock.</item>
     ///   <item><b>Consume</b>: consumo di risorsa per bisogno.</item>
@@ -46,6 +47,7 @@ namespace Arcontio.Core
         LookDirection = 55,
         Search = 60,
         PickUp = 70,
+        PrepareHand = 75,
         Drop = 80,
         Consume = 90,
         Communicate = 100,

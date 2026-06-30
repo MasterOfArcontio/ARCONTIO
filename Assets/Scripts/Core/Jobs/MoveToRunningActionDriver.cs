@@ -847,16 +847,13 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!world.FoodStocks.TryGetValue(action.TargetObjectId, out var stock))
-            {
-                if (!canVerifyTargetCell)
-                    return true;
-
-                failure = StepResult.Failed(JobFailureReason.MissingTarget, "MoveFoodStockMissing");
-                return false;
-            }
-
-            if (stock.Units <= 0)
+            if (!world.TryGetAvailableFoodObjectFacts(
+                    action.TargetObjectId,
+                    requireCommunityOwner: true,
+                    out _,
+                    out _,
+                    out int foodX,
+                    out int foodY))
             {
                 if (!canVerifyTargetCell)
                     return true;
@@ -865,13 +862,7 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (stock.OwnerKind != OwnerKind.Community || stock.OwnerId != 0)
-            {
-                failure = StepResult.Failed(JobFailureReason.InvalidRequest, "MoveFoodNotCommunityStock");
-                return false;
-            }
-
-            if (targetObject.CellX != action.TargetCell.x || targetObject.CellY != action.TargetCell.y)
+            if (foodX != action.TargetCell.x || foodY != action.TargetCell.y)
             {
                 if (!canVerifyTargetCell)
                     return true;

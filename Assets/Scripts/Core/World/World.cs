@@ -5318,6 +5318,7 @@ namespace Arcontio.Core
         {
             // Scrittura del componente oggettivo (fact).
             FoodStocks[objectId] = stock;
+            SyncLegacyFoodStockToObjectStack(objectId, stock);
 
             // Se lo stock è privato di un NPC, aggiungiamo (o aggiorniamo) la belief pinned.
             // Nota: questo non significa che l'NPC lo "vede ora", significa che lo stock è stato
@@ -5330,6 +5331,94 @@ namespace Arcontio.Core
                     EnsurePinnedFoodStockBelief(stock.OwnerId, objectId, obj.CellX, obj.CellY);
                 }
             }
+        }
+
+        // =============================================================================
+        // TryGetAvailableFoodObjectFacts
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce i fatti operativi minimi di un oggetto-cibo grounded.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: food object canonico, legacy passivo</b></para>
+        /// <para>
+        /// Da C8.10 il consumo ordinario non deve piu' dipendere da
+        /// <see cref="FoodStockComponent"/>. Questa query riconosce il cibo dal
+        /// catalogo oggetti e usa <see cref="ObjectStackComponent"/> come quantita'
+        /// primaria; il vecchio componente stock resta solo fallback di compatibilita'
+        /// per dati non ancora migrati.
+        /// </para>
+        /// </summary>
+        public bool TryGetAvailableFoodObjectFacts(
+            int objectId,
+            bool requireCommunityOwner,
+            out string defId,
+            out int quantity,
+            out int cellX,
+            out int cellY)
+        {
+            defId = string.Empty;
+            quantity = 0;
+            cellX = 0;
+            cellY = 0;
+
+            if (!Objects.TryGetValue(objectId, out var obj) || obj == null || obj.IsHeld)
+                return false;
+
+            defId = obj.DefId ?? string.Empty;
+            ObjectFoodNutritionResult nutrition = ObjectFoodNutritionResolver.Resolve(
+                this,
+                defId,
+                Global.Needs.eatSatietyGain,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+            if (!nutrition.IsConsumableFood)
+                return false;
+
+            OwnerKind ownerKind = obj.OwnerKind;
+            int ownerId = obj.OwnerId;
+            if (FoodStocks.TryGetValue(objectId, out var legacyStock))
+            {
+                ownerKind = legacyStock.OwnerKind;
+                ownerId = legacyStock.OwnerId;
+            }
+
+            if (requireCommunityOwner && (ownerKind != OwnerKind.Community || ownerId != 0))
+                return false;
+
+            if (ObjectStacks.TryGetValue(objectId, out var stack) && stack != null)
+                quantity = stack.Quantity;
+            else if (FoodStocks.TryGetValue(objectId, out legacyStock))
+                quantity = legacyStock.Units;
+            else
+                quantity = 1;
+
+            if (quantity <= 0)
+                return false;
+
+            cellX = obj.CellX;
+            cellY = obj.CellY;
+            return true;
+        }
+
+        private void SyncLegacyFoodStockToObjectStack(int objectId, FoodStockComponent stock)
+        {
+            if (!Objects.TryGetValue(objectId, out var obj) || obj == null)
+                return;
+
+            if (!TryGetObjectDef(obj.DefId, out var def) || def == null)
+                return;
+
+            if (!ObjectInventoryStackResolver.CanUseStackComponent(def))
+                return;
+
+            if (stock.Units <= 0)
+            {
+                ObjectStacks.Remove(objectId);
+                return;
+            }
+
+            ObjectStacks[objectId] = new ObjectStackComponent(stock.Units);
         }
 
         /// <summary>
@@ -6234,6 +6323,25 @@ namespace Arcontio.Core
             out ObjectFoodNutritionResult nutrition,
             out string reason)
         {
+            return TryConsumeInventoryFood(
+                npcId,
+                foodDefId,
+                0,
+                NpcInventorySlotKind.None,
+                out result,
+                out nutrition,
+                out reason);
+        }
+
+        public bool TryConsumeInventoryFood(
+            int npcId,
+            string foodDefId,
+            int objectId,
+            NpcInventorySlotKind requiredSlot,
+            out InventoryMutationResult result,
+            out ObjectFoodNutritionResult nutrition,
+            out string reason)
+        {
             result = InventoryMutationResult.None;
             nutrition = default;
             reason = string.Empty;
@@ -6247,7 +6355,7 @@ namespace Arcontio.Core
             string normalizedFoodDefId = foodDefId == null ? string.Empty : foodDefId.Trim();
             if (string.IsNullOrWhiteSpace(normalizedFoodDefId))
             {
-                if (!SelectBestFoodOnSelf(npcId, out normalizedFoodDefId, out _, out _))
+                if (!TrySelectBestFoodForConsumptionSlot(npcId, requiredSlot, out normalizedFoodDefId, out _, out _))
                 {
                     reason = "InventoryFoodMissing";
                     return false;
@@ -6267,11 +6375,216 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!TryRemoveInventoryItem(npcId, normalizedFoodDefId, 1, out result, out reason))
+            if (!TryRemoveInventoryFoodFromSlot(npcId, normalizedFoodDefId, objectId, requiredSlot, out result, out reason))
                 return false;
 
             reason = "InventoryFoodConsumed";
             return result.HasMutation;
+        }
+
+        private bool TryRemoveInventoryFoodFromSlot(
+            int npcId,
+            string defId,
+            int objectId,
+            NpcInventorySlotKind requiredSlot,
+            out InventoryMutationResult result,
+            out string reason)
+        {
+            result = InventoryMutationResult.None;
+            reason = string.Empty;
+
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+            {
+                reason = "InventoryMissing";
+                return false;
+            }
+
+            bool requireSpecificSlot = requiredSlot != NpcInventorySlotKind.None;
+            bool requireAnyHand = requiredSlot == NpcInventorySlotKind.None;
+            string normalizedDefId = defId == null ? string.Empty : defId.Trim();
+
+            for (int i = inventory.Entries.Count - 1; i >= 0; i--)
+            {
+                var entry = inventory.Entries[i];
+                if (entry == null)
+                    continue;
+
+                if (objectId > 0 && entry.ObjectId != objectId)
+                    continue;
+
+                if (requireSpecificSlot && entry.SlotKind != requiredSlot)
+                    continue;
+
+                if (requireAnyHand && !IsHandSlot(entry.SlotKind))
+                    continue;
+
+                if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int entryQuantity)
+                    || !string.Equals(obj.DefId, normalizedDefId, StringComparison.OrdinalIgnoreCase)
+                    || entryQuantity <= 0)
+                {
+                    continue;
+                }
+
+                NpcInventorySlotKind slot = entry.SlotKind;
+                if (ObjectStacks.TryGetValue(entry.ObjectId, out var stack) && stack != null)
+                {
+                    stack.Quantity -= 1;
+                    if (stack.Quantity > 0)
+                    {
+                        result = new InventoryMutationResult(npcId, entry.ObjectId, obj.DefId, 1, slot, slot);
+                        reason = "InventoryFoodRemovedFromHand";
+                        return true;
+                    }
+                }
+
+                ObjectStacks.Remove(entry.ObjectId);
+                FoodStocks.Remove(entry.ObjectId);
+                Objects.Remove(entry.ObjectId);
+                inventory.Entries.RemoveAt(i);
+                MarkNearbyNpcPerceptionDirty(obj.CellX, obj.CellY);
+
+                result = new InventoryMutationResult(npcId, entry.ObjectId, obj.DefId, 1, slot, slot);
+                reason = "InventoryFoodRemovedFromHand";
+                return true;
+            }
+
+            reason = requiredSlot == NpcInventorySlotKind.None
+                ? "InventoryFoodMissingInHand"
+                : "InventoryFoodMissingInRequiredSlot";
+            return false;
+        }
+
+        private bool TrySelectBestFoodForConsumptionSlot(
+            int npcId,
+            NpcInventorySlotKind requiredSlot,
+            out string foodDefId,
+            out int quantity,
+            out float nutritionValue)
+        {
+            if (requiredSlot != NpcInventorySlotKind.None)
+                return SelectBestFoodOnSelf(npcId, requiredSlot, out foodDefId, out quantity, out nutritionValue);
+
+            bool left = SelectBestFoodOnSelf(npcId, NpcInventorySlotKind.HandLeft, out string leftDefId, out int leftQuantity, out float leftNutrition);
+            bool right = SelectBestFoodOnSelf(npcId, NpcInventorySlotKind.HandRight, out string rightDefId, out int rightQuantity, out float rightNutrition);
+
+            if (!left && !right)
+            {
+                foodDefId = string.Empty;
+                quantity = 0;
+                nutritionValue = 0f;
+                return false;
+            }
+
+            if (right && (!left || rightNutrition > leftNutrition))
+            {
+                foodDefId = rightDefId;
+                quantity = rightQuantity;
+                nutritionValue = rightNutrition;
+                return true;
+            }
+
+            foodDefId = leftDefId;
+            quantity = leftQuantity;
+            nutritionValue = leftNutrition;
+            return true;
+        }
+
+        public bool TryGetFirstInventoryObjectInSlot(
+            int npcId,
+            NpcInventorySlotKind slot,
+            out int objectId)
+        {
+            objectId = 0;
+
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+                return false;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (entry == null || entry.SlotKind != slot || entry.ObjectId <= 0)
+                    continue;
+
+                objectId = entry.ObjectId;
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool CanMoveInventoryObjectToSlot(
+            int npcId,
+            int objectId,
+            NpcInventorySlotKind targetSlot,
+            out string reason)
+        {
+            reason = string.Empty;
+
+            if (!ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+            {
+                reason = "InventoryMissing";
+                return false;
+            }
+
+            var entry = FindInventoryEntryByObjectId(inventory, objectId);
+            if (entry == null)
+            {
+                reason = "InventoryObjectMissing";
+                return false;
+            }
+
+            if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out ObjectDef def, out int quantity)
+                || obj == null
+                || def == null)
+            {
+                reason = "InventoryObjectInvalid";
+                return false;
+            }
+
+            if (!obj.IsHeld || obj.HolderNpcId != npcId)
+            {
+                reason = "ObjectNotHeldByNpc";
+                return false;
+            }
+
+            if (!IsOperationalInventorySlot(targetSlot))
+            {
+                reason = "InventorySlotInvalid";
+                return false;
+            }
+
+            if (entry.SlotKind == targetSlot)
+            {
+                reason = "InventoryObjectAlreadyInSlot";
+                return true;
+            }
+
+            if (!CanObjectBePlacedInSlot(def, targetSlot))
+            {
+                reason = "InventoryPlacementNotAllowed";
+                return false;
+            }
+
+            int slotBulkFree = ResolveSlotBulkCapacityUnits(npcId, targetSlot) - GetInventoryUsedBulkUnits(npcId, targetSlot);
+            int slotWeightFree = ResolveSlotWeightCapacityUnits(npcId, targetSlot) - GetInventoryUsedWeightUnits(npcId, targetSlot);
+            if (!ObjectInventoryCapacityResolver.CanFitQuantityInSlot(def, quantity, slotBulkFree, slotWeightFree, out bool bulkFits, out bool weightFits))
+            {
+                reason = !bulkFits
+                    ? "InventoryTargetSlotBulkFull"
+                    : !weightFits
+                        ? "InventoryTargetSlotWeightFull"
+                        : "InventoryTargetSlotFull";
+                return false;
+            }
+
+            reason = "InventoryObjectCanMove";
+            return true;
         }
 
         // =============================================================================
@@ -6409,6 +6722,11 @@ namespace Arcontio.Core
         /// </summary>
         public int GetInventoryQuantity(int npcId, string defId)
         {
+            return GetInventoryQuantity(npcId, defId, NpcInventorySlotKind.None);
+        }
+
+        public int GetInventoryQuantity(int npcId, string defId, NpcInventorySlotKind slot)
+        {
             if (string.IsNullOrWhiteSpace(defId)
                 || !NpcInventories.TryGetValue(npcId, out var inventory)
                 || inventory == null)
@@ -6420,6 +6738,12 @@ namespace Arcontio.Core
             for (int i = 0; i < inventory.Entries.Count; i++)
             {
                 var entry = inventory.Entries[i];
+                if (entry == null)
+                    continue;
+
+                if (slot != NpcInventorySlotKind.None && entry.SlotKind != slot)
+                    continue;
+
                 if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int quantity)
                     || !string.Equals(obj.DefId, defId, StringComparison.OrdinalIgnoreCase))
                 {
@@ -6516,6 +6840,21 @@ namespace Arcontio.Core
             out int quantity,
             out float nutritionValue)
         {
+            return SelectBestFoodOnSelf(
+                npcId,
+                NpcInventorySlotKind.None,
+                out foodDefId,
+                out quantity,
+                out nutritionValue);
+        }
+
+        public bool SelectBestFoodOnSelf(
+            int npcId,
+            NpcInventorySlotKind requiredSlot,
+            out string foodDefId,
+            out int quantity,
+            out float nutritionValue)
+        {
             foodDefId = string.Empty;
             quantity = 0;
             nutritionValue = 0f;
@@ -6526,6 +6865,12 @@ namespace Arcontio.Core
             for (int i = 0; i < inventory.Entries.Count; i++)
             {
                 var entry = inventory.Entries[i];
+                if (entry == null)
+                    continue;
+
+                if (requiredSlot != NpcInventorySlotKind.None && entry.SlotKind != requiredSlot)
+                    continue;
+
                 if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int entryQuantity)
                     || entryQuantity <= 0
                     || string.IsNullOrWhiteSpace(obj.DefId))
@@ -7641,6 +7986,7 @@ if (!NpcAction.ContainsKey(id))
             ClearObjectPerceptionRelations(objectId);
             ObjectUse.Remove(objectId);
             FoodStocks.Remove(objectId);
+            ObjectStacks.Remove(objectId);
             ObjectOccluders.Remove(objectId);
 
             // 4) rimuovi dal registry oggetti
@@ -7758,9 +8104,27 @@ if (!NpcAction.ContainsKey(id))
         /// </summary>
         public bool TryPickUpObject(int npcId, int objectId, out int fromX, out int fromY, out string reason)
         {
+            return TryPickUpObject(
+                npcId,
+                objectId,
+                NpcInventorySlotKind.None,
+                out fromX,
+                out fromY,
+                out reason);
+        }
+
+        public bool TryPickUpObject(
+            int npcId,
+            int objectId,
+            NpcInventorySlotKind preferredSlot,
+            out int fromX,
+            out int fromY,
+            out string reason)
+        {
             bool picked = TryPickUpObject(
                 npcId,
                 objectId,
+                preferredSlot,
                 out ObjectPickupResult result,
                 out reason);
 
@@ -7789,6 +8153,21 @@ if (!NpcAction.ContainsKey(id))
         public bool TryPickUpObject(
             int npcId,
             int objectId,
+            out ObjectPickupResult result,
+            out string reason)
+        {
+            return TryPickUpObject(
+                npcId,
+                objectId,
+                NpcInventorySlotKind.None,
+                out result,
+                out reason);
+        }
+
+        public bool TryPickUpObject(
+            int npcId,
+            int objectId,
+            NpcInventorySlotKind preferredSlot,
             out ObjectPickupResult result,
             out string reason)
         {
@@ -7861,6 +8240,24 @@ if (!NpcAction.ContainsKey(id))
                 return false;
             }
 
+            var normalizedPreferredSlot = preferredSlot;
+            if (normalizedPreferredSlot != NpcInventorySlotKind.None)
+            {
+                return TryPickUpObjectWithPreferredSlot(
+                    npcId,
+                    objectId,
+                    obj,
+                    def,
+                    groundStack,
+                    requestedQuantity,
+                    canUseStack,
+                    normalizedPreferredSlot,
+                    fromX,
+                    fromY,
+                    out result,
+                    out reason);
+            }
+
             if (!TryResolvePickupSlotAndQuantity(
                     npcId,
                     def,
@@ -7887,6 +8284,12 @@ if (!NpcAction.ContainsKey(id))
                 // Lo stack originale resta a terra. Il nuovo objectId rappresenta
                 // solo la parte effettivamente presa dall'NPC.
                 groundStack.Quantity -= quantityToPick;
+                if (FoodStocks.TryGetValue(objectId, out var legacyStock))
+                {
+                    legacyStock.Units = groundStack.Quantity;
+                    FoodStocks[objectId] = legacyStock;
+                }
+
                 ObjectStacks[pickedObjectId] = new ObjectStackComponent(quantityToPick);
 
                 inventory.Entries.Add(new NpcInventoryEntry
@@ -7930,6 +8333,7 @@ if (!NpcAction.ContainsKey(id))
 
             obj.IsHeld = true;
             obj.HolderNpcId = npcId;
+            FoodStocks.Remove(objectId);
 
             if (ObjectInventoryStackResolver.CanUseStackComponent(def) && !ObjectStacks.ContainsKey(objectId))
                 ObjectStacks[objectId] = new ObjectStackComponent(1);
@@ -7955,6 +8359,290 @@ if (!NpcAction.ContainsKey(id))
                 false);
             reason = "ObjectPickedUp";
             return true;
+        }
+
+        private bool TryPickUpObjectWithPreferredSlot(
+            int npcId,
+            int objectId,
+            WorldObjectInstance obj,
+            ObjectDef def,
+            ObjectStackComponent groundStack,
+            int requestedQuantity,
+            bool canUseStack,
+            NpcInventorySlotKind preferredSlot,
+            int fromX,
+            int fromY,
+            out ObjectPickupResult result,
+            out string reason)
+        {
+            result = ObjectPickupResult.None;
+            reason = string.Empty;
+
+            if (!IsOperationalInventorySlot(preferredSlot))
+            {
+                reason = "InventoryPreferredSlotInvalid";
+                return false;
+            }
+
+            if (!CanObjectBePlacedInSlot(def, preferredSlot))
+            {
+                reason = "InventoryPreferredSlotNotAllowed";
+                return false;
+            }
+
+            bool hasStackComponent = groundStack != null;
+            int preferredQuantity = preferredSlot == NpcInventorySlotKind.Pack || !hasStackComponent
+                ? requestedQuantity
+                : 1;
+
+            int preferredAddable = ResolveAddableInventoryQuantity(npcId, def, preferredSlot, preferredQuantity);
+            if (preferredAddable < preferredQuantity)
+            {
+                reason = IsHandSlot(preferredSlot) ? "InventoryPreferredHandFull" : "InventoryPreferredSlotFull";
+                return false;
+            }
+
+            int packQuantity = 0;
+            if (hasStackComponent && preferredSlot != NpcInventorySlotKind.Pack)
+            {
+                int remainingAfterPreferred = requestedQuantity - preferredQuantity;
+                if (remainingAfterPreferred > 0 && CanObjectBePlacedInSlot(def, NpcInventorySlotKind.Pack))
+                {
+                    int reservedWeight = ResolveObjectWeightUnits(def) * preferredQuantity;
+                    packQuantity = ResolveAddableInventoryQuantityWithReservedWeight(
+                        npcId,
+                        def,
+                        NpcInventorySlotKind.Pack,
+                        remainingAfterPreferred,
+                        reservedWeight);
+                }
+            }
+
+            int totalPicked = preferredQuantity + packQuantity;
+            if (totalPicked <= 0)
+            {
+                reason = "InventoryFull";
+                return false;
+            }
+
+            int quantityRemainingOnGround = Math.Max(0, requestedQuantity - totalPicked);
+            var inventory = EnsureNpcInventory(npcId);
+
+            if (!canUseStack || !hasStackComponent)
+            {
+                ClearGroundObjectForPickup(objectId, obj, def, fromX, fromY);
+                FoodStocks.Remove(objectId);
+                obj.IsHeld = true;
+                obj.HolderNpcId = npcId;
+                if (ObjectInventoryStackResolver.CanUseStackComponent(def) && !ObjectStacks.ContainsKey(objectId))
+                    ObjectStacks[objectId] = new ObjectStackComponent(1);
+
+                inventory.Entries.Add(new NpcInventoryEntry
+                {
+                    EntryId = inventory.AllocateEntryId(),
+                    ObjectId = objectId,
+                    SlotKind = preferredSlot,
+                    ContainerObjectId = 0
+                });
+
+                result = new ObjectPickupResult(
+                    npcId,
+                    objectId,
+                    objectId,
+                    obj.DefId,
+                    1,
+                    0,
+                    fromX,
+                    fromY,
+                    preferredSlot,
+                    false);
+                reason = "ObjectPickedUpPreferredSlot";
+                return true;
+            }
+
+            int preferredObjectId;
+            if (quantityRemainingOnGround > 0)
+            {
+                groundStack.Quantity = quantityRemainingOnGround;
+                if (FoodStocks.TryGetValue(objectId, out var legacyStock))
+                {
+                    legacyStock.Units = quantityRemainingOnGround;
+                    FoodStocks[objectId] = legacyStock;
+                }
+
+                preferredObjectId = CreateHeldStackInventoryEntry(
+                    npcId,
+                    inventory,
+                    obj.DefId,
+                    obj.OwnerKind,
+                    obj.OwnerId,
+                    preferredSlot,
+                    preferredQuantity);
+
+                if (preferredObjectId <= 0)
+                {
+                    reason = "ObjectCreateFailed";
+                    return false;
+                }
+
+                if (packQuantity > 0
+                    && CreateHeldStackInventoryEntry(
+                        npcId,
+                        inventory,
+                        obj.DefId,
+                        obj.OwnerKind,
+                        obj.OwnerId,
+                        NpcInventorySlotKind.Pack,
+                        packQuantity) <= 0)
+                {
+                    reason = "ObjectCreateFailed";
+                    return false;
+                }
+
+                MarkNearbyNpcPerceptionDirty(fromX, fromY);
+                result = new ObjectPickupResult(
+                    npcId,
+                    objectId,
+                    preferredObjectId,
+                    obj.DefId,
+                    totalPicked,
+                    quantityRemainingOnGround,
+                    fromX,
+                    fromY,
+                    preferredSlot,
+                    true);
+                reason = "ObjectStackPartiallyPickedUpPreferredSlot";
+                return true;
+            }
+
+            ClearGroundObjectForPickup(objectId, obj, def, fromX, fromY);
+            FoodStocks.Remove(objectId);
+            if (packQuantity > 0)
+            {
+                groundStack.Quantity = packQuantity;
+                obj.IsHeld = true;
+                obj.HolderNpcId = npcId;
+                inventory.Entries.Add(new NpcInventoryEntry
+                {
+                    EntryId = inventory.AllocateEntryId(),
+                    ObjectId = objectId,
+                    SlotKind = NpcInventorySlotKind.Pack,
+                    ContainerObjectId = 0
+                });
+
+                preferredObjectId = CreateHeldStackInventoryEntry(
+                    npcId,
+                    inventory,
+                    obj.DefId,
+                    obj.OwnerKind,
+                    obj.OwnerId,
+                    preferredSlot,
+                    preferredQuantity);
+            }
+            else
+            {
+                groundStack.Quantity = preferredQuantity;
+                obj.IsHeld = true;
+                obj.HolderNpcId = npcId;
+                inventory.Entries.Add(new NpcInventoryEntry
+                {
+                    EntryId = inventory.AllocateEntryId(),
+                    ObjectId = objectId,
+                    SlotKind = preferredSlot,
+                    ContainerObjectId = 0
+                });
+                preferredObjectId = objectId;
+            }
+
+            if (preferredObjectId <= 0)
+            {
+                reason = "ObjectCreateFailed";
+                return false;
+            }
+
+            result = new ObjectPickupResult(
+                npcId,
+                objectId,
+                preferredObjectId,
+                obj.DefId,
+                totalPicked,
+                0,
+                fromX,
+                fromY,
+                preferredSlot,
+                false);
+            reason = "ObjectStackPickedUpPreferredSlot";
+            return true;
+        }
+
+        private int CreateHeldStackInventoryEntry(
+            int npcId,
+            NpcInventoryState inventory,
+            string defId,
+            OwnerKind ownerKind,
+            int ownerId,
+            NpcInventorySlotKind slot,
+            int quantity)
+        {
+            if (inventory == null || quantity <= 0)
+                return -1;
+
+            int heldObjectId = CreateHeldInventoryObject(npcId, defId, ownerKind, ownerId);
+            if (heldObjectId <= 0)
+                return -1;
+
+            ObjectStacks[heldObjectId] = new ObjectStackComponent(quantity);
+            inventory.Entries.Add(new NpcInventoryEntry
+            {
+                EntryId = inventory.AllocateEntryId(),
+                ObjectId = heldObjectId,
+                SlotKind = slot,
+                ContainerObjectId = 0
+            });
+
+            return heldObjectId;
+        }
+
+        private int ResolveAddableInventoryQuantityWithReservedWeight(
+            int npcId,
+            ObjectDef def,
+            NpcInventorySlotKind slot,
+            int requestedQuantity,
+            int reservedWeightUnits)
+        {
+            int totalWeightFree = ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                GetInventoryTotalWeightCapacityUnits(npcId),
+                GetInventoryUsedWeightUnits(npcId) + Math.Max(0, reservedWeightUnits));
+            int slotBulkFree = ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                ResolveSlotBulkCapacityUnits(npcId, slot),
+                GetInventoryUsedBulkUnits(npcId, slot));
+            int slotWeightFree = ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                ResolveSlotWeightCapacityUnits(npcId, slot),
+                GetInventoryUsedWeightUnits(npcId, slot));
+
+            return ObjectInventoryCapacityResolver.ResolveAddableQuantity(
+                def,
+                requestedQuantity,
+                slotBulkFree,
+                slotWeightFree,
+                totalWeightFree);
+        }
+
+        private void ClearGroundObjectForPickup(int objectId, WorldObjectInstance obj, ObjectDef def, int fromX, int fromY)
+        {
+            if (_objIdByCell != null && _objIdByCell.Length == MapWidth * MapHeight && InBounds(fromX, fromY))
+            {
+                int idx = CellIndex(fromX, fromY);
+                if (_objIdByCell[idx] == objectId)
+                    _objIdByCell[idx] = -1;
+            }
+
+            RemoveGroundObjectFromPerceptionIndex(objectId, fromX, fromY);
+            MarkNearbyNpcPerceptionDirty(fromX, fromY);
+            ClearObjectPerceptionRelations(objectId);
+
+            if (def != null && (def.IsOccluder || def.BlocksVision || def.BlocksMovement))
+                ClearOccluderFromCache(objectId, fromX, fromY);
         }
 
         // =============================================================================

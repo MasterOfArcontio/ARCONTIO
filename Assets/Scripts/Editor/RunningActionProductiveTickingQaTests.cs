@@ -1558,6 +1558,25 @@ namespace Arcontio.Tests
 
         private static int RegisterCommunityFoodStock(World world, int objectId, int x, int y, int units)
         {
+            world.ObjectDefs["food_stock"] = new ObjectDef
+            {
+                Id = "food_stock",
+                DisplayName = "Food stock",
+                IsInteractable = true,
+                WeightUnits = 1,
+                BulkUnits = 1,
+                Stackable = true,
+                HasDurability = false,
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
+                Properties = new List<ObjectPropertyKV>
+                {
+                    new ObjectPropertyKV { Key = "FoodItem", Value = 1f },
+                    new ObjectPropertyKV { Key = "FoodStock", Value = 1f },
+                    new ObjectPropertyKV { Key = "NutritionValue", Value = 0.45f }
+                }
+            };
+
             world.Objects[objectId] = new WorldObjectInstance
             {
                 ObjectId = objectId,
@@ -1568,12 +1587,12 @@ namespace Arcontio.Tests
                 OwnerId = 0
             };
 
-            world.FoodStocks[objectId] = new FoodStockComponent
+            world.SetFoodStock(objectId, new FoodStockComponent
             {
                 Units = units,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
 
             return objectId;
         }

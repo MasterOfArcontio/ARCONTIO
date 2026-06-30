@@ -17,14 +17,33 @@
           ]
         },
         {
-          "phaseId": "consume_food",
+          "phaseId": "prepare_food_hand",
+          "kind": "Prepare",
+          "PerceptionState": "idle",
+          "isInterruptible": false,
+          "actions": [
+            {
+              "actionId": "prepare_left_hand",
+              "kind": "PrepareHand",
+              "payloadKey": "HandLeft"
+            }
+          ]
+        },
+        {
+          "phaseId": "take_and_consume_food",
           "kind": "Execute",
           "PerceptionState": "idle",
           "isInterruptible": false,
           "actions": [
             {
+              "actionId": "pickup_food_to_hand",
+              "kind": "PickUp",
+              "payloadKey": "HandLeft"
+            },
+            {
               "actionId": "consume_known_food",
-              "kind": "Consume"
+              "kind": "Consume",
+              "payloadKey": "HandLeft"
             }
           ]
         }

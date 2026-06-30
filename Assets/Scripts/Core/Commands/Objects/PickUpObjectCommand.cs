@@ -29,11 +29,18 @@ namespace Arcontio.Core
     {
         private readonly int _npcId;
         private readonly int _objectId;
+        private readonly NpcInventorySlotKind _preferredSlot;
 
         public PickUpObjectCommand(int npcId, int objectId)
+            : this(npcId, objectId, NpcInventorySlotKind.None)
+        {
+        }
+
+        public PickUpObjectCommand(int npcId, int objectId, NpcInventorySlotKind preferredSlot)
         {
             _npcId = npcId;
             _objectId = objectId;
+            _preferredSlot = preferredSlot;
         }
 
         public void Execute(World world, MessageBus bus)
@@ -41,7 +48,7 @@ namespace Arcontio.Core
             if (world == null)
                 return;
 
-            if (!world.TryPickUpObject(_npcId, _objectId, out ObjectPickupResult result, out string reason))
+            if (!world.TryPickUpObject(_npcId, _objectId, _preferredSlot, out ObjectPickupResult result, out string reason))
             {
                 Debug.LogWarning($"[ObjectTransportJob] PickUp failed npc={_npcId} object={_objectId} reason={reason}");
                 return;

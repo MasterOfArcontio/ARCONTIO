@@ -266,12 +266,13 @@ namespace Arcontio.Tests
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
             };
-            world.FoodStocks[77] = new FoodStockComponent
+            world.ObjectDefs["food_stock"] = CreateFoodStockDef();
+            world.SetFoodStock(77, new FoodStockComponent
             {
                 Units = 3,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
-            };
+            });
             var commands = new List<ICommand>();
 
             RunDecisionOrchestrator(world, tick: 0);
@@ -543,15 +544,7 @@ namespace Arcontio.Tests
 
         private static void RegisterInteractableFoodStock(World world, int objectId, int x, int y)
         {
-            world.ObjectDefs["food_stock"] = new ObjectDef
-            {
-                Id = "food_stock",
-                DisplayName = "Food stock",
-                IsInteractable = true,
-                IsOccluder = false,
-                BlocksMovement = false,
-                BlocksVision = false
-            };
+            world.ObjectDefs["food_stock"] = CreateFoodStockDef();
 
             world.Objects[objectId] = new WorldObjectInstance
             {
@@ -563,11 +556,36 @@ namespace Arcontio.Tests
                 OwnerId = 0
             };
 
-            world.FoodStocks[objectId] = new FoodStockComponent
+            world.SetFoodStock(objectId, new FoodStockComponent
             {
                 Units = 3,
                 OwnerKind = OwnerKind.Community,
                 OwnerId = 0
+            });
+        }
+
+        private static ObjectDef CreateFoodStockDef()
+        {
+            return new ObjectDef
+            {
+                Id = "food_stock",
+                DisplayName = "Food stock",
+                IsInteractable = true,
+                IsOccluder = false,
+                BlocksMovement = false,
+                BlocksVision = false,
+                WeightUnits = 1,
+                BulkUnits = 1,
+                Stackable = true,
+                HasDurability = false,
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
+                Properties = new List<ObjectPropertyKV>
+                {
+                    new ObjectPropertyKV { Key = "FoodItem", Value = 1f },
+                    new ObjectPropertyKV { Key = "FoodStock", Value = 1f },
+                    new ObjectPropertyKV { Key = "NutritionValue", Value = 0.45f }
+                }
             };
         }
 

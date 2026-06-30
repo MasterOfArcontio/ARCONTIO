@@ -102,7 +102,7 @@ namespace Arcontio.Tests
         public void MoveInventoryObjectCommandMovesPackToHandAndPublishesSingleMovedEvent()
         {
             var world = MakeWorld(out int npcId);
-            Assert.That(world.TryAddInventoryItem(npcId, "berry", 2, out _, out _), Is.True);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 2, NpcInventorySlotKind.HandLeft, 0, out int addedBerry, out string addBerryReason), Is.True, addBerryReason);
             int objectId = world.NpcInventories[npcId].Entries[0].ObjectId;
             var bus = new MessageBus();
 
@@ -206,8 +206,8 @@ namespace Arcontio.Tests
         public void ConsumeInventoryItemCommandAutoSelectsMostNutritiousFood()
         {
             var world = MakeWorld(out int npcId);
-            Assert.That(world.TryAddInventoryItem(npcId, "acorn", 1, out _, out _), Is.True);
-            Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, out _, out _), Is.True);
+            Assert.That(world.TryAddInventoryItem(npcId, "acorn", 1, NpcInventorySlotKind.HandLeft, 0, out int addedAcorn, out string addAcornReason), Is.True, addAcornReason);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, NpcInventorySlotKind.HandLeft, 0, out int addedBerry, out string addBerryReason), Is.True, addBerryReason);
             var bus = new MessageBus();
 
             new ConsumeInventoryItemCommand(npcId).Execute(world, bus);
@@ -252,7 +252,7 @@ namespace Arcontio.Tests
         public void ConsumeInventoryItemCommandRemovesLastStackObject()
         {
             var world = MakeWorld(out int npcId);
-            Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, out _, out _), Is.True);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, NpcInventorySlotKind.HandLeft, 0, out int addedBerry, out string addBerryReason), Is.True, addBerryReason);
             int objectId = world.NpcInventories[npcId].Entries[0].ObjectId;
             var bus = new MessageBus();
 
@@ -273,7 +273,7 @@ namespace Arcontio.Tests
         public void EatPrivateFoodCommandUsesTypedInventoryAlias()
         {
             var world = MakeWorld(out int npcId);
-            Assert.That(world.TryAddInventoryItem(npcId, "acorn", 1, out _, out _), Is.True);
+            Assert.That(world.TryAddInventoryItem(npcId, "acorn", 1, NpcInventorySlotKind.HandLeft, 0, out int addedAcorn, out string addAcornReason), Is.True, addAcornReason);
             var bus = new MessageBus();
 
             new EatPrivateFoodCommand(npcId).Execute(world, bus);
@@ -411,6 +411,35 @@ namespace Arcontio.Tests
             Assert.That(world.ObjectStacks[groundObjectId].Quantity, Is.EqualTo(5));
             Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(1));
             Assert.That(world.NpcInventories[npcId].Entries[0].ObjectId, Is.EqualTo(groundObjectId));
+        }
+
+        [Test]
+        public void PickUpPreferredHandSplitsOneUnitToHandAndRestToPack()
+        {
+            var world = MakeWorld(out int npcId);
+            int groundObjectId = world.CreateObject("food_stock", 1, 1, OwnerKind.Community, 0);
+            world.ObjectStacks[groundObjectId] = new ObjectStackComponent(5);
+            var bus = new MessageBus();
+
+            new PickUpObjectCommand(npcId, groundObjectId, NpcInventorySlotKind.HandLeft).Execute(world, bus);
+
+            Assert.That(bus.Count, Is.EqualTo(1));
+            Assert.That(world.GetObjectAt(1, 1), Is.EqualTo(-1));
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(2));
+            int handQuantity = 0;
+            int packQuantity = 0;
+            foreach (var entry in world.NpcInventories[npcId].Entries)
+            {
+                int quantity = world.ObjectStacks[entry.ObjectId].Quantity;
+                if (entry.SlotKind == NpcInventorySlotKind.HandLeft)
+                    handQuantity += quantity;
+                if (entry.SlotKind == NpcInventorySlotKind.Pack)
+                    packQuantity += quantity;
+            }
+
+            Assert.That(handQuantity, Is.EqualTo(1));
+            Assert.That(packQuantity, Is.EqualTo(4));
+            Assert.That(world.GetInventoryQuantity(npcId, "food_stock", NpcInventorySlotKind.HandLeft), Is.EqualTo(1));
         }
 
         [Test]

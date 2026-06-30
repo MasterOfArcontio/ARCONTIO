@@ -464,16 +464,20 @@ namespace Arcontio.Core
 
         private static bool HasAvailableFoodAtCell(World world, int cellX, int cellY)
         {
-            foreach (var pair in world.FoodStocks)
+            foreach (var pair in world.Objects)
             {
-                if (pair.Value.Units <= 0)
-                    continue;
-
-                if (!world.Objects.TryGetValue(pair.Key, out var obj) || obj == null)
-                    continue;
-
-                if (obj.CellX == cellX && obj.CellY == cellY)
+                if (world.TryGetAvailableFoodObjectFacts(
+                        pair.Key,
+                        requireCommunityOwner: false,
+                        out _,
+                        out _,
+                        out int x,
+                        out int y)
+                    && x == cellX
+                    && y == cellY)
+                {
                     return true;
+                }
             }
 
             return false;
