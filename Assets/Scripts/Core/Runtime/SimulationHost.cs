@@ -3604,7 +3604,7 @@ namespace Arcontio.Core
             _world.SetFoodStock(foodPrivateHidden, new FoodStockComponent { Units = 2, OwnerKind = OwnerKind.Npc, OwnerId = npc2 });
            
             // --- Cibo personale NPC5 ---
-            _world.TryAddInventoryItem(npc5, "berry", _world.Global.InventoryMaxUnits, out _, out _);
+            _world.TryAddInventoryItem(npc5, "berry", _world.GetInventoryFreeBulkUnits(npc5, NpcInventorySlotKind.Pack), out _, out _);
 
 
             ArcontioLogger.Info(
@@ -3757,7 +3757,7 @@ namespace Arcontio.Core
             _world.SetFoodStock(foodPrivateHidden, new FoodStockComponent { Units = 2, OwnerKind = OwnerKind.Npc, OwnerId = npc2 });
 
             // --- Cibo personale NPC5 ---
-            _world.TryAddInventoryItem(npc5, "berry", _world.Global.InventoryMaxUnits, out _, out _);
+            _world.TryAddInventoryItem(npc5, "berry", _world.GetInventoryFreeBulkUnits(npc5, NpcInventorySlotKind.Pack), out _, out _);
    */
 
      /*       ArcontioLogger.Info(

@@ -773,7 +773,6 @@ namespace Arcontio.Core.Config
     [Serializable]
     public sealed class InventoryParams
     {
-        public int inventory_max_units = 3;
         public int hand_bulk_capacity_units = 6;
         public int base_hand_weight_units = 4;
         public int strength_hand_weight_bonus_units = 8;

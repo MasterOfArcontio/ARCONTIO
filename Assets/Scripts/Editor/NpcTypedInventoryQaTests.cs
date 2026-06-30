@@ -45,8 +45,8 @@ namespace Arcontio.Tests
             Assert.That(addedFirst, Is.EqualTo(2));
             Assert.That(addedSecond, Is.EqualTo(1));
             Assert.That(world.GetInventoryQuantity(npcId, "berry"), Is.EqualTo(3));
-            Assert.That(world.GetInventoryUsedUnits(npcId), Is.EqualTo(3));
-            Assert.That(world.GetInventoryFreeCapacity(npcId), Is.EqualTo(0));
+            Assert.That(world.GetInventoryUsedBulkUnits(npcId), Is.EqualTo(3));
+            Assert.That(InvokeWorldInt(world, "GetInventoryFreeBulkUnits", npcId), Is.EqualTo(0));
             Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(1));
             var entry = world.NpcInventories[npcId].Entries[0];
             Assert.That(entry.ObjectId, Is.GreaterThan(0));
@@ -67,7 +67,7 @@ namespace Arcontio.Tests
             Assert.That(added, Is.True, reason);
             Assert.That(addedQuantity, Is.EqualTo(3));
             Assert.That(world.GetInventoryQuantity(npcId, "acorn"), Is.EqualTo(3));
-            Assert.That(world.GetInventoryFreeCapacity(npcId), Is.EqualTo(0));
+            Assert.That(InvokeWorldInt(world, "GetInventoryFreeBulkUnits", npcId), Is.EqualTo(0));
         }
 
         [Test]
@@ -82,7 +82,7 @@ namespace Arcontio.Tests
             Assert.That(missingReason, Is.EqualTo("ObjectDefMissing"));
             Assert.That(nonTransportable, Is.False);
             Assert.That(bedReason, Is.EqualTo("ObjectDefNotTransportable"));
-            Assert.That(world.GetInventoryUsedUnits(npcId), Is.EqualTo(0));
+            Assert.That(world.GetInventoryUsedBulkUnits(npcId), Is.EqualTo(0));
         }
 
         [Test]
@@ -145,8 +145,8 @@ namespace Arcontio.Tests
 
             Assert.That(added, Is.True, reason);
             Assert.That(addedQuantity, Is.EqualTo(3));
-            Assert.That(world.GetInventoryUsedUnits(npcId), Is.EqualTo(3));
-            Assert.That(world.GetInventoryFreeCapacity(npcId), Is.EqualTo(0));
+            Assert.That(world.GetInventoryUsedBulkUnits(npcId), Is.EqualTo(3));
+            Assert.That(InvokeWorldInt(world, "GetInventoryFreeBulkUnits", npcId), Is.EqualTo(0));
         }
 
         [Test]
@@ -169,6 +169,7 @@ namespace Arcontio.Tests
             Assert.That(added, Is.True, reason);
             Assert.That(addedQuantity, Is.EqualTo(1));
             Assert.That(world.GetInventoryUsedWeightUnits(npcId), Is.EqualTo(25));
+            Assert.That(InvokeWorldInt(world, "GetInventoryFreeWeightUnits", npcId), Is.EqualTo(15));
             Assert.That(second, Is.False);
             Assert.That(secondAdded, Is.EqualTo(0));
             Assert.That(secondReason, Is.EqualTo("InventoryFull"));
@@ -276,7 +277,6 @@ namespace Arcontio.Tests
         private static World MakeWorld(out int npcId)
         {
             var world = new World(new WorldConfig(new SimulationParams()));
-            world.Global.InventoryMaxUnits = 3;
             world.Global.HandBulkCapacityUnits = 6;
             world.Global.BaseHandWeightUnits = 4;
             world.Global.StrengthHandWeightBonusUnits = 8;
@@ -398,6 +398,15 @@ namespace Arcontio.Tests
             MethodInfo method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
             Assert.That(method, Is.Not.Null, $"{methodName} deve essere un metodo pubblico statico.");
             return method.Invoke(null, args);
+        }
+
+        private static int InvokeWorldInt(World world, string methodName, params object[] args)
+        {
+            MethodInfo method = typeof(World).GetMethod(methodName, BindingFlags.Public | BindingFlags.Instance);
+            Assert.That(method, Is.Not.Null, $"{methodName} deve essere una query pubblica del World.");
+            object value = method.Invoke(world, args);
+            Assert.That(value, Is.TypeOf<int>());
+            return (int)value;
         }
 
         private static bool HasReflectedFlag(object flags, Type flagsType, string flagName)

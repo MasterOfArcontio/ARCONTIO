@@ -146,7 +146,6 @@ namespace Arcontio.Tests
         private static World MakeEmptyWorldWithDefs()
         {
             var world = new World(new WorldConfig(new SimulationParams()));
-            world.Global.InventoryMaxUnits = 12;
             world.Global.HandBulkCapacityUnits = 6;
             world.Global.BaseHandWeightUnits = 6;
             world.Global.StrengthHandWeightBonusUnits = 0;

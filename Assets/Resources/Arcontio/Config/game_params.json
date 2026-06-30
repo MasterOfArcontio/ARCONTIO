@@ -136,7 +136,6 @@
     }
   },
   "inventory": {
-    "inventory_max_units": 30,
     "hand_bulk_capacity_units": 6,
     "base_hand_weight_units": 4,
     "strength_hand_weight_bonus_units": 8,

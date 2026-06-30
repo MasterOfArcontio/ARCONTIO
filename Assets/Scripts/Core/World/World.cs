@@ -1244,13 +1244,9 @@ namespace Arcontio.Core
             // ============================================================
             // Inventory params (data-driven via game_params.json)
             // ============================================================
-            // Capienza inventario globale. Dalla C7 il cibo personale passa solo
-            // dagli oggetti typed in NpcInventories: non esiste piu' un contatore
-            // separato di cibo privato addosso all'NPC.
+            // C8.5 rimuove la capienza generica legacy: la capacita' reale passa
+            // da bulk e peso, totali e per slot.
             var invCfg = Config?.Sim != null ? Config.Sim.inventory : null;
-            int invMax = invCfg != null ? invCfg.inventory_max_units : 3;
-            if (invMax < 0) invMax = 0; // "0" Ã¨ valido: significa che non puÃ² trasportare nulla.
-            Global.InventoryMaxUnits = invMax;
             Global.HandBulkCapacityUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.hand_bulk_capacity_units : 6, 6);
             Global.BaseHandWeightUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.base_hand_weight_units : 4, 4);
             Global.StrengthHandWeightBonusUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.strength_hand_weight_bonus_units : 8, 8);
@@ -5407,30 +5403,6 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
-        // GetInventoryMaxUnits
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Restituisce la capienza massima dell'inventario personale di un NPC.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: query centrale della capienza</b></para>
-        /// <para>
-        /// Tutti i comandi che devono aggiungere o trasferire risorse devono passare
-        /// da questa API invece di duplicare il limite. In C1 la capienza e' ancora
-        /// globale e data-driven da <c>inventory_max_units</c>; override per ruolo,
-        /// corporatura o contenitori verranno aggiunti solo quando serviranno.
-        /// </para>
-        /// </summary>
-        public int GetInventoryMaxUnits(int npcId)
-        {
-            // npcId non e' ancora usato per override individuali. Tenerlo nella
-            // firma evita di cambiare tutti i call-site quando arriveranno zaini,
-            // tratti fisici o contenitori indossati.
-            return Global.InventoryMaxUnits;
-        }
-
-        // =============================================================================
         // GetInventoryTotalWeightCapacityUnits
         // =============================================================================
         /// <summary>
@@ -5473,49 +5445,6 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
-        // GetInventoryUsedUnits
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Calcola quante unita' di capienza sono occupate dall'inventario typed.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: inventario typed come unica fonte fisica</b></para>
-        /// <para>
-        /// Da questo checkpoint la capienza operativa guarda <see cref="NpcInventories"/>.
-        /// Il cibo personale non e' piu' un contatore separato: deve esistere come
-        /// oggetto fisico inventariato, con bulk, peso e stack risolti dal catalogo.
-        /// </para>
-        /// </summary>
-        public int GetInventoryUsedUnits(int npcId)
-        {
-            int used = GetInventoryUsedBulkUnits(npcId);
-            return used < 0 ? 0 : used;
-        }
-
-        // =============================================================================
-        // GetInventoryFreeCapacity
-        // =============================================================================
-        /// <summary>
-        /// <para>
-        /// Restituisce la capienza residua dell'inventario personale dell'NPC.
-        /// </para>
-        ///
-        /// <para><b>Principio architetturale: singola porta per i limiti di carico</b></para>
-        /// <para>
-        /// I comandi di aggiunta, furto, raccolta e trasferimento devono usare questa
-        /// funzione per rispettare il limite typed. La UI puo' mostrarla tramite
-        /// snapshot/view model, ma non deve mutare direttamente lo store.
-        /// </para>
-        /// </summary>
-        public int GetInventoryFreeCapacity(int npcId)
-        {
-            int max = GetInventoryMaxUnits(npcId);
-            int used = GetInventoryUsedUnits(npcId);
-            return ObjectInventoryCapacityResolver.ResolveFreeUnits(max, used);
-        }
-
-        // =============================================================================
         // GetInventoryUsedBulkUnits
         // =============================================================================
         /// <summary>
@@ -5535,7 +5464,27 @@ namespace Arcontio.Core
             return GetInventoryUsedBulkUnits(npcId, NpcInventorySlotKind.None);
         }
 
-        private int GetInventoryUsedBulkUnits(int npcId, NpcInventorySlotKind slotFilter)
+        // =============================================================================
+        // GetInventoryUsedBulkUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Somma l'ingombro fisico degli oggetti portati dall'NPC nello slot richiesto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query fisica esplicita per slot</b></para>
+        /// <para>
+        /// C8.5 espone bulk e peso come grandezze separate. I consumer che devono
+        /// ragionare su mano o pack non devono piu' passare da una capacita'
+        /// generica: chiedono direttamente l'ingombro usato nello slot.
+        /// </para>
+        /// </summary>
+        public int GetInventoryUsedBulkUnits(int npcId, NpcInventorySlotKind slot)
+        {
+            return GetInventoryUsedBulkUnitsInternal(npcId, slot);
+        }
+
+        private int GetInventoryUsedBulkUnitsInternal(int npcId, NpcInventorySlotKind slotFilter)
         {
             int used = 0;
             if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
@@ -5573,10 +5522,29 @@ namespace Arcontio.Core
         /// </summary>
         public int GetInventoryUsedWeightUnits(int npcId)
         {
-            return GetInventoryUsedWeightUnits(npcId, NpcInventorySlotKind.None);
+            return GetInventoryUsedWeightUnitsInternal(npcId, NpcInventorySlotKind.None);
         }
 
-        private int GetInventoryUsedWeightUnits(int npcId, NpcInventorySlotKind slotFilter)
+        // =============================================================================
+        // GetInventoryUsedWeightUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Somma il peso fisico degli oggetti portati dall'NPC nello slot richiesto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: peso separato dal bulk</b></para>
+        /// <para>
+        /// Il peso puo' bloccare trasporto e movimento anche quando resta spazio
+        /// fisico. Esporlo per slot evita che job e UI ricostruiscano la regola.
+        /// </para>
+        /// </summary>
+        public int GetInventoryUsedWeightUnits(int npcId, NpcInventorySlotKind slot)
+        {
+            return GetInventoryUsedWeightUnitsInternal(npcId, slot);
+        }
+
+        private int GetInventoryUsedWeightUnitsInternal(int npcId, NpcInventorySlotKind slotFilter)
         {
             int used = 0;
             if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
@@ -5595,6 +5563,90 @@ namespace Arcontio.Core
             }
 
             return used < 0 ? 0 : used;
+        }
+
+        // =============================================================================
+        // GetInventorySlotBulkCapacityUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce la capacita' bulk dello slot inventario richiesto.
+        /// </para>
+        /// </summary>
+        public int GetInventorySlotBulkCapacityUnits(int npcId, NpcInventorySlotKind slot)
+        {
+            return ResolveSlotBulkCapacityUnits(npcId, slot);
+        }
+
+        // =============================================================================
+        // GetInventorySlotWeightCapacityUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce la capacita' peso dello slot inventario richiesto.
+        /// </para>
+        /// </summary>
+        public int GetInventorySlotWeightCapacityUnits(int npcId, NpcInventorySlotKind slot)
+        {
+            return ResolveSlotWeightCapacityUnits(npcId, slot);
+        }
+
+        // =============================================================================
+        // GetInventoryFreeBulkUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il bulk libero complessivo del pack MVP.
+        /// </para>
+        /// </summary>
+        public int GetInventoryFreeBulkUnits(int npcId)
+        {
+            return GetInventoryFreeBulkUnits(npcId, NpcInventorySlotKind.Pack);
+        }
+
+        // =============================================================================
+        // GetInventoryFreeBulkUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il bulk libero nello slot richiesto.
+        /// </para>
+        /// </summary>
+        public int GetInventoryFreeBulkUnits(int npcId, NpcInventorySlotKind slot)
+        {
+            return ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                GetInventorySlotBulkCapacityUnits(npcId, slot),
+                GetInventoryUsedBulkUnits(npcId, slot));
+        }
+
+        // =============================================================================
+        // GetInventoryFreeWeightUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il peso totale ancora trasportabile dall'NPC.
+        /// </para>
+        /// </summary>
+        public int GetInventoryFreeWeightUnits(int npcId)
+        {
+            return ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                GetInventoryTotalWeightCapacityUnits(npcId),
+                GetInventoryUsedWeightUnits(npcId));
+        }
+
+        // =============================================================================
+        // GetInventoryFreeWeightUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il peso libero nello slot richiesto.
+        /// </para>
+        /// </summary>
+        public int GetInventoryFreeWeightUnits(int npcId, NpcInventorySlotKind slot)
+        {
+            return ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                GetInventorySlotWeightCapacityUnits(npcId, slot),
+                GetInventoryUsedWeightUnits(npcId, slot));
         }
 
         // =============================================================================
@@ -8370,13 +8422,8 @@ if (!NpcAction.ContainsKey(id))
         public int LandmarkEvictionCooldownTicks;
 
         // --- Inventory / Carry capacity ---
-        //
-        // NOTA:
-        // - "InventoryMaxUnits" Ã¨ la capienza massima (in unitÃ ) dell'inventario di un NPC.
-        // - Ã un parametro di configurazione letto da game_params.json (SimulationParams.inventory.inventory_max_units).
-        // - La simulazione deve usare UNA query centrale (World.GetInventoryFreeCapacity)
-        //   per evitare logiche divergenti tra comandi/sistemi.
-        public int InventoryMaxUnits;
+        // La capacita' inventario non e' piu' una unita' generica: i sistemi devono
+        // usare bulk e peso tramite le query esplicite del World.
         public int HandBulkCapacityUnits;
         public int BaseHandWeightUnits;
         public int StrengthHandWeightBonusUnits;

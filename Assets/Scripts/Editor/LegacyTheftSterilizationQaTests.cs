@@ -99,7 +99,6 @@ namespace Arcontio.Tests
         private static World MakeWorld(out int thiefNpcId, out int victimNpcId)
         {
             var world = new World(new WorldConfig(new SimulationParams()));
-            world.Global.InventoryMaxUnits = 12;
             world.Global.HandBulkCapacityUnits = 6;
             world.Global.BaseHandWeightUnits = 4;
             world.Global.StrengthHandWeightBonusUnits = 0;

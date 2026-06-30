@@ -52,7 +52,6 @@ namespace Arcontio.Tests
         public void AddInventoryItemCommandPublishesActualPartialQuantity()
         {
             var world = MakeWorld(out int npcId);
-            world.Global.InventoryMaxUnits = 3;
             world.Global.StandardPackBulkCapacityUnits = 3;
             var bus = new MessageBus();
 
@@ -401,7 +400,6 @@ namespace Arcontio.Tests
         private static World MakeWorld(out int npcId)
         {
             var world = new World(new WorldConfig(new SimulationParams()));
-            world.Global.InventoryMaxUnits = 12;
             world.Global.HandBulkCapacityUnits = 6;
             world.Global.BaseHandWeightUnits = 4;
             world.Global.StrengthHandWeightBonusUnits = 0;
