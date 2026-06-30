@@ -633,6 +633,30 @@ namespace Arcontio.Core
         /// per mantenere coerenza con i pinned belief degli NPC.
         /// </summary>
         public readonly Dictionary<int, FoodStockComponent> FoodStocks = new();
+
+        // =============================================================================
+        // ObjectStacks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Component store delle pile fisiche associate a oggetti reali.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: quantita' sul componente, non sull'inventario</b></para>
+        /// <para>
+        /// Se un NPC porta cinque bacche, l'inventario punta a un oggetto fisico
+        /// held e questo store conserva <c>Quantity=5</c>. L'entry inventario non
+        /// duplica piu' il tipo o la quantita', cosi pickup, drop, save/load e
+        /// percezione possono continuare a ragionare su objectId reali.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Chiave</b>: objectId della pila fisica.</item>
+        ///   <item><b>Valore</b>: quantita' di unita' equivalenti rappresentate dall'oggetto.</item>
+        /// </list>
+        /// </summary>
+        public readonly Dictionary<int, ObjectStackComponent> ObjectStacks = new();
         // ============================================================
         // OWNERSHIP / POSSESSION (Pinned *belief*, NOT telepathy)
         // ============================================================
@@ -1230,9 +1254,17 @@ namespace Arcontio.Core
             // NOTA: oggi l'inventario Ã¨ rappresentato principalmente da NpcPrivateFood (cibo trasportato),
             // ma la query World.GetInventoryFreeCapacity Ã¨ pensata per diventare la fonte unica
             // anche quando introdurremo altri oggetti trasportabili.
-            int invMax = Config?.Sim != null && Config.Sim.inventory != null ? Config.Sim.inventory.inventory_max_units : 3;
+            var invCfg = Config?.Sim != null ? Config.Sim.inventory : null;
+            int invMax = invCfg != null ? invCfg.inventory_max_units : 3;
             if (invMax < 0) invMax = 0; // "0" Ã¨ valido: significa che non puÃ² trasportare nulla.
             Global.InventoryMaxUnits = invMax;
+            Global.HandBulkCapacityUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.hand_bulk_capacity_units : 6, 6);
+            Global.BaseHandWeightUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.base_hand_weight_units : 4, 4);
+            Global.StrengthHandWeightBonusUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.strength_hand_weight_bonus_units : 8, 8);
+            Global.BaseTotalWeightUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.base_total_weight_units : 20, 20);
+            Global.StrengthTotalWeightBonusUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.strength_total_weight_bonus_units : 40, 40);
+            Global.StandardPackBulkCapacityUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.standard_pack_bulk_capacity_units : 30, 30);
+            Global.StandardPackWeightCapacityUnits = ResolveNonNegativeInventoryParam(invCfg != null ? invCfg.standard_pack_weight_capacity_units : 30, 30);
 
 
             // ============================================================
@@ -5268,8 +5300,16 @@ namespace Arcontio.Core
             }
         }
 
-// ============================================================
+        // ============================================================
         // INVENTORY HELPERS
+
+        private static int ResolveNonNegativeInventoryParam(int value, int fallback)
+        {
+            if (value < 0)
+                return fallback < 0 ? 0 : fallback;
+
+            return value;
+        }
 
 
         /// <summary>
@@ -5398,6 +5438,48 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // GetInventoryTotalWeightCapacityUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola il peso totale trasportabile dall'NPC a partire dalla sua forza.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: DNA come sorgente fisica, non inventario</b></para>
+        /// <para>
+        /// La forza resta nel profilo DNA dell'NPC. L'inventario non la duplica:
+        /// questa query traduce <c>Strength01</c> in capacita' fisica usando
+        /// parametri globali data-driven.
+        /// </para>
+        /// </summary>
+        public int GetInventoryTotalWeightCapacityUnits(int npcId)
+        {
+            float strength01 = ResolveNpcStrength01(npcId);
+            return Global.BaseTotalWeightUnits + Mathf.RoundToInt(strength01 * Global.StrengthTotalWeightBonusUnits);
+        }
+
+        // =============================================================================
+        // GetInventoryHandWeightCapacityUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola il peso sostenibile da una singola mano dell'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: bulk mano fisso, peso da forza</b></para>
+        /// <para>
+        /// Il bulk della mano non dipende dal DNA. Solo il peso sostenibile usa la
+        /// forza, cosi oggetti piccoli possono accumularsi in mano entro limiti
+        /// fisici chiari.
+        /// </para>
+        /// </summary>
+        public int GetInventoryHandWeightCapacityUnits(int npcId)
+        {
+            float strength01 = ResolveNpcStrength01(npcId);
+            return Global.BaseHandWeightUnits + Mathf.RoundToInt(strength01 * Global.StrengthHandWeightBonusUnits);
+        }
+
+        // =============================================================================
         // GetInventoryUsedUnits
         // =============================================================================
         /// <summary>
@@ -5415,20 +5497,7 @@ namespace Arcontio.Core
         /// </summary>
         public int GetInventoryUsedUnits(int npcId)
         {
-            int used = 0;
-            if (NpcInventories.TryGetValue(npcId, out var inventory) && inventory != null)
-            {
-                for (int i = 0; i < inventory.Entries.Count; i++)
-                {
-                    var entry = inventory.Entries[i];
-                    if (entry == null || entry.Quantity <= 0)
-                        continue;
-
-                    // In C1 ogni unita' di quantita' consuma una unita' di capienza.
-                    // Gli oggetti fisici unici useranno Quantity=1 nei sotto-step pickup.
-                    used += entry.Quantity;
-                }
-            }
+            int used = GetInventoryUsedBulkUnits(npcId);
 
             if (NpcPrivateFood.TryGetValue(npcId, out int legacyFood) && legacyFood > 0)
             {
@@ -5463,6 +5532,88 @@ namespace Arcontio.Core
             int free = max - used;
             if (free < 0) free = 0;
             return free;
+        }
+
+        // =============================================================================
+        // GetInventoryUsedBulkUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Somma l'ingombro fisico degli oggetti portati dall'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: capienza da oggetti reali</b></para>
+        /// <para>
+        /// La query attraversa le entry inventario, risolve l'oggetto fisico e
+        /// moltiplica il bulk catalogo per la quantita' dello stack fisico. Non
+        /// legge piu' quantita' duplicate nell'entry.
+        /// </para>
+        /// </summary>
+        public int GetInventoryUsedBulkUnits(int npcId)
+        {
+            return GetInventoryUsedBulkUnits(npcId, NpcInventorySlotKind.None);
+        }
+
+        private int GetInventoryUsedBulkUnits(int npcId, NpcInventorySlotKind slotFilter)
+        {
+            int used = 0;
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+                return 0;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (!TryResolveInventoryEntry(entry, out _, out ObjectDef def, out int quantity))
+                    continue;
+
+                if (slotFilter != NpcInventorySlotKind.None && entry.SlotKind != slotFilter)
+                    continue;
+
+                used += ResolveObjectBulkUnits(def) * quantity;
+            }
+
+            return used < 0 ? 0 : used;
+        }
+
+        // =============================================================================
+        // GetInventoryUsedWeightUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Somma il peso fisico degli oggetti portati dall'NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: peso totale separato dal bulk</b></para>
+        /// <para>
+        /// Il peso serve per forza, fatica e limiti fisici futuri. Il bulk serve
+        /// per spazio disponibile in mani/contenitori. I due valori non vengono
+        /// fusi in una singola capacita' generica.
+        /// </para>
+        /// </summary>
+        public int GetInventoryUsedWeightUnits(int npcId)
+        {
+            return GetInventoryUsedWeightUnits(npcId, NpcInventorySlotKind.None);
+        }
+
+        private int GetInventoryUsedWeightUnits(int npcId, NpcInventorySlotKind slotFilter)
+        {
+            int used = 0;
+            if (!NpcInventories.TryGetValue(npcId, out var inventory) || inventory == null)
+                return 0;
+
+            for (int i = 0; i < inventory.Entries.Count; i++)
+            {
+                var entry = inventory.Entries[i];
+                if (!TryResolveInventoryEntry(entry, out _, out ObjectDef def, out int quantity))
+                    continue;
+
+                if (slotFilter != NpcInventorySlotKind.None && entry.SlotKind != slotFilter)
+                    continue;
+
+                used += ResolveObjectWeightUnits(def) * quantity;
+            }
+
+            return used < 0 ? 0 : used;
         }
 
         // =============================================================================
@@ -5553,51 +5704,67 @@ namespace Arcontio.Core
                 return false;
             }
 
-            int freeCapacity = GetInventoryFreeCapacity(npcId);
-            if (freeCapacity <= 0)
+            var inventory = EnsureNpcInventory(npcId);
+            var slot = NormalizeInventorySlot(preferredSlot);
+
+            if (!CanObjectBePlacedInSlot(def, slot))
+            {
+                reason = "InventoryPlacementNotAllowed";
+                return false;
+            }
+
+            if (!def.Stackable && normalizedQuantity > 1)
+            {
+                reason = "ObjectDefNotStackable";
+                return false;
+            }
+
+            int quantityToAdd = ResolveAddableInventoryQuantity(npcId, def, slot, normalizedQuantity);
+            if (quantityToAdd <= 0)
             {
                 reason = "InventoryFull";
                 return false;
             }
 
-            int quantityToAdd = normalizedQuantity > freeCapacity ? freeCapacity : normalizedQuantity;
-            var inventory = EnsureNpcInventory(npcId);
-            var slot = NormalizeInventorySlot(preferredSlot);
-
-            if (objectId > 0)
+            if (objectId > 0 && FindInventoryEntryByObjectId(inventory, objectId) != null)
             {
-                if (FindInventoryEntryByObjectId(inventory, objectId) != null)
-                {
-                    reason = "ObjectAlreadyInInventory";
-                    return false;
-                }
-
-                if (IsHandSlot(slot) && IsInventorySlotOccupied(inventory, slot))
-                {
-                    reason = "InventorySlotOccupied";
-                    return false;
-                }
+                reason = "ObjectAlreadyInInventory";
+                return false;
             }
 
-            if (objectId <= 0 && slot == NpcInventorySlotKind.Pack)
+            if (objectId <= 0 && def.Stackable)
             {
                 var stack = FindStackEntry(inventory, defId, slot);
-                if (stack != null)
+                if (stack != null && ObjectStacks.TryGetValue(stack.ObjectId, out var stackComponent) && stackComponent != null)
                 {
-                    stack.Quantity += quantityToAdd;
+                    stackComponent.Quantity += quantityToAdd;
                     addedQuantity = quantityToAdd;
                     reason = quantityToAdd == normalizedQuantity ? "InventoryItemStacked" : "InventoryPartiallyStacked";
                     return true;
                 }
             }
 
+            int physicalObjectId = objectId > 0 ? objectId : CreateHeldInventoryObject(npcId, defId);
+            if (physicalObjectId <= 0 || !Objects.TryGetValue(physicalObjectId, out var physicalObject) || physicalObject == null)
+            {
+                reason = "ObjectCreateFailed";
+                return false;
+            }
+
+            physicalObject.IsHeld = true;
+            physicalObject.HolderNpcId = npcId;
+
+            if (def.Stackable)
+            {
+                ObjectStacks[physicalObjectId] = new ObjectStackComponent(quantityToAdd);
+            }
+
             inventory.Entries.Add(new NpcInventoryEntry
             {
                 EntryId = inventory.AllocateEntryId(),
-                DefId = defId,
-                Quantity = quantityToAdd,
+                ObjectId = physicalObjectId,
                 SlotKind = slot,
-                ObjectId = objectId > 0 ? objectId : 0
+                ContainerObjectId = 0
             });
 
             addedQuantity = quantityToAdd;
@@ -5660,20 +5827,30 @@ namespace Arcontio.Core
             for (int i = inventory.Entries.Count - 1; i >= 0 && remaining > 0; i--)
             {
                 var entry = inventory.Entries[i];
-                if (entry == null
-                    || entry.HasObject
-                    || !string.Equals(entry.DefId, defId, StringComparison.OrdinalIgnoreCase)
-                    || entry.Quantity <= 0)
+                if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int entryQuantity)
+                    || !string.Equals(obj.DefId, defId, StringComparison.OrdinalIgnoreCase)
+                    || entryQuantity <= 0)
                 {
                     continue;
                 }
 
-                int take = entry.Quantity > remaining ? remaining : entry.Quantity;
-                entry.Quantity -= take;
+                int take = entryQuantity > remaining ? remaining : entryQuantity;
                 remaining -= take;
                 removedQuantity += take;
 
-                if (entry.Quantity <= 0)
+                if (ObjectStacks.TryGetValue(entry.ObjectId, out var stack) && stack != null)
+                {
+                    stack.Quantity -= take;
+                    if (stack.Quantity > 0)
+                        continue;
+                }
+
+                ObjectStacks.Remove(entry.ObjectId);
+                Objects.Remove(entry.ObjectId);
+                if (obj != null)
+                    MarkNearbyNpcPerceptionDirty(obj.CellX, obj.CellY);
+
+                if (take >= entryQuantity)
                     inventory.Entries.RemoveAt(i);
             }
 
@@ -5709,14 +5886,13 @@ namespace Arcontio.Core
             for (int i = 0; i < inventory.Entries.Count; i++)
             {
                 var entry = inventory.Entries[i];
-                if (entry == null
-                    || entry.Quantity <= 0
-                    || !string.Equals(entry.DefId, defId, StringComparison.OrdinalIgnoreCase))
+                if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int quantity)
+                    || !string.Equals(obj.DefId, defId, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
 
-                total += entry.Quantity;
+                total += quantity;
             }
 
             return total < 0 ? 0 : total;
@@ -5773,20 +5949,22 @@ namespace Arcontio.Core
             for (int i = 0; i < inventory.Entries.Count; i++)
             {
                 var entry = inventory.Entries[i];
-                if (entry == null || entry.Quantity <= 0 || string.IsNullOrWhiteSpace(entry.DefId))
+                if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int entryQuantity)
+                    || entryQuantity <= 0
+                    || string.IsNullOrWhiteSpace(obj.DefId))
                     continue;
 
                 ObjectFoodNutritionResult resolved = ObjectFoodNutritionResolver.Resolve(
                     this,
-                    entry.DefId,
+                    obj.DefId,
                     Global.Needs.eatSatietyGain,
                     allowLegacyFallbackWhenDefinitionMissing: false);
 
                 if (!resolved.IsConsumableFood || resolved.NutritionValue <= nutritionValue)
                     continue;
 
-                foodDefId = entry.DefId;
-                quantity = entry.Quantity;
+                foodDefId = obj.DefId;
+                quantity = entryQuantity;
                 nutritionValue = resolved.NutritionValue;
             }
 
@@ -5838,22 +6016,7 @@ namespace Arcontio.Core
             return slot == NpcInventorySlotKind.HandLeft || slot == NpcInventorySlotKind.HandRight;
         }
 
-        private static bool IsInventorySlotOccupied(NpcInventoryState inventory, NpcInventorySlotKind slot)
-        {
-            if (inventory == null)
-                return false;
-
-            for (int i = 0; i < inventory.Entries.Count; i++)
-            {
-                var entry = inventory.Entries[i];
-                if (entry != null && entry.Quantity > 0 && entry.SlotKind == slot)
-                    return true;
-            }
-
-            return false;
-        }
-
-        private static NpcInventoryEntry FindStackEntry(NpcInventoryState inventory, string defId, NpcInventorySlotKind slot)
+        private NpcInventoryEntry FindStackEntry(NpcInventoryState inventory, string defId, NpcInventorySlotKind slot)
         {
             if (inventory == null || string.IsNullOrWhiteSpace(defId))
                 return null;
@@ -5862,9 +6025,12 @@ namespace Arcontio.Core
             {
                 var entry = inventory.Entries[i];
                 if (entry == null
-                    || entry.HasObject
+                    || entry.ObjectId <= 0
                     || entry.SlotKind != slot
-                    || !string.Equals(entry.DefId, defId, StringComparison.OrdinalIgnoreCase))
+                    || !Objects.TryGetValue(entry.ObjectId, out var obj)
+                    || obj == null
+                    || !ObjectStacks.ContainsKey(entry.ObjectId)
+                    || !string.Equals(obj.DefId, defId, StringComparison.OrdinalIgnoreCase))
                 {
                     continue;
                 }
@@ -5898,6 +6064,20 @@ namespace Arcontio.Core
             if (objectId > 0)
                 return true;
 
+            if (def.CanPlaceInHand
+                || def.CanPlaceInContainer
+                || def.CanEquipHead
+                || def.CanEquipHands
+                || def.CanEquipUndergarment
+                || def.CanEquipOvergarment
+                || def.CanEquipArmor
+                || def.CanEquipFeet
+                || def.CanEquipSidearm
+                || def.CanEquipBack)
+            {
+                return true;
+            }
+
             return HasPositiveObjectProperty(def, "Item")
                 || HasPositiveObjectProperty(def, "FoodItem")
                 || HasPositiveObjectProperty(def, "FoodStock")
@@ -5912,6 +6092,147 @@ namespace Arcontio.Core
             return def != null
                 && def.TryGetPropertyValue(key, out float value)
                 && value > 0f;
+        }
+
+        private bool TryResolveInventoryEntry(
+            NpcInventoryEntry entry,
+            out WorldObjectInstance obj,
+            out ObjectDef def,
+            out int quantity)
+        {
+            obj = null;
+            def = null;
+            quantity = 0;
+
+            if (entry == null || entry.ObjectId <= 0)
+                return false;
+
+            if (!Objects.TryGetValue(entry.ObjectId, out obj) || obj == null)
+                return false;
+
+            if (!TryGetObjectDef(obj.DefId, out def) || def == null)
+                return false;
+
+            quantity = ObjectStacks.TryGetValue(entry.ObjectId, out var stack) && stack != null
+                ? stack.Quantity
+                : 1;
+
+            return quantity > 0;
+        }
+
+        private int ResolveAddableInventoryQuantity(int npcId, ObjectDef def, NpcInventorySlotKind slot, int requestedQuantity)
+        {
+            if (def == null || requestedQuantity <= 0)
+                return 0;
+
+            int unitBulk = ResolveObjectBulkUnits(def);
+            int unitWeight = ResolveObjectWeightUnits(def);
+            int totalWeightFree = GetInventoryTotalWeightCapacityUnits(npcId) - GetInventoryUsedWeightUnits(npcId);
+            int slotBulkFree = ResolveSlotBulkCapacityUnits(npcId, slot) - GetInventoryUsedBulkUnits(npcId, slot);
+            int slotWeightFree = ResolveSlotWeightCapacityUnits(npcId, slot) - GetInventoryUsedWeightUnits(npcId, slot);
+
+            if (slot == NpcInventorySlotKind.Pack && NpcPrivateFood.TryGetValue(npcId, out int legacyFood) && legacyFood > 0)
+            {
+                // Ponte legacy fino alla rimozione di NpcPrivateFood: il cibo
+                // privato vecchio continua a occupare spazio/peso nello zaino MVP.
+                slotBulkFree -= legacyFood;
+                slotWeightFree -= legacyFood;
+                totalWeightFree -= legacyFood;
+            }
+
+            if (totalWeightFree <= 0 || slotBulkFree <= 0 || slotWeightFree <= 0)
+                return 0;
+
+            int byBulk = unitBulk <= 0 ? requestedQuantity : slotBulkFree / unitBulk;
+            int bySlotWeight = unitWeight <= 0 ? requestedQuantity : slotWeightFree / unitWeight;
+            int byTotalWeight = unitWeight <= 0 ? requestedQuantity : totalWeightFree / unitWeight;
+
+            int addable = Mathf.Min(requestedQuantity, byBulk, bySlotWeight, byTotalWeight);
+            return addable < 0 ? 0 : addable;
+        }
+
+        private int CreateHeldInventoryObject(int npcId, string defId)
+        {
+            if (string.IsNullOrWhiteSpace(defId) || !ExistsNpc(npcId))
+                return -1;
+
+            int x = 0;
+            int y = 0;
+            if (GridPos.TryGetValue(npcId, out var pos))
+            {
+                x = pos.X;
+                y = pos.Y;
+            }
+
+            int id = _nextObjectId++;
+            Objects[id] = new WorldObjectInstance
+            {
+                ObjectId = id,
+                DefId = defId.Trim(),
+                CellX = x,
+                CellY = y,
+                OwnerKind = OwnerKind.None,
+                OwnerId = -1,
+                OccupantNpcId = -1,
+                IsHeld = true,
+                HolderNpcId = npcId
+            };
+
+            return id;
+        }
+
+        private int ResolveSlotBulkCapacityUnits(int npcId, NpcInventorySlotKind slot)
+        {
+            if (IsHandSlot(slot))
+                return Global.HandBulkCapacityUnits;
+
+            return Global.StandardPackBulkCapacityUnits;
+        }
+
+        private int ResolveSlotWeightCapacityUnits(int npcId, NpcInventorySlotKind slot)
+        {
+            if (IsHandSlot(slot))
+                return GetInventoryHandWeightCapacityUnits(npcId);
+
+            return Global.StandardPackWeightCapacityUnits;
+        }
+
+        private static int ResolveObjectBulkUnits(ObjectDef def)
+        {
+            if (def == null)
+                return 0;
+
+            return def.BulkUnits > 0 ? def.BulkUnits : 1;
+        }
+
+        private static int ResolveObjectWeightUnits(ObjectDef def)
+        {
+            if (def == null)
+                return 0;
+
+            return def.WeightUnits > 0 ? def.WeightUnits : 1;
+        }
+
+        private static bool CanObjectBePlacedInSlot(ObjectDef def, NpcInventorySlotKind slot)
+        {
+            if (def == null)
+                return false;
+
+            if (IsHandSlot(slot))
+                return def.CanPlaceInHand || HasPositiveObjectProperty(def, "Item");
+
+            return def.CanPlaceInContainer || HasPositiveObjectProperty(def, "Item");
+        }
+
+        private float ResolveNpcStrength01(int npcId)
+        {
+            if (!NpcDna.TryGetValue(npcId, out var dna) || dna == null)
+                return 0f;
+
+            float strength = dna.Capacities.Strength01;
+            if (strength < 0f) return 0f;
+            if (strength > 1f) return 1f;
+            return strength;
         }
 
 
@@ -7653,6 +7974,13 @@ if (!NpcAction.ContainsKey(id))
         // - La simulazione deve usare UNA query centrale (World.GetInventoryFreeCapacity)
         //   per evitare logiche divergenti tra comandi/sistemi.
         public int InventoryMaxUnits;
+        public int HandBulkCapacityUnits;
+        public int BaseHandWeightUnits;
+        public int StrengthHandWeightBonusUnits;
+        public int BaseTotalWeightUnits;
+        public int StrengthTotalWeightBonusUnits;
+        public int StandardPackBulkCapacityUnits;
+        public int StandardPackWeightCapacityUnits;
 
         // Tick corrente (se lo vuoi accessibile anche qui; altrimenti usa TickContext)
         public long CurrentTickIndex;

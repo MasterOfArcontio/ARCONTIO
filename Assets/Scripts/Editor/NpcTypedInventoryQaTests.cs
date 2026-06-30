@@ -22,8 +22,8 @@ namespace Arcontio.Tests
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
-    ///   <item><b>Stacking</b>: item typed uguali vengono aggregati nel Pack.</item>
-    ///   <item><b>Capienza</b>: aggiunte oltre limite vengono clampate o rifiutate.</item>
+    ///   <item><b>Stacking fisico</b>: item uguali diventano un oggetto held con ObjectStackComponent.</item>
+    ///   <item><b>Capienza</b>: aggiunte oltre bulk/peso disponibile vengono clampate o rifiutate.</item>
     ///   <item><b>Catalogo</b>: definizioni non trasportabili o mancanti vengono respinte.</item>
     ///   <item><b>Food query</b>: alimenti typed vengono selezionati tramite nutrizione catalogo.</item>
     /// </list>
@@ -46,7 +46,13 @@ namespace Arcontio.Tests
             Assert.That(world.GetInventoryUsedUnits(npcId), Is.EqualTo(3));
             Assert.That(world.GetInventoryFreeCapacity(npcId), Is.EqualTo(0));
             Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(1));
-            Assert.That(world.NpcInventories[npcId].Entries[0].SlotKind, Is.EqualTo(NpcInventorySlotKind.Pack));
+            var entry = world.NpcInventories[npcId].Entries[0];
+            Assert.That(entry.ObjectId, Is.GreaterThan(0));
+            Assert.That(entry.SlotKind, Is.EqualTo(NpcInventorySlotKind.Pack));
+            Assert.That(world.Objects[entry.ObjectId].IsHeld, Is.True);
+            Assert.That(world.Objects[entry.ObjectId].HolderNpcId, Is.EqualTo(npcId));
+            Assert.That(world.Objects[entry.ObjectId].DefId, Is.EqualTo("berry"));
+            Assert.That(world.ObjectStacks[entry.ObjectId].Quantity, Is.EqualTo(3));
         }
 
         [Test]
@@ -95,6 +101,23 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void HandSlotCanCarryMultipleSmallEquivalentItems()
+        {
+            var world = MakeWorld(out int npcId);
+
+            bool first = world.TryAddInventoryItem(npcId, "berry", 2, NpcInventorySlotKind.HandLeft, 0, out int firstAdded, out string firstReason);
+            bool second = world.TryAddInventoryItem(npcId, "berry", 2, NpcInventorySlotKind.HandLeft, 0, out int secondAdded, out string secondReason);
+
+            Assert.That(first, Is.True, firstReason);
+            Assert.That(second, Is.True, secondReason);
+            Assert.That(firstAdded, Is.EqualTo(2));
+            Assert.That(secondAdded, Is.EqualTo(2));
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(1));
+            Assert.That(world.NpcInventories[npcId].Entries[0].SlotKind, Is.EqualTo(NpcInventorySlotKind.HandLeft));
+            Assert.That(world.GetInventoryQuantity(npcId, "berry"), Is.EqualTo(4));
+        }
+
+        [Test]
         public void SelectBestFoodOnSelfUsesTypedNutrition()
         {
             var world = MakeWorld(out int npcId);
@@ -129,6 +152,13 @@ namespace Arcontio.Tests
         {
             var world = new World(new WorldConfig(new SimulationParams()));
             world.Global.InventoryMaxUnits = 3;
+            world.Global.HandBulkCapacityUnits = 6;
+            world.Global.BaseHandWeightUnits = 4;
+            world.Global.StrengthHandWeightBonusUnits = 8;
+            world.Global.BaseTotalWeightUnits = 20;
+            world.Global.StrengthTotalWeightBonusUnits = 40;
+            world.Global.StandardPackBulkCapacityUnits = 3;
+            world.Global.StandardPackWeightCapacityUnits = 100;
             AddObjectDefs(world);
 
             npcId = world.CreateNpc(
@@ -171,6 +201,11 @@ namespace Arcontio.Tests
             {
                 Id = id,
                 DisplayName = id,
+                WeightUnits = 1,
+                BulkUnits = 1,
+                Stackable = true,
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
                 Properties = properties
             };
         }
@@ -189,6 +224,11 @@ namespace Arcontio.Tests
             {
                 Id = id,
                 DisplayName = id,
+                WeightUnits = 1,
+                BulkUnits = 1,
+                Stackable = true,
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
                 Properties = properties
             };
         }

@@ -37,48 +37,80 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // ObjectStackComponent
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Componente oggetto che rappresenta una pila fisica reale.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: stack fisico, non quantita' astratta</b></para>
+    /// <para>
+    /// Uno stack di mele, bacche o assi non e' una riga astratta dentro
+    /// l'inventario: e' un <see cref="WorldObjectInstance"/> reale con un
+    /// componente quantita'. L'entry inventario dice solo dove si trova quello
+    /// stack fisico.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Quantity</b>: numero di unita' equivalenti rappresentate dall'oggetto fisico.</item>
+    /// </list>
+    /// </summary>
+    [Serializable]
+    public sealed class ObjectStackComponent
+    {
+        public int Quantity;
+
+        public ObjectStackComponent()
+        {
+            Quantity = 1;
+        }
+
+        public ObjectStackComponent(int quantity)
+        {
+            Quantity = quantity <= 0 ? 1 : quantity;
+        }
+    }
+
+    // =============================================================================
     // NpcInventoryEntry
     // =============================================================================
     /// <summary>
     /// <para>
-    /// Entry oggettiva dell'inventario typed di un singolo NPC.
+    /// Entry oggettiva dell'inventario fisico di un singolo NPC.
     /// </para>
     ///
-    /// <para><b>Principio architetturale: item typed separato dal job</b></para>
+    /// <para><b>Principio architetturale: inventario come collocazione</b></para>
     /// <para>
-    /// L'entry conserva solo stato reale e serializzabile: tipo oggetto, quantita',
-    /// slot e, quando esiste, riferimento a un'istanza fisica del mondo. Non
-    /// contiene intenzioni, sorgenti percettive, score decisionali o logica di
-    /// raccolta. Questo permette ai job futuri di produrre comandi semplici senza
-    /// diventare proprietari dei dati inventario.
+    /// L'entry non duplica tipo catalogo, quantita', peso, ingombro o stato
+    /// dell'oggetto. Conserva soltanto il riferimento all'oggetto fisico reale e
+    /// la collocazione personale. Tutti i dati materiali vengono risolti da
+    /// <see cref="World.Objects"/>, dal catalogo oggetti e dai component store
+    /// oggetto.
     /// </para>
     ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>EntryId</b>: identificatore locale stabile nello scope dell'inventario NPC.</item>
-    ///   <item><b>DefId</b>: tipo catalogo oggetto trasportato.</item>
-    ///   <item><b>Quantity</b>: quantita' dello stack o 1 per oggetti fisici unici.</item>
-    ///   <item><b>SlotKind</b>: slot fisico personale.</item>
-    ///   <item><b>ObjectId</b>: oggetto fisico collegato, oppure 0 per stack astratti typed.</item>
+    ///   <item><b>ObjectId</b>: oggetto fisico reale trasportato; 0 e' invalido.</item>
+    ///   <item><b>SlotKind</b>: collocazione fisica personale.</item>
+    ///   <item><b>ContainerObjectId</b>: contenitore fisico specifico, futuro; 0 indica pack MVP.</item>
     /// </list>
     /// </summary>
     [Serializable]
     public sealed class NpcInventoryEntry
     {
         public int EntryId;
-        public string DefId;
-        public int Quantity;
-        public NpcInventorySlotKind SlotKind;
         public int ObjectId;
-
-        public bool HasObject => ObjectId > 0;
+        public NpcInventorySlotKind SlotKind;
+        public int ContainerObjectId;
 
         public NpcInventoryEntry()
         {
-            DefId = string.Empty;
-            SlotKind = NpcInventorySlotKind.Pack;
-            Quantity = 0;
             ObjectId = 0;
+            SlotKind = NpcInventorySlotKind.Pack;
+            ContainerObjectId = 0;
         }
     }
 

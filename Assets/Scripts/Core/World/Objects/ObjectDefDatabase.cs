@@ -3,10 +3,21 @@ using System.Collections.Generic;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // ObjectPropertyKV
+    // =============================================================================
     /// <summary>
-    /// ObjectPropertyKV:
-    /// Coppia Key/Value serializzabile per JsonUtility.
-    /// Deve matchare il JSON: { "Key": "...", "Value": 1.0 }
+    /// <para>
+    /// Coppia numerica data-driven usata per proprieta' oggetto estendibili.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: bordo authoring flessibile</b></para>
+    /// <para>
+    /// Le proprieta' testuali restano accettabili nel catalogo JSON e nei bordi di
+    /// authoring/debug. Le strutture runtime calde, come l'inventario NPC, devono
+    /// invece evitare di duplicare stringhe quando possono riferirsi a objectId,
+    /// enum o component store.
+    /// </para>
     /// </summary>
     [Serializable]
     public struct ObjectPropertyKV
@@ -123,6 +134,31 @@ namespace Arcontio.Core
         // Proprieta' generiche (letto, workbench, food, ecc.)
         public List<ObjectPropertyKV> Properties;
 
+        // Peso/ingombro inventario fisico.
+        public int WeightUnits;
+        public int BulkUnits;
+
+        // Regole materiali base.
+        public bool Stackable;
+        public bool HasDurability;
+
+        // Collocazioni ammesse. Sono bool serializzabili invece di stringhe runtime:
+        // il JSON resta leggibile, ma i sistemi possono validare senza parsing.
+        public bool CanPlaceInHand;
+        public bool CanPlaceInContainer;
+        public bool CanEquipHead;
+        public bool CanEquipHands;
+        public bool CanEquipUndergarment;
+        public bool CanEquipOvergarment;
+        public bool CanEquipArmor;
+        public bool CanEquipFeet;
+        public bool CanEquipSidearm;
+        public bool CanEquipBack;
+
+        // Capacita' eventuale degli oggetti contenitore, per esempio zaini.
+        public int ContainerBulkCapacityUnits;
+        public int ContainerWeightCapacityUnits;
+
         // =============================================================================
         // TryGetPropertyValue
         // =============================================================================
@@ -192,8 +228,20 @@ namespace Arcontio.Core
         }
     }
 
+    // =============================================================================
+    // ObjectDefDatabase
+    // =============================================================================
     /// <summary>
-    /// Root del JSON: { "Objects": [ ... ] }
+    /// <para>
+    /// Root serializzabile del catalogo oggetti.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: catalogo data-driven unico</b></para>
+    /// <para>
+    /// Il file JSON espone oggetti come dati autorevoli. I consumer specializzati
+    /// leggono solo le parti che possiedono: il core legge fisica, componenti e
+    /// collocazioni; ArcGraph legge Visual; i sistemi cibo leggono nutrizione.
+    /// </para>
     /// </summary>
     [Serializable]
     public sealed class ObjectDefDatabase

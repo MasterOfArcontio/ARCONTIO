@@ -136,7 +136,14 @@
     }
   },
   "inventory": {
-    "inventory_max_units": 30
+    "inventory_max_units": 30,
+    "hand_bulk_capacity_units": 6,
+    "base_hand_weight_units": 4,
+    "strength_hand_weight_bonus_units": 8,
+    "base_total_weight_units": 20,
+    "strength_total_weight_bonus_units": 40,
+    "standard_pack_bulk_capacity_units": 30,
+    "standard_pack_weight_capacity_units": 30
   },
   "movement": {
     "intentStuckTicksDefault": 12,
