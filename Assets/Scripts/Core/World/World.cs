@@ -5448,7 +5448,7 @@ namespace Arcontio.Core
         public int GetInventoryTotalWeightCapacityUnits(int npcId)
         {
             float strength01 = ResolveNpcStrength01(npcId);
-            return Global.BaseTotalWeightUnits + Mathf.RoundToInt(strength01 * Global.StrengthTotalWeightBonusUnits);
+            return ObjectInventoryCapacityResolver.ResolveTotalWeightCapacityUnits(BuildInventoryCarryCapacityConfig(), strength01);
         }
 
         // =============================================================================
@@ -5469,7 +5469,7 @@ namespace Arcontio.Core
         public int GetInventoryHandWeightCapacityUnits(int npcId)
         {
             float strength01 = ResolveNpcStrength01(npcId);
-            return Global.BaseHandWeightUnits + Mathf.RoundToInt(strength01 * Global.StrengthHandWeightBonusUnits);
+            return ObjectInventoryCapacityResolver.ResolveHandWeightCapacityUnits(BuildInventoryCarryCapacityConfig(), strength01);
         }
 
         // =============================================================================
@@ -5512,10 +5512,7 @@ namespace Arcontio.Core
         {
             int max = GetInventoryMaxUnits(npcId);
             int used = GetInventoryUsedUnits(npcId);
-
-            int free = max - used;
-            if (free < 0) free = 0;
-            return free;
+            return ObjectInventoryCapacityResolver.ResolveFreeUnits(max, used);
         }
 
         // =============================================================================
@@ -5553,7 +5550,7 @@ namespace Arcontio.Core
                 if (slotFilter != NpcInventorySlotKind.None && entry.SlotKind != slotFilter)
                     continue;
 
-                used += ResolveObjectBulkUnits(def) * quantity;
+                used += ObjectInventoryCapacityResolver.ResolveObjectBulkUnits(def) * quantity;
             }
 
             return used < 0 ? 0 : used;
@@ -5594,7 +5591,7 @@ namespace Arcontio.Core
                 if (slotFilter != NpcInventorySlotKind.None && entry.SlotKind != slotFilter)
                     continue;
 
-                used += ResolveObjectWeightUnits(def) * quantity;
+                used += ObjectInventoryCapacityResolver.ResolveObjectWeightUnits(def) * quantity;
             }
 
             return used < 0 ? 0 : used;
@@ -6097,20 +6094,32 @@ namespace Arcontio.Core
                 return false;
             }
 
-            int requiredBulk = ResolveObjectBulkUnits(def) * quantity;
-            int requiredWeight = ResolveObjectWeightUnits(def) * quantity;
             int slotBulkFree = ResolveSlotBulkCapacityUnits(npcId, normalizedTarget) - GetInventoryUsedBulkUnits(npcId, normalizedTarget);
             int slotWeightFree = ResolveSlotWeightCapacityUnits(npcId, normalizedTarget) - GetInventoryUsedWeightUnits(npcId, normalizedTarget);
 
-            if (requiredBulk > slotBulkFree)
+            bool fits = ObjectInventoryCapacityResolver.CanFitQuantityInSlot(
+                def,
+                quantity,
+                slotBulkFree,
+                slotWeightFree,
+                out bool bulkFits,
+                out bool weightFits);
+
+            if (!bulkFits)
             {
                 reason = "InventoryTargetSlotBulkFull";
                 return false;
             }
 
-            if (requiredWeight > slotWeightFree)
+            if (!weightFits)
             {
                 reason = "InventoryTargetSlotWeightFull";
+                return false;
+            }
+
+            if (!fits)
+            {
+                reason = "InventoryTargetSlotFull";
                 return false;
             }
 
@@ -6492,21 +6501,22 @@ namespace Arcontio.Core
             if (def == null || requestedQuantity <= 0)
                 return 0;
 
-            int unitBulk = ResolveObjectBulkUnits(def);
-            int unitWeight = ResolveObjectWeightUnits(def);
-            int totalWeightFree = GetInventoryTotalWeightCapacityUnits(npcId) - GetInventoryUsedWeightUnits(npcId);
-            int slotBulkFree = ResolveSlotBulkCapacityUnits(npcId, slot) - GetInventoryUsedBulkUnits(npcId, slot);
-            int slotWeightFree = ResolveSlotWeightCapacityUnits(npcId, slot) - GetInventoryUsedWeightUnits(npcId, slot);
+            int totalWeightFree = ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                GetInventoryTotalWeightCapacityUnits(npcId),
+                GetInventoryUsedWeightUnits(npcId));
+            int slotBulkFree = ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                ResolveSlotBulkCapacityUnits(npcId, slot),
+                GetInventoryUsedBulkUnits(npcId, slot));
+            int slotWeightFree = ObjectInventoryCapacityResolver.ResolveFreeUnits(
+                ResolveSlotWeightCapacityUnits(npcId, slot),
+                GetInventoryUsedWeightUnits(npcId, slot));
 
-            if (totalWeightFree <= 0 || slotBulkFree <= 0 || slotWeightFree <= 0)
-                return 0;
-
-            int byBulk = unitBulk <= 0 ? requestedQuantity : slotBulkFree / unitBulk;
-            int bySlotWeight = unitWeight <= 0 ? requestedQuantity : slotWeightFree / unitWeight;
-            int byTotalWeight = unitWeight <= 0 ? requestedQuantity : totalWeightFree / unitWeight;
-
-            int addable = Mathf.Min(requestedQuantity, byBulk, bySlotWeight, byTotalWeight);
-            return addable < 0 ? 0 : addable;
+            return ObjectInventoryCapacityResolver.ResolveAddableQuantity(
+                def,
+                requestedQuantity,
+                slotBulkFree,
+                slotWeightFree,
+                totalWeightFree);
         }
 
         private int CreateHeldInventoryObject(int npcId, string defId)
@@ -6541,34 +6551,23 @@ namespace Arcontio.Core
 
         private int ResolveSlotBulkCapacityUnits(int npcId, NpcInventorySlotKind slot)
         {
-            if (IsHandSlot(slot))
-                return Global.HandBulkCapacityUnits;
-
-            return Global.StandardPackBulkCapacityUnits;
+            return ObjectInventoryCapacityResolver.ResolveSlotBulkCapacityUnits(BuildInventoryCarryCapacityConfig(), slot);
         }
 
         private int ResolveSlotWeightCapacityUnits(int npcId, NpcInventorySlotKind slot)
         {
-            if (IsHandSlot(slot))
-                return GetInventoryHandWeightCapacityUnits(npcId);
-
-            return Global.StandardPackWeightCapacityUnits;
+            float strength01 = ResolveNpcStrength01(npcId);
+            return ObjectInventoryCapacityResolver.ResolveSlotWeightCapacityUnits(BuildInventoryCarryCapacityConfig(), slot, strength01);
         }
 
         private static int ResolveObjectBulkUnits(ObjectDef def)
         {
-            if (def == null)
-                return 0;
-
-            return def.BulkUnits > 0 ? def.BulkUnits : 1;
+            return ObjectInventoryCapacityResolver.ResolveObjectBulkUnits(def);
         }
 
         private static int ResolveObjectWeightUnits(ObjectDef def)
         {
-            if (def == null)
-                return 0;
-
-            return def.WeightUnits > 0 ? def.WeightUnits : 1;
+            return ObjectInventoryCapacityResolver.ResolveObjectWeightUnits(def);
         }
 
         private static bool CanObjectBePlacedInSlot(ObjectDef def, NpcInventorySlotKind slot)
@@ -6583,10 +6582,19 @@ namespace Arcontio.Core
             if (!NpcDna.TryGetValue(npcId, out var dna) || dna == null)
                 return 0f;
 
-            float strength = dna.Capacities.Strength01;
-            if (strength < 0f) return 0f;
-            if (strength > 1f) return 1f;
-            return strength;
+            return ObjectInventoryCapacityResolver.NormalizeStrength01(dna.Capacities.Strength01);
+        }
+
+        private InventoryCarryCapacityConfig BuildInventoryCarryCapacityConfig()
+        {
+            return new InventoryCarryCapacityConfig(
+                Global.HandBulkCapacityUnits,
+                Global.BaseHandWeightUnits,
+                Global.StrengthHandWeightBonusUnits,
+                Global.BaseTotalWeightUnits,
+                Global.StrengthTotalWeightBonusUnits,
+                Global.StandardPackBulkCapacityUnits,
+                Global.StandardPackWeightCapacityUnits);
         }
 
 

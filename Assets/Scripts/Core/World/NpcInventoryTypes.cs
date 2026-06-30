@@ -315,6 +315,285 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // InventoryCarryCapacityConfig
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Configurazione compatta dei limiti fisici dell'inventario personale NPC.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: input semplice verso resolver isolato</b></para>
+    /// <para>
+    /// Il <see cref="World"/> possiede i parametri globali caricati da config, ma
+    /// il resolver capacita' non deve leggere direttamente il World. Questa struct
+    /// e' quindi il piccolo pacchetto di ingresso: mano, peso da forza, peso totale
+    /// e pack MVP vengono consegnati come dati espliciti.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>HandBulkCapacityUnits</b>: ingombro massimo fisso di una mano.</item>
+    ///   <item><b>Base/Bonus weight</b>: parametri per tradurre la forza in peso sostenibile.</item>
+    ///   <item><b>StandardPack...</b>: limiti del pack MVP finche' non esistono contenitori fisici.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct InventoryCarryCapacityConfig
+    {
+        public readonly int HandBulkCapacityUnits;
+        public readonly int BaseHandWeightUnits;
+        public readonly int StrengthHandWeightBonusUnits;
+        public readonly int BaseTotalWeightUnits;
+        public readonly int StrengthTotalWeightBonusUnits;
+        public readonly int StandardPackBulkCapacityUnits;
+        public readonly int StandardPackWeightCapacityUnits;
+
+        public InventoryCarryCapacityConfig(
+            int handBulkCapacityUnits,
+            int baseHandWeightUnits,
+            int strengthHandWeightBonusUnits,
+            int baseTotalWeightUnits,
+            int strengthTotalWeightBonusUnits,
+            int standardPackBulkCapacityUnits,
+            int standardPackWeightCapacityUnits)
+        {
+            HandBulkCapacityUnits = ClampNonNegative(handBulkCapacityUnits);
+            BaseHandWeightUnits = ClampNonNegative(baseHandWeightUnits);
+            StrengthHandWeightBonusUnits = ClampNonNegative(strengthHandWeightBonusUnits);
+            BaseTotalWeightUnits = ClampNonNegative(baseTotalWeightUnits);
+            StrengthTotalWeightBonusUnits = ClampNonNegative(strengthTotalWeightBonusUnits);
+            StandardPackBulkCapacityUnits = ClampNonNegative(standardPackBulkCapacityUnits);
+            StandardPackWeightCapacityUnits = ClampNonNegative(standardPackWeightCapacityUnits);
+        }
+
+        private static int ClampNonNegative(int value)
+        {
+            return value < 0 ? 0 : value;
+        }
+    }
+
+    // =============================================================================
+    // ObjectInventoryCapacityResolver
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Resolver puro per peso, ingombro e capienze fisiche dell'inventario typed.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: matematica fisica fuori dallo store</b></para>
+    /// <para>
+    /// Il <see cref="World"/> rimane l'unico proprietario dello stato e delle
+    /// mutazioni, ma non deve duplicare formule di capacita' in add, move, pickup
+    /// e query. Questo resolver riceve solo dati gia' autorizzati e restituisce
+    /// numeri deterministici: non legge NPC, non legge Biosfera, non pubblica eventi.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Oggetto</b>: normalizza bulk e peso da <see cref="ObjectDef"/>.</item>
+    ///   <item><b>NPC</b>: traduce forza normalizzata in capacita' peso.</item>
+    ///   <item><b>Slot</b>: calcola limiti mano/pack MVP senza conoscere contenitori futuri.</item>
+    ///   <item><b>Quantita'</b>: calcola quante unita' possono entrare dati gli spazi liberi.</item>
+    /// </list>
+    /// </summary>
+    public static class ObjectInventoryCapacityResolver
+    {
+        // =============================================================================
+        // ResolveObjectBulkUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce l'ingombro unitario normalizzato di una definizione oggetto.
+        /// </para>
+        /// </summary>
+        public static int ResolveObjectBulkUnits(ObjectDef def)
+        {
+            if (def == null)
+                return 0;
+
+            // Gli item trasportabili senza valore catalogo esplicito costano 1:
+            // questo preserva il comportamento pre-C8.4 e impedisce oggetti gratis.
+            return def.BulkUnits > 0 ? def.BulkUnits : 1;
+        }
+
+        // =============================================================================
+        // ResolveObjectWeightUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il peso unitario normalizzato di una definizione oggetto.
+        /// </para>
+        /// </summary>
+        public static int ResolveObjectWeightUnits(ObjectDef def)
+        {
+            if (def == null)
+                return 0;
+
+            // Come per il bulk, 0 nel catalogo significa "non dichiarato", non
+            // "peso nullo", finche' non avremo una policy esplicita per oggetti
+            // davvero privi di peso.
+            return def.WeightUnits > 0 ? def.WeightUnits : 1;
+        }
+
+        // =============================================================================
+        // NormalizeStrength01
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Normalizza la forza NPC dentro l'intervallo fisico 0..1.
+        /// </para>
+        /// </summary>
+        public static float NormalizeStrength01(float strength01)
+        {
+            if (strength01 < 0f) return 0f;
+            if (strength01 > 1f) return 1f;
+            return strength01;
+        }
+
+        // =============================================================================
+        // ResolveTotalWeightCapacityUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola il peso totale trasportabile da un NPC.
+        /// </para>
+        /// </summary>
+        public static int ResolveTotalWeightCapacityUnits(InventoryCarryCapacityConfig config, float strength01)
+        {
+            float normalizedStrength = NormalizeStrength01(strength01);
+            return config.BaseTotalWeightUnits + RoundPositiveToInt(normalizedStrength * config.StrengthTotalWeightBonusUnits);
+        }
+
+        // =============================================================================
+        // ResolveHandWeightCapacityUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola il peso sostenibile da una singola mano.
+        /// </para>
+        /// </summary>
+        public static int ResolveHandWeightCapacityUnits(InventoryCarryCapacityConfig config, float strength01)
+        {
+            float normalizedStrength = NormalizeStrength01(strength01);
+            return config.BaseHandWeightUnits + RoundPositiveToInt(normalizedStrength * config.StrengthHandWeightBonusUnits);
+        }
+
+        // =============================================================================
+        // ResolveSlotBulkCapacityUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il bulk massimo dello slot operativo MVP richiesto.
+        /// </para>
+        /// </summary>
+        public static int ResolveSlotBulkCapacityUnits(InventoryCarryCapacityConfig config, NpcInventorySlotKind slot)
+        {
+            if (slot == NpcInventorySlotKind.HandLeft || slot == NpcInventorySlotKind.HandRight)
+                return config.HandBulkCapacityUnits;
+
+            if (slot == NpcInventorySlotKind.Pack)
+                return config.StandardPackBulkCapacityUnits;
+
+            return 0;
+        }
+
+        // =============================================================================
+        // ResolveSlotWeightCapacityUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il peso massimo dello slot operativo MVP richiesto.
+        /// </para>
+        /// </summary>
+        public static int ResolveSlotWeightCapacityUnits(InventoryCarryCapacityConfig config, NpcInventorySlotKind slot, float strength01)
+        {
+            if (slot == NpcInventorySlotKind.HandLeft || slot == NpcInventorySlotKind.HandRight)
+                return ResolveHandWeightCapacityUnits(config, strength01);
+
+            if (slot == NpcInventorySlotKind.Pack)
+                return config.StandardPackWeightCapacityUnits;
+
+            return 0;
+        }
+
+        // =============================================================================
+        // ResolveFreeUnits
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola un residuo di capacita' senza restituire valori negativi.
+        /// </para>
+        /// </summary>
+        public static int ResolveFreeUnits(int capacityUnits, int usedUnits)
+        {
+            int free = capacityUnits - usedUnits;
+            return free < 0 ? 0 : free;
+        }
+
+        // =============================================================================
+        // ResolveAddableQuantity
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Calcola quante unita' di un oggetto possono essere aggiunte allo slot.
+        /// </para>
+        /// </summary>
+        public static int ResolveAddableQuantity(
+            ObjectDef def,
+            int requestedQuantity,
+            int slotBulkFreeUnits,
+            int slotWeightFreeUnits,
+            int totalWeightFreeUnits)
+        {
+            if (def == null || requestedQuantity <= 0)
+                return 0;
+
+            if (slotBulkFreeUnits <= 0 || slotWeightFreeUnits <= 0 || totalWeightFreeUnits <= 0)
+                return 0;
+
+            int unitBulk = ResolveObjectBulkUnits(def);
+            int unitWeight = ResolveObjectWeightUnits(def);
+            int byBulk = unitBulk <= 0 ? requestedQuantity : slotBulkFreeUnits / unitBulk;
+            int bySlotWeight = unitWeight <= 0 ? requestedQuantity : slotWeightFreeUnits / unitWeight;
+            int byTotalWeight = unitWeight <= 0 ? requestedQuantity : totalWeightFreeUnits / unitWeight;
+
+            int addable = Math.Min(requestedQuantity, Math.Min(byBulk, Math.Min(bySlotWeight, byTotalWeight)));
+            return addable < 0 ? 0 : addable;
+        }
+
+        // =============================================================================
+        // CanFitQuantityInSlot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se una quantita' gia' nota puo' entrare nello spazio libero dello slot.
+        /// </para>
+        /// </summary>
+        public static bool CanFitQuantityInSlot(
+            ObjectDef def,
+            int quantity,
+            int slotBulkFreeUnits,
+            int slotWeightFreeUnits,
+            out bool bulkFits,
+            out bool weightFits)
+        {
+            int requiredBulk = ResolveObjectBulkUnits(def) * (quantity < 0 ? 0 : quantity);
+            int requiredWeight = ResolveObjectWeightUnits(def) * (quantity < 0 ? 0 : quantity);
+
+            bulkFits = requiredBulk <= slotBulkFreeUnits;
+            weightFits = requiredWeight <= slotWeightFreeUnits;
+            return bulkFits && weightFits;
+        }
+
+        private static int RoundPositiveToInt(float value)
+        {
+            if (value <= 0f)
+                return 0;
+
+            return (int)Math.Floor(value + 0.5f);
+        }
+    }
+
+    // =============================================================================
     // InventoryMutationResult
     // =============================================================================
     /// <summary>

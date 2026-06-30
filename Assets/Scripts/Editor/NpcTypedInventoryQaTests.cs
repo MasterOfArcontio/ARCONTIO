@@ -150,6 +150,52 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void InventoryCapacityUsesNpcStrengthForHandAndTotalWeight()
+        {
+            var world = MakeWorld(out int npcId);
+
+            Assert.That(world.GetInventoryHandWeightCapacityUnits(npcId), Is.EqualTo(8));
+            Assert.That(world.GetInventoryTotalWeightCapacityUnits(npcId), Is.EqualTo(40));
+        }
+
+        [Test]
+        public void AddTypedItemsClampsByTotalWeightCapacity()
+        {
+            var world = MakeWorld(out int npcId);
+
+            bool added = world.TryAddInventoryItem(npcId, "iron_ore", 2, out int addedQuantity, out string reason);
+            bool second = world.TryAddInventoryItem(npcId, "iron_ore", 1, out int secondAdded, out string secondReason);
+
+            Assert.That(added, Is.True, reason);
+            Assert.That(addedQuantity, Is.EqualTo(1));
+            Assert.That(world.GetInventoryUsedWeightUnits(npcId), Is.EqualTo(25));
+            Assert.That(second, Is.False);
+            Assert.That(secondAdded, Is.EqualTo(0));
+            Assert.That(secondReason, Is.EqualTo("InventoryFull"));
+        }
+
+        [Test]
+        public void MoveInventoryObjectRejectsTargetHandOverWeight()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "heavy_ore", 1, NpcInventorySlotKind.Pack, 0, out int added, out string addReason), Is.True, addReason);
+            Assert.That(added, Is.EqualTo(1));
+
+            int objectId = world.NpcInventories[npcId].Entries[0].ObjectId;
+            bool moved = world.TryMoveInventoryObject(
+                npcId,
+                objectId,
+                NpcInventorySlotKind.HandLeft,
+                out InventoryMutationResult result,
+                out string reason);
+
+            Assert.That(moved, Is.False);
+            Assert.That(result.HasMutation, Is.False);
+            Assert.That(reason, Is.EqualTo("InventoryTargetSlotWeightFull"));
+            Assert.That(world.NpcInventories[npcId].Entries[0].SlotKind, Is.EqualTo(NpcInventorySlotKind.Pack));
+        }
+
+        [Test]
         public void ObjectInventoryContractResolverResolvesPlacementFlags()
         {
             Type resolverType = ResolveInventoryContractResolverType();
@@ -256,6 +302,8 @@ namespace Arcontio.Tests
             world.ObjectDefs["acorn"] = FoodDef("acorn", 0.18f);
             world.ObjectDefs["food_stock"] = FoodDef("food_stock", 0.45f, legacyStock: true);
             world.ObjectDefs["wood_log"] = ItemDef("wood_log", "Material", "BiologicalProduct");
+            world.ObjectDefs["heavy_ore"] = PhysicalItemDef("heavy_ore", weightUnits: 9, bulkUnits: 1);
+            world.ObjectDefs["iron_ore"] = PhysicalItemDef("iron_ore", weightUnits: 25, bulkUnits: 1);
             world.ObjectDefs["bed_wood"] = new ObjectDef
             {
                 Id = "bed_wood",
@@ -309,6 +357,25 @@ namespace Arcontio.Tests
                 CanPlaceInHand = true,
                 CanPlaceInContainer = true,
                 Properties = properties
+            };
+        }
+
+        private static ObjectDef PhysicalItemDef(string id, int weightUnits, int bulkUnits)
+        {
+            return new ObjectDef
+            {
+                Id = id,
+                DisplayName = id,
+                WeightUnits = weightUnits,
+                BulkUnits = bulkUnits,
+                Stackable = true,
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
+                Properties = new System.Collections.Generic.List<ObjectPropertyKV>
+                {
+                    new ObjectPropertyKV { Key = "Item", Value = 1f },
+                    new ObjectPropertyKV { Key = "Material", Value = 1f }
+                }
             };
         }
 

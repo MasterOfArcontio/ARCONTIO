@@ -17591,7 +17591,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C8.1 | Audit fondazione fisica inventario typed: stato reale di ObjectId, stack, bulk, peso e slot MVP | ✅ |
 | v0.71.05.C8.2 | Consolidamento catalogo oggetti inventario fisico: peso, ingombro, stackability, collocazioni e contratto contenitori | ✅ |
 | v0.71.05.C8.3 | Enum e contratti typed per collocazioni inventory e contenitori | ✅ |
-| v0.71.05.C8.4 | Resolver capacita' fisica inventario: bulk, peso, mano, pack e forza NPC | ⏳ |
+| v0.71.05.C8.4 | Resolver capacita' fisica inventario: bulk, peso, mano, pack e forza NPC | ✅ |
 | v0.71.05.C8.5 | Sostituzione progressiva di inventory_max_units con freeBulk/freeWeight | ⏳ |
 | v0.71.05.C8.6 | Stackability reale: fusione solo per oggetti equivalenti e limite da bulk/peso | ⏳ |
 | v0.71.05.C8.7 | Validazione pickup/drop/move su collocazioni ammesse, bulk, peso e stackability | ⏳ |
@@ -17623,6 +17623,8 @@ La `v0.71.05.C7` chiude il ponte operativo `NpcPrivateFood`: il cibo personale d
 La `v0.71.05.C8.2` consolida il catalogo oggetti rispetto alla fondazione fisica inventario gia' emersa in C1.1-C7: gli oggetti dichiarano esplicitamente peso, ingombro, stackability, durabilita', collocazioni ammesse e contratto contenitore. Lo step non introduce ancora macro-slot configurabili, zaini fisici operativi o equipaggiamento indossabile.
 
 La `v0.71.05.C8.3` introduce il contratto runtime typed per collocazioni inventario e categorie contenitore. Il catalogo oggetti resta authoring leggibile con bool e stringhe, mentre `World` e save/load consumano un resolver unico per trasportabilita' e slot MVP, senza cambiare ancora formato save, macro-slot, zaini fisici o UI inventario.
+
+La `v0.71.05.C8.4` centralizza la matematica fisica dell'inventario in un resolver data-only: bulk, peso, capacita' mano, capacita' pack MVP, peso totale e forza NPC passano da punti di ingresso/uscita espliciti. Il `World` resta owner delle mutazioni, ma non duplica piu' le formule fisiche dentro add, move e pickup.
 
 Flusso atteso:
 
