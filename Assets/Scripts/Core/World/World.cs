@@ -5796,9 +5796,9 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (!def.Stackable && normalizedQuantity > 1)
+            if (!ObjectInventoryStackResolver.CanUseStackComponent(def) && normalizedQuantity > 1)
             {
-                reason = "ObjectDefNotStackable";
+                reason = def.HasDurability ? "ObjectDefDurabilityNotStackable" : "ObjectDefNotStackable";
                 return false;
             }
 
@@ -5815,9 +5815,9 @@ namespace Arcontio.Core
                 return false;
             }
 
-            if (objectId <= 0 && def.Stackable)
+            if (objectId <= 0 && ObjectInventoryStackResolver.CanUseStackComponent(def))
             {
-                var stack = FindStackEntry(inventory, defId, slot);
+                var stack = FindStackEntry(inventory, def, defId, slot, 0);
                 if (stack != null
                     && Objects.TryGetValue(stack.ObjectId, out var stackObject)
                     && stackObject != null
@@ -5849,7 +5849,7 @@ namespace Arcontio.Core
             physicalObject.IsHeld = true;
             physicalObject.HolderNpcId = npcId;
 
-            if (def.Stackable)
+            if (ObjectInventoryStackResolver.CanUseStackComponent(def))
             {
                 ObjectStacks[physicalObjectId] = new ObjectStackComponent(quantityToAdd);
             }
@@ -6389,17 +6389,27 @@ namespace Arcontio.Core
             return slot == NpcInventorySlotKind.HandLeft || slot == NpcInventorySlotKind.HandRight;
         }
 
-        private NpcInventoryEntry FindStackEntry(NpcInventoryState inventory, string defId, NpcInventorySlotKind slot)
+        private NpcInventoryEntry FindStackEntry(
+            NpcInventoryState inventory,
+            ObjectDef targetDef,
+            string defId,
+            NpcInventorySlotKind slot,
+            int containerObjectId)
         {
-            if (inventory == null || string.IsNullOrWhiteSpace(defId))
+            if (inventory == null
+                || targetDef == null
+                || string.IsNullOrWhiteSpace(defId)
+                || !ObjectInventoryStackResolver.CanUseStackComponent(targetDef))
+            {
                 return null;
+            }
 
             for (int i = 0; i < inventory.Entries.Count; i++)
             {
                 var entry = inventory.Entries[i];
                 if (entry == null
                     || entry.ObjectId <= 0
-                    || entry.SlotKind != slot
+                    || !ObjectInventoryStackResolver.CanMergeStacks(targetDef, entry, slot, containerObjectId)
                     || !Objects.TryGetValue(entry.ObjectId, out var obj)
                     || obj == null
                     || !ObjectStacks.ContainsKey(entry.ObjectId)
@@ -7547,7 +7557,7 @@ if (!NpcAction.ContainsKey(id))
             obj.IsHeld = true;
             obj.HolderNpcId = npcId;
 
-            if (def.Stackable && !ObjectStacks.ContainsKey(objectId))
+            if (ObjectInventoryStackResolver.CanUseStackComponent(def) && !ObjectStacks.ContainsKey(objectId))
                 ObjectStacks[objectId] = new ObjectStackComponent(1);
 
             inventory.Entries.Add(new NpcInventoryEntry

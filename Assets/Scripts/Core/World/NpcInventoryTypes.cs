@@ -594,6 +594,89 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // ObjectInventoryStackResolver
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Resolver puro per stabilire quando un oggetto puo' usare uno stack fisico.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: equivalenza esplicita, non fusione implicita</b></para>
+    /// <para>
+    /// Lo stack inventario non e' una scorciatoia grafica: rappresenta piu' unita'
+    /// materiali equivalenti dentro un solo <see cref="WorldObjectInstance"/>. Questo
+    /// resolver isola la regola critica di C8.6: un oggetto con durabilita' non e'
+    /// mai impilabile, anche se il catalogo dichiara erroneamente <c>Stackable</c>.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>CanUseStackComponent</b>: decide se serve/puo' esistere <see cref="ObjectStackComponent"/>.</item>
+    ///   <item><b>CanMergeStacks</b>: verifica equivalenza minima di collocazione per fondere pile.</item>
+    ///   <item><b>IsCatalogStackDeclarationValid</b>: espone la coerenza Stackable/Durability.</item>
+    /// </list>
+    /// </summary>
+    public static class ObjectInventoryStackResolver
+    {
+        // =============================================================================
+        // CanUseStackComponent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se una definizione puo' essere rappresentata da un componente stack.
+        /// </para>
+        /// </summary>
+        public static bool CanUseStackComponent(ObjectDef def)
+        {
+            // La durabilita' rende ogni istanza potenzialmente diversa dalle altre:
+            // due asce con usura diversa non possono stare nella stessa quantita'.
+            return def != null && def.Stackable && !def.HasDurability;
+        }
+
+        // =============================================================================
+        // CanMergeStacks
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Verifica se una entry esistente puo' ricevere altre unita' equivalenti.
+        /// </para>
+        /// </summary>
+        public static bool CanMergeStacks(
+            ObjectDef def,
+            NpcInventoryEntry existingEntry,
+            NpcInventorySlotKind targetSlot,
+            int targetContainerObjectId)
+        {
+            if (!CanUseStackComponent(def) || existingEntry == null)
+                return false;
+
+            // In C8.6 l'equivalenza fisica minima richiede stessa collocazione e
+            // stesso contenitore. Il DefId viene verificato dal World, che possiede
+            // l'oggetto fisico e puo' confrontarne la definizione reale.
+            return existingEntry.SlotKind == targetSlot
+                && existingEntry.ContainerObjectId == targetContainerObjectId;
+        }
+
+        // =============================================================================
+        // IsCatalogStackDeclarationValid
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se la dichiarazione stackability/durability del catalogo e' coerente.
+        /// </para>
+        /// </summary>
+        public static bool IsCatalogStackDeclarationValid(ObjectDef def)
+        {
+            if (def == null)
+                return false;
+
+            // Stackable + durabilita' e' una configurazione contraddittoria: il
+            // runtime la tratta come non stackabile e i test la rendono visibile.
+            return !(def.Stackable && def.HasDurability);
+        }
+    }
+
+    // =============================================================================
     // InventoryMutationResult
     // =============================================================================
     /// <summary>

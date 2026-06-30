@@ -17593,7 +17593,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C8.3 | Enum e contratti typed per collocazioni inventory e contenitori | ✅ |
 | v0.71.05.C8.4 | Resolver capacita' fisica inventario: bulk, peso, mano, pack e forza NPC | ✅ |
 | v0.71.05.C8.5 | Rimozione capienza generica legacy e passaggio a freeBulk/freeWeight | ✅ |
-| v0.71.05.C8.6 | Stackability reale: fusione solo per oggetti equivalenti e limite da bulk/peso | ⏳ |
+| v0.71.05.C8.6 | Stackability reale: fusione solo per oggetti equivalenti e limite da bulk/peso | ✅ |
 | v0.71.05.C8.7 | Validazione pickup/drop/move su collocazioni ammesse, bulk, peso e stackability | ⏳ |
 | v0.71.05.C8.8 | Verifica save/load rispetto al modello fisico inventario | ⏳ |
 | v0.71.05.C8.9 | Visualizzazione UI read-only degli oggetti in inventario NPC | ⏳ |
@@ -17627,6 +17627,8 @@ La `v0.71.05.C8.3` introduce il contratto runtime typed per collocazioni inventa
 La `v0.71.05.C8.4` centralizza la matematica fisica dell'inventario in un resolver data-only: bulk, peso, capacita' mano, capacita' pack MVP, peso totale e forza NPC passano da punti di ingresso/uscita espliciti. Il `World` resta owner delle mutazioni, ma non duplica piu' le formule fisiche dentro add, move e pickup.
 
 La `v0.71.05.C8.5` elimina il modello di capienza generica legacy: le query pubbliche dell'inventario espongono ora bulk e peso liberi, totali e per slot. Il pack MVP usa la propria capacita' bulk/peso, mentre i seed e i test non leggono piu' limiti generici.
+
+La `v0.71.05.C8.6` formalizza la stackability reale: gli stack si fondono solo quando sono equivalenti per definizione e collocazione, e il limite resta determinato da bulk/peso. Gli oggetti con durabilita' non possono usare `ObjectStackComponent`, anche se dichiarati per errore come `Stackable`.
 
 Flusso atteso:
 

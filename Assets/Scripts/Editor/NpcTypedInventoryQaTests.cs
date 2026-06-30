@@ -274,6 +274,64 @@ namespace Arcontio.Tests
             Assert.That(InvokeStatic(resolverType, "CanPlaceInSlot", legacyItem, NpcInventorySlotKind.Pack), Is.EqualTo(true));
         }
 
+        [Test]
+        public void ObjectInventoryStackResolverRejectsDurableStackDeclarations()
+        {
+            Type resolverType = ResolveInventoryStackResolverType();
+            var stackableFood = FoodDef("berry", 0.32f);
+            var singleItem = ItemDef("single_crate");
+            singleItem.Stackable = false;
+            var durableMisconfigured = ItemDef("durable_tool");
+            durableMisconfigured.Stackable = true;
+            durableMisconfigured.HasDurability = true;
+            var entry = new NpcInventoryEntry
+            {
+                ObjectId = 10,
+                SlotKind = NpcInventorySlotKind.Pack,
+                ContainerObjectId = 0
+            };
+
+            Assert.That(InvokeStatic(resolverType, "CanUseStackComponent", stackableFood), Is.EqualTo(true));
+            Assert.That(InvokeStatic(resolverType, "CanUseStackComponent", singleItem), Is.EqualTo(false));
+            Assert.That(InvokeStatic(resolverType, "CanUseStackComponent", durableMisconfigured), Is.EqualTo(false));
+            Assert.That(InvokeStatic(resolverType, "IsCatalogStackDeclarationValid", durableMisconfigured), Is.EqualTo(false));
+            Assert.That(InvokeStatic(resolverType, "CanMergeStacks", stackableFood, entry, NpcInventorySlotKind.Pack, 0), Is.EqualTo(true));
+            Assert.That(InvokeStatic(resolverType, "CanMergeStacks", stackableFood, entry, NpcInventorySlotKind.HandLeft, 0), Is.EqualTo(false));
+            Assert.That(InvokeStatic(resolverType, "CanMergeStacks", stackableFood, entry, NpcInventorySlotKind.Pack, 99), Is.EqualTo(false));
+        }
+
+        [Test]
+        public void DurableObjectCannotBeAddedAsStackQuantity()
+        {
+            var world = MakeWorld(out int npcId);
+            world.ObjectDefs["durable_tool"] = DurableToolDef(stackable: true);
+
+            bool added = world.TryAddInventoryItem(npcId, "durable_tool", 2, out int addedQuantity, out string reason);
+
+            Assert.That(added, Is.False);
+            Assert.That(addedQuantity, Is.EqualTo(0));
+            Assert.That(reason, Is.EqualTo("ObjectDefDurabilityNotStackable"));
+            Assert.That(world.GetInventoryQuantity(npcId, "durable_tool"), Is.EqualTo(0));
+            Assert.That(world.ObjectStacks.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void DurableObjectAddedAsSingleItemDoesNotCreateStackComponent()
+        {
+            var world = MakeWorld(out int npcId);
+            world.ObjectDefs["durable_tool"] = DurableToolDef(stackable: true);
+
+            bool added = world.TryAddInventoryItem(npcId, "durable_tool", 1, out int addedQuantity, out string reason);
+
+            Assert.That(added, Is.True, reason);
+            Assert.That(addedQuantity, Is.EqualTo(1));
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(1));
+            int objectId = world.NpcInventories[npcId].Entries[0].ObjectId;
+            Assert.That(world.Objects[objectId].DefId, Is.EqualTo("durable_tool"));
+            Assert.That(world.ObjectStacks.ContainsKey(objectId), Is.False);
+            Assert.That(world.GetInventoryQuantity(npcId, "durable_tool"), Is.EqualTo(1));
+        }
+
         private static World MakeWorld(out int npcId)
         {
             var world = new World(new WorldConfig(new SimulationParams()));
@@ -379,6 +437,26 @@ namespace Arcontio.Tests
             };
         }
 
+        private static ObjectDef DurableToolDef(bool stackable)
+        {
+            return new ObjectDef
+            {
+                Id = "durable_tool",
+                DisplayName = "Durable Tool",
+                WeightUnits = 1,
+                BulkUnits = 1,
+                Stackable = stackable,
+                HasDurability = true,
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
+                Properties = new System.Collections.Generic.List<ObjectPropertyKV>
+                {
+                    new ObjectPropertyKV { Key = "Item", Value = 1f },
+                    new ObjectPropertyKV { Key = "Tool", Value = 1f }
+                }
+            };
+        }
+
         private static Type ResolveInventoryContractResolverType()
         {
             Type type = typeof(World).Assembly.GetType("Arcontio.Core.ObjectInventoryContractResolver");
@@ -390,6 +468,13 @@ namespace Arcontio.Tests
         {
             Type type = typeof(World).Assembly.GetType("Arcontio.Core.InventoryPlacementFlags");
             Assert.That(type, Is.Not.Null, "InventoryPlacementFlags deve esistere nel runtime Core.");
+            return type;
+        }
+
+        private static Type ResolveInventoryStackResolverType()
+        {
+            Type type = typeof(World).Assembly.GetType("Arcontio.Core.ObjectInventoryStackResolver");
+            Assert.That(type, Is.Not.Null, "ObjectInventoryStackResolver deve esistere nel runtime Core.");
             return type;
         }
 

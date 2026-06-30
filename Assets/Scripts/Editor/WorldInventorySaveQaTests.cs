@@ -129,6 +129,41 @@ namespace Arcontio.Tests
             Assert.That(target.NpcInventories.ContainsKey(sourceNpcId), Is.False);
         }
 
+        [Test]
+        public void ApplyWorldSaveAcceptsDurableInventoryEntryWithoutObjectStack()
+        {
+            var source = MakeWorld(out int sourceNpcId);
+            Assert.That(source.TryAddInventoryItem(sourceNpcId, "durable_tool", 1, out _, out string addReason), Is.True, addReason);
+            WorldSaveData data = WorldSaveBuilder.BuildFromWorld(source, savedAtTick: 42);
+            var target = MakeEmptyWorldWithDefs();
+
+            bool applied = WorldSaveLoader.TryApplyObjectiveWorld(target, data, out string error);
+
+            Assert.That(applied, Is.True, error);
+            Assert.That(target.GetInventoryQuantity(sourceNpcId, "durable_tool"), Is.EqualTo(1));
+            Assert.That(target.ObjectStacks.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ApplyWorldSaveRejectsObjectStackForDurableObject()
+        {
+            var source = MakeWorld(out int sourceNpcId);
+            Assert.That(source.TryAddInventoryItem(sourceNpcId, "durable_tool", 1, out _, out string addReason), Is.True, addReason);
+            int objectId = source.NpcInventories[sourceNpcId].Entries[0].ObjectId;
+            WorldSaveData data = WorldSaveBuilder.BuildFromWorld(source, savedAtTick: 42);
+            data.inventory.objectStacks = new[]
+            {
+                new ObjectStackSaveData { objectId = objectId, quantity = 2 }
+            };
+            var target = MakeEmptyWorldWithDefs();
+
+            bool applied = WorldSaveLoader.TryApplyObjectiveWorld(target, data, out string error);
+
+            Assert.That(applied, Is.False);
+            Assert.That(error, Does.Contain("non stack-operativa"));
+            Assert.That(target.NpcInventories.ContainsKey(sourceNpcId), Is.False);
+        }
+
         private static World MakeWorld(out int npcId)
         {
             var world = MakeEmptyWorldWithDefs();
@@ -161,6 +196,7 @@ namespace Arcontio.Tests
         {
             world.ObjectDefs["berry"] = ItemDef("berry", 1, 1, true, "Item", "FoodItem", "NutritionValue");
             world.ObjectDefs["acorn"] = ItemDef("acorn", 1, 1, true, "Item", "FoodItem", "NutritionValue");
+            world.ObjectDefs["durable_tool"] = DurableToolDef();
         }
 
         private static ObjectDef ItemDef(string id, int bulk, int weight, bool stackable, params string[] flags)
@@ -182,6 +218,26 @@ namespace Arcontio.Tests
                 CanPlaceInHand = true,
                 CanPlaceInContainer = true,
                 Properties = properties
+            };
+        }
+
+        private static ObjectDef DurableToolDef()
+        {
+            return new ObjectDef
+            {
+                Id = "durable_tool",
+                DisplayName = "Durable Tool",
+                BulkUnits = 1,
+                WeightUnits = 1,
+                Stackable = true,
+                HasDurability = true,
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
+                Properties = new System.Collections.Generic.List<ObjectPropertyKV>
+                {
+                    new ObjectPropertyKV { Key = "Item", Value = 1f },
+                    new ObjectPropertyKV { Key = "Tool", Value = 1f }
+                }
             };
         }
     }

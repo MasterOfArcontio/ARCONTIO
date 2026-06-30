@@ -187,9 +187,9 @@ namespace Arcontio.Core.Save
                     return false;
                 }
 
-                if (!def.Stackable)
+                if (!ObjectInventoryStackResolver.CanUseStackComponent(def))
                 {
-                    error = $"WorldInventorySaveLoader: objectStack objectId {dto.objectId} usa def non stackable '{defId}'.";
+                    error = $"WorldInventorySaveLoader: objectStack objectId {dto.objectId} usa def non stack-operativa '{defId}'.";
                     return false;
                 }
             }
@@ -323,7 +323,7 @@ namespace Arcontio.Core.Save
                     return false;
                 }
 
-                if (def.Stackable && !HasObjectStack(inventoryData, entry.objectId))
+                if (ObjectInventoryStackResolver.CanUseStackComponent(def) && !HasObjectStack(inventoryData, entry.objectId))
                 {
                     error = $"WorldInventorySaveLoader: objectId stackable {entry.objectId} manca di ObjectStackSaveData.";
                     return false;
