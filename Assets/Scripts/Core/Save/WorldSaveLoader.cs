@@ -78,6 +78,11 @@ namespace Arcontio.Core.Save
                 return false;
             }
 
+            if (!WorldInventorySaveLoader.CanApplyInventorySafely(world, data, out error))
+            {
+                return false;
+            }
+
             if (!CanApplyBeliefSectionSafely(world, data, out error))
             {
                 return false;
@@ -101,6 +106,11 @@ namespace Arcontio.Core.Save
             }
 
             if (!TryApplyFoodInventoryAndObjectUse(world, data, out error))
+            {
+                return false;
+            }
+
+            if (!WorldInventorySaveLoader.TryApplyInventory(world, data, out error))
             {
                 return false;
             }
@@ -598,20 +608,17 @@ namespace Arcontio.Core.Save
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Applica le sezioni food/inventory/object-use dello snapshot canonico:
+        /// Applica le sezioni food/object-use dello snapshot canonico:
         /// <see cref="WorldSaveData.foodStocks"/>,
         /// <see cref="WorldSaveData.objectUseStates"/>,
-        /// <see cref="WorldSaveData.npcPrivateFood"/>,
-        /// <see cref="WorldSaveData.npcLastPrivateFoodConsumeTicks"/> e
         /// <see cref="WorldSaveData.npcPinnedFoodStockBeliefs"/>.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: stato esistente, nessun inventario nuovo</b></para>
+        /// <para><b>Principio architetturale: food/object-use separati dall'inventario typed</b></para>
         /// <para>
-        /// Questo metodo non introduce un sistema inventory generico e non cambia
-        /// le regole gameplay. Ripristina soltanto component store gia' presenti
-        /// nel <see cref="World"/> e fallisce se i riferimenti a NPC/oggetti non
-        /// sono coerenti.
+        /// Questo metodo non legge e non applica piu' <c>NpcPrivateFood</c>. Il
+        /// modulo inventory typed viene caricato da <see cref="WorldInventorySaveLoader"/>,
+        /// mentre il vecchio cibo privato resta runtime legacy fino alla rimozione C7.
         /// </para>
         /// </summary>
         public static bool TryApplyFoodInventoryAndObjectUse(World world, WorldSaveData data, out string error)
@@ -627,8 +634,6 @@ namespace Arcontio.Core.Save
             // la sezione belief pinned salvata, senza inventare conoscenza.
             world.FoodStocks.Clear();
             world.ObjectUse.Clear();
-            world.NpcPrivateFood.Clear();
-            world.NpcLastPrivateFoodConsumeTick.Clear();
             world.NpcPinnedFoodStockBeliefs.Clear();
 
             var foodStocks = data.foodStocks;
@@ -660,26 +665,6 @@ namespace Arcontio.Core.Save
                 }
             }
 
-            var privateFood = data.npcPrivateFood;
-            if (privateFood != null)
-            {
-                for (int i = 0; i < privateFood.Length; i++)
-                {
-                    var dto = privateFood[i];
-                    world.NpcPrivateFood[dto.npcId] = dto.units;
-                }
-            }
-
-            var consumeTicks = data.npcLastPrivateFoodConsumeTicks;
-            if (consumeTicks != null)
-            {
-                for (int i = 0; i < consumeTicks.Length; i++)
-                {
-                    var dto = consumeTicks[i];
-                    world.NpcLastPrivateFoodConsumeTick[dto.npcId] = dto.lastConsumeTick;
-                }
-            }
-
             var pinned = data.npcPinnedFoodStockBeliefs;
             if (pinned != null)
             {
@@ -699,7 +684,7 @@ namespace Arcontio.Core.Save
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Valida tutte le sezioni food/inventory/object-use senza mutare il
+        /// Valida tutte le sezioni food/object-use senza mutare il
         /// <see cref="World"/>. I riferimenti sono controllati contro lo stato gia'
         /// presente e contro le sezioni NPC/oggetti contenute nello stesso snapshot.
         /// </para>
@@ -715,13 +700,13 @@ namespace Arcontio.Core.Save
         {
             if (world == null)
             {
-                error = "WorldSaveLoader: world nullo. Serve un World prima di applicare food/inventory/object-use.";
+                error = "WorldSaveLoader: world nullo. Serve un World prima di applicare food/object-use.";
                 return false;
             }
 
             if (data == null)
             {
-                error = "WorldSaveLoader: WorldSaveData nullo prima di applicare food/inventory/object-use.";
+                error = "WorldSaveLoader: WorldSaveData nullo prima di applicare food/object-use.";
                 return false;
             }
 
@@ -796,64 +781,6 @@ namespace Arcontio.Core.Save
                     if (dto.isInUse && !WillNpcExistAfterLoad(world, data, dto.usingNpcId))
                     {
                         error = $"WorldSaveLoader: objectUse objectId {dto.objectId} riferisce usingNpcId mancante {dto.usingNpcId}.";
-                        return false;
-                    }
-                }
-            }
-
-            var seenPrivateFood = new HashSet<int>();
-            if (data.npcPrivateFood != null)
-            {
-                for (int i = 0; i < data.npcPrivateFood.Length; i++)
-                {
-                    var dto = data.npcPrivateFood[i];
-                    if (dto == null)
-                    {
-                        error = $"WorldSaveLoader: NpcPrivateFoodSaveData nullo all'indice {i}.";
-                        return false;
-                    }
-
-                    if (dto.npcId <= 0 || !WillNpcExistAfterLoad(world, data, dto.npcId))
-                    {
-                        error = $"WorldSaveLoader: npcPrivateFood riferisce npcId inesistente {dto.npcId}.";
-                        return false;
-                    }
-
-                    if (!seenPrivateFood.Add(dto.npcId))
-                    {
-                        error = $"WorldSaveLoader: npcPrivateFood duplicato per npcId {dto.npcId}.";
-                        return false;
-                    }
-
-                    if (dto.units < 0)
-                    {
-                        error = $"WorldSaveLoader: npcPrivateFood negativo per npcId {dto.npcId}.";
-                        return false;
-                    }
-                }
-            }
-
-            var seenConsumeTicks = new HashSet<int>();
-            if (data.npcLastPrivateFoodConsumeTicks != null)
-            {
-                for (int i = 0; i < data.npcLastPrivateFoodConsumeTicks.Length; i++)
-                {
-                    var dto = data.npcLastPrivateFoodConsumeTicks[i];
-                    if (dto == null)
-                    {
-                        error = $"WorldSaveLoader: NpcPrivateFoodConsumeTickSaveData nullo all'indice {i}.";
-                        return false;
-                    }
-
-                    if (dto.npcId <= 0 || !WillNpcExistAfterLoad(world, data, dto.npcId))
-                    {
-                        error = $"WorldSaveLoader: consume tick riferisce npcId inesistente {dto.npcId}.";
-                        return false;
-                    }
-
-                    if (!seenConsumeTicks.Add(dto.npcId))
-                    {
-                        error = $"WorldSaveLoader: consume tick duplicato per npcId {dto.npcId}.";
                         return false;
                     }
                 }

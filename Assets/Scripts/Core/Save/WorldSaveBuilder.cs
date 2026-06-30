@@ -34,8 +34,7 @@ namespace Arcontio.Core.Save
     ///   <item><b>BuildObjectEntries</b>: estrae istanze oggetto, ownership e stato runtime locale.</item>
         ///   <item><b>BuildFoodStockEntries</b>: estrae stock cibo oggettivi accessibili dal World.</item>
         ///   <item><b>BuildObjectUseStateEntries</b>: estrae stati d'uso runtime accessibili dal World.</item>
-        ///   <item><b>BuildNpcPrivateFoodEntries</b>: estrae il possesso fisico MVP di cibo per NPC.</item>
-        ///   <item><b>BuildNpcPrivateFoodConsumeTickEntries</b>: estrae i marker ultimo consumo cibo privato.</item>
+        ///   <item><b>WorldInventorySaveBuilder</b>: estrae il modulo inventario typed separato.</item>
         ///   <item><b>BuildNpcPinnedFoodStockBeliefEntries</b>: estrae le belief pinned sugli stock privati.</item>
         ///   <item><b>BuildBeliefStoreEntries</b>: estrae credenze soggettive gia' aggregate.</item>
     /// </list>
@@ -106,8 +105,7 @@ namespace Arcontio.Core.Save
                 objects = BuildObjectEntries(world),
                 foodStocks = BuildFoodStockEntries(world),
                 objectUseStates = BuildObjectUseStateEntries(world),
-                npcPrivateFood = BuildNpcPrivateFoodEntries(world),
-                npcLastPrivateFoodConsumeTicks = BuildNpcPrivateFoodConsumeTickEntries(world),
+                inventory = WorldInventorySaveBuilder.BuildFromWorld(world),
                 npcPinnedFoodStockBeliefs = BuildNpcPinnedFoodStockBeliefEntries(world),
 
                 // Belief persistence v0.10.10:
@@ -342,25 +340,7 @@ namespace Arcontio.Core.Save
         /// </list>
         /// </summary>
         private static NpcPrivateFoodSaveData[] BuildNpcPrivateFoodEntries(World world)
-        {
-            var npcIds = new List<int>(world.NpcPrivateFood.Keys);
-            npcIds.Sort();
-
-            var result = new NpcPrivateFoodSaveData[npcIds.Count];
-
-            for (int i = 0; i < npcIds.Count; i++)
-            {
-                int npcId = npcIds[i];
-
-                result[i] = new NpcPrivateFoodSaveData
-                {
-                    npcId = npcId,
-                    units = world.NpcPrivateFood[npcId]
-                };
-            }
-
-            return result;
-        }
+            => System.Array.Empty<NpcPrivateFoodSaveData>();
 
         // =============================================================================
         // BuildNpcPrivateFoodConsumeTickEntries
@@ -386,25 +366,7 @@ namespace Arcontio.Core.Save
         /// </list>
         /// </summary>
         private static NpcPrivateFoodConsumeTickSaveData[] BuildNpcPrivateFoodConsumeTickEntries(World world)
-        {
-            var npcIds = new List<int>(world.NpcLastPrivateFoodConsumeTick.Keys);
-            npcIds.Sort();
-
-            var result = new NpcPrivateFoodConsumeTickSaveData[npcIds.Count];
-
-            for (int i = 0; i < npcIds.Count; i++)
-            {
-                int npcId = npcIds[i];
-
-                result[i] = new NpcPrivateFoodConsumeTickSaveData
-                {
-                    npcId = npcId,
-                    lastConsumeTick = world.NpcLastPrivateFoodConsumeTick[npcId]
-                };
-            }
-
-            return result;
-        }
+            => System.Array.Empty<NpcPrivateFoodConsumeTickSaveData>();
 
         // =============================================================================
         // BuildNpcPinnedFoodStockBeliefEntries

@@ -17583,7 +17583,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C1 | Modello inventario typed nel World + API e capienza compatibile legacy | ✅ |
 | v0.71.05.C1.1 | Inventario fisico typed: ObjectId centrale, stack fisici, peso/ingombro e collocazioni | ✅ |
 | v0.71.05.C2 | Comandi ed eventi inventario typed | ✅ |
-| v0.71.05.C3 | Save/load inventario typed nel WorldSave canonico | ⏳ |
+| v0.71.05.C3 | Save/load inventario typed nel WorldSave canonico | ✅ |
 | v0.71.05.C4 | Consumo da inventario typed e ponte EatPrivateFood | ⏳ |
 | v0.71.05.C5 | Pickup/drop oggetti fisici dentro inventario | ⏳ |
 | v0.71.05.C6 | Furto e stock verso inventario typed | ⏳ |

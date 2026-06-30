@@ -27,7 +27,7 @@ namespace Arcontio.Core.Save
     /// <list type="bullet">
     ///   <item><b>Header</b>: versione schema, tick salvato, dimensioni mondo e prossimi id runtime.</item>
     ///   <item><b>Riferimenti</b>: path Resources opzionali per config/scenario usati dal bootstrap corrente.</item>
-    ///   <item><b>Sezioni oggettive</b>: oggetti, stock cibo, stati uso e inventario privato NPC.</item>
+    ///   <item><b>Sezioni oggettive</b>: oggetti, stock cibo, stati uso e modulo inventario typed.</item>
     ///   <item><b>Sezioni soggettive</b>: memoria, belief, object memory, landmark memory e complex edge memory.</item>
     /// </list>
     /// </summary>
@@ -39,7 +39,7 @@ namespace Arcontio.Core.Save
         /// Campo non serializzato direttamente da JsonUtility perche' const, ma usato
         /// dai futuri writer come valore canonico di <see cref="schemaVersion"/>.
         /// </summary>
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
 
         /// <summary>
         /// Versione dello schema JSON. Serve a distinguere snapshot futuri quando il
@@ -139,16 +139,25 @@ namespace Arcontio.Core.Save
         public ObjectUseStateSaveData[] objectUseStates = Array.Empty<ObjectUseStateSaveData>();
 
         /// <summary>
-        /// Sezione inventario privato MVP degli NPC. Oggi il World rappresenta il
-        /// trasporto cibo con <c>NpcPrivateFood</c>; questa sezione lo rende esplicito.
+        /// Sezione autonoma del modulo inventario typed NPC.
+        /// Contiene solo entry inventario e componenti stack reali; non legge e non
+        /// salva il vecchio <c>NpcPrivateFood</c>.
         /// </summary>
+        public WorldInventorySaveData inventory = new WorldInventorySaveData();
+
+        /// <summary>
+        /// Sezione legacy disattivata dal formato canonico v2.
+        /// <c>NpcPrivateFood</c> resta runtime temporaneo fino a C7, ma non viene
+        /// piu' serializzato dal salvataggio globale.
+        /// </summary>
+        [NonSerialized]
         public NpcPrivateFoodSaveData[] npcPrivateFood = Array.Empty<NpcPrivateFoodSaveData>();
 
         /// <summary>
-        /// Sezione marker runtime dell'ultimo consumo di cibo privato per NPC.
-        /// Questo dato non e' un inventario separato: serve ai sistemi needs/theft
-        /// per distinguere "ho consumato io" da "mi manca cibo" dopo un reload.
+        /// Sezione legacy disattivata dal formato canonico v2 insieme a
+        /// <see cref="npcPrivateFood"/>.
         /// </summary>
+        [NonSerialized]
         public NpcPrivateFoodConsumeTickSaveData[] npcLastPrivateFoodConsumeTicks = Array.Empty<NpcPrivateFoodConsumeTickSaveData>();
 
         /// <summary>
