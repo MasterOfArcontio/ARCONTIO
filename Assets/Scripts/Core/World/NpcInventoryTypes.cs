@@ -732,6 +732,74 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // ObjectPickupResult
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Risultato compatto della transizione fisica da oggetto grounded a oggetto held.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: pickup spaziale con split esplicito</b></para>
+    /// <para>
+    /// Da C8.7 uno stack fisico a terra puo' essere raccolto parzialmente quando la
+    /// capacita' dell'NPC non basta per tutta la pila. In quel caso l'oggetto
+    /// richiesto resta a terra con la quantita' residua e il World crea un nuovo
+    /// oggetto held. Questo result permette ai command di pubblicare l'evento sul
+    /// vero oggetto raccolto, senza deduzioni fragili fuori dal World.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>RequestedObjectId</b>: oggetto grounded indicato dal job/command.</item>
+    ///   <item><b>PickedObjectId</b>: oggetto effettivamente entrato nell'inventario.</item>
+    ///   <item><b>Quantity...</b>: quantita' presa e residua sullo stack a terra.</item>
+    ///   <item><b>SlotKind</b>: collocazione fisica scelta dal World per il pickup.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ObjectPickupResult
+    {
+        public readonly int NpcId;
+        public readonly int RequestedObjectId;
+        public readonly int PickedObjectId;
+        public readonly string DefId;
+        public readonly int QuantityPicked;
+        public readonly int QuantityRemainingOnGround;
+        public readonly int FromCellX;
+        public readonly int FromCellY;
+        public readonly NpcInventorySlotKind SlotKind;
+        public readonly bool IsPartialStackPickup;
+
+        public bool HasPickup => NpcId > 0 && PickedObjectId > 0 && QuantityPicked > 0;
+
+        public ObjectPickupResult(
+            int npcId,
+            int requestedObjectId,
+            int pickedObjectId,
+            string defId,
+            int quantityPicked,
+            int quantityRemainingOnGround,
+            int fromCellX,
+            int fromCellY,
+            NpcInventorySlotKind slotKind,
+            bool isPartialStackPickup)
+        {
+            NpcId = npcId;
+            RequestedObjectId = requestedObjectId;
+            PickedObjectId = pickedObjectId;
+            DefId = defId ?? string.Empty;
+            QuantityPicked = quantityPicked < 0 ? 0 : quantityPicked;
+            QuantityRemainingOnGround = quantityRemainingOnGround < 0 ? 0 : quantityRemainingOnGround;
+            FromCellX = fromCellX;
+            FromCellY = fromCellY;
+            SlotKind = slotKind;
+            IsPartialStackPickup = isPartialStackPickup;
+        }
+
+        public static ObjectPickupResult None =>
+            new ObjectPickupResult(0, 0, 0, string.Empty, 0, 0, 0, 0, NpcInventorySlotKind.None, false);
+    }
+
+    // =============================================================================
     // ObjectStackComponent
     // =============================================================================
     /// <summary>

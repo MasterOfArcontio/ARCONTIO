@@ -6131,7 +6131,13 @@ namespace Arcontio.Core
                 return false;
             }
 
-            var normalizedTarget = NormalizeInventorySlot(targetSlot);
+            if (!IsOperationalInventorySlot(targetSlot))
+            {
+                reason = "InventorySlotInvalid";
+                return false;
+            }
+
+            var normalizedTarget = targetSlot;
             if (entry.SlotKind == normalizedTarget)
             {
                 // No-op esplicito: il command riceve success=true ma nessuna mutation,
@@ -6389,6 +6395,13 @@ namespace Arcontio.Core
             return slot == NpcInventorySlotKind.HandLeft || slot == NpcInventorySlotKind.HandRight;
         }
 
+        private static bool IsOperationalInventorySlot(NpcInventorySlotKind slot)
+        {
+            return slot == NpcInventorySlotKind.HandLeft
+                || slot == NpcInventorySlotKind.HandRight
+                || slot == NpcInventorySlotKind.Pack;
+        }
+
         private NpcInventoryEntry FindStackEntry(
             NpcInventoryState inventory,
             ObjectDef targetDef,
@@ -6581,7 +6594,79 @@ namespace Arcontio.Core
                 totalWeightFree);
         }
 
+        private bool TryResolvePickupSlotAndQuantity(
+            int npcId,
+            ObjectDef def,
+            int requestedQuantity,
+            out NpcInventorySlotKind slot,
+            out int quantityToPick,
+            out string reason)
+        {
+            slot = NpcInventorySlotKind.None;
+            quantityToPick = 0;
+            reason = string.Empty;
+
+            if (def == null || requestedQuantity <= 0)
+            {
+                reason = "QuantityInvalid";
+                return false;
+            }
+
+            var candidates = new[]
+            {
+                NpcInventorySlotKind.Pack,
+                NpcInventorySlotKind.HandLeft,
+                NpcInventorySlotKind.HandRight
+            };
+
+            bool hasAllowedSlot = false;
+            for (int i = 0; i < candidates.Length; i++)
+            {
+                var candidate = candidates[i];
+                if (!CanObjectBePlacedInSlot(def, candidate))
+                    continue;
+
+                hasAllowedSlot = true;
+                int addable = ResolveAddableInventoryQuantity(npcId, def, candidate, requestedQuantity);
+                if (addable >= requestedQuantity)
+                {
+                    slot = candidate;
+                    quantityToPick = requestedQuantity;
+                    return true;
+                }
+
+                // Se nessuno slot puo' contenere tutto, il pickup da terra prende
+                // la quantita' massima possibile. I pareggi conservano la priorita'
+                // Pack -> mano sinistra -> mano destra.
+                if (addable > quantityToPick)
+                {
+                    slot = candidate;
+                    quantityToPick = addable;
+                }
+            }
+
+            if (!hasAllowedSlot)
+            {
+                reason = "ObjectDefNotTransportable";
+                return false;
+            }
+
+            if (quantityToPick <= 0)
+            {
+                slot = NpcInventorySlotKind.None;
+                reason = "InventoryFull";
+                return false;
+            }
+
+            return true;
+        }
+
         private int CreateHeldInventoryObject(int npcId, string defId)
+        {
+            return CreateHeldInventoryObject(npcId, defId, OwnerKind.None, -1);
+        }
+
+        private int CreateHeldInventoryObject(int npcId, string defId, OwnerKind ownerKind, int ownerId)
         {
             if (string.IsNullOrWhiteSpace(defId) || !ExistsNpc(npcId))
                 return -1;
@@ -6601,8 +6686,8 @@ namespace Arcontio.Core
                 DefId = defId.Trim(),
                 CellX = x,
                 CellY = y,
-                OwnerKind = OwnerKind.None,
-                OwnerId = -1,
+                OwnerKind = ownerKind,
+                OwnerId = ownerId,
                 OccupantNpcId = -1,
                 IsHeld = true,
                 HolderNpcId = npcId
@@ -7475,8 +7560,41 @@ if (!NpcAction.ContainsKey(id))
         /// </summary>
         public bool TryPickUpObject(int npcId, int objectId, out int fromX, out int fromY, out string reason)
         {
-            fromX = 0;
-            fromY = 0;
+            bool picked = TryPickUpObject(
+                npcId,
+                objectId,
+                out ObjectPickupResult result,
+                out reason);
+
+            fromX = result.FromCellX;
+            fromY = result.FromCellY;
+            return picked;
+        }
+
+        // =============================================================================
+        // TryPickUpObject
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Tenta di raccogliere un oggetto grounded restituendo l'identita' effettiva
+        /// dell'oggetto entrato nell'inventario.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: split stack autorizzato solo al boundary fisico</b></para>
+        /// <para>
+        /// Il pickup da terra puo' dividere uno stack fisico quando la capacita'
+        /// dell'NPC basta solo per una parte. Questa e' una transizione spaziale,
+        /// non una mutazione inventory-only: non pubblica eventi inventario e non
+        /// fonde con stack gia' posseduti.
+        /// </para>
+        /// </summary>
+        public bool TryPickUpObject(
+            int npcId,
+            int objectId,
+            out ObjectPickupResult result,
+            out string reason)
+        {
+            result = ObjectPickupResult.None;
             reason = string.Empty;
 
             if (!ExistsNpc(npcId))
@@ -7503,8 +7621,8 @@ if (!NpcAction.ContainsKey(id))
                 return false;
             }
 
-            fromX = obj.CellX;
-            fromY = obj.CellY;
+            int fromX = obj.CellX;
+            int fromY = obj.CellY;
 
             if (npcCell.X != fromX || npcCell.Y != fromY)
             {
@@ -7518,10 +7636,24 @@ if (!NpcAction.ContainsKey(id))
                 return false;
             }
 
-            var slot = NpcInventorySlotKind.Pack;
-            if (!IsInventoryTransportableDef(def, objectId) || !CanObjectBePlacedInSlot(def, slot))
+            if (!IsInventoryTransportableDef(def, objectId))
             {
                 reason = "ObjectDefNotTransportable";
+                return false;
+            }
+
+            bool hasStackComponent = ObjectStacks.TryGetValue(objectId, out var groundStack) && groundStack != null;
+            bool canUseStack = ObjectInventoryStackResolver.CanUseStackComponent(def);
+            if (hasStackComponent && !canUseStack)
+            {
+                reason = "ObjectStackInvalidForDef";
+                return false;
+            }
+
+            int requestedQuantity = hasStackComponent ? groundStack.Quantity : 1;
+            if (requestedQuantity <= 0)
+            {
+                reason = "ObjectStackQuantityInvalid";
                 return false;
             }
 
@@ -7531,14 +7663,58 @@ if (!NpcAction.ContainsKey(id))
                 return false;
             }
 
-            int addable = ResolveAddableInventoryQuantity(npcId, def, slot, 1);
-            if (addable < 1)
+            if (!TryResolvePickupSlotAndQuantity(
+                    npcId,
+                    def,
+                    requestedQuantity,
+                    out var slot,
+                    out int quantityToPick,
+                    out reason))
             {
-                reason = "InventoryFull";
                 return false;
             }
 
             var inventory = EnsureNpcInventory(npcId);
+            bool partialStackPickup = canUseStack && hasStackComponent && quantityToPick < requestedQuantity;
+
+            if (partialStackPickup)
+            {
+                int pickedObjectId = CreateHeldInventoryObject(npcId, obj.DefId, obj.OwnerKind, obj.OwnerId);
+                if (pickedObjectId <= 0 || !Objects.TryGetValue(pickedObjectId, out var pickedObject) || pickedObject == null)
+                {
+                    reason = "ObjectCreateFailed";
+                    return false;
+                }
+
+                // Lo stack originale resta a terra. Il nuovo objectId rappresenta
+                // solo la parte effettivamente presa dall'NPC.
+                groundStack.Quantity -= quantityToPick;
+                ObjectStacks[pickedObjectId] = new ObjectStackComponent(quantityToPick);
+
+                inventory.Entries.Add(new NpcInventoryEntry
+                {
+                    EntryId = inventory.AllocateEntryId(),
+                    ObjectId = pickedObjectId,
+                    SlotKind = slot,
+                    ContainerObjectId = 0
+                });
+
+                MarkNearbyNpcPerceptionDirty(fromX, fromY);
+
+                result = new ObjectPickupResult(
+                    npcId,
+                    objectId,
+                    pickedObjectId,
+                    pickedObject.DefId,
+                    quantityToPick,
+                    groundStack.Quantity,
+                    fromX,
+                    fromY,
+                    slot,
+                    true);
+                reason = "ObjectStackPartiallyPickedUp";
+                return true;
+            }
 
             if (_objIdByCell != null && _objIdByCell.Length == MapWidth * MapHeight && InBounds(fromX, fromY))
             {
@@ -7568,6 +7744,17 @@ if (!NpcAction.ContainsKey(id))
                 ContainerObjectId = 0
             });
 
+            result = new ObjectPickupResult(
+                npcId,
+                objectId,
+                objectId,
+                obj.DefId,
+                quantityToPick,
+                0,
+                fromX,
+                fromY,
+                slot,
+                false);
             reason = "ObjectPickedUp";
             return true;
         }

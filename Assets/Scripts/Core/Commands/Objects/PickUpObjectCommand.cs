@@ -41,13 +41,18 @@ namespace Arcontio.Core
             if (world == null)
                 return;
 
-            if (!world.TryPickUpObject(_npcId, _objectId, out int fromX, out int fromY, out string reason))
+            if (!world.TryPickUpObject(_npcId, _objectId, out ObjectPickupResult result, out string reason))
             {
                 Debug.LogWarning($"[ObjectTransportJob] PickUp failed npc={_npcId} object={_objectId} reason={reason}");
                 return;
             }
 
-            bus?.Publish(new ObjectPickedUpEvent(TickContext.CurrentTickIndex, _npcId, _objectId, fromX, fromY));
+            bus?.Publish(new ObjectPickedUpEvent(
+                TickContext.CurrentTickIndex,
+                _npcId,
+                result.PickedObjectId,
+                result.FromCellX,
+                result.FromCellY));
         }
     }
 }

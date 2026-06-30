@@ -149,6 +149,36 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void MoveInventoryObjectCommandRejectsInvalidTargetSlotWithoutEvent()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, out _, out _), Is.True);
+            int objectId = world.NpcInventories[npcId].Entries[0].ObjectId;
+            var bus = new MessageBus();
+
+            new MoveInventoryObjectCommand(npcId, objectId, NpcInventorySlotKind.None).Execute(world, bus);
+
+            Assert.That(bus.Count, Is.EqualTo(0));
+            Assert.That(world.NpcInventories[npcId].Entries[0].SlotKind, Is.EqualTo(NpcInventorySlotKind.Pack));
+        }
+
+        [Test]
+        public void MoveInventoryObjectCommandDoesNotSplitStackWhenTargetSlotIsTooSmall()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 7, out _, out string addReason), Is.True, addReason);
+            int objectId = world.NpcInventories[npcId].Entries[0].ObjectId;
+            var bus = new MessageBus();
+
+            new MoveInventoryObjectCommand(npcId, objectId, NpcInventorySlotKind.HandLeft).Execute(world, bus);
+
+            Assert.That(bus.Count, Is.EqualTo(0));
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(1));
+            Assert.That(world.NpcInventories[npcId].Entries[0].SlotKind, Is.EqualTo(NpcInventorySlotKind.Pack));
+            Assert.That(world.ObjectStacks[objectId].Quantity, Is.EqualTo(7));
+        }
+
+        [Test]
         public void ConsumeInventoryItemCommandConsumesTypedFoodAndPublishesSingleFoodEvent()
         {
             var world = MakeWorld(out int npcId);
@@ -340,7 +370,7 @@ namespace Arcontio.Tests
             Assert.That(bus.Count, Is.EqualTo(0));
             Assert.That(world.Objects[objectId].IsHeld, Is.False);
             Assert.That(world.GetObjectAt(1, 1), Is.EqualTo(objectId));
-            Assert.That(world.NpcInventories.ContainsKey(npcId), Is.False);
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(0));
         }
 
         [Test]
@@ -359,6 +389,88 @@ namespace Arcontio.Tests
             Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(2));
             Assert.That(world.ObjectStacks[existingStackObjectId].Quantity, Is.EqualTo(2));
             Assert.That(world.ObjectStacks[groundObjectId].Quantity, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void PickUpPhysicalStackMovesWholeStackWhenCapacityAllows()
+        {
+            var world = MakeWorld(out int npcId);
+            int groundObjectId = world.CreateObject("berry", 1, 1, OwnerKind.Community, 0);
+            world.ObjectStacks[groundObjectId] = new ObjectStackComponent(5);
+            var bus = new MessageBus();
+
+            new PickUpObjectCommand(npcId, groundObjectId).Execute(world, bus);
+
+            Assert.That(bus.Count, Is.EqualTo(1));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var picked = simEvent as ObjectPickedUpEvent;
+            Assert.That(picked, Is.Not.Null);
+            Assert.That(picked.ObjectId, Is.EqualTo(groundObjectId));
+            Assert.That(world.GetObjectAt(1, 1), Is.EqualTo(-1));
+            Assert.That(world.Objects[groundObjectId].IsHeld, Is.True);
+            Assert.That(world.ObjectStacks[groundObjectId].Quantity, Is.EqualTo(5));
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(1));
+            Assert.That(world.NpcInventories[npcId].Entries[0].ObjectId, Is.EqualTo(groundObjectId));
+        }
+
+        [Test]
+        public void PickUpPhysicalStackSplitsWhenOnlyPartialCapacityIsAvailable()
+        {
+            var world = MakeWorld(out int npcId);
+            world.Global.StandardPackBulkCapacityUnits = 3;
+            world.Global.HandBulkCapacityUnits = 0;
+            world.Global.BaseHandWeightUnits = 0;
+            Assert.That(world.TryAddInventoryItem(npcId, "acorn", 1, out _, out _), Is.True);
+            int groundObjectId = world.CreateObject("berry", 1, 1, OwnerKind.Community, 0);
+            world.ObjectStacks[groundObjectId] = new ObjectStackComponent(5);
+            var bus = new MessageBus();
+
+            new PickUpObjectCommand(npcId, groundObjectId).Execute(world, bus);
+
+            Assert.That(bus.Count, Is.EqualTo(1));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var picked = simEvent as ObjectPickedUpEvent;
+            Assert.That(picked, Is.Not.Null);
+            Assert.That(picked.ObjectId, Is.Not.EqualTo(groundObjectId));
+            Assert.That(world.GetObjectAt(1, 1), Is.EqualTo(groundObjectId));
+            Assert.That(world.Objects[groundObjectId].IsHeld, Is.False);
+            Assert.That(world.ObjectStacks[groundObjectId].Quantity, Is.EqualTo(3));
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(2));
+            Assert.That(world.Objects[picked.ObjectId].IsHeld, Is.True);
+            Assert.That(world.Objects[picked.ObjectId].HolderNpcId, Is.EqualTo(npcId));
+            Assert.That(world.ObjectStacks[picked.ObjectId].Quantity, Is.EqualTo(2));
+        }
+
+        [Test]
+        public void PickUpHandOnlyObjectUsesFirstFreeHandWhenPackIsNotAllowed()
+        {
+            var world = MakeWorld(out int npcId);
+            int objectId = world.CreateObject("hand_only_tool", 1, 1, OwnerKind.Community, 0);
+            var bus = new MessageBus();
+
+            new PickUpObjectCommand(npcId, objectId).Execute(world, bus);
+
+            Assert.That(bus.Count, Is.EqualTo(1));
+            Assert.That(world.Objects[objectId].IsHeld, Is.True);
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(1));
+            Assert.That(world.NpcInventories[npcId].Entries[0].SlotKind, Is.EqualTo(NpcInventorySlotKind.HandLeft));
+        }
+
+        [Test]
+        public void PickUpDurableObjectWithStackComponentIsRejectedWithoutMutation()
+        {
+            var world = MakeWorld(out int npcId);
+            int objectId = world.CreateObject("durable_tool", 1, 1, OwnerKind.Community, 0);
+            world.ObjectStacks[objectId] = new ObjectStackComponent(2);
+            var bus = new MessageBus();
+
+            new PickUpObjectCommand(npcId, objectId).Execute(world, bus);
+
+            Assert.That(bus.Count, Is.EqualTo(0));
+            Assert.That(world.GetObjectAt(1, 1), Is.EqualTo(objectId));
+            Assert.That(world.Objects[objectId].IsHeld, Is.False);
+            Assert.That(world.ObjectStacks[objectId].Quantity, Is.EqualTo(2));
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(0));
         }
 
         [Test]
@@ -426,6 +538,10 @@ namespace Arcontio.Tests
             world.ObjectDefs["wood_log"] = ItemDef("wood_log", bulk: 1, weight: 1, stackable: true, "Item", "Material");
             world.ObjectDefs["heavy_log"] = ItemDef("heavy_log", bulk: 8, weight: 1, stackable: true, "Item", "Material");
             world.ObjectDefs["qa_crate"] = ItemDef("qa_crate", bulk: 2, weight: 2, stackable: false, "Item");
+            world.ObjectDefs["durable_tool"] = ItemDef("durable_tool", bulk: 1, weight: 1, stackable: true, "Item", "Tool");
+            world.ObjectDefs["durable_tool"].HasDurability = true;
+            world.ObjectDefs["hand_only_tool"] = ItemDef("hand_only_tool", bulk: 1, weight: 1, stackable: false, "Item", "Tool");
+            world.ObjectDefs["hand_only_tool"].CanPlaceInContainer = false;
             world.ObjectDefs["static_wall"] = new ObjectDef
             {
                 Id = "static_wall",
