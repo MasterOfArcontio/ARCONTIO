@@ -33,7 +33,7 @@ namespace Arcontio.Tests
     public sealed class FoodJobVerticalSliceQaTests
     {
         private const string TemplateJson =
-            "{\"templates\":[{\"templateId\":\"food.eat_carried_inventory.v1\",\"phases\":[{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"ready_carried_food\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"ready_inventory_food\",\"kind\":\"ReadyInventoryFood\",\"payloadKey\":\"HandLeft\",\"durationTicks\":6}]},{\"phaseId\":\"consume_carried_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"consume_carried_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\",\"durationTicks\":12}]}]},{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"take_and_consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"pickup_food_to_hand\",\"kind\":\"PickUp\",\"payloadKey\":\"HandLeft\",\"durationTicks\":6},{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\",\"durationTicks\":12}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
+            "{\"templates\":[{\"templateId\":\"food.eat_carried_inventory.v1\",\"phases\":[{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"ready_carried_food\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"ready_inventory_food\",\"kind\":\"ReadyInventoryFood\",\"payloadKey\":\"HandLeft\",\"durationTicks\":6}]},{\"phaseId\":\"consume_carried_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"consume_carried_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\",\"durationTicks\":12}]}]},{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"take_and_consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"pickup_food_to_hand\",\"kind\":\"PickUp\",\"payloadKey\":\"HandLeft\",\"durationTicks\":6},{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\",\"durationTicks\":42}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
 
         [Test]
         public void RegistryLoadsFoodAndMoveTemplates()
@@ -73,6 +73,16 @@ namespace Arcontio.Tests
             Assert.That(prepare.Kind, Is.EqualTo(JobPhaseKind.Prepare));
             Assert.That(prepare.TryGetAction(0, out var prepareHand), Is.True);
             Assert.That(prepareHand.Kind, Is.EqualTo(JobActionKind.PrepareHand));
+            Assert.That(job.Plan.TryGetPhase(2, out var execute), Is.True);
+            Assert.That(execute.Kind, Is.EqualTo(JobPhaseKind.Execute));
+            Assert.That(execute.TryGetAction(0, out var pickupFood), Is.True);
+            Assert.That(pickupFood.ActionId, Is.EqualTo("pickup_food_to_hand"));
+            Assert.That(pickupFood.Kind, Is.EqualTo(JobActionKind.PickUp));
+            Assert.That(pickupFood.DurationTicks, Is.EqualTo(6));
+            Assert.That(execute.TryGetAction(1, out var consumeFood), Is.True);
+            Assert.That(consumeFood.ActionId, Is.EqualTo("consume_known_food"));
+            Assert.That(consumeFood.Kind, Is.EqualTo(JobActionKind.Consume));
+            Assert.That(consumeFood.DurationTicks, Is.EqualTo(42));
         }
 
         [Test]
@@ -119,10 +129,14 @@ namespace Arcontio.Tests
             Assert.That(prepareHand.Kind, Is.EqualTo(JobActionKind.PrepareHand));
             Assert.That(job.Plan.TryGetPhase(1, out var ready), Is.True);
             Assert.That(ready.TryGetAction(0, out var readyFood), Is.True);
+            Assert.That(readyFood.ActionId, Is.EqualTo("ready_inventory_food"));
             Assert.That(readyFood.Kind, Is.EqualTo(JobActionKind.ReadyInventoryFood));
+            Assert.That(readyFood.DurationTicks, Is.EqualTo(6));
             Assert.That(job.Plan.TryGetPhase(2, out var consume), Is.True);
             Assert.That(consume.TryGetAction(0, out var consumeFood), Is.True);
+            Assert.That(consumeFood.ActionId, Is.EqualTo("consume_carried_food"));
             Assert.That(consumeFood.Kind, Is.EqualTo(JobActionKind.Consume));
+            Assert.That(consumeFood.DurationTicks, Is.EqualTo(12));
         }
 
         [Test]

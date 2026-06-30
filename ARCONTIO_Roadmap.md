@@ -17602,6 +17602,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C8.12 | Timed command actions per step atomici inventario/cibo | ✅ |
 | v0.71.05.C8.13 | Timed PickUp per step atomici: raccolta visibile e command finale a completion | ✅ |
 | v0.71.05.C8.14 | NPC running action overlay ArcGraph con label e barra tempo residuo | ✅ |
+| v0.71.05.C8.15 | Consolidamento finale C8: contratti job food, overlay UGUI e legacy passivo verificati | ✅ |
 | v0.71.05.D | Stato reale risorse per singola pianta | ⏳ |
 | v0.71.05.E | Ricrescita risorse biologiche nel tempo | ⏳ |
 | v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ⏳ |
@@ -17647,7 +17648,9 @@ La `v0.71.05.C8.12` rende multi-tick gli step atomici inventario/cibo che produc
 
 La `v0.71.05.C8.13` estende lo stesso modello agli step `PickUp`: ogni raccolta oggetto passa da running action volatile, rivalida target e co-locazione alla completion e solo allora accoda `PickUpObjectCommand`. Il pickup cibo noto ha durata configurata per rendere osservabile il passaggio a mano; i pickup senza durata esplicita restano rapidi con default effettivo di un tick.
 
-La `v0.71.05.C8.14` rende osservabili le running action sopra gli NPC ArcGraph: il dato passa da `RunningActionStore` a snapshot actor, render item e renderer NPC come payload read-only, mostrando label compatta e barra del tempo residuo. La UI non legge il World direttamente, non muta job e non salva progressi runtime.
+La `v0.71.05.C8.14` rende osservabili le running action sopra gli NPC ArcGraph: il dato passa da `RunningActionStore` a snapshot actor e render item come payload read-only, poi viene mostrato da un pannello UGUI ArcGraph dedicato con label compatta e barra del tempo residuo. La UI non legge il World direttamente, non muta job e non salva progressi runtime.
+
+La `v0.71.05.C8.15` consolida la chiusura del blocco C8: i fixture QA dei job food sono allineati alle durate runtime effettive di `ReadyInventoryFood`, `PickUp` e `Consume`, l'overlay running action viene registrato come pannello UGUI separato dal renderer NPC e il legacy `FoodStockComponent` resta indicato come compatibilita' passiva fuori dal percorso operativo ordinario. Restano fuori scope la rimozione fisica completa del legacy food stock, i macro-slot configurabili, i contenitori fisici reali e l'equipaggiamento indossabile.
 
 Flusso atteso:
 
