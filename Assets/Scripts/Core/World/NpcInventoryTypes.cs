@@ -837,6 +837,197 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // NpcInventorySlotViewSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot read-only delle capacita' fisiche di uno slot inventario NPC.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: query presentazionale senza mutazione</b></para>
+    /// <para>
+    /// La UI non deve ricalcolare capienze o leggere direttamente gli store del
+    /// World. Questo record espone solo valori gia' risolti dal gateway autorizzato,
+    /// separando bulk e peso come richiesto dal modello C8.
+    /// </para>
+    /// </summary>
+    public readonly struct NpcInventorySlotViewSnapshot
+    {
+        public readonly NpcInventorySlotKind SlotKind;
+        public readonly int UsedBulkUnits;
+        public readonly int BulkCapacityUnits;
+        public readonly int FreeBulkUnits;
+        public readonly int UsedWeightUnits;
+        public readonly int WeightCapacityUnits;
+        public readonly int FreeWeightUnits;
+
+        public NpcInventorySlotViewSnapshot(
+            NpcInventorySlotKind slotKind,
+            int usedBulkUnits,
+            int bulkCapacityUnits,
+            int freeBulkUnits,
+            int usedWeightUnits,
+            int weightCapacityUnits,
+            int freeWeightUnits)
+        {
+            SlotKind = slotKind;
+            UsedBulkUnits = ClampNonNegative(usedBulkUnits);
+            BulkCapacityUnits = ClampNonNegative(bulkCapacityUnits);
+            FreeBulkUnits = ClampNonNegative(freeBulkUnits);
+            UsedWeightUnits = ClampNonNegative(usedWeightUnits);
+            WeightCapacityUnits = ClampNonNegative(weightCapacityUnits);
+            FreeWeightUnits = ClampNonNegative(freeWeightUnits);
+        }
+
+        private static int ClampNonNegative(int value)
+        {
+            return value < 0 ? 0 : value;
+        }
+    }
+
+    // =============================================================================
+    // NpcInventoryEntryViewSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot read-only di una entry inventario risolta per uso UI/debug.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: ObjectId reale, dato visuale derivato</b></para>
+    /// <para>
+    /// L'entry operativa conserva solo collocazione e ObjectId. Questo record
+    /// aggiunge nome, quantita', peso, bulk e classificazione food come dati
+    /// derivati, evitando che i consumer visuali attraversino direttamente gli
+    /// store interni del World.
+    /// </para>
+    /// </summary>
+    public readonly struct NpcInventoryEntryViewSnapshot
+    {
+        public readonly int EntryId;
+        public readonly int ObjectId;
+        public readonly string DefId;
+        public readonly string DisplayName;
+        public readonly NpcInventorySlotKind SlotKind;
+        public readonly int ContainerObjectId;
+        public readonly int Quantity;
+        public readonly int UnitBulkUnits;
+        public readonly int UnitWeightUnits;
+        public readonly int TotalBulkUnits;
+        public readonly int TotalWeightUnits;
+        public readonly bool IsStacked;
+        public readonly bool CanUseStackComponent;
+        public readonly bool HasDurability;
+        public readonly bool IsConsumableFood;
+        public readonly float NutritionValue;
+        public readonly bool UsedNutritionFallback;
+        public readonly string Issue;
+
+        public bool HasIssue => !string.IsNullOrWhiteSpace(Issue);
+
+        public NpcInventoryEntryViewSnapshot(
+            int entryId,
+            int objectId,
+            string defId,
+            string displayName,
+            NpcInventorySlotKind slotKind,
+            int containerObjectId,
+            int quantity,
+            int unitBulkUnits,
+            int unitWeightUnits,
+            int totalBulkUnits,
+            int totalWeightUnits,
+            bool isStacked,
+            bool canUseStackComponent,
+            bool hasDurability,
+            bool isConsumableFood,
+            float nutritionValue,
+            bool usedNutritionFallback,
+            string issue)
+        {
+            EntryId = entryId < 0 ? 0 : entryId;
+            ObjectId = objectId < 0 ? 0 : objectId;
+            DefId = defId ?? string.Empty;
+            DisplayName = string.IsNullOrWhiteSpace(displayName) ? DefId : displayName.Trim();
+            SlotKind = slotKind;
+            ContainerObjectId = containerObjectId < 0 ? 0 : containerObjectId;
+            Quantity = quantity <= 0 ? 0 : quantity;
+            UnitBulkUnits = unitBulkUnits < 0 ? 0 : unitBulkUnits;
+            UnitWeightUnits = unitWeightUnits < 0 ? 0 : unitWeightUnits;
+            TotalBulkUnits = totalBulkUnits < 0 ? 0 : totalBulkUnits;
+            TotalWeightUnits = totalWeightUnits < 0 ? 0 : totalWeightUnits;
+            IsStacked = isStacked;
+            CanUseStackComponent = canUseStackComponent;
+            HasDurability = hasDurability;
+            IsConsumableFood = isConsumableFood;
+            NutritionValue = nutritionValue < 0f ? 0f : nutritionValue;
+            UsedNutritionFallback = usedNutritionFallback;
+            Issue = string.IsNullOrWhiteSpace(issue) ? string.Empty : issue.Trim();
+        }
+    }
+
+    // =============================================================================
+    // NpcInventoryViewSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot read-only completo dell'inventario fisico di un NPC.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: World -> Snapshot -> UI</b></para>
+    /// <para>
+    /// Questo DTO non autorizza modifiche e non sostituisce lo store inventario.
+    /// Serve solo come uscita centralizzata e stabile per inspector, test e debug
+    /// runtime: il World rimane owner dei dati e delle mutazioni.
+    /// </para>
+    /// </summary>
+    public readonly struct NpcInventoryViewSnapshot
+    {
+        public readonly int NpcId;
+        public readonly int EntryCount;
+        public readonly int TotalQuantity;
+        public readonly int UsedBulkUnits;
+        public readonly int TotalBulkCapacityUnits;
+        public readonly int FreeBulkUnits;
+        public readonly int UsedWeightUnits;
+        public readonly int TotalWeightCapacityUnits;
+        public readonly int FreeWeightUnits;
+        public readonly NpcInventorySlotViewSnapshot[] Slots;
+        public readonly NpcInventoryEntryViewSnapshot[] Entries;
+
+        public bool IsValid => NpcId > 0;
+        public bool HasEntries => Entries.Length > 0;
+
+        public NpcInventoryViewSnapshot(
+            int npcId,
+            int entryCount,
+            int totalQuantity,
+            int usedBulkUnits,
+            int totalBulkCapacityUnits,
+            int freeBulkUnits,
+            int usedWeightUnits,
+            int totalWeightCapacityUnits,
+            int freeWeightUnits,
+            NpcInventorySlotViewSnapshot[] slots,
+            NpcInventoryEntryViewSnapshot[] entries)
+        {
+            NpcId = npcId < 0 ? 0 : npcId;
+            EntryCount = entryCount < 0 ? 0 : entryCount;
+            TotalQuantity = totalQuantity < 0 ? 0 : totalQuantity;
+            UsedBulkUnits = usedBulkUnits < 0 ? 0 : usedBulkUnits;
+            TotalBulkCapacityUnits = totalBulkCapacityUnits < 0 ? 0 : totalBulkCapacityUnits;
+            FreeBulkUnits = freeBulkUnits < 0 ? 0 : freeBulkUnits;
+            UsedWeightUnits = usedWeightUnits < 0 ? 0 : usedWeightUnits;
+            TotalWeightCapacityUnits = totalWeightCapacityUnits < 0 ? 0 : totalWeightCapacityUnits;
+            FreeWeightUnits = freeWeightUnits < 0 ? 0 : freeWeightUnits;
+            Slots = slots ?? Array.Empty<NpcInventorySlotViewSnapshot>();
+            Entries = entries ?? Array.Empty<NpcInventoryEntryViewSnapshot>();
+        }
+
+        public static NpcInventoryViewSnapshot Empty =>
+            new NpcInventoryViewSnapshot(0, 0, 0, 0, 0, 0, 0, 0, 0, null, null);
+    }
+
+    // =============================================================================
     // NpcInventoryEntry
     // =============================================================================
     /// <summary>

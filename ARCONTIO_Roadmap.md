@@ -17596,7 +17596,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C8.6 | Stackability reale: fusione solo per oggetti equivalenti e limite da bulk/peso | ✅ |
 | v0.71.05.C8.7 | Validazione pickup/drop/move su collocazioni ammesse, bulk, peso e stackability | ✅ |
 | v0.71.05.C8.8 | Verifica save/load rispetto al modello fisico inventario | ✅ |
-| v0.71.05.C8.9 | Visualizzazione UI read-only degli oggetti in inventario NPC | ⏳ |
+| v0.71.05.C8.9 | Visualizzazione UI read-only degli oggetti in inventario NPC | ✅ |
 | v0.71.05.C8.10 | Test regressivi C8 inventario fisico e inspector inventario | ⏳ |
 | v0.71.05.C8.11 | Chiusura roadmap C8 e note su macro-slot/contenitori/equipaggiamento futuro | ⏳ |
 | v0.71.05.D | Stato reale risorse per singola pianta | ⏳ |
@@ -17633,6 +17633,8 @@ La `v0.71.05.C8.6` formalizza la stackability reale: gli stack si fondono solo q
 La `v0.71.05.C8.7` consolida le transizioni fisiche dell'inventario: il pickup da terra puo' dividere uno stack fisico se la capacita' basta solo per una parte, mentre il move interno tra slot resta all-or-nothing. Pickup, drop e move rispettano collocazioni ammesse, bulk, peso e stackability reale.
 
 La `v0.71.05.C8.8` verifica il save/load del modello fisico inventario: snapshot e restore preservano pickup totale, pickup parziale, stack grounded residuo e stack held. Il loader rifiuta anche stati held orfani, cioe' oggetti trasportati senza entry inventario coerente.
+
+La `v0.71.05.C8.9` rende l'inventario typed visibile nel RightInspector NPC tramite snapshot read-only prodotto dal `World`: la UI mostra capacita' bulk/peso, slot mano/zaino e oggetti trasportati con quantita', stack, food/nutrizione e diagnostica, senza introdurre comandi o mutazioni inventario.
 
 Flusso atteso:
 

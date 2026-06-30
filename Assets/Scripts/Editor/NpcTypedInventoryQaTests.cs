@@ -332,6 +332,80 @@ namespace Arcontio.Tests
             Assert.That(world.GetInventoryQuantity(npcId, "durable_tool"), Is.EqualTo(1));
         }
 
+        [Test]
+        public void InventoryViewSnapshotShowsStackedFoodInPack()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 2, out _, out string reason), Is.True, reason);
+
+            bool built = world.TryBuildNpcInventoryViewSnapshot(npcId, out NpcInventoryViewSnapshot snapshot);
+
+            Assert.That(built, Is.True);
+            Assert.That(snapshot.NpcId, Is.EqualTo(npcId));
+            Assert.That(snapshot.EntryCount, Is.EqualTo(1));
+            Assert.That(snapshot.TotalQuantity, Is.EqualTo(2));
+            Assert.That(snapshot.UsedBulkUnits, Is.EqualTo(2));
+            Assert.That(snapshot.UsedWeightUnits, Is.EqualTo(2));
+            Assert.That(snapshot.Entries.Length, Is.EqualTo(1));
+            Assert.That(snapshot.Entries[0].DefId, Is.EqualTo("berry"));
+            Assert.That(snapshot.Entries[0].SlotKind, Is.EqualTo(NpcInventorySlotKind.Pack));
+            Assert.That(snapshot.Entries[0].Quantity, Is.EqualTo(2));
+            Assert.That(snapshot.Entries[0].IsStacked, Is.True);
+            Assert.That(snapshot.Entries[0].IsConsumableFood, Is.True);
+            Assert.That(snapshot.Entries[0].NutritionValue, Is.EqualTo(0.32f).Within(0.0001f));
+        }
+
+        [Test]
+        public void InventoryViewSnapshotShowsHandSlotAndNonFood()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "wood_log", 1, NpcInventorySlotKind.HandLeft, 0, out int addedQuantity, out string reason), Is.True, reason);
+            Assert.That(addedQuantity, Is.EqualTo(1));
+
+            bool built = world.TryBuildNpcInventoryViewSnapshot(npcId, out NpcInventoryViewSnapshot snapshot);
+
+            Assert.That(built, Is.True);
+            Assert.That(snapshot.Entries.Length, Is.EqualTo(1));
+            Assert.That(snapshot.Entries[0].DefId, Is.EqualTo("wood_log"));
+            Assert.That(snapshot.Entries[0].SlotKind, Is.EqualTo(NpcInventorySlotKind.HandLeft));
+            Assert.That(snapshot.Entries[0].IsConsumableFood, Is.False);
+            Assert.That(snapshot.Entries[0].HasIssue, Is.False);
+            bool foundHandSlot = false;
+            int handBulk = 0;
+            for (int i = 0; i < snapshot.Slots.Length; i++)
+            {
+                if (snapshot.Slots[i].SlotKind != NpcInventorySlotKind.HandLeft)
+                    continue;
+
+                foundHandSlot = true;
+                handBulk = snapshot.Slots[i].UsedBulkUnits;
+                break;
+            }
+
+            Assert.That(foundHandSlot, Is.True);
+            Assert.That(handBulk, Is.EqualTo(1));
+        }
+
+        [Test]
+        public void InventoryViewSnapshotSurfacesBrokenEntryWithoutThrowing()
+        {
+            var world = MakeWorld(out int npcId);
+            world.EnsureNpcInventory(npcId).Entries.Add(new NpcInventoryEntry
+            {
+                EntryId = 99,
+                ObjectId = 999,
+                SlotKind = NpcInventorySlotKind.Pack
+            });
+
+            bool built = world.TryBuildNpcInventoryViewSnapshot(npcId, out NpcInventoryViewSnapshot snapshot);
+
+            Assert.That(built, Is.True);
+            Assert.That(snapshot.Entries.Length, Is.EqualTo(1));
+            Assert.That(snapshot.Entries[0].ObjectId, Is.EqualTo(999));
+            Assert.That(snapshot.Entries[0].HasIssue, Is.True);
+            Assert.That(snapshot.Entries[0].Issue, Is.EqualTo("InventoryObjectMissing"));
+        }
+
         private static World MakeWorld(out int npcId)
         {
             var world = new World(new WorldConfig(new SimulationParams()));

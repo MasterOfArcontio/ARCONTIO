@@ -5650,6 +5650,204 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // TryBuildNpcInventoryViewSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce uno snapshot read-only dell'inventario fisico di un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: uscita centralizzata verso UI/debug</b></para>
+        /// <para>
+        /// La UI non deve attraversare direttamente <see cref="NpcInventories"/>,
+        /// <see cref="Objects"/> e <see cref="ObjectStacks"/>. Questa query
+        /// autorizzata risolve quantita', peso, ingombro, food e problemi
+        /// strutturali in un DTO value-only, senza applicare mutazioni.
+        /// </para>
+        /// </summary>
+        public bool TryBuildNpcInventoryViewSnapshot(
+            int npcId,
+            out NpcInventoryViewSnapshot snapshot)
+        {
+            snapshot = NpcInventoryViewSnapshot.Empty;
+
+            if (!ExistsNpc(npcId))
+                return false;
+
+            NpcInventorySlotViewSnapshot[] slots = BuildInventorySlotViewSnapshots(npcId);
+            var entries = new List<NpcInventoryEntryViewSnapshot>(8);
+            int totalQuantity = 0;
+
+            if (NpcInventories.TryGetValue(npcId, out var inventory) && inventory != null)
+            {
+                for (int i = 0; i < inventory.Entries.Count; i++)
+                {
+                    NpcInventoryEntryViewSnapshot entrySnapshot = BuildInventoryEntryViewSnapshot(npcId, inventory.Entries[i]);
+                    entries.Add(entrySnapshot);
+                    totalQuantity += entrySnapshot.Quantity;
+                }
+            }
+
+            int totalBulkCapacity = 0;
+            int totalFreeBulk = 0;
+            for (int i = 0; i < slots.Length; i++)
+            {
+                totalBulkCapacity += slots[i].BulkCapacityUnits;
+                totalFreeBulk += slots[i].FreeBulkUnits;
+            }
+
+            snapshot = new NpcInventoryViewSnapshot(
+                npcId,
+                entries.Count,
+                totalQuantity,
+                GetInventoryUsedBulkUnits(npcId),
+                totalBulkCapacity,
+                totalFreeBulk,
+                GetInventoryUsedWeightUnits(npcId),
+                GetInventoryTotalWeightCapacityUnits(npcId),
+                GetInventoryFreeWeightUnits(npcId),
+                slots,
+                entries.ToArray());
+            return true;
+        }
+
+        private NpcInventorySlotViewSnapshot[] BuildInventorySlotViewSnapshots(int npcId)
+        {
+            var slots = new[]
+            {
+                NpcInventorySlotKind.HandLeft,
+                NpcInventorySlotKind.HandRight,
+                NpcInventorySlotKind.Pack
+            };
+
+            var result = new NpcInventorySlotViewSnapshot[slots.Length];
+            for (int i = 0; i < slots.Length; i++)
+            {
+                NpcInventorySlotKind slot = slots[i];
+                result[i] = new NpcInventorySlotViewSnapshot(
+                    slot,
+                    GetInventoryUsedBulkUnits(npcId, slot),
+                    GetInventorySlotBulkCapacityUnits(npcId, slot),
+                    GetInventoryFreeBulkUnits(npcId, slot),
+                    GetInventoryUsedWeightUnits(npcId, slot),
+                    GetInventorySlotWeightCapacityUnits(npcId, slot),
+                    GetInventoryFreeWeightUnits(npcId, slot));
+            }
+
+            return result;
+        }
+
+        private NpcInventoryEntryViewSnapshot BuildInventoryEntryViewSnapshot(
+            int npcId,
+            NpcInventoryEntry entry)
+        {
+            if (entry == null)
+                return BuildBrokenInventoryEntryView("InventoryEntryNull", "Entry inventario nulla", 0, 0, NpcInventorySlotKind.None, 0);
+
+            if (!Objects.TryGetValue(entry.ObjectId, out WorldObjectInstance obj) || obj == null)
+            {
+                return BuildBrokenInventoryEntryView(
+                    "InventoryObjectMissing",
+                    "Oggetto mancante",
+                    entry.EntryId,
+                    entry.ObjectId,
+                    entry.SlotKind,
+                    entry.ContainerObjectId);
+            }
+
+            string defId = obj.DefId ?? string.Empty;
+            int quantity = ObjectStacks.TryGetValue(entry.ObjectId, out var stack) && stack != null
+                ? stack.Quantity
+                : 1;
+
+            if (!TryGetObjectDef(defId, out ObjectDef def) || def == null)
+            {
+                return new NpcInventoryEntryViewSnapshot(
+                    entry.EntryId,
+                    entry.ObjectId,
+                    defId,
+                    string.IsNullOrWhiteSpace(defId) ? "Def mancante" : defId,
+                    entry.SlotKind,
+                    entry.ContainerObjectId,
+                    quantity,
+                    0,
+                    0,
+                    0,
+                    0,
+                    ObjectStacks.ContainsKey(entry.ObjectId),
+                    false,
+                    false,
+                    false,
+                    0f,
+                    false,
+                    "ObjectDefMissing");
+            }
+
+            string issue = string.Empty;
+            if (!obj.IsHeld || obj.HolderNpcId != npcId)
+                issue = "ObjectNotHeldByNpc";
+
+            int unitBulk = ObjectInventoryCapacityResolver.ResolveObjectBulkUnits(def);
+            int unitWeight = ObjectInventoryCapacityResolver.ResolveObjectWeightUnits(def);
+            bool isStacked = ObjectStacks.ContainsKey(entry.ObjectId);
+            bool canUseStack = ObjectInventoryStackResolver.CanUseStackComponent(def);
+            ObjectFoodNutritionResult nutrition = ObjectFoodNutritionResolver.Resolve(
+                this,
+                defId,
+                Global.Needs.eatSatietyGain,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+
+            return new NpcInventoryEntryViewSnapshot(
+                entry.EntryId,
+                entry.ObjectId,
+                defId,
+                string.IsNullOrWhiteSpace(def.DisplayName) ? defId : def.DisplayName,
+                entry.SlotKind,
+                entry.ContainerObjectId,
+                quantity,
+                unitBulk,
+                unitWeight,
+                unitBulk * Math.Max(0, quantity),
+                unitWeight * Math.Max(0, quantity),
+                isStacked,
+                canUseStack,
+                def.HasDurability,
+                nutrition.IsConsumableFood,
+                nutrition.NutritionValue,
+                nutrition.UsedNutritionFallback,
+                issue);
+        }
+
+        private static NpcInventoryEntryViewSnapshot BuildBrokenInventoryEntryView(
+            string issue,
+            string displayName,
+            int entryId,
+            int objectId,
+            NpcInventorySlotKind slotKind,
+            int containerObjectId)
+        {
+            return new NpcInventoryEntryViewSnapshot(
+                entryId,
+                objectId,
+                string.Empty,
+                displayName,
+                slotKind,
+                containerObjectId,
+                0,
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                false,
+                false,
+                0f,
+                false,
+                issue);
+        }
+
+        // =============================================================================
         // TryAddInventoryItem
         // =============================================================================
         /// <summary>

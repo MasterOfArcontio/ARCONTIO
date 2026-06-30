@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Arcontio.Core;
@@ -175,6 +176,7 @@ namespace Arcontio.View.ArcGraph
             {
                 new ArcUiInspectorTab(InfoTabKey, "Info", BuildInfoRows(world, target, npcId, dna, needs, position, action)),
                 new ArcUiInspectorTab("dna", "DNA", BuildDnaRows(dna, profile)),
+                new ArcUiInspectorTab("inventory", "Inventario", BuildNpcInventoryRows(world, npcId, includeEditHeader: false)),
                 new ArcUiInspectorTab("memory", "Memory", BuildMemoryRows(hasEl)),
                 new ArcUiInspectorTab("belief", "Belief", BuildBeliefRows(hasEl)),
                 new ArcUiInspectorTab("decision", "Decision", BuildDecisionRows(hasEl)),
@@ -693,15 +695,150 @@ namespace Arcontio.View.ArcGraph
             World world,
             int npcId)
         {
-            var rows = new List<ArcUiInspectorRow>(12)
+            var rows = new List<ArcUiInspectorRow>(8)
             {
-                ArcUiInspectorRow.Section("Inventario shell"),
-                new ArcUiInspectorRow("Stato", "Modifica cibo addosso disponibile"),
-                new ArcUiInspectorRow("Effetto", "I bottoni sotto accodano comando autorizzato"),
-                ArcUiInspectorRow.Section("Cibo")
+                ArcUiInspectorRow.Section("Inventario read-only"),
+                new ArcUiInspectorRow("Stato", "Visualizzazione oggetti typed"),
+                new ArcUiInspectorRow("Effetto", "Nessun comando inventario in C8.9")
             };
 
-            AddFoodMetrics(world, npcId, rows);
+            rows.AddRange(BuildNpcInventoryRows(world, npcId, includeEditHeader: true));
+            return rows.ToArray();
+        }
+
+        // =============================================================================
+        // BuildNpcInventoryRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara la tab read-only dell'inventario fisico typed di un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: snapshot Core, ViewModel UI</b></para>
+        /// <para>
+        /// La funzione non legge <c>NpcInventories</c>, <c>Objects</c> o
+        /// <c>ObjectStacks</c>. Consuma solo lo snapshot value-only prodotto dal
+        /// World e lo trasforma in righe visuali espandibili.
+        /// </para>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildNpcInventoryRows(
+            World world,
+            int npcId,
+            bool includeEditHeader)
+        {
+            var rows = new List<ArcUiInspectorRow>(32);
+            if (!world.TryBuildNpcInventoryViewSnapshot(npcId, out NpcInventoryViewSnapshot snapshot))
+            {
+                rows.Add(ArcUiInspectorRow.Section("Inventario"));
+                rows.Add(new ArcUiInspectorRow("Stato", "Snapshot non disponibile"));
+                return rows.ToArray();
+            }
+
+            if (!includeEditHeader)
+                rows.Add(ArcUiInspectorRow.Section("Capacita"));
+
+            rows.Add(ArcUiInspectorRow.IconMetrics(
+                "npc_inventory_totals",
+                "Totale",
+                new[]
+                {
+                    new ArcUiInspectorMetric("entries", "Entry", snapshot.EntryCount.ToString(CultureInfo.InvariantCulture)),
+                    new ArcUiInspectorMetric("quantity", "Unita'", snapshot.TotalQuantity.ToString(CultureInfo.InvariantCulture)),
+                    new ArcUiInspectorMetric("bulk", "Bulk", FormatUnits(snapshot.UsedBulkUnits, snapshot.TotalBulkCapacityUnits), ResolveCapacitySeverity(snapshot.UsedBulkUnits, snapshot.TotalBulkCapacityUnits)),
+                    new ArcUiInspectorMetric("weight", "Peso", FormatUnits(snapshot.UsedWeightUnits, snapshot.TotalWeightCapacityUnits), ResolveCapacitySeverity(snapshot.UsedWeightUnits, snapshot.TotalWeightCapacityUnits))
+                }));
+
+            AddInventorySlotRows(rows, snapshot);
+
+            rows.Add(ArcUiInspectorRow.Section("Oggetti"));
+            if (!snapshot.HasEntries)
+            {
+                rows.Add(new ArcUiInspectorRow("Inventario", "Vuoto"));
+                return rows.ToArray();
+            }
+
+            AddInventoryEntryRows(rows, snapshot, NpcInventorySlotKind.HandLeft);
+            AddInventoryEntryRows(rows, snapshot, NpcInventorySlotKind.HandRight);
+            AddInventoryEntryRows(rows, snapshot, NpcInventorySlotKind.Pack);
+            return rows.ToArray();
+        }
+
+        private static void AddInventorySlotRows(
+            List<ArcUiInspectorRow> rows,
+            NpcInventoryViewSnapshot snapshot)
+        {
+            for (int i = 0; i < snapshot.Slots.Length; i++)
+            {
+                NpcInventorySlotViewSnapshot slot = snapshot.Slots[i];
+                rows.Add(ArcUiInspectorRow.IconMetrics(
+                    "npc_inventory_slot_" + slot.SlotKind,
+                    FormatInventorySlotLabel(slot.SlotKind),
+                    new[]
+                    {
+                        new ArcUiInspectorMetric("bulk", "Bulk", FormatUnits(slot.UsedBulkUnits, slot.BulkCapacityUnits), ResolveCapacitySeverity(slot.UsedBulkUnits, slot.BulkCapacityUnits)),
+                        new ArcUiInspectorMetric("weight", "Peso", FormatUnits(slot.UsedWeightUnits, slot.WeightCapacityUnits), ResolveCapacitySeverity(slot.UsedWeightUnits, slot.WeightCapacityUnits)),
+                        new ArcUiInspectorMetric("free", "Libero", "B " + slot.FreeBulkUnits.ToString(CultureInfo.InvariantCulture) + " / P " + slot.FreeWeightUnits.ToString(CultureInfo.InvariantCulture), ArcUiInspectorSeverity.Info)
+                    }));
+            }
+        }
+
+        private static void AddInventoryEntryRows(
+            List<ArcUiInspectorRow> rows,
+            NpcInventoryViewSnapshot snapshot,
+            NpcInventorySlotKind slotKind)
+        {
+            bool addedSlotHeader = false;
+            for (int i = 0; i < snapshot.Entries.Length; i++)
+            {
+                NpcInventoryEntryViewSnapshot entry = snapshot.Entries[i];
+                if (entry.SlotKind != slotKind)
+                    continue;
+
+                if (!addedSlotHeader)
+                {
+                    rows.Add(ArcUiInspectorRow.Section(FormatInventorySlotLabel(slotKind)));
+                    addedSlotHeader = true;
+                }
+
+                string rowKey = "inventory_entry_" + entry.EntryId.ToString(CultureInfo.InvariantCulture) + "_" + entry.ObjectId.ToString(CultureInfo.InvariantCulture);
+                rows.Add(ArcUiInspectorRow.Expandable(
+                    rowKey,
+                    ReadString(entry.DisplayName, "Oggetto"),
+                    "x" + entry.Quantity.ToString(CultureInfo.InvariantCulture),
+                    "obj " + entry.ObjectId.ToString(CultureInfo.InvariantCulture),
+                    ResolveInventoryEntrySeverity(entry),
+                    false,
+                    BuildInventoryEntryDetailRows(entry)));
+            }
+        }
+
+        private static ArcUiInspectorRow[] BuildInventoryEntryDetailRows(NpcInventoryEntryViewSnapshot entry)
+        {
+            var rows = new List<ArcUiInspectorRow>(14)
+            {
+                new ArcUiInspectorRow("EntryId", entry.EntryId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("ObjectId", entry.ObjectId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Def", ReadString(entry.DefId, EmptyValue)),
+                new ArcUiInspectorRow("Slot", FormatInventorySlotLabel(entry.SlotKind)),
+                new ArcUiInspectorRow("Container", entry.ContainerObjectId == 0 ? "Pack MVP" : entry.ContainerObjectId.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Quantita'", entry.Quantity.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Bulk", FormatItemUnits(entry.TotalBulkUnits, entry.UnitBulkUnits)),
+                new ArcUiInspectorRow("Peso", FormatItemUnits(entry.TotalWeightUnits, entry.UnitWeightUnits)),
+                new ArcUiInspectorRow("Stack", BoolText(entry.IsStacked)),
+                new ArcUiInspectorRow("Stack ammesso", BoolText(entry.CanUseStackComponent)),
+                new ArcUiInspectorRow("Durabilita'", BoolText(entry.HasDurability)),
+                new ArcUiInspectorRow("Cibo", BoolText(entry.IsConsumableFood))
+            };
+
+            if (entry.IsConsumableFood)
+            {
+                rows.Add(new ArcUiInspectorRow("Nutrizione", FormatDecimal(entry.NutritionValue)));
+                rows.Add(new ArcUiInspectorRow("Fallback nutrizione", BoolText(entry.UsedNutritionFallback)));
+            }
+
+            if (entry.HasIssue)
+                rows.Add(new ArcUiInspectorRow("Diagnostica", entry.Issue));
+
             return rows.ToArray();
         }
 
@@ -2164,6 +2301,61 @@ namespace Arcontio.View.ArcGraph
                 return "None";
 
             return ownerKind + ":" + ownerId.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatUnits(int usedUnits, int capacityUnits)
+        {
+            return usedUnits.ToString(CultureInfo.InvariantCulture)
+                + "/"
+                + capacityUnits.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatItemUnits(int totalUnits, int unitUnits)
+        {
+            return totalUnits.ToString(CultureInfo.InvariantCulture)
+                + " tot | "
+                + unitUnits.ToString(CultureInfo.InvariantCulture)
+                + " cad";
+        }
+
+        private static string FormatInventorySlotLabel(NpcInventorySlotKind slot)
+        {
+            return slot switch
+            {
+                NpcInventorySlotKind.HandLeft => "Mano sx",
+                NpcInventorySlotKind.HandRight => "Mano dx",
+                NpcInventorySlotKind.Pack => "Zaino",
+                _ => "Slot sconosciuto"
+            };
+        }
+
+        private static ArcUiInspectorSeverity ResolveCapacitySeverity(int usedUnits, int capacityUnits)
+        {
+            if (capacityUnits <= 0)
+                return usedUnits > 0 ? ArcUiInspectorSeverity.Warning : ArcUiInspectorSeverity.Muted;
+
+            float ratio = Mathf.Clamp01((float)usedUnits / capacityUnits);
+            if (ratio >= 0.95f)
+                return ArcUiInspectorSeverity.Warning;
+
+            if (ratio >= 0.70f)
+                return ArcUiInspectorSeverity.Info;
+
+            return ArcUiInspectorSeverity.Good;
+        }
+
+        private static ArcUiInspectorSeverity ResolveInventoryEntrySeverity(NpcInventoryEntryViewSnapshot entry)
+        {
+            if (entry.HasIssue)
+                return ArcUiInspectorSeverity.Warning;
+
+            if (entry.IsConsumableFood)
+                return ArcUiInspectorSeverity.Good;
+
+            if (entry.HasDurability)
+                return ArcUiInspectorSeverity.Info;
+
+            return ArcUiInspectorSeverity.Normal;
         }
 
         private static string FormatFootprint(ObjectDef def)
