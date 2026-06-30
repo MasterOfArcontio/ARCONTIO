@@ -5639,7 +5639,17 @@ namespace Arcontio.Core
             out int addedQuantity,
             out string reason)
         {
-            return TryAddInventoryItem(npcId, defId, quantity, NpcInventorySlotKind.Pack, 0, out addedQuantity, out reason);
+            bool added = TryAddInventoryItem(
+                npcId,
+                defId,
+                quantity,
+                NpcInventorySlotKind.Pack,
+                0,
+                out InventoryMutationResult result,
+                out reason);
+
+            addedQuantity = result.QuantityChanged;
+            return added;
         }
 
         // =============================================================================
@@ -5667,7 +5677,47 @@ namespace Arcontio.Core
             out int addedQuantity,
             out string reason)
         {
-            addedQuantity = 0;
+            bool added = TryAddInventoryItem(
+                npcId,
+                defId,
+                quantity,
+                preferredSlot,
+                objectId,
+                out InventoryMutationResult result,
+                out reason);
+
+            addedQuantity = result.QuantityChanged;
+            return added;
+        }
+
+        // =============================================================================
+        // TryAddInventoryItem
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Aggiunge item typed o un oggetto fisico unico all'inventario di un NPC e
+        /// restituisce il risultato compatto della mutazione applicata.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: eventi derivati dalla mutazione canonica</b></para>
+        /// <para>
+        /// I command C2 non devono rileggere l'inventario dopo la scrittura per capire
+        /// che cosa pubblicare. Questo overload concentra validazione e mutazione nel
+        /// World, poi consegna un <see cref="InventoryMutationResult"/> che descrive
+        /// esattamente la quantita' realmente aggiunta, lo slot di destinazione e
+        /// l'oggetto fisico coinvolto.
+        /// </para>
+        /// </summary>
+        public bool TryAddInventoryItem(
+            int npcId,
+            string defId,
+            int quantity,
+            NpcInventorySlotKind preferredSlot,
+            int objectId,
+            out InventoryMutationResult result,
+            out string reason)
+        {
+            result = InventoryMutationResult.None;
             reason = string.Empty;
 
             if (!ExistsNpc(npcId))
@@ -5735,10 +5785,22 @@ namespace Arcontio.Core
             if (objectId <= 0 && def.Stackable)
             {
                 var stack = FindStackEntry(inventory, defId, slot);
-                if (stack != null && ObjectStacks.TryGetValue(stack.ObjectId, out var stackComponent) && stackComponent != null)
+                if (stack != null
+                    && Objects.TryGetValue(stack.ObjectId, out var stackObject)
+                    && stackObject != null
+                    && ObjectStacks.TryGetValue(stack.ObjectId, out var stackComponent)
+                    && stackComponent != null)
                 {
+                    // Uno stack esistente non crea una nuova entry: cambia solo la
+                    // quantita' dell'oggetto-stack gia' held dall'NPC.
                     stackComponent.Quantity += quantityToAdd;
-                    addedQuantity = quantityToAdd;
+                    result = new InventoryMutationResult(
+                        npcId,
+                        stack.ObjectId,
+                        stackObject.DefId,
+                        quantityToAdd,
+                        slot,
+                        NpcInventorySlotKind.None);
                     reason = quantityToAdd == normalizedQuantity ? "InventoryItemStacked" : "InventoryPartiallyStacked";
                     return true;
                 }
@@ -5767,7 +5829,13 @@ namespace Arcontio.Core
                 ContainerObjectId = 0
             });
 
-            addedQuantity = quantityToAdd;
+            result = new InventoryMutationResult(
+                npcId,
+                physicalObjectId,
+                physicalObject.DefId,
+                quantityToAdd,
+                slot,
+                NpcInventorySlotKind.None);
             reason = quantityToAdd == normalizedQuantity ? "InventoryItemAdded" : "InventoryPartiallyAdded";
             return true;
         }
@@ -5795,7 +5863,42 @@ namespace Arcontio.Core
             out int removedQuantity,
             out string reason)
         {
-            removedQuantity = 0;
+            bool removed = TryRemoveInventoryItem(
+                npcId,
+                defId,
+                quantity,
+                out InventoryMutationResult result,
+                out reason);
+
+            removedQuantity = result.QuantityChanged;
+            return removed;
+        }
+
+        // =============================================================================
+        // TryRemoveInventoryItem
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Rimuove una quantita' typed dall'inventario di un NPC e restituisce il
+        /// risultato compatto della mutazione applicata.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: rimozione atomica e osservabile</b></para>
+        /// <para>
+        /// La rimozione continua a essere all-or-nothing: se la quantita' richiesta
+        /// non esiste, il World non modifica nulla. Quando invece la mutazione riesce,
+        /// il risultato contiene il primo oggetto-stack toccato e la quantita' totale
+        /// rimossa, sufficiente per pubblicare un evento inventario non spaziale.
+        /// </para>
+        /// </summary>
+        public bool TryRemoveInventoryItem(
+            int npcId,
+            string defId,
+            int quantity,
+            out InventoryMutationResult result,
+            out string reason)
+        {
+            result = InventoryMutationResult.None;
             reason = string.Empty;
 
             if (!ExistsNpc(npcId))
@@ -5824,11 +5927,15 @@ namespace Arcontio.Core
 
             var inventory = EnsureNpcInventory(npcId);
             int remaining = quantity;
+            int removedQuantity = 0;
+            int firstObjectId = 0;
+            NpcInventorySlotKind firstSlot = NpcInventorySlotKind.None;
+            string normalizedDefId = defId.Trim();
             for (int i = inventory.Entries.Count - 1; i >= 0 && remaining > 0; i--)
             {
                 var entry = inventory.Entries[i];
                 if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out _, out int entryQuantity)
-                    || !string.Equals(obj.DefId, defId, StringComparison.OrdinalIgnoreCase)
+                    || !string.Equals(obj.DefId, normalizedDefId, StringComparison.OrdinalIgnoreCase)
                     || entryQuantity <= 0)
                 {
                     continue;
@@ -5837,6 +5944,14 @@ namespace Arcontio.Core
                 int take = entryQuantity > remaining ? remaining : entryQuantity;
                 remaining -= take;
                 removedQuantity += take;
+
+                if (firstObjectId <= 0)
+                {
+                    // Per rimozioni che attraversano piu' stack equivalenti, l'evento
+                    // conserva il primo oggetto toccato e la quantita' complessiva.
+                    firstObjectId = entry.ObjectId;
+                    firstSlot = entry.SlotKind;
+                }
 
                 if (ObjectStacks.TryGetValue(entry.ObjectId, out var stack) && stack != null)
                 {
@@ -5855,7 +5970,122 @@ namespace Arcontio.Core
             }
 
             reason = "InventoryItemRemoved";
+            result = new InventoryMutationResult(
+                npcId,
+                firstObjectId,
+                normalizedDefId,
+                removedQuantity,
+                firstSlot,
+                firstSlot);
             return removedQuantity == quantity;
+        }
+
+        // =============================================================================
+        // TryMoveInventoryObject
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Sposta un oggetto inventario gia' held tra slot interni dello stesso NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: cambio slot senza transizione spaziale</b></para>
+        /// <para>
+        /// Questo metodo non crea, distrugge, raccoglie o deposita oggetti. Verifica
+        /// solo che l'entry appartenga fisicamente all'NPC, che lo slot richiesto sia
+        /// ammesso dal catalogo oggetti e che bulk/peso dello slot di destinazione
+        /// abbiano spazio sufficiente. Il command corrispondente pubblichera' solo
+        /// <see cref="InventoryItemMovedEvent"/>, mai eventi di pickup/drop.
+        /// </para>
+        /// </summary>
+        public bool TryMoveInventoryObject(
+            int npcId,
+            int objectId,
+            NpcInventorySlotKind targetSlot,
+            out InventoryMutationResult result,
+            out string reason)
+        {
+            result = InventoryMutationResult.None;
+            reason = string.Empty;
+
+            if (!ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            var inventory = EnsureNpcInventory(npcId);
+            var entry = FindInventoryEntryByObjectId(inventory, objectId);
+            if (entry == null)
+            {
+                reason = "InventoryObjectMissing";
+                return false;
+            }
+
+            if (!TryResolveInventoryEntry(entry, out WorldObjectInstance obj, out ObjectDef def, out int quantity)
+                || obj == null
+                || def == null)
+            {
+                reason = "InventoryObjectInvalid";
+                return false;
+            }
+
+            if (!obj.IsHeld || obj.HolderNpcId != npcId)
+            {
+                reason = "ObjectNotHeldByNpc";
+                return false;
+            }
+
+            var normalizedTarget = NormalizeInventorySlot(targetSlot);
+            if (entry.SlotKind == normalizedTarget)
+            {
+                // No-op esplicito: il command riceve success=true ma nessuna mutation,
+                // quindi non pubblica eventi inutili.
+                reason = "InventoryObjectAlreadyInSlot";
+                return true;
+            }
+
+            if (!CanObjectBePlacedInSlot(def, normalizedTarget))
+            {
+                reason = "InventoryPlacementNotAllowed";
+                return false;
+            }
+
+            int requiredBulk = ResolveObjectBulkUnits(def) * quantity;
+            int requiredWeight = ResolveObjectWeightUnits(def) * quantity;
+            int slotBulkFree = ResolveSlotBulkCapacityUnits(npcId, normalizedTarget) - GetInventoryUsedBulkUnits(npcId, normalizedTarget);
+            int slotWeightFree = ResolveSlotWeightCapacityUnits(npcId, normalizedTarget) - GetInventoryUsedWeightUnits(npcId, normalizedTarget);
+
+            if (normalizedTarget == NpcInventorySlotKind.Pack && NpcPrivateFood.TryGetValue(npcId, out int legacyFood) && legacyFood > 0)
+            {
+                // Ponte legacy identico alla logica di add: finche' C7 non rimuove
+                // NpcPrivateFood, lo spazio del Pack deve tenerne conto.
+                slotBulkFree -= legacyFood;
+                slotWeightFree -= legacyFood;
+            }
+
+            if (requiredBulk > slotBulkFree)
+            {
+                reason = "InventoryTargetSlotBulkFull";
+                return false;
+            }
+
+            if (requiredWeight > slotWeightFree)
+            {
+                reason = "InventoryTargetSlotWeightFull";
+                return false;
+            }
+
+            var previousSlot = entry.SlotKind;
+            entry.SlotKind = normalizedTarget;
+            result = new InventoryMutationResult(
+                npcId,
+                objectId,
+                obj.DefId,
+                quantity,
+                normalizedTarget,
+                previousSlot);
+            reason = "InventoryObjectMoved";
+            return true;
         }
 
         // =============================================================================

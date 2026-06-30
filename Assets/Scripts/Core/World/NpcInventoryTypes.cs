@@ -37,6 +37,61 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // InventoryMutationResult
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Risultato compatto prodotto dalle API autorizzate di mutazione inventario.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: evento derivato dalla mutazione, non da rilettura fragile</b></para>
+    /// <para>
+    /// I command devono pubblicare eventi usando il fatto appena applicato dal
+    /// <see cref="World"/>, non ricostruendo a posteriori lo stato dagli store. Il
+    /// result conserva quindi l'oggetto fisico coinvolto, la quantita' realmente
+    /// cambiata e gli slot prima/dopo quando la mutazione riguarda una collocazione.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>NpcId</b>: NPC proprietario fisico dell'inventario mutato.</item>
+    ///   <item><b>ObjectId/DefId</b>: oggetto fisico e definizione catalogo coinvolti.</item>
+    ///   <item><b>QuantityChanged</b>: quantita' realmente aggiunta, rimossa o spostata.</item>
+    ///   <item><b>SlotKind/PreviousSlotKind</b>: collocazione finale e precedente.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct InventoryMutationResult
+    {
+        public readonly int NpcId;
+        public readonly int ObjectId;
+        public readonly string DefId;
+        public readonly int QuantityChanged;
+        public readonly NpcInventorySlotKind SlotKind;
+        public readonly NpcInventorySlotKind PreviousSlotKind;
+
+        public bool HasMutation => NpcId > 0 && QuantityChanged > 0;
+
+        public InventoryMutationResult(
+            int npcId,
+            int objectId,
+            string defId,
+            int quantityChanged,
+            NpcInventorySlotKind slotKind,
+            NpcInventorySlotKind previousSlotKind)
+        {
+            NpcId = npcId;
+            ObjectId = objectId;
+            DefId = defId ?? string.Empty;
+            QuantityChanged = quantityChanged < 0 ? 0 : quantityChanged;
+            SlotKind = slotKind;
+            PreviousSlotKind = previousSlotKind;
+        }
+
+        public static InventoryMutationResult None =>
+            new InventoryMutationResult(0, 0, string.Empty, 0, NpcInventorySlotKind.None, NpcInventorySlotKind.None);
+    }
+
+    // =============================================================================
     // ObjectStackComponent
     // =============================================================================
     /// <summary>

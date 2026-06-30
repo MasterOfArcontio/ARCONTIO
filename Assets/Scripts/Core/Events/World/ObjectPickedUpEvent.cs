@@ -18,6 +18,14 @@ namespace Arcontio.Core
     /// consumare senza cambiare il contratto di base.
     /// </para>
     ///
+    /// <para><b>Policy anti-duplicazione eventi</b></para>
+    /// <para>
+    /// Quando una transizione terra-corpo entra anche nell'inventario typed, questo
+    /// evento resta il fatto canonico. Lo stesso pickup non deve pubblicare anche
+    /// <see cref="InventoryItemAddedEvent"/>, per evitare che memory, belief o log
+    /// interpretino due volte una sola mutazione fisica.
+    /// </para>
+    ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Tick</b>: tick simulativo in cui il command ha applicato la mutazione.</item>

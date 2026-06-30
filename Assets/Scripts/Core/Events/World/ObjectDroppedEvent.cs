@@ -17,6 +17,14 @@ namespace Arcontio.Core
     /// essere collegate in futuro se il dominio lo richiedera'.
     /// </para>
     ///
+    /// <para><b>Policy anti-duplicazione eventi</b></para>
+    /// <para>
+    /// Quando il drop rimuovera' anche l'entry dall'inventario typed, questo evento
+    /// restera' il fatto canonico della transizione corpo-terra. Lo stesso drop non
+    /// deve pubblicare anche <see cref="InventoryItemRemovedEvent"/>, perche' non e'
+    /// una rimozione inventory-only ma un cambio spaziale dell'oggetto.
+    /// </para>
+    ///
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Tick</b>: tick simulativo in cui il command ha applicato la mutazione.</item>
