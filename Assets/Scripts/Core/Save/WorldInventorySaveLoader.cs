@@ -441,21 +441,10 @@ namespace Arcontio.Core.Save
 
         private static bool CanObjectBePlacedInSlot(ObjectDef def, NpcInventorySlotKind slot)
         {
-            if (def == null)
-                return false;
-
-            if (slot == NpcInventorySlotKind.HandLeft || slot == NpcInventorySlotKind.HandRight)
-                return def.CanPlaceInHand || HasPositiveObjectProperty(def, "Item");
-
-            return slot == NpcInventorySlotKind.Pack
-                && (def.CanPlaceInContainer || HasPositiveObjectProperty(def, "Item"));
-        }
-
-        private static bool HasPositiveObjectProperty(ObjectDef def, string key)
-        {
-            return def != null
-                && def.TryGetPropertyValue(key, out float value)
-                && value > 0f;
+            // Il loader non deve possedere una seconda copia delle regole
+            // inventario: se un save e' valido a runtime, deve esserlo con la
+            // stessa grammatica usata dal World.
+            return ObjectInventoryContractResolver.CanPlaceInSlot(def, slot);
         }
 
         private static bool HasObjectStack(WorldInventorySaveData inventoryData, int objectId)

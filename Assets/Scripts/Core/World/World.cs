@@ -6455,40 +6455,10 @@ namespace Arcontio.Core
 
         private static bool IsInventoryTransportableDef(ObjectDef def, int objectId)
         {
-            if (def == null)
-                return false;
-
-            if (objectId > 0)
-                return true;
-
-            if (def.CanPlaceInHand
-                || def.CanPlaceInContainer
-                || def.CanEquipHead
-                || def.CanEquipHands
-                || def.CanEquipUndergarment
-                || def.CanEquipOvergarment
-                || def.CanEquipArmor
-                || def.CanEquipFeet
-                || def.CanEquipSidearm
-                || def.CanEquipBack)
-            {
-                return true;
-            }
-
-            return HasPositiveObjectProperty(def, "Item")
-                || HasPositiveObjectProperty(def, "FoodItem")
-                || HasPositiveObjectProperty(def, "FoodStock")
-                || HasPositiveObjectProperty(def, "Material")
-                || HasPositiveObjectProperty(def, "SeedItem")
-                || HasPositiveObjectProperty(def, "Tool")
-                || HasPositiveObjectProperty(def, "BiologicalProduct");
-        }
-
-        private static bool HasPositiveObjectProperty(ObjectDef def, string key)
-        {
-            return def != null
-                && def.TryGetPropertyValue(key, out float value)
-                && value > 0f;
+            // Da C8.3 la regola non vive piu' dentro World: il World resta
+            // l'autorita' della mutazione, ma il contratto inventario e' tipizzato
+            // in ObjectInventoryContractResolver e condiviso con save/load.
+            return ObjectInventoryContractResolver.IsTransportable(def, objectId > 0);
         }
 
         private bool TryResolveInventoryEntry(
@@ -6603,13 +6573,9 @@ namespace Arcontio.Core
 
         private static bool CanObjectBePlacedInSlot(ObjectDef def, NpcInventorySlotKind slot)
         {
-            if (def == null)
-                return false;
-
-            if (IsHandSlot(slot))
-                return def.CanPlaceInHand || HasPositiveObjectProperty(def, "Item");
-
-            return def.CanPlaceInContainer || HasPositiveObjectProperty(def, "Item");
+            // La validazione slot deve essere identica in add, move, pickup e
+            // ripristino save/load; per questo il World delega al resolver unico.
+            return ObjectInventoryContractResolver.CanPlaceInSlot(def, slot);
         }
 
         private float ResolveNpcStrength01(int npcId)

@@ -17590,7 +17590,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C7 | Rimozione operativa NpcPrivateFood dai flussi runtime | ✅ |
 | v0.71.05.C8.1 | Audit fondazione fisica inventario typed: stato reale di ObjectId, stack, bulk, peso e slot MVP | ✅ |
 | v0.71.05.C8.2 | Consolidamento catalogo oggetti inventario fisico: peso, ingombro, stackability, collocazioni e contratto contenitori | ✅ |
-| v0.71.05.C8.3 | Enum e contratti typed per collocazioni inventory e contenitori | ⏳ |
+| v0.71.05.C8.3 | Enum e contratti typed per collocazioni inventory e contenitori | ✅ |
 | v0.71.05.C8.4 | Resolver capacita' fisica inventario: bulk, peso, mano, pack e forza NPC | ⏳ |
 | v0.71.05.C8.5 | Sostituzione progressiva di inventory_max_units con freeBulk/freeWeight | ⏳ |
 | v0.71.05.C8.6 | Stackability reale: fusione solo per oggetti equivalenti e limite da bulk/peso | ⏳ |
@@ -17621,6 +17621,8 @@ La `v0.71.05.C6` sterilizza il furto legacy Day9/Day10: i command e gli audit st
 La `v0.71.05.C7` chiude il ponte operativo `NpcPrivateFood`: il cibo personale dell'NPC e' ora rappresentato esclusivamente da oggetti alimentari nell'inventario typed. I vecchi campi save restano solo compatibilita' passiva dei DTO storici e non ricreano stato runtime.
 
 La `v0.71.05.C8.2` consolida il catalogo oggetti rispetto alla fondazione fisica inventario gia' emersa in C1.1-C7: gli oggetti dichiarano esplicitamente peso, ingombro, stackability, durabilita', collocazioni ammesse e contratto contenitore. Lo step non introduce ancora macro-slot configurabili, zaini fisici operativi o equipaggiamento indossabile.
+
+La `v0.71.05.C8.3` introduce il contratto runtime typed per collocazioni inventario e categorie contenitore. Il catalogo oggetti resta authoring leggibile con bool e stringhe, mentre `World` e save/load consumano un resolver unico per trasportabilita' e slot MVP, senza cambiare ancora formato save, macro-slot, zaini fisici o UI inventario.
 
 Flusso atteso:
 

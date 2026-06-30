@@ -1,3 +1,5 @@
+using System;
+using System.Reflection;
 using Arcontio.Core;
 using Arcontio.Core.Config;
 using NUnit.Framework;
@@ -147,6 +149,84 @@ namespace Arcontio.Tests
             Assert.That(world.GetInventoryFreeCapacity(npcId), Is.EqualTo(0));
         }
 
+        [Test]
+        public void ObjectInventoryContractResolverResolvesPlacementFlags()
+        {
+            Type resolverType = ResolveInventoryContractResolverType();
+            Type flagsType = ResolveInventoryPlacementFlagsType();
+            var def = new ObjectDef
+            {
+                CanPlaceInHand = true,
+                CanPlaceInContainer = true,
+                CanEquipHead = true,
+                CanEquipSidearm = true
+            };
+
+            var flags = InvokeStatic(resolverType, "ResolvePlacementFlags", def);
+
+            Assert.That(HasReflectedFlag(flags, flagsType, "Hand"), Is.True);
+            Assert.That(HasReflectedFlag(flags, flagsType, "Container"), Is.True);
+            Assert.That(HasReflectedFlag(flags, flagsType, "EquipHead"), Is.True);
+            Assert.That(HasReflectedFlag(flags, flagsType, "EquipSidearm"), Is.True);
+            Assert.That(InvokeStatic(resolverType, "HasPlacement", def, Enum.Parse(flagsType, "Hand")), Is.EqualTo(true));
+            Assert.That(InvokeStatic(resolverType, "HasPlacement", def, Enum.Parse(flagsType, "EquipFeet")), Is.EqualTo(false));
+        }
+
+        [Test]
+        public void ObjectInventoryContractResolverNormalizesContainerKinds()
+        {
+            Type resolverType = ResolveInventoryContractResolverType();
+            var def = new ObjectDef
+            {
+                IsContainer = true,
+                ContainerKind = "SmallContainer"
+            };
+
+            Assert.That(InvokeStatic(resolverType, "IsContainer", def), Is.EqualTo(true));
+            Assert.That(ResolveContainerKindName(resolverType, def), Is.EqualTo("Small"));
+
+            def.ContainerKind = "Medium";
+            Assert.That(ResolveContainerKindName(resolverType, def), Is.EqualTo("Medium"));
+
+            def.ContainerKind = "LargeContainer";
+            Assert.That(ResolveContainerKindName(resolverType, def), Is.EqualTo("Large"));
+
+            def.ContainerKind = "UnexpectedKind";
+            Assert.That(ResolveContainerKindName(resolverType, def), Is.EqualTo("None"));
+
+            def.IsContainer = false;
+            def.ContainerKind = "Small";
+            Assert.That(ResolveContainerKindName(resolverType, def), Is.EqualTo("None"));
+        }
+
+        [Test]
+        public void ObjectInventoryContractResolverKeepsLegacyItemFallbackButRejectsStaticObject()
+        {
+            Type resolverType = ResolveInventoryContractResolverType();
+            var staticObject = new ObjectDef
+            {
+                Id = "wall_stone",
+                DisplayName = "Stone Wall",
+                Properties = new System.Collections.Generic.List<ObjectPropertyKV>()
+            };
+
+            var legacyItem = new ObjectDef
+            {
+                Id = "legacy_item",
+                DisplayName = "Legacy Item",
+                Properties = new System.Collections.Generic.List<ObjectPropertyKV>
+                {
+                    new ObjectPropertyKV { Key = "Item", Value = 1f }
+                }
+            };
+
+            Assert.That(InvokeStatic(resolverType, "IsTransportable", staticObject, false), Is.EqualTo(false));
+            Assert.That(InvokeStatic(resolverType, "CanPlaceInSlot", staticObject, NpcInventorySlotKind.Pack), Is.EqualTo(false));
+            Assert.That(InvokeStatic(resolverType, "IsTransportable", legacyItem, false), Is.EqualTo(true));
+            Assert.That(InvokeStatic(resolverType, "CanPlaceInSlot", legacyItem, NpcInventorySlotKind.HandLeft), Is.EqualTo(true));
+            Assert.That(InvokeStatic(resolverType, "CanPlaceInSlot", legacyItem, NpcInventorySlotKind.Pack), Is.EqualTo(true));
+        }
+
         private static World MakeWorld(out int npcId)
         {
             var world = new World(new WorldConfig(new SimulationParams()));
@@ -230,6 +310,40 @@ namespace Arcontio.Tests
                 CanPlaceInContainer = true,
                 Properties = properties
             };
+        }
+
+        private static Type ResolveInventoryContractResolverType()
+        {
+            Type type = typeof(World).Assembly.GetType("Arcontio.Core.ObjectInventoryContractResolver");
+            Assert.That(type, Is.Not.Null, "ObjectInventoryContractResolver deve esistere nel runtime Core.");
+            return type;
+        }
+
+        private static Type ResolveInventoryPlacementFlagsType()
+        {
+            Type type = typeof(World).Assembly.GetType("Arcontio.Core.InventoryPlacementFlags");
+            Assert.That(type, Is.Not.Null, "InventoryPlacementFlags deve esistere nel runtime Core.");
+            return type;
+        }
+
+        private static object InvokeStatic(Type type, string methodName, params object[] args)
+        {
+            MethodInfo method = type.GetMethod(methodName, BindingFlags.Public | BindingFlags.Static);
+            Assert.That(method, Is.Not.Null, $"{methodName} deve essere un metodo pubblico statico.");
+            return method.Invoke(null, args);
+        }
+
+        private static bool HasReflectedFlag(object flags, Type flagsType, string flagName)
+        {
+            int value = Convert.ToInt32(flags);
+            int flag = Convert.ToInt32(Enum.Parse(flagsType, flagName));
+            return (value & flag) == flag;
+        }
+
+        private static string ResolveContainerKindName(Type resolverType, ObjectDef def)
+        {
+            object value = InvokeStatic(resolverType, "ResolveContainerKind", def);
+            return value == null ? string.Empty : value.ToString();
         }
     }
 }
