@@ -1,89 +1,56 @@
-using Arcontio.Core.Logging;
-using UnityEngine;
-
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // EatPrivateFoodCommand
+    // =============================================================================
     /// <summary>
-    /// EatPrivateFoodCommand (Day9):
-    /// L’NPC consuma 1 unità dal proprio cibo privato (World.NpcPrivateFood[npcId]).
+    /// <para>
+    /// Bridge temporaneo per i call-site storici che chiedono di mangiare cibo
+    /// personale.
+    /// </para>
     ///
-    /// Effetto:
-    /// - decrementa il contatore privato
-    /// - riduce Hunger01 usando NeedsConfig.eatSatietyGain
+    /// <para><b>Principio architetturale: legacy spento, contratto conservato</b></para>
+    /// <para>
+    /// Da C4 il cibo personale operativo vive nell'inventario typed. Questa classe
+    /// non legge e non scrive piu' <c>World.NpcPrivateFood</c>: inoltra la richiesta
+    /// al comando canonico <see cref="ConsumeInventoryItemCommand"/> e verra'
+    /// rimossa quando C7 eliminera' i residui runtime legacy.
+    /// </para>
     ///
-    /// Nota:
-    /// - Non genera di per sé "furto" o "sospetto": è consumo legittimo.
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>NpcId</b>: NPC che deve consumare un alimento posseduto.</item>
+    ///   <item><b>Execute</b>: delega al consumo typed senza produrre eventi duplicati.</item>
+    /// </list>
     /// </summary>
     public sealed class EatPrivateFoodCommand : ICommand
     {
         private readonly int _npcId;
 
+        // =============================================================================
+        // EatPrivateFoodCommand
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mantiene il costruttore storico basato solo su NPC.
+        /// </para>
+        /// </summary>
         public EatPrivateFoodCommand(int npcId)
         {
             _npcId = npcId;
         }
 
+        // =============================================================================
+        // Execute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Consuma il miglior cibo disponibile nell'inventario typed dell'NPC.
+        /// </para>
+        /// </summary>
         public void Execute(World world, MessageBus bus)
         {
-            if (!world.Needs.TryGetValue(_npcId, out var needs))
-                return;
-
-            if (!world.NpcPrivateFood.TryGetValue(_npcId, out int priv) || priv <= 0)
-                return;
-
-            // NpcPrivateFood e' il ponte temporaneo pre-inventario: non contiene
-            // ancora stack typed, quindi ogni unita' privata viene risolta come
-            // food_stock legacy/generico tramite lo stesso resolver usato dagli
-            // altri consumi alimentari.
-            var cfg = world.Global.Needs;
-            ObjectFoodNutritionResult nutrition = ObjectFoodNutritionResolver.Resolve(
-                world,
-                "food_stock",
-                cfg.eatSatietyGain,
-                allowLegacyFallbackWhenDefinitionMissing: true);
-            if (!nutrition.IsConsumableFood)
-                return;
-
-            // ACTION TRACE (debug/overlay): consumo cibo privato (inventario v0).
-            world.SetNpcAction(_npcId, NpcActionState.Eat("EatPrivateFood"));
-
-            // BALLOON SIGNAL (view): fumetto "Eat" (cibo privato)
-            world.EmitNpcBalloon(_npcId, NpcBalloonKind.Eat);
-
-            // 1) Mutazione inventario privato
-            int remainingPrivateFood = priv - 1;
-            world.NpcPrivateFood[_npcId] = remainingPrivateFood;
-            
-            // Marker: "ho consumato io" in questo tick
-            world.NpcLastPrivateFoodConsumeTick[_npcId] = world.Global.CurrentTickIndex;
-            
-            // 2) Mutazione hunger
-            needs.AddValue(NeedKind.Hunger, -nutrition.NutritionValue);
-
-            world.Needs[_npcId] = needs;
-
-            int cellX = 0;
-            int cellY = 0;
-            if (world.GridPos.TryGetValue(_npcId, out var pos))
-            {
-                cellX = pos.X;
-                cellY = pos.Y;
-            }
-
-            bus?.Publish(new FoodConsumedEvent(
-                TickContext.CurrentTickIndex,
-                _npcId,
-                "PrivateFood",
-                foodObjectId: 0,
-                units: 1,
-                remainingUnits: remainingPrivateFood,
-                depleted: remainingPrivateFood <= 0,
-                cellX: cellX,
-                cellY: cellY,
-                hungerAfter: needs.GetValue(NeedKind.Hunger),
-                foodDefId: nutrition.ObjectDefId,
-                nutritionValue: nutrition.NutritionValue,
-                usedNutritionFallback: nutrition.UsedNutritionFallback));
+            new ConsumeInventoryItemCommand(_npcId).Execute(world, bus);
         }
     }
 }

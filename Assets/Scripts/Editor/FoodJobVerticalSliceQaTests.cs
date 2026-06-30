@@ -969,27 +969,29 @@ namespace Arcontio.Tests
         }
 
         [Test]
-        public void EatPrivateFoodCommandPublishesFoodConsumedEventAfterMutation()
+        public void EatPrivateFoodCommandConsumesTypedInventoryWithoutMutatingLegacyPrivateFood()
         {
             var world = MakeWorldWithNpcOnly(4, 6, out int npcId);
-            AddObjectDef(world, "food_stock", nutritionValue: 0.20f, foodItem: true, foodStock: true);
+            AddObjectDef(world, "berry", nutritionValue: 0.20f, foodItem: true, foodStock: false);
             world.NpcPrivateFood[npcId] = 2;
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, out _, out string addReason), Is.True, addReason);
             var bus = new MessageBus();
 
             new EatPrivateFoodCommand(npcId).Execute(world, bus);
 
-            Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(1));
+            Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(2));
+            Assert.That(world.GetInventoryQuantity(npcId, "berry"), Is.EqualTo(0));
             Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(0.75f).Within(0.0001f));
             Assert.That(bus.TryDequeue(out var simEvent), Is.True);
             var consumed = simEvent as FoodConsumedEvent;
             Assert.That(consumed, Is.Not.Null);
             Assert.That(consumed.NpcId, Is.EqualTo(npcId));
-            Assert.That(consumed.SourceKind, Is.EqualTo("PrivateFood"));
-            Assert.That(consumed.FoodObjectId, Is.EqualTo(0));
-            Assert.That(consumed.FoodDefId, Is.EqualTo("food_stock"));
+            Assert.That(consumed.SourceKind, Is.EqualTo("Inventory"));
+            Assert.That(consumed.FoodObjectId, Is.GreaterThan(0));
+            Assert.That(consumed.FoodDefId, Is.EqualTo("berry"));
             Assert.That(consumed.NutritionValue, Is.EqualTo(0.20f).Within(0.0001f));
             Assert.That(consumed.UsedNutritionFallback, Is.False);
-            Assert.That(consumed.RemainingUnits, Is.EqualTo(1));
+            Assert.That(consumed.RemainingUnits, Is.EqualTo(0));
             Assert.That(consumed.CellX, Is.EqualTo(4));
             Assert.That(consumed.CellY, Is.EqualTo(6));
             Assert.That(bus.Count, Is.EqualTo(0));

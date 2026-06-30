@@ -6,7 +6,7 @@ namespace Arcontio.Core
     /// <summary>
     /// <para>
     /// Evento world-level minimale emesso quando un NPC consuma davvero una unita'
-    /// di cibo, da uno stock oggettivo o dal proprio cibo privato.
+    /// di cibo, da uno stock oggettivo o dal proprio inventario typed.
     /// </para>
     ///
     /// <para><b>Fatto di mondo senza nuova logica sociale</b></para>
@@ -19,8 +19,8 @@ namespace Arcontio.Core
     /// <para><b>Struttura interna:</b></para>
     /// <list type="bullet">
     ///   <item><b>Tick/NpcId</b>: quando e chi ha consumato.</item>
-    ///   <item><b>SourceKind</b>: origine diagnostica, per esempio Stock o PrivateFood.</item>
-    ///   <item><b>FoodObjectId</b>: oggetto stock quando esiste, zero per cibo privato.</item>
+    ///   <item><b>SourceKind</b>: origine diagnostica, per esempio Stock o Inventory.</item>
+    ///   <item><b>FoodObjectId</b>: oggetto stock o stack inventario consumato quando esiste.</item>
     ///   <item><b>Cell</b>: cella osservabile del consumo o posizione dell'NPC.</item>
     ///   <item><b>RemainingUnits/HungerAfter</b>: stato gia' risultante dalla mutazione.</item>
     ///   <item><b>FoodDefId/NutritionValue</b>: dato alimentare risolto dal catalogo o dal fallback legacy.</item>

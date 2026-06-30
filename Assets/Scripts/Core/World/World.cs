@@ -5489,10 +5489,9 @@ namespace Arcontio.Core
         ///
         /// <para><b>Principio architetturale: C1 sposta la capienza sul nuovo store</b></para>
         /// <para>
-        /// Da questo checkpoint la capienza operativa inizia a guardare
-        /// <see cref="NpcInventories"/>. Finche' i sotto-step C4-C7 non avranno
-        /// migrato fame e furto, somma anche <c>NpcPrivateFood</c> come ponte
-        /// legacy, cosi i comandi esistenti non possono sovraccaricare l'NPC.
+        /// Da questo checkpoint la capienza operativa guarda <see cref="NpcInventories"/>.
+        /// Fino alla rimozione C7 somma anche <c>NpcPrivateFood</c> come ponte
+        /// legacy, cosi i flussi non ancora migrati non possono sovraccaricare l'NPC.
         /// </para>
         /// </summary>
         public int GetInventoryUsedUnits(int npcId)
@@ -5978,6 +5977,69 @@ namespace Arcontio.Core
                 firstSlot,
                 firstSlot);
             return removedQuantity == quantity;
+        }
+
+        // =============================================================================
+        // TryConsumeInventoryFood
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Consuma una singola unita' alimentare dall'inventario typed di un NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: consumo alimentare autorizzato dal World</b></para>
+        /// <para>
+        /// Il metodo valida NPC, inventario, catalogo e nutrizione prima di rimuovere
+        /// l'oggetto fisico o una sua unita' stack. Non modifica Fame e non pubblica
+        /// eventi: questi effetti restano responsabilita' del command, che usa il
+        /// risultato della mutazione per produrre un singolo <c>FoodConsumedEvent</c>.
+        /// </para>
+        /// </summary>
+        public bool TryConsumeInventoryFood(
+            int npcId,
+            string foodDefId,
+            out InventoryMutationResult result,
+            out ObjectFoodNutritionResult nutrition,
+            out string reason)
+        {
+            result = InventoryMutationResult.None;
+            nutrition = default;
+            reason = string.Empty;
+
+            if (!ExistsNpc(npcId))
+            {
+                reason = "NpcMissing";
+                return false;
+            }
+
+            string normalizedFoodDefId = foodDefId == null ? string.Empty : foodDefId.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedFoodDefId))
+            {
+                if (!SelectBestFoodOnSelf(npcId, out normalizedFoodDefId, out _, out _))
+                {
+                    reason = "InventoryFoodMissing";
+                    return false;
+                }
+            }
+
+            nutrition = ObjectFoodNutritionResolver.Resolve(
+                this,
+                normalizedFoodDefId,
+                Global.Needs.eatSatietyGain,
+                allowLegacyFallbackWhenDefinitionMissing: false);
+            if (!nutrition.IsConsumableFood)
+            {
+                reason = string.IsNullOrWhiteSpace(nutrition.FailureReason)
+                    ? "InventoryItemIsNotFood"
+                    : nutrition.FailureReason;
+                return false;
+            }
+
+            if (!TryRemoveInventoryItem(npcId, normalizedFoodDefId, 1, out result, out reason))
+                return false;
+
+            reason = "InventoryFoodConsumed";
+            return result.HasMutation;
         }
 
         // =============================================================================

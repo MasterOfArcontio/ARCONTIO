@@ -150,6 +150,131 @@ namespace Arcontio.Tests
         }
 
         [Test]
+        public void ConsumeInventoryItemCommandConsumesTypedFoodAndPublishesSingleFoodEvent()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 2, out _, out _), Is.True);
+            float hungerBefore = world.Needs[npcId].GetValue(NeedKind.Hunger);
+            var bus = new MessageBus();
+
+            new ConsumeInventoryItemCommand(npcId, "berry").Execute(world, bus);
+
+            Assert.That(world.GetInventoryQuantity(npcId, "berry"), Is.EqualTo(1));
+            Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(hungerBefore - 0.32f).Within(0.0001f));
+            Assert.That(bus.Count, Is.EqualTo(1));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var consumed = simEvent as FoodConsumedEvent;
+            Assert.That(consumed, Is.Not.Null);
+            Assert.That(consumed.NpcId, Is.EqualTo(npcId));
+            Assert.That(consumed.SourceKind, Is.EqualTo("Inventory"));
+            Assert.That(consumed.FoodDefId, Is.EqualTo("berry"));
+            Assert.That(consumed.NutritionValue, Is.EqualTo(0.32f).Within(0.0001f));
+            Assert.That(consumed.RemainingUnits, Is.EqualTo(1));
+            Assert.That(consumed.Depleted, Is.False);
+        }
+
+        [Test]
+        public void ConsumeInventoryItemCommandAutoSelectsMostNutritiousFood()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "acorn", 1, out _, out _), Is.True);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, out _, out _), Is.True);
+            var bus = new MessageBus();
+
+            new ConsumeInventoryItemCommand(npcId).Execute(world, bus);
+
+            Assert.That(world.GetInventoryQuantity(npcId, "berry"), Is.EqualTo(0));
+            Assert.That(world.GetInventoryQuantity(npcId, "acorn"), Is.EqualTo(1));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var consumed = simEvent as FoodConsumedEvent;
+            Assert.That(consumed, Is.Not.Null);
+            Assert.That(consumed.FoodDefId, Is.EqualTo("berry"));
+        }
+
+        [Test]
+        public void ConsumeInventoryItemCommandRejectsNonFoodWithoutEvent()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "wood_log", 1, out _, out _), Is.True);
+            float hungerBefore = world.Needs[npcId].GetValue(NeedKind.Hunger);
+            var bus = new MessageBus();
+
+            new ConsumeInventoryItemCommand(npcId, "wood_log").Execute(world, bus);
+
+            Assert.That(world.GetInventoryQuantity(npcId, "wood_log"), Is.EqualTo(1));
+            Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(hungerBefore).Within(0.0001f));
+            Assert.That(bus.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ConsumeInventoryItemCommandEmptyInventoryDoesNotMutate()
+        {
+            var world = MakeWorld(out int npcId);
+            float hungerBefore = world.Needs[npcId].GetValue(NeedKind.Hunger);
+            var bus = new MessageBus();
+
+            new ConsumeInventoryItemCommand(npcId).Execute(world, bus);
+
+            Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(hungerBefore).Within(0.0001f));
+            Assert.That(bus.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void ConsumeInventoryItemCommandRemovesLastStackObject()
+        {
+            var world = MakeWorld(out int npcId);
+            Assert.That(world.TryAddInventoryItem(npcId, "berry", 1, out _, out _), Is.True);
+            int objectId = world.NpcInventories[npcId].Entries[0].ObjectId;
+            var bus = new MessageBus();
+
+            new ConsumeInventoryItemCommand(npcId, "berry").Execute(world, bus);
+
+            Assert.That(world.GetInventoryQuantity(npcId, "berry"), Is.EqualTo(0));
+            Assert.That(world.NpcInventories[npcId].Entries.Count, Is.EqualTo(0));
+            Assert.That(world.ObjectStacks.ContainsKey(objectId), Is.False);
+            Assert.That(world.Objects.ContainsKey(objectId), Is.False);
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var consumed = simEvent as FoodConsumedEvent;
+            Assert.That(consumed, Is.Not.Null);
+            Assert.That(consumed.FoodObjectId, Is.EqualTo(objectId));
+            Assert.That(consumed.Depleted, Is.True);
+        }
+
+        [Test]
+        public void EatPrivateFoodCommandUsesTypedInventoryAndDoesNotTouchLegacyPrivateFood()
+        {
+            var world = MakeWorld(out int npcId);
+            world.NpcPrivateFood[npcId] = 3;
+            Assert.That(world.TryAddInventoryItem(npcId, "acorn", 1, out _, out _), Is.True);
+            var bus = new MessageBus();
+
+            new EatPrivateFoodCommand(npcId).Execute(world, bus);
+
+            Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(3));
+            Assert.That(world.GetInventoryQuantity(npcId, "acorn"), Is.EqualTo(0));
+            Assert.That(bus.TryDequeue(out var simEvent), Is.True);
+            var consumed = simEvent as FoodConsumedEvent;
+            Assert.That(consumed, Is.Not.Null);
+            Assert.That(consumed.SourceKind, Is.EqualTo("Inventory"));
+            Assert.That(consumed.FoodDefId, Is.EqualTo("acorn"));
+        }
+
+        [Test]
+        public void EatPrivateFoodCommandDoesNotConsumeLegacyPrivateFoodWithoutTypedFood()
+        {
+            var world = MakeWorld(out int npcId);
+            world.NpcPrivateFood[npcId] = 3;
+            float hungerBefore = world.Needs[npcId].GetValue(NeedKind.Hunger);
+            var bus = new MessageBus();
+
+            new EatPrivateFoodCommand(npcId).Execute(world, bus);
+
+            Assert.That(world.NpcPrivateFood[npcId], Is.EqualTo(3));
+            Assert.That(world.Needs[npcId].GetValue(NeedKind.Hunger), Is.EqualTo(hungerBefore).Within(0.0001f));
+            Assert.That(bus.Count, Is.EqualTo(0));
+        }
+
+        [Test]
         public void PickUpObjectCommandPublishesOnlyObjectPickedUpEvent()
         {
             var world = MakeWorld(out int npcId);
@@ -206,6 +331,8 @@ namespace Arcontio.Tests
         private static void AddObjectDefs(World world)
         {
             world.ObjectDefs["berry"] = ItemDef("berry", bulk: 1, weight: 1, stackable: true, "Item", "FoodItem", "NutritionValue");
+            world.ObjectDefs["acorn"] = ItemDef("acorn", bulk: 1, weight: 1, stackable: true, "Item", "FoodItem", "NutritionValueLow");
+            world.ObjectDefs["wood_log"] = ItemDef("wood_log", bulk: 1, weight: 1, stackable: true, "Item", "Material");
             world.ObjectDefs["heavy_log"] = ItemDef("heavy_log", bulk: 8, weight: 1, stackable: true, "Item", "Material");
             world.ObjectDefs["qa_crate"] = ItemDef("qa_crate", bulk: 2, weight: 2, stackable: false, "Item");
         }
@@ -216,7 +343,14 @@ namespace Arcontio.Tests
             for (int i = 0; i < flags.Length; i++)
             {
                 float value = flags[i] == "NutritionValue" ? 0.32f : 1f;
-                properties.Add(new ObjectPropertyKV { Key = flags[i], Value = value });
+                string key = flags[i];
+                if (flags[i] == "NutritionValueLow")
+                {
+                    key = "NutritionValue";
+                    value = 0.18f;
+                }
+
+                properties.Add(new ObjectPropertyKV { Key = key, Value = value });
             }
 
             return new ObjectDef
