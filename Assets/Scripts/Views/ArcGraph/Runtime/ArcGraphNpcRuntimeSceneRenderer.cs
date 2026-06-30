@@ -61,11 +61,11 @@ namespace Arcontio.View.ArcGraph
         // braccia e testa, evitando che attraversi alcuni layer anatomici.
         [SerializeField] private int selectionMarkerSortingOffset = -1;
         [SerializeField] private bool renderRunningActionOverlay = true;
-        [SerializeField] private Vector3 runningActionOverlayLocalOffset = new Vector3(0f, 0.98f, 0f);
-        [SerializeField] private Vector2 runningActionOverlaySize = new Vector2(0.96f, 0.26f);
-        [SerializeField] private Color runningActionOverlayBackgroundTint = new Color(0.04f, 0.06f, 0.08f, 0.82f);
-        [SerializeField] private Color runningActionOverlayTrackTint = new Color(1f, 1f, 1f, 0.22f);
-        [SerializeField] private Color runningActionOverlayFillTint = new Color(0.35f, 0.85f, 1f, 0.9f);
+        [SerializeField] private Vector3 runningActionOverlayLocalOffset = new Vector3(0f, 1.22f, 0f);
+        [SerializeField] private Vector2 runningActionOverlaySize = new Vector2(0.54f, 0.12f);
+        [SerializeField] private Color runningActionOverlayBackgroundTint = new Color(0.04f, 0.06f, 0.08f, 0f);
+        [SerializeField] private Color runningActionOverlayTrackTint = new Color(0.04f, 0.08f, 0.09f, 0.5f);
+        [SerializeField] private Color runningActionOverlayFillTint = new Color(0.78f, 0.96f, 1f, 0.95f);
         [SerializeField] private Color runningActionOverlayTextTint = new Color(0.94f, 0.98f, 1f, 1f);
         [SerializeField] private int runningActionOverlaySortingOffset = 90;
         [SerializeField] private Vector3 originOffset = Vector3.zero;
@@ -1165,8 +1165,8 @@ namespace Arcontio.View.ArcGraph
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
         ///   <item><b>Root</b>: figlio locale dell'NPC, quindi segue posizione e scala.</item>
-        ///   <item><b>Text</b>: label compatta gia' normalizzata dallo snapshot.</item>
-        ///   <item><b>Barra</b>: track fisso e fill ancorato a sinistra su <c>Remaining01</c>.</item>
+        ///   <item><b>Text</b>: label compatta gia' normalizzata dallo snapshot, disegnata senza box pieno.</item>
+        ///   <item><b>Barra</b>: linea sottile sotto la label, con fill ancorato a sinistra su <c>Remaining01</c>.</item>
         /// </list>
         /// </summary>
         private void ApplyRunningActionOverlay(
@@ -1192,30 +1192,29 @@ namespace Arcontio.View.ArcGraph
             handle.RunningActionOverlayRoot.transform.localPosition = runningActionOverlayLocalOffset;
             handle.RunningActionOverlayRoot.transform.localScale = Vector3.one;
 
-            float panelWidth = Mathf.Max(0.2f, runningActionOverlaySize.x);
-            float panelHeight = Mathf.Max(0.12f, runningActionOverlaySize.y);
-            float barWidth = panelWidth * 0.78f;
-            float barHeight = Mathf.Max(0.025f, panelHeight * 0.18f);
+            float panelWidth = Mathf.Max(0.24f, runningActionOverlaySize.x);
+            float panelHeight = Mathf.Max(0.08f, runningActionOverlaySize.y);
+            float barWidth = panelWidth * 0.82f;
+            float barHeight = Mathf.Max(0.012f, panelHeight * 0.12f);
             float remainingWidth = Mathf.Max(0.001f, barWidth * Mathf.Clamp01(overlay.Remaining01));
             int sortingOrder = handle.LastSortingOrder + ResolveRunningActionOverlaySortingOffset();
 
-            ApplyOverlaySprite(
-                handle.RunningActionOverlayBackgroundRenderer,
-                Vector3.zero,
-                new Vector3(panelWidth, panelHeight, 1f),
-                runningActionOverlayBackgroundTint,
-                sortingOrder);
+            // Nel layout corrente l'azione non deve avere un cartellino proprio:
+            // resta una piccola scritta sopra il nameplate NPC, come nel mockup
+            // operatore, per non coprire il selettore nero gia' presente.
+            if (handle.RunningActionOverlayBackgroundRenderer != null)
+                handle.RunningActionOverlayBackgroundRenderer.enabled = false;
 
             ApplyOverlaySprite(
                 handle.RunningActionOverlayTrackRenderer,
-                new Vector3(0f, -panelHeight * 0.22f, 0f),
+                new Vector3(0f, -panelHeight * 0.19f, 0f),
                 new Vector3(barWidth, barHeight, 1f),
                 runningActionOverlayTrackTint,
                 sortingOrder + 1);
 
             ApplyOverlaySprite(
                 handle.RunningActionOverlayFillRenderer,
-                new Vector3((-barWidth * 0.5f) + (remainingWidth * 0.5f), -panelHeight * 0.22f, 0f),
+                new Vector3((-barWidth * 0.5f) + (remainingWidth * 0.5f), -panelHeight * 0.19f, 0f),
                 new Vector3(remainingWidth, barHeight, 1f),
                 runningActionOverlayFillTint,
                 sortingOrder + 2);
@@ -1223,7 +1222,7 @@ namespace Arcontio.View.ArcGraph
             ApplyOverlayText(
                 handle.RunningActionOverlayText,
                 overlay.Label,
-                new Vector3(0f, panelHeight * 0.17f, 0f),
+                new Vector3(0f, panelHeight * 0.22f, 0f),
                 sortingOrder + 3);
 
             SetRunningActionOverlayEnabled(handle, true);
@@ -1256,11 +1255,11 @@ namespace Arcontio.View.ArcGraph
             if (text == null)
                 return;
 
-            text.text = string.IsNullOrWhiteSpace(label) ? "Azione" : label.Trim();
+            text.text = string.IsNullOrWhiteSpace(label) ? "azione" : label.Trim().ToLowerInvariant();
             text.anchor = TextAnchor.MiddleCenter;
             text.alignment = TextAlignment.Center;
-            text.characterSize = 0.042f;
-            text.fontSize = 32;
+            text.characterSize = 0.026f;
+            text.fontSize = 24;
             text.color = runningActionOverlayTextTint;
             text.transform.localPosition = localPosition;
             text.transform.localRotation = Quaternion.identity;
@@ -1333,7 +1332,9 @@ namespace Arcontio.View.ArcGraph
                 handle.RunningActionOverlayRoot.SetActive(enabled);
 
             if (handle.RunningActionOverlayBackgroundRenderer != null)
-                handle.RunningActionOverlayBackgroundRenderer.enabled = enabled;
+                handle.RunningActionOverlayBackgroundRenderer.enabled =
+                    enabled &&
+                    runningActionOverlayBackgroundTint.a > 0.001f;
 
             if (handle.RunningActionOverlayTrackRenderer != null)
                 handle.RunningActionOverlayTrackRenderer.enabled = enabled;

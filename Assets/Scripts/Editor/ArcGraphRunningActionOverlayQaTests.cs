@@ -41,7 +41,7 @@ namespace Arcontio.Tests
             Assert.That(overlay.IsActive, Is.True);
             Assert.That(overlay.ActionKind, Is.EqualTo(RunningActionKind.UseObject));
             Assert.That(overlay.JobActionId, Is.EqualTo("consume_known_food"));
-            Assert.That(overlay.Label, Is.EqualTo("Mangia"));
+            Assert.That(overlay.Label, Is.EqualTo("mangia"));
             Assert.That(overlay.Progress01, Is.EqualTo(0.5f).Within(0.0001f));
             Assert.That(overlay.Remaining01, Is.EqualTo(0.5f).Within(0.0001f));
         }
@@ -58,7 +58,7 @@ namespace Arcontio.Tests
                 label: string.Empty);
 
             Assert.That(overlay.IsActive, Is.True);
-            Assert.That(overlay.Label, Is.EqualTo("Raccoglie"));
+            Assert.That(overlay.Label, Is.EqualTo("raccoglie"));
             Assert.That(overlay.Progress01, Is.EqualTo(1f));
             Assert.That(overlay.Remaining01, Is.EqualTo(0f));
         }
@@ -72,7 +72,7 @@ namespace Arcontio.Tests
                 "pickup_food_to_hand",
                 elapsedTicks: 1,
                 requiredTicks: 4,
-                label: "Raccoglie");
+                label: "raccoglie");
             var actorLayer = new ArcGraphActorLayer();
             var snapshot = new ArcGraphActorVisualSnapshot(
                 7,
@@ -94,7 +94,7 @@ namespace Arcontio.Tests
 
             Assert.That(items.Count, Is.EqualTo(1));
             Assert.That(items[0].RunningActionOverlay.IsActive, Is.True);
-            Assert.That(items[0].RunningActionOverlay.Label, Is.EqualTo("Raccoglie"));
+            Assert.That(items[0].RunningActionOverlay.Label, Is.EqualTo("raccoglie"));
             Assert.That(items[0].RunningActionOverlay.Remaining01, Is.EqualTo(0.75f).Within(0.0001f));
         }
 

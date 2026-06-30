@@ -56,7 +56,7 @@ namespace Arcontio.View.ArcGraph
             Remaining01 = Clamp01(1f - Progress01);
             Label = string.IsNullOrWhiteSpace(label)
                 ? ResolveFallbackLabel(actionKind)
-                : label.Trim();
+                : label.Trim().ToLowerInvariant();
         }
 
         public static ArcGraphActorRunningActionOverlaySnapshot None()
@@ -94,19 +94,19 @@ namespace Arcontio.View.ArcGraph
                 : jobActionId.Trim().ToLowerInvariant();
 
             if (action.Contains("pickup"))
-                return "Raccoglie";
+                return "raccoglie";
 
             if (action.Contains("consume") || action.Contains("eat"))
-                return "Mangia";
+                return "mangia";
 
             if (action.Contains("ready"))
-                return "Prepara";
+                return "prepara";
 
             if (action.Contains("look"))
-                return "Osserva";
+                return "osserva";
 
             if (action.Contains("wait"))
-                return "Attende";
+                return "attende";
 
             return ResolveFallbackLabel(kind);
         }
@@ -116,13 +116,13 @@ namespace Arcontio.View.ArcGraph
             switch (kind)
             {
                 case RunningActionKind.Movement:
-                    return "Si muove";
+                    return "si muove";
                 case RunningActionKind.UseObject:
-                    return "Usa";
+                    return "usa";
                 case RunningActionKind.Wait:
-                    return "Attende";
+                    return "attende";
                 default:
-                    return "Azione";
+                    return "azione";
             }
         }
 
