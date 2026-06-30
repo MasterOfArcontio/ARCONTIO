@@ -33,7 +33,7 @@ namespace Arcontio.Tests
     public sealed class FoodJobVerticalSliceQaTests
     {
         private const string TemplateJson =
-            "{\"templates\":[{\"templateId\":\"food.eat_carried_inventory.v1\",\"phases\":[{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"ready_carried_food\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"ready_inventory_food\",\"kind\":\"ReadyInventoryFood\",\"payloadKey\":\"HandLeft\",\"durationTicks\":6}]},{\"phaseId\":\"consume_carried_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"consume_carried_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\",\"durationTicks\":12}]}]},{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"take_and_consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"pickup_food_to_hand\",\"kind\":\"PickUp\",\"payloadKey\":\"HandLeft\"},{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\",\"durationTicks\":12}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
+            "{\"templates\":[{\"templateId\":\"food.eat_carried_inventory.v1\",\"phases\":[{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"ready_carried_food\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"ready_inventory_food\",\"kind\":\"ReadyInventoryFood\",\"payloadKey\":\"HandLeft\",\"durationTicks\":6}]},{\"phaseId\":\"consume_carried_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"consume_carried_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\",\"durationTicks\":12}]}]},{\"templateId\":\"food.eat_known_community_stock.v1\",\"phases\":[{\"phaseId\":\"reach_food\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_food\",\"kind\":\"MoveToCell\"}]},{\"phaseId\":\"prepare_food_hand\",\"kind\":\"Prepare\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"prepare_left_hand\",\"kind\":\"PrepareHand\",\"payloadKey\":\"HandLeft\"}]},{\"phaseId\":\"take_and_consume_food\",\"kind\":\"Execute\",\"isInterruptible\":false,\"actions\":[{\"actionId\":\"pickup_food_to_hand\",\"kind\":\"PickUp\",\"payloadKey\":\"HandLeft\",\"durationTicks\":6},{\"actionId\":\"consume_known_food\",\"kind\":\"Consume\",\"payloadKey\":\"HandLeft\",\"durationTicks\":12}]}]},{\"templateId\":\"generic.move_to_cell.v1\",\"phases\":[{\"phaseId\":\"move_to_cell\",\"kind\":\"ReachTarget\",\"isInterruptible\":true,\"actions\":[{\"actionId\":\"move_to_cell\",\"kind\":\"MoveToCell\"}]}]}]}";
 
         [Test]
         public void RegistryLoadsFoodAndMoveTemplates()
@@ -851,31 +851,121 @@ namespace Arcontio.Tests
             world.JobRuntimeState.CommandBuffer.Clear();
             system.Update(world, new Tick(2, 1f), bus, new Telemetry());
 
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+            Assert.That(world.Objects.TryGetValue(foodId, out var groundedFood), Is.True);
+            Assert.That(groundedFood.IsHeld, Is.False);
+            Assert.That(world.GetInventoryQuantity(npcId, "food_stock", NpcInventorySlotKind.HandLeft), Is.EqualTo(0));
+
+            for (int tick = 3; tick < 7; tick++)
+            {
+                system.Update(world, new Tick(tick, 1f), bus, new Telemetry());
+                Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+                Assert.That(world.Objects.TryGetValue(foodId, out groundedFood), Is.True);
+                Assert.That(groundedFood.IsHeld, Is.False);
+                Assert.That(world.GetInventoryQuantity(npcId, "food_stock", NpcInventorySlotKind.HandLeft), Is.EqualTo(0));
+            }
+
+            system.Update(world, new Tick(7, 1f), bus, new Telemetry());
+
             var commands = world.JobRuntimeState.CommandBuffer.Snapshot();
             Assert.That(commands.Length, Is.EqualTo(1));
             Assert.That(commands[0], Is.TypeOf<PickUpObjectCommand>());
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
 
             commands[0].Execute(world, bus);
             world.JobRuntimeState.CommandBuffer.Clear();
 
-            system.Update(world, new Tick(3, 1f), bus, new Telemetry());
+            system.Update(world, new Tick(8, 1f), bus, new Telemetry());
             Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
             Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
             Assert.That(world.GetInventoryQuantity(npcId, "food_stock", NpcInventorySlotKind.HandLeft), Is.EqualTo(1));
 
-            for (int tick = 4; tick < 14; tick++)
+            for (int tick = 9; tick < 19; tick++)
             {
                 system.Update(world, new Tick(tick, 1f), bus, new Telemetry());
                 Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
                 Assert.That(world.GetInventoryQuantity(npcId, "food_stock", NpcInventorySlotKind.HandLeft), Is.EqualTo(1));
             }
 
-            system.Update(world, new Tick(14, 1f), bus, new Telemetry());
+            system.Update(world, new Tick(19, 1f), bus, new Telemetry());
             commands = world.JobRuntimeState.CommandBuffer.Snapshot();
             Assert.That(commands.Length, Is.EqualTo(1));
             Assert.That(commands[0], Is.TypeOf<ConsumeInventoryItemCommand>());
             Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
             Assert.That(world.GetInventoryQuantity(npcId, "food_stock", NpcInventorySlotKind.HandLeft), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void JobExecutionPickUpFailsIfTargetDisappearsDuringTimedAction()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AssignFoodJob(world, npcId, foodId, 5, 5);
+            var system = new JobExecutionSystem();
+            var bus = new MessageBus();
+
+            system.Update(world, new Tick(0, 1f), bus, new Telemetry());
+            system.Update(world, new Tick(1, 1f), bus, new Telemetry());
+            system.Update(world, new Tick(2, 1f), bus, new Telemetry());
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+
+            world.Objects.Remove(foodId);
+            system.Update(world, new Tick(3, 1f), bus, new Telemetry());
+
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+        }
+
+        [Test]
+        public void JobExecutionPickUpFailsIfNpcLeavesTargetCellDuringTimedAction()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AssignFoodJob(world, npcId, foodId, 5, 5);
+            var system = new JobExecutionSystem();
+            var bus = new MessageBus();
+
+            system.Update(world, new Tick(0, 1f), bus, new Telemetry());
+            system.Update(world, new Tick(1, 1f), bus, new Telemetry());
+            system.Update(world, new Tick(2, 1f), bus, new Telemetry());
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+
+            world.SetNpcPos(npcId, 4, 5);
+            system.Update(world, new Tick(3, 1f), bus, new Telemetry());
+
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
+            Assert.That(world.Objects.TryGetValue(foodId, out var food), Is.True);
+            Assert.That(food.IsHeld, Is.False);
+        }
+
+        [Test]
+        public void JobExecutionPickUpFailsIfTargetBecomesHeldDuringTimedAction()
+        {
+            var world = MakeWorldWithNpcAndCommunityFood(npcX: 5, npcY: 5, foodX: 5, foodY: 5, out int npcId, out int foodId);
+            AssignFoodJob(world, npcId, foodId, 5, 5);
+            var system = new JobExecutionSystem();
+            var bus = new MessageBus();
+
+            system.Update(world, new Tick(0, 1f), bus, new Telemetry());
+            system.Update(world, new Tick(1, 1f), bus, new Telemetry());
+            system.Update(world, new Tick(2, 1f), bus, new Telemetry());
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(1));
+
+            var food = world.Objects[foodId];
+            food.IsHeld = true;
+            food.HolderNpcId = npcId + 1;
+            world.Objects[foodId] = food;
+
+            system.Update(world, new Tick(3, 1f), bus, new Telemetry());
+
+            Assert.That(world.JobRuntimeState.CommandBuffer.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.RunningActions.Count, Is.EqualTo(0));
+            Assert.That(world.JobRuntimeState.HasActiveJob(npcId), Is.False);
         }
 
         [Test]

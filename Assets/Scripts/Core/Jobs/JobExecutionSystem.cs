@@ -657,7 +657,7 @@ namespace Arcontio.Core
                 return ExecuteReadyInventoryFood(world, runtime, runningActionExecutor, npcId, in npcState, job, phase, action, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.PickUp)
-                return ExecutePickUpObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
+                return ExecutePickUpObject(world, runtime, runningActionExecutor, npcId, in npcState, job, phase, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
 
             if (action.Kind == JobActionKind.Drop)
                 return ExecuteDropObject(world, runtime, npcId, job, action, npcCell, tick, explainabilityConfig, explainabilityRegistry);
@@ -1378,16 +1378,111 @@ namespace Arcontio.Core
             return StepResult.Succeeded("ReadyInventoryFoodMoveToHandCommandEnqueued");
         }
 
+        // =============================================================================
+        // ExecutePickUpObject
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue uno step di raccolta oggetto come azione atomica temporizzata:
+        /// durante il tempo di esecuzione non muta il <c>World</c> e alla completion
+        /// accoda un solo <see cref="PickUpObjectCommand"/> autorizzato.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: Job temporizza, Command muta</b></para>
+        /// <para>
+        /// Il job rende osservabile il gesto di raccolta tramite <c>RunningAction</c>,
+        /// ma la transizione fisica terra -> inventario resta di competenza del
+        /// command gateway. La stessa validazione viene eseguita prima di avviare
+        /// il running e subito prima di accodare il command, cosi' eventuali cambi
+        /// di stato intercorsi durante la durata non producono mutazioni obsolete.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione iniziale</b>: target, oggetto, stato held e co-locazione.</item>
+        ///   <item><b>Running</b>: usa la durata configurata sul template, con minimo un tick.</item>
+        ///   <item><b>Completion</b>: rivalida e accoda <c>PickUpObjectCommand</c>.</item>
+        /// </list>
+        /// </summary>
         private static StepResult ExecutePickUpObject(
             World world,
             JobRuntimeState runtime,
+            RunningActionExecutor runningActionExecutor,
             int npcId,
+            in NpcJobState npcState,
             Job job,
+            JobPhase phase,
             JobAction action,
             GridPosition npcCell,
             int tick,
             MemoryBeliefDecisionExplainabilityParams explainabilityConfig,
             MemoryBeliefDecisionExplainabilityRegistry explainabilityRegistry)
+        {
+            StepResult validation = ValidatePickUpObject(world, action, npcCell);
+            if (validation.Status == StepResultStatus.Failed)
+                return validation;
+
+            NpcInventorySlotKind preferredSlot = ResolveInventorySlotPayload(action.PayloadKey, NpcInventorySlotKind.None);
+
+            return ExecuteTimedCommandAction(
+                runtime,
+                runningActionExecutor,
+                npcId,
+                in npcState,
+                job,
+                phase,
+                action,
+                tick,
+                "pickup",
+                "PickUpTimedActionStarted",
+                "PickUpTimedActionTick",
+                "PickUpTimedActionRunning",
+                () => ValidatePickUpObject(world, action, npcCell),
+                () =>
+                {
+                    runtime.CommandBuffer.Enqueue(
+                        new PickUpObjectCommand(npcId, action.TargetObjectId, preferredSlot),
+                        explainabilityConfig,
+                        explainabilityRegistry,
+                        npcId,
+                        tick,
+                        job.JobId,
+                        "PickUpCommandEnqueued");
+                    return StepResult.Succeeded("PickUpCommandEnqueued");
+                },
+                explainabilityConfig,
+                explainabilityRegistry);
+        }
+
+        // =============================================================================
+        // ValidatePickUpObject
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Valida le condizioni minime per raccogliere un oggetto fisico da terra
+        /// senza produrre mutazioni e senza decidere la capienza inventario finale.
+        /// </para>
+        ///
+        /// <para><b>Boundary deliberato</b></para>
+        /// <para>
+        /// Questa funzione controlla solo cio' che il Job Layer puo' verificare in
+        /// modo read-only prima di emettere un command: esistenza del target, stato
+        /// grounded e co-locazione NPC/oggetto. Le regole fisiche complete di slot,
+        /// peso, bulk e split stack restano dentro <c>World.TryPickUpObject</c>,
+        /// invocato dal command autorizzato.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Target</b>: richiede un object id valido.</item>
+        ///   <item><b>Grounded</b>: rifiuta oggetti gia' tenuti da un NPC.</item>
+        ///   <item><b>Co-locazione</b>: richiede NPC e oggetto sulla stessa cella.</item>
+        /// </list>
+        /// </summary>
+        private static StepResult ValidatePickUpObject(
+            World world,
+            JobAction action,
+            GridPosition npcCell)
         {
             if (action.TargetObjectId <= 0)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "PickUpMissingObject");
@@ -1401,16 +1496,7 @@ namespace Arcontio.Core
             if (npcCell.X != obj.CellX || npcCell.Y != obj.CellY)
                 return StepResult.Failed(JobFailureReason.MissingTarget, "PickUpObjectNoLongerCoLocated");
 
-            NpcInventorySlotKind preferredSlot = ResolveInventorySlotPayload(action.PayloadKey, NpcInventorySlotKind.None);
-            runtime.CommandBuffer.Enqueue(
-                new PickUpObjectCommand(npcId, action.TargetObjectId, preferredSlot),
-                explainabilityConfig,
-                explainabilityRegistry,
-                npcId,
-                tick,
-                job.JobId,
-                "PickUpCommandEnqueued");
-            return StepResult.Succeeded("PickUpCommandEnqueued");
+            return StepResult.Succeeded("PickUpObjectValid");
         }
 
         private static StepResult ExecuteDropObject(

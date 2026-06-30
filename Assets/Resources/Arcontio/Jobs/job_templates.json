@@ -85,13 +85,14 @@
             {
               "actionId": "pickup_food_to_hand",
               "kind": "PickUp",
-              "payloadKey": "HandLeft"
+              "payloadKey": "HandLeft",
+              "durationTicks": 6
             },
             {
               "actionId": "consume_known_food",
               "kind": "Consume",
               "payloadKey": "HandLeft",
-              "durationTicks": 12
+              "durationTicks": 42
             }
           ]
         }

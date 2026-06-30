@@ -17600,6 +17600,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C8.10 | EatKnownFood via inventario typed, mano e stack oggetto | ✅ |
 | v0.71.05.C8.11 | EatCarriedFood via inventario typed, mano e split stack singola unita' | ✅ |
 | v0.71.05.C8.12 | Timed command actions per step atomici inventario/cibo | ✅ |
+| v0.71.05.C8.13 | Timed PickUp per step atomici: raccolta visibile e command finale a completion | ✅ |
 | v0.71.05.D | Stato reale risorse per singola pianta | ⏳ |
 | v0.71.05.E | Ricrescita risorse biologiche nel tempo | ⏳ |
 | v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ⏳ |
@@ -17642,6 +17643,8 @@ La `v0.71.05.C8.10` converte il ciclo operativo `EatKnownFood`: il cibo noto vie
 La `v0.71.05.C8.11` aggiunge il ciclo operativo `EatCarriedFood`: un NPC affamato puo' scegliere cibo gia' posseduto senza belief su cibo esterno, preparare la mano, spostare una singola unita' da uno stack nel pack e consumarla dall'inventario. Il consumo fame copre quindi sia cibo a terra/conosciuto sia cibo gia' trasportato dall'NPC, mantenendo il vincolo che il cibo venga mangiato dalla mano.
 
 La `v0.71.05.C8.12` rende multi-tick gli step atomici inventario/cibo che producono un singolo command finale: `ReadyInventoryFood` e `Consume` usano una running action volatile di tipo `UseObject`, non mutano il World durante il progress e accodano il command solo alla completion. Il progresso corrente resta runtime-only e non viene salvato/caricato; `durationTicks` resta configurazione del template job.
+
+La `v0.71.05.C8.13` estende lo stesso modello agli step `PickUp`: ogni raccolta oggetto passa da running action volatile, rivalida target e co-locazione alla completion e solo allora accoda `PickUpObjectCommand`. Il pickup cibo noto ha durata configurata per rendere osservabile il passaggio a mano; i pickup senza durata esplicita restano rapidi con default effettivo di un tick.
 
 Flusso atteso:
 
