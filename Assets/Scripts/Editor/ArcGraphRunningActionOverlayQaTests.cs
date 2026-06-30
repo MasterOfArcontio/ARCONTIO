@@ -98,6 +98,20 @@ namespace Arcontio.Tests
             Assert.That(items[0].RunningActionOverlay.Remaining01, Is.EqualTo(0.75f).Within(0.0001f));
         }
 
+        [Test]
+        public void RunningActionOverlayPanelPresetMatchesCompactArcGraphContract()
+        {
+            ArcGraphNpcRunningActionOverlayPreset preset =
+                ArcGraphNpcRunningActionOverlayPreset.Default().Normalize();
+
+            Assert.That(preset.Width, Is.EqualTo(53f));
+            Assert.That(preset.Height, Is.EqualTo(18f));
+            Assert.That(preset.WorldOffsetY, Is.EqualTo(1.45f));
+            Assert.That(preset.ScreenOffsetY, Is.EqualTo(30f));
+            Assert.That(preset.PanelAlpha, Is.EqualTo(1f));
+            Assert.That(preset.PanelColor.a, Is.EqualTo(0f));
+        }
+
         private static RunningActionRuntimeState CreateUseObjectState(string actionId, int requiredTicks)
         {
             var policy = new RunningActionCompletionPolicy(

@@ -74,6 +74,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphPlacementCellHighlightSceneConsumer _placementHighlightConsumer;
         private ArcGraphUiSelectionSceneConsumer _uiSelectionConsumer;
         private ArcGraphSelectionActionMenuSceneView _selectionActionMenu;
+        private ArcGraphNpcRunningActionOverlaySceneView _npcRunningActionOverlay;
         private ArcGraphUiSelectionEditRequestBridge _selectionEditRequestBridge;
         private ArcGraphUiSelectionDeleteCommandBridge _selectionDeleteCommandBridge;
         private ArcGraphNpcDnaEditCommandBridge _npcDnaEditCommandBridge;
@@ -311,6 +312,7 @@ namespace Arcontio.View.ArcGraph
             _placementHighlightConsumer = _visualRoot.AddComponent<ArcGraphPlacementCellHighlightSceneConsumer>();
             _uiSelectionConsumer = _visualRoot.AddComponent<ArcGraphUiSelectionSceneConsumer>();
             _selectionActionMenu = _visualRoot.AddComponent<ArcGraphSelectionActionMenuSceneView>();
+            _npcRunningActionOverlay = _visualRoot.AddComponent<ArcGraphNpcRunningActionOverlaySceneView>();
             _selectionEditRequestBridge = _visualRoot.AddComponent<ArcGraphUiSelectionEditRequestBridge>();
             _selectionDeleteCommandBridge = _visualRoot.AddComponent<ArcGraphUiSelectionDeleteCommandBridge>();
             _npcDnaEditCommandBridge = _visualRoot.AddComponent<ArcGraphNpcDnaEditCommandBridge>();
@@ -461,6 +463,10 @@ namespace Arcontio.View.ArcGraph
             _selectionActionMenu.SetRenderQueue(_wrapper.RenderQueue);
             _selectionActionMenu.SetSceneCamera(Camera.main);
             _selectionActionMenu.SetMenuEnabled(true);
+            _npcRunningActionOverlay.SetUiRoot(_uiRoot);
+            _npcRunningActionOverlay.SetRenderQueue(_wrapper.RenderQueue);
+            _npcRunningActionOverlay.SetSceneCamera(Camera.main);
+            _npcRunningActionOverlay.SetOverlayEnabled(true);
             _selectionEditRequestBridge.SetSelectionActionController(_selectionActionController);
             _selectionEditRequestBridge.SetEditSelectionController(_editSelectionController);
             _selectionDeleteCommandBridge.SetSelectionActionController(_selectionActionController);
