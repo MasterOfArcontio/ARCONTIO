@@ -1,72 +1,50 @@
 using Arcontio.Core.Diagnostics;
-using System.Collections.Generic;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // FoodInventoryAuditSystem
+    // =============================================================================
     /// <summary>
-    /// FoodInventoryAuditSystem (Day9 - rumor/sospetto):
-    /// Confronta private food tra tick precedente e tick corrente.
+    /// <para>
+    /// Sistema legacy Day9 che in passato deduceva sospetti furti osservando cali di
+    /// <c>NpcPrivateFood</c>.
+    /// </para>
     ///
-    /// Se il valore diminuisce, emette FoodMissingSuspectedEvent.
+    /// <para><b>v0.71.05.C6 - Sterilizzazione furto legacy</b></para>
+    /// <para>
+    /// Il sistema resta compilabile, ma non produce piu' eventi. La deduzione di un
+    /// furto richiede un modulo dedicato con furtivita', percezione, illegalita',
+    /// trauma e conseguenze sociali; non deve nascere da un audit automatico dello
+    /// store legacy.
+    /// </para>
     ///
-    /// IMPORTANTI FIX:
-    /// - Non usare "return" dentro il loop (altrimenti interrompi il controllo sugli altri NPC).
-    /// - Segno: se prev > cur => missing = prev - cur.
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>No-op</b>: non legge differenze operative da <c>NpcPrivateFood</c>.</item>
+    ///   <item><b>Telemetry</b>: registra solo che il sistema legacy e' sterilizzato.</item>
+    ///   <item><b>Nessun evento</b>: non pubblica <c>FoodMissingSuspectedEvent</c>.</item>
+    /// </list>
     /// </summary>
     public sealed class FoodInventoryAuditSystem : ISystem
     {
         public int Period => 1;
 
-        private readonly Dictionary<int, int> _lastPrivateFood = new();
-        private readonly List<int> _npcIds = new(2048);
-
+        // =============================================================================
+        // Update
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mantiene il sistema come no-op esplicito per evitare riattivazioni
+        /// accidentali del vecchio furto.
+        /// </para>
+        /// </summary>
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
-            _npcIds.Clear();
-            _npcIds.AddRange(world.NpcDna.Keys);
-
-            int suspected = 0;
-
-            for (int i = 0; i < _npcIds.Count; i++)
-            {
-                int npcId = _npcIds[i];
-
-                world.NpcPrivateFood.TryGetValue(npcId, out int cur);
-
-                // Primo tick per questo NPC: init e stop (ma NON return globale)
-                if (!_lastPrivateFood.TryGetValue(npcId, out int prev))
-                {
-                    _lastPrivateFood[npcId] = cur;
-                    continue;
-                }
-
-                // Se � diminuito, manca cibo
-                if (cur < prev)
-                {
-                    int missingUnits = prev - cur;
-
-                    int cx = 0, cy = 0;
-                    if (world.GridPos.TryGetValue(npcId, out var p))
-                    {
-                        cx = p.X;
-                        cy = p.Y;
-                    }
-
-                    bus.Publish(new FoodMissingSuspectedEvent(
-                        victimNpcId: npcId,
-                        missingUnits: missingUnits,
-                        cellX: cx,
-                        cellY: cy
-                    ));
-
-                    suspected++;
-                }
-
-                // Update snapshot sempre
-                _lastPrivateFood[npcId] = cur;
-            }
-
-            telemetry.Counter("Day9.FoodMissingSuspectedEvents", suspected);
+            // v0.71.05.C6: nessuna lettura comparativa, nessun sospetto automatico,
+            // nessun evento. Il futuro modulo furto dovra' produrre fatti osservabili
+            // attraverso job/command autorizzati, non tramite audit globale.
+            telemetry?.Counter("LegacyTheft.FoodInventoryAuditSterilized", 1);
         }
     }
 }

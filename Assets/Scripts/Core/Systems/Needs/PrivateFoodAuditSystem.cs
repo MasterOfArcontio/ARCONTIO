@@ -1,77 +1,58 @@
-using System.Collections.Generic;
 using Arcontio.Core.Diagnostics;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // PrivateFoodAuditSystem
+    // =============================================================================
     /// <summary>
-    /// PrivateFoodAuditSystem (Day9):
-    /// Deduzione v0: un NPC nota che il suo cibo privato � diminuito rispetto all'ultima verifica.
+    /// <para>
+    /// Sistema legacy Day9 che in passato confrontava periodicamente il cibo privato
+    /// di un NPC per produrre un evento di cibo mancante.
+    /// </para>
     ///
-    /// - NON dice chi � stato.
-    /// - Produce FoodMissingEvent -> FoodMissingMemoryRule -> memoria sospetto.
+    /// <para><b>v0.71.05.C6 - Sterilizzazione furto legacy</b></para>
+    /// <para>
+    /// Il sistema non deve piu' produrre furto, sospetto furto o cibo mancante da
+    /// <c>NpcPrivateFood</c>. Il furto verra' riprogettato come modulo autonomo,
+    /// attraversando decisione, job, step, command ed eventi osservabili.
+    /// </para>
     ///
-    /// Nota importante:
-    /// - Questo system � una scorciatoia "di gameplay" per testare il ramo rumor/sospetto.
-    /// - In futuro l'audit sar� un'azione (l'NPC controlla la scorta).
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Configurazione legacy</b>: conserva il costruttore con cadenza storica.</item>
+    ///   <item><b>No-op</b>: non legge o confronta <c>NpcPrivateFood</c>.</item>
+    ///   <item><b>Nessun evento</b>: non pubblica <c>FoodMissingEvent</c>.</item>
+    /// </list>
     /// </summary>
     public sealed class PrivateFoodAuditSystem : ISystem
     {
-        public int Period => 1;
-
-        private readonly List<int> _npcIds = new(2048);
-
-        // Ledger interno (runtime): ultimo valore noto per ogni NPC
-        private readonly Dictionary<int, int> _lastAuditFood = new();
-
         private readonly int _auditEveryTicks;
+
+        public int Period => 1;
 
         public PrivateFoodAuditSystem(int auditEveryTicks = 20)
         {
             _auditEveryTicks = auditEveryTicks <= 0 ? 20 : auditEveryTicks;
         }
 
+        // =============================================================================
+        // Update
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Mantiene il vecchio audit come no-op difensivo.
+        /// </para>
+        /// </summary>
         public void Update(World world, Tick tick, MessageBus bus, Telemetry telemetry)
         {
-            if (world.NpcDna.Count == 0) return;
-
+            // La cadenza resta solo per rendere stabile il comportamento diagnostico
+            // storico: anche se qualcuno riagganciasse il sistema, non produrrebbe
+            // eventi ogni tick e non riattiverebbe il furto.
             if ((tick.Index % _auditEveryTicks) != 0)
                 return;
 
-            _npcIds.Clear();
-            _npcIds.AddRange(world.NpcDna.Keys);
-
-            int missingEvents = 0;
-
-            for (int i = 0; i < _npcIds.Count; i++)
-            {
-                int npcId = _npcIds[i];
-
-                // Se l'NPC non ha entry, assumiamo 0
-                int current = 0;
-                world.NpcPrivateFood.TryGetValue(npcId, out current);
-
-                if (!_lastAuditFood.TryGetValue(npcId, out int last))
-                {
-                    // primo audit: inizializza e basta
-                    _lastAuditFood[npcId] = current;
-                    continue;
-                }
-
-                if (current < last)
-                {
-                    int missing = last - current;
-
-                    bus.Publish(new FoodMissingEvent(victimNpcId: npcId, missingUnits: missing));
-                    missingEvents++;
-
-                    telemetry.Counter("Day9.FoodMissingEvents", 1);
-                }
-
-                _lastAuditFood[npcId] = current;
-            }
-
-            telemetry.Counter("Day9.AuditRuns", 1);
-            telemetry.Counter("Day9.AuditMissingEventsBatch", missingEvents);
+            telemetry?.Counter("LegacyTheft.PrivateFoodAuditSterilized", 1);
         }
     }
 }

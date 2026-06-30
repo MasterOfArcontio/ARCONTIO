@@ -17586,7 +17586,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C3 | Save/load inventario typed nel WorldSave canonico | ✅ |
 | v0.71.05.C4 | Consumo da inventario typed e ponte EatPrivateFood | ✅ |
 | v0.71.05.C5 | Pickup/drop oggetti fisici dentro inventario | ✅ |
-| v0.71.05.C6 | Furto e stock verso inventario typed | ⏳ |
+| v0.71.05.C6 | Furto legacy sterilizzato; modulo furto dedicato rimandato | ✅ |
 | v0.71.05.C7 | Rimozione operativa NpcPrivateFood dai flussi runtime | ⏳ |
 | v0.71.05.D | Stato reale risorse per singola pianta | ⏳ |
 | v0.71.05.E | Ricrescita risorse biologiche nel tempo | ⏳ |
@@ -17604,6 +17604,8 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.Q | Verifica rimozione legacy cibo privato e chiusura compatibilita' finale | ⏳ |
 
 La `v0.71.05.A` separa il catalogo prodotti biologici dal catalogo specie vegetali. La Biosfera continua a dichiarare quali `productKey` una specie puo' produrre; il nuovo catalogo prodotti definisce il contratto semantico del prodotto; il catalogo oggetti resta owner di item, proprieta' e nutrizione concreta.
+
+La `v0.71.05.C6` sterilizza il furto legacy Day9/Day10: i command e gli audit storici restano compilabili ma non producono piu' mutazioni o eventi. Il modulo furto viene rimandato a una feature dedicata, da progettare dentro Decision -> Job -> Step -> Command -> Event con furtivita', visibilita', illegalita', trauma e conseguenze sociali.
 
 Flusso atteso:
 

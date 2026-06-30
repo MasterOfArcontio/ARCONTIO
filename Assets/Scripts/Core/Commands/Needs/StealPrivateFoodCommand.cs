@@ -1,38 +1,29 @@
 using Arcontio.Core.Logging;
-using UnityEngine;
 
 namespace Arcontio.Core
 {
+    // =============================================================================
+    // StealPrivateFoodCommand
+    // =============================================================================
     /// <summary>
-    /// StealPrivateFoodCommand (Day9):
-    /// Il ladro ruba Units dal cibo privato della vittima.
+    /// <para>
+    /// Comando legacy Day9 per il vecchio furto di cibo privato da un NPC a un altro.
+    /// </para>
     ///
-    /// Pubblica FoodStolenEvent come FACT del mondo (furto avvenuto).
-    /// IMPORTANTE:
-    /// - Questo evento NON rende automaticamente la vittima consapevole.
-    /// - La consapevolezza/memoria verrà gestita dal MemoryEncodingSystem:
-    ///   testimoni (range + cono + LOS) => TheftWitnessed / FoodStolenFromMe
+    /// <para><b>v0.71.05.C6 - Furto legacy sterilizzato</b></para>
+    /// <para>
+    /// Il furto non e' piu' una feature operativa. Questo comando resta compilabile
+    /// per preservare il materiale storico, ma non legge precondizioni, non trasferisce
+    /// cibo, non scrive <c>NpcPrivateFood</c>, non scrive inventario typed e non
+    /// pubblica <c>FoodStolenEvent</c>.
+    /// </para>
     ///
-    /// cellX/cellY dell’evento:
-    /// - posizione del ladro al momento dell’azione (se nota),
-    /// - fallback (0,0) se mancante.
-    ///
-    /// PATCH (Day10+):
-    /// - Regola fisica del furto "addosso" (NPC -> NPC), richiesta Marcello:
-    ///   1) ladro e vittima devono essere in celle ADIACENTI (Manhattan distance = 1)
-    ///   2) deve esserci LOS (OcclusionMap) tra le due celle (nessuna occlusione)
-    ///
-    /// - Quantità rubabile:
-    ///   si può rubare tutto il cibo privato della vittima, ma solo fino alla capienza residua del ladro.
-    ///   amount = min(victimFood, world.GetInventoryFreeCapacity(thief))
-    ///
-    /// - Fix bug storico:
-    ///   la versione Day9 sottraeva alla vittima ma NON aggiungeva al ladro.
-    ///   Ora il trasferimento è atomico e coerente con StealFromStockCommand.
-    ///
-    /// - Nota retrocompatibilità:
-    ///   manteniamo _units e i costruttori esistenti, ma l'execution è governata
-    ///   da capienza + disponibilità + regole fisiche.
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Identita' richiesta</b>: conserva ladro, vittima e quantita' per diagnostica.</item>
+    ///   <item><b>No-op runtime</b>: l'esecuzione registra solo un log debug stabile.</item>
+    ///   <item><b>Boundary futuro</b>: il furto tornera' solo come Decision -> Job -> Step -> Command.</item>
+    /// </list>
     /// </summary>
     public sealed class StealPrivateFoodCommand : ICommand
     {
@@ -40,11 +31,6 @@ namespace Arcontio.Core
         private readonly int _victimNpcId;
         private readonly int _units;
 
-        /// <summary>
-        /// Overload comodo: units default = 1.
-        /// Così NeedsDecisionRule può chiamare new StealPrivateFoodCommand(thief, victim)
-        /// senza errori di compilazione.
-        /// </summary>
         public StealPrivateFoodCommand(int thiefNpcId, int victimNpcId)
             : this(thiefNpcId, victimNpcId, 1)
         {
@@ -54,94 +40,42 @@ namespace Arcontio.Core
         {
             _thiefNpcId = thiefNpcId;
             _victimNpcId = victimNpcId;
-
-            // Manteniamo units>=1 per compatibilità.
             _units = units <= 0 ? 1 : units;
         }
 
+        // =============================================================================
+        // Execute
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Esegue il comando legacy come no-op difensivo.
+        /// </para>
+        ///
+        /// <para><b>Sterilizzazione feature</b></para>
+        /// <para>
+        /// Non vengono applicate nemmeno le vecchie regole di adiacenza o linea di
+        /// vista: il furto deve rientrare solo quando sara' un modulo completo dentro
+        /// la nuova pipeline decisionale e lavorativa.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Log</b>: emette solo diagnostica debug.</item>
+        ///   <item><b>Nessun evento</b>: non pubblica <c>FoodStolenEvent</c>.</item>
+        ///   <item><b>Nessuna mutazione</b>: non modifica NPC, inventari o bisogni.</item>
+        /// </list>
+        /// </summary>
         public void Execute(World world, MessageBus bus)
         {
-            if (!world.ExistsNpc(_thiefNpcId) || !world.ExistsNpc(_victimNpcId))
-                return;
-
-            if (!world.NpcPrivateFood.TryGetValue(_victimNpcId, out int victimFood) || victimFood <= 0)
-                return;
-
-            // ============================================================
-            // REGOLE FISICHE (PATCH): adjacency + LOS
-            // ============================================================
-            if (!world.GridPos.TryGetValue(_thiefNpcId, out var thiefPos))
-                return;
-
-            if (!world.GridPos.TryGetValue(_victimNpcId, out var victimPos))
-                return;
-
-            int dx = Mathf.Abs(thiefPos.X - victimPos.X);
-            int dy = Mathf.Abs(thiefPos.Y - victimPos.Y);
-
-            // Manhattan adjacency => dx+dy == 1.
-            if ((dx + dy) != 1)
-            {
-                // Planning deve prima avvicinarsi con SetMoveIntentCommand (verso last known cell della vittima).
-                // Questa guardia blocca furti "a distanza".
-                return;
-            }
-
-            // LOS via OcclusionMap: nessuna occlusione tra le due celle.
-            // Nota: per celle adiacenti, LOS è quasi sempre true; ma porte/muri devono bloccare.
-            if (!world.HasLineOfSight(thiefPos.X, thiefPos.Y, victimPos.X, victimPos.Y))
-                return;
-
-            // ============================================================
-            // CAPACITÀ INVENTARIO (PATCH): rubo tutto ciò che posso portare.
-            // ============================================================
-            int freeCapacity = world.GetInventoryFreeCapacity(_thiefNpcId);
-            if (freeCapacity <= 0)
-                return;
-
-            int stolen = victimFood;
-            if (stolen > freeCapacity) stolen = freeCapacity;
-
-            if (stolen <= 0)
-                return;
-
-            // ACTION TRACE (debug/overlay): furto di cibo privato.
-            world.SetNpcAction(_thiefNpcId, NpcActionState.Steal("StealPrivateFood", targetObjectId: 0));
-
-            // BALLOON SIGNAL (view): fumetto "Steal" per il ladro.
-            world.EmitNpcBalloon(_thiefNpcId, NpcBalloonKind.Steal, subjectId: _victimNpcId);
-
-            // ============================================================
-            // TRASFERIMENTO ATOMICO:
-            // 1) togli alla vittima
-            // 2) aggiungi al ladro
-            // ============================================================
-            world.NpcPrivateFood[_victimNpcId] = victimFood - stolen;
-
-            if (!world.NpcPrivateFood.TryGetValue(_thiefNpcId, out int thiefFood))
-                thiefFood = 0;
-            world.NpcPrivateFood[_thiefNpcId] = thiefFood + stolen;
-
-            // 2) Cella evento = posizione del ladro (nota qui).
-            int ex = thiefPos.X;
-            int ey = thiefPos.Y;
-
-            // 3) Pubblica FACT del mondo: il furto è successo
-            bus.Publish(new FoodStolenEvent(
-                victimNpcId: _victimNpcId,
-                thiefNpcId: _thiefNpcId,
-                units: stolen,
-                cellX: ex,
-                cellY: ey
-            ));
-
-            ArcontioLogger.Info(
-                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "World", cell: (ex, ey)),
-                new LogBlock(LogLevel.Info, "log.world.theft.happened")
+            // v0.71.05.C6: il furto NPC -> NPC resta disattivato finche' non
+            // esistera' un modulo completo con furtivita', illegalita', visibilita'
+            // del furto, trauma della vittima e conseguenze sociali.
+            ArcontioLogger.Debug(
+                new LogContext(tick: (int)TickContext.CurrentTickIndex, channel: "World"),
+                new LogBlock(LogLevel.Debug, "log.world.theft.private_food.legacy_sterilized")
                     .AddField("thief", _thiefNpcId)
                     .AddField("victim", _victimNpcId)
-                    .AddField("units", stolen)
-                    .AddField("freeCapacity", freeCapacity)
+                    .AddField("requestedUnits", _units)
             );
         }
     }
