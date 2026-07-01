@@ -169,6 +169,8 @@ namespace Arcontio.Core.Environment
         public readonly string RequiresToolKey;
         public readonly string MinGrowthStageKey;
         public readonly int RegrowDays;
+        public readonly int RegrowProgressDays;
+        public readonly float RegrowProgress01;
         public readonly bool IsStageAvailable;
         public readonly bool IsSeasonallyAvailable;
 
@@ -199,7 +201,8 @@ namespace Arcontio.Core.Environment
             string minGrowthStageKey,
             int regrowDays,
             bool isStageAvailable,
-            bool isSeasonallyAvailable)
+            bool isSeasonallyAvailable,
+            int regrowProgressDays = -1)
         {
             ProductKey = string.IsNullOrWhiteSpace(productKey)
                 ? string.Empty
@@ -216,8 +219,53 @@ namespace Arcontio.Core.Environment
             RequiresToolKey = requiresToolKey ?? string.Empty;
             MinGrowthStageKey = minGrowthStageKey ?? string.Empty;
             RegrowDays = regrowDays < 0 ? 0 : regrowDays;
+            RegrowProgressDays = NormalizeRegrowProgressDays(
+                regrowProgressDays,
+                AvailableAmountUnits,
+                MaxAmountUnits,
+                RegrowDays);
+            RegrowProgress01 = RegrowDays <= 0
+                ? 0f
+                : EnvironmentMath.Clamp01(RegrowProgressDays / (float)RegrowDays);
             IsStageAvailable = isStageAvailable;
             IsSeasonallyAvailable = isSeasonallyAvailable;
+        }
+
+        private static int NormalizeRegrowProgressDays(
+            int regrowProgressDays,
+            int availableAmountUnits,
+            int maxAmountUnits,
+            int regrowDays)
+        {
+            if (regrowDays <= 0 || maxAmountUnits <= 0)
+                return 0;
+
+            int normalized = regrowProgressDays < 0
+                ? DeriveProgressDaysFromAmount(
+                    availableAmountUnits,
+                    maxAmountUnits,
+                    regrowDays)
+                : regrowProgressDays;
+
+            if (normalized < 0)
+                return 0;
+
+            return normalized > regrowDays ? regrowDays : normalized;
+        }
+
+        private static int DeriveProgressDaysFromAmount(
+            int availableAmountUnits,
+            int maxAmountUnits,
+            int regrowDays)
+        {
+            if (availableAmountUnits <= 0 || maxAmountUnits <= 0 || regrowDays <= 0)
+                return 0;
+
+            if (availableAmountUnits >= maxAmountUnits)
+                return regrowDays;
+
+            return (int)System.Math.Ceiling(
+                availableAmountUnits * (double)regrowDays / maxAmountUnits);
         }
     }
 
@@ -634,7 +682,7 @@ namespace Arcontio.Core.Environment
                 bool stageAvailable = species.IsStageAtLeast(growthStageKey, product.MinGrowthStageKey);
                 bool seasonAvailable = !enforceSeason || product.IsSeasonAvailable(season);
                 int maxAmount = product.BaseMaxAmountUnits;
-                int availableAmount = stageAvailable && seasonAvailable && health01 > 0f
+                int availableAmount = stageAvailable && health01 > 0f
                     ? maxAmount
                     : 0;
 
@@ -648,7 +696,88 @@ namespace Arcontio.Core.Environment
                     product.MinGrowthStageKey,
                     product.RegrowDays,
                     stageAvailable,
-                    seasonAvailable);
+                    seasonAvailable,
+                    regrowProgressDays: stageAvailable && health01 > 0f ? product.RegrowDays : 0);
+            }
+
+            return states;
+        }
+
+        // =============================================================================
+        // BuildProgressedResourceStates
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Evolve lo stato risorse di una pianta concreta applicando ricrescita
+        /// giornaliera progressiva e aggiornando stadio/stagione correnti.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ricrescita come regola Biosfera</b></para>
+        /// <para>
+        /// Il metodo non crea oggetti, inventari o job. Riceve catalogo specie e
+        /// risorse correnti, produce un nuovo array value-only e lascia al World solo
+        /// la proiezione read-only. Le quantita' maturano anche fuori stagione, ma
+        /// la flag stagionale impedisce alle query harvestable di esporle.
+        /// </para>
+        /// </summary>
+        public static EnvironmentPlantResourceState[] BuildProgressedResourceStates(
+            EnvironmentPlantSpeciesDefinition species,
+            System.Collections.Generic.IReadOnlyList<EnvironmentPlantResourceState> currentResources,
+            string growthStageKey,
+            EnvironmentSeasonKind season,
+            bool enforceSeason,
+            float health01,
+            int elapsedDays)
+        {
+            if (species == null || species.Products == null || species.Products.Count == 0)
+                return EmptyResources;
+
+            int safeElapsedDays = elapsedDays < 0 ? 0 : elapsedDays;
+            var states = new EnvironmentPlantResourceState[species.Products.Count];
+            for (int i = 0; i < species.Products.Count; i++)
+            {
+                EnvironmentPlantProductDefinition product = species.Products[i];
+                bool stageAvailable = species.IsStageAtLeast(growthStageKey, product.MinGrowthStageKey);
+                bool seasonAvailable = !enforceSeason || product.IsSeasonAvailable(season);
+                int maxAmount = product.BaseMaxAmountUnits;
+                bool canHoldResource = stageAvailable && health01 > 0f && maxAmount > 0;
+
+                EnvironmentPlantResourceState current;
+                bool hasCurrent = TryFindResource(
+                    currentResources,
+                    product.ProductKey,
+                    out current);
+                int currentAmount = hasCurrent ? current.AvailableAmountUnits : maxAmount;
+                int currentProgress = hasCurrent ? current.RegrowProgressDays : product.RegrowDays;
+
+                int nextAmount = 0;
+                if (canHoldResource)
+                {
+                    nextAmount = ResolveProgressedAmount(
+                        product,
+                        maxAmount,
+                        currentAmount,
+                        currentProgress,
+                        safeElapsedDays,
+                        out currentProgress);
+                }
+                else
+                {
+                    currentProgress = 0;
+                }
+
+                states[i] = new EnvironmentPlantResourceState(
+                    product.ProductKey,
+                    nextAmount,
+                    maxAmount,
+                    product.IsFood,
+                    product.DestroysPlantOnHarvest,
+                    product.RequiresToolKey,
+                    product.MinGrowthStageKey,
+                    product.RegrowDays,
+                    stageAvailable,
+                    seasonAvailable,
+                    currentProgress);
             }
 
             return states;
@@ -668,22 +797,21 @@ namespace Arcontio.Core.Environment
             EnvironmentSeasonKind season,
             bool enforceSeason)
         {
-            if (plant.Resources != null && plant.Resources.Length > 0)
-                return CopyResources(plant.Resources);
-
             if (catalog == null
                 || string.IsNullOrWhiteSpace(plant.SpeciesKey)
                 || !catalog.TryGetSpecies(plant.SpeciesKey, out EnvironmentPlantSpeciesDefinition species))
             {
-                return EmptyResources;
+                return CopyResources(plant.Resources);
             }
 
-            return BuildInitialResourceStates(
+            return BuildProgressedResourceStates(
                 species,
+                plant.Resources,
                 plant.GrowthStageKey,
                 season,
                 enforceSeason,
-                plant.Health01);
+                plant.Health01,
+                elapsedDays: 0);
         }
 
         public static bool TryFindResource(
@@ -732,6 +860,104 @@ namespace Arcontio.Core.Environment
             }
 
             return false;
+        }
+
+        public static bool AreEquivalent(
+            System.Collections.Generic.IReadOnlyList<EnvironmentPlantResourceState> left,
+            System.Collections.Generic.IReadOnlyList<EnvironmentPlantResourceState> right)
+        {
+            int leftCount = left == null ? 0 : left.Count;
+            int rightCount = right == null ? 0 : right.Count;
+            if (leftCount != rightCount)
+                return false;
+
+            for (int i = 0; i < leftCount; i++)
+            {
+                EnvironmentPlantResourceState a = left[i];
+                EnvironmentPlantResourceState b = right[i];
+                if (!string.Equals(a.ProductKey, b.ProductKey, System.StringComparison.OrdinalIgnoreCase)
+                    || a.AvailableAmountUnits != b.AvailableAmountUnits
+                    || a.MaxAmountUnits != b.MaxAmountUnits
+                    || a.RegrowDays != b.RegrowDays
+                    || a.RegrowProgressDays != b.RegrowProgressDays
+                    || a.IsStageAvailable != b.IsStageAvailable
+                    || a.IsSeasonallyAvailable != b.IsSeasonallyAvailable)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static int ResolveProgressedAmount(
+            EnvironmentPlantProductDefinition product,
+            int maxAmount,
+            int currentAmount,
+            int currentProgressDays,
+            int elapsedDays,
+            out int nextProgressDays)
+        {
+            int safeCurrentAmount = ClampAmount(currentAmount, maxAmount);
+            if (product.RegrowDays <= 0)
+            {
+                nextProgressDays = 0;
+                return safeCurrentAmount;
+            }
+
+            int progress = currentProgressDays;
+            int minimumProgressFromAmount = DeriveProgressDaysFromAmount(
+                safeCurrentAmount,
+                maxAmount,
+                product.RegrowDays);
+            if (progress < minimumProgressFromAmount)
+                progress = minimumProgressFromAmount;
+
+            progress += elapsedDays;
+            if (progress < 0)
+                progress = 0;
+            if (progress > product.RegrowDays)
+                progress = product.RegrowDays;
+
+            nextProgressDays = progress;
+            return ResolveAmountFromProgress(maxAmount, product.RegrowDays, progress);
+        }
+
+        private static int ResolveAmountFromProgress(
+            int maxAmount,
+            int regrowDays,
+            int progressDays)
+        {
+            if (maxAmount <= 0 || regrowDays <= 0 || progressDays <= 0)
+                return 0;
+
+            if (progressDays >= regrowDays)
+                return maxAmount;
+
+            return (int)System.Math.Floor(maxAmount * (double)progressDays / regrowDays);
+        }
+
+        private static int DeriveProgressDaysFromAmount(
+            int availableAmountUnits,
+            int maxAmount,
+            int regrowDays)
+        {
+            if (availableAmountUnits <= 0 || maxAmount <= 0 || regrowDays <= 0)
+                return 0;
+
+            if (availableAmountUnits >= maxAmount)
+                return regrowDays;
+
+            return (int)System.Math.Ceiling(
+                availableAmountUnits * (double)regrowDays / maxAmount);
+        }
+
+        private static int ClampAmount(int amount, int maxAmount)
+        {
+            if (amount <= 0 || maxAmount <= 0)
+                return 0;
+
+            return amount > maxAmount ? maxAmount : amount;
         }
 
         private static EnvironmentPlantResourceState[] CopyResources(

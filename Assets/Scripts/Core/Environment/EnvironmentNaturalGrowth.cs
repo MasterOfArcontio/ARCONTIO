@@ -622,7 +622,8 @@ namespace Arcontio.Core.Environment
             EnvironmentTemporalTransition transition,
             EnvironmentNaturalGrowthConfig config)
         {
-            int nextAge = current.AgeDays + (transition.DayChanged && current.IsAlive ? 1 : 0);
+            int elapsedPlantDays = ResolveElapsedPlantDays(transition, current.IsAlive);
+            int nextAge = current.AgeDays + elapsedPlantDays;
             float healthDelta = 0f;
             EnvironmentPlantSpeciesDefinition species = null;
             bool hasSpecies = plantCatalog != null
@@ -664,7 +665,7 @@ namespace Arcontio.Core.Environment
 
             if (hasSpecies)
             {
-                return EnvironmentPlantInstance.CreateFromSpecies(
+                EnvironmentPlantInstance evolved = EnvironmentPlantInstance.CreateFromSpecies(
                     current.PlantId,
                     species,
                     current.Cell,
@@ -673,6 +674,15 @@ namespace Arcontio.Core.Environment
                     current.SourceAreaId,
                     climate.Season,
                     enforceSeason: true);
+                return evolved.WithResourceStates(
+                    EnvironmentPlantResourceStateResolver.BuildProgressedResourceStates(
+                        species,
+                        current.Resources,
+                        evolved.GrowthStageKey,
+                        climate.Season,
+                        enforceSeason: true,
+                        evolved.Health01,
+                        elapsedPlantDays));
             }
 
             return new EnvironmentPlantInstance(
@@ -688,6 +698,16 @@ namespace Arcontio.Core.Environment
                 current.IsHarvestable,
                 current.SourceAreaId,
                 current.Resources);
+        }
+
+        private static int ResolveElapsedPlantDays(
+            EnvironmentTemporalTransition transition,
+            bool isAlive)
+        {
+            if (!isAlive || !transition.DayChanged)
+                return 0;
+
+            return transition.ElapsedWholeDays <= 0 ? 1 : transition.ElapsedWholeDays;
         }
 
         // =============================================================================

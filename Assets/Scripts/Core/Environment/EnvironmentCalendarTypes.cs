@@ -148,6 +148,7 @@ namespace Arcontio.Core.Environment
     public readonly struct EnvironmentCalendarState
     {
         public readonly long ElapsedEnvironmentTicks;
+        public readonly int AbsoluteDayIndex;
         public readonly EnvironmentDate Date;
         public readonly EnvironmentTimeOfDay TimeOfDay;
         public readonly float DaylightHours;
@@ -155,12 +156,14 @@ namespace Arcontio.Core.Environment
 
         public EnvironmentCalendarState(
             long elapsedEnvironmentTicks,
+            int absoluteDayIndex,
             EnvironmentDate date,
             EnvironmentTimeOfDay timeOfDay,
             float daylightHours,
             float lightIntensity01)
         {
             ElapsedEnvironmentTicks = elapsedEnvironmentTicks < 0 ? 0 : elapsedEnvironmentTicks;
+            AbsoluteDayIndex = absoluteDayIndex < 0 ? 0 : absoluteDayIndex;
             Date = date;
             TimeOfDay = timeOfDay;
             DaylightHours = daylightHours < 0f ? 0f : daylightHours;

@@ -89,6 +89,8 @@ namespace Arcontio.View.ArcGraph
         public readonly bool DestroysPlantOnHarvest;
         public readonly string RequiresToolKey;
         public readonly int RegrowDays;
+        public readonly int RegrowProgressDays;
+        public readonly float RegrowProgress01;
         public readonly bool IsStageAvailable;
         public readonly bool IsSeasonallyAvailable;
 
@@ -104,6 +106,8 @@ namespace Arcontio.View.ArcGraph
             bool destroysPlantOnHarvest,
             string requiresToolKey,
             int regrowDays,
+            int regrowProgressDays,
+            float regrowProgress01,
             bool isStageAvailable,
             bool isSeasonallyAvailable)
         {
@@ -115,6 +119,8 @@ namespace Arcontio.View.ArcGraph
             DestroysPlantOnHarvest = destroysPlantOnHarvest;
             RequiresToolKey = requiresToolKey ?? string.Empty;
             RegrowDays = regrowDays < 0 ? 0 : regrowDays;
+            RegrowProgressDays = regrowProgressDays < 0 ? 0 : regrowProgressDays;
+            RegrowProgress01 = Clamp01(regrowProgress01);
             IsStageAvailable = isStageAvailable;
             IsSeasonallyAvailable = isSeasonallyAvailable;
         }

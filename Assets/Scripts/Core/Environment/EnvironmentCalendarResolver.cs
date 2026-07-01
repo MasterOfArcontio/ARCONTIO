@@ -77,6 +77,7 @@ namespace Arcontio.Core.Environment
 
             return new EnvironmentCalendarState(
                 safeTicks,
+                absoluteDay,
                 date,
                 time,
                 profile.DaylightHours,

@@ -615,6 +615,8 @@ namespace Arcontio.Core.Environment
         public string requiresToolKey = string.Empty;
         public string minGrowthStageKey = string.Empty;
         public int regrowDays;
+        public int regrowProgressDays;
+        public bool hasRegrowProgressDays;
         public bool isStageAvailable;
         public bool isSeasonallyAvailable;
 
@@ -631,6 +633,8 @@ namespace Arcontio.Core.Environment
                 requiresToolKey = resource.RequiresToolKey,
                 minGrowthStageKey = resource.MinGrowthStageKey,
                 regrowDays = resource.RegrowDays,
+                regrowProgressDays = resource.RegrowProgressDays,
+                hasRegrowProgressDays = true,
                 isStageAvailable = resource.IsStageAvailable,
                 isSeasonallyAvailable = resource.IsSeasonallyAvailable
             };
@@ -672,7 +676,10 @@ namespace Arcontio.Core.Environment
                     record.minGrowthStageKey,
                     record.regrowDays,
                     record.isStageAvailable,
-                    record.isSeasonallyAvailable));
+                    record.isSeasonallyAvailable,
+                    record.hasRegrowProgressDays
+                        ? record.regrowProgressDays
+                        : -1));
             }
 
             return resources.Count == 0 ? new EnvironmentPlantResourceState[0] : resources.ToArray();

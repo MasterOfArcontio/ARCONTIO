@@ -17604,7 +17604,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C8.14 | NPC running action overlay ArcGraph con label e barra tempo residuo | ✅ |
 | v0.71.05.C8.15 | Consolidamento finale C8: contratti job food, overlay UGUI e legacy passivo verificati | ✅ |
 | v0.71.05.D | Stato reale risorse per singola pianta + Inspector ArcGraph read-only | ✅ |
-| v0.71.05.E | Ricrescita risorse biologiche nel tempo | ⏳ |
+| v0.71.05.E | Ricrescita progressiva risorse biologiche nel tempo | ✅ |
 | v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ⏳ |
 | v0.71.05.G | Query operativa job: pianta piu' vicina che fornisce risorsa X | ⏳ |
 | v0.71.05.H | Landmark provider centralizzato per moduli | ⏳ |
@@ -17653,6 +17653,8 @@ La `v0.71.05.C8.14` rende osservabili le running action sopra gli NPC ArcGraph: 
 La `v0.71.05.C8.15` consolida la chiusura del blocco C8: i fixture QA dei job food sono allineati alle durate runtime effettive di `ReadyInventoryFood`, `PickUp` e `Consume`, l'overlay running action viene registrato come pannello UGUI separato dal renderer NPC e il legacy `FoodStockComponent` resta indicato come compatibilita' passiva fuori dal percorso operativo ordinario. Restano fuori scope la rimozione fisica completa del legacy food stock, i macro-slot configurabili, i contenitori fisici reali e l'equipaggiamento indossabile.
 
 La `v0.71.05.D` introduce lo stato reale delle risorse per singola pianta fisica: ogni `EnvironmentPlantInstance` puo' esporre prodotti con quantita' disponibile, quantita' massima, stagionalita', tool richiesto, food/non-food, distruzione pianta e ricrescita futura. Le query harvestable leggono quantita' reali maggiori di zero, mentre il RightInspector pianta mostra i prodotti tramite contratti ArcGraph read-only derivati dalla proiezione `WorldPhysicalPlantProjection`. Non entra ancora raccolta, comando harvest o ricrescita post-raccolta.
+
+La `v0.71.05.E` rende operativa la ricrescita progressiva delle risorse per-pianta: i prodotti con `regrowDays > 0` aumentano a unita' intere lungo i giorni ambientali, mentre `regrowDays = 0` indica assenza di ricrescita passiva. Le risorse possono maturare fuori stagione, ma restano escluse dalle query harvestable finche' la stagione del prodotto non e' valida.
 
 Flusso atteso:
 

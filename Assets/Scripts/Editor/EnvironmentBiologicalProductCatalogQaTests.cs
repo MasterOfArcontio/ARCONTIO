@@ -202,7 +202,7 @@ namespace Arcontio.EditorTests
         /// <para>
         /// Una pianta concreta possiede stato risorse per-prodotto: il legno della
         /// quercia adulta e' disponibile in primavera, mentre la ghianda resta
-        /// prodotto possibile ma non disponibile fuori stagione.
+        /// prodotto possibile e maturo ma non raccoglibile fuori stagione.
         /// </para>
         /// </summary>
         [Test]
@@ -227,7 +227,7 @@ namespace Arcontio.EditorTests
             Assert.That(wood.IsAvailable, Is.True);
 
             Assert.That(EnvironmentPlantResourceStateResolver.TryFindResource(plant.Resources, "acorn", out var acorn), Is.True);
-            Assert.That(acorn.AvailableAmountUnits, Is.EqualTo(0));
+            Assert.That(acorn.AvailableAmountUnits, Is.EqualTo(4));
             Assert.That(acorn.MaxAmountUnits, Is.EqualTo(4));
             Assert.That(acorn.IsSeasonallyAvailable, Is.False);
             Assert.That(acorn.IsAvailable, Is.False);
@@ -239,7 +239,7 @@ namespace Arcontio.EditorTests
         /// <summary>
         /// <para>
         /// Le query harvestable usano la quantita' reale nello stato pianta: una
-        /// risorsa possibile ma a zero non diventa candidata raccoglibile.
+        /// risorsa possibile ma fuori stagione non diventa candidata raccoglibile.
         /// </para>
         /// </summary>
         [Test]
@@ -355,6 +355,301 @@ namespace Arcontio.EditorTests
             }
         }
 
+        // =============================================================================
+        // PlantResourcesRegrowProgressivelyByElapsedDays
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// La ricrescita usa giorni ambientali discreti e aumenta le quantita' a
+        /// unita' intere, senza tornare al massimo in un singolo scatto.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void PlantResourcesRegrowProgressivelyByElapsedDays()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            Assert.That(plantCatalog.TryGetSpecies("berry_bush", out EnvironmentPlantSpeciesDefinition berryBush), Is.True);
+
+            var plantId = new EnvironmentPlantId(3000);
+            EnvironmentState state = MakeStateWithSinglePlant(
+                EnvironmentPlantInstance.CreateFromSpecies(
+                        plantId,
+                        berryBush,
+                        new EnvironmentCellCoord(2, 2),
+                        45,
+                        1f,
+                        new EnvironmentAreaId(20),
+                        EnvironmentSeasonKind.Summer,
+                        enforceSeason: true)
+                    .WithResourceStates(new[]
+                    {
+                        new EnvironmentPlantResourceState(
+                            "berry",
+                            0,
+                            6,
+                            isFood: true,
+                            destroysPlantOnHarvest: false,
+                            requiresToolKey: "",
+                            minGrowthStageKey: "fruiting",
+                            regrowDays: 20,
+                            isStageAvailable: true,
+                            isSeasonallyAvailable: true,
+                            regrowProgressDays: 0)
+                    }));
+
+            EnvironmentNaturalGrowthResult partial = EvolveByDays(
+                state,
+                plantCatalog,
+                EnvironmentSeasonKind.Summer,
+                4);
+            Assert.That(partial.State.TryGetPlantInstance(plantId, out EnvironmentPlantInstance partialPlant), Is.True);
+            Assert.That(EnvironmentPlantResourceStateResolver.TryFindResource(partialPlant.Resources, "berry", out var partialBerry), Is.True);
+            Assert.That(partialBerry.AvailableAmountUnits, Is.EqualTo(1));
+            Assert.That(partialBerry.RegrowProgressDays, Is.EqualTo(4));
+
+            EnvironmentNaturalGrowthResult full = EvolveByDays(
+                state,
+                plantCatalog,
+                EnvironmentSeasonKind.Summer,
+                20);
+            Assert.That(full.State.TryGetPlantInstance(plantId, out EnvironmentPlantInstance fullPlant), Is.True);
+            Assert.That(EnvironmentPlantResourceStateResolver.TryFindResource(fullPlant.Resources, "berry", out var fullBerry), Is.True);
+            Assert.That(fullBerry.AvailableAmountUnits, Is.EqualTo(6));
+            Assert.That(fullBerry.RegrowProgressDays, Is.EqualTo(20));
+        }
+
+        // =============================================================================
+        // OffSeasonResourcesMatureButRemainNonHarvestable
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// La quantita' reale puo' esistere fuori stagione, ma le query harvestable
+        /// la escludono finche' la stagione del prodotto non torna valida.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void OffSeasonResourcesMatureButRemainNonHarvestable()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            Assert.That(plantCatalog.TryGetSpecies("berry_bush", out EnvironmentPlantSpeciesDefinition berryBush), Is.True);
+
+            var plantId = new EnvironmentPlantId(3001);
+            EnvironmentState springState = MakeStateWithSinglePlant(
+                EnvironmentPlantInstance.CreateFromSpecies(
+                    plantId,
+                    berryBush,
+                    new EnvironmentCellCoord(3, 3),
+                    45,
+                    1f,
+                    new EnvironmentAreaId(21),
+                    EnvironmentSeasonKind.Spring,
+                    enforceSeason: true));
+
+            IReadOnlyList<EnvironmentConsumerResourceCandidate> springCandidates =
+                QueryProduct(springState, plantCatalog, new EnvironmentCellCoord(3, 3), "berry");
+            Assert.That(springCandidates.Count, Is.EqualTo(0));
+            Assert.That(springState.TryGetPlantInstance(plantId, out EnvironmentPlantInstance springPlant), Is.True);
+            Assert.That(EnvironmentPlantResourceStateResolver.TryFindResource(springPlant.Resources, "berry", out var springBerry), Is.True);
+            Assert.That(springBerry.AvailableAmountUnits, Is.EqualTo(6));
+            Assert.That(springBerry.IsSeasonallyAvailable, Is.False);
+
+            EnvironmentNaturalGrowthResult summer = EvolveByDays(
+                springState,
+                plantCatalog,
+                EnvironmentSeasonKind.Summer,
+                75);
+            IReadOnlyList<EnvironmentConsumerResourceCandidate> summerCandidates =
+                QueryProduct(summer.State, plantCatalog, new EnvironmentCellCoord(3, 3), "berry");
+            Assert.That(summerCandidates.Count, Is.EqualTo(1));
+            Assert.That(summerCandidates[0].EstimatedAmountUnits, Is.EqualTo(6));
+        }
+
+        // =============================================================================
+        // NonRegrowingResourceDoesNotIncreasePassively
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Un prodotto con <c>regrowDays = 0</c> non viene rigenerato dal ciclo
+        /// naturale. Questo protegge risorse distruttive come il legno.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void NonRegrowingResourceDoesNotIncreasePassively()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            Assert.That(plantCatalog.TryGetSpecies("oak_tree", out EnvironmentPlantSpeciesDefinition oak), Is.True);
+
+            var plantId = new EnvironmentPlantId(3002);
+            EnvironmentState state = MakeStateWithSinglePlant(
+                EnvironmentPlantInstance.CreateFromSpecies(
+                        plantId,
+                        oak,
+                        new EnvironmentCellCoord(4, 4),
+                        300,
+                        1f,
+                        new EnvironmentAreaId(22),
+                        EnvironmentSeasonKind.Summer,
+                        enforceSeason: true)
+                    .WithResourceStates(new[]
+                    {
+                        new EnvironmentPlantResourceState(
+                            "wood_log",
+                            0,
+                            8,
+                            isFood: false,
+                            destroysPlantOnHarvest: true,
+                            requiresToolKey: "axe",
+                            minGrowthStageKey: "adult",
+                            regrowDays: 0,
+                            isStageAvailable: true,
+                            isSeasonallyAvailable: true)
+                    }));
+
+            EnvironmentNaturalGrowthResult result = EvolveByDays(
+                state,
+                plantCatalog,
+                EnvironmentSeasonKind.Summer,
+                30);
+            Assert.That(result.State.TryGetPlantInstance(plantId, out EnvironmentPlantInstance plant), Is.True);
+            Assert.That(EnvironmentPlantResourceStateResolver.TryFindResource(plant.Resources, "wood_log", out var wood), Is.True);
+            Assert.That(wood.AvailableAmountUnits, Is.EqualTo(0));
+        }
+
+        // =============================================================================
+        // ResourceChangeProducesPhysicalPlantDelta
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Quando cambia solo la risorsa della pianta, la Biosfera produce comunque
+        /// un delta per riallineare la proiezione World consumata da ArcGraph.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void ResourceChangeProducesPhysicalPlantDelta()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            Assert.That(plantCatalog.TryGetSpecies("berry_bush", out EnvironmentPlantSpeciesDefinition berryBush), Is.True);
+
+            var plantId = new EnvironmentPlantId(3003);
+            EnvironmentState state = MakeStateWithSinglePlant(
+                EnvironmentPlantInstance.CreateFromSpecies(
+                        plantId,
+                        berryBush,
+                        new EnvironmentCellCoord(5, 5),
+                        45,
+                        1f,
+                        new EnvironmentAreaId(23),
+                        EnvironmentSeasonKind.Summer,
+                        enforceSeason: true)
+                    .WithResourceStates(new[]
+                    {
+                        new EnvironmentPlantResourceState(
+                            "berry",
+                            0,
+                            6,
+                            isFood: true,
+                            destroysPlantOnHarvest: false,
+                            requiresToolKey: "",
+                            minGrowthStageKey: "fruiting",
+                            regrowDays: 20,
+                            isStageAvailable: true,
+                            isSeasonallyAvailable: true,
+                            regrowProgressDays: 0)
+                    }));
+
+            EnvironmentNaturalGrowthResult result = EvolveByDays(
+                state,
+                plantCatalog,
+                EnvironmentSeasonKind.Summer,
+                4);
+
+            Assert.That(result.PhysicalPlantDeltas.Count, Is.EqualTo(1));
+            Assert.That(result.PhysicalPlantDeltas[0].Kind, Is.EqualTo(EnvironmentPhysicalPlantDeltaKind.ResourceChanged));
+            Assert.That(result.PhysicalPlantDeltas[0].PlantId, Is.EqualTo(plantId));
+        }
+
+        private static EnvironmentState MakeStateWithSinglePlant(
+            EnvironmentPlantInstance plant)
+        {
+            var state = new EnvironmentState();
+            state.SetCalendar(EnvironmentCalendarResolver.Resolve(0, new EnvironmentCalendarConfig()));
+            state.SetClimate(new EnvironmentGlobalClimateState(
+                0.55f,
+                0.55f,
+                0f,
+                EnvironmentWeatherState.Clear,
+                EnvironmentSeasonKind.Spring));
+            state.SetPlantInstance(plant);
+            return state;
+        }
+
+        private static EnvironmentNaturalGrowthResult EvolveByDays(
+            EnvironmentState state,
+            EnvironmentPlantCatalog plantCatalog,
+            EnvironmentSeasonKind targetSeason,
+            int days)
+        {
+            var calendarConfig = new EnvironmentCalendarConfig();
+            long previousTicks = 0;
+            long currentTicks = ResolveTicksForDays(calendarConfig, days);
+            EnvironmentTemporalTransition transition = EnvironmentTemporalTransitionResolver.Resolve(
+                previousTicks,
+                currentTicks,
+                calendarConfig);
+            var climate = new EnvironmentGlobalClimateState(
+                0.55f,
+                0.55f,
+                0f,
+                EnvironmentWeatherState.Clear,
+                targetSeason);
+            EnvironmentSeasonProfile profile = EnvironmentCalendarResolver.ResolveSeasonProfile(
+                calendarConfig,
+                targetSeason);
+
+            return EnvironmentNaturalGrowthResolver.Evolve(
+                state.CreateSnapshot(),
+                plantCatalog,
+                transition,
+                climate,
+                profile,
+                new EnvironmentNaturalGrowthConfig
+                {
+                    allowNewPlantInstances = false,
+                    maxNewPlantsPerDay = 0,
+                    maxNewPlantsPerAreaPerDay = 0,
+                    healthRecoveryStep01 = 0f,
+                    healthStressStep01 = 0f,
+                    plantAridityHealthStressScale01 = 0f
+                });
+        }
+
+        private static IReadOnlyList<EnvironmentConsumerResourceCandidate> QueryProduct(
+            EnvironmentState state,
+            EnvironmentPlantCatalog plantCatalog,
+            EnvironmentCellCoord cell,
+            string productKey)
+        {
+            EnvironmentFullSnapshot snapshot =
+                EnvironmentReadOnlySnapshotResolver.BuildFullSnapshot(state.CreateSnapshot());
+            return EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                snapshot,
+                plantCatalog,
+                cell,
+                1,
+                productKey);
+        }
+
+        private static long ResolveTicksForDays(
+            EnvironmentCalendarConfig calendarConfig,
+            int days)
+        {
+            int safeDays = days < 0 ? 0 : days;
+            int ticksPerDay =
+                calendarConfig.ResolveHoursPerDay()
+                * calendarConfig.ResolveCalendarTicksPerSimulatedHour();
+            return (long)safeDays * ticksPerDay;
+        }
+
         private static EnvironmentPlantCatalogConfig MakePlantCatalogConfig()
         {
             return new EnvironmentPlantCatalogConfig
@@ -399,6 +694,7 @@ namespace Arcontio.EditorTests
                                 isFood = true,
                                 destroysPlantOnHarvest = false,
                                 minGrowthStageKey = "adult",
+                                availableSeasons = new[] { "Autumn" },
                                 baseMaxAmountUnits = 4,
                                 regrowDays = 365
                             }
@@ -425,6 +721,7 @@ namespace Arcontio.EditorTests
                                 productKey = "berry",
                                 isFood = true,
                                 minGrowthStageKey = "fruiting",
+                                availableSeasons = new[] { "Summer", "Autumn" },
                                 baseMaxAmountUnits = 6,
                                 regrowDays = 20
                             }

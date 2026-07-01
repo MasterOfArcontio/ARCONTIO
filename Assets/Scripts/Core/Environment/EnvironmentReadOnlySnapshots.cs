@@ -28,6 +28,7 @@ namespace Arcontio.Core.Environment
     public readonly struct EnvironmentCalendarSnapshot
     {
         public readonly long ElapsedEnvironmentTicks;
+        public readonly int AbsoluteDayIndex;
         public readonly int Year;
         public readonly int Month;
         public readonly int DayOfMonth;
@@ -47,6 +48,7 @@ namespace Arcontio.Core.Environment
         public EnvironmentCalendarSnapshot(EnvironmentCalendarState state)
         {
             ElapsedEnvironmentTicks = state.ElapsedEnvironmentTicks;
+            AbsoluteDayIndex = state.AbsoluteDayIndex;
             Year = state.Date.Year;
             Month = state.Date.Month;
             DayOfMonth = state.Date.DayOfMonth;

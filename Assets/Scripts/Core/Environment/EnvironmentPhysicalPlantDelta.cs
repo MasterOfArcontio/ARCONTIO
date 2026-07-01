@@ -35,7 +35,8 @@ namespace Arcontio.Core.Environment
         Died = 2,
         StateChanged = 3,
         StageChanged = 4,
-        Relocated = 5
+        Relocated = 5,
+        ResourceChanged = 6
     }
 
     // =============================================================================
@@ -242,6 +243,13 @@ namespace Arcontio.Core.Environment
 
             if (previous.HealthState != current.HealthState)
                 return EnvironmentPhysicalPlantDeltaKind.StateChanged;
+
+            if (!EnvironmentPlantResourceStateResolver.AreEquivalent(
+                    previous.Resources,
+                    current.Resources))
+            {
+                return EnvironmentPhysicalPlantDeltaKind.ResourceChanged;
+            }
 
             // Cambiamenti biologici fini restano nella biosfera: non devono produrre
             // lavoro fisico/visuale ogni giorno se non cambiano una banda esposta.

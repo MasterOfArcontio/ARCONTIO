@@ -589,26 +589,24 @@ namespace Arcontio.Core.Environment
             EnvironmentSeasonKind season,
             bool enforceSeason)
         {
+            EnvironmentPlantResourceState[] resources =
+                EnvironmentPlantResourceStateResolver.BuildProgressedResourceStates(
+                    species,
+                    plant.Resources,
+                    plant.GrowthStageKey,
+                    season,
+                    enforceSeason,
+                    plant.Health01,
+                    elapsedDays: 0);
             if (EnvironmentPlantResourceStateResolver.TryFindResource(
-                    plant,
+                    resources,
                     product.ProductKey,
                     out EnvironmentPlantResourceState resource))
             {
                 return resource;
             }
 
-            var resources = EnvironmentPlantResourceStateResolver.BuildInitialResourceStates(
-                species,
-                plant.GrowthStageKey,
-                season,
-                enforceSeason,
-                plant.Health01);
-            return EnvironmentPlantResourceStateResolver.TryFindResource(
-                resources,
-                product.ProductKey,
-                out resource)
-                ? resource
-                : default;
+            return default;
         }
 
         private static int ResolveEstimatedAmountUnits(

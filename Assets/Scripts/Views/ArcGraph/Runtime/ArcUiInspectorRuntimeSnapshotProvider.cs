@@ -1490,6 +1490,8 @@ namespace Arcontio.View.ArcGraph
                     resource.DestroysPlantOnHarvest,
                     resource.RequiresToolKey,
                     resource.RegrowDays,
+                    resource.RegrowProgressDays,
+                    resource.RegrowProgress01,
                     resource.IsStageAvailable,
                     resource.IsSeasonallyAvailable);
             }
@@ -1506,6 +1508,12 @@ namespace Arcontio.View.ArcGraph
                             + "/"
                             + product.MaxAmountUnits.ToString(CultureInfo.InvariantCulture);
             string state = product.IsAvailable ? "Disponibile" : "Non disponibile";
+            string regrowText = product.RegrowDays <= 0
+                ? "Non ricresce"
+                : product.RegrowProgressDays.ToString(CultureInfo.InvariantCulture)
+                  + "/"
+                  + product.RegrowDays.ToString(CultureInfo.InvariantCulture)
+                  + " giorni";
             var details = new[]
             {
                 ArcUiInspectorRow.Bar(
@@ -1517,7 +1525,14 @@ namespace Arcontio.View.ArcGraph
                 new ArcUiInspectorRow("Food", BoolText(product.IsFood)),
                 new ArcUiInspectorRow("Tool", string.IsNullOrWhiteSpace(product.RequiresToolKey) ? EmptyValue : product.RequiresToolKey),
                 new ArcUiInspectorRow("Distrugge pianta", BoolText(product.DestroysPlantOnHarvest)),
-                new ArcUiInspectorRow("Ricrescita giorni", product.RegrowDays.ToString(CultureInfo.InvariantCulture)),
+                product.RegrowDays <= 0
+                    ? new ArcUiInspectorRow("Ricrescita", regrowText)
+                    : ArcUiInspectorRow.Bar(
+                        rowKey + "_regrow",
+                        "Ricrescita",
+                        regrowText,
+                        product.RegrowProgress01,
+                        product.RegrowProgress01 >= 1f ? ArcUiInspectorSeverity.Good : ArcUiInspectorSeverity.Info),
                 new ArcUiInspectorRow("Stadio valido", BoolText(product.IsStageAvailable)),
                 new ArcUiInspectorRow("Stagione valida", BoolText(product.IsSeasonallyAvailable))
             };

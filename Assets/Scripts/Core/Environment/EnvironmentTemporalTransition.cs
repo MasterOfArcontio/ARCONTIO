@@ -32,6 +32,7 @@ namespace Arcontio.Core.Environment
         public readonly EnvironmentCalendarState Previous;
         public readonly EnvironmentCalendarState Current;
         public readonly long ElapsedTicks;
+        public readonly int ElapsedWholeDays;
         public readonly bool HourChanged;
         public readonly bool DayChanged;
         public readonly bool MonthChanged;
@@ -66,11 +67,20 @@ namespace Arcontio.Core.Environment
             Previous = previous;
             Current = current;
             ElapsedTicks = elapsedTicks < 0 ? 0 : elapsedTicks;
+            ElapsedWholeDays = ResolveElapsedWholeDays(previous, current);
             HourChanged = hourChanged;
             DayChanged = dayChanged;
             MonthChanged = monthChanged;
             SeasonChanged = seasonChanged;
             YearChanged = yearChanged;
+        }
+
+        private static int ResolveElapsedWholeDays(
+            EnvironmentCalendarState previous,
+            EnvironmentCalendarState current)
+        {
+            int elapsed = current.AbsoluteDayIndex - previous.AbsoluteDayIndex;
+            return elapsed < 0 ? 0 : elapsed;
         }
     }
 
