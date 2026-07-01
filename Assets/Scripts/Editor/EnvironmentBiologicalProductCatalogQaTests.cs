@@ -763,6 +763,171 @@ namespace Arcontio.EditorTests
             Assert.That(built, Is.False);
         }
 
+        // =============================================================================
+        // ReachablePlantResourceQueryReturnsAdjacentInteractionCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// La query operativa G non manda l'NPC sulla cella della pianta fisica:
+        /// restituisce una cella cardinale adiacente raggiungibile tramite
+        /// pathfinding.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void ReachablePlantResourceQueryReturnsAdjacentInteractionCell()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBerryResourcePlants(
+                plantCatalog,
+                new[] { new EnvironmentPlantId(9200) },
+                new[] { new EnvironmentCellCoord(5, 5) },
+                out EnvironmentAreaId areaId,
+                out int landmarkNodeId);
+            int npcId = CreateNpcOnLandmark(world, landmarkNodeId);
+
+            EnvironmentReachablePlantResourceQueryResult result =
+                world.QueryEnvironmentReachablePlantResourceFromBiologicalLandmark(
+                    npcId,
+                    landmarkNodeId,
+                    10,
+                    "berry",
+                    plantCatalog);
+
+            Assert.That(result.IsValid, Is.True);
+            Assert.That(result.AreaId, Is.EqualTo(areaId));
+            Assert.That(result.PlantId, Is.EqualTo(new EnvironmentPlantId(9200)));
+            Assert.That(result.PlantCell.X, Is.EqualTo(5));
+            Assert.That(result.PlantCell.Y, Is.EqualTo(5));
+            Assert.That(
+                Mathf.Abs(result.InteractionCell.X - result.PlantCell.X)
+                + Mathf.Abs(result.InteractionCell.Y - result.PlantCell.Y),
+                Is.EqualTo(1));
+            Assert.That(result.EstimatedAmountUnits, Is.EqualTo(6));
+            Assert.That(result.IsFood, Is.True);
+        }
+
+        // =============================================================================
+        // ReachablePlantResourceQuerySkipsCloserBlockedPlant
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Se la pianta piu' vicina non ha nessuna cella di interazione
+        /// raggiungibile, la query sceglie una pianta piu' lontana ma realmente
+        /// raggiungibile.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void ReachablePlantResourceQuerySkipsCloserBlockedPlant()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBerryResourcePlants(
+                plantCatalog,
+                new[]
+                {
+                    new EnvironmentPlantId(9201),
+                    new EnvironmentPlantId(9202)
+                },
+                new[]
+                {
+                    new EnvironmentCellCoord(4, 4),
+                    new EnvironmentCellCoord(8, 4)
+                },
+                out _,
+                out int landmarkNodeId);
+            AddBlockingWallRingAroundCell(world, 4, 4);
+            int npcId = CreateNpcOnLandmark(world, landmarkNodeId);
+
+            EnvironmentReachablePlantResourceQueryResult result =
+                world.QueryEnvironmentReachablePlantResourceFromBiologicalLandmark(
+                    npcId,
+                    landmarkNodeId,
+                    12,
+                    "berry",
+                    plantCatalog);
+
+            Assert.That(result.IsValid, Is.True);
+            Assert.That(result.PlantId, Is.EqualTo(new EnvironmentPlantId(9202)));
+            Assert.That(result.PlantCell.X, Is.EqualTo(8));
+            Assert.That(result.PlantCell.Y, Is.EqualTo(4));
+        }
+
+        // =============================================================================
+        // ReachablePlantResourceQueryFailsWhenNoInteractionCellIsReachable
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Una risorsa harvestable ma completamente isolata non diventa target
+        /// operativo: il job futuro dovra' ricevere un fallimento esplicito.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void ReachablePlantResourceQueryFailsWhenNoInteractionCellIsReachable()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBerryResourcePlants(
+                plantCatalog,
+                new[] { new EnvironmentPlantId(9203) },
+                new[] { new EnvironmentCellCoord(4, 4) },
+                out _,
+                out int landmarkNodeId);
+            AddBlockingWallRingAroundCell(world, 4, 4);
+            int npcId = CreateNpcOnLandmark(world, landmarkNodeId);
+
+            EnvironmentReachablePlantResourceQueryResult result =
+                world.QueryEnvironmentReachablePlantResourceFromBiologicalLandmark(
+                    npcId,
+                    landmarkNodeId,
+                    10,
+                    "berry",
+                    plantCatalog);
+
+            Assert.That(result.IsValid, Is.False);
+            Assert.That(result.Reason, Is.EqualTo("NoReachablePlant"));
+            Assert.That(result.PlantId.IsValid, Is.False);
+        }
+
+        // =============================================================================
+        // ReachablePlantResourceQueryRejectsInvalidLandmarkAndMissingProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// La query G distingue un landmark non biologico/inesistente da un
+        /// prodotto che non esiste tra le risorse harvestable locali.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void ReachablePlantResourceQueryRejectsInvalidLandmarkAndMissingProduct()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBerryResourcePlants(
+                plantCatalog,
+                new[] { new EnvironmentPlantId(9204) },
+                new[] { new EnvironmentCellCoord(5, 5) },
+                out _,
+                out int landmarkNodeId);
+            int npcId = CreateNpcOnLandmark(world, landmarkNodeId);
+
+            EnvironmentReachablePlantResourceQueryResult invalidLandmark =
+                world.QueryEnvironmentReachablePlantResourceFromBiologicalLandmark(
+                    npcId,
+                    9999,
+                    10,
+                    "berry",
+                    plantCatalog);
+            EnvironmentReachablePlantResourceQueryResult missingProduct =
+                world.QueryEnvironmentReachablePlantResourceFromBiologicalLandmark(
+                    npcId,
+                    landmarkNodeId,
+                    10,
+                    "acorn",
+                    plantCatalog);
+
+            Assert.That(invalidLandmark.IsValid, Is.False);
+            Assert.That(invalidLandmark.Reason, Is.EqualTo("BiologicalLandmarkMissing"));
+            Assert.That(missingProduct.IsValid, Is.False);
+            Assert.That(missingProduct.Reason, Is.EqualTo("NoHarvestableCandidates"));
+        }
+
         private static EnvironmentState MakeStateWithSinglePlant(
             EnvironmentPlantInstance plant)
         {
@@ -890,6 +1055,158 @@ namespace Arcontio.EditorTests
                 });
             world.SetEnvironmentState(state);
             return world;
+        }
+
+        // =============================================================================
+        // MakeWorldWithBerryResourcePlants
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un mondo QA con una singola area biologica, una lista di
+        /// piante berry mature, proiezioni fisiche attive e landmark biologici gia'
+        /// ricostruiti.
+        /// </para>
+        /// </summary>
+        private static World MakeWorldWithBerryResourcePlants(
+            EnvironmentPlantCatalog plantCatalog,
+            EnvironmentPlantId[] plantIds,
+            EnvironmentCellCoord[] plantCells,
+            out EnvironmentAreaId areaId,
+            out int landmarkNodeId)
+        {
+            Assert.That(plantIds, Is.Not.Null);
+            Assert.That(plantCells, Is.Not.Null);
+            Assert.That(plantIds.Length, Is.EqualTo(plantCells.Length));
+            Assert.That(plantCatalog.TryGetSpecies("berry_bush", out EnvironmentPlantSpeciesDefinition berryBush), Is.True);
+
+            World world = MakeWorldWithNaturalSurface(12, 12);
+            world.Config.Sim.landmarks.localSearch.maxSearchRadius = 16;
+            world.Config.Sim.landmarks.localSearch.maxExpandedNodes = 256;
+            world.Config.Sim.landmarks.localSearch.maxIterations = 512;
+
+            areaId = new EnvironmentAreaId(92);
+            var state = new EnvironmentState();
+            state.SetCalendar(EnvironmentCalendarResolver.Resolve(0, new EnvironmentCalendarConfig()));
+            state.SetClimate(new EnvironmentGlobalClimateState(
+                0.55f,
+                0.55f,
+                0f,
+                EnvironmentWeatherState.Clear,
+                EnvironmentSeasonKind.Summer));
+            state.SetAreaDefinition(new EnvironmentAreaDefinition(
+                areaId,
+                EnvironmentAreaKind.Vegetation,
+                new EnvironmentAreaBounds(1, 1, 10, 10),
+                1,
+                true,
+                "qa_reachable_resource_area"));
+
+            var placements = new List<EnvironmentPhysicalPlantPlacement>(plantIds.Length);
+            for (int i = 0; i < plantIds.Length; i++)
+            {
+                EnvironmentCellCoord cell = plantCells[i];
+                state.SetPlantInstance(EnvironmentPlantInstance.CreateFromSpecies(
+                    plantIds[i],
+                    berryBush,
+                    cell,
+                    45,
+                    0.95f,
+                    areaId,
+                    EnvironmentSeasonKind.Summer,
+                    enforceSeason: true));
+                placements.Add(new EnvironmentPhysicalPlantPlacement(
+                    plantIds[i],
+                    areaId,
+                    cell,
+                    "berry_bush"));
+            }
+
+            state.ReplaceBiologicalPlacementsForSaveLoad(
+                new EnvironmentVegetationCellPlacement[0],
+                placements.ToArray());
+            world.SetEnvironmentState(state);
+            Assert.That(world.ApplyEnvironmentPhysicalPlantProjections(), Is.EqualTo(plantIds.Length));
+            world.RebuildLandmarksBootstrap();
+
+            Assert.That(
+                world.EnvironmentState.TryGetBiologicalLandmarkNodeIds(areaId, out IReadOnlyList<int> landmarkIds),
+                Is.True);
+            Assert.That(landmarkIds.Count, Is.GreaterThan(0));
+            landmarkNodeId = landmarkIds[0];
+            return world;
+        }
+
+        // =============================================================================
+        // CreateNpcOnLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Crea un NPC esattamente sulla cella del landmark biologico usato dalla
+        /// query, simulando lo stato operativo in cui il job ha gia' raggiunto
+        /// l'ancora locale e deve cercare una pianta concreta.
+        /// </para>
+        /// </summary>
+        private static int CreateNpcOnLandmark(
+            World world,
+            int landmarkNodeId)
+        {
+            Assert.That(world.LandmarkRegistry.TryGetActiveNodeById(landmarkNodeId, out LandmarkRegistry.LandmarkNode node), Is.True);
+            Assert.That(node, Is.Not.Null);
+            return world.CreateNpc(
+                NpcDnaProfile.CreateDefault("reachable_resource_qa"),
+                NpcNeeds.Make(0.4f, 0.2f),
+                new Arcontio.Core.Social(),
+                node.CellX,
+                node.CellY);
+        }
+
+        // =============================================================================
+        // AddBlockingWallRingAroundCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Circonda una cella con quattro oggetti bloccanti cardinali per verificare
+        /// che la query non confonda una risorsa biologica esistente con una risorsa
+        /// realmente raggiungibile.
+        /// </para>
+        /// </summary>
+        private static void AddBlockingWallRingAroundCell(
+            World world,
+            int centerX,
+            int centerY)
+        {
+            EnsureBlockingWallDef(world);
+            Assert.That(world.CreateObject("qa_blocking_wall", centerX, centerY + 1), Is.GreaterThan(0));
+            Assert.That(world.CreateObject("qa_blocking_wall", centerX + 1, centerY), Is.GreaterThan(0));
+            Assert.That(world.CreateObject("qa_blocking_wall", centerX, centerY - 1), Is.GreaterThan(0));
+            Assert.That(world.CreateObject("qa_blocking_wall", centerX - 1, centerY), Is.GreaterThan(0));
+        }
+
+        // =============================================================================
+        // EnsureBlockingWallDef
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Registra nel catalogo oggetti QA un ostacolo minimale che aggiorna la
+        /// cache movimento del World tramite il percorso ordinario
+        /// <see cref="World.CreateObject"/>.
+        /// </para>
+        /// </summary>
+        private static void EnsureBlockingWallDef(
+            World world)
+        {
+            if (world.ObjectDefs.ContainsKey("qa_blocking_wall"))
+                return;
+
+            world.ObjectDefs["qa_blocking_wall"] = new ObjectDef
+            {
+                Id = "qa_blocking_wall",
+                DisplayName = "QA Blocking Wall",
+                IsOccluder = true,
+                BlocksMovement = true,
+                BlocksVision = true,
+                VisionCost = 1f
+            };
         }
 
         private static EnvironmentPlantCatalogConfig MakePlantCatalogConfig()
@@ -1060,10 +1377,12 @@ namespace Arcontio.EditorTests
             };
         }
 
-        private static World MakeWorldWithNaturalSurface()
+        private static World MakeWorldWithNaturalSurface(
+            int width = 8,
+            int height = 8)
         {
             var world = new World(new WorldConfig(new SimulationParams()));
-            world.InitMap(8, 8);
+            world.InitMap(width, height);
             world.SurfaceDefs["grass"] = new CellSurfaceDef
             {
                 Id = "grass",
@@ -1073,9 +1392,9 @@ namespace Arcontio.EditorTests
                 CanHostPhysicalPlant = true
             };
 
-            for (int y = 0; y < 8; y++)
+            for (int y = 0; y < height; y++)
             {
-                for (int x = 0; x < 8; x++)
+                for (int x = 0; x < width; x++)
                 {
                     Assert.That(world.CellSurfaces.SetSurface(x, y, CellSurfaceMacro.Natural, "grass"), Is.True);
                 }

@@ -661,6 +661,9 @@ namespace Arcontio.Core
         ///   stanze, muri a U semplici, landmark immediato dietro ostacolo, ecc.
         ///
         /// Restituisce un path cella-per-cella completo (inclusa la sorgente) se riesce.
+        /// Se recordPathfindingMemory e' false, il metodo resta un probe read-only:
+        /// costruisce o rifiuta il path senza aggiornare la memoria locale di
+        /// successi/fallimenti del pathfinding.
         /// </summary>
         public static bool TryBuildBoundedMovePath(
             World world,
@@ -671,7 +674,8 @@ namespace Arcontio.Core
             int targetY,
             int maxVisited,
             List<Vector2Int> outCells,
-            int forcedBlockedFirstStepCellIndex = -1)
+            int forcedBlockedFirstStepCellIndex = -1,
+            bool recordPathfindingMemory = true)
         {
             if (outCells == null)
                 return false;
@@ -789,7 +793,8 @@ namespace Arcontio.Core
                 else
                     outCells.AddRange(candidatePath);
 
-                world.Pathfinding.RememberLocalSearchSuccess(npcId, startX, startY, targetX, targetY);
+                if (recordPathfindingMemory)
+                    world.Pathfinding.RememberLocalSearchSuccess(npcId, startX, startY, targetX, targetY);
                 LogBoundedMovePathResult(
                     world, npcId, "Complete", startX, startY, targetX, targetY,
                     expandedLimit, iterationLimit, radiusLimit, jumpLimit, smartFallbackUsed,
@@ -806,7 +811,8 @@ namespace Arcontio.Core
 
                 int blockedStep = outCells.Count >= 2 ? world.CellIndex(outCells[1].x, outCells[1].y) : -1;
                 int progressCell = outCells.Count > 0 ? world.CellIndex(outCells[outCells.Count - 1].x, outCells[outCells.Count - 1].y) : -1;
-                world.Pathfinding.RememberLocalSearchFailure(npcId, startX, startY, targetX, targetY, blockedStep, progressCell);
+                if (recordPathfindingMemory)
+                    world.Pathfinding.RememberLocalSearchFailure(npcId, startX, startY, targetX, targetY, blockedStep, progressCell);
                 LogBoundedMovePathResult(
                     world, npcId, "Partial", startX, startY, targetX, targetY,
                     expandedLimit, iterationLimit, radiusLimit, jumpLimit, smartFallbackUsed,
@@ -815,7 +821,8 @@ namespace Arcontio.Core
                 return false;
             }
 
-            world.Pathfinding.RememberLocalSearchFailure(npcId, startX, startY, targetX, targetY, blockedFirstStepCellIndex, -1);
+            if (recordPathfindingMemory)
+                world.Pathfinding.RememberLocalSearchFailure(npcId, startX, startY, targetX, targetY, blockedFirstStepCellIndex, -1);
             LogBoundedMovePathResult(
                 world, npcId, "Failed", startX, startY, targetX, targetY,
                 expandedLimit, iterationLimit, radiusLimit, jumpLimit, smartFallbackUsed,

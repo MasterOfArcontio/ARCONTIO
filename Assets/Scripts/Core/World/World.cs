@@ -1784,6 +1784,281 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // QueryEnvironmentReachablePlantResourceFromBiologicalLandmark
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la pianta concreta piu' vicina e raggiungibile che puo' fornire
+        /// un prodotto biologico partendo da un landmark biologico noto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query operativa job-boundary</b></para>
+        /// <para>
+        /// Questa API e' deliberatamente nel <see cref="World"/>: la Biosfera
+        /// fornisce candidate biologiche read-only, mentre il World e' l'unico
+        /// boundary che puo' verificare celle fisiche, NPC presenti e pathfinding.
+        /// Il risultato puo' contenere un <see cref="EnvironmentPlantId"/> perche'
+        /// non e' una belief remota, ma un target operativo locale per un job
+        /// futuro. Nessuna mutazione, raccolta, prenotazione o scrittura memoria
+        /// avviene in questo metodo.
+        /// </para>
+        ///
+        /// <para><b>Struttura interna:</b></para>
+        /// <list type="bullet">
+        ///   <item><b>Validazione</b>: NPC, landmark biologico, prodotto e registry.</item>
+        ///   <item><b>Candidate</b>: risorse harvestable locali gia' filtrate dalla Biosfera.</item>
+        ///   <item><b>Raggiungibilita'</b>: path verso una cella cardinale adiacente alla pianta.</item>
+        ///   <item><b>Ordinamento</b>: path piu' corto, quantita', qualita', plant id.</item>
+        /// </list>
+        /// </summary>
+        public EnvironmentReachablePlantResourceQueryResult QueryEnvironmentReachablePlantResourceFromBiologicalLandmark(
+            int npcId,
+            int landmarkNodeId,
+            int radius,
+            string productKey,
+            EnvironmentPlantCatalog catalog)
+        {
+            string safeProductKey = productKey ?? string.Empty;
+            if (!GridPos.TryGetValue(npcId, out GridPosition npcCell))
+            {
+                return BuildReachablePlantResourceResult(
+                    "NpcMissing",
+                    npcId,
+                    landmarkNodeId,
+                    EnvironmentAreaId.None,
+                    safeProductKey);
+            }
+
+            if (string.IsNullOrWhiteSpace(safeProductKey))
+            {
+                return BuildReachablePlantResourceResult(
+                    "ProductKeyMissing",
+                    npcId,
+                    landmarkNodeId,
+                    EnvironmentAreaId.None,
+                    safeProductKey);
+            }
+
+            if (!TryResolveEnvironmentAreaFromBiologicalLandmark(landmarkNodeId, out EnvironmentAreaId areaId)
+                || LandmarkRegistry == null
+                || !LandmarkRegistry.TryGetActiveNodeById(landmarkNodeId, out LandmarkRegistry.LandmarkNode node)
+                || node == null)
+            {
+                return BuildReachablePlantResourceResult(
+                    "BiologicalLandmarkMissing",
+                    npcId,
+                    landmarkNodeId,
+                    areaId,
+                    safeProductKey);
+            }
+
+            IReadOnlyList<EnvironmentConsumerResourceCandidate> resources =
+                QueryEnvironmentHarvestableResourcesForBiologicalLandmarkProduct(
+                    landmarkNodeId,
+                    radius,
+                    safeProductKey,
+                    catalog);
+
+            if (resources == null || resources.Count == 0)
+            {
+                return BuildReachablePlantResourceResult(
+                    "NoHarvestableCandidates",
+                    npcId,
+                    landmarkNodeId,
+                    areaId,
+                    safeProductKey);
+            }
+
+            var localSearch = Config?.Sim?.landmarks?.localSearch ?? new LandmarkLocalSearchParams();
+            int pathBudget = Mathf.Max(64, localSearch.maxExpandedNodes * Mathf.Max(1, localSearch.fallbackExpandedNodesMultiplier));
+            var pathScratch = new List<Vector2Int>(64);
+
+            bool found = false;
+            EnvironmentConsumerResourceCandidate bestResource = default;
+            EnvironmentCellCoord bestInteractionCell = default;
+            int bestPathLength = int.MaxValue;
+
+            for (int i = 0; i < resources.Count; i++)
+            {
+                EnvironmentConsumerResourceCandidate resource = resources[i];
+                if (!resource.IsAvailable)
+                    continue;
+
+                // La query da landmark deve restare ancorata alla sua area
+                // biologica. Il raggio locale puo' intercettare piante vicine di
+                // altre aree: quelle non sono il target operativo di questo LM.
+                if (!resource.AreaId.Equals(areaId))
+                    continue;
+
+                if (!TryResolveReachableInteractionCellForPlantResource(
+                        npcId,
+                        npcCell,
+                        resource,
+                        pathBudget,
+                        pathScratch,
+                        out EnvironmentCellCoord interactionCell,
+                        out int pathLength))
+                {
+                    continue;
+                }
+
+                if (!found
+                    || pathLength < bestPathLength
+                    || (pathLength == bestPathLength && resource.EstimatedAmountUnits > bestResource.EstimatedAmountUnits)
+                    || (pathLength == bestPathLength
+                        && resource.EstimatedAmountUnits == bestResource.EstimatedAmountUnits
+                        && resource.Quality01 > bestResource.Quality01)
+                    || (pathLength == bestPathLength
+                        && resource.EstimatedAmountUnits == bestResource.EstimatedAmountUnits
+                        && Mathf.Approximately(resource.Quality01, bestResource.Quality01)
+                        && resource.PlantId.Value < bestResource.PlantId.Value))
+                {
+                    found = true;
+                    bestResource = resource;
+                    bestInteractionCell = interactionCell;
+                    bestPathLength = pathLength;
+                }
+            }
+
+            if (!found)
+            {
+                return BuildReachablePlantResourceResult(
+                    "NoReachablePlant",
+                    npcId,
+                    landmarkNodeId,
+                    areaId,
+                    safeProductKey);
+            }
+
+            return new EnvironmentReachablePlantResourceQueryResult(
+                true,
+                "Ok",
+                npcId,
+                landmarkNodeId,
+                areaId,
+                safeProductKey,
+                bestResource.PlantId,
+                bestResource.Cell,
+                bestInteractionCell,
+                bestPathLength,
+                bestResource.EstimatedAmountUnits,
+                bestResource.Quality01,
+                bestResource.IsFood,
+                bestResource.DestroysPlantOnHarvest,
+                bestResource.RequiresToolKey,
+                bestResource.RegrowDays);
+        }
+
+        // =============================================================================
+        // TryResolveReachableInteractionCellForPlantResource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Trova la migliore cella cardinale adiacente alla pianta da cui l'NPC
+        /// potra' interagire con la risorsa.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: la pianta non e' la destinazione fisica</b></para>
+        /// <para>
+        /// Le piante fisiche possono bloccare la propria cella. Per evitare falsi
+        /// negativi, la query non pretende che l'NPC cammini sulla pianta: richiede
+        /// invece una cella adiacente raggiungibile via pathfinding. Questo e' il
+        /// contratto che il futuro step harvest usera' come destinazione operativa.
+        /// </para>
+        /// </summary>
+        private bool TryResolveReachableInteractionCellForPlantResource(
+            int npcId,
+            GridPosition npcCell,
+            EnvironmentConsumerResourceCandidate resource,
+            int pathBudget,
+            List<Vector2Int> pathScratch,
+            out EnvironmentCellCoord interactionCell,
+            out int pathLength)
+        {
+            interactionCell = default;
+            pathLength = int.MaxValue;
+            if (!resource.PlantId.IsValid || pathScratch == null)
+                return false;
+
+            int[] dx = { 0, 1, 0, -1 };
+            int[] dy = { 1, 0, -1, 0 };
+            bool found = false;
+
+            for (int i = 0; i < dx.Length; i++)
+            {
+                int targetX = resource.Cell.X + dx[i];
+                int targetY = resource.Cell.Y + dy[i];
+                if (!InBounds(targetX, targetY))
+                    continue;
+
+                if (IsMovementBlocked(targetX, targetY))
+                    continue;
+
+                if (TryGetNpcAt(targetX, targetY, out int otherNpcId) && otherNpcId != npcId)
+                    continue;
+
+                int candidatePathLength;
+                if (npcCell.X == targetX && npcCell.Y == targetY)
+                {
+                    candidatePathLength = 0;
+                }
+                else
+                {
+                    pathScratch.Clear();
+                    if (!MovementPathfinder.TryBuildBoundedMovePath(
+                            this,
+                            npcId,
+                            npcCell.X,
+                            npcCell.Y,
+                            targetX,
+                            targetY,
+                            pathBudget,
+                            pathScratch,
+                            recordPathfindingMemory: false)
+                        || pathScratch.Count < 2)
+                    {
+                        continue;
+                    }
+
+                    candidatePathLength = pathScratch.Count - 1;
+                }
+
+                if (!found || candidatePathLength < pathLength)
+                {
+                    found = true;
+                    pathLength = candidatePathLength;
+                    interactionCell = new EnvironmentCellCoord(targetX, targetY, resource.Cell.Z);
+                }
+            }
+
+            return found;
+        }
+
+        // =============================================================================
+        // BuildReachablePlantResourceResult
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce un risultato negativo normalizzato per la query operativa G.
+        /// </para>
+        /// </summary>
+        private static EnvironmentReachablePlantResourceQueryResult BuildReachablePlantResourceResult(
+            string reason,
+            int npcId,
+            int landmarkNodeId,
+            EnvironmentAreaId areaId,
+            string productKey)
+        {
+            return new EnvironmentReachablePlantResourceQueryResult(
+                false,
+                reason,
+                npcId,
+                landmarkNodeId,
+                areaId,
+                productKey);
+        }
+
+        // =============================================================================
         // BuildEnvironmentObservedProductBeliefHintsForBiologicalLandmark
         // =============================================================================
         /// <summary>

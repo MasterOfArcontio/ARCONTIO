@@ -128,6 +128,7 @@ namespace Arcontio.Core.Environment
     public readonly struct EnvironmentConsumerResourceCandidate
     {
         public readonly EnvironmentPlantId PlantId;
+        public readonly EnvironmentAreaId AreaId;
         public readonly string SpeciesKey;
         public readonly EnvironmentCellCoord Cell;
         public readonly string ResourceOutputKey;
@@ -156,6 +157,7 @@ namespace Arcontio.Core.Environment
         /// </summary>
         public EnvironmentConsumerResourceCandidate(
             EnvironmentPlantId plantId,
+            EnvironmentAreaId areaId,
             string speciesKey,
             EnvironmentCellCoord cell,
             string resourceOutputKey,
@@ -170,6 +172,7 @@ namespace Arcontio.Core.Environment
             int regrowDays = 0)
         {
             PlantId = plantId;
+            AreaId = areaId;
             SpeciesKey = speciesKey ?? string.Empty;
             Cell = cell;
             ResourceOutputKey = resourceOutputKey ?? string.Empty;
@@ -182,6 +185,102 @@ namespace Arcontio.Core.Environment
             RegrowDays = regrowDays < 0 ? 0 : regrowDays;
             Availability01 = EnvironmentMath.Clamp01(availability01);
             Quality01 = EnvironmentMath.Clamp01(quality01);
+        }
+    }
+
+    // =============================================================================
+    // EnvironmentReachablePlantResourceQueryResult
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Risultato operativo read-only per un job che, partendo da un landmark
+    /// biologico noto, deve scegliere una pianta concreta raggiungibile da cui
+    /// raccogliere un prodotto.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: query operativa senza mutazione</b></para>
+    /// <para>
+    /// Il record puo' contenere un <see cref="EnvironmentPlantId"/> perche' non
+    /// rappresenta una belief remota: e' una risposta locale e job-boundary,
+    /// calcolata tramite <c>World</c>, candidate biosfera autorizzate e pathfinding.
+    /// Non raccoglie risorse, non prenota piante e non scrive nel mondo.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Input normalizzati</b>: NPC, landmark, area e prodotto richiesto.</item>
+    ///   <item><b>Target biologico</b>: pianta concreta e cella della pianta.</item>
+    ///   <item><b>Target operativo</b>: cella adiacente realmente raggiungibile.</item>
+    ///   <item><b>Risorsa</b>: quantita', qualita', tool e regole raccolta.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct EnvironmentReachablePlantResourceQueryResult
+    {
+        public readonly bool IsValid;
+        public readonly string Reason;
+        public readonly int NpcId;
+        public readonly int LandmarkNodeId;
+        public readonly EnvironmentAreaId AreaId;
+        public readonly string ProductKey;
+        public readonly EnvironmentPlantId PlantId;
+        public readonly EnvironmentCellCoord PlantCell;
+        public readonly EnvironmentCellCoord InteractionCell;
+        public readonly int PathLengthCells;
+        public readonly int EstimatedAmountUnits;
+        public readonly float Quality01;
+        public readonly bool IsFood;
+        public readonly bool DestroysPlantOnHarvest;
+        public readonly string RequiresToolKey;
+        public readonly int RegrowDays;
+
+        public bool HasReachablePlant => IsValid && PlantId.IsValid;
+
+        // =============================================================================
+        // EnvironmentReachablePlantResourceQueryResult
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il risultato normalizzando campi numerici e stringhe
+        /// diagnostiche. I risultati negativi mantengono gli input principali per
+        /// facilitare log e test senza rieseguire la query.
+        /// </para>
+        /// </summary>
+        public EnvironmentReachablePlantResourceQueryResult(
+            bool isValid,
+            string reason,
+            int npcId,
+            int landmarkNodeId,
+            EnvironmentAreaId areaId,
+            string productKey,
+            EnvironmentPlantId plantId = default,
+            EnvironmentCellCoord plantCell = default,
+            EnvironmentCellCoord interactionCell = default,
+            int pathLengthCells = 0,
+            int estimatedAmountUnits = 0,
+            float quality01 = 0f,
+            bool isFood = false,
+            bool destroysPlantOnHarvest = false,
+            string requiresToolKey = "",
+            int regrowDays = 0)
+        {
+            IsValid = isValid && plantId.IsValid;
+            Reason = string.IsNullOrWhiteSpace(reason)
+                ? (IsValid ? "Ok" : "Invalid")
+                : reason;
+            NpcId = npcId < 0 ? 0 : npcId;
+            LandmarkNodeId = landmarkNodeId < 0 ? 0 : landmarkNodeId;
+            AreaId = areaId;
+            ProductKey = productKey ?? string.Empty;
+            PlantId = plantId;
+            PlantCell = plantCell;
+            InteractionCell = interactionCell;
+            PathLengthCells = pathLengthCells < 0 ? 0 : pathLengthCells;
+            EstimatedAmountUnits = estimatedAmountUnits < 0 ? 0 : estimatedAmountUnits;
+            Quality01 = EnvironmentMath.Clamp01(quality01);
+            IsFood = isFood;
+            DestroysPlantOnHarvest = destroysPlantOnHarvest;
+            RequiresToolKey = requiresToolKey ?? string.Empty;
+            RegrowDays = regrowDays < 0 ? 0 : regrowDays;
         }
     }
 
@@ -780,6 +879,7 @@ namespace Arcontio.Core.Environment
 
                 candidates.Add(new EnvironmentConsumerResourceCandidate(
                     plant.PlantId,
+                    plant.SourceAreaId,
                     plant.SpeciesKey,
                     plant.Cell,
                     output.ResourceOutputKey,
@@ -827,6 +927,7 @@ namespace Arcontio.Core.Environment
 
                 candidates.Add(new EnvironmentConsumerResourceCandidate(
                     plant.PlantId,
+                    plant.SourceAreaId,
                     plant.SpeciesKey,
                     plant.Cell,
                     output.ResourceOutputKey,
