@@ -553,6 +553,7 @@ namespace Arcontio.Core.Environment
         public float maturity01;
         public bool isHarvestable;
         public int sourceAreaId;
+        public EnvironmentPlantResourceSaveRecord[] resources = new EnvironmentPlantResourceSaveRecord[0];
 
         public static EnvironmentPlantSaveRecord FromSnapshot(
             EnvironmentPlantSnapshot snapshot)
@@ -571,7 +572,8 @@ namespace Arcontio.Core.Environment
                 health01 = snapshot.Health01,
                 maturity01 = snapshot.Maturity01,
                 isHarvestable = snapshot.IsHarvestable,
-                sourceAreaId = snapshot.SourceAreaId.Value
+                sourceAreaId = snapshot.SourceAreaId.Value,
+                resources = EnvironmentPlantResourceSaveRecord.FromResources(snapshot.Resources)
             };
         }
 
@@ -588,7 +590,92 @@ namespace Arcontio.Core.Environment
                 health01,
                 maturity01,
                 isHarvestable,
-                new EnvironmentAreaId(sourceAreaId));
+                new EnvironmentAreaId(sourceAreaId),
+                EnvironmentPlantResourceSaveRecord.ToResources(resources));
+        }
+    }
+
+    // =============================================================================
+    // EnvironmentPlantResourceSaveRecord
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Record serializzabile dello stato reale di un prodotto biologico su una
+    /// singola pianta persistita.
+    /// </para>
+    /// </summary>
+    [Serializable]
+    public sealed class EnvironmentPlantResourceSaveRecord
+    {
+        public string productKey = string.Empty;
+        public int availableAmountUnits;
+        public int maxAmountUnits;
+        public bool isFood;
+        public bool destroysPlantOnHarvest;
+        public string requiresToolKey = string.Empty;
+        public string minGrowthStageKey = string.Empty;
+        public int regrowDays;
+        public bool isStageAvailable;
+        public bool isSeasonallyAvailable;
+
+        public static EnvironmentPlantResourceSaveRecord FromResource(
+            EnvironmentPlantResourceState resource)
+        {
+            return new EnvironmentPlantResourceSaveRecord
+            {
+                productKey = resource.ProductKey,
+                availableAmountUnits = resource.AvailableAmountUnits,
+                maxAmountUnits = resource.MaxAmountUnits,
+                isFood = resource.IsFood,
+                destroysPlantOnHarvest = resource.DestroysPlantOnHarvest,
+                requiresToolKey = resource.RequiresToolKey,
+                minGrowthStageKey = resource.MinGrowthStageKey,
+                regrowDays = resource.RegrowDays,
+                isStageAvailable = resource.IsStageAvailable,
+                isSeasonallyAvailable = resource.IsSeasonallyAvailable
+            };
+        }
+
+        public static EnvironmentPlantResourceSaveRecord[] FromResources(
+            IReadOnlyList<EnvironmentPlantResourceState> resources)
+        {
+            if (resources == null || resources.Count == 0)
+                return new EnvironmentPlantResourceSaveRecord[0];
+
+            var records = new EnvironmentPlantResourceSaveRecord[resources.Count];
+            for (int i = 0; i < resources.Count; i++)
+                records[i] = FromResource(resources[i]);
+
+            return records;
+        }
+
+        public static EnvironmentPlantResourceState[] ToResources(
+            EnvironmentPlantResourceSaveRecord[] records)
+        {
+            if (records == null || records.Length == 0)
+                return new EnvironmentPlantResourceState[0];
+
+            var resources = new List<EnvironmentPlantResourceState>(records.Length);
+            for (int i = 0; i < records.Length; i++)
+            {
+                EnvironmentPlantResourceSaveRecord record = records[i];
+                if (record == null || string.IsNullOrWhiteSpace(record.productKey))
+                    continue;
+
+                resources.Add(new EnvironmentPlantResourceState(
+                    record.productKey,
+                    record.availableAmountUnits,
+                    record.maxAmountUnits,
+                    record.isFood,
+                    record.destroysPlantOnHarvest,
+                    record.requiresToolKey,
+                    record.minGrowthStageKey,
+                    record.regrowDays,
+                    record.isStageAvailable,
+                    record.isSeasonallyAvailable));
+            }
+
+            return resources.Count == 0 ? new EnvironmentPlantResourceState[0] : resources.ToArray();
         }
     }
 

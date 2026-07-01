@@ -2605,7 +2605,7 @@ namespace Arcontio.Core
                     world.ObjectDefs));
 
             world.SetEnvironmentState(bootstrap.Build.State);
-            world.EnvironmentState?.BuildInitialBiologicalOccupancy(world);
+            world.EnvironmentState?.BuildInitialBiologicalOccupancy(world, _environmentPlantCatalog);
             world.ApplyEnvironmentDiffuseVegetationProjections();
             world.ApplyEnvironmentPhysicalPlantProjections();
 

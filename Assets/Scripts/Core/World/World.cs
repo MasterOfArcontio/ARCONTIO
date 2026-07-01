@@ -2023,7 +2023,28 @@ namespace Arcontio.Core
             // relocation senza duplicare occluder.
             RemovePhysicalPlantProjection(delta.PlantId);
 
-            var projection = CreatePhysicalPlantProjectionFromDelta(delta);
+            WorldPhysicalPlantProjection projection;
+            if (EnvironmentState != null
+                && EnvironmentState.TryGetPlantInstance(delta.PlantId, out var plant))
+            {
+                projection = new WorldPhysicalPlantProjection(
+                    delta.PlantId,
+                    delta.AreaId.IsValid ? delta.AreaId : plant.SourceAreaId,
+                    delta.Cell,
+                    string.IsNullOrWhiteSpace(plant.SpeciesKey) ? delta.SpeciesKey : plant.SpeciesKey,
+                    plant.GrowthStageKey,
+                    plant.HealthState,
+                    plant.IsAlive,
+                    blocksMovement: true,
+                    blocksVision: true,
+                    visionCost: 1f,
+                    plant.Resources);
+            }
+            else
+            {
+                projection = CreatePhysicalPlantProjectionFromDelta(delta);
+            }
+
             _physicalPlants[delta.PlantId] = projection;
             ApplyPhysicalPlantProjectionToCache(projection);
             return true;
@@ -9059,7 +9080,8 @@ if (!NpcAction.ContainsKey(id))
                 plant.IsAlive,
                 blocksMovement: true,
                 blocksVision: true,
-                visionCost: 1f);
+                visionCost: 1f,
+                plant.Resources);
             return true;
         }
 

@@ -611,7 +611,8 @@ namespace Arcontio.Core.Environment
                 plant.Health01,
                 plant.Maturity01,
                 plant.IsHarvestable,
-                plant.SourceAreaId);
+                plant.SourceAreaId,
+                plant.Resources);
         }
 
         private static EnvironmentPlantInstance EvolvePlant(
@@ -669,7 +670,9 @@ namespace Arcontio.Core.Environment
                     current.Cell,
                     nextAge,
                     nextHealth,
-                    current.SourceAreaId);
+                    current.SourceAreaId,
+                    climate.Season,
+                    enforceSeason: true);
             }
 
             return new EnvironmentPlantInstance(
@@ -683,7 +686,8 @@ namespace Arcontio.Core.Environment
                 nextHealth,
                 current.Maturity01,
                 current.IsHarvestable,
-                current.SourceAreaId);
+                current.SourceAreaId,
+                current.Resources);
         }
 
         // =============================================================================
@@ -877,7 +881,9 @@ namespace Arcontio.Core.Environment
                     cell,
                     0,
                     initialHealth01,
-                    area.Definition.AreaId);
+                    area.Definition.AreaId,
+                    climate.Season,
+                    enforceSeason: true);
                 return plant.PlantId.IsValid;
             }
 

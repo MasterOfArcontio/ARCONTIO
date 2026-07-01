@@ -462,7 +462,9 @@ namespace Arcontio.Core.Environment
         /// trasformarle in occupazione fisica minima.
         /// </para>
         /// </summary>
-        public int BuildInitialBiologicalOccupancy(World world)
+        public int BuildInitialBiologicalOccupancy(
+            World world,
+            EnvironmentPlantCatalog plantCatalog = null)
         {
             _vegetationCellPlacements.Clear();
             _physicalPlantPlacements.Clear();
@@ -492,7 +494,7 @@ namespace Arcontio.Core.Environment
                 RemoveCells(freeCells, globalPlantUsedCells);
                 SelectBiologicalAnchorCells(area, freeCells, anchorCells, globalPlantUsedCells);
                 AddCellsIfMissing(globalAnchorCells, anchorCells);
-                BuildPhysicalPlantCells(area, physicalPlantCells, globalAnchorCells, globalPlantUsedCells);
+                BuildPhysicalPlantCells(area, physicalPlantCells, globalAnchorCells, globalPlantUsedCells, plantCatalog);
                 BuildVegetationCells(area, freeCells, globalVegetationUsedCells, globalPlantUsedCells);
             }
 
@@ -873,7 +875,8 @@ namespace Arcontio.Core.Environment
             EnvironmentAreaDefinition area,
             List<EnvironmentCellCoord> freeCells,
             List<EnvironmentCellCoord> anchorCells,
-            List<EnvironmentCellCoord> usedPlantCells)
+            List<EnvironmentCellCoord> usedPlantCells,
+            EnvironmentPlantCatalog plantCatalog)
         {
             if (!_seedBankAreas.TryGetValue(area.AreaId, out EnvironmentSeedBankAreaState seedBank)
                 || seedBank.Entries == null
@@ -906,17 +909,12 @@ namespace Arcontio.Core.Environment
                         entry,
                         plantId,
                         cell);
-                    var plant = new EnvironmentPlantInstance(
+                    EnvironmentPlantInstance plant = CreateInitialPhysicalPlantInstance(
+                        plantCatalog,
                         plantId,
                         entry.SpeciesKey,
                         cell,
-                        0,
-                        EnvironmentPlantGrowthStage.Seedling,
-                        ResolveInitialPhysicalPlantGrowthStageKey(entry.SpeciesKey),
-                        EnvironmentPlantHealthState.Healthy,
                         initialHealth01,
-                        0f,
-                        false,
                         area.AreaId);
 
                     _plantInstances[plantId] = plant;
@@ -929,6 +927,43 @@ namespace Arcontio.Core.Environment
                     createdInArea++;
                 }
             }
+        }
+
+        private EnvironmentPlantInstance CreateInitialPhysicalPlantInstance(
+            EnvironmentPlantCatalog plantCatalog,
+            EnvironmentPlantId plantId,
+            string speciesKey,
+            EnvironmentCellCoord cell,
+            float initialHealth01,
+            EnvironmentAreaId areaId)
+        {
+            EnvironmentSeasonKind season = Calendar.Date.Season;
+            if (plantCatalog != null
+                && plantCatalog.TryGetSpecies(speciesKey, out EnvironmentPlantSpeciesDefinition species))
+            {
+                return EnvironmentPlantInstance.CreateFromSpecies(
+                    plantId,
+                    species,
+                    cell,
+                    0,
+                    initialHealth01,
+                    areaId,
+                    season,
+                    enforceSeason: true);
+            }
+
+            return new EnvironmentPlantInstance(
+                plantId,
+                speciesKey,
+                cell,
+                0,
+                EnvironmentPlantGrowthStage.Seedling,
+                ResolveInitialPhysicalPlantGrowthStageKey(speciesKey),
+                EnvironmentPlantHealthState.Healthy,
+                initialHealth01,
+                0f,
+                false,
+                areaId);
         }
 
         // =============================================================================

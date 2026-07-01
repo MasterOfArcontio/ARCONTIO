@@ -625,29 +625,11 @@ namespace Arcontio.Core.Environment
                 if (!IsInsideRadius(center, plant.Cell, safeRadius))
                     continue;
 
-                if (!EnvironmentAgricultureFoundationResolver.TryBuildHarvestOutput(
+                AddAvailableResourceCandidates(
+                    candidates,
                     plant,
                     catalog,
-                    snapshot.Calendar.Season,
-                    out EnvironmentHarvestOutput output))
-                {
-                    continue;
-                }
-
-                candidates.Add(new EnvironmentConsumerResourceCandidate(
-                    plant.PlantId,
-                    plant.SpeciesKey,
-                    plant.Cell,
-                    output.ResourceOutputKey,
-                    output.Amount01,
-                    output.Quality01,
-                    output.IsFood,
-                    output.DestroysPlantOnHarvest,
-                    output.RequiresToolKey,
-                    output.MinGrowthStageKey,
-                    output.BaseMaxAmountUnits,
-                    output.EstimatedAmountUnits,
-                    output.RegrowDays));
+                    snapshot.Calendar.Season);
             }
 
             return candidates.Count == 0 ? EmptyCandidates : candidates.ToArray();
@@ -714,6 +696,51 @@ namespace Arcontio.Core.Environment
             }
 
             return candidates.Count == 0 ? EmptyCandidates : candidates.ToArray();
+        }
+
+        private static void AddAvailableResourceCandidates(
+            List<EnvironmentConsumerResourceCandidate> candidates,
+            EnvironmentPlantSnapshot plant,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentSeasonKind season)
+        {
+            if (candidates == null
+                || catalog == null
+                || !plant.IsAlive
+                || !plant.IsHarvestable
+                || !catalog.TryGetSpecies(plant.SpeciesKey, out EnvironmentPlantSpeciesDefinition species))
+            {
+                return;
+            }
+
+            for (int productIndex = 0; productIndex < species.Products.Count; productIndex++)
+            {
+                EnvironmentPlantProductDefinition product = species.Products[productIndex];
+                if (!EnvironmentAgricultureFoundationResolver.TryBuildHarvestOutputForProduct(
+                        plant,
+                        catalog,
+                        product.ProductKey,
+                        season,
+                        out EnvironmentHarvestOutput output))
+                {
+                    continue;
+                }
+
+                candidates.Add(new EnvironmentConsumerResourceCandidate(
+                    plant.PlantId,
+                    plant.SpeciesKey,
+                    plant.Cell,
+                    output.ResourceOutputKey,
+                    output.Amount01,
+                    output.Quality01,
+                    output.IsFood,
+                    output.DestroysPlantOnHarvest,
+                    output.RequiresToolKey,
+                    output.MinGrowthStageKey,
+                    output.BaseMaxAmountUnits,
+                    output.EstimatedAmountUnits,
+                    output.RegrowDays));
+            }
         }
 
         // =============================================================================

@@ -33,6 +33,9 @@ namespace Arcontio.Core
     /// </summary>
     public readonly struct WorldPhysicalPlantProjection
     {
+        private static readonly EnvironmentPlantResourceState[] EmptyResources =
+            new EnvironmentPlantResourceState[0];
+
         public readonly EnvironmentPlantId PlantId;
         public readonly EnvironmentAreaId AreaId;
         public readonly EnvironmentCellCoord Cell;
@@ -43,6 +46,7 @@ namespace Arcontio.Core
         public readonly bool BlocksMovement;
         public readonly bool BlocksVision;
         public readonly float VisionCost;
+        public readonly EnvironmentPlantResourceState[] Resources;
 
         public WorldPhysicalPlantProjection(
             EnvironmentPlantId plantId,
@@ -54,7 +58,8 @@ namespace Arcontio.Core
             bool isAlive,
             bool blocksMovement,
             bool blocksVision,
-            float visionCost)
+            float visionCost,
+            System.Collections.Generic.IReadOnlyList<EnvironmentPlantResourceState> resources = null)
         {
             PlantId = plantId;
             AreaId = areaId;
@@ -70,6 +75,20 @@ namespace Arcontio.Core
             BlocksMovement = blocksMovement;
             BlocksVision = blocksVision;
             VisionCost = visionCost <= 0f ? 1f : visionCost;
+            Resources = CopyResources(resources);
+        }
+
+        private static EnvironmentPlantResourceState[] CopyResources(
+            System.Collections.Generic.IReadOnlyList<EnvironmentPlantResourceState> resources)
+        {
+            if (resources == null || resources.Count == 0)
+                return EmptyResources;
+
+            var copy = new EnvironmentPlantResourceState[resources.Count];
+            for (int i = 0; i < resources.Count; i++)
+                copy[i] = resources[i];
+
+            return copy;
         }
     }
 }

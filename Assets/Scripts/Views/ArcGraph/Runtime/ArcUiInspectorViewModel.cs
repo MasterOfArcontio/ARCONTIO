@@ -56,6 +56,79 @@ namespace Arcontio.View.ArcGraph
     }
 
     // =============================================================================
+    // ArcUiPlantProductViewSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot ArcGraph read-only di un prodotto biologico mostrabile
+    /// nell'inspector di una pianta fisica.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: contratto UI separato dal dominio biologico</b></para>
+    /// <para>
+    /// La view non riceve <c>EnvironmentPlantInstance</c>, cataloghi o riferimenti al
+    /// <c>World</c>. Questo DTO contiene solo testo, numeri e flag gia' autorizzati
+    /// dal provider runtime, abbastanza per costruire righe ArcGraph coerenti.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>ProductKey</b>: chiave prodotto normalizzata.</item>
+    ///   <item><b>Available/Max</b>: quantita' reale corrente e massima.</item>
+    ///   <item><b>Availability01</b>: riempimento barra normalizzato.</item>
+    ///   <item><b>Flags</b>: food, tool, distruzione pianta e ricrescita.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct ArcUiPlantProductViewSnapshot
+    {
+        public readonly string ProductKey;
+        public readonly int AvailableAmountUnits;
+        public readonly int MaxAmountUnits;
+        public readonly float Availability01;
+        public readonly bool IsFood;
+        public readonly bool DestroysPlantOnHarvest;
+        public readonly string RequiresToolKey;
+        public readonly int RegrowDays;
+        public readonly bool IsStageAvailable;
+        public readonly bool IsSeasonallyAvailable;
+
+        public bool IsDefined => !string.IsNullOrWhiteSpace(ProductKey);
+        public bool IsAvailable => IsDefined && AvailableAmountUnits > 0;
+
+        public ArcUiPlantProductViewSnapshot(
+            string productKey,
+            int availableAmountUnits,
+            int maxAmountUnits,
+            float availability01,
+            bool isFood,
+            bool destroysPlantOnHarvest,
+            string requiresToolKey,
+            int regrowDays,
+            bool isStageAvailable,
+            bool isSeasonallyAvailable)
+        {
+            ProductKey = string.IsNullOrWhiteSpace(productKey) ? string.Empty : productKey.Trim();
+            AvailableAmountUnits = availableAmountUnits < 0 ? 0 : availableAmountUnits;
+            MaxAmountUnits = maxAmountUnits < 0 ? 0 : maxAmountUnits;
+            Availability01 = Clamp01(availability01);
+            IsFood = isFood;
+            DestroysPlantOnHarvest = destroysPlantOnHarvest;
+            RequiresToolKey = requiresToolKey ?? string.Empty;
+            RegrowDays = regrowDays < 0 ? 0 : regrowDays;
+            IsStageAvailable = isStageAvailable;
+            IsSeasonallyAvailable = isSeasonallyAvailable;
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value <= 0f)
+                return 0f;
+
+            return value >= 1f ? 1f : value;
+        }
+    }
+
+    // =============================================================================
     // ArcUiInspectorMetric
     // =============================================================================
     /// <summary>

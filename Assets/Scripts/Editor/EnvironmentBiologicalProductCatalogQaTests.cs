@@ -1,7 +1,10 @@
 using System.Collections.Generic;
 using Arcontio.Core;
+using Arcontio.Core.Config;
 using Arcontio.Core.Environment;
+using Arcontio.View.ArcGraph;
 using NUnit.Framework;
+using UnityEngine;
 
 namespace Arcontio.EditorTests
 {
@@ -192,6 +195,166 @@ namespace Arcontio.EditorTests
             Assert.That(wood[0].RequiresToolKey, Is.EqualTo("axe"));
         }
 
+        // =============================================================================
+        // PlantResourceStateTracksRealAmountsAndSeason
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Una pianta concreta possiede stato risorse per-prodotto: il legno della
+        /// quercia adulta e' disponibile in primavera, mentre la ghianda resta
+        /// prodotto possibile ma non disponibile fuori stagione.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void PlantResourceStateTracksRealAmountsAndSeason()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            Assert.That(plantCatalog.TryGetSpecies("oak_tree", out EnvironmentPlantSpeciesDefinition oak), Is.True);
+
+            EnvironmentPlantInstance plant = EnvironmentPlantInstance.CreateFromSpecies(
+                new EnvironmentPlantId(2000),
+                oak,
+                new EnvironmentCellCoord(4, 4),
+                300,
+                0.9f,
+                new EnvironmentAreaId(10),
+                EnvironmentSeasonKind.Spring,
+                enforceSeason: true);
+
+            Assert.That(EnvironmentPlantResourceStateResolver.TryFindResource(plant.Resources, "wood_log", out var wood), Is.True);
+            Assert.That(wood.AvailableAmountUnits, Is.EqualTo(8));
+            Assert.That(wood.MaxAmountUnits, Is.EqualTo(8));
+            Assert.That(wood.IsAvailable, Is.True);
+
+            Assert.That(EnvironmentPlantResourceStateResolver.TryFindResource(plant.Resources, "acorn", out var acorn), Is.True);
+            Assert.That(acorn.AvailableAmountUnits, Is.EqualTo(0));
+            Assert.That(acorn.MaxAmountUnits, Is.EqualTo(4));
+            Assert.That(acorn.IsSeasonallyAvailable, Is.False);
+            Assert.That(acorn.IsAvailable, Is.False);
+        }
+
+        // =============================================================================
+        // HarvestQueriesUseRealPlantResourceAmounts
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Le query harvestable usano la quantita' reale nello stato pianta: una
+        /// risorsa possibile ma a zero non diventa candidata raccoglibile.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void HarvestQueriesUseRealPlantResourceAmounts()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            Assert.That(plantCatalog.TryGetSpecies("oak_tree", out EnvironmentPlantSpeciesDefinition oak), Is.True);
+
+            var state = new EnvironmentState();
+            state.SetPlantInstance(EnvironmentPlantInstance.CreateFromSpecies(
+                new EnvironmentPlantId(2001),
+                oak,
+                new EnvironmentCellCoord(5, 5),
+                300,
+                0.9f,
+                new EnvironmentAreaId(10),
+                EnvironmentSeasonKind.Spring,
+                enforceSeason: true));
+
+            EnvironmentFullSnapshot snapshot =
+                EnvironmentReadOnlySnapshotResolver.BuildFullSnapshot(state.CreateSnapshot());
+            IReadOnlyList<EnvironmentConsumerResourceCandidate> wood =
+                EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                    snapshot,
+                    plantCatalog,
+                    new EnvironmentCellCoord(5, 5),
+                    1,
+                    "wood_log");
+            IReadOnlyList<EnvironmentConsumerResourceCandidate> acorns =
+                EnvironmentConsumerQueryResolver.QueryHarvestableResourcesForProduct(
+                    snapshot,
+                    plantCatalog,
+                    new EnvironmentCellCoord(5, 5),
+                    1,
+                    "acorn");
+
+            Assert.That(wood.Count, Is.EqualTo(1));
+            Assert.That(wood[0].EstimatedAmountUnits, Is.EqualTo(8));
+            Assert.That(acorns.Count, Is.EqualTo(0));
+        }
+
+        // =============================================================================
+        // PlantInspectorShowsProductsFromArcGraphContract
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// L'inspector pianta riceve i prodotti tramite proiezione World e ViewModel
+        /// ArcGraph, senza accedere direttamente allo stato interno della Biosfera.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void PlantInspectorShowsProductsFromArcGraphContract()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            Assert.That(plantCatalog.TryGetSpecies("oak_tree", out EnvironmentPlantSpeciesDefinition oak), Is.True);
+
+            World world = MakeWorldWithNaturalSurface();
+            var areaId = new EnvironmentAreaId(10);
+            var plantId = new EnvironmentPlantId(2002);
+            var cell = new EnvironmentCellCoord(3, 3);
+            var state = new EnvironmentState();
+            state.SetAreaDefinition(new EnvironmentAreaDefinition(
+                areaId,
+                EnvironmentAreaKind.Vegetation,
+                new EnvironmentAreaBounds(0, 0, 8, 8),
+                1,
+                true,
+                "qa_area"));
+            state.SetPlantInstance(EnvironmentPlantInstance.CreateFromSpecies(
+                plantId,
+                oak,
+                cell,
+                300,
+                0.9f,
+                areaId,
+                EnvironmentSeasonKind.Spring,
+                enforceSeason: true));
+            state.ReplaceBiologicalPlacementsForSaveLoad(
+                new EnvironmentVegetationCellPlacement[0],
+                new[]
+                {
+                    new EnvironmentPhysicalPlantPlacement(
+                        plantId,
+                        areaId,
+                        cell,
+                        "oak_tree")
+                });
+            world.SetEnvironmentState(state);
+            Assert.That(world.ApplyEnvironmentPhysicalPlantProjections(), Is.EqualTo(1));
+
+            var providerObject = new GameObject("ArcGraphPlantInspectorQaProvider");
+            try
+            {
+                var contextProvider = providerObject.AddComponent<TestRuntimeContextProvider>();
+                contextProvider.World = world;
+                var provider = new ArcUiInspectorRuntimeSnapshotProvider();
+                provider.SetRuntimeContextProvider(contextProvider);
+                var target = new ArcUiSelectionTarget(
+                    ArcUiSelectionTargetKind.Plant,
+                    plantId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    new ArcGraphCellCoord(cell.X, cell.Y, cell.Z),
+                    "Pianta QA",
+                    "qa");
+
+                Assert.That(provider.TryBuildPlantViewModel(target, out ArcUiInspectorViewModel viewModel), Is.True);
+                Assert.That(HasTab(viewModel, "products"), Is.True);
+                Assert.That(ContainsRowValue(viewModel, "wood_log"), Is.True);
+                Assert.That(ContainsRowValue(viewModel, "8/8"), Is.True);
+            }
+            finally
+            {
+                Object.DestroyImmediate(providerObject);
+            }
+        }
+
         private static EnvironmentPlantCatalogConfig MakePlantCatalogConfig()
         {
             return new EnvironmentPlantCatalogConfig
@@ -356,6 +519,80 @@ namespace Arcontio.EditorTests
                 DisplayName = id,
                 Properties = properties
             };
+        }
+
+        private static World MakeWorldWithNaturalSurface()
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            world.InitMap(8, 8);
+            world.SurfaceDefs["grass"] = new CellSurfaceDef
+            {
+                Id = "grass",
+                DisplayName = "grass",
+                MacroSurface = "Natural",
+                CanHostNaturalVegetation = true,
+                CanHostPhysicalPlant = true
+            };
+
+            for (int y = 0; y < 8; y++)
+            {
+                for (int x = 0; x < 8; x++)
+                {
+                    Assert.That(world.CellSurfaces.SetSurface(x, y, CellSurfaceMacro.Natural, "grass"), Is.True);
+                }
+            }
+
+            return world;
+        }
+
+        private static bool HasTab(ArcUiInspectorViewModel viewModel, string tabKey)
+        {
+            for (int i = 0; i < viewModel.Tabs.Length; i++)
+            {
+                if (viewModel.Tabs[i].TabKey == tabKey)
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool ContainsRowValue(ArcUiInspectorViewModel viewModel, string value)
+        {
+            for (int tabIndex = 0; tabIndex < viewModel.Tabs.Length; tabIndex++)
+            {
+                if (ContainsRowValue(viewModel.Tabs[tabIndex].Rows, value))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool ContainsRowValue(ArcUiInspectorRow[] rows, string value)
+        {
+            if (rows == null)
+                return false;
+
+            for (int i = 0; i < rows.Length; i++)
+            {
+                ArcUiInspectorRow row = rows[i];
+                if (row.Label == value || row.Value == value || row.SecondaryValue == value)
+                    return true;
+
+                if (ContainsRowValue(row.Details, value))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private sealed class TestRuntimeContextProvider : ArcGraphRuntimeContextProvider
+        {
+            public World World;
+
+            public override ArcGraphRuntimeContext BuildTerrainRuntimeContext()
+            {
+                return new ArcGraphRuntimeContext(World);
+            }
         }
 
         private static bool ContainsIssue(

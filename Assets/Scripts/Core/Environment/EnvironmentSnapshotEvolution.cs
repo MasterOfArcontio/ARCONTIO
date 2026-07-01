@@ -225,7 +225,8 @@ namespace Arcontio.Core.Environment
                         plant.Health01,
                         plant.Maturity01,
                         plant.IsHarvestable,
-                        plant.SourceAreaId));
+                        plant.SourceAreaId,
+                        plant.Resources));
                 }
             }
 

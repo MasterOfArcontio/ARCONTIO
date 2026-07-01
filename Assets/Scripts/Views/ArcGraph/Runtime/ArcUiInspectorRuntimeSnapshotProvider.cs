@@ -327,6 +327,7 @@ namespace Arcontio.View.ArcGraph
             var tabs = new[]
             {
                 new ArcUiInspectorTab(InfoTabKey, "Info", BuildPlantInfoRows(target, plant)),
+                new ArcUiInspectorTab("products", "Prodotti", BuildPlantProductRows(plant)),
                 new ArcUiInspectorTab("physical", "Fisica", BuildPlantPhysicalRows(plant)),
                 new ArcUiInspectorTab("boundary", "Boundary", BuildPlantBoundaryRows(target, plant))
             };
@@ -1417,6 +1418,118 @@ namespace Arcontio.View.ArcGraph
                 new ArcUiInspectorRow("Owner spazio/fisica", "World projection"),
                 new ArcUiInspectorRow("Mutazione UI", "Non consentita")
             };
+        }
+
+        // =============================================================================
+        // BuildPlantProductRows
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Prepara le righe read-only dei prodotti biologici reali della pianta.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: ArcGraph consuma contratti, non Biosfera</b></para>
+        /// <para>
+        /// Il metodo riceve solo la proiezione autorizzata del World e la trasforma
+        /// in DTO UI locali. Non consulta cataloghi, non legge EnvironmentState e non
+        /// espone comandi di raccolta.
+        /// </para>
+        /// </summary>
+        private static ArcUiInspectorRow[] BuildPlantProductRows(
+            WorldPhysicalPlantProjection plant)
+        {
+            var products = BuildPlantProductSnapshots(plant);
+            var rows = new List<ArcUiInspectorRow>(products.Length + 3)
+            {
+                ArcUiInspectorRow.Section("Prodotti biologici")
+            };
+
+            if (products.Length == 0)
+            {
+                rows.Add(new ArcUiInspectorRow("Stato", "Nessun prodotto definito"));
+                rows.Add(new ArcUiInspectorRow("Raccolta", "Fuori scope v0.71.05.D"));
+                return rows.ToArray();
+            }
+
+            int availableCount = 0;
+            for (int i = 0; i < products.Length; i++)
+            {
+                if (products[i].IsAvailable)
+                    availableCount++;
+            }
+
+            rows.Add(new ArcUiInspectorRow(
+                "Disponibili ora",
+                availableCount.ToString(CultureInfo.InvariantCulture)
+                + "/"
+                + products.Length.ToString(CultureInfo.InvariantCulture)));
+
+            for (int i = 0; i < products.Length; i++)
+                rows.Add(BuildPlantProductRow(products[i], i));
+
+            rows.Add(new ArcUiInspectorRow("Mutazione UI", "Non consentita"));
+            return rows.ToArray();
+        }
+
+        private static ArcUiPlantProductViewSnapshot[] BuildPlantProductSnapshots(
+            WorldPhysicalPlantProjection plant)
+        {
+            if (plant.Resources == null || plant.Resources.Length == 0)
+                return Array.Empty<ArcUiPlantProductViewSnapshot>();
+
+            var products = new ArcUiPlantProductViewSnapshot[plant.Resources.Length];
+            for (int i = 0; i < plant.Resources.Length; i++)
+            {
+                EnvironmentPlantResourceState resource = plant.Resources[i];
+                products[i] = new ArcUiPlantProductViewSnapshot(
+                    resource.ProductKey,
+                    resource.AvailableAmountUnits,
+                    resource.MaxAmountUnits,
+                    resource.Availability01,
+                    resource.IsFood,
+                    resource.DestroysPlantOnHarvest,
+                    resource.RequiresToolKey,
+                    resource.RegrowDays,
+                    resource.IsStageAvailable,
+                    resource.IsSeasonallyAvailable);
+            }
+
+            return products;
+        }
+
+        private static ArcUiInspectorRow BuildPlantProductRow(
+            ArcUiPlantProductViewSnapshot product,
+            int index)
+        {
+            string rowKey = "plant_product_" + index.ToString(CultureInfo.InvariantCulture) + "_" + product.ProductKey;
+            string amount = product.AvailableAmountUnits.ToString(CultureInfo.InvariantCulture)
+                            + "/"
+                            + product.MaxAmountUnits.ToString(CultureInfo.InvariantCulture);
+            string state = product.IsAvailable ? "Disponibile" : "Non disponibile";
+            var details = new[]
+            {
+                ArcUiInspectorRow.Bar(
+                    rowKey + "_amount",
+                    "Quantita'",
+                    amount,
+                    product.Availability01,
+                    product.IsAvailable ? ArcUiInspectorSeverity.Good : ArcUiInspectorSeverity.Muted),
+                new ArcUiInspectorRow("Food", BoolText(product.IsFood)),
+                new ArcUiInspectorRow("Tool", string.IsNullOrWhiteSpace(product.RequiresToolKey) ? EmptyValue : product.RequiresToolKey),
+                new ArcUiInspectorRow("Distrugge pianta", BoolText(product.DestroysPlantOnHarvest)),
+                new ArcUiInspectorRow("Ricrescita giorni", product.RegrowDays.ToString(CultureInfo.InvariantCulture)),
+                new ArcUiInspectorRow("Stadio valido", BoolText(product.IsStageAvailable)),
+                new ArcUiInspectorRow("Stagione valida", BoolText(product.IsSeasonallyAvailable))
+            };
+
+            return ArcUiInspectorRow.Expandable(
+                rowKey,
+                ReadString(product.ProductKey, EmptyValue),
+                amount,
+                state,
+                product.IsAvailable ? ArcUiInspectorSeverity.Good : ArcUiInspectorSeverity.Muted,
+                product.IsAvailable,
+                details);
         }
 
         // =============================================================================

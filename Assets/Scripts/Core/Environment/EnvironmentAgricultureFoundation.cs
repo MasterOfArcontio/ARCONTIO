@@ -440,19 +440,27 @@ namespace Arcontio.Core.Environment
                 || catalog == null
                 || !catalog.TryGetSpecies(
                     plant.SpeciesKey,
-                    out EnvironmentPlantSpeciesDefinition species)
-                || !TryResolvePrimaryProduct(species, out EnvironmentPlantProductDefinition product))
+                    out EnvironmentPlantSpeciesDefinition species))
             {
                 return false;
             }
 
-            return TryBuildHarvestOutputFromProduct(
-                plant,
-                species,
-                product,
-                season,
-                enforceSeason,
-                out output);
+            for (int i = 0; i < species.Products.Count; i++)
+            {
+                EnvironmentPlantProductDefinition product = species.Products[i];
+                if (TryBuildHarvestOutputFromProduct(
+                        plant,
+                        species,
+                        product,
+                        season,
+                        enforceSeason,
+                        out output))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // =============================================================================
@@ -548,25 +556,59 @@ namespace Arcontio.Core.Environment
                 return false;
 
             bool seasonAvailable = !enforceSeason || product.IsSeasonAvailable(season);
-            float amount = plant.Maturity01 * plant.Health01;
+            EnvironmentPlantResourceState resource = ResolveResourceState(
+                plant,
+                product,
+                species,
+                season,
+                enforceSeason);
+            float amount = resource.Availability01;
             float quality = (plant.Maturity01 + plant.Health01) * 0.5f;
-            int estimatedUnits = ResolveEstimatedAmountUnits(product.BaseMaxAmountUnits, amount);
             output = new EnvironmentHarvestOutput(
                 plant.PlantId,
                 plant.SpeciesKey,
                 product.ProductKey,
                 amount,
                 quality,
-                true,
+                resource.IsAvailable,
                 product.IsFood,
                 product.DestroysPlantOnHarvest,
                 product.RequiresToolKey,
                 product.MinGrowthStageKey,
-                product.BaseMaxAmountUnits,
-                estimatedUnits,
+                resource.MaxAmountUnits,
+                resource.AvailableAmountUnits,
                 product.RegrowDays,
-                seasonAvailable);
+                resource.IsSeasonallyAvailable && seasonAvailable);
             return output.IsAvailable;
+        }
+
+        private static EnvironmentPlantResourceState ResolveResourceState(
+            EnvironmentPlantSnapshot plant,
+            EnvironmentPlantProductDefinition product,
+            EnvironmentPlantSpeciesDefinition species,
+            EnvironmentSeasonKind season,
+            bool enforceSeason)
+        {
+            if (EnvironmentPlantResourceStateResolver.TryFindResource(
+                    plant,
+                    product.ProductKey,
+                    out EnvironmentPlantResourceState resource))
+            {
+                return resource;
+            }
+
+            var resources = EnvironmentPlantResourceStateResolver.BuildInitialResourceStates(
+                species,
+                plant.GrowthStageKey,
+                season,
+                enforceSeason,
+                plant.Health01);
+            return EnvironmentPlantResourceStateResolver.TryFindResource(
+                resources,
+                product.ProductKey,
+                out resource)
+                ? resource
+                : default;
         }
 
         private static int ResolveEstimatedAmountUnits(
