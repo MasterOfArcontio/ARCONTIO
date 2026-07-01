@@ -17605,7 +17605,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.C8.15 | Consolidamento finale C8: contratti job food, overlay UGUI e legacy passivo verificati | ✅ |
 | v0.71.05.D | Stato reale risorse per singola pianta + Inspector ArcGraph read-only | ✅ |
 | v0.71.05.E | Ricrescita progressiva risorse biologiche nel tempo | ✅ |
-| v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ⏳ |
+| v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ✅ |
 | v0.71.05.G | Query operativa job: pianta piu' vicina che fornisce risorsa X | ⏳ |
 | v0.71.05.H | Landmark provider centralizzato per moduli | ⏳ |
 | v0.71.05.I | Landmark di supporto in spazi aperti privi di landmark | ⏳ |

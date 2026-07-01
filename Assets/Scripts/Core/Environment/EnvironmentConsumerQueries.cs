@@ -283,6 +283,105 @@ namespace Arcontio.Core.Environment
     }
 
     // =============================================================================
+    // EnvironmentKnownAreaResourceQueryResult
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Risultato compatto della query "area/landmark biologico noto -> prodotto".
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: landmark navigabile, area descrittiva</b></para>
+    /// <para>
+    /// Il risultato distingue il centro geometrico dell'area dal landmark conosciuto:
+    /// il centro resta metadato diagnostico, mentre solo un landmark valido puo'
+    /// diventare ancora navigabile per un NPC. La query non restituisce piante
+    /// concrete e non scrive belief.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Area</b>: identificativo, chiave, centro tecnico e raggio.</item>
+    ///   <item><b>Landmark</b>: nodo biologico noto, quando la query nasce da LM.</item>
+    ///   <item><b>Product</b>: prodotto cercato e contratto potenziale.</item>
+    ///   <item><b>Evidence</b>: score e conteggi aggregati, mai PlantId puntuali.</item>
+    /// </list>
+    /// </summary>
+    public readonly struct EnvironmentKnownAreaResourceQueryResult
+    {
+        public readonly bool IsValidAreaReference;
+        public readonly EnvironmentAreaId AreaId;
+        public readonly string AreaKey;
+        public readonly EnvironmentCellCoord AreaCenterCell;
+        public readonly int RadiusCells;
+        public readonly int LandmarkNodeId;
+        public readonly string ProductKey;
+        public readonly bool CanPotentiallyProvide;
+        public readonly bool IsFood;
+        public readonly bool DestroysPlantOnHarvest;
+        public readonly string RequiresToolKey;
+        public readonly string MinGrowthStageKey;
+        public readonly int AvailableSeasonMask;
+        public readonly int BaseMaxAmountUnits;
+        public readonly int RegrowDays;
+        public readonly float PotentialScore01;
+        public readonly int LivePlantCount;
+        public readonly int HarvestablePlantCount;
+
+        public bool CanUseAsNavigationAnchor =>
+            LandmarkNodeId > 0 && IsValidAreaReference;
+
+        // =============================================================================
+        // EnvironmentKnownAreaResourceQueryResult
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce il risultato normalizzando score, conteggi e stringhe.
+        /// </para>
+        /// </summary>
+        public EnvironmentKnownAreaResourceQueryResult(
+            bool isValidAreaReference,
+            EnvironmentAreaId areaId,
+            string areaKey,
+            EnvironmentCellCoord areaCenterCell,
+            int radiusCells,
+            int landmarkNodeId,
+            string productKey,
+            bool canPotentiallyProvide,
+            bool isFood,
+            bool destroysPlantOnHarvest,
+            string requiresToolKey,
+            string minGrowthStageKey,
+            int availableSeasonMask,
+            int baseMaxAmountUnits,
+            int regrowDays,
+            float potentialScore01,
+            int livePlantCount,
+            int harvestablePlantCount)
+        {
+            IsValidAreaReference = isValidAreaReference && areaId.IsValid;
+            AreaId = areaId;
+            AreaKey = areaKey ?? string.Empty;
+            AreaCenterCell = areaCenterCell;
+            RadiusCells = radiusCells < 0 ? 0 : radiusCells;
+            LandmarkNodeId = landmarkNodeId < 0 ? 0 : landmarkNodeId;
+            ProductKey = productKey ?? string.Empty;
+            CanPotentiallyProvide = IsValidAreaReference
+                                    && canPotentiallyProvide
+                                    && !string.IsNullOrWhiteSpace(ProductKey);
+            IsFood = isFood;
+            DestroysPlantOnHarvest = destroysPlantOnHarvest;
+            RequiresToolKey = requiresToolKey ?? string.Empty;
+            MinGrowthStageKey = minGrowthStageKey ?? string.Empty;
+            AvailableSeasonMask = availableSeasonMask;
+            BaseMaxAmountUnits = baseMaxAmountUnits < 0 ? 0 : baseMaxAmountUnits;
+            RegrowDays = regrowDays < 0 ? 0 : regrowDays;
+            PotentialScore01 = EnvironmentMath.Clamp01(potentialScore01);
+            LivePlantCount = livePlantCount < 0 ? 0 : livePlantCount;
+            HarvestablePlantCount = harvestablePlantCount < 0 ? 0 : harvestablePlantCount;
+        }
+    }
+
+    // =============================================================================
     // EnvironmentBiologicalResourceBeliefKind
     // =============================================================================
     /// <summary>
@@ -881,6 +980,105 @@ namespace Arcontio.Core.Environment
         }
 
         // =============================================================================
+        // QueryKnownAreaResourcePotential
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risponde alla domanda consumer: "questa area o questo landmark biologico
+        /// noto possono fornire il prodotto X?".
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query di belief potenziale, non target operativo</b></para>
+        /// <para>
+        /// La query restituisce solo dati aggregati di area. Il centro area non e'
+        /// una destinazione NPC; l'unica ancora navigabile e' il landmark passato dal
+        /// chiamante, quando presente. La pianta concreta resta responsabilita' di
+        /// una query job locale successiva.
+        /// </para>
+        /// </summary>
+        public static EnvironmentKnownAreaResourceQueryResult QueryKnownAreaResourcePotential(
+            EnvironmentFullSnapshot snapshot,
+            EnvironmentPlantCatalog catalog,
+            EnvironmentAreaId areaId,
+            string productKey,
+            int landmarkNodeId = 0)
+        {
+            string requestedProduct = productKey?.Trim() ?? string.Empty;
+            if (snapshot == null || catalog == null || !areaId.IsValid || string.IsNullOrWhiteSpace(requestedProduct))
+                return CreateInvalidKnownAreaResourceResult(areaId, requestedProduct, landmarkNodeId);
+
+            for (int i = 0; i < snapshot.Areas.Count; i++)
+            {
+                EnvironmentAreaSnapshot area = snapshot.Areas[i];
+                if (!area.Definition.AreaId.Equals(areaId)
+                    || !area.Definition.IsEnabled
+                    || !IsBiologicalSearchArea(area))
+                {
+                    continue;
+                }
+
+                // Prima validiamo l'area e raccogliamo i prodotti potenziali con il
+                // resolver esistente: evitiamo una seconda logica di aggregazione.
+                IReadOnlyList<EnvironmentConsumerProductCandidate> products =
+                    BuildPotentialProductsForArea(snapshot, catalog, area);
+                for (int productIndex = 0; productIndex < products.Count; productIndex++)
+                {
+                    EnvironmentConsumerProductCandidate product = products[productIndex];
+                    if (!string.Equals(product.ProductKey, requestedProduct, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    return CreateKnownAreaResourceResult(
+                        area,
+                        requestedProduct,
+                        landmarkNodeId,
+                        product);
+                }
+
+                // Area valida ma prodotto assente: e' una risposta negativa utile
+                // per il layer cognitivo, distinta da "area/landmark non validi".
+                return CreateKnownAreaResourceResult(
+                    area,
+                    requestedProduct,
+                    landmarkNodeId,
+                    null);
+            }
+
+            return CreateInvalidKnownAreaResourceResult(areaId, requestedProduct, landmarkNodeId);
+        }
+
+        // =============================================================================
+        // BuildPotentialBeliefHintForKnownAreaResource
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Trasforma una query positiva su landmark biologico noto in un solo hint
+        /// belief potenziale.
+        /// </para>
+        /// </summary>
+        public static bool TryBuildPotentialBeliefHintForKnownAreaResource(
+            EnvironmentKnownAreaResourceQueryResult result,
+            int observedDay,
+            out EnvironmentBiologicalResourceBeliefHint hint)
+        {
+            hint = default;
+            if (!result.CanPotentiallyProvide
+                || !result.CanUseAsNavigationAnchor)
+            {
+                return false;
+            }
+
+            hint = new EnvironmentBiologicalResourceBeliefHint(
+                EnvironmentBiologicalResourceBeliefKind.Potential,
+                result.LandmarkNodeId,
+                result.AreaId,
+                result.ProductKey,
+                0,
+                result.PotentialScore01,
+                observedDay);
+            return hint.IsValid;
+        }
+
+        // =============================================================================
         // BuildPotentialBeliefHintsForLandmark
         // =============================================================================
         /// <summary>
@@ -1319,6 +1517,88 @@ namespace Arcontio.Core.Environment
                 a.SpeciesKey,
                 b.SpeciesKey,
                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static EnvironmentKnownAreaResourceQueryResult CreateKnownAreaResourceResult(
+            EnvironmentAreaSnapshot area,
+            string productKey,
+            int landmarkNodeId,
+            EnvironmentConsumerProductCandidate? product)
+        {
+            EnvironmentCellCoord center = new EnvironmentCellCoord(
+                area.Definition.CenterX,
+                area.Definition.CenterY,
+                area.Definition.Bounds.Z);
+
+            if (product.HasValue)
+            {
+                EnvironmentConsumerProductCandidate value = product.Value;
+                return new EnvironmentKnownAreaResourceQueryResult(
+                    true,
+                    area.Definition.AreaId,
+                    area.Definition.Key,
+                    center,
+                    area.Definition.RadiusCells,
+                    landmarkNodeId,
+                    value.ProductKey,
+                    true,
+                    value.IsFood,
+                    value.DestroysPlantOnHarvest,
+                    value.RequiresToolKey,
+                    value.MinGrowthStageKey,
+                    value.AvailableSeasonMask,
+                    value.BaseMaxAmountUnits,
+                    value.RegrowDays,
+                    value.Score01,
+                    value.LivePlantCount,
+                    value.HarvestablePlantCount);
+            }
+
+            return new EnvironmentKnownAreaResourceQueryResult(
+                true,
+                area.Definition.AreaId,
+                area.Definition.Key,
+                center,
+                area.Definition.RadiusCells,
+                landmarkNodeId,
+                productKey,
+                false,
+                false,
+                false,
+                string.Empty,
+                string.Empty,
+                0,
+                0,
+                0,
+                0f,
+                0,
+                0);
+        }
+
+        private static EnvironmentKnownAreaResourceQueryResult CreateInvalidKnownAreaResourceResult(
+            EnvironmentAreaId areaId,
+            string productKey,
+            int landmarkNodeId)
+        {
+            return new EnvironmentKnownAreaResourceQueryResult(
+                false,
+                areaId,
+                string.Empty,
+                default,
+                0,
+                landmarkNodeId,
+                productKey,
+                false,
+                false,
+                false,
+                string.Empty,
+                string.Empty,
+                0,
+                0,
+                0,
+                0f,
+                0,
+                0);
         }
 
         private static bool IsInsideRadius(

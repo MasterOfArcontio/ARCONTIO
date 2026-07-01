@@ -568,6 +568,201 @@ namespace Arcontio.EditorTests
             Assert.That(result.PhysicalPlantDeltas[0].PlantId, Is.EqualTo(plantId));
         }
 
+        // =============================================================================
+        // KnownAreaResourceQueryFindsPotentialProductWithoutNavigationAnchor
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// La query F su area nota risponde che l'area puo' fornire berry, ma non
+        /// trasforma il centro area in un'ancora navigabile per l'NPC.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void KnownAreaResourceQueryFindsPotentialProductWithoutNavigationAnchor()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBiologicalResourceArea(
+                plantCatalog,
+                "berry_bush",
+                out EnvironmentAreaId areaId);
+
+            EnvironmentKnownAreaResourceQueryResult result =
+                world.QueryEnvironmentKnownAreaResourcePotential(
+                    areaId,
+                    "berry",
+                    plantCatalog);
+
+            Assert.That(result.IsValidAreaReference, Is.True);
+            Assert.That(result.CanPotentiallyProvide, Is.True);
+            Assert.That(result.ProductKey, Is.EqualTo("berry"));
+            Assert.That(result.IsFood, Is.True);
+            Assert.That(result.BaseMaxAmountUnits, Is.EqualTo(6));
+            Assert.That(result.RegrowDays, Is.EqualTo(20));
+            Assert.That(result.LivePlantCount, Is.EqualTo(1));
+            Assert.That(result.CanUseAsNavigationAnchor, Is.False);
+            Assert.That(result.LandmarkNodeId, Is.EqualTo(0));
+        }
+
+        // =============================================================================
+        // KnownAreaResourceQueryDistinguishesMissingProductFromInvalidArea
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Un'area biologica valida che non produce il prodotto cercato resta una
+        /// risposta negativa valida, distinta da un riferimento area inesistente.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void KnownAreaResourceQueryDistinguishesMissingProductFromInvalidArea()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBiologicalResourceArea(
+                plantCatalog,
+                "berry_bush",
+                out EnvironmentAreaId areaId);
+
+            EnvironmentKnownAreaResourceQueryResult absent =
+                world.QueryEnvironmentKnownAreaResourcePotential(
+                    areaId,
+                    "acorn",
+                    plantCatalog);
+            EnvironmentKnownAreaResourceQueryResult invalid =
+                world.QueryEnvironmentKnownAreaResourcePotential(
+                    new EnvironmentAreaId(9999),
+                    "berry",
+                    plantCatalog);
+
+            Assert.That(absent.IsValidAreaReference, Is.True);
+            Assert.That(absent.CanPotentiallyProvide, Is.False);
+            Assert.That(absent.ProductKey, Is.EqualTo("acorn"));
+
+            Assert.That(invalid.IsValidAreaReference, Is.False);
+            Assert.That(invalid.CanPotentiallyProvide, Is.False);
+        }
+
+        // =============================================================================
+        // KnownLandmarkResourceQueryUsesLandmarkAsNavigationAnchor
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Quando la query parte da un landmark biologico, il risultato resta
+        /// ancorato al nodeId del landmark e non al centro tecnico dell'area.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void KnownLandmarkResourceQueryUsesLandmarkAsNavigationAnchor()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBiologicalResourceArea(
+                plantCatalog,
+                "berry_bush",
+                out EnvironmentAreaId areaId);
+            world.RebuildLandmarksBootstrap();
+
+            Assert.That(
+                world.EnvironmentState.TryGetBiologicalLandmarkNodeIds(areaId, out IReadOnlyList<int> landmarkIds),
+                Is.True);
+            Assert.That(landmarkIds.Count, Is.GreaterThan(0));
+
+            int landmarkNodeId = landmarkIds[0];
+            EnvironmentKnownAreaResourceQueryResult result =
+                world.QueryEnvironmentKnownBiologicalLandmarkResourcePotential(
+                    landmarkNodeId,
+                    "berry",
+                    plantCatalog);
+
+            Assert.That(result.IsValidAreaReference, Is.True);
+            Assert.That(result.CanPotentiallyProvide, Is.True);
+            Assert.That(result.CanUseAsNavigationAnchor, Is.True);
+            Assert.That(result.LandmarkNodeId, Is.EqualTo(landmarkNodeId));
+            Assert.That(result.AreaId, Is.EqualTo(areaId));
+            Assert.That(result.AreaCenterCell.X, Is.EqualTo(4));
+            Assert.That(result.AreaCenterCell.Y, Is.EqualTo(4));
+        }
+
+        // =============================================================================
+        // KnownLandmarkResourceQueryBuildsSinglePotentialBeliefHint
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Il helper cognitivo produce un solo hint potenziale per prodotto e non
+        /// contiene quantita' osservate reali.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void KnownLandmarkResourceQueryBuildsSinglePotentialBeliefHint()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBiologicalResourceArea(
+                plantCatalog,
+                "berry_bush",
+                out EnvironmentAreaId areaId);
+            world.RebuildLandmarksBootstrap();
+
+            Assert.That(
+                world.EnvironmentState.TryGetBiologicalLandmarkNodeIds(areaId, out IReadOnlyList<int> landmarkIds),
+                Is.True);
+
+            int landmarkNodeId = landmarkIds[0];
+            bool built = world.TryBuildEnvironmentPotentialProductBeliefHintForBiologicalLandmarkProduct(
+                landmarkNodeId,
+                "berry",
+                plantCatalog,
+                observedDay: 12,
+                out EnvironmentBiologicalResourceBeliefHint hint);
+            bool absentBuilt = world.TryBuildEnvironmentPotentialProductBeliefHintForBiologicalLandmarkProduct(
+                landmarkNodeId,
+                "acorn",
+                plantCatalog,
+                observedDay: 12,
+                out _);
+
+            Assert.That(built, Is.True);
+            Assert.That(hint.Kind, Is.EqualTo(EnvironmentBiologicalResourceBeliefKind.Potential));
+            Assert.That(hint.LandmarkNodeId, Is.EqualTo(landmarkNodeId));
+            Assert.That(hint.AreaId, Is.EqualTo(areaId));
+            Assert.That(hint.ProductKey, Is.EqualTo("berry"));
+            Assert.That(hint.EstimatedAmount, Is.EqualTo(0));
+            Assert.That(hint.ObservedDay, Is.EqualTo(12));
+            Assert.That(absentBuilt, Is.False);
+        }
+
+        // =============================================================================
+        // UnknownBiologicalLandmarkResourceQueryIsInvalid
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Un landmark non registrato o non biologico non produce ancora navigabile
+        /// ne' hint di belief potenziale.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void UnknownBiologicalLandmarkResourceQueryIsInvalid()
+        {
+            EnvironmentPlantCatalog plantCatalog = MakePlantCatalogConfig().ToCatalog();
+            World world = MakeWorldWithBiologicalResourceArea(
+                plantCatalog,
+                "berry_bush",
+                out _);
+
+            EnvironmentKnownAreaResourceQueryResult result =
+                world.QueryEnvironmentKnownBiologicalLandmarkResourcePotential(
+                    9999,
+                    "berry",
+                    plantCatalog);
+            bool built = world.TryBuildEnvironmentPotentialProductBeliefHintForBiologicalLandmarkProduct(
+                9999,
+                "berry",
+                plantCatalog,
+                observedDay: 12,
+                out _);
+
+            Assert.That(result.IsValidAreaReference, Is.False);
+            Assert.That(result.CanPotentiallyProvide, Is.False);
+            Assert.That(result.CanUseAsNavigationAnchor, Is.False);
+            Assert.That(built, Is.False);
+        }
+
         private static EnvironmentState MakeStateWithSinglePlant(
             EnvironmentPlantInstance plant)
         {
@@ -648,6 +843,53 @@ namespace Arcontio.EditorTests
                 calendarConfig.ResolveHoursPerDay()
                 * calendarConfig.ResolveCalendarTicksPerSimulatedHour();
             return (long)safeDays * ticksPerDay;
+        }
+
+        private static World MakeWorldWithBiologicalResourceArea(
+            EnvironmentPlantCatalog plantCatalog,
+            string speciesKey,
+            out EnvironmentAreaId areaId)
+        {
+            World world = MakeWorldWithNaturalSurface();
+            areaId = new EnvironmentAreaId(91);
+
+            Assert.That(plantCatalog.TryGetSpecies(speciesKey, out EnvironmentPlantSpeciesDefinition species), Is.True);
+            var state = new EnvironmentState();
+            state.SetCalendar(EnvironmentCalendarResolver.Resolve(0, new EnvironmentCalendarConfig()));
+            state.SetClimate(new EnvironmentGlobalClimateState(
+                0.55f,
+                0.55f,
+                0f,
+                EnvironmentWeatherState.Clear,
+                EnvironmentSeasonKind.Summer));
+            state.SetAreaDefinition(new EnvironmentAreaDefinition(
+                areaId,
+                EnvironmentAreaKind.Vegetation,
+                new EnvironmentAreaBounds(1, 1, 6, 6),
+                1,
+                true,
+                "qa_resource_area"));
+            state.SetPlantInstance(EnvironmentPlantInstance.CreateFromSpecies(
+                new EnvironmentPlantId(9100),
+                species,
+                new EnvironmentCellCoord(4, 4),
+                300,
+                0.95f,
+                areaId,
+                EnvironmentSeasonKind.Summer,
+                enforceSeason: true));
+            state.ReplaceBiologicalPlacementsForSaveLoad(
+                new EnvironmentVegetationCellPlacement[0],
+                new[]
+                {
+                    new EnvironmentPhysicalPlantPlacement(
+                        new EnvironmentPlantId(9100),
+                        areaId,
+                        new EnvironmentCellCoord(4, 4),
+                        speciesKey)
+                });
+            world.SetEnvironmentState(state);
+            return world;
         }
 
         private static EnvironmentPlantCatalogConfig MakePlantCatalogConfig()

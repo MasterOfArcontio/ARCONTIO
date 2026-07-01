@@ -1567,6 +1567,44 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
+        // QueryEnvironmentKnownAreaResourcePotential
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interroga in modo autorizzato se un'area biologica nota puo' fornire uno
+        /// specifico prodotto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: area descrittiva, non destinazione NPC</b></para>
+        /// <para>
+        /// La risposta contiene il centro area come metadato tecnico, ma non lo
+        /// abilita come ancora navigabile. Un NPC potra' usarla per belief
+        /// potenziali solo se un layer successivo la collega a un landmark noto.
+        /// </para>
+        /// </summary>
+        public EnvironmentKnownAreaResourceQueryResult QueryEnvironmentKnownAreaResourcePotential(
+            EnvironmentAreaId areaId,
+            string productKey,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (EnvironmentState == null)
+            {
+                return EnvironmentConsumerQueryResolver.QueryKnownAreaResourcePotential(
+                    null,
+                    catalog,
+                    areaId,
+                    productKey);
+            }
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryKnownAreaResourcePotential(
+                snapshot,
+                catalog,
+                areaId,
+                productKey);
+        }
+
+        // =============================================================================
         // QueryEnvironmentPotentialProductsForBiologicalLandmark
         // =============================================================================
         /// <summary>
@@ -1590,6 +1628,48 @@ namespace Arcontio.Core
                 return new EnvironmentConsumerProductCandidate[0];
 
             return QueryEnvironmentPotentialProductsForArea(areaId, catalog);
+        }
+
+        // =============================================================================
+        // QueryEnvironmentKnownBiologicalLandmarkResourcePotential
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Interroga se il landmark biologico noto appartiene a un'area che puo'
+        /// fornire uno specifico prodotto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: il landmark resta l'ancora navigabile</b></para>
+        /// <para>
+        /// La query risolve il mapping landmark -> area tramite Biosfera, ma non
+        /// sostituisce il landmark con il centro geometrico dell'area. Il futuro job
+        /// dovra' muoversi verso il landmark noto e solo sul posto risolvere la
+        /// pianta concreta.
+        /// </para>
+        /// </summary>
+        public EnvironmentKnownAreaResourceQueryResult QueryEnvironmentKnownBiologicalLandmarkResourcePotential(
+            int landmarkNodeId,
+            string productKey,
+            EnvironmentPlantCatalog catalog)
+        {
+            if (!TryResolveEnvironmentAreaFromBiologicalLandmark(landmarkNodeId, out EnvironmentAreaId areaId)
+                || EnvironmentState == null)
+            {
+                return EnvironmentConsumerQueryResolver.QueryKnownAreaResourcePotential(
+                    null,
+                    catalog,
+                    areaId,
+                    productKey,
+                    landmarkNodeId);
+            }
+
+            EnvironmentFullSnapshot snapshot = BuildEnvironmentFullSnapshot();
+            return EnvironmentConsumerQueryResolver.QueryKnownAreaResourcePotential(
+                snapshot,
+                catalog,
+                areaId,
+                productKey,
+                landmarkNodeId);
         }
 
         // =============================================================================
@@ -1626,6 +1706,41 @@ namespace Arcontio.Core
                 landmarkNodeId,
                 products,
                 observedDay);
+        }
+
+        // =============================================================================
+        // TryBuildEnvironmentPotentialProductBeliefHintForBiologicalLandmarkProduct
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce al massimo un hint belief potenziale per un prodotto specifico
+        /// collegato a un landmark biologico noto.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: helper cognitivo senza scrittura belief</b></para>
+        /// <para>
+        /// Il metodo produce un record data-only gia' ancorato al landmark. Non
+        /// scrive nel BeliefStore, non crea memory trace e non interroga piante
+        /// concrete.
+        /// </para>
+        /// </summary>
+        public bool TryBuildEnvironmentPotentialProductBeliefHintForBiologicalLandmarkProduct(
+            int landmarkNodeId,
+            string productKey,
+            EnvironmentPlantCatalog catalog,
+            int observedDay,
+            out EnvironmentBiologicalResourceBeliefHint hint)
+        {
+            EnvironmentKnownAreaResourceQueryResult result =
+                QueryEnvironmentKnownBiologicalLandmarkResourcePotential(
+                    landmarkNodeId,
+                    productKey,
+                    catalog);
+
+            return EnvironmentConsumerQueryResolver.TryBuildPotentialBeliefHintForKnownAreaResource(
+                result,
+                observedDay,
+                out hint);
         }
 
         // =============================================================================
