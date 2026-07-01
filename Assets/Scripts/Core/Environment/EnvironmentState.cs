@@ -346,13 +346,19 @@ namespace Arcontio.Core.Environment
             for (int i = 0; i < resolutions.Count; i++)
             {
                 LandmarkRegistry.ManualLandmarkResolution resolution = resolutions[i];
-                if (resolution.OwnerId <= 0 || resolution.NodeId <= 0)
+                if (resolution.ProviderKey.Kind != LandmarkProviderKind.EnvironmentBiosphere)
+                    continue;
+
+                int ownerId = resolution.ProviderKey.OwnerId > 0
+                    ? resolution.ProviderKey.OwnerId
+                    : resolution.OwnerId;
+                if (ownerId <= 0 || resolution.NodeId <= 0)
                     continue;
 
                 if (resolution.Kind != LandmarkRegistry.LandmarkKind.BiologicalAnchor)
                     continue;
 
-                var areaId = new EnvironmentAreaId(resolution.OwnerId);
+                var areaId = new EnvironmentAreaId(ownerId);
                 if (!grouped.TryGetValue(areaId, out var nodeIds))
                 {
                     nodeIds = new List<int>(8);

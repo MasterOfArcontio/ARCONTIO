@@ -681,6 +681,81 @@ namespace Arcontio.EditorTests
         }
 
         // =============================================================================
+        // BiologicalLandmarkResolutionIgnoresOtherProvidersWithSameOwnerId
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// La Biosfera deve usare ProviderKind + OwnerId, non il solo OwnerId.
+        /// Questo evita che futuri provider con owner locale identico contaminino il
+        /// mapping area biologica -> landmark.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void BiologicalLandmarkResolutionIgnoresOtherProvidersWithSameOwnerId()
+        {
+            var state = new EnvironmentState();
+            var areaId = new EnvironmentAreaId(10);
+            var resolutions = new[]
+            {
+                new LandmarkRegistry.ManualLandmarkResolution(
+                    new LandmarkProviderKey(LandmarkProviderKind.SupportOpenSpace, areaId.Value),
+                    100,
+                    1,
+                    1,
+                    LandmarkRegistry.LandmarkKind.BiologicalAnchor),
+                new LandmarkRegistry.ManualLandmarkResolution(
+                    new LandmarkProviderKey(LandmarkProviderKind.EnvironmentBiosphere, areaId.Value),
+                    200,
+                    2,
+                    2,
+                    LandmarkRegistry.LandmarkKind.BiologicalAnchor)
+            };
+
+            state.ApplyBiologicalLandmarkResolutions(resolutions);
+
+            Assert.That(state.TryGetBiologicalLandmarkNodeIds(areaId, out IReadOnlyList<int> nodeIds), Is.True);
+            Assert.That(nodeIds.Count, Is.EqualTo(1));
+            Assert.That(nodeIds[0], Is.EqualTo(200));
+        }
+
+        // =============================================================================
+        // LandmarkProviderCoordinatorReturnsResolutionsOnlyToOwningProvider
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Il coordinator e' il nuovo boundary: raccoglie candidati multi-provider e
+        /// riconsegna a ciascun provider solo le proprie resolution.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void LandmarkProviderCoordinatorReturnsResolutionsOnlyToOwningProvider()
+        {
+            World world = MakeWorldWithNaturalSurface();
+            var coordinator = new WorldLandmarkProviderCoordinator();
+            var biosphereProvider = new CapturingLandmarkProvider(
+                LandmarkProviderKind.EnvironmentBiosphere,
+                10,
+                2,
+                2);
+            var supportProvider = new CapturingLandmarkProvider(
+                LandmarkProviderKind.SupportOpenSpace,
+                10,
+                5,
+                5);
+
+            Assert.That(coordinator.RegisterProvider(supportProvider), Is.True);
+            Assert.That(coordinator.RegisterProvider(biosphereProvider), Is.True);
+            coordinator.Rebuild(world, new LandmarkRegistry());
+
+            Assert.That(biosphereProvider.Resolutions.Count, Is.EqualTo(1));
+            Assert.That(supportProvider.Resolutions.Count, Is.EqualTo(1));
+            Assert.That(biosphereProvider.Resolutions[0].ProviderKey.Kind, Is.EqualTo(LandmarkProviderKind.EnvironmentBiosphere));
+            Assert.That(supportProvider.Resolutions[0].ProviderKey.Kind, Is.EqualTo(LandmarkProviderKind.SupportOpenSpace));
+            Assert.That(biosphereProvider.Resolutions[0].OwnerId, Is.EqualTo(10));
+            Assert.That(supportProvider.Resolutions[0].OwnerId, Is.EqualTo(10));
+        }
+
+        // =============================================================================
         // KnownLandmarkResourceQueryBuildsSinglePotentialBeliefHint
         // =============================================================================
         /// <summary>
@@ -1401,6 +1476,54 @@ namespace Arcontio.EditorTests
             }
 
             return world;
+        }
+
+        private sealed class CapturingLandmarkProvider : IWorldLandmarkProvider
+        {
+            private readonly LandmarkProviderKind _providerKind;
+            private readonly int _ownerId;
+            private readonly int _cellX;
+            private readonly int _cellY;
+
+            public readonly List<LandmarkRegistry.ManualLandmarkResolution> Resolutions = new();
+
+            public CapturingLandmarkProvider(
+                LandmarkProviderKind providerKind,
+                int ownerId,
+                int cellX,
+                int cellY)
+            {
+                _providerKind = providerKind;
+                _ownerId = ownerId;
+                _cellX = cellX;
+                _cellY = cellY;
+            }
+
+            public LandmarkProviderKind ProviderKind => _providerKind;
+
+            public int BuildLandmarkCandidates(
+                World world,
+                List<LandmarkRegistry.ManualLandmarkCandidate> outCandidates)
+            {
+                outCandidates.Add(new LandmarkRegistry.ManualLandmarkCandidate(
+                    _cellX,
+                    _cellY,
+                    LandmarkRegistry.LandmarkKind.BiologicalAnchor,
+                    0f,
+                    new LandmarkProviderKey(_providerKind, _ownerId)));
+                return 1;
+            }
+
+            public void ApplyLandmarkResolutions(
+                IReadOnlyList<LandmarkRegistry.ManualLandmarkResolution> resolutions)
+            {
+                Resolutions.Clear();
+                if (resolutions == null)
+                    return;
+
+                for (int i = 0; i < resolutions.Count; i++)
+                    Resolutions.Add(resolutions[i]);
+            }
         }
 
         private static bool HasTab(ArcUiInspectorViewModel viewModel, string tabKey)

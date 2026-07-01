@@ -225,8 +225,7 @@ namespace Arcontio.Core
         public IReadOnlyDictionary<EnvironmentCellCoord, WorldDiffuseVegetationProjection> DiffuseVegetation =>
             _diffuseVegetation;
 
-        private readonly List<LandmarkRegistry.ManualLandmarkCandidate> _environmentLandmarkCandidates = new(64);
-        private readonly List<LandmarkRegistry.ManualLandmarkResolution> _environmentLandmarkResolutions = new(64);
+        private readonly WorldLandmarkProviderCoordinator _landmarkProviderCoordinator = new();
         private readonly Dictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> _physicalPlants = new();
         private readonly Dictionary<EnvironmentCellCoord, WorldDiffuseVegetationProjection> _diffuseVegetation = new();
 
@@ -1086,6 +1085,7 @@ namespace Arcontio.Core
             //   oggetti come muri/porte sono stati piazzati sulla griglia.
             LandmarkRegistry = new LandmarkRegistry();
             EnvironmentState = new EnvironmentState();
+            _landmarkProviderCoordinator.RegisterProvider(new EnvironmentBiologicalLandmarkProvider(this));
             InitialEnvironmentAreaSetConfig = new EnvironmentAreaSetConfig();
 
             // ============================================================
@@ -1306,7 +1306,7 @@ namespace Arcontio.Core
         /// </summary>
         public void RebuildLandmarksBootstrap()
         {
-            RebuildLandmarksWithEnvironmentAnchors();
+            RebuildLandmarksWithProviders();
         }
 
         // =============================================================================
@@ -2441,29 +2441,24 @@ namespace Arcontio.Core
         }
 
         // =============================================================================
-        // RebuildLandmarksWithEnvironmentAnchors
+        // RebuildLandmarksWithProviders
         // =============================================================================
         /// <summary>
         /// <para>
-        /// Ricostruisce il registry landmark includendo gli anchor biologici prodotti
-        /// dalla biosfera prima della fase comune di cap, indice ed edge.
+        /// Ricostruisce il registry landmark usando il coordinator dei provider
+        /// modulari registrati nel World.
         /// </para>
         ///
-        /// <para><b>Principio architetturale: rebuild unica, input multipli</b></para>
+        /// <para><b>Principio architetturale: rebuild unica, provider isolati</b></para>
         /// <para>
-        /// Gli anchor biologici non vengono aggiunti dopo la rebuild: entrano nello
-        /// stesso passaggio che crea doorway, junction e area center, cosi' snapshot,
-        /// percezione landmark e debug overlay leggono una struttura stabile unica.
+        /// Il World non chiama piu' direttamente i singoli moduli produttori di
+        /// landmark. Il coordinator raccoglie candidati data-only, invoca una sola
+        /// rebuild del registry e riconsegna le resolution al provider proprietario.
         /// </para>
         /// </summary>
-        private void RebuildLandmarksWithEnvironmentAnchors()
+        private void RebuildLandmarksWithProviders()
         {
-            _environmentLandmarkCandidates.Clear();
-            _environmentLandmarkResolutions.Clear();
-
-            EnvironmentState?.BuildBiologicalLandmarkCandidates(this, _environmentLandmarkCandidates);
-            LandmarkRegistry?.RebuildFromWorld(this, _environmentLandmarkCandidates, _environmentLandmarkResolutions);
-            EnvironmentState?.ApplyBiologicalLandmarkResolutions(_environmentLandmarkResolutions);
+            _landmarkProviderCoordinator.Rebuild(this, LandmarkRegistry);
         }
 
         // =============================================================================
@@ -2781,7 +2776,7 @@ namespace Arcontio.Core
 
             // Landmark registry Ã¨ anch'esso derivato dalla geometria mappa.
             // Nota: questa chiamata Ã¨ safe se LandmarkRegistry Ã¨ null.
-            RebuildLandmarksWithEnvironmentAnchors();
+            RebuildLandmarksWithProviders();
         }
 
         /// <summary>

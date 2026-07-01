@@ -17607,7 +17607,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.E | Ricrescita progressiva risorse biologiche nel tempo | ✅ |
 | v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ✅ |
 | v0.71.05.G | Query operativa job: pianta piu' vicina che fornisce risorsa X | ✅ |
-| v0.71.05.H | Landmark provider centralizzato per moduli | ⏳ |
+| v0.71.05.H | Landmark provider centralizzato per moduli | ✅ |
 | v0.71.05.I | Landmark di supporto in spazi aperti privi di landmark | ⏳ |
 | v0.71.05.J | Memory trace percezione landmark biologico | ⏳ |
 | v0.71.05.K | Memory trace ricerca risorsa da landmark biologico | ⏳ |

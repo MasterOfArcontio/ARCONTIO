@@ -63,7 +63,7 @@ namespace Arcontio.Core
         ///   <item><b>CellX/CellY</b>: cella proposta dal sistema chiamante.</item>
         ///   <item><b>Kind</b>: enum numerico del tipo landmark da creare o mergiare.</item>
         ///   <item><b>MergeRadius</b>: raggio locale usato dal registry per evitare duplicati.</item>
-        ///   <item><b>OwnerId</b>: id temporaneo del dominio chiamante, restituito solo nella resolution.</item>
+        ///   <item><b>ProviderKey</b>: modulo proprietario + owner locale, restituito solo nella resolution.</item>
         /// </list>
         /// </summary>
         public readonly struct ManualLandmarkCandidate
@@ -73,14 +73,48 @@ namespace Arcontio.Core
             public readonly LandmarkKind Kind;
             public readonly float MergeRadius;
             public readonly int OwnerId;
+            public readonly LandmarkProviderKey ProviderKey;
 
             public ManualLandmarkCandidate(int cellX, int cellY, LandmarkKind kind, float mergeRadius, int ownerId)
+                : this(cellX, cellY, kind, mergeRadius, LandmarkProviderKey.None, ownerId)
+            {
+            }
+
+            public ManualLandmarkCandidate(
+                int cellX,
+                int cellY,
+                LandmarkKind kind,
+                float mergeRadius,
+                LandmarkProviderKey providerKey)
+                : this(cellX, cellY, kind, mergeRadius, providerKey, providerKey.OwnerId)
+            {
+            }
+
+            private ManualLandmarkCandidate(
+                int cellX,
+                int cellY,
+                LandmarkKind kind,
+                float mergeRadius,
+                LandmarkProviderKey providerKey,
+                int ownerId)
             {
                 CellX = cellX;
                 CellY = cellY;
                 Kind = kind;
                 MergeRadius = mergeRadius < 0f ? 0f : mergeRadius;
                 OwnerId = ownerId < 0 ? 0 : ownerId;
+                ProviderKey = providerKey;
+            }
+
+            public ManualLandmarkCandidate WithProviderKey(LandmarkProviderKey providerKey)
+            {
+                return new ManualLandmarkCandidate(
+                    CellX,
+                    CellY,
+                    Kind,
+                    MergeRadius,
+                    providerKey,
+                    providerKey.OwnerId > 0 ? providerKey.OwnerId : OwnerId);
             }
         }
 
@@ -102,7 +136,7 @@ namespace Arcontio.Core
         ///
         /// <para><b>Struttura interna:</b></para>
         /// <list type="bullet">
-        ///   <item><b>OwnerId</b>: id del dominio chiamante ricevuto dal candidate.</item>
+        ///   <item><b>ProviderKey</b>: modulo proprietario e owner locale ricevuti dal candidate.</item>
         ///   <item><b>NodeId</b>: id landmark attivo creato o riusato.</item>
         ///   <item><b>CellX/CellY</b>: cella reale del nodo dopo eventuale merge.</item>
         ///   <item><b>Kind</b>: tipo finale del nodo risolto.</item>
@@ -111,14 +145,37 @@ namespace Arcontio.Core
         public readonly struct ManualLandmarkResolution
         {
             public readonly int OwnerId;
+            public readonly LandmarkProviderKey ProviderKey;
             public readonly int NodeId;
             public readonly int CellX;
             public readonly int CellY;
             public readonly LandmarkKind Kind;
 
             public ManualLandmarkResolution(int ownerId, int nodeId, int cellX, int cellY, LandmarkKind kind)
+                : this(LandmarkProviderKey.None, ownerId, nodeId, cellX, cellY, kind)
+            {
+            }
+
+            public ManualLandmarkResolution(
+                LandmarkProviderKey providerKey,
+                int nodeId,
+                int cellX,
+                int cellY,
+                LandmarkKind kind)
+                : this(providerKey, providerKey.OwnerId, nodeId, cellX, cellY, kind)
+            {
+            }
+
+            private ManualLandmarkResolution(
+                LandmarkProviderKey providerKey,
+                int ownerId,
+                int nodeId,
+                int cellX,
+                int cellY,
+                LandmarkKind kind)
             {
                 OwnerId = ownerId < 0 ? 0 : ownerId;
+                ProviderKey = providerKey;
                 NodeId = nodeId < 0 ? 0 : nodeId;
                 CellX = cellX;
                 CellY = cellY;
@@ -478,7 +535,7 @@ namespace Arcontio.Core
                     continue;
 
                 outResolutions?.Add(new ManualLandmarkResolution(
-                    candidate.OwnerId,
+                    candidate.ProviderKey,
                     node.Id,
                     node.CellX,
                     node.CellY,
