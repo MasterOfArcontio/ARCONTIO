@@ -525,9 +525,11 @@ namespace Arcontio.Core
                 if (!world.InBounds(candidate.CellX, candidate.CellY))
                     continue;
 
+                ResolveManualCandidateCell(world, candidate, out int resolvedCellX, out int resolvedCellY);
+
                 LandmarkNode node = AddOrMergeNode(
-                    candidate.CellX,
-                    candidate.CellY,
+                    resolvedCellX,
+                    resolvedCellY,
                     candidate.Kind,
                     candidate.MergeRadius);
 
@@ -541,6 +543,158 @@ namespace Arcontio.Core
                     node.CellY,
                     node.Kind));
             }
+        }
+
+        // =============================================================================
+        // ResolveManualCandidateCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Risolve la cella effettiva di un candidato manuale prima di inserirlo nel
+        /// registry.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: separazione tra semantica e marker visuale</b></para>
+        /// <para>
+        /// Un BiologicalAnchor non viene fuso con landmark strutturali di altro
+        /// tipo, perche' rappresenta un dominio diverso. Se pero' la cella proposta
+        /// e' gia' occupata da un nodo strutturale, il marker biologico viene
+        /// spostato su una cella camminabile vicina e deterministica, preservando
+        /// ProviderKey e OwnerId del candidato originale.
+        /// </para>
+        /// </summary>
+        private void ResolveManualCandidateCell(
+            World world,
+            ManualLandmarkCandidate candidate,
+            out int cellX,
+            out int cellY)
+        {
+            cellX = candidate.CellX;
+            cellY = candidate.CellY;
+
+            if (candidate.Kind != LandmarkKind.BiologicalAnchor)
+                return;
+
+            if (!HasActiveNodeOfDifferentKindAtCell(cellX, cellY, candidate.Kind))
+                return;
+
+            if (TryFindNearbyFreeManualCandidateCell(world, cellX, cellY, candidate.Kind, out int relocatedX, out int relocatedY))
+            {
+                cellX = relocatedX;
+                cellY = relocatedY;
+            }
+        }
+
+        private bool TryFindNearbyFreeManualCandidateCell(
+            World world,
+            int originX,
+            int originY,
+            LandmarkKind candidateKind,
+            out int cellX,
+            out int cellY)
+        {
+            cellX = originX;
+            cellY = originY;
+
+            // Raggio piccolo: il marker resta un'ancora dell'area, non una nuova
+            // destinazione biologica puntuale. L'ordine e' stabile: cardinali,
+            // diagonali, poi anelli quadrati ordinati.
+            const int maxRadius = 3;
+            for (int radius = 1; radius <= maxRadius; radius++)
+            {
+                if (TryFindNearbyFreeManualCandidateCellAtRadius(
+                    world,
+                    originX,
+                    originY,
+                    candidateKind,
+                    radius,
+                    out cellX,
+                    out cellY))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private bool TryFindNearbyFreeManualCandidateCellAtRadius(
+            World world,
+            int originX,
+            int originY,
+            LandmarkKind candidateKind,
+            int radius,
+            out int cellX,
+            out int cellY)
+        {
+            cellX = originX;
+            cellY = originY;
+
+            if (radius == 1)
+            {
+                if (IsValidManualCandidateRelocationCell(world, originX, originY + 1, candidateKind, out cellX, out cellY)) return true;
+                if (IsValidManualCandidateRelocationCell(world, originX + 1, originY, candidateKind, out cellX, out cellY)) return true;
+                if (IsValidManualCandidateRelocationCell(world, originX, originY - 1, candidateKind, out cellX, out cellY)) return true;
+                if (IsValidManualCandidateRelocationCell(world, originX - 1, originY, candidateKind, out cellX, out cellY)) return true;
+                if (IsValidManualCandidateRelocationCell(world, originX + 1, originY + 1, candidateKind, out cellX, out cellY)) return true;
+                if (IsValidManualCandidateRelocationCell(world, originX - 1, originY + 1, candidateKind, out cellX, out cellY)) return true;
+                if (IsValidManualCandidateRelocationCell(world, originX + 1, originY - 1, candidateKind, out cellX, out cellY)) return true;
+                if (IsValidManualCandidateRelocationCell(world, originX - 1, originY - 1, candidateKind, out cellX, out cellY)) return true;
+                return false;
+            }
+
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dx = -radius; dx <= radius; dx++)
+                {
+                    if (Mathf.Max(Mathf.Abs(dx), Mathf.Abs(dy)) != radius)
+                        continue;
+
+                    if (IsValidManualCandidateRelocationCell(world, originX + dx, originY + dy, candidateKind, out cellX, out cellY))
+                        return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool IsValidManualCandidateRelocationCell(
+            World world,
+            int candidateX,
+            int candidateY,
+            LandmarkKind candidateKind,
+            out int cellX,
+            out int cellY)
+        {
+            cellX = candidateX;
+            cellY = candidateY;
+
+            if (world == null || !world.InBounds(candidateX, candidateY))
+                return false;
+
+            if (world.BlocksMovementAt(candidateX, candidateY))
+                return false;
+
+            return !HasActiveNodeOfDifferentKindAtCell(candidateX, candidateY, candidateKind);
+        }
+
+        private bool HasActiveNodeOfDifferentKindAtCell(
+            int cellX,
+            int cellY,
+            LandmarkKind candidateKind)
+        {
+            for (int i = 0; i < _nodes.Count; i++)
+            {
+                LandmarkNode node = _nodes[i];
+                if (node == null || !node.IsActive)
+                    continue;
+
+                if (node.CellX != cellX || node.CellY != cellY)
+                    continue;
+
+                if (node.Kind != candidateKind)
+                    return true;
+            }
+
+            return false;
         }
 
         private void FilterInactiveManualResolutions(List<ManualLandmarkResolution> resolutions)

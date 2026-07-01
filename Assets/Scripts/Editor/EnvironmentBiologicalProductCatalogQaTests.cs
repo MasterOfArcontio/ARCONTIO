@@ -756,6 +756,136 @@ namespace Arcontio.EditorTests
         }
 
         // =============================================================================
+        // BiologicalLandmarkCandidateMovesAwayFromStructuralLandmarkCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Un BiologicalAnchor proposto sulla stessa cella di un landmark strutturale
+        /// resta semanticamente distinto, ma viene materializzato su una cella vicina
+        /// per evitare marker runtime sovrapposti.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void BiologicalLandmarkCandidateMovesAwayFromStructuralLandmarkCell()
+        {
+            World world = MakeWorldWithNaturalSurface();
+            var registry = new LandmarkRegistry();
+            var resolutions = new List<LandmarkRegistry.ManualLandmarkResolution>();
+            var candidates = new[]
+            {
+                new LandmarkRegistry.ManualLandmarkCandidate(
+                    3,
+                    3,
+                    LandmarkRegistry.LandmarkKind.AreaCenter,
+                    0f,
+                    new LandmarkProviderKey(LandmarkProviderKind.SupportOpenSpace, 100)),
+                new LandmarkRegistry.ManualLandmarkCandidate(
+                    3,
+                    3,
+                    LandmarkRegistry.LandmarkKind.BiologicalAnchor,
+                    0f,
+                    new LandmarkProviderKey(LandmarkProviderKind.EnvironmentBiosphere, 200))
+            };
+
+            registry.RebuildFromWorld(world, candidates, resolutions);
+
+            Assert.That(registry.TryGetActiveNodeIdAtCell(3, 3, out int structuralNodeId), Is.True);
+            Assert.That(registry.TryGetActiveNodeById(structuralNodeId, out LandmarkRegistry.LandmarkNode structuralNode), Is.True);
+            Assert.That(structuralNode.Kind, Is.EqualTo(LandmarkRegistry.LandmarkKind.AreaCenter));
+
+            LandmarkRegistry.ManualLandmarkResolution biologicalResolution =
+                FindResolution(resolutions, LandmarkProviderKind.EnvironmentBiosphere, 200);
+            Assert.That(biologicalResolution.NodeId, Is.GreaterThan(0));
+            Assert.That(biologicalResolution.Kind, Is.EqualTo(LandmarkRegistry.LandmarkKind.BiologicalAnchor));
+            Assert.That(biologicalResolution.CellX == 3 && biologicalResolution.CellY == 3, Is.False);
+            Assert.That(
+                Mathf.Abs(biologicalResolution.CellX - 3) + Mathf.Abs(biologicalResolution.CellY - 3),
+                Is.EqualTo(1));
+            Assert.That(biologicalResolution.ProviderKey.Kind, Is.EqualTo(LandmarkProviderKind.EnvironmentBiosphere));
+            Assert.That(biologicalResolution.ProviderKey.OwnerId, Is.EqualTo(200));
+        }
+
+        // =============================================================================
+        // BiologicalLandmarkCandidateKeepsFreeCell
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Se la cella proposta dalla Biosfera e' libera da landmark di altro kind,
+        /// il registry non sposta artificialmente il candidate.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void BiologicalLandmarkCandidateKeepsFreeCell()
+        {
+            World world = MakeWorldWithNaturalSurface();
+            var registry = new LandmarkRegistry();
+            var resolutions = new List<LandmarkRegistry.ManualLandmarkResolution>();
+            var candidates = new[]
+            {
+                new LandmarkRegistry.ManualLandmarkCandidate(
+                    4,
+                    4,
+                    LandmarkRegistry.LandmarkKind.BiologicalAnchor,
+                    0f,
+                    new LandmarkProviderKey(LandmarkProviderKind.EnvironmentBiosphere, 201))
+            };
+
+            registry.RebuildFromWorld(world, candidates, resolutions);
+
+            LandmarkRegistry.ManualLandmarkResolution biologicalResolution =
+                FindResolution(resolutions, LandmarkProviderKind.EnvironmentBiosphere, 201);
+            Assert.That(biologicalResolution.NodeId, Is.GreaterThan(0));
+            Assert.That(biologicalResolution.CellX, Is.EqualTo(4));
+            Assert.That(biologicalResolution.CellY, Is.EqualTo(4));
+            Assert.That(registry.TryGetActiveNodeIdAtCell(4, 4, out int nodeId), Is.True);
+            Assert.That(registry.TryGetActiveNodeById(nodeId, out LandmarkRegistry.LandmarkNode node), Is.True);
+            Assert.That(node.Kind, Is.EqualTo(LandmarkRegistry.LandmarkKind.BiologicalAnchor));
+        }
+
+        // =============================================================================
+        // DuplicateBiologicalLandmarkCandidatesStillMergeTogether
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Due candidate biologici uguali continuano a usare il merge radius del
+        /// registry: il fix non trasforma la sovrapposizione legittima tra stesso
+        /// kind in duplicati visuali.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DuplicateBiologicalLandmarkCandidatesStillMergeTogether()
+        {
+            World world = MakeWorldWithNaturalSurface();
+            var registry = new LandmarkRegistry();
+            var resolutions = new List<LandmarkRegistry.ManualLandmarkResolution>();
+            var candidates = new[]
+            {
+                new LandmarkRegistry.ManualLandmarkCandidate(
+                    5,
+                    5,
+                    LandmarkRegistry.LandmarkKind.BiologicalAnchor,
+                    1f,
+                    new LandmarkProviderKey(LandmarkProviderKind.EnvironmentBiosphere, 202)),
+                new LandmarkRegistry.ManualLandmarkCandidate(
+                    5,
+                    5,
+                    LandmarkRegistry.LandmarkKind.BiologicalAnchor,
+                    1f,
+                    new LandmarkProviderKey(LandmarkProviderKind.EnvironmentBiosphere, 203))
+            };
+
+            registry.RebuildFromWorld(world, candidates, resolutions);
+
+            LandmarkRegistry.ManualLandmarkResolution first =
+                FindResolution(resolutions, LandmarkProviderKind.EnvironmentBiosphere, 202);
+            LandmarkRegistry.ManualLandmarkResolution second =
+                FindResolution(resolutions, LandmarkProviderKind.EnvironmentBiosphere, 203);
+            Assert.That(first.NodeId, Is.GreaterThan(0));
+            Assert.That(second.NodeId, Is.EqualTo(first.NodeId));
+            Assert.That(CountActiveNodesOfKind(registry, LandmarkRegistry.LandmarkKind.BiologicalAnchor), Is.EqualTo(1));
+        }
+
+        // =============================================================================
         // KnownLandmarkResourceQueryBuildsSinglePotentialBeliefHint
         // =============================================================================
         /// <summary>
@@ -1476,6 +1606,39 @@ namespace Arcontio.EditorTests
             }
 
             return world;
+        }
+
+        private static LandmarkRegistry.ManualLandmarkResolution FindResolution(
+            IReadOnlyList<LandmarkRegistry.ManualLandmarkResolution> resolutions,
+            LandmarkProviderKind providerKind,
+            int ownerId)
+        {
+            Assert.That(resolutions, Is.Not.Null);
+            for (int i = 0; i < resolutions.Count; i++)
+            {
+                LandmarkRegistry.ManualLandmarkResolution resolution = resolutions[i];
+                if (resolution.ProviderKey.Kind == providerKind && resolution.ProviderKey.OwnerId == ownerId)
+                    return resolution;
+            }
+
+            Assert.Fail($"Resolution mancante per provider={providerKind}, ownerId={ownerId}.");
+            return default;
+        }
+
+        private static int CountActiveNodesOfKind(
+            LandmarkRegistry registry,
+            LandmarkRegistry.LandmarkKind kind)
+        {
+            int count = 0;
+            IReadOnlyList<LandmarkRegistry.LandmarkNode> nodes = registry.Nodes;
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                LandmarkRegistry.LandmarkNode node = nodes[i];
+                if (node != null && node.IsActive && node.Kind == kind)
+                    count++;
+            }
+
+            return count;
         }
 
         private sealed class CapturingLandmarkProvider : IWorldLandmarkProvider
