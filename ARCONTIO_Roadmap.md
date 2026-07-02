@@ -17614,7 +17614,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.I.3 | Provider SupportOpenSpace per landmark di supporto in open area | ✅ |
 | v0.71.05.I.4 | Support LM coverage-first + debug dettagliato aree chiuse | ✅ |
 | v0.71.05.J | Memory trace percezione landmark biologico | ✅ |
-| v0.71.05.K | Memory trace ricerca risorsa da landmark biologico | ⏳ |
+| v0.71.05.K | Memory trace ricerca risorsa da landmark biologico | ✅ |
 | v0.71.05.L | Belief potenziale: qui puo' esserci risorsa X | ⏳ |
 | v0.71.05.M | Belief osservato: qui esistono circa N risorse X | ⏳ |
 | v0.71.05.N | Decisioni: cerca cibo, cerca non-cibo, cerca area biologica con risorsa | ⏳ |

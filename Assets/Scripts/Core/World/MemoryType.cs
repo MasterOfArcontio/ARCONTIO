@@ -42,6 +42,7 @@ namespace Arcontio.Core
         FoodMissingSuspected,       // Sospetto che mi manchi cibo
 
         LandmarkSpotted,            // Ho visto un landmark tipizzato
+        ResourceSearchFromLandmark, // Ho cercato una risorsa partendo da un landmark
 
     }
 }

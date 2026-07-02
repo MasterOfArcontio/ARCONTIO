@@ -45,6 +45,10 @@ namespace Arcontio.Core
             // Landmark tipizzati visti -> memoria soggettiva generalizzabile.
             _rules.Add(new LandmarkSpottedMemoryRule());
 
+            // Ricerca risorsa biologica da landmark -> memoria soggettiva
+            // dell'azione compiuta. La belief resta fuori da v0.71.05.K.
+            _rules.Add(new BiologicalResourceSearchFromLandmarkMemoryRule());
+
             // Furto cibo (Day9)
             _rules.Add(new FoodStolenMemoryRule());
 
@@ -251,7 +255,10 @@ namespace Arcontio.Core
 
                         if (rule.TryEncode(world, npcId, e, quality, out var trace))
                         {
-                            if (e is ObjectSpottedEvent || e is NpcSpottedEvent || e is LandmarkSpottedEvent)
+                            if (e is ObjectSpottedEvent
+                                || e is NpcSpottedEvent
+                                || e is LandmarkSpottedEvent
+                                || e is BiologicalResourceSearchFromLandmarkEvent)
                                 trace.LastObservedTick = (int)tick.Index;
 
                             var res = world.Memory[npcId].AddOrMerge(trace, out var acceptedTrace);
@@ -358,16 +365,15 @@ namespace Arcontio.Core
         {
             tracesAdded = 0;
 
-            if (e is not LandmarkSpottedEvent landmarkEvent)
+            if (!TryGetObserverBoundMemoryEvent(e, out int npcId, out float witnessQuality01))
                 return false;
 
-            int npcId = landmarkEvent.ObserverNpcId;
             if (!world.ExistsNpc(npcId))
                 return true;
 
             telemetry.Counter("MemoryEncodingSystem.TracesEncodedAttempts", 1);
 
-            if (!rule.TryEncode(world, npcId, e, landmarkEvent.WitnessQuality01, out var trace))
+            if (!rule.TryEncode(world, npcId, e, witnessQuality01, out var trace))
                 return true;
 
             trace.LastObservedTick = (int)tick.Index;
@@ -400,14 +406,52 @@ namespace Arcontio.Core
                     break;
             }
 
-            // v0.71.05.J: la trace LandmarkSpotted resta memoria. Le belief
-            // biologiche potenziali/osservate arrivano negli step L/M tramite regole
-            // esplicite, non come effetto collaterale di questa osservazione.
+            // v0.71.05.J/K: le trace observer-bound dei landmark restano memoria.
+            // Le belief biologiche potenziali/osservate arrivano negli step L/M
+            // tramite regole esplicite, non come effetto collaterale automatico.
             tracesAdded = 1;
             if (costPerNpc)
                 costObserver.AddNpcWork(npcId, 1);
 
             return true;
+        }
+
+        // =============================================================================
+        // TryGetObserverBoundMemoryEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Riconosce gli eventi memoria gia' legati a un singolo NPC.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: niente redistribuzione dei fatti soggettivi</b></para>
+        /// <para>
+        /// Alcuni eventi non descrivono un fatto pubblico da mostrare ai testimoni,
+        /// ma una percezione o un'azione gia' attribuita a un NPC. In questi casi il
+        /// memory encoder deve scrivere solo nello store dell'attore/osservatore
+        /// dichiarato, senza rieseguire range, cono o linea di vista.
+        /// </para>
+        /// </summary>
+        private static bool TryGetObserverBoundMemoryEvent(ISimEvent e, out int npcId, out float witnessQuality01)
+        {
+            npcId = 0;
+            witnessQuality01 = 0f;
+
+            if (e is LandmarkSpottedEvent landmarkEvent)
+            {
+                npcId = landmarkEvent.ObserverNpcId;
+                witnessQuality01 = landmarkEvent.WitnessQuality01;
+                return true;
+            }
+
+            if (e is BiologicalResourceSearchFromLandmarkEvent searchEvent)
+            {
+                npcId = searchEvent.ActorNpcId;
+                witnessQuality01 = searchEvent.SearchQuality01;
+                return true;
+            }
+
+            return false;
         }
 
         // =============================================================================
