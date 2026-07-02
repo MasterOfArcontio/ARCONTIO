@@ -958,11 +958,11 @@ namespace Arcontio.View.ArcGraph
             group.anchorMin = new Vector2(0f, 0.5f);
             group.anchorMax = new Vector2(0f, 0.5f);
             group.pivot = new Vector2(0f, 0.5f);
-            group.sizeDelta = new Vector2(132f, 28f);
+            group.sizeDelta = new Vector2(178f, 28f);
 
             LayoutElement groupLayout = group.gameObject.AddComponent<LayoutElement>();
-            groupLayout.minWidth = 132f;
-            groupLayout.preferredWidth = 132f;
+            groupLayout.minWidth = 178f;
+            groupLayout.preferredWidth = 178f;
             groupLayout.minHeight = 28f;
             groupLayout.preferredHeight = 28f;
 
@@ -977,6 +977,7 @@ namespace Arcontio.View.ArcGraph
             CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.LandmarksKey, "LM", 30f);
             CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.NpcLineOfSightKey, "LOS", 36f);
             CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.PathfindingKey, "PATH", 54f);
+            CreateVisualOverlayButton(group, ArcUiVisualOverlayCatalog.AreaOverlayKey, "AREA", 46f);
         }
 
         private void BuildRightInspector()
