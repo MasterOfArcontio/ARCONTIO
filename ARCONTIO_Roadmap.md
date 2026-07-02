@@ -17664,7 +17664,7 @@ La `v0.71.05.I` introduce le aree spaziali del `World` come dominio distinto dal
 
 La stessa patch aggiunge la sezione save/load modulare `spatialAreas`, il toggle ArcGraph `AREA` e il provider `SupportOpenSpace`: i landmark di supporto sono scaffolding oggettivo di navigazione, generati solo in `OpenArea` quando la copertura dei landmark navigazionali esistenti non basta. Da `v0.71.05.I.4` il provider usa una logica coverage-first deterministica: cerca la cella valida piu' scoperta, rispetta `support_lm_spacing_cells` come distanza minima e copertura target, esclude i `BiologicalAnchor` dalla copertura e non genera support sui bordi mappa. Non crea memory, belief, decisioni o job e non e' conoscenza soggettiva dell'NPC.
 
-Il pannello debug Spatial/Support LM espone anche i passaggi di calcolo delle aree chiuse: conteggi boundary muro/porta/altro, componenti flood-fill, candidati chiusi, room, corridor, invalidi, bounds e narrow span delle prime classificazioni. Questo rende diagnosticabile se una stanza non nasce per oggetti non caricati, boundary mancanti, flood collegato all'esterno o classificazione errata.
+La diagnostica Core Spatial/Support LM conserva anche i passaggi di calcolo delle aree chiuse: conteggi boundary muro/porta/altro, componenti flood-fill, candidati chiusi, room, corridor, invalidi, bounds e narrow span delle prime classificazioni. La finestra debug ArcGraph temporanea usata per validare I.4 e' stata rimossa dal runtime dopo il gate operatore positivo.
 
 Flusso atteso:
 
