@@ -8599,6 +8599,9 @@ if (!NpcAction.ContainsKey(id))
             };
 
             Objects[id] = inst;
+            if (_objIdByCell != null && _objIdByCell.Length == MapWidth * MapHeight && InBounds(x, y))
+                _objIdByCell[CellIndex(x, y)] = id;
+
             AddGroundObjectToPerceptionIndex(id, inst);
             MarkNearbyNpcPerceptionDirty(x, y);
             MarkObjectWatchedByNearbyNpc(id, x, y);
@@ -10036,7 +10039,7 @@ if (!NpcAction.ContainsKey(id))
             if (!InBounds(x, y)) return;
 
             int objId = GetObjectAt(x, y);
-            if (objId == 0 || !Objects.TryGetValue(objId, out var obj) || obj == null)
+            if (objId < 0 || !Objects.TryGetValue(objId, out var obj) || obj == null)
             {
                 _occlusion[Idx(x, y)] = default;
                 return;

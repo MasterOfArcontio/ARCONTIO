@@ -150,6 +150,29 @@ namespace Arcontio.EditorTests
         }
 
         // =============================================================================
+        // CreatedStructuralObjectIsImmediatelyVisibleToSpatialBoundaryQueries
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Una boundary strutturale creata tramite <c>World.CreateObject</c> deve
+        /// essere leggibile subito da <c>GetObjectAt</c> e dalle query area, senza
+        /// richiedere un rebuild globale delle cache.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void CreatedStructuralObjectIsImmediatelyVisibleToSpatialBoundaryQueries()
+        {
+            World world = CreateWorld(5, 5);
+
+            int wallId = world.CreateObject("qa_wall", 2, 2, OwnerKind.Community, 0);
+
+            Assert.That(wallId, Is.GreaterThan(0));
+            Assert.That(world.GetObjectAt(2, 2), Is.EqualTo(wallId));
+            Assert.That(world.ResolveSpatialAreaBoundaryKindAt(2, 2), Is.EqualTo(WorldSpatialBoundaryKind.Wall));
+            Assert.That(world.IsSpatialAreaBoundaryAt(2, 2), Is.True);
+        }
+
+        // =============================================================================
         // NonStructuralObjectsDoNotCloseAreas
         // =============================================================================
         /// <summary>
