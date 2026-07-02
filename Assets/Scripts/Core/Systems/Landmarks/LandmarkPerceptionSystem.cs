@@ -133,9 +133,26 @@ namespace Arcontio.Core
                     if (!world.HasLineOfSight(ox, oy, nx, ny))
                         continue;
 
-                    // Notifica: aggiorna il nodo nella memoria soggettiva dell'NPC.
+                    // Notifica: aggiorna il nodo nella memoria soggettiva tecnica dell'NPC.
+                    // Questa e' la memoria topologica usata dal pathfinding soggettivo.
                     world.NotifyNpcSeenLandmark(npcId, node.Id);
                     learned++;
+
+                    // v0.71.05.J: per i landmark biologici produciamo anche un evento
+                    // percettivo observer-bound. Il MemoryEncodingSystem lo trasformera'
+                    // in MemoryTrace narrativa senza ridistribuirlo ad altri testimoni,
+                    // perche' qui range, cono e LOS sono gia' stati verificati.
+                    if (node.Kind == LandmarkRegistry.LandmarkKind.BiologicalAnchor)
+                    {
+                        float q = FovUtils.ObservationQuality(dist, visionRange);
+                        bus.Publish(new LandmarkSpottedEvent(
+                            observerNpcId: npcId,
+                            landmarkNodeId: node.Id,
+                            landmarkKind: node.Kind,
+                            cellX: node.CellX,
+                            cellY: node.CellY,
+                            witnessQuality01: q));
+                    }
 
                     // Accumula per i meccanismi di edge soggettivi.
                     if (subjectiveEdgesEnabled)

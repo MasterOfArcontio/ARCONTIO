@@ -42,6 +42,9 @@ namespace Arcontio.Core
             // NPC visti -> memoria
             _rules.Add(new NpcSpottedMemoryRule());
 
+            // Landmark tipizzati visti -> memoria soggettiva generalizzabile.
+            _rules.Add(new LandmarkSpottedMemoryRule());
+
             // Furto cibo (Day9)
             _rules.Add(new FoodStolenMemoryRule());
 
@@ -109,6 +112,20 @@ namespace Arcontio.Core
 
                     if (!rule.Matches(e))
                         continue;
+
+                    if (TryProcessObserverBoundMemoryEvent(
+                            world,
+                            tick,
+                            telemetry,
+                            costPerNpc,
+                            costObserver,
+                            rule,
+                            e,
+                            out int observerBoundTracesAdded))
+                    {
+                        tracesAdded += observerBoundTracesAdded;
+                        break;
+                    }
 
                     // ? FIX CS0136: evX/evY invece di ex/ey
                     if (!TryGetEventCell(e, out int evX, out int evY))
@@ -234,7 +251,7 @@ namespace Arcontio.Core
 
                         if (rule.TryEncode(world, npcId, e, quality, out var trace))
                         {
-                            if (e is ObjectSpottedEvent || e is NpcSpottedEvent)
+                            if (e is ObjectSpottedEvent || e is NpcSpottedEvent || e is LandmarkSpottedEvent)
                                 trace.LastObservedTick = (int)tick.Index;
 
                             var res = world.Memory[npcId].AddOrMerge(trace, out var acceptedTrace);
@@ -268,7 +285,7 @@ namespace Arcontio.Core
                             // - parte solo dopo che il MemoryStore ha accettato o rinforzato la trace;
                             // - salta le trace droppate, perche non sono entrate nella memoria soggettiva;
                             // - non legge stato globale: il BeliefUpdater usa solo MemoryTrace + BeliefStore.
-                            if (res != AddOrMergeResult.Dropped)
+                            if (res != AddOrMergeResult.Dropped && trace.Type != MemoryType.LandmarkSpotted)
                             {
                                 if (!world.Beliefs.TryGetValue(npcId, out var beliefStore) || beliefStore == null)
                                 {
@@ -310,6 +327,108 @@ namespace Arcontio.Core
 
         // Patch 0.02.5A: Manhattan rimosso — usa FovUtils.Manhattan
 
+        // =============================================================================
+        // TryProcessObserverBoundMemoryEvent
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Gestisce gli eventi percettivi che arrivano gia' legati a un singolo
+        /// osservatore. Questi eventi non devono essere ridistribuiti a tutti gli NPC
+        /// con il gate testimoni del MemoryEncodingSystem, perche' il sistema che li
+        /// produce ha gia' applicato range, cono e linea di vista.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: niente doppia percezione</b></para>
+        /// <para>
+        /// <see cref="LandmarkSpottedEvent"/> nasce dentro <c>LandmarkPerceptionSystem</c>.
+        /// Il suo <c>ObserverNpcId</c> e la sua qualita' percettiva sono quindi gia'
+        /// parte del contratto. Questo helper copia l'evento nel MemoryStore del solo
+        /// osservatore dichiarato e non crea belief nello step v0.71.05.J.
+        /// </para>
+        /// </summary>
+        private bool TryProcessObserverBoundMemoryEvent(
+            World world,
+            Tick tick,
+            Telemetry telemetry,
+            bool costPerNpc,
+            RuntimeCostObserver costObserver,
+            IMemoryRule rule,
+            ISimEvent e,
+            out int tracesAdded)
+        {
+            tracesAdded = 0;
+
+            if (e is not LandmarkSpottedEvent landmarkEvent)
+                return false;
+
+            int npcId = landmarkEvent.ObserverNpcId;
+            if (!world.ExistsNpc(npcId))
+                return true;
+
+            telemetry.Counter("MemoryEncodingSystem.TracesEncodedAttempts", 1);
+
+            if (!rule.TryEncode(world, npcId, e, landmarkEvent.WitnessQuality01, out var trace))
+                return true;
+
+            trace.LastObservedTick = (int)tick.Index;
+
+            MemoryStore memoryStore = EnsureMemoryStore(world, npcId);
+            AddOrMergeResult res = memoryStore.AddOrMerge(trace, out var acceptedTrace);
+            MemoryBeliefDecisionExplainabilityEmitter.TryWriteMemoryTrace(
+                world.Config?.Sim?.memory_belief_decision_explainability,
+                world.MemoryBeliefDecisionExplainability,
+                npcId,
+                tick.Index,
+                acceptedTrace,
+                res,
+                e.GetType().Name);
+
+            switch (res)
+            {
+                case AddOrMergeResult.Inserted:
+                    telemetry.Counter("MemoryEncodingSystem.TracesActuallyInserted", 1);
+                    break;
+                case AddOrMergeResult.Replaced:
+                    telemetry.Counter("MemoryEncodingSystem.TracesActuallyInserted", 1);
+                    telemetry.Counter("MemoryEncodingSystem.TracesReplaced", 1);
+                    break;
+                case AddOrMergeResult.Reinforced:
+                    telemetry.Counter("MemoryEncodingSystem.TracesReinforced", 1);
+                    break;
+                case AddOrMergeResult.Dropped:
+                    telemetry.Counter("MemoryEncodingSystem.TracesDropped", 1);
+                    break;
+            }
+
+            // v0.71.05.J: la trace LandmarkSpotted resta memoria. Le belief
+            // biologiche potenziali/osservate arrivano negli step L/M tramite regole
+            // esplicite, non come effetto collaterale di questa osservazione.
+            tracesAdded = 1;
+            if (costPerNpc)
+                costObserver.AddNpcWork(npcId, 1);
+
+            return true;
+        }
+
+        // =============================================================================
+        // EnsureMemoryStore
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce lo store memoria dell'NPC, creandolo solo come fallback
+        /// difensivo per snapshot o test costruiti manualmente.
+        /// </para>
+        /// </summary>
+        private static MemoryStore EnsureMemoryStore(World world, int npcId)
+        {
+            if (!world.Memory.TryGetValue(npcId, out var store) || store == null)
+            {
+                store = new MemoryStore();
+                world.Memory[npcId] = store;
+            }
+
+            return store;
+        }
         // ============================================================
         // Patch 0.01P3 extension: Theft communication (event-driven tokens)
         // ============================================================

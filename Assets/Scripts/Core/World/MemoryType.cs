@@ -41,5 +41,7 @@ namespace Arcontio.Core
         FoodPossiblyStolenFromMe,
         FoodMissingSuspected,       // Sospetto che mi manchi cibo
 
+        LandmarkSpotted,            // Ho visto un landmark tipizzato
+
     }
 }
