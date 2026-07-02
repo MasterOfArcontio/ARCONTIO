@@ -95,6 +95,8 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphFovDebugOverlayRuntimeController _fovOverlayController;
         private ArcGraphDebugOverlaySceneProbeRenderer _landmarkPathOverlayConsumer;
         private ArcGraphLandmarkPathDebugOverlayRuntimeController _landmarkPathOverlayController;
+        private ArcGraphDebugOverlaySceneProbeRenderer _areaOverlayConsumer;
+        private ArcGraphSpatialAreaOverlayRuntimeController _areaOverlayController;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
         private ArcGraphSerializedSpriteResolver _spriteResolver;
         private ArcGraphUiRuntimeRoot _uiRoot;
@@ -333,6 +335,8 @@ namespace Arcontio.View.ArcGraph
             _fovOverlayController = _visualRoot.AddComponent<ArcGraphFovDebugOverlayRuntimeController>();
             _landmarkPathOverlayConsumer = _visualRoot.AddComponent<ArcGraphDebugOverlaySceneProbeRenderer>();
             _landmarkPathOverlayController = _visualRoot.AddComponent<ArcGraphLandmarkPathDebugOverlayRuntimeController>();
+            _areaOverlayConsumer = _visualRoot.AddComponent<ArcGraphDebugOverlaySceneProbeRenderer>();
+            _areaOverlayController = _visualRoot.AddComponent<ArcGraphSpatialAreaOverlayRuntimeController>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
             _uiRoot = gameObject.AddComponent<ArcGraphUiRuntimeRoot>();
@@ -500,11 +504,18 @@ namespace Arcontio.View.ArcGraph
             // LM mostra il grafo landmark, PATH mostra route/path dell'NPC attivo.
             _landmarkPathOverlayConsumer.SetPlaceProbeAtSceneCameraCenter(false);
             _landmarkPathOverlayConsumer.SetLogDiagnostics(false);
+            _landmarkPathOverlayConsumer.SetProbeRootName("ArcGraphDebugOverlaySceneProbeRoot_LandmarkPath");
             _landmarkPathOverlayController.SetRuntimeContextProvider(_contextProvider);
             _landmarkPathOverlayController.SetOverlayConsumer(_landmarkPathOverlayConsumer);
             _landmarkPathOverlayController.SetProcessInUpdate(true);
             _landmarkPathOverlayController.SetLandmarkOverlayEnabled(false);
             _landmarkPathOverlayController.SetPathfindingOverlayEnabled(false);
+
+            _areaOverlayConsumer.SetPlaceProbeAtSceneCameraCenter(false);
+            _areaOverlayConsumer.SetLogDiagnostics(false);
+            _areaOverlayConsumer.SetProbeRootName("ArcGraphDebugOverlaySceneProbeRoot_Area");
+            _areaOverlayController.Configure(_contextProvider, _areaOverlayConsumer);
+            _areaOverlayController.SetAreaOverlayEnabled(false);
         }
 
         // =============================================================================
@@ -618,6 +629,15 @@ namespace Arcontio.View.ArcGraph
                     return;
 
                 _landmarkPathOverlayController.SetLandmarkOverlayEnabled(enabled);
+                return;
+            }
+
+            if (normalized == ArcUiVisualOverlayCatalog.AreaOverlayKey)
+            {
+                if (_areaOverlayController == null)
+                    return;
+
+                _areaOverlayController.SetAreaOverlayEnabled(enabled);
                 return;
             }
 
@@ -740,6 +760,9 @@ namespace Arcontio.View.ArcGraph
 
             if (_placementHighlightConsumer != null)
                 _placementHighlightConsumer.SetPlacementPreviewSource(placementPreviewSource);
+
+            if (_areaOverlayController != null)
+                _areaOverlayController.Configure(_contextProvider, _areaOverlayConsumer);
 
             if (_cameraViewportController != null)
                 _cameraViewportController.SetSceneCamera(Camera.main);

@@ -83,6 +83,11 @@ namespace Arcontio.Core.Save
                 return false;
             }
 
+            if (!WorldSpatialAreaSaveLoader.CanApplySpatialAreasSafely(world, data, out error))
+            {
+                return false;
+            }
+
             if (!CanApplyBeliefSectionSafely(world, data, out error))
             {
                 return false;
@@ -111,6 +116,11 @@ namespace Arcontio.Core.Save
             }
 
             if (!WorldInventorySaveLoader.TryApplyInventory(world, data, out error))
+            {
+                return false;
+            }
+
+            if (!WorldSpatialAreaSaveLoader.TryApplySpatialAreas(world, data, out error))
             {
                 return false;
             }

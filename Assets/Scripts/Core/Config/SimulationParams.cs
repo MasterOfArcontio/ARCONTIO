@@ -79,6 +79,9 @@ namespace Arcontio.Core.Config
         // ---------------- Landmark pathfinding (v0.02) ----------------
         public LandmarkSystemParams landmarks = new LandmarkSystemParams();
 
+        // ---------------- World Spatial Areas (v0.71.05.I) ----------------
+        public SpatialAreaParams spatial_areas = new SpatialAreaParams();
+
         // ---------------- Movement (v0.02.05.B) ----------------
         public MovementParams movement = new MovementParams();
 
@@ -1300,6 +1303,52 @@ namespace Arcontio.Core.Config
     {
         public int eviction_stale_ticks = 600;
         public int eviction_cooldown_ticks = 120;
+    }
+
+    [Serializable]
+    public sealed class SpatialAreaParams
+    {
+        public const int DefaultMaxClosedRoomSurfaceCells = 256;
+        public const int DefaultCorridorMaxWidthCells = 3;
+        public const int DefaultSupportLmSpacingVisionMarginCells = 1;
+        public const int DefaultSupportLmCoverageRadiusMultiplier = 2;
+
+        public int max_closed_room_surface_cells = DefaultMaxClosedRoomSurfaceCells;
+        public int corridor_max_width_cells = DefaultCorridorMaxWidthCells;
+        public int support_lm_spacing_vision_margin_cells = DefaultSupportLmSpacingVisionMarginCells;
+        public int support_lm_coverage_radius_multiplier = DefaultSupportLmCoverageRadiusMultiplier;
+
+        public int ResolveMaxClosedRoomSurfaceCells()
+        {
+            return max_closed_room_surface_cells <= 0
+                ? DefaultMaxClosedRoomSurfaceCells
+                : max_closed_room_surface_cells;
+        }
+
+        public int ResolveCorridorMaxWidthCells()
+        {
+            return corridor_max_width_cells <= 0
+                ? DefaultCorridorMaxWidthCells
+                : corridor_max_width_cells;
+        }
+
+        public int ResolveSupportLandmarkSpacingCells(int npcVisionRangeCells)
+        {
+            int vision = npcVisionRangeCells <= 0 ? 1 : npcVisionRangeCells;
+            int margin = support_lm_spacing_vision_margin_cells < 0
+                ? DefaultSupportLmSpacingVisionMarginCells
+                : support_lm_spacing_vision_margin_cells;
+            int spacing = vision - margin;
+            return spacing <= 0 ? 1 : spacing;
+        }
+
+        public int ResolveSupportLandmarkCoverageRadiusCells(int npcVisionRangeCells)
+        {
+            int multiplier = support_lm_coverage_radius_multiplier <= 0
+                ? DefaultSupportLmCoverageRadiusMultiplier
+                : support_lm_coverage_radius_multiplier;
+            return ResolveSupportLandmarkSpacingCells(npcVisionRangeCells) * multiplier;
+        }
     }
 
     [Serializable]

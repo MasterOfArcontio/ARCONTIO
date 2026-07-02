@@ -17608,7 +17608,11 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.F | Query autorizzata: risorsa da area/landmark noto | ✅ |
 | v0.71.05.G | Query operativa job: pianta piu' vicina che fornisce risorsa X | ✅ |
 | v0.71.05.H | Landmark provider centralizzato per moduli | ✅ |
-| v0.71.05.I | Landmark di supporto in spazi aperti privi di landmark | ⏳ |
+| v0.71.05.I | Aree spaziali World + landmark di supporto in spazi aperti | ✅ |
+| v0.71.05.I.1 | WorldSpatialAreas: flood-fill fisico, stanze, corridoi e open area | ✅ |
+| v0.71.05.I.2 | Persistenza modulare spatialAreas + overlay ArcGraph AREA | ✅ |
+| v0.71.05.I.3 | Provider SupportOpenSpace per landmark di supporto in open area | ✅ |
+| v0.71.05.I.4 | Roadmap/QA e nota costituzionale su aree fisiche vs biologiche | ✅ |
 | v0.71.05.J | Memory trace percezione landmark biologico | ⏳ |
 | v0.71.05.K | Memory trace ricerca risorsa da landmark biologico | ⏳ |
 | v0.71.05.L | Belief potenziale: qui puo' esserci risorsa X | ⏳ |
@@ -17655,6 +17659,10 @@ La `v0.71.05.C8.15` consolida la chiusura del blocco C8: i fixture QA dei job fo
 La `v0.71.05.D` introduce lo stato reale delle risorse per singola pianta fisica: ogni `EnvironmentPlantInstance` puo' esporre prodotti con quantita' disponibile, quantita' massima, stagionalita', tool richiesto, food/non-food, distruzione pianta e ricrescita futura. Le query harvestable leggono quantita' reali maggiori di zero, mentre il RightInspector pianta mostra i prodotti tramite contratti ArcGraph read-only derivati dalla proiezione `WorldPhysicalPlantProjection`. Non entra ancora raccolta, comando harvest o ricrescita post-raccolta.
 
 La `v0.71.05.E` rende operativa la ricrescita progressiva delle risorse per-pianta: i prodotti con `regrowDays > 0` aumentano a unita' intere lungo i giorni ambientali, mentre `regrowDays = 0` indica assenza di ricrescita passiva. Le risorse possono maturare fuori stagione, ma restano escluse dalle query harvestable finche' la stagione del prodotto non e' valida.
+
+La `v0.71.05.I` introduce le aree spaziali del `World` come dominio distinto dalle aree biologiche della Biosfera. Il flood-fill fisico separa `OpenArea`, `ClosedRoom` e `Corridor`: muri e porte sono confini, le porte restano confini anche se aperte, mentre piante, vegetazione, NPC e oggetti mobili non chiudono aree. Le aree chiuse troppo grandi e troppo larghe producono diagnostica di mappa, non vengono usate come aree valide.
+
+La stessa patch aggiunge la sezione save/load modulare `spatialAreas`, il toggle ArcGraph `AREA` e il provider `SupportOpenSpace`: i landmark di supporto sono scaffolding oggettivo di navigazione, generati solo in `OpenArea` quando la copertura dei landmark esistenti non basta. Non creano memory, belief, decisioni o job e non sono conoscenza soggettiva dell'NPC.
 
 Flusso atteso:
 

@@ -39,7 +39,8 @@ namespace Arcontio.View.ArcGraph
         Belief = 5,
         Memory = 6,
         Biosphere = 7,
-        Resources = 8
+        Resources = 8,
+        Area = 9
     }
 
     // =============================================================================
@@ -133,6 +134,7 @@ namespace Arcontio.View.ArcGraph
         public const string MemoryOverlayKey = "memory_overlay";
         public const string BiosphereOverlayKey = "biosphere_overlay";
         public const string ResourcesOverlayKey = "resources_overlay";
+        public const string AreaOverlayKey = "area_overlay";
 
         private static readonly ArcUiVisualOverlayDefinition[] Definitions =
         {
@@ -199,6 +201,14 @@ namespace Arcontio.View.ArcGraph
                 ArcUiVisualOverlayKind.Resources,
                 requiresSelectedNpc: false,
                 debugOnly: true,
+                enabledByDefault: false),
+            new ArcUiVisualOverlayDefinition(
+                AreaOverlayKey,
+                "AREA",
+                "icon_area",
+                ArcUiVisualOverlayKind.Area,
+                requiresSelectedNpc: false,
+                debugOnly: false,
                 enabledByDefault: false)
         };
 

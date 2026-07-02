@@ -40,6 +40,7 @@ namespace Arcontio.Core
             Junction   = 2,
             AreaCenter = 3, // Nuovo (v0.03): massimo locale DT in zona aperta
             BiologicalAnchor = 4,
+            SupportOpenSpaceAnchor = 5,
         }
 
         // =============================================================================
@@ -1236,7 +1237,9 @@ namespace Arcontio.Core
                             ? $"A#{n.Id}"
                             : n.Kind == LandmarkKind.BiologicalAnchor
                                 ? $"B#{n.Id}"
-                                : $"J#{n.Id}";
+                                : n.Kind == LandmarkKind.SupportOpenSpaceAnchor
+                                    ? $"S#{n.Id}"
+                                    : $"J#{n.Id}";
                     outNodes.Add(new LandmarkOverlayNode(cellX: n.CellX, cellY: n.CellY, kind: (int)n.Kind, nodeId: n.Id, label: label));
                 }
             }

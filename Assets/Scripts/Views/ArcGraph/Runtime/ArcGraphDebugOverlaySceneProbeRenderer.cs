@@ -44,6 +44,7 @@ namespace Arcontio.View.ArcGraph
         [SerializeField] private float nodeScale = 0.55f;
         [SerializeField] private float normalEdgeWidth = 0.055f;
         [SerializeField] private float strongEdgeWidth = 0.10f;
+        [SerializeField] private string probeRootName = ProbeRootName;
 
         private const string ProbeRootName = "ArcGraphDebugOverlaySceneProbeRoot";
         private const int CellSortingOrder = 180;
@@ -68,6 +69,12 @@ namespace Arcontio.View.ArcGraph
         public void SetTileWorldSize(float value)
         {
             tileWorldSize = value > 0.0001f ? value : 1f;
+        }
+
+        public void SetProbeRootName(string value)
+        {
+            probeRootName = string.IsNullOrWhiteSpace(value) ? ProbeRootName : value.Trim();
+            _root = null;
         }
 
         // =============================================================================
@@ -531,14 +538,19 @@ namespace Arcontio.View.ArcGraph
             if (_root != null)
                 return;
 
-            var go = new GameObject(ProbeRootName);
+            var go = new GameObject(ResolveProbeRootName());
             go.transform.SetParent(transform, false);
             _root = go.transform;
         }
 
         private Transform FindExistingRoot()
         {
-            return transform.Find(ProbeRootName);
+            return transform.Find(ResolveProbeRootName());
+        }
+
+        private string ResolveProbeRootName()
+        {
+            return string.IsNullOrWhiteSpace(probeRootName) ? ProbeRootName : probeRootName;
         }
 
         private void EnsureDebugSprite()
@@ -615,6 +627,15 @@ namespace Arcontio.View.ArcGraph
                 case "debug/gvd/raw":
                     color = new Color(0f, 1f, 1f, 0.55f);
                     break;
+                case "debug/area/open":
+                    color = new Color(0.20f, 0.72f, 1f, 0.24f + (Clamp01(intensity01) * 0.12f));
+                    break;
+                case "debug/area/room":
+                    color = new Color(1f, 0.72f, 0.22f, 0.25f + (Clamp01(intensity01) * 0.12f));
+                    break;
+                case "debug/area/corridor":
+                    color = new Color(0.70f, 0.35f, 1f, 0.25f + (Clamp01(intensity01) * 0.12f));
+                    break;
                 case "debug/landmark/world-node":
                     color = new Color(1f, 1f, 1f, 0.85f);
                     break;
@@ -632,6 +653,9 @@ namespace Arcontio.View.ArcGraph
                     break;
                 case "debug/landmark/biological-anchor":
                     color = new Color(0.10f, 0.95f, 0.25f, 1f);
+                    break;
+                case "debug/landmark/support-open-space":
+                    color = new Color(0.35f, 0.90f, 1f, 1f);
                     break;
                 case "debug/landmark/known-node":
                     color = new Color(0.20f, 1f, 0.55f, 1f);

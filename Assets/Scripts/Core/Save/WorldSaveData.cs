@@ -39,7 +39,7 @@ namespace Arcontio.Core.Save
         /// Campo non serializzato direttamente da JsonUtility perche' const, ma usato
         /// dai futuri writer come valore canonico di <see cref="schemaVersion"/>.
         /// </summary>
-        public const int CurrentSchemaVersion = 2;
+        public const int CurrentSchemaVersion = 3;
 
         /// <summary>
         /// Versione dello schema JSON. Serve a distinguere snapshot futuri quando il
@@ -144,6 +144,13 @@ namespace Arcontio.Core.Save
         /// salva il vecchio <c>NpcPrivateFood</c>.
         /// </summary>
         public WorldInventorySaveData inventory = new WorldInventorySaveData();
+
+        /// <summary>
+        /// Sezione autonoma delle aree fisico-spaziali del World.
+        /// Le aree sono topologia oggettiva, distinta da <see cref="environment"/>
+        /// che resta dominio della Biosfera.
+        /// </summary>
+        public WorldSpatialAreaSaveData spatialAreas = new WorldSpatialAreaSaveData();
 
         /// <summary>
         /// Sezione legacy disattivata dal formato canonico v2.

@@ -39,6 +39,7 @@ namespace Arcontio.View.ArcGraph
         LandmarkRouteNode = 32,
         LandmarkGvdNode = 33,
         LandmarkBiologicalNode = 34,
+        LandmarkSupportNode = 35,
 
         LandmarkWorldEdge = 40,
         LandmarkKnownEdge = 41,
@@ -52,6 +53,7 @@ namespace Arcontio.View.ArcGraph
         DtHeatCell = 60,
         DtValueLabel = 61,
         GvdRawCell = 62,
+        SpatialAreaCell = 63,
 
         LandmarkLabel = 80,
         PointerCellCoordsHud = 90,

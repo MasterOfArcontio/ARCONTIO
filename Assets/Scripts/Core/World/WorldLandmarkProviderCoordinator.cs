@@ -21,6 +21,7 @@ namespace Arcontio.Core
     {
         private readonly List<IWorldLandmarkProvider> _providers = new(4);
         private readonly List<LandmarkRegistry.ManualLandmarkCandidate> _candidates = new(64);
+        private readonly List<LandmarkRegistry.ManualLandmarkCandidate> _coverageCandidates = new(64);
         private readonly List<LandmarkRegistry.ManualLandmarkResolution> _resolutions = new(64);
         private readonly List<LandmarkRegistry.ManualLandmarkResolution> _providerResolutions = new(16);
 
@@ -45,15 +46,39 @@ namespace Arcontio.Core
         public void Rebuild(World world, LandmarkRegistry registry)
         {
             _candidates.Clear();
+            _coverageCandidates.Clear();
             _resolutions.Clear();
 
             for (int i = 0; i < _providers.Count; i++)
                 _providers[i]?.BuildLandmarkCandidates(world, _candidates);
 
             if (registry != null)
+            {
                 registry.RebuildFromWorld(world, _candidates, _resolutions);
+                BuildCoverageCandidates(world, registry);
+
+                if (_coverageCandidates.Count > 0)
+                {
+                    for (int i = 0; i < _coverageCandidates.Count; i++)
+                        _candidates.Add(_coverageCandidates[i]);
+
+                    registry.RebuildFromWorld(world, _candidates, _resolutions);
+                }
+            }
 
             ApplyResolutionsByProvider();
+        }
+
+        private void BuildCoverageCandidates(World world, LandmarkRegistry registry)
+        {
+            if (world == null || registry == null)
+                return;
+
+            for (int i = 0; i < _providers.Count; i++)
+            {
+                if (_providers[i] is IWorldLandmarkCoverageProvider coverageProvider)
+                    coverageProvider.BuildCoverageLandmarkCandidates(world, registry, _coverageCandidates);
+            }
         }
 
         private void ApplyResolutionsByProvider()

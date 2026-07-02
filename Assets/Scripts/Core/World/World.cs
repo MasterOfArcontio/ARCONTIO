@@ -221,6 +221,7 @@ namespace Arcontio.Core
 
         public EnvironmentState EnvironmentState { get; private set; }
         public EnvironmentAreaSetConfig InitialEnvironmentAreaSetConfig { get; private set; }
+        public WorldSpatialAreaState SpatialAreas { get; private set; } = new WorldSpatialAreaState();
         public IReadOnlyDictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> PhysicalPlants => _physicalPlants;
         public IReadOnlyDictionary<EnvironmentCellCoord, WorldDiffuseVegetationProjection> DiffuseVegetation =>
             _diffuseVegetation;
@@ -406,6 +407,7 @@ namespace Arcontio.Core
             _blocksVision = new bool[size];
             _blocksMovement = new bool[size];
             CellSurfaces = new CellSurfaceLayer(MapWidth, MapHeight);
+            SpatialAreas?.Clear(MapWidth, MapHeight);
 
             // Pulizia cache: default Ã¨ ok per OcclusionCell/bool,
             // ma _objIdByCell deve essere inizializzato a -1 (empty).
@@ -1086,6 +1088,7 @@ namespace Arcontio.Core
             LandmarkRegistry = new LandmarkRegistry();
             EnvironmentState = new EnvironmentState();
             _landmarkProviderCoordinator.RegisterProvider(new EnvironmentBiologicalLandmarkProvider(this));
+            _landmarkProviderCoordinator.RegisterProvider(new SupportOpenSpaceLandmarkProvider());
             InitialEnvironmentAreaSetConfig = new EnvironmentAreaSetConfig();
 
             // ============================================================
@@ -2458,7 +2461,33 @@ namespace Arcontio.Core
         /// </summary>
         private void RebuildLandmarksWithProviders()
         {
+            RebuildSpatialAreas();
             _landmarkProviderCoordinator.Rebuild(this, LandmarkRegistry);
+        }
+
+        // =============================================================================
+        // RebuildSpatialAreas
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Ricostruisce le aree fisico-spaziali del World dalla geometria corrente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: topologia oggettiva prima dei provider</b></para>
+        /// <para>
+        /// Le aree sono una cache derivata dalla mappa, come i landmark. Vengono
+        /// ricostruite prima dei provider di supporto per evitare che un modulo
+        /// landmark debba decidere autonomamente cosa sia spazio aperto.
+        /// </para>
+        /// </summary>
+        public void RebuildSpatialAreas()
+        {
+            if (SpatialAreas == null)
+                SpatialAreas = new WorldSpatialAreaState();
+
+            var builder = new WorldSpatialAreaBuilder();
+            builder.Build(this, Config?.Sim?.spatial_areas);
+            SpatialAreas.ReplaceAll(MapWidth, MapHeight, builder.Areas, builder.Diagnostics);
         }
 
         // =============================================================================
@@ -3934,6 +3963,44 @@ namespace Arcontio.Core
             return _objIdByCell[CellIndex(x, y)];
         }
 
+        // =============================================================================
+        // IsSpatialAreaBoundaryAt
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Indica se una cella e' un confine per le aree fisico-spaziali.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: area fisica diversa da pathfinding</b></para>
+        /// <para>
+        /// Questa query non usa <see cref="BlocksMovementAt"/>: il pathfinding puo'
+        /// essere influenzato da piante fisiche o stati runtime, mentre le aree
+        /// spaziali devono essere chiuse solo da strutture. Le porte separano sempre
+        /// le aree, anche quando aperte.
+        /// </para>
+        /// </summary>
+        public bool IsSpatialAreaBoundaryAt(int x, int y)
+        {
+            if (!InBounds(x, y))
+                return true;
+
+            int objectId = GetObjectAt(x, y);
+            if (objectId < 0 || !Objects.TryGetValue(objectId, out WorldObjectInstance instance) || instance == null)
+                return false;
+
+            if (!TryGetObjectDef(instance.DefId, out ObjectDef def) || def == null)
+                return false;
+
+            if (def.IsDoor)
+                return true;
+
+            string visualKind = def.Visual != null ? def.Visual.VisualKind : string.Empty;
+            if (string.Equals(visualKind, "wall", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return def.IsOccluder && def.BlocksMovement && !def.CanPlaceInHand && !def.CanPlaceInContainer;
+        }
+
 
         // ============================================================
         // LANDMARK MEMORY HELPERS (v0.02 Day3)
@@ -5383,7 +5450,7 @@ namespace Arcontio.Core
         /// - Non introduciamo nuovi parametri JSON: e' una scelta hardcoded di debug/UX.
         /// </summary>
         public void GetNpcLandmarkOverlayData(
-    int npcId,
+            int npcId,
     System.Collections.Generic.List<LandmarkOverlayNode> outWorldNodes,
     System.Collections.Generic.List<LandmarkOverlayEdge> outWorldEdges,
     System.Collections.Generic.List<LandmarkOverlayNode> outKnownNodes,
@@ -5510,6 +5577,42 @@ namespace Arcontio.Core
                     }
                 }
             }
+        }
+
+        // =============================================================================
+        // TryGetSpatialAreaAt
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce l'area fisico-spaziale che contiene una cella, se presente.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: query read-only su store World</b></para>
+        /// <para>
+        /// Il chiamante non riceve accesso mutabile allo store interno. Questo metodo
+        /// serve a UI diagnostica, save/load e provider, non a cambiare la mappa.
+        /// </para>
+        /// </summary>
+        public bool TryGetSpatialAreaAt(int x, int y, out WorldSpatialArea area)
+        {
+            area = null;
+            return SpatialAreas != null && SpatialAreas.TryGetAreaAt(x, y, out area);
+        }
+
+        // =============================================================================
+        // FillSpatialAreaOverlayData
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Popola un buffer value-only con le celle dell'overlay AREA.
+        /// </para>
+        /// </summary>
+        public void FillSpatialAreaOverlayData(List<WorldSpatialAreaOverlayCell> outCells)
+        {
+            if (outCells == null)
+                return;
+
+            SpatialAreas?.FillOverlayCells(outCells);
         }
 
         /// <summary>
@@ -5682,7 +5785,9 @@ namespace Arcontio.Core
                     ? $"D#{n.Id}"
                     : n.Kind == LandmarkRegistry.LandmarkKind.BiologicalAnchor
                         ? $"B#{n.Id}"
-                        : $"J#{n.Id}";
+                        : n.Kind == LandmarkRegistry.LandmarkKind.SupportOpenSpaceAnchor
+                            ? $"S#{n.Id}"
+                            : $"J#{n.Id}";
                 outRouteNodes?.Add(new LandmarkOverlayNode(cellX: n.CellX, cellY: n.CellY, kind: (int)n.Kind, nodeId: n.Id, label: label));
 
                 if (i <= 0)

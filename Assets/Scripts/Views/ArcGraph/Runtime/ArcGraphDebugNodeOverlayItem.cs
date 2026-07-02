@@ -87,6 +87,8 @@ namespace Arcontio.View.ArcGraph
                     return "debug/landmark/gvd-node";
                 case ArcGraphDebugOverlayKind.LandmarkBiologicalNode:
                     return "debug/landmark/biological-node";
+                case ArcGraphDebugOverlayKind.LandmarkSupportNode:
+                    return "debug/landmark/support-open-space";
                 default:
                     return "debug/node/default";
             }

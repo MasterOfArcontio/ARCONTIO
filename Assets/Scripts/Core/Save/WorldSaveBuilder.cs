@@ -106,6 +106,7 @@ namespace Arcontio.Core.Save
                 foodStocks = BuildFoodStockEntries(world),
                 objectUseStates = BuildObjectUseStateEntries(world),
                 inventory = WorldInventorySaveBuilder.BuildFromWorld(world),
+                spatialAreas = WorldSpatialAreaSaveBuilder.BuildFromWorld(world),
                 npcPinnedFoodStockBeliefs = BuildNpcPinnedFoodStockBeliefEntries(world),
 
                 // Belief persistence v0.10.10:

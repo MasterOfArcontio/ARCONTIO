@@ -350,6 +350,9 @@ namespace Arcontio.View.ArcGraph
             if (node.Kind == (int)LandmarkRegistry.LandmarkKind.BiologicalAnchor)
                 return "B#" + node.NodeId;
 
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.SupportOpenSpaceAnchor)
+                return "S#" + node.NodeId;
+
             return "J#" + node.NodeId;
         }
 
@@ -359,6 +362,9 @@ namespace Arcontio.View.ArcGraph
         {
             if (node.Kind == (int)LandmarkRegistry.LandmarkKind.BiologicalAnchor)
                 return ArcGraphDebugOverlayKind.LandmarkBiologicalNode;
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.SupportOpenSpaceAnchor)
+                return ArcGraphDebugOverlayKind.LandmarkSupportNode;
 
             return fallback;
         }
@@ -381,6 +387,9 @@ namespace Arcontio.View.ArcGraph
 
             if (node.Kind == (int)LandmarkRegistry.LandmarkKind.BiologicalAnchor)
                 return "debug/landmark/biological-anchor";
+
+            if (node.Kind == (int)LandmarkRegistry.LandmarkKind.SupportOpenSpaceAnchor)
+                return "debug/landmark/support-open-space";
 
             return null;
         }

@@ -110,4 +110,28 @@ namespace Arcontio.Core
         void ApplyLandmarkResolutions(
             IReadOnlyList<LandmarkRegistry.ManualLandmarkResolution> resolutions);
     }
+
+    // =============================================================================
+    // IWorldLandmarkCoverageProvider
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Contratto opzionale per provider che riempiono vuoti dopo una prima rebuild
+    /// dei landmark strutturali e dei provider primari.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: supporto dopo copertura reale</b></para>
+    /// <para>
+    /// I landmark di supporto devono sapere quali landmark esistono gia'. Per questo
+    /// non vengono prodotti nel passaggio primario: ricevono un registry gia'
+    /// popolato e propongono solo candidati supplementari.
+    /// </para>
+    /// </summary>
+    public interface IWorldLandmarkCoverageProvider : IWorldLandmarkProvider
+    {
+        int BuildCoverageLandmarkCandidates(
+            World world,
+            LandmarkRegistry registry,
+            List<LandmarkRegistry.ManualLandmarkCandidate> outCandidates);
+    }
 }

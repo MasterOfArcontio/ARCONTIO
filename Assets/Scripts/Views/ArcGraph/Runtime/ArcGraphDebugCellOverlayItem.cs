@@ -93,6 +93,8 @@ namespace Arcontio.View.ArcGraph
                     return "debug/dt/heat";
                 case ArcGraphDebugOverlayKind.GvdRawCell:
                     return "debug/gvd/raw";
+                case ArcGraphDebugOverlayKind.SpatialAreaCell:
+                    return "debug/area/cell";
                 default:
                     return "debug/cell/default";
             }
