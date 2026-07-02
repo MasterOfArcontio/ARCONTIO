@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using Arcontio.Core;
 using Arcontio.Core.Config;
+using Arcontio.Core.Diagnostics;
 using NUnit.Framework;
 
 namespace Arcontio.EditorTests
