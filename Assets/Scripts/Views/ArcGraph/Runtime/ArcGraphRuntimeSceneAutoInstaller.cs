@@ -97,6 +97,7 @@ namespace Arcontio.View.ArcGraph
         private ArcGraphLandmarkPathDebugOverlayRuntimeController _landmarkPathOverlayController;
         private ArcGraphDebugOverlaySceneProbeRenderer _areaOverlayConsumer;
         private ArcGraphSpatialAreaOverlayRuntimeController _areaOverlayController;
+        private ArcGraphSpatialAreaDebugPanelSceneView _spatialAreaDebugPanel;
         private ArcGraphNpcSpriteResourceProbe _npcSpriteProbe;
         private ArcGraphSerializedSpriteResolver _spriteResolver;
         private ArcGraphUiRuntimeRoot _uiRoot;
@@ -337,6 +338,7 @@ namespace Arcontio.View.ArcGraph
             _landmarkPathOverlayController = _visualRoot.AddComponent<ArcGraphLandmarkPathDebugOverlayRuntimeController>();
             _areaOverlayConsumer = _visualRoot.AddComponent<ArcGraphDebugOverlaySceneProbeRenderer>();
             _areaOverlayController = _visualRoot.AddComponent<ArcGraphSpatialAreaOverlayRuntimeController>();
+            _spatialAreaDebugPanel = _visualRoot.AddComponent<ArcGraphSpatialAreaDebugPanelSceneView>();
             _npcSpriteProbe = _visualRoot.AddComponent<ArcGraphNpcSpriteResourceProbe>();
             _spriteResolver = _visualRoot.AddComponent<ArcGraphSerializedSpriteResolver>();
             _uiRoot = gameObject.AddComponent<ArcGraphUiRuntimeRoot>();
@@ -471,6 +473,9 @@ namespace Arcontio.View.ArcGraph
             _npcRunningActionOverlay.SetRenderQueue(_wrapper.RenderQueue);
             _npcRunningActionOverlay.SetSceneCamera(Camera.main);
             _npcRunningActionOverlay.SetOverlayEnabled(true);
+            _spatialAreaDebugPanel.SetUiRoot(_uiRoot);
+            _spatialAreaDebugPanel.SetRuntimeContextProvider(_contextProvider);
+            _spatialAreaDebugPanel.SetPanelVisible(true);
             _selectionEditRequestBridge.SetSelectionActionController(_selectionActionController);
             _selectionEditRequestBridge.SetEditSelectionController(_editSelectionController);
             _selectionDeleteCommandBridge.SetSelectionActionController(_selectionActionController);
@@ -763,6 +768,13 @@ namespace Arcontio.View.ArcGraph
 
             if (_areaOverlayController != null)
                 _areaOverlayController.Configure(_contextProvider, _areaOverlayConsumer);
+
+            if (_spatialAreaDebugPanel != null)
+            {
+                _spatialAreaDebugPanel.SetUiRoot(_uiRoot);
+                _spatialAreaDebugPanel.SetRuntimeContextProvider(_contextProvider);
+                _spatialAreaDebugPanel.SetPanelVisible(true);
+            }
 
             if (_cameraViewportController != null)
                 _cameraViewportController.SetSceneCamera(Camera.main);

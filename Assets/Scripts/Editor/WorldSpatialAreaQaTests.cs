@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Arcontio.Core;
 using Arcontio.Core.Config;
 using Arcontio.Core.Save;
+using Arcontio.View.ArcGraph;
 using NUnit.Framework;
 
 namespace Arcontio.EditorTests
@@ -271,6 +272,58 @@ namespace Arcontio.EditorTests
         }
 
         // =============================================================================
+        // SpatialDebugSnapshotReportsDefaultHouseRoom
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Lo snapshot diagnostico esposto al pannello ArcGraph deve vedere la casa
+        /// della mappa default come stanza chiusa, non solo l'overlay celle.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SpatialDebugSnapshotReportsDefaultHouseRoom()
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            ObjectDatabaseLoader.LoadIntoWorld(world);
+            CellSurfaceDatabaseLoader.LoadIntoWorld(world);
+
+            bool loaded = WorldMapConfigLoader.LoadIntoWorld(world);
+
+            Assert.That(loaded, Is.True);
+            WorldSpatialAreaDebugSnapshot snapshot = world.BuildSpatialAreaDebugSnapshot();
+            Assert.That(snapshot.HasErrors, Is.False);
+            Assert.That(snapshot.ClosedRoomCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(snapshot.OpenAreaCount, Is.GreaterThanOrEqualTo(1));
+        }
+
+        // =============================================================================
+        // SpatialAreaOverlayUsesDistinctClosedAreaColorKeys
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Il contratto overlay AREA separa open, room e corridor con chiavi colore
+        /// distinte. Il renderer associa poi room al rosso e corridor all'arancio.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SpatialAreaOverlayUsesDistinctClosedAreaColorKeys()
+        {
+            string open = ArcGraphSpatialAreaOverlayRuntimeController.ResolveColorKeyForAreaKind(
+                WorldSpatialAreaKind.OpenArea);
+            string room = ArcGraphSpatialAreaOverlayRuntimeController.ResolveColorKeyForAreaKind(
+                WorldSpatialAreaKind.ClosedRoom);
+            string corridor = ArcGraphSpatialAreaOverlayRuntimeController.ResolveColorKeyForAreaKind(
+                WorldSpatialAreaKind.Corridor);
+
+            Assert.That(open, Is.EqualTo("debug/area/open"));
+            Assert.That(room, Is.EqualTo("debug/area/room"));
+            Assert.That(corridor, Is.EqualTo("debug/area/corridor"));
+            Assert.That(room, Is.Not.EqualTo(open));
+            Assert.That(corridor, Is.Not.EqualTo(open));
+            Assert.That(corridor, Is.Not.EqualTo(room));
+        }
+
+        // =============================================================================
         // BiologicalAnchorsDoNotCoverSupportOpenSpace
         // =============================================================================
         /// <summary>
@@ -307,6 +360,64 @@ namespace Arcontio.EditorTests
 
             Assert.That(produced, Is.GreaterThan(0));
             Assert.That(supportCandidates.Count, Is.GreaterThan(0));
+        }
+
+        // =============================================================================
+        // SpatialDebugSnapshotListsSupportOpenSpaceAnchors
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Il pannello debug deve poter confrontare gli S# visibili in LM con una
+        /// lista data-only prodotta dal World.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SpatialDebugSnapshotListsSupportOpenSpaceAnchors()
+        {
+            var sim = new SimulationParams();
+            sim.spatial_areas.support_lm_spacing_cells = 3;
+            sim.spatial_areas.support_lm_coverage_radius_multiplier = 1;
+            World world = CreateWorld(10, 10, sim);
+
+            world.RebuildLandmarksBootstrap();
+            WorldSpatialAreaDebugSnapshot snapshot = world.BuildSpatialAreaDebugSnapshot();
+
+            Assert.That(snapshot.SupportLandmarkCount, Is.GreaterThan(0));
+            Assert.That(snapshot.SupportLandmarks.Length, Is.EqualTo(snapshot.SupportLandmarkCount));
+            Assert.That(snapshot.SupportLandmarkZeroReason, Is.Empty);
+            for (int i = 0; i < snapshot.SupportLandmarks.Length; i++)
+            {
+                Assert.That(snapshot.SupportLandmarks[i].NodeId, Is.GreaterThan(0));
+                Assert.That(snapshot.SupportLandmarks[i].AreaKind, Is.EqualTo(WorldSpatialAreaKind.OpenArea));
+                Assert.That(snapshot.SupportLandmarks[i].AreaId, Is.GreaterThan(0));
+            }
+        }
+
+        // =============================================================================
+        // SpatialDebugSnapshotExplainsMissingSupportOpenArea
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Quando non esiste alcuna area aperta, lo snapshot non deve limitarsi a
+        /// dire zero S#: deve spiegare il motivo principale.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SpatialDebugSnapshotExplainsMissingSupportOpenArea()
+        {
+            World world = CreateWorld(3, 3);
+            for (int y = 0; y < 3; y++)
+            {
+                for (int x = 0; x < 3; x++)
+                    Assert.That(world.CreateObject("qa_wall", x, y, OwnerKind.Community, 0), Is.GreaterThan(0));
+            }
+
+            world.RebuildLandmarksBootstrap();
+            WorldSpatialAreaDebugSnapshot snapshot = world.BuildSpatialAreaDebugSnapshot();
+
+            Assert.That(snapshot.OpenAreaCount, Is.EqualTo(0));
+            Assert.That(snapshot.SupportLandmarkCount, Is.EqualTo(0));
+            Assert.That(snapshot.SupportLandmarkZeroReason, Is.EqualTo("NoOpenArea"));
         }
 
         private static World CreateWorld(int width, int height, SimulationParams sim = null)

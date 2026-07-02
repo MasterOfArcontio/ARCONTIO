@@ -77,6 +77,11 @@ namespace Arcontio.View.ArcGraph
             overlayConsumer.RenderQueue(_queue);
         }
 
+        public static string ResolveColorKeyForAreaKind(WorldSpatialAreaKind kind)
+        {
+            return ResolveColorKey(kind);
+        }
+
         private static string ResolveColorKey(WorldSpatialAreaKind kind)
         {
             switch (kind)

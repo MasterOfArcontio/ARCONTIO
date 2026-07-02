@@ -631,10 +631,10 @@ namespace Arcontio.View.ArcGraph
                     color = new Color(0.20f, 0.72f, 1f, 0.24f + (Clamp01(intensity01) * 0.12f));
                     break;
                 case "debug/area/room":
-                    color = new Color(1f, 0.72f, 0.22f, 0.25f + (Clamp01(intensity01) * 0.12f));
+                    color = new Color(1f, 0.08f, 0.08f, 0.30f + (Clamp01(intensity01) * 0.16f));
                     break;
                 case "debug/area/corridor":
-                    color = new Color(0.70f, 0.35f, 1f, 0.25f + (Clamp01(intensity01) * 0.12f));
+                    color = new Color(1f, 0.38f, 0.10f, 0.28f + (Clamp01(intensity01) * 0.14f));
                     break;
                 case "debug/landmark/world-node":
                     color = new Color(1f, 1f, 1f, 0.85f);

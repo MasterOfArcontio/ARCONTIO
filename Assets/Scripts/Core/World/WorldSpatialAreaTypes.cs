@@ -158,6 +158,144 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // WorldSupportLandmarkDebugEntry
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Riga read-only del pannello diagnostico Spatial/Support Landmark.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: debug UI da snapshot, non da registry mutabile</b></para>
+    /// <para>
+    /// Il pannello ArcGraph non deve scorrere direttamente il <c>LandmarkRegistry</c>.
+    /// Il World produce invece righe value-only gia' risolte con area spaziale,
+    /// lasciando alla view solo il compito di stamparle.
+    /// </para>
+    /// </summary>
+    public readonly struct WorldSupportLandmarkDebugEntry
+    {
+        public readonly int NodeId;
+        public readonly int CellX;
+        public readonly int CellY;
+        public readonly int AreaId;
+        public readonly WorldSpatialAreaKind AreaKind;
+
+        public WorldSupportLandmarkDebugEntry(
+            int nodeId,
+            int cellX,
+            int cellY,
+            int areaId,
+            WorldSpatialAreaKind areaKind)
+        {
+            NodeId = nodeId;
+            CellX = cellX;
+            CellY = cellY;
+            AreaId = areaId;
+            AreaKind = areaKind;
+        }
+    }
+
+    // =============================================================================
+    // WorldSpatialAreaDebugSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Snapshot read-only dello stato aree spaziali e landmark di supporto.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: diagnostica data-only autorizzata</b></para>
+    /// <para>
+    /// Questo DTO e' prodotto dal World e consumato da ArcGraph. Contiene solo
+    /// conteggi, configurazione effettiva e righe gia' normalizzate; non contiene
+    /// riferimenti a liste interne, provider o oggetti mutabili.
+    /// </para>
+    ///
+    /// <para><b>Struttura interna:</b></para>
+    /// <list type="bullet">
+    ///   <item><b>Conteggi aree</b>: totali per open, room, corridor e diagnostiche invalide.</item>
+    ///   <item><b>Config support</b>: spacing, raggio e moltiplicatore effettivi.</item>
+    ///   <item><b>SupportLandmarks</b>: elenco dei nodi S# finali presenti nel registry.</item>
+    ///   <item><b>SupportLandmarkZeroReason</b>: motivo sintetico quando non esistono S#.</item>
+    /// </list>
+    /// </summary>
+    public sealed class WorldSpatialAreaDebugSnapshot
+    {
+        private static readonly string[] EmptyDiagnostics = Array.Empty<string>();
+        private static readonly WorldSupportLandmarkDebugEntry[] EmptySupportLandmarks =
+            Array.Empty<WorldSupportLandmarkDebugEntry>();
+
+        public readonly int TotalAreaCount;
+        public readonly int OpenAreaCount;
+        public readonly int ClosedRoomCount;
+        public readonly int CorridorCount;
+        public readonly int InvalidDiagnosticCount;
+        public readonly int SupportLandmarkSpacingCells;
+        public readonly int SupportLandmarkCoverageRadiusCells;
+        public readonly int SupportLandmarkCoverageMultiplier;
+        public readonly int SupportLandmarkCount;
+        public readonly string SupportLandmarkZeroReason;
+        public readonly string[] Diagnostics;
+        public readonly WorldSupportLandmarkDebugEntry[] SupportLandmarks;
+
+        public bool HasErrors => InvalidDiagnosticCount > 0;
+
+        public WorldSpatialAreaDebugSnapshot(
+            int totalAreaCount,
+            int openAreaCount,
+            int closedRoomCount,
+            int corridorCount,
+            int invalidDiagnosticCount,
+            int supportLandmarkSpacingCells,
+            int supportLandmarkCoverageRadiusCells,
+            int supportLandmarkCoverageMultiplier,
+            int supportLandmarkCount,
+            string supportLandmarkZeroReason,
+            IReadOnlyList<string> diagnostics,
+            IReadOnlyList<WorldSupportLandmarkDebugEntry> supportLandmarks)
+        {
+            TotalAreaCount = totalAreaCount < 0 ? 0 : totalAreaCount;
+            OpenAreaCount = openAreaCount < 0 ? 0 : openAreaCount;
+            ClosedRoomCount = closedRoomCount < 0 ? 0 : closedRoomCount;
+            CorridorCount = corridorCount < 0 ? 0 : corridorCount;
+            InvalidDiagnosticCount = invalidDiagnosticCount < 0 ? 0 : invalidDiagnosticCount;
+            SupportLandmarkSpacingCells = supportLandmarkSpacingCells <= 0 ? 1 : supportLandmarkSpacingCells;
+            SupportLandmarkCoverageRadiusCells = supportLandmarkCoverageRadiusCells < 0 ? 0 : supportLandmarkCoverageRadiusCells;
+            SupportLandmarkCoverageMultiplier = supportLandmarkCoverageMultiplier <= 0 ? 1 : supportLandmarkCoverageMultiplier;
+            SupportLandmarkCount = supportLandmarkCount < 0 ? 0 : supportLandmarkCount;
+            SupportLandmarkZeroReason = string.IsNullOrWhiteSpace(supportLandmarkZeroReason)
+                ? string.Empty
+                : supportLandmarkZeroReason;
+            Diagnostics = CopyDiagnostics(diagnostics);
+            SupportLandmarks = CopySupportLandmarks(supportLandmarks);
+        }
+
+        private static string[] CopyDiagnostics(IReadOnlyList<string> diagnostics)
+        {
+            if (diagnostics == null || diagnostics.Count == 0)
+                return EmptyDiagnostics;
+
+            var copy = new string[diagnostics.Count];
+            for (int i = 0; i < diagnostics.Count; i++)
+                copy[i] = diagnostics[i] ?? string.Empty;
+
+            return copy;
+        }
+
+        private static WorldSupportLandmarkDebugEntry[] CopySupportLandmarks(
+            IReadOnlyList<WorldSupportLandmarkDebugEntry> supportLandmarks)
+        {
+            if (supportLandmarks == null || supportLandmarks.Count == 0)
+                return EmptySupportLandmarks;
+
+            var copy = new WorldSupportLandmarkDebugEntry[supportLandmarks.Count];
+            for (int i = 0; i < supportLandmarks.Count; i++)
+                copy[i] = supportLandmarks[i];
+
+            return copy;
+        }
+    }
+
+    // =============================================================================
     // WorldSpatialAreaState
     // =============================================================================
     /// <summary>

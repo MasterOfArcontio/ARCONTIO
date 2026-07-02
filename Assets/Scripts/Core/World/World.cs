@@ -5615,6 +5615,139 @@ namespace Arcontio.Core
             SpatialAreas?.FillOverlayCells(outCells);
         }
 
+        // =============================================================================
+        // BuildSpatialAreaDebugSnapshot
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Costruisce una fotografia diagnostica read-only di aree spaziali e
+        /// landmark di supporto open-space.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: debug centralizzato sul boundary World</b></para>
+        /// <para>
+        /// ArcGraph non deve ricostruire flood-fill, non deve leggere provider e non
+        /// deve interrogare il <c>LandmarkRegistry</c> direttamente. Il World produce
+        /// un DTO gia' normalizzato che la UI puo' solo renderizzare.
+        /// </para>
+        /// </summary>
+        public WorldSpatialAreaDebugSnapshot BuildSpatialAreaDebugSnapshot()
+        {
+            int openCount = 0;
+            int closedRoomCount = 0;
+            int corridorCount = 0;
+            IReadOnlyList<WorldSpatialArea> areas = SpatialAreas?.Areas;
+
+            if (areas != null)
+            {
+                for (int i = 0; i < areas.Count; i++)
+                {
+                    WorldSpatialArea area = areas[i];
+                    if (area == null)
+                        continue;
+
+                    switch (area.Kind)
+                    {
+                        case WorldSpatialAreaKind.OpenArea:
+                            openCount++;
+                            break;
+                        case WorldSpatialAreaKind.ClosedRoom:
+                            closedRoomCount++;
+                            break;
+                        case WorldSpatialAreaKind.Corridor:
+                            corridorCount++;
+                            break;
+                    }
+                }
+            }
+
+            int npcVisionRangeCells = Global.NpcVisionRangeCells <= 0
+                ? 1
+                : Global.NpcVisionRangeCells;
+            SpatialAreaParams spatialConfig = Config?.Sim?.spatial_areas;
+            int spacing = spatialConfig != null
+                ? spatialConfig.ResolveSupportLandmarkSpacingCells(npcVisionRangeCells)
+                : SpatialAreaParams.DefaultSupportLmSpacingCells;
+            int coverageRadius = spatialConfig != null
+                ? spatialConfig.ResolveSupportLandmarkCoverageRadiusCells(npcVisionRangeCells)
+                : spacing * SpatialAreaParams.DefaultSupportLmCoverageRadiusMultiplier;
+            int coverageMultiplier = spatialConfig != null && spatialConfig.support_lm_coverage_radius_multiplier > 0
+                ? spatialConfig.support_lm_coverage_radius_multiplier
+                : SpatialAreaParams.DefaultSupportLmCoverageRadiusMultiplier;
+
+            var supportLandmarks = new List<WorldSupportLandmarkDebugEntry>(16);
+            int activeLandmarkCount = CollectSupportOpenSpaceDebugEntries(supportLandmarks);
+            string zeroReason = supportLandmarks.Count == 0
+                ? ResolveSupportOpenSpaceZeroReason(openCount, activeLandmarkCount)
+                : string.Empty;
+
+            IReadOnlyList<string> diagnostics = SpatialAreas?.Diagnostics;
+            int diagnosticCount = SpatialAreas?.DiagnosticCount ?? 0;
+            return new WorldSpatialAreaDebugSnapshot(
+                areas?.Count ?? 0,
+                openCount,
+                closedRoomCount,
+                corridorCount,
+                diagnosticCount,
+                spacing,
+                coverageRadius,
+                coverageMultiplier,
+                supportLandmarks.Count,
+                zeroReason,
+                diagnostics,
+                supportLandmarks);
+        }
+
+        private int CollectSupportOpenSpaceDebugEntries(List<WorldSupportLandmarkDebugEntry> outEntries)
+        {
+            if (outEntries == null || LandmarkRegistry == null)
+                return 0;
+
+            int activeCount = 0;
+            IReadOnlyList<LandmarkRegistry.LandmarkNode> nodes = LandmarkRegistry.Nodes;
+            for (int i = 0; i < nodes.Count; i++)
+            {
+                LandmarkRegistry.LandmarkNode node = nodes[i];
+                if (node == null || !node.IsActive)
+                    continue;
+
+                activeCount++;
+                if (node.Kind != LandmarkRegistry.LandmarkKind.SupportOpenSpaceAnchor)
+                    continue;
+
+                int areaId = 0;
+                WorldSpatialAreaKind areaKind = WorldSpatialAreaKind.None;
+                if (TryGetSpatialAreaAt(node.CellX, node.CellY, out WorldSpatialArea area) && area != null)
+                {
+                    areaId = area.AreaId;
+                    areaKind = area.Kind;
+                }
+
+                outEntries.Add(new WorldSupportLandmarkDebugEntry(
+                    node.Id,
+                    node.CellX,
+                    node.CellY,
+                    areaId,
+                    areaKind));
+            }
+
+            return activeCount;
+        }
+
+        private string ResolveSupportOpenSpaceZeroReason(int openAreaCount, int activeLandmarkCount)
+        {
+            if (LandmarkRegistry == null)
+                return "LandmarkRegistryMissing";
+
+            if (openAreaCount <= 0)
+                return "NoOpenArea";
+
+            if (activeLandmarkCount <= 0)
+                return "LandmarkRegistryEmptyOrNotRebuilt";
+
+            return "OpenAreaCoveredByNavigationalLandmarks";
+        }
+
         /// <summary>
         /// Applica un PathSegment al cursore (cx, cy) modificandolo in-place.
         /// </summary>
