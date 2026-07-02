@@ -213,6 +213,7 @@ namespace Arcontio.EditorTests
         {
             var sim = new SimulationParams();
             sim.npcVisionRangeCells = 3;
+            sim.spatial_areas.support_lm_spacing_cells = 0;
             sim.spatial_areas.support_lm_spacing_vision_margin_cells = 1;
             sim.spatial_areas.support_lm_coverage_radius_multiplier = 1;
             World world = CreateWorld(8, 8, sim);
@@ -235,6 +236,77 @@ namespace Arcontio.EditorTests
             }
 
             Assert.That(foundSupport, Is.True);
+        }
+
+        // =============================================================================
+        // DefaultMapHouseBuildsClosedRoom
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// La casa reale della mappa default deve essere una stanza chiusa 12x12
+        /// interna, non parte dello spazio aperto globale.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void DefaultMapHouseBuildsClosedRoom()
+        {
+            var world = new World(new WorldConfig(new SimulationParams()));
+            ObjectDatabaseLoader.LoadIntoWorld(world);
+            CellSurfaceDatabaseLoader.LoadIntoWorld(world);
+
+            bool loaded = WorldMapConfigLoader.LoadIntoWorld(world);
+
+            Assert.That(loaded, Is.True);
+            Assert.That(world.TryGetSpatialAreaAt(52, 14, out WorldSpatialArea house), Is.True);
+            Assert.That(house.Kind, Is.EqualTo(WorldSpatialAreaKind.ClosedRoom));
+            Assert.That(house.MinX, Is.EqualTo(46));
+            Assert.That(house.MaxX, Is.EqualTo(57));
+            Assert.That(house.MinY, Is.EqualTo(9));
+            Assert.That(house.MaxY, Is.EqualTo(20));
+            Assert.That(house.CellCount, Is.EqualTo(144));
+            Assert.That(world.TryGetSpatialAreaAt(51, 8, out _), Is.False);
+            Assert.That(world.TryGetSpatialAreaAt(58, 14, out _), Is.False);
+            Assert.That(world.TryGetSpatialAreaAt(32, 32, out WorldSpatialArea outside), Is.True);
+            Assert.That(outside.Kind, Is.EqualTo(WorldSpatialAreaKind.OpenArea));
+        }
+
+        // =============================================================================
+        // BiologicalAnchorsDoNotCoverSupportOpenSpace
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// I landmark biologici restano ancore cognitive/ambientali e non saturano
+        /// la copertura navigazionale richiesta dai support landmark.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void BiologicalAnchorsDoNotCoverSupportOpenSpace()
+        {
+            var sim = new SimulationParams();
+            sim.spatial_areas.support_lm_spacing_cells = 8;
+            sim.spatial_areas.support_lm_coverage_radius_multiplier = 2;
+            World world = CreateWorld(24, 24, sim);
+            world.RebuildSpatialAreas();
+
+            var registry = new LandmarkRegistry();
+            var manual = new List<LandmarkRegistry.ManualLandmarkCandidate>
+            {
+                new LandmarkRegistry.ManualLandmarkCandidate(
+                    8,
+                    8,
+                    LandmarkRegistry.LandmarkKind.BiologicalAnchor,
+                    1f,
+                    new LandmarkProviderKey(LandmarkProviderKind.EnvironmentBiosphere, 1))
+            };
+            var resolutions = new List<LandmarkRegistry.ManualLandmarkResolution>();
+            registry.RebuildFromWorld(world, manual, resolutions);
+
+            var provider = new SupportOpenSpaceLandmarkProvider();
+            var supportCandidates = new List<LandmarkRegistry.ManualLandmarkCandidate>();
+            int produced = provider.BuildCoverageLandmarkCandidates(world, registry, supportCandidates);
+
+            Assert.That(produced, Is.GreaterThan(0));
+            Assert.That(supportCandidates.Count, Is.GreaterThan(0));
         }
 
         private static World CreateWorld(int width, int height, SimulationParams sim = null)

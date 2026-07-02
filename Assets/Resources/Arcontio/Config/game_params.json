@@ -219,6 +219,7 @@
   "spatial_areas": {
     "max_closed_room_surface_cells": 256,
     "corridor_max_width_cells": 3,
+    "support_lm_spacing_cells": 8,
     "support_lm_spacing_vision_margin_cells": 1,
     "support_lm_coverage_radius_multiplier": 2
   },

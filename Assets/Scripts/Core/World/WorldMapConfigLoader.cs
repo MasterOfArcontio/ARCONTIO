@@ -81,6 +81,7 @@ namespace Arcontio.Core
             ApplySurfaceLayer(world, map.SurfaceLayer);
             ApplyInitialObjects(world, map.InitialObjects);
             ApplyBiologicalAreas(world, map.BiologicalAreas);
+            world.RebuildSpatialAreas();
             return true;
         }
 

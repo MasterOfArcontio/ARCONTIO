@@ -1310,11 +1310,13 @@ namespace Arcontio.Core.Config
     {
         public const int DefaultMaxClosedRoomSurfaceCells = 256;
         public const int DefaultCorridorMaxWidthCells = 3;
+        public const int DefaultSupportLmSpacingCells = 8;
         public const int DefaultSupportLmSpacingVisionMarginCells = 1;
         public const int DefaultSupportLmCoverageRadiusMultiplier = 2;
 
         public int max_closed_room_surface_cells = DefaultMaxClosedRoomSurfaceCells;
         public int corridor_max_width_cells = DefaultCorridorMaxWidthCells;
+        public int support_lm_spacing_cells = DefaultSupportLmSpacingCells;
         public int support_lm_spacing_vision_margin_cells = DefaultSupportLmSpacingVisionMarginCells;
         public int support_lm_coverage_radius_multiplier = DefaultSupportLmCoverageRadiusMultiplier;
 
@@ -1334,6 +1336,9 @@ namespace Arcontio.Core.Config
 
         public int ResolveSupportLandmarkSpacingCells(int npcVisionRangeCells)
         {
+            if (support_lm_spacing_cells > 0)
+                return support_lm_spacing_cells;
+
             int vision = npcVisionRangeCells <= 0 ? 1 : npcVisionRangeCells;
             int margin = support_lm_spacing_vision_margin_cells < 0
                 ? DefaultSupportLmSpacingVisionMarginCells

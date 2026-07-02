@@ -97,6 +97,9 @@ namespace Arcontio.Core
             for (int i = 0; i < _existingNodes.Count; i++)
             {
                 LandmarkOverlayNode node = _existingNodes[i];
+                if (!IsNavigationalCoverageNode(node.Kind))
+                    continue;
+
                 if (GridDistance(x, y, node.CellX, node.CellY) <= radius)
                     return true;
             }
@@ -116,6 +119,14 @@ namespace Arcontio.Core
             int dx = ax >= bx ? ax - bx : bx - ax;
             int dy = ay >= by ? ay - by : by - ay;
             return dx > dy ? dx : dy;
+        }
+
+        private static bool IsNavigationalCoverageNode(int kind)
+        {
+            return kind == (int)LandmarkRegistry.LandmarkKind.Doorway
+                || kind == (int)LandmarkRegistry.LandmarkKind.Junction
+                || kind == (int)LandmarkRegistry.LandmarkKind.AreaCenter
+                || kind == (int)LandmarkRegistry.LandmarkKind.SupportOpenSpaceAnchor;
         }
     }
 }
