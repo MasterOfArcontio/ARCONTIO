@@ -222,6 +222,8 @@ namespace Arcontio.Core
         public EnvironmentState EnvironmentState { get; private set; }
         public EnvironmentAreaSetConfig InitialEnvironmentAreaSetConfig { get; private set; }
         public WorldSpatialAreaState SpatialAreas { get; private set; } = new WorldSpatialAreaState();
+        public WorldSupportLandmarkGenerationDebugSnapshot SupportOpenSpaceGenerationDebug { get; private set; } =
+            WorldSupportLandmarkGenerationDebugSnapshot.Empty;
         public IReadOnlyDictionary<EnvironmentPlantId, WorldPhysicalPlantProjection> PhysicalPlants => _physicalPlants;
         public IReadOnlyDictionary<EnvironmentCellCoord, WorldDiffuseVegetationProjection> DiffuseVegetation =>
             _diffuseVegetation;
@@ -2462,7 +2464,13 @@ namespace Arcontio.Core
         private void RebuildLandmarksWithProviders()
         {
             RebuildSpatialAreas();
+            SupportOpenSpaceGenerationDebug = WorldSupportLandmarkGenerationDebugSnapshot.Empty;
             _landmarkProviderCoordinator.Rebuild(this, LandmarkRegistry);
+        }
+
+        internal void SetSupportOpenSpaceGenerationDebug(WorldSupportLandmarkGenerationDebugSnapshot snapshot)
+        {
+            SupportOpenSpaceGenerationDebug = snapshot;
         }
 
         // =============================================================================
@@ -2487,7 +2495,7 @@ namespace Arcontio.Core
 
             var builder = new WorldSpatialAreaBuilder();
             builder.Build(this, Config?.Sim?.spatial_areas);
-            SpatialAreas.ReplaceAll(MapWidth, MapHeight, builder.Areas, builder.Diagnostics);
+            SpatialAreas.ReplaceAll(MapWidth, MapHeight, builder.Areas, builder.Diagnostics, builder.BuildDebug);
         }
 
         // =============================================================================
@@ -3981,24 +3989,46 @@ namespace Arcontio.Core
         /// </summary>
         public bool IsSpatialAreaBoundaryAt(int x, int y)
         {
+            return ResolveSpatialAreaBoundaryKindAt(x, y) != WorldSpatialBoundaryKind.None;
+        }
+
+        // =============================================================================
+        // ResolveSpatialAreaBoundaryKindAt
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Restituisce il tipo diagnostico di confine spaziale presente su una cella.
+        /// </para>
+        ///
+        /// <para><b>Principio architetturale: una sola fonte per le boundary fisiche</b></para>
+        /// <para>
+        /// Il builder usa questa query per costruire le aree e il debug usa gli
+        /// stessi risultati per spiegare il processo. In questo modo il pannello
+        /// ArcGraph non duplica la logica di muro, porta o oggetto strutturale.
+        /// </para>
+        /// </summary>
+        public WorldSpatialBoundaryKind ResolveSpatialAreaBoundaryKindAt(int x, int y)
+        {
             if (!InBounds(x, y))
-                return true;
+                return WorldSpatialBoundaryKind.Other;
 
             int objectId = GetObjectAt(x, y);
             if (objectId < 0 || !Objects.TryGetValue(objectId, out WorldObjectInstance instance) || instance == null)
-                return false;
+                return WorldSpatialBoundaryKind.None;
 
             if (!TryGetObjectDef(instance.DefId, out ObjectDef def) || def == null)
-                return false;
+                return WorldSpatialBoundaryKind.None;
 
             if (def.IsDoor)
-                return true;
+                return WorldSpatialBoundaryKind.Door;
 
             string visualKind = def.Visual != null ? def.Visual.VisualKind : string.Empty;
             if (string.Equals(visualKind, "wall", StringComparison.OrdinalIgnoreCase))
-                return true;
+                return WorldSpatialBoundaryKind.Wall;
 
-            return def.IsOccluder && def.BlocksMovement && !def.CanPlaceInHand && !def.CanPlaceInContainer;
+            return def.IsOccluder && def.BlocksMovement && !def.CanPlaceInHand && !def.CanPlaceInContainer
+                ? WorldSpatialBoundaryKind.Other
+                : WorldSpatialBoundaryKind.None;
         }
 
 
@@ -5668,12 +5698,8 @@ namespace Arcontio.Core
             int spacing = spatialConfig != null
                 ? spatialConfig.ResolveSupportLandmarkSpacingCells(npcVisionRangeCells)
                 : SpatialAreaParams.DefaultSupportLmSpacingCells;
-            int coverageRadius = spatialConfig != null
-                ? spatialConfig.ResolveSupportLandmarkCoverageRadiusCells(npcVisionRangeCells)
-                : spacing * SpatialAreaParams.DefaultSupportLmCoverageRadiusMultiplier;
-            int coverageMultiplier = spatialConfig != null && spatialConfig.support_lm_coverage_radius_multiplier > 0
-                ? spatialConfig.support_lm_coverage_radius_multiplier
-                : SpatialAreaParams.DefaultSupportLmCoverageRadiusMultiplier;
+            int coverageRadius = spacing;
+            int coverageMultiplier = 1;
 
             var supportLandmarks = new List<WorldSupportLandmarkDebugEntry>(16);
             int activeLandmarkCount = CollectSupportOpenSpaceDebugEntries(supportLandmarks);
@@ -5694,8 +5720,11 @@ namespace Arcontio.Core
                 coverageMultiplier,
                 supportLandmarks.Count,
                 zeroReason,
+                SpatialAreas?.BuildDebug,
+                SupportOpenSpaceGenerationDebug,
                 diagnostics,
-                supportLandmarks);
+                supportLandmarks,
+                SpatialAreas?.BuildDebug?.Classifications);
         }
 
         private int CollectSupportOpenSpaceDebugEntries(List<WorldSupportLandmarkDebugEntry> outEntries)

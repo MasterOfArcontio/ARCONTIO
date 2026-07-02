@@ -28,6 +28,29 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // WorldSpatialBoundaryKind
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Classificazione diagnostica minima delle celle che chiudono un'area spaziale.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: una sola regola boundary</b></para>
+    /// <para>
+    /// Il builder delle aree e il pannello debug devono leggere la stessa decisione
+    /// prodotta dal World. Questo enum evita che ArcGraph o i test ricostruiscano
+    /// in modo parallelo il significato di muro, porta o altro confine strutturale.
+    /// </para>
+    /// </summary>
+    public enum WorldSpatialBoundaryKind : byte
+    {
+        None = 0,
+        Wall = 1,
+        Door = 2,
+        Other = 3
+    }
+
+    // =============================================================================
     // WorldSpatialAreaCell
     // =============================================================================
     /// <summary>
@@ -196,6 +219,188 @@ namespace Arcontio.Core
     }
 
     // =============================================================================
+    // WorldSpatialAreaClassificationDebugEntry
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Riga diagnostica compatta di una componente flood-fill classificata dal
+    /// builder aree spaziali.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: debug del processo, non solo del risultato</b></para>
+    /// <para>
+    /// Quando una stanza non viene riconosciuta, il solo conteggio finale non basta.
+    /// Questa riga conserva i dati essenziali del passaggio di classificazione:
+    /// bounds, superficie, contatto con bordo mappa, narrow span e risultato.
+    /// </para>
+    /// </summary>
+    public readonly struct WorldSpatialAreaClassificationDebugEntry
+    {
+        public readonly int AreaId;
+        public readonly WorldSpatialAreaKind Kind;
+        public readonly int MinX;
+        public readonly int MinY;
+        public readonly int MaxX;
+        public readonly int MaxY;
+        public readonly int CellCount;
+        public readonly bool TouchesMapBorder;
+        public readonly int MaxNarrowSpan;
+        public readonly bool IsInvalid;
+
+        public WorldSpatialAreaClassificationDebugEntry(
+            int areaId,
+            WorldSpatialAreaKind kind,
+            int minX,
+            int minY,
+            int maxX,
+            int maxY,
+            int cellCount,
+            bool touchesMapBorder,
+            int maxNarrowSpan,
+            bool isInvalid)
+        {
+            AreaId = areaId < 0 ? 0 : areaId;
+            Kind = kind;
+            MinX = minX;
+            MinY = minY;
+            MaxX = maxX;
+            MaxY = maxY;
+            CellCount = cellCount < 0 ? 0 : cellCount;
+            TouchesMapBorder = touchesMapBorder;
+            MaxNarrowSpan = maxNarrowSpan < 0 ? 0 : maxNarrowSpan;
+            IsInvalid = isInvalid;
+        }
+    }
+
+    // =============================================================================
+    // WorldSpatialAreaBuildDebugSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Diagnostica read-only prodotta dal builder aree spaziali durante l'ultimo
+    /// rebuild.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: diagnostica Core, visualizzazione ArcGraph</b></para>
+    /// <para>
+    /// I conteggi di boundary e flood-fill nascono dove avviene il calcolo reale.
+    /// La UI riceve soltanto numeri e righe gia' normalizzate, senza ripetere il
+    /// flood-fill e senza leggere oggetti o cataloghi.
+    /// </para>
+    /// </summary>
+    public sealed class WorldSpatialAreaBuildDebugSnapshot
+    {
+        private static readonly WorldSpatialAreaClassificationDebugEntry[] EmptyClassifications =
+            Array.Empty<WorldSpatialAreaClassificationDebugEntry>();
+
+        public static readonly WorldSpatialAreaBuildDebugSnapshot Empty =
+            new WorldSpatialAreaBuildDebugSnapshot(0, 0, 0, 0, 0, 0, 0, 0, 0, EmptyClassifications);
+
+        public readonly int BoundaryWallCount;
+        public readonly int BoundaryDoorCount;
+        public readonly int BoundaryOtherCount;
+        public readonly int BoundaryTotalCount;
+        public readonly int FloodComponentCount;
+        public readonly int FloodOpenComponentCount;
+        public readonly int FloodClosedCandidateCount;
+        public readonly int FloodClosedRoomCount;
+        public readonly int FloodCorridorCount;
+        public readonly int FloodInvalidClosedAreaCount;
+        public readonly WorldSpatialAreaClassificationDebugEntry[] Classifications;
+
+        public WorldSpatialAreaBuildDebugSnapshot(
+            int boundaryWallCount,
+            int boundaryDoorCount,
+            int boundaryOtherCount,
+            int floodComponentCount,
+            int floodOpenComponentCount,
+            int floodClosedCandidateCount,
+            int floodClosedRoomCount,
+            int floodCorridorCount,
+            int floodInvalidClosedAreaCount,
+            IReadOnlyList<WorldSpatialAreaClassificationDebugEntry> classifications)
+        {
+            BoundaryWallCount = boundaryWallCount < 0 ? 0 : boundaryWallCount;
+            BoundaryDoorCount = boundaryDoorCount < 0 ? 0 : boundaryDoorCount;
+            BoundaryOtherCount = boundaryOtherCount < 0 ? 0 : boundaryOtherCount;
+            BoundaryTotalCount = BoundaryWallCount + BoundaryDoorCount + BoundaryOtherCount;
+            FloodComponentCount = floodComponentCount < 0 ? 0 : floodComponentCount;
+            FloodOpenComponentCount = floodOpenComponentCount < 0 ? 0 : floodOpenComponentCount;
+            FloodClosedCandidateCount = floodClosedCandidateCount < 0 ? 0 : floodClosedCandidateCount;
+            FloodClosedRoomCount = floodClosedRoomCount < 0 ? 0 : floodClosedRoomCount;
+            FloodCorridorCount = floodCorridorCount < 0 ? 0 : floodCorridorCount;
+            FloodInvalidClosedAreaCount = floodInvalidClosedAreaCount < 0 ? 0 : floodInvalidClosedAreaCount;
+            Classifications = CopyClassifications(classifications);
+        }
+
+        private static WorldSpatialAreaClassificationDebugEntry[] CopyClassifications(
+            IReadOnlyList<WorldSpatialAreaClassificationDebugEntry> classifications)
+        {
+            if (classifications == null || classifications.Count == 0)
+                return EmptyClassifications;
+
+            var copy = new WorldSpatialAreaClassificationDebugEntry[classifications.Count];
+            for (int i = 0; i < classifications.Count; i++)
+                copy[i] = classifications[i];
+
+            return copy;
+        }
+    }
+
+    // =============================================================================
+    // WorldSupportLandmarkGenerationDebugSnapshot
+    // =============================================================================
+    /// <summary>
+    /// <para>
+    /// Diagnostica dell'ultimo passaggio coverage-first dei landmark SupportOpenSpace.
+    /// </para>
+    ///
+    /// <para><b>Principio architetturale: provider isolato, debug value-only</b></para>
+    /// <para>
+    /// Il provider produce questi numeri mentre lavora, poi il World li espone come
+    /// snapshot. ArcGraph non vede liste mutabili del provider e non ricalcola la
+    /// copertura dei landmark.
+    /// </para>
+    /// </summary>
+    public readonly struct WorldSupportLandmarkGenerationDebugSnapshot
+    {
+        public static readonly WorldSupportLandmarkGenerationDebugSnapshot Empty =
+            new WorldSupportLandmarkGenerationDebugSnapshot(0, 0, 0, 0, 0, 0, 0, 0, "NotGenerated");
+
+        public readonly int OpenAreasProcessed;
+        public readonly int NavigationalSourceLandmarks;
+        public readonly int CandidateCellsValidated;
+        public readonly int FarthestIterations;
+        public readonly int SupportAccepted;
+        public readonly int MaxResidualDistanceCells;
+        public readonly int RejectedBorderCells;
+        public readonly int RejectedOccupiedCells;
+        public readonly string LastReason;
+
+        public WorldSupportLandmarkGenerationDebugSnapshot(
+            int openAreasProcessed,
+            int navigationalSourceLandmarks,
+            int candidateCellsValidated,
+            int farthestIterations,
+            int supportAccepted,
+            int maxResidualDistanceCells,
+            int rejectedBorderCells,
+            int rejectedOccupiedCells,
+            string lastReason)
+        {
+            OpenAreasProcessed = openAreasProcessed < 0 ? 0 : openAreasProcessed;
+            NavigationalSourceLandmarks = navigationalSourceLandmarks < 0 ? 0 : navigationalSourceLandmarks;
+            CandidateCellsValidated = candidateCellsValidated < 0 ? 0 : candidateCellsValidated;
+            FarthestIterations = farthestIterations < 0 ? 0 : farthestIterations;
+            SupportAccepted = supportAccepted < 0 ? 0 : supportAccepted;
+            MaxResidualDistanceCells = maxResidualDistanceCells < 0 ? 0 : maxResidualDistanceCells;
+            RejectedBorderCells = rejectedBorderCells < 0 ? 0 : rejectedBorderCells;
+            RejectedOccupiedCells = rejectedOccupiedCells < 0 ? 0 : rejectedOccupiedCells;
+            LastReason = string.IsNullOrWhiteSpace(lastReason) ? string.Empty : lastReason;
+        }
+    }
+
+    // =============================================================================
     // WorldSpatialAreaDebugSnapshot
     // =============================================================================
     /// <summary>
@@ -234,8 +439,11 @@ namespace Arcontio.Core
         public readonly int SupportLandmarkCoverageMultiplier;
         public readonly int SupportLandmarkCount;
         public readonly string SupportLandmarkZeroReason;
+        public readonly WorldSpatialAreaBuildDebugSnapshot BuildDebug;
+        public readonly WorldSupportLandmarkGenerationDebugSnapshot SupportGenerationDebug;
         public readonly string[] Diagnostics;
         public readonly WorldSupportLandmarkDebugEntry[] SupportLandmarks;
+        public readonly WorldSpatialAreaClassificationDebugEntry[] Classifications;
 
         public bool HasErrors => InvalidDiagnosticCount > 0;
 
@@ -250,8 +458,11 @@ namespace Arcontio.Core
             int supportLandmarkCoverageMultiplier,
             int supportLandmarkCount,
             string supportLandmarkZeroReason,
+            WorldSpatialAreaBuildDebugSnapshot buildDebug,
+            WorldSupportLandmarkGenerationDebugSnapshot supportGenerationDebug,
             IReadOnlyList<string> diagnostics,
-            IReadOnlyList<WorldSupportLandmarkDebugEntry> supportLandmarks)
+            IReadOnlyList<WorldSupportLandmarkDebugEntry> supportLandmarks,
+            IReadOnlyList<WorldSpatialAreaClassificationDebugEntry> classifications)
         {
             TotalAreaCount = totalAreaCount < 0 ? 0 : totalAreaCount;
             OpenAreaCount = openAreaCount < 0 ? 0 : openAreaCount;
@@ -265,8 +476,11 @@ namespace Arcontio.Core
             SupportLandmarkZeroReason = string.IsNullOrWhiteSpace(supportLandmarkZeroReason)
                 ? string.Empty
                 : supportLandmarkZeroReason;
+            BuildDebug = buildDebug ?? WorldSpatialAreaBuildDebugSnapshot.Empty;
+            SupportGenerationDebug = supportGenerationDebug;
             Diagnostics = CopyDiagnostics(diagnostics);
             SupportLandmarks = CopySupportLandmarks(supportLandmarks);
+            Classifications = CopyClassifications(classifications);
         }
 
         private static string[] CopyDiagnostics(IReadOnlyList<string> diagnostics)
@@ -290,6 +504,19 @@ namespace Arcontio.Core
             var copy = new WorldSupportLandmarkDebugEntry[supportLandmarks.Count];
             for (int i = 0; i < supportLandmarks.Count; i++)
                 copy[i] = supportLandmarks[i];
+
+            return copy;
+        }
+
+        private static WorldSpatialAreaClassificationDebugEntry[] CopyClassifications(
+            IReadOnlyList<WorldSpatialAreaClassificationDebugEntry> classifications)
+        {
+            if (classifications == null || classifications.Count == 0)
+                return Array.Empty<WorldSpatialAreaClassificationDebugEntry>();
+
+            var copy = new WorldSpatialAreaClassificationDebugEntry[classifications.Count];
+            for (int i = 0; i < classifications.Count; i++)
+                copy[i] = classifications[i];
 
             return copy;
         }
@@ -318,11 +545,13 @@ namespace Arcontio.Core
         private int[] _areaIdByCell = Array.Empty<int>();
         private int _mapWidth;
         private int _mapHeight;
+        private WorldSpatialAreaBuildDebugSnapshot _buildDebug = WorldSpatialAreaBuildDebugSnapshot.Empty;
 
         public IReadOnlyList<WorldSpatialArea> Areas => _areas;
         public IReadOnlyList<string> Diagnostics => _diagnostics;
         public int AreaCount => _areas.Count;
         public int DiagnosticCount => _diagnostics.Count;
+        public WorldSpatialAreaBuildDebugSnapshot BuildDebug => _buildDebug ?? WorldSpatialAreaBuildDebugSnapshot.Empty;
 
         public void Clear(int mapWidth, int mapHeight)
         {
@@ -333,15 +562,18 @@ namespace Arcontio.Core
             _mapHeight = Math.Max(0, mapHeight);
             int size = _mapWidth * _mapHeight;
             _areaIdByCell = size > 0 ? new int[size] : Array.Empty<int>();
+            _buildDebug = WorldSpatialAreaBuildDebugSnapshot.Empty;
         }
 
         public void ReplaceAll(
             int mapWidth,
             int mapHeight,
             IReadOnlyList<WorldSpatialArea> areas,
-            IReadOnlyList<string> diagnostics)
+            IReadOnlyList<string> diagnostics,
+            WorldSpatialAreaBuildDebugSnapshot buildDebug = null)
         {
             Clear(mapWidth, mapHeight);
+            _buildDebug = buildDebug ?? WorldSpatialAreaBuildDebugSnapshot.Empty;
 
             if (diagnostics != null)
             {
@@ -457,20 +689,51 @@ namespace Arcontio.Core
 
         private readonly List<WorldSpatialArea> _areas = new(32);
         private readonly List<string> _diagnostics = new(8);
+        private readonly List<WorldSpatialAreaClassificationDebugEntry> _classificationDebug = new(32);
         private readonly List<WorldSpatialAreaCell> _component = new(256);
         private readonly Queue<WorldSpatialAreaCell> _queue = new(256);
         private bool[] _visited;
         private bool[] _boundary;
         private int _width;
         private int _height;
+        private int _boundaryWallCount;
+        private int _boundaryDoorCount;
+        private int _boundaryOtherCount;
+        private int _floodComponentCount;
+        private int _floodOpenComponentCount;
+        private int _floodClosedCandidateCount;
+        private int _floodClosedRoomCount;
+        private int _floodCorridorCount;
+        private int _floodInvalidClosedAreaCount;
 
         public IReadOnlyList<WorldSpatialArea> Areas => _areas;
         public IReadOnlyList<string> Diagnostics => _diagnostics;
+        public WorldSpatialAreaBuildDebugSnapshot BuildDebug => new WorldSpatialAreaBuildDebugSnapshot(
+            _boundaryWallCount,
+            _boundaryDoorCount,
+            _boundaryOtherCount,
+            _floodComponentCount,
+            _floodOpenComponentCount,
+            _floodClosedCandidateCount,
+            _floodClosedRoomCount,
+            _floodCorridorCount,
+            _floodInvalidClosedAreaCount,
+            _classificationDebug);
 
         public void Build(World world, Config.SpatialAreaParams config)
         {
             _areas.Clear();
             _diagnostics.Clear();
+            _classificationDebug.Clear();
+            _boundaryWallCount = 0;
+            _boundaryDoorCount = 0;
+            _boundaryOtherCount = 0;
+            _floodComponentCount = 0;
+            _floodOpenComponentCount = 0;
+            _floodClosedCandidateCount = 0;
+            _floodClosedRoomCount = 0;
+            _floodCorridorCount = 0;
+            _floodInvalidClosedAreaCount = 0;
 
             if (world == null)
                 return;
@@ -484,7 +747,16 @@ namespace Arcontio.Core
             for (int y = 0; y < _height; y++)
             {
                 for (int x = 0; x < _width; x++)
-                    _boundary[Index(x, y)] = world.IsSpatialAreaBoundaryAt(x, y);
+                {
+                    WorldSpatialBoundaryKind boundaryKind = world.ResolveSpatialAreaBoundaryKindAt(x, y);
+                    _boundary[Index(x, y)] = boundaryKind != WorldSpatialBoundaryKind.None;
+                    if (boundaryKind == WorldSpatialBoundaryKind.Wall)
+                        _boundaryWallCount++;
+                    else if (boundaryKind == WorldSpatialBoundaryKind.Door)
+                        _boundaryDoorCount++;
+                    else if (boundaryKind == WorldSpatialBoundaryKind.Other)
+                        _boundaryOtherCount++;
+                }
             }
 
             int nextAreaId = 1;
@@ -499,14 +771,49 @@ namespace Arcontio.Core
                     if (!BuildComponent(x, y, out bool touchesBorder, out int minX, out int minY, out int maxX, out int maxY))
                         continue;
 
-                    WorldSpatialAreaKind kind = ClassifyComponent(config, touchesBorder, out bool invalidClosedArea);
+                    _floodComponentCount++;
+                    WorldSpatialAreaKind kind = ClassifyComponent(config, touchesBorder, out bool invalidClosedArea, out int maxNarrowSpan);
+                    if (touchesBorder)
+                        _floodOpenComponentCount++;
+                    else
+                        _floodClosedCandidateCount++;
+
                     if (invalidClosedArea)
                     {
+                        _floodInvalidClosedAreaCount++;
                         _diagnostics.Add(
                             "InvalidClosedSpatialArea:cells=" + _component.Count +
                             " bounds=(" + minX + "," + minY + ")-(" + maxX + "," + maxY + ")");
+                        _classificationDebug.Add(new WorldSpatialAreaClassificationDebugEntry(
+                            0,
+                            WorldSpatialAreaKind.None,
+                            minX,
+                            minY,
+                            maxX,
+                            maxY,
+                            _component.Count,
+                            touchesBorder,
+                            maxNarrowSpan,
+                            true));
                         continue;
                     }
+
+                    if (kind == WorldSpatialAreaKind.ClosedRoom)
+                        _floodClosedRoomCount++;
+                    else if (kind == WorldSpatialAreaKind.Corridor)
+                        _floodCorridorCount++;
+
+                    _classificationDebug.Add(new WorldSpatialAreaClassificationDebugEntry(
+                        nextAreaId,
+                        kind,
+                        minX,
+                        minY,
+                        maxX,
+                        maxY,
+                        _component.Count,
+                        touchesBorder,
+                        maxNarrowSpan,
+                        false));
 
                     _areas.Add(new WorldSpatialArea(
                         nextAreaId++,
@@ -575,9 +882,11 @@ namespace Arcontio.Core
         private WorldSpatialAreaKind ClassifyComponent(
             Config.SpatialAreaParams config,
             bool touchesMapBorder,
-            out bool invalidClosedArea)
+            out bool invalidClosedArea,
+            out int maxNarrowSpan)
         {
             invalidClosedArea = false;
+            maxNarrowSpan = 0;
             if (touchesMapBorder)
                 return WorldSpatialAreaKind.OpenArea;
 
@@ -588,7 +897,8 @@ namespace Arcontio.Core
                 ? config.ResolveCorridorMaxWidthCells()
                 : Config.SpatialAreaParams.DefaultCorridorMaxWidthCells;
 
-            if (ResolveMaxLocalNarrowSpan() <= corridorMaxWidth)
+            maxNarrowSpan = ResolveMaxLocalNarrowSpan();
+            if (maxNarrowSpan <= corridorMaxWidth)
                 return WorldSpatialAreaKind.Corridor;
 
             if (_component.Count <= maxRoomSurface)

@@ -294,6 +294,10 @@ namespace Arcontio.EditorTests
             Assert.That(snapshot.HasErrors, Is.False);
             Assert.That(snapshot.ClosedRoomCount, Is.GreaterThanOrEqualTo(1));
             Assert.That(snapshot.OpenAreaCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(snapshot.BuildDebug.BoundaryWallCount, Is.GreaterThanOrEqualTo(50));
+            Assert.That(snapshot.BuildDebug.BoundaryDoorCount, Is.EqualTo(2));
+            Assert.That(snapshot.BuildDebug.FloodClosedRoomCount, Is.GreaterThanOrEqualTo(1));
+            Assert.That(HasClassificationForBounds(snapshot, 46, 9, 57, 20, WorldSpatialAreaKind.ClosedRoom), Is.True);
         }
 
         // =============================================================================
@@ -363,6 +367,45 @@ namespace Arcontio.EditorTests
         }
 
         // =============================================================================
+        // SupportOpenSpaceProviderUsesCoverageFirstAwayFromMapBorder
+        // =============================================================================
+        /// <summary>
+        /// <para>
+        /// Il provider coverage-first non deve piu' scegliere coordinate da griglia
+        /// cieca come (0,0): sceglie celle interne, lontane tra loro almeno dello
+        /// spacing configurato, e riempie progressivamente i vuoti.
+        /// </para>
+        /// </summary>
+        [Test]
+        public void SupportOpenSpaceProviderUsesCoverageFirstAwayFromMapBorder()
+        {
+            var sim = new SimulationParams();
+            sim.spatial_areas.support_lm_spacing_cells = 6;
+            World world = CreateWorld(24, 24, sim);
+            world.RebuildSpatialAreas();
+
+            var provider = new SupportOpenSpaceLandmarkProvider();
+            var supportCandidates = new List<LandmarkRegistry.ManualLandmarkCandidate>();
+            int produced = provider.BuildCoverageLandmarkCandidates(world, new LandmarkRegistry(), supportCandidates);
+
+            Assert.That(produced, Is.GreaterThan(1));
+            for (int i = 0; i < supportCandidates.Count; i++)
+            {
+                LandmarkRegistry.ManualLandmarkCandidate candidate = supportCandidates[i];
+                Assert.That(candidate.CellX, Is.GreaterThan(0));
+                Assert.That(candidate.CellY, Is.GreaterThan(0));
+                Assert.That(candidate.CellX, Is.LessThan(world.MapWidth - 1));
+                Assert.That(candidate.CellY, Is.LessThan(world.MapHeight - 1));
+
+                for (int j = i + 1; j < supportCandidates.Count; j++)
+                {
+                    LandmarkRegistry.ManualLandmarkCandidate other = supportCandidates[j];
+                    Assert.That(GridDistance(candidate.CellX, candidate.CellY, other.CellX, other.CellY), Is.GreaterThan(6));
+                }
+            }
+        }
+
+        // =============================================================================
         // SpatialDebugSnapshotListsSupportOpenSpaceAnchors
         // =============================================================================
         /// <summary>
@@ -385,6 +428,9 @@ namespace Arcontio.EditorTests
             Assert.That(snapshot.SupportLandmarkCount, Is.GreaterThan(0));
             Assert.That(snapshot.SupportLandmarks.Length, Is.EqualTo(snapshot.SupportLandmarkCount));
             Assert.That(snapshot.SupportLandmarkZeroReason, Is.Empty);
+            Assert.That(snapshot.SupportGenerationDebug.OpenAreasProcessed, Is.GreaterThan(0));
+            Assert.That(snapshot.SupportGenerationDebug.CandidateCellsValidated, Is.GreaterThan(0));
+            Assert.That(snapshot.SupportGenerationDebug.SupportAccepted, Is.EqualTo(snapshot.SupportLandmarkCount));
             for (int i = 0; i < snapshot.SupportLandmarks.Length; i++)
             {
                 Assert.That(snapshot.SupportLandmarks[i].NodeId, Is.GreaterThan(0));
@@ -485,6 +531,37 @@ namespace Arcontio.EditorTests
                 Assert.That(world.CreateObject("qa_wall", minX, y, OwnerKind.Community, 0), Is.GreaterThan(0));
                 Assert.That(world.CreateObject("qa_wall", maxX, y, OwnerKind.Community, 0), Is.GreaterThan(0));
             }
+        }
+
+        private static bool HasClassificationForBounds(
+            WorldSpatialAreaDebugSnapshot snapshot,
+            int minX,
+            int minY,
+            int maxX,
+            int maxY,
+            WorldSpatialAreaKind kind)
+        {
+            for (int i = 0; i < snapshot.Classifications.Length; i++)
+            {
+                WorldSpatialAreaClassificationDebugEntry entry = snapshot.Classifications[i];
+                if (entry.MinX == minX
+                    && entry.MinY == minY
+                    && entry.MaxX == maxX
+                    && entry.MaxY == maxY
+                    && entry.Kind == kind)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static int GridDistance(int ax, int ay, int bx, int by)
+        {
+            int dx = ax >= bx ? ax - bx : bx - ax;
+            int dy = ay >= by ? ay - by : by - ay;
+            return dx > dy ? dx : dy;
         }
     }
 }

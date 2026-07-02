@@ -17612,7 +17612,7 @@ La `v0.69` ha lasciato esplicitamente fuori scope il job NPC completo di raccolt
 | v0.71.05.I.1 | WorldSpatialAreas: flood-fill fisico, stanze, corridoi e open area | ✅ |
 | v0.71.05.I.2 | Persistenza modulare spatialAreas + overlay ArcGraph AREA | ✅ |
 | v0.71.05.I.3 | Provider SupportOpenSpace per landmark di supporto in open area | ✅ |
-| v0.71.05.I.4 | Roadmap/QA e nota costituzionale su aree fisiche vs biologiche | ✅ |
+| v0.71.05.I.4 | Support LM coverage-first + debug dettagliato aree chiuse | ✅ |
 | v0.71.05.J | Memory trace percezione landmark biologico | ⏳ |
 | v0.71.05.K | Memory trace ricerca risorsa da landmark biologico | ⏳ |
 | v0.71.05.L | Belief potenziale: qui puo' esserci risorsa X | ⏳ |
@@ -17662,7 +17662,9 @@ La `v0.71.05.E` rende operativa la ricrescita progressiva delle risorse per-pian
 
 La `v0.71.05.I` introduce le aree spaziali del `World` come dominio distinto dalle aree biologiche della Biosfera. Il flood-fill fisico separa `OpenArea`, `ClosedRoom` e `Corridor`: muri e porte sono confini, le porte restano confini anche se aperte, mentre piante, vegetazione, NPC e oggetti mobili non chiudono aree. Le aree chiuse troppo grandi e troppo larghe producono diagnostica di mappa, non vengono usate come aree valide.
 
-La stessa patch aggiunge la sezione save/load modulare `spatialAreas`, il toggle ArcGraph `AREA` e il provider `SupportOpenSpace`: i landmark di supporto sono scaffolding oggettivo di navigazione, generati solo in `OpenArea` quando la copertura dei landmark esistenti non basta. Non creano memory, belief, decisioni o job e non sono conoscenza soggettiva dell'NPC.
+La stessa patch aggiunge la sezione save/load modulare `spatialAreas`, il toggle ArcGraph `AREA` e il provider `SupportOpenSpace`: i landmark di supporto sono scaffolding oggettivo di navigazione, generati solo in `OpenArea` quando la copertura dei landmark navigazionali esistenti non basta. Da `v0.71.05.I.4` il provider usa una logica coverage-first deterministica: cerca la cella valida piu' scoperta, rispetta `support_lm_spacing_cells` come distanza minima e copertura target, esclude i `BiologicalAnchor` dalla copertura e non genera support sui bordi mappa. Non crea memory, belief, decisioni o job e non e' conoscenza soggettiva dell'NPC.
+
+Il pannello debug Spatial/Support LM espone anche i passaggi di calcolo delle aree chiuse: conteggi boundary muro/porta/altro, componenti flood-fill, candidati chiusi, room, corridor, invalidi, bounds e narrow span delle prime classificazioni. Questo rende diagnosticabile se una stanza non nasce per oggetti non caricati, boundary mancanti, flood collegato all'esterno o classificazione errata.
 
 Flusso atteso:
 

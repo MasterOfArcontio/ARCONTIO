@@ -34,12 +34,13 @@ namespace Arcontio.View.ArcGraph
     public sealed class ArcGraphSpatialAreaDebugPanelSceneView : MonoBehaviour
     {
         private const float PanelWidth = 282f;
-        private const float PanelHeight = 152f;
+        private const float PanelHeight = 222f;
         private const float PanelOffsetX = 8f;
         private const float PanelOffsetY = -56f;
         private const float RefreshIntervalSeconds = 0.25f;
         private const int MaxSupportRows = 7;
         private const int MaxDiagnosticRows = 3;
+        private const int MaxClassificationRows = 3;
 
         [SerializeField] private bool panelVisible = true;
         [SerializeField] private ArcGraphRuntimeContextProvider runtimeContextProvider;
@@ -180,10 +181,13 @@ namespace Arcontio.View.ArcGraph
             _builder.Append(snapshot.SupportLandmarkCoverageRadiusCells);
             _builder.Append(" x");
             _builder.AppendLine(snapshot.SupportLandmarkCoverageMultiplier.ToString());
+            AppendBuildRows(snapshot);
+            AppendSupportGenerationRows(snapshot);
             _builder.Append("Support LM: ");
             _builder.AppendLine(snapshot.SupportLandmarkCount.ToString());
 
             AppendSupportRows(snapshot);
+            AppendClassificationRows(snapshot);
             AppendDiagnostics(snapshot);
 
             _label.text = _builder.ToString();
@@ -221,6 +225,88 @@ namespace Arcontio.View.ArcGraph
                 _builder.Append("+");
                 _builder.Append(snapshot.SupportLandmarks.Length - count);
                 _builder.AppendLine(" altri S#");
+            }
+        }
+
+        private void AppendBuildRows(WorldSpatialAreaDebugSnapshot snapshot)
+        {
+            WorldSpatialAreaBuildDebugSnapshot build = snapshot.BuildDebug;
+            if (build == null)
+                return;
+
+            _builder.Append("Boundary W/D/O/T: ");
+            _builder.Append(build.BoundaryWallCount);
+            _builder.Append('/');
+            _builder.Append(build.BoundaryDoorCount);
+            _builder.Append('/');
+            _builder.Append(build.BoundaryOtherCount);
+            _builder.Append('/');
+            _builder.AppendLine(build.BoundaryTotalCount.ToString());
+            _builder.Append("Flood C/O/Closed/Room/Corr/Inv: ");
+            _builder.Append(build.FloodComponentCount);
+            _builder.Append('/');
+            _builder.Append(build.FloodOpenComponentCount);
+            _builder.Append('/');
+            _builder.Append(build.FloodClosedCandidateCount);
+            _builder.Append('/');
+            _builder.Append(build.FloodClosedRoomCount);
+            _builder.Append('/');
+            _builder.Append(build.FloodCorridorCount);
+            _builder.Append('/');
+            _builder.AppendLine(build.FloodInvalidClosedAreaCount.ToString());
+        }
+
+        private void AppendSupportGenerationRows(WorldSpatialAreaDebugSnapshot snapshot)
+        {
+            WorldSupportLandmarkGenerationDebugSnapshot generation = snapshot.SupportGenerationDebug;
+            _builder.Append("Support pass A/LM/C/I/Acc/Max: ");
+            _builder.Append(generation.OpenAreasProcessed);
+            _builder.Append('/');
+            _builder.Append(generation.NavigationalSourceLandmarks);
+            _builder.Append('/');
+            _builder.Append(generation.CandidateCellsValidated);
+            _builder.Append('/');
+            _builder.Append(generation.FarthestIterations);
+            _builder.Append('/');
+            _builder.Append(generation.SupportAccepted);
+            _builder.Append('/');
+            _builder.AppendLine(generation.MaxResidualDistanceCells.ToString());
+            if (!string.IsNullOrWhiteSpace(generation.LastReason))
+            {
+                _builder.Append("Support pass: ");
+                _builder.AppendLine(generation.LastReason);
+            }
+        }
+
+        private void AppendClassificationRows(WorldSpatialAreaDebugSnapshot snapshot)
+        {
+            if (snapshot.Classifications == null || snapshot.Classifications.Length == 0)
+                return;
+
+            int count = snapshot.Classifications.Length < MaxClassificationRows
+                ? snapshot.Classifications.Length
+                : MaxClassificationRows;
+            for (int i = 0; i < count; i++)
+            {
+                WorldSpatialAreaClassificationDebugEntry entry = snapshot.Classifications[i];
+                _builder.Append("area#");
+                _builder.Append(entry.AreaId);
+                _builder.Append(' ');
+                _builder.Append(entry.Kind);
+                _builder.Append(" c=");
+                _builder.Append(entry.CellCount);
+                _builder.Append(" b=(");
+                _builder.Append(entry.MinX);
+                _builder.Append(',');
+                _builder.Append(entry.MinY);
+                _builder.Append(")-(");
+                _builder.Append(entry.MaxX);
+                _builder.Append(',');
+                _builder.Append(entry.MaxY);
+                _builder.Append(") n=");
+                _builder.Append(entry.MaxNarrowSpan);
+                _builder.Append(entry.TouchesMapBorder ? " edge" : string.Empty);
+                _builder.AppendLine(entry.IsInvalid ? " INVALID" : string.Empty);
             }
         }
 
